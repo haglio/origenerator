@@ -18,6 +18,7 @@ from origenerator.workflows.frame_rate import (
 from origenerator.workflows.wan_experts import (
     wan_expert_lora_params,
     wan_expert_model_params,
+    wan_expert_shift_param,
 )
 
 
@@ -99,8 +100,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("shift_high", "Composition Focus (First Pass)", ParamType.FLOAT, defaults["shift_high"], min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("shift_low", "Composition Focus (Second Pass)", ParamType.FLOAT, defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
+            wan_expert_shift_param(defaults),
             *wan_expert_model_params(defaults),
             *wan_expert_lora_params(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],

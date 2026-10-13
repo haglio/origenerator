@@ -2657,6 +2657,13 @@ def test_the_prompts_loras_and_sampler_keep_the_names_everyone_already_uses(name
     assert named == {key: _NAMES_EVERYONE_USES[key] for key in named}
 
 
+@pytest.mark.parametrize("name", ["wan22_t2i", "wan22_flf2v_loop", "wan22_i2v"])
+def test_a_wan_2_2_form_offers_one_composition_focus_for_both_passes(name):
+    focus = [(pd.label, pd.key, pd.also_sets) for pd in WORKFLOW_REGISTRY[name].param_definitions()
+             if pd.label.startswith("Composition Focus")]
+    assert focus == [("Composition Focus", "shift_high", ("shift_low",))]
+
+
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
 def test_a_workflow_is_named_in_words_rather_than_model_card_shorthand(name):
     assert not re.search(r"\b(I2V|T2V|FLF2V|ATI|T2I|I2I|S2V)\b",

@@ -806,6 +806,7 @@ class ParamForm(QWidget):
         result.update(self._hidden)
         for pd in self._param_defs:
             result[pd.key] = self._read_field(pd)
+            result.update(dict.fromkeys(pd.also_sets, result[pd.key]))
         result.update(self._override_dimensions())
         return result
 

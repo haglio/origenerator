@@ -184,6 +184,7 @@ class ParamDef:
     # file is played at — the frames are generated at the one and interpolated up
     # to the other, so a clip's seconds don't move when its rate does.
     rate: float | None = None
+    also_sets: tuple[str, ...] = ()
 
     def __post_init__(self):
         self.type = ParamType(self.type)

@@ -12754,12 +12754,6 @@ class _SignalMotion(QObject):
     def adjust_center(self, delta):
         self.calls.append(("center", delta))
 
-    def toggle_cruise(self):
-        self.calls.append("cruise")
-
-    def set_cruise(self, on):
-        self.calls.append(("cruise", on))
-
     def toggle_learned(self):
         self.calls.append("learned")
 
@@ -15420,17 +15414,17 @@ def test_min_speed_lands_on_the_slowest_the_bar_actually_moves(qtbot, tmp_path):
     assert view._osr2_motion.state.state.speed == motion_engine.MIN_SPEED
 
 
-def test_cruise_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
+def test_human_inspired_motion_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
 
-    view._voice.listener.speak("cruise on")
-    assert view._osr2_motion.state.cruise.active
+    view._voice.listener.speak("human inspired on")
+    assert view._osr2_motion.state.learned.active
 
-    view._voice.listener.speak("cruise on")       # already on: still ends up on
-    assert view._osr2_motion.state.cruise.active
+    view._voice.listener.speak("human inspired on")       # already on: still ends up on
+    assert view._osr2_motion.state.learned.active
 
-    view._voice.listener.speak("cruise off")
-    assert not view._osr2_motion.state.cruise.active
+    view._voice.listener.speak("human inspired off")
+    assert not view._osr2_motion.state.learned.active
 
 
 def test_a_motion_word_answers_from_a_show_too(qtbot, tmp_path):

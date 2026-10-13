@@ -63,22 +63,20 @@ def test_the_motion_bars_keep_fun_times_phrases():
     assert match_app_command("slow down") is AppCommand.SPEED_DOWN
     assert match_app_command("amp down") is AppCommand.AMP_DOWN
     assert match_app_command("center up") is AppCommand.CENTER_UP
-    assert match_app_command("cruise control") is AppCommand.CRUISE
     assert match_app_command("offset") is AppCommand.OFFSET
 
 
-def test_the_learned_motion_answers_the_same_three_ways_cruise_does():
+def test_human_inspired_motion_answers_a_flip_and_an_explicit_on_and_off():
+    # It is reached for without looking at the panel, so a speaker who wants it
+    # ON must not have to find out which way it is standing first.
     assert match_app_command("human inspired") is AppCommand.LEARNED
     assert match_app_command("human inspired on") is AppCommand.LEARNED_ON
     assert match_app_command("human inspired off") is AppCommand.LEARNED_OFF
 
 
-def test_cruise_answers_an_explicit_on_and_off_as_well_as_a_flip():
-    # Hands-free is reached for without looking at the panel, so a speaker who
-    # wants it ON must not have to find out which way it is standing first.
-    assert match_app_command("cruise") is AppCommand.CRUISE
-    assert match_app_command("cruise on") is AppCommand.CRUISE_ON
-    assert match_app_command("cruise off") is AppCommand.CRUISE_OFF
+@pytest.mark.parametrize("said", ["cruise", "cruise control", "cruise on", "cruise off"])
+def test_cruise_control_is_no_word_here(said):
+    assert match_app_command(said) is None
 
 
 # --- the bars said outright, which is Fun Time's numeric grid ---------------

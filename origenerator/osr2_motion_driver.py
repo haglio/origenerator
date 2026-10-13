@@ -201,13 +201,8 @@ class Osr2MotionDriver(QObject):
         now = self._now()
         lead_ms = self._lead_for(now)
         with self._lock:
-            # Carry the motion to now first: that is what moves its own clock,
-            # and cruise control's ramps are all timed against that clock. Then
-            # let cruise move things, before the phase is sampled, so a tick
-            # sends the motion it just asked for rather than the one before.
             motion_engine.advance(self._state, now - self._last_tick)
             self._last_tick = now
-            motion_engine.tick_cruise_control(self._state, now)
             motion_engine.tick_learned_motion(self._state, now)
             pos = (self._held_at if self._held_at is not None
                    else motion_engine.position_ahead(self._state, lead_ms / 1000.0))
@@ -265,42 +260,16 @@ class Osr2MotionDriver(QObject):
         with self._lock:
             motion_engine.cycle_shape(self._state.state, step)
 
-    def toggle_cruise(self) -> None:
-        """Hands off: cruise control takes the motion over (genau's ``/``).
-
-        What it hands the device is several waves summed — a deep slow one with
-        a quicker ripple riding it, say — with every wave's speed and share of
-        the travel always on its way somewhere else. The bars go on reading the
-        whole motion's travel, center and pace, so the console still says what is
-        being sent. It only moves while the motion is actually running, so arming
-        it against a parked device changes nothing until the device is taken."""
-        with self._lock:
-            motion_engine.toggle_cruise_control(self._state)
-
-    def set_cruise(self, on: bool) -> None:
-        """Put cruise control the way asked, whichever way it is standing.
-
-        The toggle above is what a key press is; this is what a spoken "cruise
-        on" is, and the two are different questions. Someone reaching for
-        hands-free has not looked at the panel, so a toggle would be a coin
-        flip — the same reason every switch in the toolbar answers an explicit
-        on and off beside its flip.
-        """
-        with self._lock:
-            if on:
-                motion_engine.enable_cruise_control(self._state)
-            else:
-                motion_engine.disable_cruise_control(self._state)
-
     def toggle_learned(self) -> None:
         """Hands off to the scripts: the learned motion takes the motion over
-        (genau's ``;``), and cruise control lets go if it had it."""
+        (genau's ``;``)."""
         with self._lock:
             motion_engine.toggle_learned_motion(self._state)
 
     def set_learned(self, on: bool) -> None:
         """Put the learned motion the way asked, whichever way it is standing —
-        what a spoken "human inspired on" is, as :meth:`set_cruise` is for cruise."""
+        what a spoken "human inspired on" is, where the toggle above is what a
+        key press is."""
         with self._lock:
             if on:
                 motion_engine.enable_learned_motion(self._state)
@@ -339,8 +308,6 @@ class Osr2MotionDriver(QObject):
         state = self._state.state
         caption = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
                  f" · travel {state.amplitude} around {state.center}")
-        if self._state.cruise.active:
-            caption += " · cruise"
         if self._state.learned.active:
             caption += " · human inspired"
         return f"OSR2 · {caption}" if self._active else f"Motion stopped · {caption}"

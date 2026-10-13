@@ -9,7 +9,7 @@ from __future__ import annotations
 import itertools
 import random
 
-from funestra import drive_layout, wave_stack
+from funestra import drive_layout
 from funestra.console import (
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_OFF,
@@ -102,7 +102,7 @@ def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
     for gone in ("genau_prev_clip", "genau_next_clip", "main_lock", "genau_weird_clip",
                  "genau_clip_seconds_down", "genau_clip_seconds_up"):
         assert gone not in actions, gone
-    for kept in ("robot_hand_toggle_cruise", "robot_hand_toggle_learned",
+    for kept in ("robot_hand_toggle_learned",
                  "robot_hand_cycle_shape", "quarter_button", "robot_hand_park",
                  "robot_hand_retract", "robot_hand_release",
                  "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
@@ -118,7 +118,7 @@ def test_the_console_declares_the_buttons_this_app_answers(qtbot):
 
     assert hud.console.rows == ()
     assert [[b.command for b in row] for row in hud.console.osr2_rows] == [
-        ["robot_hand_toggle_cruise", "robot_hand_toggle_learned", "robot_hand_cycle_shape",
+        ["robot_hand_toggle_learned", "robot_hand_cycle_shape",
          "quarter_button", "osr2_control_off", "robot_hand_park", "robot_hand_retract",
          "robot_hand_release"],
     ]
@@ -146,11 +146,10 @@ def test_the_motion_buttons_reach_the_driver(qtbot):
     motion.state.state.amplitude = 40
     panel.render_console()
     for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
-                   "robot_hand_toggle_cruise", "robot_hand_toggle_learned",
-                   "robot_hand_cycle_shape", "quarter_button"):
+                   "robot_hand_toggle_learned", "robot_hand_cycle_shape", "quarter_button"):
         _press(panel, action)
     assert motion.calls == [("speed", 5), ("amp", -10), ("center", 5),
-                            "cruise", "learned", "shape", "quarter"]
+                            "learned", "shape", "quarter"]
 
 
 def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):
@@ -439,7 +438,7 @@ def test_the_panel_actually_paints(qtbot):
     assert not panel.grab().isNull()
 
     motion.active = True
-    motion.state.cruise.active = True
+    motion.state.learned.active = True
 
     assert not panel.grab().isNull()  # and again with every reading lit
 
@@ -464,34 +463,6 @@ def test_no_state_draws_the_console_outside_the_room_kept_for_it():
             console_hud(motion, device_on=device_on, control=control, script=script))
 
         assert width <= room_width and height <= room_height, (control, active, device_on)
-
-
-def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):
-    # Cruise control hands the device several waves summed, and the readout is
-    # meant to be the motion rather than a drawing of it — so the bar is the
-    # whole motion's travel and center, and the trace is the sum, not whichever
-    # wave happens to be the big one.
-
-    motion = FakeMotion()
-    live = motion.state
-    live.state.playing = True
-    live.cruise.rng = random.Random(4)
-    motion_engine.toggle_cruise_control(live)
-    now = 1000.0
-    for _ in range(400):
-        now += 0.05
-        motion_engine.advance(live, 0.05)
-        motion_engine.tick_cruise_control(live, now)
-
-    bars = wave_stack.bars(live.cruise.stack, live.clock)
-    hud = drive_hud(live, active=True)
-    assert hud.amplitude == round(bars.travel)
-    assert abs(hud.center - bars.center) <= 1
-    assert hud.position == round(
-        POSITION_MAX * wave_stack.position(live.cruise.stack, live.clock) / 100)
-    assert len(set(hud.waveform)) > 20  # a live trace, not a held line
-    assert len(hud.waveform) == drive_layout.TRACE_SAMPLES
-    assert hud.edge is not None and 0.0 <= hud.slide < 1.0
 
 
 def test_the_readout_holds_the_waves_picture_still_between_knots(qtbot):

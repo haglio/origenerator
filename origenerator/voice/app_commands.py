@@ -99,9 +99,6 @@ class AppCommand(Enum):
     CENTER_DOWN = "center_down"
     NEXT_SHAPE = "next_shape"
     PREVIOUS_SHAPE = "previous_shape"
-    CRUISE = "cruise"
-    CRUISE_ON = "cruise_on"
-    CRUISE_OFF = "cruise_off"
     LEARNED = "learned"
     LEARNED_ON = "learned_on"
     LEARNED_OFF = "learned_off"
@@ -232,12 +229,6 @@ _say(AppCommand.CENTER_UP, "center up")
 _say(AppCommand.CENTER_DOWN, "center down")
 _say(AppCommand.NEXT_SHAPE, "next shape")
 _say(AppCommand.PREVIOUS_SHAPE, "previous shape")
-_say(AppCommand.CRUISE, "cruise", "cruise control")
-# Cruise takes the explicit pair too, the way every switch above does: hands-free
-# is the one setting you reach for without looking, so a speaker who wants it ON
-# should never have to find out which way it is standing first.
-_say(AppCommand.CRUISE_ON, "cruise on")
-_say(AppCommand.CRUISE_OFF, "cruise off")
 _say(AppCommand.LEARNED, "human inspired")
 _say(AppCommand.LEARNED_ON, "human inspired on")
 _say(AppCommand.LEARNED_OFF, "human inspired off")

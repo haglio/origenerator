@@ -36,11 +36,9 @@ _.top_block  # noqa  # origenerator/gui/slideshow_view.py:1626
 _.set_showing  # noqa  # origenerator/gui/slideshow_view.py:1629
 
 # --- reached by name, from the table a spoken word is dispatched through ---
-# `voice_router._MOTION` maps the spoken on and off words for cruise and human
-# inspired to "set_cruise" and "set_learned", which `_hold_the_motion` hands to
-# getattr.
-_.set_cruise  # noqa  # origenerator/osr2_motion_driver.py:260
-_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:281
+# `voice_router._MOTION` maps the spoken on and off words for human inspired to
+# "set_learned", which `_hold_the_motion` hands to getattr.
+_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:269
 
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231

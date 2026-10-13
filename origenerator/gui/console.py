@@ -189,8 +189,7 @@ def show_device(motion, *, pace_s: int | None = None, device_on: bool = True,
     return ShowDevice(
         osr2_control=control,
         rows=() if pace_s is None else (pace_row(pace_s),),
-        osr2_rows=(aim_row(cruise=motion.state.cruise.active,
-                           learned=motion.state.learned.active,
+        osr2_rows=(aim_row(learned=motion.state.learned.active,
                            shape=motion.state.state.shape.value, control=control),),
         osr2=(Osr2State.FUNSCRIPT if scripted
               else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
@@ -265,8 +264,6 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
         step[0](step[1])
     elif action in OSR2_CONTROL_BY_COMMAND:
         _ask_for_control(OSR2_CONTROL_BY_COMMAND[action], motion, control)
-    elif action == "robot_hand_toggle_cruise":
-        motion.toggle_cruise()
     elif action == "robot_hand_toggle_learned":
         motion.toggle_learned()
     elif action == "robot_hand_cycle_shape":

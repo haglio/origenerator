@@ -158,16 +158,14 @@ class TestTheOnePanelAShowWears:
         assert "robot_hand_cycle_shape" not in posted
 
     def test_everything_that_aims_the_device_rides_with_the_device(self, qtbot):
-        """Cruise, human-inspired, the waveform, the quarter nudge and the four
+        """Human-inspired motion, the waveform, the quarter nudge and the four
         control states act on the OSR2, so they sit in its own block at the foot
         of the panel rather than up among the rows that act on the set."""
         model = self._model(qtbot)
         aiming = [button.command for row in model.osr2_rows for button in row]
 
-        assert "robot_hand_toggle_cruise" in aiming
-        assert "robot_hand_toggle_learned" in aiming
-        assert "robot_hand_cycle_shape" in aiming
-        assert "quarter_button" in aiming
+        assert aiming[:3] == ["robot_hand_toggle_learned", "robot_hand_cycle_shape",
+                              "quarter_button"]
         assert "osr2_control_off" in aiming
 
     def test_the_transport_is_drawn_once(self, qtbot):

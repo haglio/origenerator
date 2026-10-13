@@ -23,10 +23,6 @@ class FakeMotion:
         self.calls.append(("toggle", self.active))
         return self.active
 
-    def toggle_cruise(self):
-        self.calls.append("cruise")
-        self.state.cruise.active = not self.state.cruise.active
-
     def toggle_learned(self):
         self.calls.append("learned")
         self.state.learned.active = not self.state.learned.active

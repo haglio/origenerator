@@ -18,8 +18,6 @@ GOOD_STEP_SPACING = {
     "lcm": ("sgm_uniform", "simple"),
 }
 _PASSES = ("high", "low")
-ADVISED_KEYS = frozenset({"sampler_name", "scheduler", "steps", "cfg", "cfg_high", "cfg_low",
-                          "lora_strength_high", "lora_strength_low", "shift", "shift_high"})
 
 
 def model_recommendations() -> dict:

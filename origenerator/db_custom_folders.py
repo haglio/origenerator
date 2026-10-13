@@ -29,11 +29,6 @@ class CustomFolderStore(Store):
                                (folder_id, name, side))
             return int(cur.lastrowid)
 
-    def rename_custom_folder(self, folder_id: int, name: str):
-        with self._connect() as conn:
-            conn.execute("UPDATE custom_folders SET name = ? WHERE id = ?",
-                         (name, folder_id))
-
     def set_custom_folder_side(self, folder_id: int, side: str):
         with self._connect() as conn:
             conn.execute("UPDATE custom_folders SET side = ? WHERE id = ?",

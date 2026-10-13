@@ -47,11 +47,6 @@ def custom_folder_id(key: str) -> int | None:
         return None
 
 
-def is_custom_key(key) -> bool:
-    """Whether ``key`` names a custom folder — saved or the live selection."""
-    return key == SELECTION_KEY or custom_folder_id(key) is not None
-
-
 def index_folders(tree: list) -> dict:
     """Every folder in ``tree`` by key, at any depth — how an item reference is
     resolved back to the live folder it points at."""

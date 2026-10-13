@@ -126,18 +126,6 @@ def folder_level(group) -> str | None:
     return group.level if group.level in _HIERARCHY_LEVELS else None
 
 
-def is_renamable(group) -> bool:
-    """Whether the user can give this folder a name of their own.
-
-    A folder whose name states a fact — a workflow, a model, a LoRA, the source
-    image a video animates — is named by what it holds, and a name of your own
-    there would only hide which one it is. The rest are named
-    by a generic code (:mod:`origenerator.gallery.keys`) or already by the user,
-    and naming those is the entire point of starting them off with a code.
-    """
-    return folder_level(group) is None
-
-
 def child_groups(group) -> list:
     """The sub-folders directly under a folder (empty for a settings leaf)."""
     return list(group.children)

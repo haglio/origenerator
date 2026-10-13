@@ -306,7 +306,8 @@ def test_reconcile_repoints_both_favorites_across_the_enhancement_merge(tmp_path
     )
     assert plain_key != enhanced_key != current_key  # two folders before
     db.set_folder_favorite(plain_key, True)
-    db.rename_folder(enhanced_key, "Cats")
+    db.upsert_folder_meta(enhanced_key, custom_name="Cats", favorite=False,
+                          level=None, ref_prompt_id=None)
 
     summary = reconcile_folder_meta(db)
 
@@ -336,7 +337,8 @@ def test_reconcile_merges_when_the_target_folder_is_already_bookmarked(tmp_path)
                          filename="sdxl_t2i_p1.png")
     legacy_key = gallery.legacy_settings_folder_key(row)
     current_key = gallery.settings_folder_key(row)
-    db.rename_folder(current_key, "Cats")    # the live folder already has a name
+    db.upsert_folder_meta(current_key, custom_name="Cats", favorite=False,  # named already
+                          level=None, ref_prompt_id=None)
     db.set_folder_favorite(legacy_key, True)  # a stale star to fold in
 
     reconcile_folder_meta(db)

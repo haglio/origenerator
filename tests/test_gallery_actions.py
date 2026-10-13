@@ -77,9 +77,9 @@ def test_undoing_a_delete_says_which_generation_came_back(tmp_path):
     assert actions.undo() == "p1"
 
 
-def test_undoing_a_rename_moves_the_selection_nowhere(tmp_path):
+def test_undoing_a_folder_made_by_hand_moves_the_selection_nowhere(tmp_path):
     actions, _db, _out = _actions(tmp_path)
-    actions.rename_folder("media/wf/deadbeef", "My Folder")
+    actions.custom_folders.create("Keepers", [])
     assert actions.undo() is None
 
 
@@ -146,23 +146,12 @@ def test_deleting_many_rows_undoes_as_one_step(tmp_path):
     assert not actions.can_undo()
 
 
-def test_rename_folder_is_undoable_back_to_the_previous_name(tmp_path):
-    actions, db, _ = _actions(tmp_path)
-    db.rename_folder("image/sdxl_t2i", "First Name")
-
-    actions.rename_folder("image/sdxl_t2i", "Second Name")
-    assert db.folder_meta_map()["image/sdxl_t2i"]["custom_name"] == "Second Name"
-
-    actions.undo()
-    assert db.folder_meta_map()["image/sdxl_t2i"]["custom_name"] == "First Name"
-
-
 def test_undo_label_describes_the_most_recent_action(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     assert actions.undo_label() is None
 
-    actions.rename_folder("image/sdxl_t2i", "Name")
-    assert "rename" in actions.undo_label().lower()
+    actions.custom_folders.create("Keepers", [])
+    assert "create folder" in actions.undo_label().lower()
 
     rows = [_completed_row(db, output_dir, "p1", "a.png"),
             _completed_row(db, output_dir, "p2", "b.png")]
@@ -224,7 +213,7 @@ def test_a_new_action_forks_history_and_drops_the_redo(tmp_path):
     actions.undo()
     assert actions.can_redo()
 
-    actions.rename_folder("image/sdxl_t2i", "Name")
+    actions.custom_folders.create("Keepers", [])
 
     assert not actions.can_redo()  # the branch that redo led to is gone
 
@@ -232,20 +221,9 @@ def test_a_new_action_forks_history_and_drops_the_redo(tmp_path):
 def test_redo_label_names_the_step_it_would_re_apply(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     assert actions.redo_label() is None and not actions.can_redo()
-    actions.rename_folder("image/sdxl_t2i", "Name")
+    actions.custom_folders.create("Keepers", [])
     actions.undo()
-    assert "rename" in actions.redo_label().lower()
-
-
-def test_redo_of_a_rename_puts_the_new_name_back(tmp_path):
-    actions, db, _ = _actions(tmp_path)
-    db.rename_folder("image/sdxl_t2i", "First Name")
-    actions.rename_folder("image/sdxl_t2i", "Second Name")
-    actions.undo()
-
-    actions.redo()
-
-    assert db.folder_meta_map()["image/sdxl_t2i"]["custom_name"] == "Second Name"
+    assert "create folder" in actions.redo_label().lower()
 
 
 def test_redo_with_nothing_undone_is_a_noop(tmp_path):

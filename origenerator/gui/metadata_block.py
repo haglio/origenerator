@@ -57,6 +57,7 @@ class MetadataBlock(QWidget):
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._container: QWidget | None = None
+        self._folded = False
 
     def show_row(self, row: dict, upscale=None) -> bool:
         """Render this row's section, reporting whether it has anything in it.
@@ -87,20 +88,26 @@ class MetadataBlock(QWidget):
         layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         if section is not None or self._go_to_folder is not None:
-            layout.addWidget(_build_section(section, self._go_to_folder))
+            block = _build_section(section, self._go_to_folder, collapsed=self._folded)
+            block.toggled.connect(lambda: self._keep_the_fold(block))
+            layout.addWidget(block)
         self._container = container
         self._outer.addWidget(container)
 
+    def _keep_the_fold(self, block: CollapsibleSection) -> None:
+        self._folded = block.is_collapsed()
 
-def _build_section(section: MetaSection | None,
-                   go_to_folder: QAction | None = None) -> QWidget:
+
+def _build_section(section: MetaSection | None, go_to_folder: QAction | None = None,
+                   *, collapsed: bool = False) -> CollapsibleSection:
     """One titled block, folding like every other section in the pane.
 
     It sits among the form's own sections, so it folds by the same header rather
     than being the one heading in the column that doesn't.
     """
     items = section.items if section is not None else []
-    block = CollapsibleSection(section.title if section is not None else BASIC_TITLE)
+    block = CollapsibleSection(section.title if section is not None else BASIC_TITLE,
+                               collapsed=collapsed)
     rows = QWidget()
     layout = QVBoxLayout(rows)
     layout.setContentsMargins(0, 0, 0, 0)

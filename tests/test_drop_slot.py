@@ -11,12 +11,16 @@ from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.media_badge import MediaBadge
 
 
-def _slot(qtbot, kind="image", accepts=lambda pid: True,
+def _slot(qtbot, kind="image", lent_by=lambda pid: pid,
           preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False):
-    slot = DropSlot(kind=kind, accepts=accepts, preview=preview, placeholder=placeholder,
+    slot = DropSlot(kind=kind, lent_by=lent_by, preview=preview, placeholder=placeholder,
                     grayscale=grayscale)
     qtbot.addWidget(slot)
     return slot
+
+
+def _pictures_only(pid):
+    return pid if pid.startswith("img") else None
 
 
 def _drop(slot, pid):
@@ -45,7 +49,7 @@ def _write_looping_webp(path, size=(64, 48)):
 
 
 def test_dropping_an_allowed_id_fills_the_slot_and_notifies(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
     seen = []
     slot.changed.connect(lambda: seen.append(slot.current_id()))
 
@@ -56,16 +60,25 @@ def test_dropping_an_allowed_id_fills_the_slot_and_notifies(qtbot):
     assert seen == ["img1"]
 
 
+def test_a_dropped_item_is_held_as_what_it_lends_the_slot(qtbot):
+    slot = _slot(qtbot, lent_by={"vid1": "img1"}.get)
+
+    ev = _drop(slot, "vid1")
+
+    assert slot.current_id() == "img1"
+    assert ev.isAccepted()
+
+
 def test_dropping_a_disallowed_id_is_ignored(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
 
     _drop(slot, "vid9")
 
-    assert slot.current_id() is None  # the predicate rejected it
+    assert slot.current_id() is None  # it lends this slot nothing
 
 
 def test_drag_enter_accepts_only_allowed_ids(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
 
     assert _drag_enter(slot, "img1").isAccepted()
     assert not _drag_enter(slot, "vid1").isAccepted()
@@ -165,7 +178,7 @@ def test_set_candidate_lights_and_clears_the_slot(qtbot):
 
 
 def test_accepts_delegates_to_the_predicate(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
 
     assert slot.accepts("img1") is True
     assert slot.accepts("vid1") is False

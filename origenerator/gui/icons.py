@@ -17,7 +17,7 @@ or a video.
 contents and on the radio that chooses how it is drawn: a frame of the
 proportions each side holds, drawn here because what they say is the difference
 between them rather than any one named mark.  :func:`recent_mark_icon`
-is the dot at the end of the row of a folder lately worked in, drawn here for the
+is the dot at the start of the row of a folder lately worked in, drawn here for the
 same reason: it is a color saying one thing, not a mark anyone reads.
 
 The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
@@ -48,6 +48,7 @@ from shared_ui.colors import (
     TEXT_PRIMARY,
     TEXT_SECONDARY,
 )
+from shared_ui.icon_geometry import shapes_of
 from shared_ui.icons import CANVAS, PEN_WIDTH, draw_glyph, glyph_icon, glyph_pixmap
 
 from origenerator.gallery.collection import (
@@ -183,8 +184,24 @@ def star_icon(*, filled: bool) -> QIcon:
     button bank's Favorite wears the filled one, so the control and the mark it
     leaves on a tile are one symbol in one color."""
     if filled:
-        return glyph_icon("star", color=_STAR_GLYPH, size=_SIZE)
+        icon = glyph_icon("star", color=_STAR_GLYPH, size=_SIZE)
+        icon.addPixmap(_painted(_ringed_star), QIcon.Mode.Selected)
+        return icon
     return glyph_icon("star_outline", size=_SIZE)
+
+
+_RING_WIDTH = 3.0
+
+
+def _ringed_star(painter: QPainter):
+    (star,) = shapes_of("star")
+    pen = QPen(TEXT_PRIMARY)
+    pen.setWidthF(2 * _RING_WIDTH)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pen)
+    painter.setBrush(TEXT_PRIMARY)
+    painter.drawPolygon(*(QPointF(x, y) for x, y in star.points))
+    draw_glyph(painter, "star", _STAR_GLYPH, size=_SIZE)
 
 
 @cache

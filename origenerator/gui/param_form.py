@@ -247,6 +247,8 @@ class ParamForm(QWidget):
         for title, collapsed in specs:
             section = CollapsibleSection(title, collapsed=collapsed)
             section.toggled.connect(self._position_dimension_controls)
+            section.warning.pressed.connect(
+                lambda title=title: self._resolve_warnings(self._present_keys[title]))
             self._sections[title] = section
             self._present_keys[title] = []
             self._label_columns[title] = LabelColumn()
@@ -389,13 +391,14 @@ class ParamForm(QWidget):
 
     def _label_cell(self, key: str, label: QWidget, column: LabelColumn) -> LabelCell:
         mark = WarningMark()
-        mark.pressed.connect(lambda: self._take_advice(key))
+        mark.pressed.connect(lambda: self._resolve_warnings([key]))
         self._warning_marks[key] = mark
         return LabelCell(mark, label, column)
 
-    def _take_advice(self, key: str) -> None:
-        if key in self._advice:
-            self.set_values({key: self._advice[key].fix})
+    def _resolve_warnings(self, keys: list[str]) -> None:
+        for key in keys:
+            if key in self._advice:
+                self.set_values({key: self._advice[key].fix})
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
         for key, good in choices.items():

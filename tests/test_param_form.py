@@ -2107,6 +2107,27 @@ def test_clicking_a_warning_sets_its_setting_to_the_recommended_value(qtbot):
     assert (values["steps"], values["sampler_name"]) == (40, "euler_ancestral")
 
 
+_STRENGTH_ADVICE = {"lora_strength_high": Advice(
+    "Example LoRA's page recommends a strength of 0.8–1.2.", 1.2)}
+_PROMPT_STRENGTH_ADVICE = {"cfg_high": Advice("Example Model's page recommends 3–6.", 6.0)}
+
+
+def _wan_form(qtbot):
+    return _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
+                                      size_deriver=lambda values: (464, 912)))
+
+
+def test_clicking_a_sections_warning_resolves_every_warning_in_it_and_none_outside(qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"steps": 50, "cfg_high": 9.0, "lora_strength_high": 1.5})
+    form.set_warnings({**_STEPS_ADVICE, **_PROMPT_STRENGTH_ADVICE, **_STRENGTH_ADVICE})
+
+    qtbot.mouseClick(form._sections["Calibration"].warning, Qt.MouseButton.LeftButton)
+
+    values = form.get_values()
+    assert (values["steps"], values["cfg_high"], values["lora_strength_high"]) == (40, 6.0, 1.5)
+
+
 def test_a_warning_mark_sits_left_of_its_label(qtbot):
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
 

@@ -8,16 +8,18 @@ into the sections defined in :mod:`origenerator.gui.param_sections`.
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QPainter, QPixmap
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QFormLayout,
     QStyle,
     QStyleOptionButton,
+    QStylePainter,
     QVBoxLayout,
     QWidget,
 )
 
 from origenerator.gui.eliding import ElidingButton
+from origenerator.gui.warning_mark import WarningMark
 
 # Prefixed to the header title so the fold state reads at a glance: a down
 # triangle when open, a right-pointing one when shut.
@@ -30,6 +32,7 @@ class _Header(ElidingButton):
     def __init__(self):
         super().__init__()
         self._mark: QPixmap | None = None
+        self.warning = WarningMark(self)
 
     def set_mark(self, mark: QPixmap | None, tip: str) -> None:
         self._mark = mark
@@ -38,14 +41,17 @@ class _Header(ElidingButton):
         self.update()
 
     def sizeHint(self):
-        return self._with_room_for_the_mark(super().sizeHint())
+        return self._with_room_for_the_marks(super().sizeHint())
 
     def minimumSizeHint(self):
-        return self._with_room_for_the_mark(super().minimumSizeHint())
+        return self._with_room_for_the_marks(super().minimumSizeHint())
 
-    def _with_room_for_the_mark(self, hint: QSize) -> QSize:
-        hint.setWidth(hint.width() + self._mark_room())
+    def _with_room_for_the_marks(self, hint: QSize) -> QSize:
+        hint.setWidth(hint.width() + self._warning_room() + self._mark_room())
         return hint
+
+    def _warning_room(self) -> int:
+        return self.warning.sizeHint().width() + _MARK_GAP
 
     def _mark_room(self) -> int:
         return 0 if self._mark is None else _MARK_GAP + self._mark_size().width()
@@ -54,23 +60,36 @@ class _Header(ElidingButton):
         return self._mark.deviceIndependentSize().toSize()
 
     def _text_room(self, opt: QStyleOptionButton) -> int:
-        return super()._text_room(opt) - self._mark_room()
+        return super()._text_room(opt) - self._warning_room() - self._mark_room()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        size = self.warning.sizeHint()
+        self.warning.setGeometry(QRect(QPoint(0, (self.height() - size.height()) // 2), size))
 
     def paintEvent(self, event):
-        super().paintEvent(event)
+        painter = QStylePainter(self)
+        opt = self._elided_option()
+        painter.drawControl(QStyle.ControlElement.CE_PushButtonBevel, opt)
+        opt.rect = self._title_rect(opt)
+        painter.drawControl(QStyle.ControlElement.CE_PushButtonLabel, opt)
         if self._mark is not None:
-            QPainter(self).drawPixmap(self._mark_rect(), self._mark)
+            painter.drawPixmap(self._mark_rect(), self._mark)
+
+    def _title_rect(self, opt: QStyleOptionButton) -> QRect:
+        contents = self.style().subElementRect(
+            QStyle.SubElement.SE_PushButtonContents, opt, self)
+        return contents.adjusted(self._warning_room(), 0, 0, 0)
 
     def _mark_rect(self) -> QRect:
         opt = QStyleOptionButton()
         self.initStyleOption(opt)
-        contents = self.style().subElementRect(
-            QStyle.SubElement.SE_PushButtonContents, opt, self)
+        title_rect = self._title_rect(opt)
         title = self.display_text(self._text_room(opt))
         size = self._mark_size()
         return QRect(
-            QPoint(contents.left() + self.fontMetrics().horizontalAdvance(title) + _MARK_GAP,
-                   contents.top() + (contents.height() - size.height()) // 2),
+            QPoint(title_rect.left() + self.fontMetrics().horizontalAdvance(title) + _MARK_GAP,
+                   title_rect.top() + (title_rect.height() - size.height()) // 2),
             size)
 
 
@@ -100,6 +119,7 @@ class CollapsibleSection(QWidget):
         self._header.setFlat(True)
         self._header.setCursor(Qt.CursorShape.PointingHandCursor)
         self._header.clicked.connect(self._toggle)
+        self.warning = self._header.warning
         outer.addWidget(self._header)
 
         self._content = QWidget()

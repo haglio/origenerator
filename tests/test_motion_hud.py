@@ -2,8 +2,8 @@
 
 Every surface that can drive the device answers these keys through one helper, so
 the muscle memory carries from genau — and so a slip here is a slip on all of
-them at once. Nothing exercised it: giving J the speed-up L has, and taking the
-cruise toggle off `/`, left 184 tests green across the five files that reach it.
+them at once. Nothing exercised it: giving J the speed-up L has left 184 tests
+green across the five files that reach it.
 """
 from __future__ import annotations
 
@@ -37,7 +37,6 @@ _KEYS = [
     (Qt.Key.Key_U, ("adjust_center", -5)),
     (Qt.Key.Key_O, ("adjust_center", 5)),
     (Qt.Key.Key_I, ("cycle_shape",)),
-    (Qt.Key.Key_Slash, ("toggle_cruise",)),
     (Qt.Key.Key_Semicolon, ("toggle_learned",)),
     (Qt.Key.Key_Backslash, ("quarter_offset",)),
 ]
@@ -53,12 +52,14 @@ def test_each_motion_key_asks_the_driver_for_its_own_move(key, asked):
     assert motion.asked == [asked]
 
 
-def test_a_key_the_cluster_does_not_answer_falls_through_untouched():
+@pytest.mark.parametrize("key", [Qt.Key.Key_K, Qt.Key.Key_Slash],
+                         ids=lambda v: getattr(v, "name", None))
+def test_a_key_the_cluster_does_not_answer_falls_through_untouched(key):
     # False is how the caller learns the key is still its own to handle — a
     # surface's own shortcuts live on the other side of this return.
     motion = _Motion()
 
-    assert apply_motion_key(motion, Qt.Key.Key_K) is False
+    assert apply_motion_key(motion, key) is False
     assert motion.asked == []
 
 
@@ -87,5 +88,5 @@ def test_the_legend_names_every_key_the_cluster_answers():
     # Each key beside the word for what it does: "/" and "I" alone appear inside
     # "J/L" and elsewhere, so on their own they would say nothing.
     for written in ("Space drives", "J/L speed", "7/9 travel", "U/O center",
-                    "I shape", "/ cruise", "; human inspired", "\\ nudge"):
+                    "I shape", "; human inspired", "\\ nudge"):
         assert written in MOTION_KEY_LEGEND

@@ -203,16 +203,15 @@ def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_bars(qtbot):
 def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     # Hands off to the scripts: the tick streams where the phrases will have
     # the device when the command's own interval runs out, inside the bars'
-    # range -- and cruise control, had it the motion, has let go.
+    # range.
 
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
     driver, broker, clock = _driver(qtbot)
     driver.state.learned.model = LearnedModel(
         phrases={classify(phrase): [phrase]}, seen={classify(phrase): 1})
     driver.start()
-    driver.toggle_cruise()
     driver.toggle_learned()
-    assert driver.state.learned.active and not driver.state.cruise.active
+    assert driver.state.learned.active
     for _ in range(60):
         clock.t += 0.025
         driver.poll()
@@ -223,28 +222,6 @@ def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtb
     assert "human inspired" in driver.status_text()
     driver.set_learned(False)
     assert not driver.state.learned.active and not driver.state.learned.times
-
-
-def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
-    # Hands off, the motion is no longer one wave: it is several summed, each
-    # with its own speed and its own share of the travel, both on their way
-    # somewhere else. What has to stay true is that the tick still sends where
-    # that motion will be when the command's own interval runs out.
-    driver, broker, clock = _driver(qtbot)
-    driver.start()
-    driver.toggle_cruise()
-    assert driver.state.cruise.active
-    assert not driver.state.cruise.stack  # drawn on the next tick, from the bars
-    for _ in range(60):
-        clock.t += 0.025
-        driver.poll()
-        pos, interval = broker.positions[-1]
-        assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
-    assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
-    assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
-    assert driver.state.cruise.stack.waves
-    driver.toggle_cruise()
-    assert not driver.state.cruise.active and not driver.state.cruise.stack.waves
 
 
 def test_a_hold_leaves_amp_speed_and_center_where_they_were(qtbot):
@@ -312,14 +289,14 @@ def test_park_then_retract_then_driving_leaves_amp_speed_and_center_as_they_were
             driver.state.state.speed) == (60, 40, 70)
 
 
-def test_cruise_stays_on_through_a_hold(qtbot):
+def test_human_inspired_motion_stays_on_through_a_hold(qtbot):
     driver, _broker, _clock = _driver(qtbot)
-    motion_engine.enable_cruise_control(driver.state)
+    driver.set_learned(True)
 
     driver.hold(PARK_CENTER)
     driver.release()
 
-    assert driver.state.cruise.active is True
+    assert driver.state.learned.active is True
 
 
 def test_driving_with_nothing_held_changes_nothing(qtbot):
@@ -331,7 +308,7 @@ def test_driving_with_nothing_held_changes_nothing(qtbot):
     assert driver.state.state.amplitude == 55
 
 
-def test_amp_speed_center_and_cruise_answer_while_held_as_they_do_in_fun_time(qtbot):
+def test_amp_speed_center_and_human_inspired_answer_while_held_as_they_do_in_fun_time(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.set_amplitude(60)
     speed = driver.state.state.speed
@@ -340,11 +317,11 @@ def test_amp_speed_center_and_cruise_answer_while_held_as_they_do_in_fun_time(qt
     driver.adjust_amplitude(10)
     driver.set_center(50)
     driver.adjust_speed(10)
-    driver.set_cruise(True)
+    driver.set_learned(True)
 
     bars = driver.state.state
     assert (bars.amplitude, bars.intended_center, bars.speed) == (70, 50, speed + 10)
-    assert driver.state.cruise.active is True
+    assert driver.state.learned.active is True
 
 
 def test_the_max_intensity_is_the_devices_to_keep_even_through_a_hold(qtbot):

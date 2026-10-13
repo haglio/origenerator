@@ -179,8 +179,7 @@ class FakeMotion:
     def __init__(self):
         self.speed = 40
         self.amplitude = 50
-        self.centre = 50
-        self.cruising = False
+        self.center = 50
         self.learned = False
         self.shape_steps = []
 
@@ -191,16 +190,10 @@ class FakeMotion:
         self.amplitude += by
 
     def adjust_center(self, by):
-        self.centre += by
+        self.center += by
 
     def cycle_shape(self, by):
         self.shape_steps.append(by)
-
-    def toggle_cruise(self):
-        self.cruising = not self.cruising
-
-    def set_cruise(self, on):
-        self.cruising = on
 
     def toggle_learned(self):
         self.learned = not self.learned
@@ -218,7 +211,7 @@ class FakeMotion:
         self.amplitude = value
 
     def set_center(self, value):
-        self.centre = value
+        self.center = value
 
     def status_text(self):
         return f"speed {self.speed}, amp {self.amplitude}"

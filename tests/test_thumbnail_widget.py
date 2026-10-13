@@ -139,24 +139,25 @@ def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
     assert _RecordingDrag.last.pixmap is None
 
 
-def test_left_click_emits_clicked_but_right_click_does_not(qtbot):
+def test_a_left_click_picks_and_opens_the_picture_and_a_right_click_does_neither(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)
-    clicks = []
-    tw.clicked.connect(lambda prompt_id, modifiers: clicks.append(prompt_id))
+    picked, opened = [], []
+    tw.pressed.connect(lambda prompt_id, _keys: picked.append(prompt_id))
+    tw.clicked.connect(opened.append)
 
     qtbot.mouseClick(tw, Qt.MouseButton.RightButton)
-    assert clicks == []  # right-click is for the menu; it must not re-select
+    assert picked == opened == []  # right-click is for the menu; it must not re-select
 
     qtbot.mouseClick(tw, Qt.MouseButton.LeftButton)
-    assert clicks == ["p1"]
+    assert picked == opened == ["p1"]
 
 
-def test_a_click_reports_the_keys_held_during_it(qtbot):
+def test_a_press_reports_the_keys_held_during_it(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)
     held = []
-    tw.clicked.connect(lambda prompt_id, modifiers: held.append(modifiers))
+    tw.pressed.connect(lambda prompt_id, modifiers: held.append(modifiers))
 
     qtbot.mouseClick(tw, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ControlModifier)
 

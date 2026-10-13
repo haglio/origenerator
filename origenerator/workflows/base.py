@@ -14,8 +14,7 @@ from origenerator.workflows.detail_parts import detail_fix_passes
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
 
-# ComfyUI's KSampler vocabulary, for workflows that expose sampler/scheduler
-# pickers (the SDXL pair) — one copy, so the option lists can't drift apart.
+# ComfyUI's KSampler vocabulary, which the SDXL pair's pickers offer.
 SAMPLER_OPTIONS = [
     "euler", "euler_ancestral", "heun", "heunpp2", "dpm_2",
     "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
@@ -188,6 +187,15 @@ class ParamDef:
 
     def __post_init__(self):
         self.type = ParamType(self.type)
+
+
+def sampler_params(defaults: dict) -> list[ParamDef]:
+    return [
+        ParamDef("sampler_name", "Drawing Method", ParamType.COMBO, defaults["sampler_name"],
+                 options=SAMPLER_OPTIONS),
+        ParamDef("scheduler", "Step Spacing", ParamType.COMBO, defaults["scheduler"],
+                 options=SCHEDULER_OPTIONS),
+    ]
 
 
 class WorkflowTemplate(ABC):

@@ -3,11 +3,10 @@ from __future__ import annotations
 from origenerator.config import CUSTOM_POSES_DIR
 from origenerator.media import MediaType
 from origenerator.workflows.base import (
-    SAMPLER_OPTIONS,
-    SCHEDULER_OPTIONS,
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    sampler_params,
 )
 from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.model_arch import SD15, SDXL
@@ -132,10 +131,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=200),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5),
-            ParamDef("sampler_name", "Drawing Method", ParamType.COMBO, defaults["sampler_name"],
-                     options=SAMPLER_OPTIONS),
-            ParamDef("scheduler", "Step Spacing", ParamType.COMBO, defaults["scheduler"],
-                     options=SCHEDULER_OPTIONS),
+            *sampler_params(defaults),
             ParamDef("denoise", "Redraw Amount", ParamType.FLOAT, defaults["denoise"], min_val=0.0, max_val=1.0, step=0.01),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
             ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],

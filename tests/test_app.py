@@ -155,9 +155,17 @@ def _a_boot_leaves_the_suites_own_error_hooks_in_place(monkeypatch):
                         lambda logger: None)
 
 
+def _the_copies(monkeypatch, claim, *, closing=False):
+    copies = MagicMock()
+    copies.claim_the_library.return_value = claim
+    copies.one_is_closing.return_value = closing
+    monkeypatch.setattr("origenerator.single_instance.Copies", MagicMock(return_value=copies))
+    return copies
+
+
 @pytest.fixture(autouse=True)
-def _a_boot_holds_the_library_until_its_process_ends_so_each_test_finds_it_free(monkeypatch):
-    monkeypatch.setattr("origenerator.single_instance.claim_the_library", lambda state_dir: 1)
+def _each_boot_finds_the_library_free(monkeypatch):
+    _the_copies(monkeypatch, MagicMock())
 
 
 def test_warming_the_voice_runtimes_reaches_for_both_and_survives_any_install(monkeypatch):
@@ -461,6 +469,24 @@ def test_a_canceled_launch_keeps_its_loading_screen_up_until_it_has_let_go_of_co
         assert main([]) == 0
 
     assert seen == ["screen up"]
+
+
+def test_a_canceled_launch_lets_go_of_the_library_once_it_has_let_go_of_comfyui(
+        qapp, monkeypatch):
+    screens = []
+    events = []
+    claim = MagicMock()
+    claim.let_go.side_effect = lambda: events.append("let go")
+    _the_copies(monkeypatch, claim)
+    client = MagicMock()
+    client.wait.side_effect = lambda ms: events.append("disconnected")
+
+    with _a_faked_boot([], passes=_canceled_at_the_scan(screens),
+                       **_real_loading_screens(screens),
+                       **{"origenerator.comfyui_client.ComfyUIClient": MagicMock(return_value=client)}):
+        assert main([]) == 0
+
+    assert events == ["disconnected", "let go"]
 
 
 def test_a_canceled_launch_says_in_the_log_that_it_ended_there(qapp):
@@ -1531,8 +1557,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
 class TestASecondCopy:
     @pytest.fixture(autouse=True)
     def another_copy_holds_the_library(self, monkeypatch):
-        monkeypatch.setattr("origenerator.single_instance.claim_the_library",
-                            lambda state_dir: None)
+        _the_copies(monkeypatch, None)
 
     def test_it_says_another_copy_is_running_in_a_box_like_the_close_question_and_starts_nothing(
             self, qapp):
@@ -1568,27 +1593,132 @@ class TestASecondCopy:
         window.assert_called_once()
 
 
+def test_a_launch_while_another_copy_closes_waits_for_it_on_its_loading_screen_and_opens(
+        qapp, monkeypatch):
+    screens = []
+    said_while_waiting = []
+    claim = MagicMock()
+    copies = _the_copies(monkeypatch, None, closing=True)
+
+    def the_closing_copy_lets_go():
+        said_while_waiting.append(screens[0].panel.status)
+        return claim
+
+    copies.claim_the_library_once_the_closing_one_lets_go.side_effect = the_closing_copy_lets_go
+    window = MagicMock()
+    logger = MagicMock()
+
+    with _a_faked_boot([], **_real_loading_screens(screens), **{
+        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.app._configure_logging": MagicMock(return_value=logger),
+    }):
+        assert main([]) == 0
+
+    assert "Another copy is closing; waiting for it to let go of the library" in [
+        said.args[0] for said in logger.info.call_args_list]
+    assert said_while_waiting == ["Waiting for the other copy to finish closing..."]
+    assert len(screens) == 1
+    window.show.assert_called_once()
+    claim.let_go.assert_called_once()
+
+
+def test_a_launch_canceled_while_it_waits_for_the_other_copy_opens_nothing_and_lets_go(
+        qapp, monkeypatch):
+    screens = []
+    claim = MagicMock()
+    copies = _the_copies(monkeypatch, None, closing=True)
+
+    def canceled_while_the_other_copy_closes():
+        screens[0].reject()
+        return claim
+
+    copies.claim_the_library_once_the_closing_one_lets_go.side_effect = (
+        canceled_while_the_other_copy_closes)
+    window = MagicMock()
+
+    with _a_faked_boot([], **_real_loading_screens(screens), **{
+        "origenerator.gui.main_window.OrigeneratorWindow": window,
+    }):
+        assert main([]) == 0
+
+    window.assert_not_called()
+    claim.let_go.assert_called_once()
+    assert not screens[0].isVisible()
+
+
+def test_a_launch_that_waited_in_vain_takes_its_loading_screen_down_before_saying_so(
+        qapp, monkeypatch):
+    screens = []
+    seen = []
+    copies = _the_copies(monkeypatch, None, closing=True)
+    copies.claim_the_library_once_the_closing_one_lets_go.return_value = None
+    told = MagicMock(side_effect=lambda *a: seen.append(
+        "screen up" if screens[0].isVisible() else "screen down"))
+
+    with _a_faked_boot([], **_real_loading_screens(screens), **{
+        "PyQt6.QtWidgets.QMessageBox.information": told,
+    }):
+        assert main([]) == 1
+
+    assert seen == ["screen down"]
+
+
 def test_the_claim_is_on_the_library_a_preview_shares_with_the_production_copy(
         qapp, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "LIBRARY_STATE_DIR", tmp_path / "production" / "state")
-    claimed = MagicMock(return_value=1)
-    monkeypatch.setattr("origenerator.single_instance.claim_the_library", claimed)
+    copies = MagicMock()
+    monkeypatch.setattr("origenerator.single_instance.Copies", copies)
 
     with _a_faked_boot([]):
         assert main([]) == 0
 
-    claimed.assert_called_once_with(tmp_path / "production" / "state")
+    copies.assert_called_once_with(tmp_path / "production" / "state")
+
+
+def test_the_claim_says_the_copy_is_closing_ahead_of_every_quit_step_the_window_adds(
+        qapp, monkeypatch):
+    events = []
+    claim = MagicMock()
+    claim.closes_with.side_effect = lambda app: events.append(("closes with", app))
+    _the_copies(monkeypatch, claim)
+
+    with _a_faked_boot([], **{
+        "origenerator.gui.main_window.OrigeneratorWindow":
+            MagicMock(side_effect=lambda *a, **k: events.append("built") or MagicMock()),
+    }):
+        assert main([]) == 0
+
+    assert events == [("closes with", qapp), "built"]
+
+
+def test_a_closed_copy_lets_go_of_the_library_once_disconnected_and_before_handing_its_runs_on(
+        qapp, monkeypatch):
+    events = []
+    claim = MagicMock()
+    claim.let_go.side_effect = lambda: events.append("let go")
+    _the_copies(monkeypatch, claim)
+    client = MagicMock()
+    client.wait.side_effect = lambda ms: events.append("disconnected")
+
+    with _a_faked_boot([], **{
+        "origenerator.comfyui_client.ComfyUIClient": MagicMock(return_value=client),
+        "origenerator.landed_while_away.hand_over_what_is_in_flight":
+            MagicMock(side_effect=lambda *a: events.append("handed on")),
+    }):
+        assert main([]) == 0
+
+    assert events == ["disconnected", "let go", "handed on"]
 
 
 def test_the_launch_check_claims_nothing_so_it_passes_beside_a_running_copy(
         qapp, monkeypatch):
-    claimed = MagicMock(return_value=None)
-    monkeypatch.setattr("origenerator.single_instance.claim_the_library", claimed)
+    copies = MagicMock()
+    monkeypatch.setattr("origenerator.single_instance.Copies", copies)
 
     with _a_faked_boot([]):
         assert main(["--check-launch"]) == 0
 
-    claimed.assert_not_called()
+    copies.assert_not_called()
 
 
 def test_the_launch_check_is_no_launch_in_the_crash_log(qapp, monkeypatch):

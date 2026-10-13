@@ -1710,6 +1710,85 @@ def test_a_closed_copy_lets_go_of_the_library_once_disconnected_and_before_handi
     assert events == ["disconnected", "let go", "handed on"]
 
 
+_A_COPY_ON_A_LIBRARY_OF_ITS_OWN = """
+import os, sys
+os.environ["ORIGENERATOR_STATE_DIR"] = {state!r}
+os.environ.pop("ORIGENERATOR_BRANCH_SESSION", None)
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+sys.path.insert(0, {repo!r})
+from app_support import haglio_settings
+os.environ[haglio_settings.SETTINGS_ENV] = haglio_settings.THE_EXAMPLE
+from origenerator import content
+content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
+from unittest.mock import MagicMock, patch
+from PyQt6.QtCore import QTimer
+from origenerator import app
+
+def built(*args, **kwargs):
+    print("MARK opened", flush=True)
+    return MagicMock()
+
+def disconnected(client):
+    print("MARK closing", flush=True)
+    sys.stdin.readline()
+
+with patch.object(app, "MAINTENANCE", ()), \\
+        patch("origenerator.app._warm_voice_runtimes"), \\
+        patch("origenerator.app._name_this_process"), \\
+        patch("origenerator.app._init_windows_taskbar_identity"), \\
+        patch("origenerator.gui.link_listener.LinkListener"), \\
+        patch("origenerator.app._taskbar_identity", return_value=None), \\
+        patch("origenerator.app._ensure_comfyui_server"), \\
+        patch("origenerator.app._disconnect", disconnected), \\
+        patch("origenerator.comfyui_client.ComfyUIClient"), \\
+        patch("origenerator.gui.loading_screen.loading_screen"), \\
+        patch("origenerator.gui.main_window.OrigeneratorWindow", built), \\
+        patch("origenerator.freeze_watch.watch_the_window",
+              lambda app, crash_log: QTimer.singleShot(0, app.quit)), \\
+        patch("PyQt6.QtWidgets.QMessageBox.information",
+              lambda *said: print("MARK refused", flush=True)), \\
+        patch("PyQt6.QtWidgets.QMessageBox.warning"):
+    app.main([])
+print("MARK main returned", flush=True)
+sys.stdin.readline()
+"""
+
+
+def _the_first_line_with(stream, *wanted):
+    return next((line.strip() for line in stream if any(words in line for words in wanted)), "")
+
+
+def test_reopening_while_the_last_copy_is_still_closing_opens_before_its_process_ends(tmp_path):
+    def a_copy(log):
+        script = _A_COPY_ON_A_LIBRARY_OF_ITS_OWN.format(state=str(tmp_path / "state"),
+                                                         repo=str(REPO_ROOT))
+        return subprocess.Popen([sys.executable, "-c", script], cwd=REPO_ROOT,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log,
+                                text=True, encoding="utf-8", errors="replace",
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    with open(tmp_path / "first.log", "w", encoding="utf-8") as first_log, \
+            open(tmp_path / "second.log", "w", encoding="utf-8") as second_log:
+        first = a_copy(first_log)
+        try:
+            assert _the_first_line_with(first.stdout, "MARK") == "MARK opened"
+            assert _the_first_line_with(first.stdout, "MARK") == "MARK closing"
+            second = a_copy(second_log)
+            try:
+                assert "Another copy is closing; waiting for it to let go" in _the_first_line_with(
+                    second.stdout, "Another copy is closing", "MARK")
+                first.stdin.write("\n")
+                first.stdin.flush()
+                assert _the_first_line_with(first.stdout, "MARK") == "MARK main returned"
+
+                assert _the_first_line_with(second.stdout, "MARK") == "MARK opened"
+                assert first.poll() is None
+            finally:
+                second.communicate("\n\n", timeout=60)
+        finally:
+            first.communicate("\n\n", timeout=60)
+
+
 def test_the_launch_check_claims_nothing_so_it_passes_beside_a_running_copy(
         qapp, monkeypatch):
     copies = MagicMock()

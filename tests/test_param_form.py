@@ -2079,3 +2079,20 @@ def test_every_field_starts_as_far_from_its_label_whether_or_not_it_can_warn(qtb
     gaps = {key: _gap_after_label(form, key) for key in shown}
     assert {"steps", "noise_seed", "width", "scene_frames"} <= set(gaps)
     assert len(set(gaps.values())) == 1, gaps
+
+
+def _items_wearing(dropdown, icon):
+    return {dropdown.itemText(i) for i in range(dropdown.count())
+            if dropdown.itemIcon(i).cacheKey() == icon.cacheKey()}
+
+
+def test_the_recommended_choices_wear_a_check_and_the_rest_a_blank_as_wide(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+
+    form.mark_recommended({"sampler_name": ("euler_ancestral", "dpmpp_2m"), "scheduler": ()})
+
+    samplers, spacings = form._widgets["sampler_name"], form._widgets["scheduler"]
+    assert _items_wearing(samplers, icons.recommended_icon()) == {"euler_ancestral", "dpmpp_2m"}
+    assert len(_items_wearing(samplers, icons.unmarked_icon())) == samplers.count() - 2
+    assert len(_items_wearing(spacings, icons.unmarked_icon())) == spacings.count()

@@ -187,6 +187,18 @@ def star_icon(*, filled: bool) -> QIcon:
     return glyph_icon("star_outline", size=_SIZE)
 
 
+@cache
+def recommended_icon() -> QIcon:
+    return glyph_icon("check", color=GREEN)
+
+
+@cache
+def unmarked_icon() -> QIcon:
+    canvas = QPixmap(_SIZE, _SIZE)
+    canvas.fill(Qt.GlobalColor.transparent)
+    return QIcon(canvas)
+
+
 def latest_icon() -> QIcon:
     return glyph_icon("latest", size=_SIZE)
 

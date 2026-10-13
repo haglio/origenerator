@@ -494,7 +494,6 @@ class GalleryView(QWidget):
         self._custom_folders_by_side: dict[str, list] = {}
         self._lists_built_from = None
         self._lists_by_side: dict[str, list] = {}
-        self._both_kind_workflows: frozenset[str] = frozenset()
         self._start_frames: dict = {}
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
@@ -1854,14 +1853,12 @@ class GalleryView(QWidget):
         if library != self._lists_built_from:
             self._lists_built_from = library
             self._start_frames = gallery.start_frame_index(rows)
-            self._both_kind_workflows = gallery.workflows_of_both_kinds(rows)
             self._item_names.take(rows, self._held_rows, self._start_frames)
             self._lists_by_side = {}
         for side in sides:
             if side not in self._lists_by_side:
                 self._lists_by_side[side] = _side_list(
-                    rows, meta, self._start_frames, self._both_kind_workflows, side,
-                    self._item_names.of)
+                    rows, meta, self._start_frames, side, self._item_names.of)
         return self._start_frames, {side: self._lists_by_side[side] for side in sides}
 
     def _build_sides(self, trees):
@@ -4412,10 +4409,9 @@ class GalleryView(QWidget):
         self._info_tabs.pin_current_tab()
 
 
-def _side_list(rows, meta, start_frames, both_kinds, side, name_of):
+def _side_list(rows, meta, start_frames, side, name_of):
     return gallery.build_gallery_tree(filter_rows(rows, side), meta,
-                                      image_index=start_frames,
-                                      both_kinds=both_kinds, name_of=name_of)
+                                      image_index=start_frames, name_of=name_of)
 
 
 def _custom_folders_by_side(trees, records) -> dict[str, list]:

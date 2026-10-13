@@ -157,7 +157,6 @@ from origenerator.gallery.tree import (
     settings_folder_key,
     start_frame_index,
     unreviewed_experiments,
-    workflows_of_both_kinds,
 )
 from origenerator.gallery.voice_commands import (
     ENHANCE_COMMAND,
@@ -281,5 +280,4 @@ __all__ = [
     "unreviewed_experiments",
     "videos_from_source_image",
     "workflow_output_type",
-    "workflows_of_both_kinds",
 ]

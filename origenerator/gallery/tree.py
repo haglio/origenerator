@@ -650,32 +650,9 @@ def start_frame_index(rows: list[dict]) -> dict:
     )
 
 
-_HOLDS = {MediaType.IMAGE: "images", MediaType.VIDEO: "videos"}
-
-
-def workflows_of_both_kinds(rows: list[dict]) -> frozenset[str]:
-    kinds_made: dict[str, set] = {}
-    for row in placeable_rows(rows):
-        kinds_made.setdefault(row.get("workflow_name") or "unknown", set()).add(
-            media_type_of_row(row))
-    return frozenset(name for name, kinds in kinds_made.items() if len(kinds) > 1)
-
-
-def _workflow_folder_label(media_type, wf_name: str, folder_meta: dict,
-                           both_kinds: frozenset[str]) -> tuple[str, bool]:
-    label, favorite = _overlay(workflow_label(wf_name), f"{media_type}/{wf_name}", folder_meta)
-    if wf_name in both_kinds:
-        other_kind = next(kind for kind in _HOLDS if kind != media_type)
-        twin, _ = _overlay(workflow_label(wf_name), f"{other_kind}/{wf_name}", folder_meta)
-        if twin == label:
-            label = f"{label} {_HOLDS[media_type]}"
-    return label, favorite
-
-
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None,
     *, image_index: dict | None = None,
-    both_kinds: frozenset[str] | None = None,
     name_of: Callable[[str], str] | None = None,
 ) -> list[MediaGroup]:
     """Nest rows into Images and Videos, then workflow -> model -> LoRA ->
@@ -703,29 +680,26 @@ def build_gallery_tree(
     holding pen outside the tree.
     """
     folder_meta = folder_meta or {}
-    if both_kinds is None:
-        both_kinds = workflows_of_both_kinds(rows)
     rows = placeable_rows(rows)
     if image_index is None:
         image_index = start_frame_index(rows)
     by_kind = dict(_group_by_creation(rows, media_type_of_row))
-    return [_media_folder(media_type, by_kind[media_type], folder_meta, image_index, both_kinds,
+    return [_media_folder(media_type, by_kind[media_type], folder_meta, image_index,
                           name_of or _unnamed)
             for media_type in MediaType if media_type in by_kind]
 
 
-def _media_folder(media_type, rows, folder_meta, image_index, both_kinds,
-                  name_of) -> MediaGroup:
+def _media_folder(media_type, rows, folder_meta, image_index, name_of) -> MediaGroup:
     label, favorite = _overlay(MEDIA_LABELS[media_type], media_type, folder_meta)
     workflows = []
     for wf_name, wf_rows in _group_by_creation(
         rows, lambda r: r.get("workflow_name") or "unknown"
     ):
-        wf_label, wf_favorite = _workflow_folder_label(media_type, wf_name, folder_meta,
-                                                       both_kinds)
+        wf_key = f"{media_type}/{wf_name}"
+        wf_label, wf_favorite = _overlay(workflow_label(wf_name), wf_key, folder_meta)
         tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of)
         workflows.append(WorkflowGroup(
-            f"{media_type}/{wf_name}", wf_name, wf_label,
+            wf_key, wf_name, wf_label,
             _build_model_groups(tier, wf_rows),
             wf_favorite,
         ))

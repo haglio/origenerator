@@ -135,7 +135,7 @@ class CombineController(QObject):
         # Combine: drop an image + an i2v video, Generate re-runs that video's
         # recipe on the image. Needs a client to generate, so it hides without one.
         self.panel = CombinePanel(
-            self._accepts_image, self._accepts_video, self._slot_preview)
+            self._picture_lent_by, self._recipe_lent_by, self._slot_preview)
         # Both Generate paths go through a wrapper that puts a stand-in row in the
         # line first: the work between the press and a real job is seconds long,
         # and a button that seems to do nothing reads as an app that has died.
@@ -183,6 +183,12 @@ class CombineController(QObject):
             row and gallery.media_type_of_row(row) == MediaType.VIDEO
             and gallery.is_image_conditioned(row.get("workflow_name") or "")
         )
+
+    def _picture_lent_by(self, prompt_id: str) -> str | None:
+        return prompt_id if self._accepts_image(prompt_id) else None
+
+    def _recipe_lent_by(self, prompt_id: str) -> str | None:
+        return prompt_id if self._accepts_video(prompt_id) else None
 
     def _accepts_video(self, prompt_id: str) -> bool:
         """Whether the video slot accepts a dropped generation (see

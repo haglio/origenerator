@@ -1,11 +1,11 @@
-"""One drop target for a dragged gallery generation, gated by a predicate.
+"""One drop target for a dragged gallery generation, holding what the item lends it.
 
 The gallery's combine panel pairs two of these — an image slot and a video slot.
-Each accepts only a generation its ``accepts`` predicate allows (the image slot an
-image, the video slot a rebuildable i2v video), previews the dropped item — a video
-loops its clip, an image shows its still — and wears a corner badge of its own kind
-so it's clear which item belongs where. It knows only prompt_ids; the view supplies
-the predicate and the preview, so the slot stays free of database knowledge.
+Each holds whatever its ``lent_by`` says a dropped generation lends it, and turns
+away one that lends it nothing; it previews what it holds — a video loops its clip,
+an image shows its still — and wears a corner badge of its own kind so it's clear
+which item belongs where. It knows only prompt_ids; the view supplies ``lent_by``
+and the preview, so the slot stays free of database knowledge.
 
 A slot whose item is held only for its settings is built ``grayscale``, and draws
 whatever lands in it drained of color (:mod:`origenerator.gui.grayscale`) — the
@@ -37,14 +37,14 @@ class DropSlot(QWidget):
     def __init__(
         self,
         kind: str,
-        accepts: Callable[[str], bool],
+        lent_by: Callable[[str], str | None],
         preview: Callable[[str], tuple[str | None, str | None]],
         placeholder: str,
         parent=None,
         grayscale: bool = False,
     ):
         super().__init__(parent)
-        self._accepts = accepts
+        self._lent_by = lent_by
         self._preview = preview    # (prompt_id) -> (thumb_path, movie_path)
         self._placeholder = placeholder
         self._go_to_tip = f"Click to go to this {kind}"
@@ -129,16 +129,13 @@ class DropSlot(QWidget):
 
     # --- drag & drop ------------------------------------------------------
 
-    def _pid_from(self, mime) -> str | None:
-        """The dropped generation's id if it carries our type and passes ``accepts``."""
+    def _lent(self, mime) -> str | None:
         if not mime.hasFormat(GENERATION_MIME):
             return None
-        pid = bytes(mime.data(GENERATION_MIME)).decode("utf-8")
-        return pid if self._accepts(pid) else None
+        return self._lent_by(bytes(mime.data(GENERATION_MIME)).decode("utf-8"))
 
     def accepts(self, prompt_id: str) -> bool:
-        """Whether this slot would take ``prompt_id`` (its kind gate)."""
-        return self._accepts(prompt_id)
+        return self._lent_by(prompt_id) is not None
 
     def set_candidate(self, active: bool):
         """Light the slot as a valid target for the in-progress drag (or clear it).
@@ -155,23 +152,23 @@ class DropSlot(QWidget):
     def dragEnterEvent(self, event):
         # Accept so the drop lands (and the OS shows a "can drop" cursor); the
         # highlight is already on from drag-start, so nothing to toggle here.
-        if self._pid_from(event.mimeData()) is not None:
+        if self._lent(event.mimeData()) is not None:
             event.acceptProposedAction()
         else:
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if self._pid_from(event.mimeData()) is not None:
+        if self._lent(event.mimeData()) is not None:
             event.acceptProposedAction()
         else:
             event.ignore()
 
     def dropEvent(self, event):
-        pid = self._pid_from(event.mimeData())
-        if pid is None:
+        held = self._lent(event.mimeData())
+        if held is None:
             event.ignore()
             return
-        self.set_item(pid)
+        self.set_item(held)
         event.acceptProposedAction()
 
     def mousePressEvent(self, event):

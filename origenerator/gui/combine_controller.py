@@ -2,7 +2,7 @@
 
 The fifth of the gallery's screen concerns to come out of the view that used to
 hold all of them. What lives here is the whole act -- the panel with its two drop
-slots, what each slot accepts and what it shows of a dropped item, the lane and
+slots, what a dropped item lends each and how it shows there, the lane and
 the act picked beside them, and every way a recipe is found and launched: the
 dropped video's own, the one pinned in the overlay for an act, or the one a local
 model mines out of past clips that fit the picture's situation.
@@ -59,6 +59,9 @@ class CombineHost(Protocol):
     def image_rows(self) -> list[dict]:
         """The image rows the gallery is holding — what a start frame is found
         among, without a query per video."""
+
+    def image_config_index(self) -> dict:
+        """Which picture made each file the gallery holds."""
 
     def animated_preview(self, row: dict) -> str | None:
         """A looping preview of a video row, for a slot and for a prepared tab."""
@@ -135,14 +138,20 @@ class CombineController(QObject):
     # --- what the slots take, and what the session keeps ---------------------
 
     def _accepts_image(self, prompt_id: str) -> bool:
-        """Whether the image slot accepts a dropped generation: an image with a
-        file to seed an i2v from (not merely anything that produced a file — a
+        """Whether a generation is a picture the image slot can hold: an image with
+        a file to seed an i2v from (not merely anything that produced a file — a
         video's clip would satisfy that and can't be a start frame)."""
         row = self._db.get_generation(prompt_id)
         return bool(
             row and gallery.media_type_of_row(row) == MediaType.IMAGE
             and gallery.output_file_reference(gallery.row_output_files(row)) is not None
         )
+
+    def _picture_lent_by(self, prompt_id: str) -> str | None:
+        row = self._db.get_generation(prompt_id)
+        if row is not None and gallery.media_type_of_row(row) == MediaType.VIDEO:
+            prompt_id = gallery.source_image_id_in(row, self._host.image_config_index())
+        return prompt_id if prompt_id and self._accepts_image(prompt_id) else None
 
     def _rebuildable_video_row(self, row) -> bool:
         """Whether ``row`` is a video whose i2v recipe the app can rebuild — so its
@@ -154,16 +163,11 @@ class CombineController(QObject):
             and gallery.is_image_conditioned(row.get("workflow_name") or "")
         )
 
-    def _picture_lent_by(self, prompt_id: str) -> str | None:
-        return prompt_id if self._accepts_image(prompt_id) else None
+    def _accepts_video(self, prompt_id: str) -> bool:
+        return self._rebuildable_video_row(self._db.get_generation(prompt_id))
 
     def _recipe_lent_by(self, prompt_id: str) -> str | None:
         return prompt_id if self._accepts_video(prompt_id) else None
-
-    def _accepts_video(self, prompt_id: str) -> bool:
-        """Whether the video slot accepts a dropped generation (see
-        :meth:`_rebuildable_video_row`)."""
-        return self._rebuildable_video_row(self._db.get_generation(prompt_id))
 
     def _slot_preview(self, prompt_id: str) -> tuple[str | None, str | None]:
         """A dropped item's (thumbnail, looping-preview) paths for its slot: a video

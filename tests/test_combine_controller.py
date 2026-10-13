@@ -14,7 +14,7 @@ import json
 import pytest
 from PyQt6.QtWidgets import QWidget
 
-from origenerator import evolver_export, recipe_match
+from origenerator import evolver_export, gallery, recipe_match
 from origenerator.gui import combine_controller as module
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
@@ -202,6 +202,9 @@ class FakeHost:
     def image_rows(self):
         return self.rows
 
+    def image_config_index(self):
+        return gallery.build_image_config_index(self.rows)
+
     def animated_preview(self, row):
         return f"{row['prompt_id']}.webp"
 
@@ -293,6 +296,28 @@ def test_the_image_slot_takes_a_picture_with_a_file_to_seed_from(combine):
 
     assert controller._accepts_image("img") is True
     assert controller._accepts_image("clip") is False
+
+
+def test_a_picture_lends_the_image_slot_itself(combine):
+    controller, _host = combine(db=FakeDB([_image("img")]))
+
+    assert controller._picture_lent_by("img") == "img"
+    assert controller._picture_lent_by("gone") is None
+
+
+def test_a_video_lends_the_image_slot_the_picture_it_was_made_from(combine):
+    picture = _image("img", files=("frame.png",))
+    controller, _host = combine(
+        FakeHost(rows=[picture]),
+        db=FakeDB([picture, _video("clip", source_image="images/frame.png [output]")]))
+
+    assert controller._picture_lent_by("clip") == "img"
+
+
+def test_a_video_made_from_a_picture_the_gallery_lacks_lends_the_image_slot_nothing(combine):
+    controller, _host = combine(db=FakeDB([_video("clip", source_image="elsewhere.png")]))
+
+    assert controller._picture_lent_by("clip") is None
 
 
 def test_the_video_slot_takes_only_a_recipe_this_app_can_rebuild(combine):

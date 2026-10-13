@@ -28,12 +28,12 @@ from origenerator.voice.app_commands import (
 )
 from origenerator.voice.commands import (
     CollectionCommand,
-    ShowControl,
+    SlideshowControl,
     SurfaceCommand,
     spoken_phrases,
 )
 from origenerator.voice.dictation import COMPLETED
-from origenerator.voice.show_commands import ShowCommand
+from origenerator.voice.slideshow_commands import SlideshowCommand
 
 
 class FakeSignal:
@@ -112,7 +112,7 @@ class FakeButton:
         self.set_to.append(on)
 
 
-class FakeShow:
+class FakeSlideshow:
     def __init__(self, target="g1"):
         self.target = target
         self.said = []
@@ -136,8 +136,8 @@ class FakeShow:
         self.requests.append((message, working, kind))
 
 
-class FakeShows:
-    """The shows reduced to what a spoken word asks of them."""
+class FakeSlideshows:
+    """The slideshows reduced to what a spoken word asks of them."""
 
     def __init__(self, showing=None, by_side=None):
         self.showing = showing
@@ -147,7 +147,7 @@ class FakeShows:
         self.said = []
         self.kinds = []
         self.collections_played = []
-        self.show_commands = []
+        self.slideshow_commands = []
         self.filters = []
         self.slide_words = []
 
@@ -165,8 +165,8 @@ class FakeShows:
     def play_collection(self, command):
         self.collections_played.append(command)
 
-    def run_show_command(self, command, side):
-        self.show_commands.append((command, side))
+    def run_slideshow_command(self, command, side):
+        self.slideshow_commands.append((command, side))
 
     def filter_enhanced(self, enhanced_only, side):
         self.filters.append((enhanced_only, side))
@@ -291,13 +291,13 @@ def router(qtbot, monkeypatch):
     monkeypatch.setattr(module, "VoiceSteering", FakeListener)
     built = []
 
-    def build(host=None, *, shows=None, db=None, client=object(), motion=None,
+    def build(host=None, *, slideshows=None, db=None, client=object(), motion=None,
               bank=None, mic_on=True):
         host = host or FakeHost()
-        shows = shows or FakeShows()
+        slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
         qtbot.addWidget(parent)
-        router = VoiceRouter(host, parent=parent, db=db or FakeDB(), shows=shows,
+        router = VoiceRouter(host, parent=parent, db=db or FakeDB(), slideshows=slideshows,
                              client=client, motion=motion)
         built.append((parent, router))
         buttons = dict(bank or {})
@@ -310,7 +310,7 @@ def router(qtbot, monkeypatch):
                                 (FakeButton(tip="Enhance 2 images"), lambda: None)),
             actions=buttons.get("actions", {}),
         )
-        return router, host, shows
+        return router, host, slideshows
 
     yield build
 
@@ -323,7 +323,7 @@ def _row(prompt_id="g1", *, workflow_name="sdxl_t2i"):
 
 
 def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
 
     built_with = voice.listener.built_with
     assert built_with["phrases"] == spoken_phrases()
@@ -333,9 +333,9 @@ def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
-    # It used to come on with the Auto loop and again with a show, which left
+    # It used to come on with the Auto loop and again with a slideshow, which left
     # "start slideshow" unhearable in the one state it is for.
-    voice, _host, _shows = router(mic_on=False)
+    voice, _host, _slideshows = router(mic_on=False)
 
     voice.sync()
 
@@ -347,7 +347,7 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
 
 
 def test_the_commands_hold_the_mic_open_with_no_loop_to_steer(router):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
 
     voice.sync()
 
@@ -356,7 +356,7 @@ def test_the_commands_hold_the_mic_open_with_no_loop_to_steer(router):
 
 
 def test_a_loop_gives_the_open_mic_a_prompt_to_steer(router):
-    voice, host, _shows = router()
+    voice, host, _slideshows = router()
 
     voice.steer("folder/a")
 
@@ -368,7 +368,7 @@ def test_a_loop_gives_the_open_mic_a_prompt_to_steer(router):
 def test_the_steered_folder_moving_does_not_re_open_the_listener(router):
     # The steering reads the folder at each utterance, so following it there is
     # a re-point and nothing more.
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
     voice.steer("folder/a")
     stops = voice.listener.stops
 
@@ -379,7 +379,7 @@ def test_the_steered_folder_moving_does_not_re_open_the_listener(router):
 
 
 def test_a_folder_that_was_not_the_steered_one_moving_changes_nothing(router):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
     voice.steer("folder/a")
 
     voice.re_home("folder/z", "folder/b")
@@ -391,7 +391,7 @@ def test_a_folder_that_was_not_the_steered_one_moving_changes_nothing(router):
 
 
 def test_a_flashed_line_goes_back_to_the_idle_caption(router):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
     voice.sync()
 
     voice.say("🎤 audio on")
@@ -404,7 +404,7 @@ def test_a_flashed_line_goes_back_to_the_idle_caption(router):
 def test_a_flash_over_a_promise_goes_back_to_the_promise(router):
     # "Listening…" over an app still working out a request reads as a request
     # that was dropped.
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
     voice.sync()
     voice._answer_request(None, "🎤 working out “no hat”…", Spoken(listening=False),
                           working=True)
@@ -416,7 +416,7 @@ def test_a_flash_over_a_promise_goes_back_to_the_promise(router):
 
 
 def test_only_that_requests_own_answer_takes_its_promise_down(router):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
     voice.sync()
     mine = Spoken("no hat")
     voice._answer_request(None, "🎤 working out “no hat”…", mine, working=True)
@@ -428,63 +428,63 @@ def test_only_that_requests_own_answer_takes_its_promise_down(router):
     assert voice._working_status == ""
 
 
-def test_what_was_heard_reaches_the_caption_and_the_shows_corner(router):
+def test_what_was_heard_reaches_the_caption_and_the_slideshows_corner(router):
     # Different screens: someone watching a slideshow can see nothing of this
     # window at all.
-    show = FakeShow()
-    voice, _host, shows = router(shows=FakeShows(showing=show))
+    slideshow = FakeSlideshow()
+    voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice.listener.heard.emit("start slideshow")
 
     assert voice.status.text().startswith("🎤 heard:")
-    assert len(shows.said) == 1
+    assert len(slideshows.said) == 1
 
 
 def test_words_that_are_no_command_show_for_a_moment_and_are_logged_nowhere(router, caplog):
-    voice, _host, shows = router(shows=FakeShows(showing=FakeShow()))
+    voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=FakeSlideshow()))
     voice.sync()
 
     with caplog.at_level(logging.DEBUG):
         voice.listener.heard.emit("put the kettle on")
 
     assert voice.status.text() == "🎤 heard: “put the kettle on”"
-    assert shows.said == ["🎤 heard: “put the kettle on”"]
+    assert slideshows.said == ["🎤 heard: “put the kettle on”"]
     assert voice._flash_timer.isActive()
     assert caplog.messages == []
 
 
 def test_a_transcription_with_no_letters_in_it_says_nothing(router):
-    voice, _host, shows = router()
+    voice, _host, slideshows = router()
 
     voice.listener.heard.emit("...")
 
     assert voice.status.text() == ""
-    assert shows.said == []
+    assert slideshows.said == []
 
 
 # --- where one word lands ---------------------------------------------------
 
 
 def test_a_collection_name_stands_you_in_that_collection(router):
-    voice, host, shows = router()
+    voice, host, slideshows = router()
 
     voice.on_command(AppCommand.RECENTS)
 
     assert host.stood_in == [(RECENTS_KEY, None)]
-    assert shows.answers == ["🎤 Latest"]
+    assert slideshows.answers == ["🎤 Latest"]
 
 
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
-    voice, _host, shows = router(FakeHost(collections=()))
+    voice, _host, slideshows = router(FakeHost(collections=()))
 
     voice.on_command(AppCommand.RECENTS)
 
-    assert shows.answers == ["🎤 no Latest collection yet"]
-    assert shows.answer_kinds == [WARNING]
+    assert slideshows.answers == ["🎤 no Latest collection yet"]
+    assert slideshows.answer_kinds == [WARNING]
 
 
 def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
-    voice, host, _shows = router()
+    voice, host, _slideshows = router()
 
     voice.on_command(SurfaceCommand(AppCommand.RECENTS, "portrait"))
 
@@ -495,48 +495,48 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(router):
     # A spoken switch is the same event as a clicked one, so the bank lights the
     # same way and nothing has to be kept in step.
     audio = FakeButton(tip="Audio bed")
-    voice, _host, shows = router(bank={"audio": audio})
+    voice, _host, slideshows = router(bank={"audio": audio})
 
     voice.on_command(AppCommand.AUDIO_ON)
 
     assert audio.set_to == [True]
-    assert shows.answers == ["🎤 the audio bed on"]
+    assert slideshows.answers == ["🎤 the audio bed on"]
 
 
 def test_a_switch_this_window_does_not_have_says_the_session_owns_it(router):
-    voice, _host, shows = router(bank={"audio": None})
+    voice, _host, slideshows = router(bank={"audio": None})
 
     voice.on_command(AppCommand.AUDIO)
 
-    assert shows.answers == ["🎤 the audio bed is the session's here"]
-    assert shows.answer_kinds == [WARNING]
+    assert slideshows.answers == ["🎤 the audio bed is the session's here"]
+    assert slideshows.answer_kinds == [WARNING]
 
 
 def test_a_switch_that_cannot_be_flipped_here_says_so(router):
-    voice, _host, shows = router(
+    voice, _host, slideshows = router(
         bank={"drive": FakeButton(tip="Drive", enabled=False)})
 
     voice.on_command(AppCommand.DRIVE_ON)
 
-    assert shows.answers == ["🎤 OSR2 control can't be switched here"]
-    assert shows.answer_kinds == [WARNING]
+    assert slideshows.answers == ["🎤 OSR2 control can't be switched here"]
+    assert slideshows.answer_kinds == [WARNING]
 
 
 def test_a_bar_word_moves_its_bar_the_way_its_key_does(router):
     motion = FakeMotion()
-    voice, _host, shows = router(motion=motion)
+    voice, _host, slideshows = router(motion=motion)
 
     voice.on_command(AppCommand.SPEED_UP)
 
     assert motion.speed == 45
-    assert shows.answers == ["🎤 speed 45, amp 50"]
+    assert slideshows.answers == ["🎤 speed 45, amp 50"]
 
 
 def test_a_spoken_number_puts_a_bar_where_it_says(router):
     # The nudges are for a motion that is nearly right; this is for one that is
     # not, and the bar does its own clamping.
     motion = FakeMotion()
-    voice, _host, _shows = router(motion=motion)
+    voice, _host, _slideshows = router(motion=motion)
 
     voice.on_command(BarSetting("amp", 70))
 
@@ -545,21 +545,21 @@ def test_a_spoken_number_puts_a_bar_where_it_says(router):
 
 def test_a_router_taken_into_a_session_leaves_the_motion_to_the_session(router):
     motion = FakeMotion()
-    voice, _host, shows = router(motion=motion)
+    voice, _host, slideshows = router(motion=motion)
 
     voice.become_hosted()
     voice.on_command(AppCommand.SPEED_UP)
     voice.on_command(BarSetting("amp", 70))
 
     assert (motion.speed, motion.amplitude) == (40, 50)
-    assert shows.answers == ["🎤 the motion is the session's here"] * 2
-    assert shows.answer_kinds == [WARNING] * 2
+    assert slideshows.answers == ["🎤 the motion is the session's here"] * 2
+    assert slideshows.answer_kinds == [WARNING] * 2
 
 
 def test_a_router_handed_back_from_a_session_holds_the_motion_and_switches_again(router):
     motion = FakeMotion()
     audio = FakeButton(tip="Audio bed")
-    voice, _host, _shows = router(motion=motion, bank={"audio": audio})
+    voice, _host, _slideshows = router(motion=motion, bank={"audio": audio})
     voice.become_hosted()
 
     voice.become_standalone(motion, audio=audio, drive=FakeButton(), mic=FakeButton(checked=True))
@@ -575,78 +575,78 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
     # what a speaker who is not looking at the bank needs told back.
     pressed = []
     undo = FakeButton(tip="Undo: delete of 2 items")
-    voice, _host, shows = router(
+    voice, _host, slideshows = router(
         bank={"actions": {AppCommand.UNDO: (undo, lambda: pressed.append(1))}})
 
     voice.on_command(AppCommand.UNDO)
 
     assert pressed == [1]
-    assert shows.answers == ["🎤 Undo: delete of 2 items"]
-    assert shows.answer_kinds == [NOTICE]
+    assert slideshows.answers == ["🎤 Undo: delete of 2 items"]
+    assert slideshows.answer_kinds == [NOTICE]
 
 
 def test_a_bank_word_whose_button_is_dead_says_why(router):
-    voice, _host, shows = router(
+    voice, _host, slideshows = router(
         bank={"actions": {AppCommand.GROUP: (FakeButton(tip="Group", enabled=False),
                                              lambda: None)}})
 
     voice.on_command(AppCommand.GROUP)
 
-    assert shows.answers == ["🎤 pick some folders first"]
-    assert shows.answer_kinds == [WARNING]
+    assert slideshows.answers == ["🎤 pick some folders first"]
+    assert slideshows.answer_kinds == [WARNING]
 
 
 def test_a_slideshows_word_with_none_up_says_it_is_a_slideshows(router):
-    voice, _host, shows = router()
+    voice, _host, slideshows = router()
 
     voice.on_command(AppCommand.LOCK)
 
-    assert shows.answers == [f"🎤 {AppCommand.LOCK.value} is a slideshow's — none is up"]
-    assert shows.answer_kinds == [WARNING]
+    assert slideshows.answers == [f"🎤 {AppCommand.LOCK.value} is a slideshow's — none is up"]
+    assert slideshows.answer_kinds == [WARNING]
 
 
-def test_a_transport_word_goes_to_the_slide_while_a_show_is_up(router):
-    voice, _host, shows = router(shows=FakeShows(showing=FakeShow()))
+def test_a_transport_word_goes_to_the_slide_while_a_slideshow_is_up(router):
+    voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=FakeSlideshow()))
 
     voice.on_command(AppCommand.FORWARD)
 
-    assert shows.slide_words == [AppCommand.FORWARD]
+    assert slideshows.slide_words == [AppCommand.FORWARD]
 
 
-def test_undo_stays_the_gallerys_even_under_a_show(router):
+def test_undo_stays_the_gallerys_even_under_a_slideshow(router):
     # Undoing a cull you regret is exactly a thing to do mid-show.
     pressed = []
-    voice, _host, shows = router(
-        shows=FakeShows(showing=FakeShow()),
+    voice, _host, slideshows = router(
+        slideshows=FakeSlideshows(showing=FakeSlideshow()),
         bank={"actions": {AppCommand.UNDO: (FakeButton(tip="Undo"),
                                             lambda: pressed.append(1))}})
 
     voice.on_command(AppCommand.UNDO)
 
     assert pressed == [1]
-    assert shows.slide_words == []
+    assert slideshows.slide_words == []
 
 
-def test_a_collection_to_play_and_a_show_command_go_to_the_shows(router):
-    voice, _host, shows = router()
+def test_a_collection_to_play_and_a_slideshow_command_go_to_the_slideshows(router):
+    voice, _host, slideshows = router()
 
     voice.on_command(CollectionCommand(RECENTS_KEY, "portrait"))
-    voice.on_command(ShowControl(ShowCommand.STOP, "landscape"))
+    voice.on_command(SlideshowControl(SlideshowCommand.STOP, "landscape"))
 
-    assert len(shows.collections_played) == 1
-    assert shows.show_commands == [(ShowCommand.STOP, "landscape")]
+    assert len(slideshows.collections_played) == 1
+    assert slideshows.slideshow_commands == [(SlideshowCommand.STOP, "landscape")]
 
 
-def test_a_filter_word_narrows_the_show_rather_than_the_gallery(router):
-    voice, _host, shows = router()
+def test_a_filter_word_narrows_the_slideshow_rather_than_the_gallery(router):
+    voice, _host, slideshows = router()
 
     voice.on_command(AppCommand.FILTER_ENHANCED)
 
-    assert shows.filters == [(True, None)]
+    assert slideshows.filters == [(True, None)]
 
 
 def test_a_matched_kind_nobody_wired_through_is_logged_not_dropped(router, caplog):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
 
     with caplog.at_level("WARNING"):
         voice.on_command(object())
@@ -658,20 +658,20 @@ def test_a_matched_kind_nobody_wired_through_is_logged_not_dropped(router, caplo
 
 
 def test_an_order_about_the_picture_goes_to_the_slide_filling_the_screen(router):
-    show = FakeShow(target="g7")
-    voice, host, _shows = router(shows=FakeShows(showing=show))
+    slideshow = FakeSlideshow(target="g7")
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND, None))
 
     assert host.enhanced == ["g7"]
-    assert show.runs == [("g7", "🎤 enhancing…", NOTICE)]
+    assert slideshow.runs == [("g7", "🎤 enhancing…", NOTICE)]
 
 
-def test_enhance_with_no_show_up_falls_to_the_bank_button_of_that_name(router):
+def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(router):
     # A refusal there would be a dead end where there is a perfectly good thing
     # to do.
     pressed = []
-    voice, host, shows = router(
+    voice, host, slideshows = router(
         bank={"enhance": (FakeButton(tip="Enhance 2 images"),
                           lambda: pressed.append(1))})
 
@@ -679,11 +679,11 @@ def test_enhance_with_no_show_up_falls_to_the_bank_button_of_that_name(router):
 
     assert pressed == [1]
     assert host.enhanced == []
-    assert shows.answers == ["🎤 Enhance 2 images"]
+    assert slideshows.answers == ["🎤 Enhance 2 images"]
 
 
 def test_a_flick_asked_for_with_no_picture_on_screen_says_so(router):
-    voice, host, _shows = router()
+    voice, host, _slideshows = router()
 
     voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND, None))
 
@@ -694,27 +694,27 @@ def test_a_flick_asked_for_with_no_picture_on_screen_says_so(router):
 # --- a request said over several breaths ------------------------------------
 
 
-def test_an_opening_request_pauses_the_show_and_says_so(router):
-    show = FakeShow()
-    voice, _host, _shows = router(shows=FakeShows(showing=show))
+def test_an_opening_request_pauses_the_slideshow_and_says_so(router):
+    slideshow = FakeSlideshow()
+    voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
-    assert show.pauses == [(True, "🎤 Request: no hat…")]
+    assert slideshow.pauses == [(True, "🎤 Request: no hat…")]
 
 
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):
-    # A show holds still for the sentence, but the words take seconds and the
+    # A slideshow holds still for the sentence, but the words take seconds and the
     # item on screen when they end is not necessarily the one they were about.
-    show = FakeShow(target="g1")
-    voice, _host, _shows = router(shows=FakeShows(showing=show),
-                                  db=FakeDB([_row("g1")]))
+    slideshow = FakeSlideshow(target="g1")
+    voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
+                                       db=FakeDB([_row("g1")]))
     begun = []
     # The working-out itself goes to a pool thread, whose answer would land
     # whenever it landed; what this is about is which picture it is begun on.
     voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("no hat", listening=True))
-    show.target = "g2"
+    slideshow.target = "g2"
 
     voice.on_spoken_request(Spoken("no hat"))
 
@@ -722,8 +722,8 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
     assert voice._request_target is None
 
 
-def test_a_request_with_no_show_up_is_about_the_picked_generation(router):
-    voice, _host, _shows = router(FakeHost(selected="g5"))
+def test_a_request_with_no_slideshow_up_is_about_the_picked_generation(router):
+    voice, _host, _slideshows = router(FakeHost(selected="g5"))
 
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
@@ -731,7 +731,7 @@ def test_a_request_with_no_show_up_is_about_the_picked_generation(router):
 
 
 def test_a_request_whose_terminator_never_came_is_dropped_and_says_so(router):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
     voice.on_spoken_request(Spoken("no hat", state="never got there"))
@@ -740,7 +740,7 @@ def test_a_request_whose_terminator_never_came_is_dropped_and_says_so(router):
 
 
 def test_a_request_over_nothing_is_answered_rather_than_queued(router):
-    voice, host, _shows = router(db=FakeDB())
+    voice, host, _slideshows = router(db=FakeDB())
 
     voice._begin_request(None, Spoken("no hat"))
 
@@ -749,7 +749,7 @@ def test_a_request_over_nothing_is_answered_rather_than_queued(router):
 
 
 def test_a_recipe_this_app_cannot_rebuild_is_answered_here(router):
-    voice, host, _shows = router(db=FakeDB([_row("g1", workflow_name="a_stranger")]))
+    voice, host, _slideshows = router(db=FakeDB([_row("g1", workflow_name="a_stranger")]))
 
     voice._begin_request("g1", Spoken("no hat"))
 
@@ -763,7 +763,7 @@ def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
         changed = False
         term = "hat"
 
-    voice, host, _shows = router()
+    voice, host, _slideshows = router()
 
     voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None), Revision())
 
@@ -772,7 +772,7 @@ def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
 
 
 def test_a_revision_nobody_could_read_says_so(router):
-    voice, host, _shows = router()
+    voice, host, _slideshows = router()
 
     voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None), None)
 
@@ -785,49 +785,49 @@ def test_a_real_revision_is_queued_and_answered_where_it_was_said(router):
         changed = True
         term = "hat"
 
-    show = FakeShow()
-    voice, host, _shows = router(shows=FakeShows(by_side={"portrait": show}))
+    slideshow = FakeSlideshow()
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(by_side={"portrait": slideshow}))
 
     voice._on_revised(
         (_row("g1"), object(), {}, Spoken("no hat"), "portrait"), Revision())
 
     assert [pid for pid, _rev in host.queued] == ["g1"]
-    assert show.requests[-1] == ("🎤 queued it", False, NOTICE)
+    assert slideshow.requests[-1] == ("🎤 queued it", False, NOTICE)
 
 
 def test_a_request_with_nothing_to_act_on_is_answered_as_a_warning(router):
-    show = FakeShow()
-    voice, host, _shows = router(shows=FakeShows(by_side={"portrait": show}))
+    slideshow = FakeSlideshow()
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(by_side={"portrait": slideshow}))
 
     voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), "portrait"), None)
 
     assert host.queued == []
-    assert show.requests[-1] == (
+    assert slideshow.requests[-1] == (
         "🎤 didn't catch what to change in “no hat”", False, WARNING)
 
 
 def test_a_microphone_that_fails_says_so_as_an_error(router):
-    voice, _host, shows = router()
+    voice, _host, slideshows = router()
 
     voice.listener.error.emit("mic unavailable")
 
-    assert shows.said == ["🎤 mic unavailable"]
-    assert shows.kinds == [ERROR]
+    assert slideshows.said == ["🎤 mic unavailable"]
+    assert slideshows.kinds == [ERROR]
 
 
 # --- words the hosting session heard ----------------------------------------
 
 
 def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
-    voice, _host, shows = router()
+    voice, _host, slideshows = router()
     voice.listener.bare = AppCommand.RECENTS
 
     assert voice.run_spoken_command("recents") is True
-    assert shows.answers == ["🎤 Latest"]
+    assert slideshows.answers == ["🎤 Latest"]
 
 
 def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
     voice.listener.dictated = Spoken("no hat", listening=True)
 
     assert voice.run_spoken_command("portrait request no hat") is True
@@ -836,7 +836,7 @@ def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
 
 def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(
         router, caplog):
-    voice, _host, _shows = router()
+    voice, _host, _slideshows = router()
 
     with caplog.at_level(logging.DEBUG):
         assert voice.run_spoken_command("put the kettle on") is False

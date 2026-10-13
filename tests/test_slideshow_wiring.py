@@ -1,11 +1,11 @@
-"""What a show is handed when it opens.
+"""What a slideshow is handed when it opens.
 
 SlideshowView took nineteen constructor arguments, six of them callbacks back
 into the gallery and three of them the Funestras' HUD's description of the set.
 Neither group ever travelled alone — the six are passed at exactly one place,
 always all six, and the three go together at every caller that passes any of
 them — so each is one argument now. These pin the two records and the fact that
-the show still reads its wiring off them.
+the slideshow still reads its wiring off them.
 """
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
-from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from tests.funestra_fakes import FakeEngine
 
 _ITEMS = [("a.png", "image", "id-a", None), ("b.png", "image", "id-b", None)]
@@ -28,7 +28,7 @@ def _press(view, key, modifier=Qt.KeyboardModifier.NoModifier):
 
 @pytest.fixture
 def wired(qtbot):
-    """A show with every one of the six acts recorded rather than performed."""
+    """A slideshow with every one of the six acts recorded rather than performed."""
     calls: dict[str, list] = {name: [] for name in
                               ("delete", "enhance", "star", "lock", "reset",
                                "drive_toggle")}
@@ -39,7 +39,7 @@ def wired(qtbot):
             return result
         return _act
 
-    actions = ShowActions(
+    actions = SlideshowActions(
         delete=record("delete"),
         enhance=record("enhance", result=True),
         favorite=record("star"),
@@ -64,19 +64,19 @@ def test_the_six_acts_travel_as_one_record_and_land_where_they_did(wired):
     _press(view, Qt.Key.Key_Up)       # cull
     assert calls["delete"] == [("id-a",)]
 
-    view.show_reset()
+    view.slideshow_reset()
     assert calls["reset"] == [(view,)]
 
 
-def test_a_show_handed_no_acts_at_all_just_does_less(qtbot):
-    # Every field defaults to nothing, which is what a show opened by a test or
+def test_a_slideshow_handed_no_acts_at_all_just_does_less(qtbot):
+    # Every field defaults to nothing, which is what a slideshow opened by a test or
     # standing alone gets: the presses still work, they just ask nobody.
     view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
 
     _press(view, Qt.Key.Key_Down)
 
-    assert view._playlist.locked is True   # the hold itself is the show's own
+    assert view._playlist.locked is True   # the hold itself is the slideshow's own
 
 
 def test_the_hud_facts_travel_as_one_record(qtbot):
@@ -92,7 +92,7 @@ def test_the_hud_facts_travel_as_one_record(qtbot):
 
 def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
     # And not looping: a loop is one axis of the map played round and round,
-    # started from the show, never a fact about the set it was handed.
+    # started from the slideshow, never a fact about the set it was handed.
     view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
 
@@ -100,8 +100,8 @@ def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
     assert view.hud_is_favorite is False
 
 
-def test_retuning_a_show_dresses_it_as_a_base_state(qtbot):
-    # A hosted reset points the show at the region's base set, which is one KIND
+def test_retuning_a_slideshow_dresses_it_as_a_base_state(qtbot):
+    # A hosted reset points the slideshow at the region's base set, which is one KIND
     # of set and always the same one: shuffled.  Its two callers used to spell
     # that out and could have disagreed; there is one answer now, and the
     # favorites it already had are not part of it.
@@ -116,9 +116,9 @@ def test_retuning_a_show_dresses_it_as_a_base_state(qtbot):
 
 
 def test_neither_record_can_be_edited_after_it_is_handed_over(qtbot):
-    # They describe how a show was opened. A caller that wants a different
-    # answer opens a different show, or retunes this one.
+    # They describe how a slideshow was opened. A caller that wants a different
+    # answer opens a different slideshow, or retunes this one.
     with pytest.raises(FrozenInstanceError):
-        ShowActions().delete = print
+        SlideshowActions().delete = print
     with pytest.raises(FrozenInstanceError):
         HudFacts().order_label = "Latest"

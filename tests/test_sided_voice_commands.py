@@ -2,8 +2,8 @@
 
 The vocabularies themselves live where they are owned — the picture commands
 in :mod:`origenerator.gallery.voice_commands`, the slideshow's in
-:mod:`origenerator.voice.show_commands`.  This is what wraps them: an optional
-leading side, and the collection names, so an utterance can say WHICH show it means
+:mod:`origenerator.voice.slideshow_commands`.  This is what wraps them: an optional
+leading side, and the collection names, so an utterance can say WHICH slideshow it means
 when two are running on the satellite regions.
 
 Everything this does NOT match falls through to a prompt rewrite, so the
@@ -23,14 +23,14 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.voice_commands import GENAU_COMMAND
 from origenerator.voice.commands import (
     CollectionCommand,
-    ShowControl,
+    SlideshowControl,
     SurfaceCommand,
     match_voice_command,
     sided_app_command,
     split_side,
     spoken_phrases,
 )
-from origenerator.voice.show_commands import ShowCommand
+from origenerator.voice.slideshow_commands import SlideshowCommand
 
 
 @pytest.mark.parametrize("text, side", [
@@ -39,7 +39,7 @@ from origenerator.voice.show_commands import ShowCommand
     ("portrait fix her hands", "portrait"),
 ])
 def test_a_fix_can_name_the_side_it_means(text, side):
-    """Hosted, two shows run and neither is the active window, so the side word
+    """Hosted, two slideshows run and neither is the active window, so the side word
     is the only thing that says which picture is being looked at."""
     command = match_voice_command(text)
 
@@ -96,14 +96,14 @@ def test_every_phrase_the_recognizer_is_asked_to_hear_means_something():
     ("landscape start slideshow", "landscape"),
     ("portrait stop slideshow", "portrait"),
 ])
-def test_a_show_command_can_name_the_side_it_means(text, side):
-    """The show's own controls take a side too, for the same reason: hosted,
+def test_a_slideshow_command_can_name_the_side_it_means(text, side):
+    """The slideshow's own controls take a side too, for the same reason: hosted,
     "stop slideshow" with two up has to say which one."""
     command = match_voice_command(text)
 
-    assert isinstance(command, ShowControl)
+    assert isinstance(command, SlideshowControl)
     assert command.side == side
-    assert isinstance(command.command, ShowCommand)
+    assert isinstance(command.command, SlideshowCommand)
 
 
 @pytest.mark.parametrize("text, side", [

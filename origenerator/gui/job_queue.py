@@ -148,7 +148,7 @@ class JobQueue(QObject):
     And the user's image work owns it outright: whatever is being rendered when a
     picture is asked for is set aside -- stopped, and put back in the line to
     start over once the pictures are done (:meth:`_set_aside_for`) -- unless it
-    is what a show is locked on (:meth:`put_first`)."""
+    is what a slideshow is locked on (:meth:`put_first`)."""
 
     changed = pyqtSignal()            # the set of live jobs changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well

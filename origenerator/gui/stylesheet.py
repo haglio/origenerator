@@ -410,7 +410,7 @@ def dress_application(app, preview: Preview | None) -> None:
     to begin with: a sheet dresses the widgets it names, while the colors it
     names none of -- a selection's ground, a link's ink -- stay whatever the
     desktop handed the app, which here was the user's accent orange.  The icon
-    is the third: a show on a satellite region is a window of its own that sets
+    is the third: a slideshow on a satellite region is a window of its own that sets
     none, and the window switcher drew it a blank page.
     """
     app.setPalette(family_palette(app.palette()))

@@ -57,7 +57,7 @@ def test_the_remembered_shapes_stop_piling_up():
 
 
 def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypatch):
-    """A show on a Fun Time region re-sorts the whole library by shape on every
+    """A slideshow on a Fun Time region re-sorts the whole library by shape on every
     picture a running generation streams; looking each item's file up on disk
     again, for a shape already known, froze the window long enough for Windows
     to close it."""

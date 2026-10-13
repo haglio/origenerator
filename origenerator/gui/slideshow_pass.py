@@ -1,4 +1,4 @@
-"""The pass a show hands a Funestra: each slide as the item the Funestra plays,
+"""The pass a slideshow hands a Funestra: each slide as the item the Funestra plays,
 turned so the slide on screen leads."""
 from __future__ import annotations
 

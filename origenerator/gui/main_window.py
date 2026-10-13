@@ -72,7 +72,7 @@ SESSION_UI_STATE = (
     # read the answer is a preference, and re-picking it every launch is the kind
     # of small friction that makes a control feel unfinished.
     ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
-    ("slideshows", GalleryView.remembered_shows, GalleryView.remember_shows),
+    ("slideshows", GalleryView.remembered_slideshows, GalleryView.remember_slideshows),
     ("generations_failed_as_it_closed", GalleryView.generations_failed_as_it_closed,
      GalleryView.say_generations_failed_as_it_closed),
     ("how_many", GalleryView.how_many, GalleryView.set_how_many),
@@ -126,7 +126,7 @@ class OrigeneratorWindow(QMainWindow):
         self._notices = DesktopNotices(self.windowIcon(), parent=self, shown_as=preview)
         self._gallery_view.run_ended.connect(self._notices.note)
         if fun_time is not None:
-            # The session's channels: its verbs onto the region shows, the
+            # The session's channels: its verbs onto the region slideshows, the
             # paused flag over them, and the occupancy status back. Built here
             # rather than by the boot, which had to reach through this window
             # for the gallery to hand over. Parented to the window, so it lives

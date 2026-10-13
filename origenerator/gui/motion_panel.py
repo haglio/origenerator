@@ -4,15 +4,15 @@ Nothing on it is drawn here. :class:`funestra.console_hud.ConsolePainter`
 paints it, and this widget renders that into a bitmap and blits it: the
 hands-free row, the OSR2 line and the drive readout under them, all the code
 Fun Time runs.  What goes on it and what a press takes off it are
-:mod:`origenerator.gui.console`'s, which a show's own panel asks the same
+:mod:`origenerator.gui.console`'s, which a slideshow's own panel asks the same
 questions of.
 
 The on/off switch IS on it: the control-state group -- parked, retracted,
 driving, control off -- is the app's one OSR2 switch now, and the toolbar's
 separate one is gone.
 
-This is the surface with no show under it.  A show does not float one of these:
-it wears ONE panel (:mod:`origenerator.gui.show_panel`), which carries the device
+This is the surface with no slideshow under it.  A slideshow does not float one of these:
+it wears ONE panel (:mod:`origenerator.gui.slideshow_panel`), which carries the device
 rows, the OSR2 line and the readout itself -- two panels in one corner said the
 status twice, in two lines that disagreed, and drew prev/next/lock/trash on
 each.

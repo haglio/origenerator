@@ -119,7 +119,7 @@ model, where the honest shrug only leaves it listed.
 ## An act keyword has to mean its act and nothing else in this library
 
 `recipe_categories` in the content overlay decides which act a prompt depicts,
-by plain substring, and that answer is now a name the user reads: a show's HUD
+by plain substring, and that answer is now a name the user reads: a slideshow's HUD
 writes it into the gutter of every map row and onto that row's filter button
 (`nav_map.act_of`). So a keyword that is also ordinary describing vocabulary
 costs more than a wrong suggestion in Combine — it names rows for an act they
@@ -165,7 +165,7 @@ feature and a follow-up. Four shapes it takes: a verb in
 `fun_time_mode.py` declares every line the command file answers and publishes
 them in `origenerator_contract.json`, which fun_time's
 `tests/test_vr_control_parity.py` holds everything its keys and phrases send
-here to), a switch on the shared HUD in `gui/show_panel.py` (which posts a verb
+here to), a switch on the shared HUD in `gui/slideshow_panel.py` (which posts a verb
 `fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
 `windows_bridge_startup.py`; that module declares the flags and the window
@@ -183,7 +183,7 @@ writes one; a preview that read only its own went on driving beside Fun Time
 
 One-sided, none of them fails loudly. The console's enhanced-only switch shipped
 on the shared side with nothing on fun_time's side answering the verb it posts,
-so the button lit and the shows played on unchanged — a control that looks live
+so the button lit and the slideshows played on unchanged — a control that looks live
 and does nothing, found by an audit rather than by a red test (bug 90). Pointed
 the other way it is worse: a flag this app stops accepting is a flag the session
 goes on passing, and the hosted launch dies in argparse before it can log.

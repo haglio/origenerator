@@ -5,7 +5,7 @@ where that one follows a playing video's script, this one *is* the motion
 source, advancing a :class:`~origenerator.motion_engine.Motion` on a clock
 of its own and streaming each sampled position as T-code, and parking the device
 when it stops. The gallery owns the one instance, app-global — every surface (the
-main window, the fullscreen show) drives it through the shared key cluster in
+main window, the fullscreen slideshow) drives it through the shared key cluster in
 :mod:`origenerator.gui.motion_hud`, and the motion outlives any of them: closing
 a view leaves the device running until Space (or Esc in the gallery) stops it.
 

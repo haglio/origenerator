@@ -482,7 +482,7 @@ def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
 
     assert view._browser.visible_prompt_ids() == ["t1"]
     # The slideshow plays exactly the listing — a homogeneous set, so the
-    # hosting session routes the whole show to the portrait region.
+    # hosting session routes the whole slideshow to the portrait region.
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
     # And it is what history remembers, so Back returns to that side's collection.
     assert view._current_collection_key() == oriented_key(RECENTS_KEY, "portrait")
@@ -567,12 +567,12 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
     assert drawn == [oriented_key("image/sdxl_t2i", "portrait"),
                      oriented_key("image/sdxl_t2i", "landscape")]
     for key, expected in zip(drawn, (["t1"], ["w1"])):
-        assert [row["prompt_id"] for row in view._shows.rows_at(key)] == expected
+        assert [row["prompt_id"] for row in view._slideshows.rows_at(key)] == expected
         assert view.group_for_key(key).key == "image/sdxl_t2i"  # its identity is unsplit
 
 
 def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
-    """The payoff: which screen a show is for is read off the key it was started
+    """The payoff: which screen a slideshow is for is read off the key it was started
     from, not voted on by measuring the items back out."""
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     view = GalleryView(FakeDB([tall]))
@@ -586,9 +586,9 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
         opened.append(kwargs)
         return stub
 
-    view._shows.open = record
+    view._slideshows.open = record
     view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, "portrait")])
-    view._shows.start()
+    view._slideshows.start()
 
     assert opened and opened[0]["side"] == "portrait"
     assert opened[0]["location"] == oriented_key(RECENTS_KEY, "portrait")
@@ -602,6 +602,6 @@ def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):
     view.refresh()
 
     for side, expected in (("portrait", ["t1"]), ("landscape", ["w1"])):
-        key = view._shows.base_location(side)
+        key = view._slideshows.base_location(side)
         assert key in view._item_by_key  # a real row, not a synthetic narrowing
-        assert [row["prompt_id"] for row in view._shows.rows_at(key)] == expected
+        assert [row["prompt_id"] for row in view._slideshows.rows_at(key)] == expected

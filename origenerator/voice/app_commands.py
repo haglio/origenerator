@@ -9,7 +9,7 @@ does, and "undo" takes back the last delete without reaching for the mouse.
 Every phrase is matched against the WHOLE utterance, and that is the only thing
 making a one-word vocabulary safe on a mic that is also dictating prompts. The
 looser matchers can afford filler words because each carries a word no prompt
-says — a fix leads with "fix", a show command names the slideshow — but a bare
+says — a fix leads with "fix", a slideshow command names the slideshow — but a bare
 "lock" carries nothing, so it gets no slack at all: "lock" is the command and "a
 lock of hair over her eye" is a prompt.
 
@@ -20,9 +20,9 @@ and the value rather than a constant each for three dozen combinations. Both com
 back from the one matcher, and the caller tells them apart by type.
 
 **Where a command lands is the surface in front of the speaker**, not a fixed
-target. A fullscreen show has the floor while one is up and the gallery has it
+target. A fullscreen slideshow has the floor while one is up and the gallery has it
 otherwise, which is Fun Time's active-side idea with two sides: "back" steps a
-slide over a show and walks the history in the gallery, because in both places
+slide over a slideshow and walks the history in the gallery, because in both places
 it means the one before. The app-wide switches (the mic, the audio bed, the
 OSR2) and the motion's own bars belong to no surface and answer from either.
 
@@ -52,7 +52,7 @@ class AppCommand(Enum):
     TRASH = "trash"
 
     # The transport, aimed at whichever surface has the floor: a slide either
-    # way over a show, a step through the history in the gallery.
+    # way over a slideshow, a step through the history in the gallery.
     BACK = "back"
     FORWARD = "forward"
 
@@ -80,7 +80,7 @@ class AppCommand(Enum):
     # back — the toolbar's switch is it. Fun Time's mic works the same way.
     MIC_OFF = "mic_off"
 
-    # What a show may play: the switch beside F-mode on its HUD, which keeps
+    # What a slideshow may play: the switch beside F-mode on its HUD, which keeps
     # only the pictures it has enhanced. Said either way round rather than as
     # one toggle: a speaker mid-show is not looking at the HUD to see which way
     # it is set, and "filter enhanced" that turned the filter OFF half the time
@@ -90,7 +90,7 @@ class AppCommand(Enum):
     FILTER_OFF = "filter_off"
 
     # The OSR2 motion's bars, in Fun Time's own words. The driver is app-wide,
-    # so these answer from the gallery and from a show alike.
+    # so these answer from the gallery and from a slideshow alike.
     SPEED_UP = "speed_up"
     SPEED_DOWN = "speed_down"
     AMP_UP = "amp_up"
@@ -167,7 +167,7 @@ _COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.TRASH: ("trash",),
 }
 _COLLECTION_VERBS = ("go to", "open", "show")
-# Said on its own, this one already plays the collection, or narrows a show to it
+# Said on its own, this one already plays the collection, or narrows a slideshow to it
 # (origenerator.voice.commands.COLLECTION_KEYS), so standing in it takes the sentence.
 _NEVER_SAID_BARE = frozenset({"favorites"})
 for _collection, _names in _COLLECTION_NAMES.items():
@@ -207,7 +207,7 @@ _say(AppCommand.MIC_OFF, "mic off", "voice off")
 # off -- the letters and the number however whisper writes them.
 _say(AppCommand.DRIVE_OFF, "osr 2 off", "o s r 2 off", "osr two off", "o s r two off")
 
-# The show's own narrowing filter, in Fun Time's own grammar: "filter <what to
+# The slideshow's own narrowing filter, in Fun Time's own grammar: "filter <what to
 # keep>" turns one on, and "clear filter" is the way back to all of it — the
 # very phrase the satellites answer, so one gesture has one wording in both
 # rooms. "Upscales" is what the enhanced pictures are called at the desk, so it

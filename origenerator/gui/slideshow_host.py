@@ -1,7 +1,7 @@
-"""What a show answers to — the interface, written down once.
+"""What a slideshow answers to — the interface, written down once.
 
 Three things drive whatever is holding a region: the Funestras' own panel
-(:mod:`origenerator.gui.show_panel`), the console's clip-seconds pair
+(:mod:`origenerator.gui.slideshow_panel`), the console's clip-seconds pair
 (:mod:`origenerator.gui.console`), and, inside a session, Fun Time's file
 channels (:mod:`origenerator.fun_time_bridge`). They reached it through
 sixteen ``hasattr``/``getattr`` probes spread over those three modules, each
@@ -10,8 +10,8 @@ not agree: the console called five of the names with no guard at all while the
 other two guarded every one, so nothing in the repo said which was right.
 
 There are two hosts, :class:`~origenerator.gui.slideshow_view.SlideshowView`
-and :class:`~origenerator.gui.funestra_show.FunestraShow`, and both answer all of
-it. A caller therefore asks; it does not check first. ``tests/test_show_host.py``
+and :class:`~origenerator.gui.funestra_slideshow.FunestraSlideshow`, and both answer all of
+it. A caller therefore asks; it does not check first. ``tests/test_slideshow_host.py``
 holds that per driver module at zero, and holds every host to every attribute.
 """
 
@@ -20,12 +20,12 @@ from __future__ import annotations
 from typing import Protocol
 
 
-class ShowHost(Protocol):
-    """The surface a console, a HUD or a hosting session drives a show through.
+class SlideshowHost(Protocol):
+    """The surface a console, a HUD or a hosting session drives a slideshow through.
 
     The first six attributes are the transport: the four buttons and the pace
     pair that Genau's console, the Funestras' HUD and Fun Time's own hotkeys all
-    reach for. The rest are about the *set* a show is playing.
+    reach for. The rest are about the *set* a slideshow is playing.
     """
 
     # --- the transport ------------------------------------------------------
@@ -41,62 +41,62 @@ class ShowHost(Protocol):
         ...
 
     def set_dwell_s(self, seconds: int) -> None:
-        """Take a new pace. It is app-wide, so this sets the next show's too."""
+        """Take a new pace. It is app-wide, so this sets the next slideshow's too."""
         ...
 
-    def show_step(self, delta: int) -> None:
+    def slideshow_step(self, delta: int) -> None:
         """Move a slide either way — prev/next, however it was pressed."""
         ...
 
-    def show_toggle_lock(self) -> None:
+    def slideshow_toggle_lock(self) -> None:
         """Lock what is on screen, or let it go."""
         ...
 
     def set_locked(self, locked: bool) -> bool: ...
 
-    def show_cull(self) -> None:
+    def slideshow_cull(self) -> None:
         """Take what is on screen away and move on."""
         ...
 
     # --- the set ------------------------------------------------------------
 
-    def show_reset(self) -> None:
+    def slideshow_reset(self) -> None:
         """Put the side back how it started."""
 
-    def show_order(self, *, latest: bool) -> None:
+    def slideshow_order(self, *, latest: bool) -> None:
         """Play the side's whole library newest first, or shuffled."""
 
-    def show_loop(self, axis: str) -> None:
+    def slideshow_loop(self, axis: str) -> None:
         """Loop the map's *axis* — "seed" or "action" — around what is on
         screen, or end the loop for ""."""
 
-    def show_loop_cycle(self) -> None:
+    def slideshow_loop_cycle(self) -> None:
         """The loop key: seeds, then actions, then off — or the lock, with
         nothing on either axis to loop."""
 
-    def show_more_seeds(self) -> None:
+    def slideshow_more_seeds(self) -> None:
         """Widen the seed row past what exactly matches and loop it."""
 
-    def show_filter(self, query: str) -> None:
+    def slideshow_filter(self, query: str) -> None:
         """Narrow the set to the act(s) *query* names, as the button at the
         head of a map row posts them."""
 
-    def show_filter_to_the_act_on_screen(self) -> None: ...
+    def slideshow_filter_to_the_act_on_screen(self) -> None: ...
 
     def clear_modes(self) -> bool:
         """Every narrowing off at once — the favorites, the enhanced ones and
-        the act filter — which is what "no filter" means said to a show.
+        the act filter — which is what "no filter" means said to a slideshow.
         ``False`` where nothing moved."""
         ...
 
-    def show_nav(self, direction: str) -> None:
+    def slideshow_nav(self, direction: str) -> None:
         """Step to the map cell one *direction* from the lit one."""
 
     def hud_map(self):
         """The map the HUD draws around what is on screen
-        (:class:`~origenerator.gui.show_map.ShowMap`), which says which of its
+        (:class:`~origenerator.gui.slideshow_map.SlideshowMap`), which says which of its
         axes is looping — or ``None`` for nothing to map, which
-        :func:`~origenerator.gui.show_panel.show_hud_model` reads as no map at all.
+        :func:`~origenerator.gui.slideshow_panel.slideshow_hud_model` reads as no map at all.
         """
 
     @property
@@ -117,11 +117,11 @@ class ShowHost(Protocol):
 
     @property
     def hud_device(self):
-        """What this window is doing to the OSR2, as the one panel a show wears
-        takes it (:class:`~origenerator.gui.console.ShowDevice`) — or None where
+        """What this window is doing to the OSR2, as the one panel a slideshow wears
+        takes it (:class:`~origenerator.gui.console.SlideshowDevice`) — or None where
         this app is not the one driving.
 
-        The show is one host doing two things: browsing a set and driving the
+        The slideshow is one host doing two things: browsing a set and driving the
         device.  It wore two panels for that, the Funestras' HUD over the set and
         Genau's whole console under it, which said the status twice and drew
         prev/next/lock/trash twice.  One panel now, and this is the half of it
@@ -183,7 +183,7 @@ class ShowHost(Protocol):
         ...
 
     def set_audio_muted(self, muted: bool) -> None:
-        """Silence this show, or let it be heard."""
+        """Silence this slideshow, or let it be heard."""
 
     def requeue(self, keys) -> None:
         """Re-line the queue in this order — a row dragged down the block."""

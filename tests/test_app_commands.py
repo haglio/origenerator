@@ -46,7 +46,7 @@ def test_the_requests_collection_answers_only_to_the_plural():
     assert match_app_command("request") is None
 
 
-# --- Fun Time's own words over a show ---------------------------------------
+# --- Fun Time's own words over a slideshow ----------------------------------
 
 def test_the_words_fun_times_funestras_answer_to_mean_the_same_here():
     assert match_app_command("weird") is AppCommand.CULL
@@ -173,7 +173,7 @@ def test_the_enhanced_filter_answers_to_upscales_as_well():
         assert match_app_command(phrase) is AppCommand.FILTER_ENHANCED, phrase
 
 
-def test_the_show_filter_is_said_either_way_round_not_toggled():
+def test_the_slideshow_filter_is_said_either_way_round_not_toggled():
     # A speaker mid-show is not looking at the console to see which way it is
     # set, so a single word that flipped it would do the opposite half the time.
     assert match_app_command("filter enhanced") is AppCommand.FILTER_ENHANCED

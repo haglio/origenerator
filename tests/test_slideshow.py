@@ -7,10 +7,10 @@ from dataclasses import asdict
 
 from origenerator.slideshow import (
     LIVE,
-    ShowFilters,
-    ShowState,
     Slide,
+    SlideshowFilters,
     SlideshowPlaylist,
+    SlideshowState,
     in_order,
 )
 from tests.slideshow_support import ahead
@@ -157,7 +157,7 @@ def test_the_start_item_is_found_wherever_the_shuffle_put_it():
 
 
 def test_no_start_leads_with_whatever_the_pass_leads_with():
-    # A shuffled show opens on the front of its pass, not on the set's first item.
+    # A shuffled slideshow opens on the front of its pass, not on the set's first item.
     playlist = SlideshowPlaylist(
         [("a.png", "image"), ("b.png", "image"), ("c.png", "image")],
         shuffle=lambda order: order.reverse(),
@@ -176,7 +176,7 @@ def test_in_order_leaves_the_set_exactly_as_handed_over():
     assert playlist.order == [0, 1, 2]
 
 def test_a_paused_playlist_has_no_dwell_either():
-    # What a spoken request puts on the show while the sentence is being said.
+    # What a spoken request puts on the slideshow while the sentence is being said.
     playlist = _playlist()
     playlist.set_paused(True)
     assert playlist.dwell_ms() is None
@@ -189,7 +189,7 @@ def test_a_paused_playlist_has_no_dwell_either():
 def test_the_pause_and_the_lock_are_independent():
     # Releasing one must not release the other: a slide the user locked stays
     # locked when a request ends, and stepping (which drops the lock) must not
-    # quietly resume a show that is still listening.
+    # quietly resume a slideshow that is still listening.
     playlist = _playlist()
     playlist.toggle_lock()
     playlist.set_paused(True)
@@ -220,7 +220,7 @@ def test_peek_names_the_items_either_side_wrapping():
     assert ahead(SlideshowPlaylist([]), 1) is None
 
 
-# --- an item that lands while the show runs ---------------------------------
+# --- an item that lands while the slideshow runs ----------------------------
 
 def test_an_item_that_lands_mid_pass_comes_up_next():
     # Watching a folder fill is watching for the new one, and at the end of a
@@ -267,7 +267,7 @@ def test_a_slide_led_with_from_earlier_in_the_pass_still_comes_up_now():
     assert ahead(playlist, 2) == Slide("b.mp4", "video")
 
 
-# --- an item that gets enhanced while the show runs -------------------------
+# --- an item that gets enhanced while the slideshow runs --------------------
 
 def _keyed(**kw):
     kw.setdefault("shuffle", lambda order: None)
@@ -278,7 +278,7 @@ def _keyed(**kw):
 
 
 def test_an_enhanced_item_is_replaced_wherever_it_sits():
-    # The show paged on long before the enhancement landed, so an arrival dropped
+    # The slideshow paged on long before the enhancement landed, so an arrival dropped
     # for being late would play the pre-enhance file every pass from here on.
     playlist = _keyed()
     playlist.advance()  # on b now; the enhancement of a arrives
@@ -290,8 +290,8 @@ def test_an_enhanced_item_is_replaced_wherever_it_sits():
 
 
 def test_replacing_an_item_the_playlist_does_not_hold_reports_nothing():
-    # Every landed enhancement is offered to every open show; one that belongs
-    # to a folder this show isn't playing simply isn't here.
+    # Every landed enhancement is offered to every open slideshow; one that belongs
+    # to a folder this slideshow isn't playing simply isn't here.
     assert _keyed().replace_item("id-elsewhere", "x.png") is False
 
 
@@ -310,7 +310,7 @@ def test_an_upgraded_item_takes_the_new_thumbnail_when_one_comes_with_it():
 
 
 
-# --- picking a closed show's pass back up -----------------------------------
+# --- picking a closed slideshow's pass back up ------------------------------
 
 def _four(**kw):
     kw.setdefault("shuffle", lambda order: None)
@@ -336,7 +336,7 @@ def test_a_resumed_pass_stands_on_the_slide_wherever_the_order_puts_it():
 
 
 def test_a_slide_that_is_no_longer_here_resumes_nothing():
-    # Culled while the show was away, or this is another folder's set entirely:
+    # Culled while the slideshow was away, or this is another folder's set entirely:
     # a pass laid out around an item that isn't in it would open on a stranger.
     playlist = _four()
     assert playlist.resume(["id-elsewhere"], "id-elsewhere") is False
@@ -345,7 +345,7 @@ def test_a_slide_that_is_no_longer_here_resumes_nothing():
 
 
 def test_items_the_remembered_order_never_saw_follow_the_ones_it_did():
-    # Two landed while the show was away. They were no part of the pass being
+    # Two landed while the slideshow was away. They were no part of the pass being
     # picked back up, and the next pass reshuffles the lot anyway.
     playlist = _four()
     assert playlist.resume(["id-c", "id-a"], "id-c") is True
@@ -366,7 +366,7 @@ def test_a_set_with_no_ids_names_no_pass():
     assert playlist.resume([None], None) is False
 
 
-def test_the_lock_can_be_put_back_where_a_closed_show_left_it():
+def test_the_lock_can_be_put_back_where_a_closed_slideshow_left_it():
     playlist = _four()
     playlist.set_locked(True)
     assert playlist.locked
@@ -379,7 +379,7 @@ def test_the_lock_can_be_put_back_where_a_closed_show_left_it():
 
 
 def test_a_run_being_made_joins_as_a_slide_of_its_frames():
-    # Waiting for the file is waiting minutes for the one thing a show of a
+    # Waiting for the file is waiting minutes for the one thing a slideshow of a
     # generating folder is being watched for.
     playlist = _four()
 
@@ -420,7 +420,7 @@ def test_a_live_slide_becomes_the_file_it_lands_as():
     assert playlist.live_ids() == []
 
 
-def test_a_run_that_lands_after_the_show_moved_past_it_comes_up_next():
+def test_a_run_that_lands_after_the_slideshow_moved_past_it_comes_up_next():
     playlist = _four()
     playlist.add((b"frame-1", LIVE, "id-new", None))
     for _ in range(3):
@@ -502,7 +502,7 @@ def test_an_arrival_led_with_no_longer_waits_ahead_of_new_ones():
     assert playlist.advance()[2] == "id-new"
 
 
-def test_a_waiting_run_the_show_jumped_past_comes_up_next_when_it_lands():
+def test_a_waiting_run_the_slideshow_jumped_past_comes_up_next_when_it_lands():
     playlist = _four()
     playlist.add((b"frame-1", LIVE, "id-first", None))
     playlist.jump_to(2)
@@ -565,23 +565,23 @@ def test_dropping_something_that_was_never_here_changes_nothing():
     assert playlist.order_ids() == ["id-a", "id-b", "id-c", "id-d"]
 
 
-def test_where_a_show_was_left_reads_back_as_it_was_saved():
-    state = ShowState(order=("id-b", "id-a"), current="id-a", locked=True, level_index=1,
-                      loop="seed")
+def test_where_a_slideshow_was_left_reads_back_as_it_was_saved():
+    state = SlideshowState(order=("id-b", "id-a"), current="id-a", locked=True, level_index=1,
+                           loop="seed")
 
-    assert ShowState.restored(json.loads(json.dumps(state.saved()))) == state
+    assert SlideshowState.restored(json.loads(json.dumps(state.saved()))) == state
 
 
 def test_the_filters_read_back_as_they_were_saved():
-    filters = ShowFilters(favorites=True, enhanced=True, act="alpha")
+    filters = SlideshowFilters(favorites=True, enhanced=True, act="alpha")
 
-    assert ShowFilters.restored(json.loads(json.dumps(asdict(filters)))) == filters
-    assert ShowFilters.restored({"favorites": 1, "act": ["alpha"]}) == ShowFilters()
+    assert SlideshowFilters.restored(json.loads(json.dumps(asdict(filters)))) == filters
+    assert SlideshowFilters.restored({"favorites": 1, "act": ["alpha"]}) == SlideshowFilters()
 
 
-def test_a_saved_show_that_makes_no_sense_reads_back_as_nowhere():
+def test_a_saved_slideshow_that_makes_no_sense_reads_back_as_nowhere():
     nonsense = {"order": "id-a", "current": 3, "locked": "yes", "level_index": -2,
                 "loop": 5}
 
-    assert ShowState.restored(nonsense) == ShowState()
-    assert ShowState.restored(None) == ShowState()
+    assert SlideshowState.restored(nonsense) == SlideshowState()
+    assert SlideshowState.restored(None) == SlideshowState()

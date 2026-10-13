@@ -93,7 +93,7 @@ class CombineController(QObject):
     """The combine panel, and every way a recipe reaches a dropped picture."""
 
     def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
-                 info_tabs_of, shows, inbox: evolver_export.EvolverInbox | None = None):
+                 info_tabs_of, slideshows, inbox: evolver_export.EvolverInbox | None = None):
         super().__init__(parent)
         self._host = host
         self._db = db
@@ -108,7 +108,7 @@ class CombineController(QObject):
         # rather than held, so a prepared combination reaches whichever tabs
         # exist by then.
         self._info_tabs_of = info_tabs_of
-        self._shows = shows
+        self._slideshows = slideshows
         # Stand-in queue rows for a Generate pressed but not yet a job, by key
         # (:meth:`_show_launching`), and the counter their keys are drawn from —
         # anything that can't be mistaken for a prompt id.
@@ -450,7 +450,7 @@ class CombineController(QObject):
             return False
         if send:
             self._mark_for_sending(going.prompt_id, send)
-            self._shows.note_voice_run(None, ALREADY_MAKING_ONE, kind=NOTICE)
+            self._slideshows.note_voice_run(None, ALREADY_MAKING_ONE, kind=NOTICE)
         self._host.reveal_launch(key)
         return True
 
@@ -525,8 +525,8 @@ class CombineController(QObject):
         place this must never appear."""
         what = (f"looping “{category}” {genau_flick_word()}" if intent == recipe_match.GENAU
                 else f"“{category}” video")
-        if self._shows.showing is not None:
-            self._shows.note_voice_run(
+        if self._slideshows.showing is not None:
+            self._slideshows.note_voice_run(
                 None, f"🎤 no past {what} to base a recipe on yet", kind=WARNING)
             return
         self._host.tell(

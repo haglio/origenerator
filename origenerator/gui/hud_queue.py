@@ -1,8 +1,8 @@
-"""The generation queue, painted onto the one panel a show wears.
+"""The generation queue, painted onto the one panel a slideshow wears.
 
-A show covers the lower strip that carries the queue, and it is the worst
-moment to lose it: a show is when the user keeps adding to it.  So it rides on
-the panel the show already wears rather than on a plate of its own, which would
+A slideshow covers the lower strip that carries the queue, and it is the worst
+moment to lose it: a slideshow is when the user keeps adding to it.  So it rides on
+the panel the slideshow already wears rather than on a plate of its own, which would
 be a second HUD.
 
 It says what the strip says: the job being made with its live frame and the
@@ -48,7 +48,7 @@ from origenerator.gui.inflight import (
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-# What a press on this block posts, and what the show does with each: throw the
+# What a press on this block posts, and what the slideshow does with each: throw the
 # job away, go to the folder it will land in, drop another app's work.
 CANCEL = "queue_cancel"
 OPEN = "queue_open"
@@ -91,7 +91,7 @@ _MARK_GAP = 4
 _DROP_W = 2             # the mark showing where a dragged row would land
 # The widest the block asks the panel to be. Past this the texts elide instead:
 # the panel is anchored in a corner of the screen, and a line of queued work is
-# not worth half the width of a show.
+# not worth half the width of a slideshow.
 _MAX_W = 460
 
 _SLOT_ALPHA = 110       # a cell with nothing in it reads as a slot, not a picture
@@ -155,7 +155,7 @@ class Leader:
 
 @dataclass(frozen=True)
 class QueueSection:
-    """What is in flight, as the show's HUD draws it at the panel's foot."""
+    """What is in flight, as the slideshow's HUD draws it at the panel's foot."""
 
     lines: tuple[JobLine, ...] = ()
     leader: Leader | None = None

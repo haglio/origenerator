@@ -125,7 +125,7 @@ class CombinationView(QWidget):
         for paren in self._parens:
             paren.hide()
         # Clicks fall through to the pane, which owns the double-click that opens
-        # a show — there is nothing here to open, so nothing here should eat one.
+        # a slideshow — there is nothing here to open, so nothing here should eat one.
         for label in (self.image_label, self.plus_label, self.open_paren_label,
                       self.video_label, self.close_paren_label):
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)

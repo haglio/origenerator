@@ -337,7 +337,7 @@ def test_a_hairline_still_separates_one_tab_from_the_next(qtbot):
 
 
 def test_dressing_the_app_hands_it_the_icon_every_window_wears(qapp):
-    """A show on a satellite region is a frameless window of its own that sets
+    """A slideshow on a satellite region is a frameless window of its own that sets
     no icon, so the window switcher drew it a blank page. The icon belongs to
     the application, where every window it opens picks it up."""
     before = qapp.windowIcon()

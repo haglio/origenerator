@@ -105,7 +105,7 @@ def test_a_session_on_the_monitors_asks_for_no_picture():
 
 
 def test_a_session_that_names_no_funestra_hands_over_none():
-    """A session too old to name them is one whose shows still open windows of
+    """A session too old to name them is one whose slideshows still open windows of
     their own, so the answer has to be "there is no Funestra here" rather than a
     channel of empty paths."""
     args = parse_app_args(hosted_launch())
@@ -222,8 +222,8 @@ def test_region_for_items_takes_the_majority_orientation(tmp_path):
     assert region_for_items(items) == "portrait"
 
 
-def test_region_for_items_routes_a_running_shows_own_slides(tmp_path):
-    # A show already playing asks again when its region has to be re-decided,
+def test_region_for_items_routes_a_running_slideshows_own_slides(tmp_path):
+    # A slideshow already playing asks again when its region has to be re-decided,
     # and what it holds are slides rather than the tuples the browser built.
     tall = _png(tmp_path / "tall.png", 100, 200)
     assert region_for_items([Slide(str(tall), "image", "a", str(tall))]) == "portrait"

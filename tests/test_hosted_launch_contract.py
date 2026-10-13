@@ -96,12 +96,12 @@ def test_no_other_window_here_wears_that_caption():
     assert elsewhere == []
 
 
-def test_the_show_captions_the_document_names_are_the_ones_a_region_show_wears():
-    source = (REPO_ROOT / "origenerator" / "gui" / "show_director.py").read_text(
+def test_the_slideshow_captions_the_document_names_are_the_ones_a_region_slideshow_wears():
+    source = (REPO_ROOT / "origenerator" / "gui" / "slideshow_director.py").read_text(
         encoding="utf-8")
 
-    assert "view.setWindowTitle(SHOW_TITLES[side])" in source
-    assert _document()["show_titles"] == dict(contract.SHOW_TITLES)
+    assert "view.setWindowTitle(SLIDESHOW_TITLES[side])" in source
+    assert _document()["show_titles"] == dict(contract.SLIDESHOW_TITLES)
 
 
 def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):

@@ -1,20 +1,20 @@
-"""The fullscreen shows: opening them, placing them, feeding them, letting go.
+"""The fullscreen slideshows: opening them, placing them, feeding them, letting go.
 
 The third of the gallery's screen concerns to come out of the view that used to
 hold all of them, and the first one that owns a window. What lives here is a
-show's whole life -- built once however it was asked for, put on the monitor
+slideshow's whole life -- built once however it was asked for, put on the monitor
 standalone or on one of Fun Time's satellite regions, kept up with the folder it
 is playing as generations land there, frozen with the room, and let go when it
 closes (which puts a satellite region back on its base state).
 
-The spoken words about a show are here too -- close it, lock it, narrow it to
+The spoken words about a slideshow are here too -- close it, lock it, narrow it to
 the favorites or to the enhanced ones, step off the slide, play a collection. They
-are words about a show rather than words about the microphone, and a router that
+are words about a slideshow rather than words about the microphone, and a router that
 carried them would only have to hand every one of them straight back.
 
-What stays with the host is what a show is *of*: which folder or collection the
-gallery is standing in, what plays from there, and what a gesture inside a show
-does back in the window. :class:`ShowHost` names each of those.
+What stays with the host is what a slideshow is *of*: which folder or collection the
+gallery is standing in, what plays from there, and what a gesture inside a slideshow
+does back in the window. :class:`SlideshowHost` names each of those.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ from origenerator.config import (
 )
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
-from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
+from origenerator.fun_time_mode import SLIDESHOW_TITLES, region_for_items
 from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
@@ -49,11 +49,11 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import folder_collection
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_show import FunestraShow
+from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
-from origenerator.gui.show_map import MapNeighbors, MapRow
-from origenerator.gui.show_wiring import HudFacts, ShowActions
+from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.media import MediaType
 from origenerator.nav_map import (
     act_labels,
@@ -72,33 +72,33 @@ from origenerator.orientation import (
 from origenerator.orientation import (
     split_key as _split_collection_key,
 )
-from origenerator.show_buttons import PANEL_CORNER
 from origenerator.slideshow import (
     DEFAULT_IMAGE_DWELL_MS,
-    ShowFilters,
-    ShowState,
     Slide,
+    SlideshowFilters,
+    SlideshowState,
     in_order,
 )
+from origenerator.slideshow_buttons import PANEL_CORNER
 from origenerator.voice.app_commands import AppCommand
-from origenerator.voice.show_commands import ShowCommand
+from origenerator.voice.slideshow_commands import SlideshowCommand
 from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
 
 
-class ShowHost(Protocol):
-    """What the shows need of the gallery around them, and nothing else."""
+class SlideshowHost(Protocol):
+    """What the slideshows need of the gallery around them, and nothing else."""
 
-    def show_location(self) -> str | None:
+    def slideshow_location(self) -> str | None:
         """Where the view on screen is playing FROM, as something re-askable: a
         collection key in a collection, else the open folder's key."""
 
     def rows_to_play(self) -> list[dict]:
-        """The generations a show opened from the view on screen would play."""
+        """The generations a slideshow opened from the view on screen would play."""
 
     def slideshow_subject(self) -> str:
-        """What such a show would be *of*, named the way the gallery names it."""
+        """What such a slideshow would be *of*, named the way the gallery names it."""
 
     def side_in_view(self) -> str:
         """Which of the two sides the tree is standing on."""
@@ -120,7 +120,7 @@ class ShowHost(Protocol):
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
-        app's -- the block a show's panel hangs at its foot."""
+        app's -- the block a slideshow's panel hangs at its foot."""
 
     def clear_foreign_queue(self) -> None:
         """Drop another app's work off ComfyUI, as that block's Clear does."""
@@ -129,10 +129,10 @@ class ShowHost(Protocol):
         """Land on this generation: its folder, its tile, its config tab."""
 
     def trash_generation(self, prompt_id: str) -> None:
-        """Condemn it, as a show's Up key does."""
+        """Condemn it, as a slideshow's Up key does."""
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True) -> None:
-        """Bookmark it, as a show's Down key does — or take the bookmark back,
+        """Bookmark it, as a slideshow's Down key does — or take the bookmark back,
         as its Up key does over a favorite."""
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
@@ -145,7 +145,7 @@ class ShowHost(Protocol):
         """Re-pick what the device follows, a surface having changed."""
 
     def set_room_paused(self, paused: bool) -> None:
-        """Stop the room or play it again: the shows, the pictures, the sound
+        """Stop the room or play it again: the slideshows, the pictures, the sound
         and the device."""
 
     def say(self, message: str) -> None:
@@ -153,26 +153,26 @@ class ShowHost(Protocol):
 
 
 @dataclass(frozen=True)
-class HeldShow:
+class HeldSlideshow:
     items: tuple
     location: str | None
     side: str | None
     order_label: str
     image_dwell_ms: int
-    state: ShowState
-    filters: ShowFilters
+    state: SlideshowState
+    filters: SlideshowFilters
 
 
-def _still_up(show):
-    """*show* if it is still on screen, else None — a closed one is no
+def _still_up(slideshow):
+    """*slideshow* if it is still on screen, else None — a closed one is no
     occupant of anything, however recently it was one."""
-    return show if show is not None and show.is_showing() else None
+    return slideshow if slideshow is not None and slideshow.is_showing() else None
 
 
-class ShowDirector:
-    """Every fullscreen show this window has open, and the words about them."""
+class SlideshowDirector:
+    """Every fullscreen slideshow this window has open, and the words about them."""
 
-    def __init__(self, host: ShowHost, *, db, browser, jobs, pace, motion,
+    def __init__(self, host: SlideshowHost, *, db, browser, jobs, pace, motion,
                  fun_time):
         self._host = host
         self._db = db
@@ -189,56 +189,56 @@ class ShowDirector:
         self._standalone_side: str | None = None
         self._hud_corners: dict[str, HudCorner] = {}
         self._hud_minimized: dict[str, bool] = {}
-        # Every show currently up, each with the collection/folder key it opened
-        # from: what a landing generation is offered to, so a show keeps up
+        # Every slideshow currently up, each with the collection/folder key it opened
+        # from: what a landing generation is offered to, so a slideshow keeps up
         # with an auto-generating folder however far the browser has moved on.
         # A list rather than one, because Fun Time runs two at once.
-        self._live_shows: list[tuple] = []
+        self._live_slideshows: list[tuple] = []
         # The regions the hosting session has handed over, until it takes
         # each back: a region it wants is never left empty -- what covers it
         # may end, but the base state comes back under it.
         self._regions_wanted: set[str] = set()
-        # Shows asked for on a side the session has not handed over yet.
+        # Slideshows asked for on a side the session has not handed over yet.
         self._asked_for: dict[str, partial] = {}
-        # Inside Fun Time, what occupies each satellite region — a show per
-        # region, at most one each.  A show is "open" while its window is
+        # Inside Fun Time, what occupies each satellite region — a slideshow per
+        # region, at most one each.  A slideshow is "open" while its window is
         # visible; a closed one just goes stale in its slot until something
         # replaces it.
-        self._region_shows: dict[str, QWidget | None] = (
+        self._region_slideshows: dict[str, QWidget | None] = (
             dict.fromkeys(_ORIENTATIONS) if fun_time is not None else {}
         )
-        # Whether the room is paused, remembered so a show opened mid-pause
+        # Whether the room is paused, remembered so a slideshow opened mid-pause
         # opens frozen (see :meth:`_present_surface`).
         self._room_paused = False
-        # Where the last show was when it closed, so opening one comes back to
+        # Where the last slideshow was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
-        self._show_state = ShowState()
-        self._filters = ShowFilters()
+        self._slideshow_state = SlideshowState()
+        self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
         self._held_at_stamp = None
         self._held_at: dict[str, frozenset[str]] = {}
-        self._taken_into_the_session: HeldShow | None = None
+        self._taken_into_the_session: HeldSlideshow | None = None
 
     def become_hosted(self, session) -> None:
-        self._taken_into_the_session = self.held_show()
+        self._taken_into_the_session = self.held_slideshow()
         if self._slideshow is not None:
             self._slideshow.close()
         self._fun_time = session
         self._motion = None
-        self._region_shows = dict.fromkeys(_ORIENTATIONS)
+        self._region_slideshows = dict.fromkeys(_ORIENTATIONS)
 
     def become_standalone(self, motion) -> None:
         self._taken_into_the_session = None
-        self.close_the_shows()
+        self.close_the_slideshows()
         self._fun_time = None
         self._motion = motion
-        self._region_shows = {}
+        self._region_slideshows = {}
 
     # --- what is up ---------------------------------------------------------
 
     @property
     def showing(self):
-        """The show in front of the user, or ``None`` with none up."""
+        """The slideshow in front of the user, or ``None`` with none up."""
         return self._slideshow
 
     def surfaces(self) -> list:
@@ -246,8 +246,8 @@ class ShowDirector:
         and whatever the satellite regions hold inside Fun Time.  The
         enhancement feed and the media release address all of them — a surface
         that has since closed takes the note inertly, so nothing here polices
-        visibility; only region occupancy does (see :meth:`region_show`)."""
-        candidates = [self._slideshow, *self._region_shows.values()]
+        visibility; only region occupancy does (see :meth:`region_slideshow`)."""
+        candidates = [self._slideshow, *self._region_slideshows.values()]
         surfaces, seen = [], set()
         for surface in candidates:
             if surface is None or id(surface) in seen:
@@ -257,24 +257,24 @@ class ShowDirector:
         return surfaces
 
     def locked_prompt_ids(self) -> set[str]:
-        return {show.locked_on for show in self.surfaces()
-                if show.is_showing() and show.locked_on is not None}
+        return {slideshow.locked_on for slideshow in self.surfaces()
+                if slideshow.is_showing() and slideshow.locked_on is not None}
 
     def surface_for(self, side: str | None):
-        """The show a spoken command means: *side*'s region show when it named
-        one, else the show that is up.
+        """The slideshow a spoken command means: *side*'s region slideshow when it named
+        one, else the slideshow that is up.
 
         Hosted, a named side that holds nothing is an answer in itself —
-        falling back to the other region's show would act on the picture the
+        falling back to the other region's slideshow would act on the picture the
         speaker did not name."""
         if side is not None and self._fun_time is not None:
-            return self.region_show(side)
+            return self.region_slideshow(side)
         return self._slideshow
 
-    def region_show(self, side: str):
-        """The show occupying satellite region *side*, or None — a closed
+    def region_slideshow(self, side: str):
+        """The slideshow occupying satellite region *side*, or None — a closed
         window is no occupant, however recently it was one."""
-        return _still_up(self._region_shows.get(side))
+        return _still_up(self._region_slideshows.get(side))
 
     def _window_up(self):
         """The fullscreen window this app has on the monitor, or None — asked
@@ -284,7 +284,7 @@ class ShowDirector:
     def is_in_front(self) -> bool:
         """True when the window ahead of the gallery is our own fullscreen
         slideshow — one of the things Esc turns off, rather than a window to hand
-        the key back to. A dialog or popup over the show still owns it."""
+        the key back to. A dialog or popup over the slideshow still owns it."""
         if self._slideshow is None:
             return False
         if QApplication.activeModalWidget() or QApplication.activePopupWidget():
@@ -292,7 +292,7 @@ class ShowDirector:
         return QApplication.activeWindow() is self._slideshow
 
     def anything_to_play(self) -> bool:
-        """Whether the view on screen holds media a show could play at all."""
+        """Whether the view on screen holds media a slideshow could play at all."""
         return next(self._playable(self._host.rows_to_play()), None) is not None
 
     # --- opening one --------------------------------------------------------
@@ -300,9 +300,9 @@ class ShowDirector:
     def start(self, *, side: str | None = None):
         """Open what's on screen — a folder, or the Latest/Favorites collection —
         as a fullscreen slideshow, shuffled and running at the app-wide pace,
-        and standing where the last show was closed when that slide is in
+        and standing where the last slideshow was closed when that slide is in
         here."""
-        location = self._host.show_location()
+        location = self._host.slideshow_location()
         base, orientation = _split_collection_key(location)
         collection = folder_collection(base)
         side = side or orientation
@@ -322,12 +322,12 @@ class ShowDirector:
             return
         # Recents is Latest, exactly as on a Fun Time Funestra: the collection lists
         # newest first and its slideshow plays that order, where every other
-        # set shuffles — and the show's HUD status line says which.  Latest
-        # opens on the newest rather than where the last Latest show stopped:
+        # set shuffles — and the slideshow's HUD status line says which.  Latest
+        # opens on the newest rather than where the last Latest slideshow stopped:
         # the newest is what it is opened for.
         latest = collection is not None and collection.which == _RECENTS_KEY
         self.open(items, rows=rows, location=location, side=side,
-                  resume=None if latest else self._show_state,
+                  resume=None if latest else self._slideshow_state,
                   filters=replace(self._filters, favorites=True) if favorites else None,
                   **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
@@ -347,7 +347,7 @@ class ShowDirector:
         the order Latest plays.
 
         ``media`` is the file the pane is showing, or ``None`` while a generation
-        is still running under it — in which case the show opens over ``frame``,
+        is still running under it — in which case the slideshow opens over ``frame``,
         that run's latest, and goes on following it until the pane hands over the
         file it lands as.
         """
@@ -387,26 +387,26 @@ class ShowDirector:
              side=None, resume=None, filters=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
-        The one place a show is made, however it was asked for, so the toolbar's
+        The one place a slideshow is made, however it was asked for, so the toolbar's
         and a double-click's differ only in the order and the pace they pass.
-        ``folder_items`` is what to arm a show that opened over a running
+        ``folder_items`` is what to arm a slideshow that opened over a running
         generation with, since that one has no items of its own yet, and
-        ``resume`` where a closed show left off, for one picking that back up
+        ``resume`` where a closed slideshow left off, for one picking that back up
         rather than naming its own opening slide.
 
         ``rows`` are the library rows *items* were built from, and the folder
-        rows for a live show armed with one: the enhanced switch and the
-        versions each item steps are both read off them, and a show asked for
+        rows for a live slideshow armed with one: the enhanced switch and the
+        versions each item steps are both read off them, and a slideshow asked for
         them itself would be asking the library what its caller already knows.
 
         ``location`` is the collection or folder key the set came from, kept so the
-        show can be fed what lands there while it runs (:meth:`note_finished`) —
-        a running show has to keep up with the folder it is playing, and the
+        slideshow can be fed what lands there while it runs (:meth:`note_finished`) —
+        a running slideshow has to keep up with the folder it is playing, and the
         browser will have moved on by then.  ``side`` names the satellite region
-        to land it on inside Fun Time, for a show asked for by side rather than
+        to land it on inside Fun Time, for a slideshow asked for by side rather than
         routed by its own shape.
         """
-        # Which side this show belongs to: the one asked for, else the one this
+        # Which side this slideshow belongs to: the one asked for, else the one this
         # set's own shape belongs on.  Standalone it names nothing but the
         # panel's own verbs, since the monitor is the whole screen.
         where = side or region_for_items(items or folder_items or [])
@@ -432,41 +432,42 @@ class ShowDirector:
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the band's versions button walk.
         levels = self.versions_of(rows)
-        actions = self._show_actions(where)
+        actions = self._slideshow_actions(where)
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
-            show = self._hand_to_the_funestra(items, where, channel, actions=actions,
+            slideshow = self._hand_to_the_funestra(items, where, channel, actions=actions,
                                             hud=hud, levels=levels, **kwargs)
         else:
-            show = self._open_a_window(items, where, actions=actions, hud=hud,
+            slideshow = self._open_a_window(items, where, actions=actions, hud=hud,
                                        levels=levels,
                                        folder_items=folder_items, **kwargs)
-        self._slideshow = show
-        already_live = any(live is show for live, _where in self._live_shows)
-        self._live_shows = [entry for entry in self._live_shows if entry[0] is not show]
-        self._live_shows.append((show, location))
+        self._slideshow = slideshow
+        already_live = any(live is slideshow for live, _where in self._live_slideshows)
+        self._live_slideshows = [entry for entry in self._live_slideshows
+                                 if entry[0] is not slideshow]
+        self._live_slideshows.append((slideshow, location))
         if filters is None:
-            filters = self._filters if self._fun_time is None else ShowFilters()
-        show.take_up(filters, keep_the_slide=keep_the_slide)
+            filters = self._filters if self._fun_time is None else SlideshowFilters()
+        slideshow.take_up(filters, keep_the_slide=keep_the_slide)
         if resume is not None:
             # After the levels a window armed above: the version a slide was
             # left showing is only a version once they are armed.
-            show.resume(resume)
+            slideshow.resume(resume)
         if kwargs.get("start") is None:
-            self._offer_the_frames(show, location, self._host.queue_now()[0])
-            show.lead_with_what_is_being_made()
+            self._offer_the_frames(slideshow, location, self._host.queue_now()[0])
+            slideshow.lead_with_what_is_being_made()
         if not already_live:
-            show.open_requested.connect(self._pick_where_it_played)
-            show.closed.connect(lambda s=show: self._on_closed(s))
-            show.media_changed.connect(self._host.reconcile_osr2)
+            slideshow.open_requested.connect(self._pick_where_it_played)
+            slideshow.closed.connect(lambda s=slideshow: self._on_closed(s))
+            slideshow.media_changed.connect(self._host.reconcile_osr2)
         self._host.reconcile_osr2()
-        return show
+        return slideshow
 
-    def _show_actions(self, side: str) -> ShowActions:
-        """What a press on a show asks the gallery to do on its behalf, and what
-        the gallery says about the library the show on *side* is mapped
+    def _slideshow_actions(self, side: str) -> SlideshowActions:
+        """What a press on a slideshow asks the gallery to do on its behalf, and what
+        the gallery says about the library the slideshow on *side* is mapped
         against — that side's own shape of it."""
-        return ShowActions(
+        return SlideshowActions(
             delete=self._host.trash_generation,
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
@@ -476,7 +477,7 @@ class ShowDirector:
             lock=(self._open_generate_tab_for
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
-            reorder=self.reorder_show,
+            reorder=self.reorder_slideshow,
             browse_all=self.browse_it_all,
             # The queue's own two: a row dragged down the block the panel hangs
             # at its foot re-lines the line, and its Clear drops another app's
@@ -495,7 +496,7 @@ class ShowDirector:
             filters_changed=self._note_filters,
         )
 
-    def _note_filters(self, filters: ShowFilters) -> None:
+    def _note_filters(self, filters: SlideshowFilters) -> None:
         if self._fun_time is None:
             self._filters = filters
 
@@ -512,32 +513,32 @@ class ShowDirector:
 
     def _hand_to_the_funestra(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
-        """A show on one of the session's Funestras: the set goes to the Funestra
+        """A slideshow on one of the session's Funestras: the set goes to the Funestra
         and the panel this app publishes goes with it — no window of ours."""
         kwargs.pop("frame", None)
-        occupant = self.region_show(side)
+        occupant = self.region_slideshow(side)
         if occupant is not None:
             occupant.play(items, hud=hud, **kwargs)
             occupant.set_levels(levels)
             return occupant
-        show = FunestraShow(items, side=side, channel=channel,
+        slideshow = FunestraSlideshow(items, side=side, channel=channel,
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
-        show.set_levels(levels)
-        self._region_shows[side] = show
-        # A show opened while the hosting session is frozen opens frozen, the
+        slideshow.set_levels(levels)
+        self._region_slideshows[side] = slideshow
+        # A slideshow opened while the hosting session is frozen opens frozen, the
         # way a window one does.
         if self._room_paused:
-            show.set_paused(True)
-        return show
+            slideshow.set_paused(True)
+        return slideshow
 
     def _open_a_window(self, items, side: str, *, actions, hud, levels,
                        folder_items=None, **kwargs):
-        """A show in a window of this app's: over the whole monitor standalone,
+        """A slideshow in a window of this app's: over the whole monitor standalone,
         or over one of the session's regions.
 
-        Standalone the monitor holds one show and only one, so a second set
+        Standalone the monitor holds one slideshow and only one, so a second set
         asked for while one is up re-points the window that is there rather
         than stacking another over it -- the same reuse a region's Funestra gets
         (:meth:`_hand_to_the_funestra`).  Inside a session the regions do their
@@ -576,7 +577,7 @@ class ShowDirector:
 
         A row with no file is left out, whether it never got one or is still
         being made: a slide with nothing to look at is a gap between pictures,
-        and one still in flight joins the running show the moment it lands (see
+        and one still in flight joins the running slideshow the moment it lands (see
         :meth:`note_finished`)."""
         return list(self._playable(rows))
 
@@ -614,7 +615,7 @@ class ShowDirector:
     # --- the map around the slide on screen ---------------------------------
 
     def _library_of(self, side: str) -> list[dict]:
-        """The generations a show on *side* is mapped against: the whole
+        """The generations a slideshow on *side* is mapped against: the whole
         library of that side's shape — what the Satellite Funestras map their
         clips against too, each over its own sources.  Every generation of
         that shape, whatever the gallery's two ticks are showing: the ticks
@@ -625,7 +626,7 @@ class ShowDirector:
         return tuple(Slide.of(item) for item in self.items_of(rows))
 
     def neighbors_of(self, prompt_id: str, *, side: str) -> MapNeighbors:
-        """What the library says about one generation, for the map a show on
+        """What the library says about one generation, for the map a slideshow on
         *side* draws around it: its act under other seeds along the row, and
         down the column the same seed under other configurations, then what
         else was made of its picture — the videos animated from it, and for a
@@ -654,7 +655,7 @@ class ShowDirector:
         )
 
     def beyond_the_row_of(self, prompt_id: str, *, side: str) -> tuple[Slide, ...]:
-        """The slides "more seeds" adds to a show's row around *prompt_id*, or
+        """The slides "more seeds" adds to a slideshow's row around *prompt_id*, or
         nothing when nothing lies beyond it."""
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
@@ -672,7 +673,7 @@ class ShowDirector:
                 if prompt_id in named_for}
 
     def rows_at(self, location) -> list[dict]:
-        """What a show opened at *location* would play if it opened now.
+        """What a slideshow opened at *location* would play if it opened now.
 
         Every key names a shape as well as a place: the collections narrow
         themselves (``rows_for_collection`` splits the key it is handed), and a
@@ -690,7 +691,7 @@ class ShowDirector:
 
     def _one_per_run_where_the_order_is_newest_first(self, location, rows) -> list[dict]:
         """Latest lists a sitting's generations one after another, several seeds
-        of a configuration at a time; its show plays one of each such run, and
+        of a configuration at a time; its slideshow plays one of each such run, and
         the map's row reaches the rest.  Every other set is shuffled, where a
         run is not a run of anything."""
         collection = folder_collection(_split_collection_key(location)[0])
@@ -703,23 +704,23 @@ class ShowDirector:
     def _present_surface(self, view, side: str):
         """Put a full-screen surface on screen: over the whole monitor
         standalone, or — inside Fun Time — on the satellite region *side*,
-        replacing whatever show currently holds it.
+        replacing whatever slideshow currently holds it.
 
-        A region show is frameless (the region IS the window, like every
+        A region slideshow is frameless (the region IS the window, like every
         managed Funestra) and topmost, since the Satellite Funestra it covers is
         topmost itself; Fun Time restacks the band as its modes change.
 
         Either way it ends up wearing the Funestras' HUD (:meth:`_wear_the_hud`):
-        the panel is about the show, and a show is a show wherever it is.
+        the panel is about the slideshow, and a slideshow is a slideshow wherever it is.
         """
         if self._fun_time is None:
             view.showFullScreen()
             self._wear_the_hud(view, side)
             return
-        occupant = self._region_shows.get(side)
+        occupant = self._region_slideshows.get(side)
         if occupant is not None and occupant.is_showing():
             occupant.close()
-        view.setWindowTitle(SHOW_TITLES[side])
+        view.setWindowTitle(SLIDESHOW_TITLES[side])
         view.setWindowFlags(
             view.windowFlags()
             | Qt.WindowType.FramelessWindowHint
@@ -741,15 +742,15 @@ class ShowDirector:
         # because an unrealized window has no handle to place.
         place_window_in_device_pixels(int(view.winId()),
                                       rect.x, rect.y, rect.width, rect.height)
-        # The show answers its own keys (a slideshow's arrows, a fullscreen
+        # The slideshow answers its own keys (a slideshow's arrows, a fullscreen
         # view's paging), so it takes the keyboard the moment it opens —
         # left unfocused, those keys land in the main window and the view
         # reads as dead.  raise_() first: activation alone does not lift a
         # window over the topmost Funestras it shares the region with.
         view.raise_()
         view.activateWindow()
-        self._region_shows[side] = view
-        # A show opened while the hosting session is frozen opens frozen: the
+        self._region_slideshows[side] = view
+        # A slideshow opened while the hosting session is frozen opens frozen: the
         # room's OmniPause holds everything, this surface included, from its
         # first frame — not from whenever the flag next changes.
         if self._room_paused:
@@ -766,22 +767,22 @@ class ShowDirector:
             self._hud_corners[side] = read_mode(HudCorner, argument, corner)
         else:
             self._hud_minimized[side] = argument == "1"
-        self._tell_the_show_wearing_it(side)
+        self._tell_the_slideshow_wearing_it(side)
 
     def move_the_hud(self, direction: str, *, side: str) -> None:
         self._hud_corners[side] = self.hud_place(side)[0].toward(direction)
-        self._tell_the_show_wearing_it(side)
+        self._tell_the_slideshow_wearing_it(side)
 
     def collapse_the_hud(self, minimized: bool, *, side: str) -> None:
         self._hud_minimized[side] = minimized
-        self._tell_the_show_wearing_it(side)
+        self._tell_the_slideshow_wearing_it(side)
 
     def open_the_hud_in(self, corner: HudCorner, *, side: str) -> None:
         self._hud_corners[side] = corner
         self._hud_minimized[side] = False
-        self._tell_the_show_wearing_it(side)
+        self._tell_the_slideshow_wearing_it(side)
 
-    def _tell_the_show_wearing_it(self, side: str) -> None:
+    def _tell_the_slideshow_wearing_it(self, side: str) -> None:
         for surface in self.surfaces():
             if getattr(surface, "hud_side", "") == side:
                 surface.set_hud_place(*self.hud_place(side))
@@ -792,10 +793,10 @@ class ShowDirector:
         map speaking the set as a seed family.  The view's own furnishings come
         off with it, because the map says all of it.
 
-        Hosted, the show covers a Satellite Funestra's HUD and has to BE that
+        Hosted, the slideshow covers a Satellite Funestra's HUD and has to BE that
         HUD: its session commands go out on the session's channel and the mode
         pair leads the panel.  Standalone the panel is the same panel minus
-        those two — no channel to post on, so the transport lands on the show
+        those two — no channel to post on, so the transport lands on the slideshow
         itself, and no session to switch modes on, so no mode row.
         """
         corner, minimized = self.hud_place(side)
@@ -809,7 +810,7 @@ class ShowDirector:
         return None if self._fun_time is None else self._fun_time.dashboard_cmd_file
 
     def _item_label(self, prompt_id: str) -> str:
-        """What to call the item on a show's HUD, in this app's vocabulary.
+        """What to call the item on a slideshow's HUD, in this app's vocabulary.
 
         ``<folder> / seed <n>`` — the folder by the name the tree gives it (the
         one the user typed, else its short code) and the item by its seed, which
@@ -841,26 +842,26 @@ class ShowDirector:
 
     # --- letting one go -----------------------------------------------------
 
-    def _on_closed(self, show=None):
-        """A show was dismissed (however): let it go, and hand the OSR2 back to
-        whatever the toggle was driving. A show standing on its own lets go of
+    def _on_closed(self, slideshow=None):
+        """A slideshow was dismissed (however): let it go, and hand the OSR2 back to
+        whatever the toggle was driving. A slideshow standing on its own lets go of
         the room's pause too, since it was the one thing a click could play the
         room again from. The mic is untouched — it answers to its own button,
-        and "start slideshow" has to still be heard now there is no show to
+        and "start slideshow" has to still be heard now there is no slideshow to
         hear it over.
 
-        Named rather than assumed, because inside Fun Time two shows run at
+        Named rather than assumed, because inside Fun Time two slideshows run at
         once: closing the portrait one must not forget the landscape one.
         """
         # Where it had got to, so the next one opens back on that slide: the
         # look at the folder under a picture doesn't cost the place among them.
-        if show is not None:
-            self._show_state = show.state()
-        self._live_shows = [entry for entry in self._live_shows
-                            if entry[0] is not show]
-        side = self._side_of(show) if show is not None else None
-        if show is None or self._slideshow is show:
-            self._slideshow = next((s for s, _loc in reversed(self._live_shows)), None)
+        if slideshow is not None:
+            self._slideshow_state = slideshow.state()
+        self._live_slideshows = [entry for entry in self._live_slideshows
+                            if entry[0] is not slideshow]
+        side = self._side_of(slideshow) if slideshow is not None else None
+        if slideshow is None or self._slideshow is slideshow:
+            self._slideshow = next((s for s, _loc in reversed(self._live_slideshows)), None)
         self._host.reconcile_osr2()
         if self._fun_time is None and self._room_paused:
             self._host.set_room_paused(False)
@@ -869,12 +870,12 @@ class ShowDirector:
             # culled empty -- the region goes back to browsing its library.  The
             # Funestra under it is blacked for the whole mode, so an empty region
             # is a black rectangle, which is the one thing the base state is for.
-            self._region_shows[side] = None
+            self._region_slideshows[side] = None
             self._refill_region(side)
 
     def remembered(self) -> dict:
         up = _still_up(self._slideshow)
-        state = up.state() if up is not None and not up.is_live() else self._show_state
+        state = up.state() if up is not None and not up.is_live() else self._slideshow_state
         panels = {}
         for side in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
             corner, minimized = self.hud_place(side)
@@ -885,8 +886,8 @@ class ShowDirector:
     def remember(self, saved) -> None:
         if not isinstance(saved, dict):
             return
-        self._show_state = ShowState.restored(saved.get("last_show"))
-        self._filters = ShowFilters.restored(saved.get("filters"))
+        self._slideshow_state = SlideshowState.restored(saved.get("last_show"))
+        self._filters = SlideshowFilters.restored(saved.get("filters"))
         if type(saved.get("pace")) is int:
             self._pace.set_seconds(saved["pace"])
         panels = saved.get("panels")
@@ -896,25 +897,25 @@ class ShowDirector:
                                                     HudCorner.UPPER_LEFT)
                 self._hud_minimized[side] = place.get("minimized") is True
 
-    def _show_to_hold(self):
-        show = self._slideshow
-        return None if show is None or show.is_live() else show
+    def _slideshow_to_hold(self):
+        slideshow = self._slideshow
+        return None if slideshow is None or slideshow.is_live() else slideshow
 
     def shows_a_slideshow(self) -> bool:
-        return self._show_to_hold() is not None
+        return self._slideshow_to_hold() is not None
 
-    def held_show(self) -> HeldShow | None:
-        show = self._show_to_hold()
-        if show is None:
+    def held_slideshow(self) -> HeldSlideshow | None:
+        slideshow = self._slideshow_to_hold()
+        if slideshow is None:
             return None
-        return HeldShow(items=tuple(show.whole_set()),
-                        location=next((where for live, where in self._live_shows
-                                       if live is show), None),
-                        side=self._base_side(show), order_label=show.hud_order_label,
-                        image_dwell_ms=show.dwell_s * 1000, state=show.state(),
-                        filters=show.filters)
+        return HeldSlideshow(items=tuple(slideshow.whole_set()),
+                        location=next((where for live, where in self._live_slideshows
+                                       if live is slideshow), None),
+                        side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
+                        image_dwell_ms=slideshow.dwell_s * 1000, state=slideshow.state(),
+                        filters=slideshow.filters)
 
-    def put_back(self, held: HeldShow):
+    def put_back(self, held: HeldSlideshow):
         ids = (item.prompt_id for item in held.items if item.prompt_id is not None)
         return self.open(list(held.items),
                          rows=[row for row in map(self._host.row_for, ids) if row is not None],
@@ -926,40 +927,40 @@ class ShowDirector:
                                       favorite_ids=self._favorite_prompt_ids()))
 
     def close_live(self):
-        """Dismiss a show that was watching a generation which ended with
+        """Dismiss a slideshow that was watching a generation which ended with
         nothing to show — left up, it would sit on a stale partial frame forever."""
-        show = self._slideshow
-        if show is not None and show.is_live():
-            show.close()
+        slideshow = self._slideshow
+        if slideshow is not None and slideshow.is_live():
+            slideshow.close()
 
-    def close_the_shows(self) -> None:
-        """Give every show back -- the session leaving origenerator mode, or
-        this view going away with shows still up.
+    def close_the_slideshows(self) -> None:
+        """Give every slideshow back -- the session leaving origenerator mode, or
+        this view going away with slideshows still up.
 
-        The wanting is dropped first: a show closing while the mode still wants
+        The wanting is dropped first: a slideshow closing while the mode still wants
         its regions is refilled with the base state, and these closes must not
         be.
         """
         self._regions_wanted.clear()
         self._asked_for.clear()
-        for show, _location in list(self._live_shows):
-            show.close()
+        for slideshow, _location in list(self._live_slideshows):
+            slideshow.close()
 
-    def close_the_show(self, side: str) -> None:
+    def close_the_slideshow(self, side: str) -> None:
         self._regions_wanted.discard(side)
         self._asked_for.pop(side, None)
-        show = self.region_show(side)
-        if show is not None:
-            show.close()
+        slideshow = self.region_slideshow(side)
+        if slideshow is not None:
+            slideshow.close()
 
     def _pick_where_it_played(self, prompt_id: str):
-        """A show handed its slide over on the way out: pick that picture where
-        the show was playing, and put it in a tab the way a click on it would."""
+        """A slideshow handed its slide over on the way out: pick that picture where
+        the slideshow was playing, and put it in a tab the way a click on it would."""
         self._slideshow = None
         self._host.reveal(prompt_id)
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
-        """A lock on a hosted show: go to the locked item, in the browser and in
+        """A lock on a hosted slideshow: go to the locked item, in the browser and in
         the tabs — the way the RFB answers a lock by opening the video's tab.
 
         The item itself, not one of its siblings.  Asking the pane to reveal a
@@ -988,13 +989,13 @@ class ShowDirector:
         return oriented_key(gallery.ALL_KEY, side)
 
     def fill_the_regions(self) -> None:
-        """Put a show on each region: the slideshow this window was taken over
+        """Put a slideshow on each region: the slideshow this window was taken over
         on, on its side, and elsewhere the whole library, shuffled, one shape each.
 
         What entering origenerator mode means — the session's own mode opens
         with both Funestras playing, so this one opens with both regions playing
         rather than with two empty rectangles and a mode that has to be started
-        by hand.  A region already holding a show is left alone: the switch is
+        by hand.  A region already holding a slideshow is left alone: the switch is
         no reason to interrupt something already up.
         """
         for side in _ORIENTATIONS:
@@ -1011,7 +1012,7 @@ class ShowDirector:
         if asked is not None:
             asked()
             return
-        if self._put_back_what_was_taken_over(side) or self.region_show(side) is not None:
+        if self._put_back_what_was_taken_over(side) or self.region_slideshow(side) is not None:
             return
         if not self._fill_region(side):
             # Not a dead end: the tree this reads is built by the first
@@ -1061,153 +1062,153 @@ class ShowDirector:
     def _refill_region(self, side: str) -> None:
         """Put *side* back on its base state, if the mode still wants it there.
 
-        What a region does when the show covering it ends -- the loop button
+        What a region does when the slideshow covering it ends -- the loop button
         pressed off, an Escape, a set culled empty.  In origenerator mode the
         Funestra underneath is blacked for the whole mode, so a region left empty
         is a black rectangle rather than a fallback.
         """
-        if side not in self._regions_wanted or self.region_show(side) is not None:
+        if side not in self._regions_wanted or self.region_slideshow(side) is not None:
             return
         self._fill_region(side)
 
-    def _side_of(self, show) -> str | None:
-        """Which satellite region *show* is holding, if it holds one."""
-        return next((side for side, on_that_side in self._region_shows.items()
-                     if on_that_side is show), None)
+    def _side_of(self, slideshow) -> str | None:
+        """Which satellite region *slideshow* is holding, if it holds one."""
+        return next((side for side, on_that_side in self._region_slideshows.items()
+                     if on_that_side is slideshow), None)
 
-    def reset_region(self, show) -> None:
+    def reset_region(self, slideshow) -> None:
         """A region's reset: back to the base state, not to the top of whatever
         that region happens to be playing.
 
         The Funestras' own meaning of the button — reset drops the narrowing and
-        leaves the satellite shuffling its whole library again — so a show
+        leaves the satellite shuffling its whole library again — so a slideshow
         started on one folder goes back to the library of its shape.  A region
-        with nothing to play there, and a show holding no region at all, fall
-        back to the show's own reset rather than emptying the screen.
+        with nothing to play there, and a slideshow holding no region at all, fall
+        back to the slideshow's own reset rather than emptying the screen.
         """
-        side = self._side_of(show)
+        side = self._side_of(slideshow)
         if side is None:
-            show.reset_in_place()
+            slideshow.reset_in_place()
             return
         key = self.base_location(side)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
-            show.reset_in_place()
+            slideshow.reset_in_place()
             return
-        self._repoint(show, key)
-        show.set_levels(self.versions_of(rows))
-        show.retune(items, enhanced_ids=self._enhanced_ids_of(rows))
+        self._repoint(slideshow, key)
+        slideshow.set_levels(self.versions_of(rows))
+        slideshow.retune(items, enhanced_ids=self._enhanced_ids_of(rows))
 
-    def _repoint(self, show, key: str) -> None:
-        self._live_shows = [(live, key if live is show else where)
-                            for live, where in self._live_shows]
+    def _repoint(self, slideshow, key: str) -> None:
+        self._live_slideshows = [(live, key if live is slideshow else where)
+                            for live, where in self._live_slideshows]
 
-    def _base_side(self, show) -> str | None:
+    def _base_side(self, slideshow) -> str | None:
         if self._fun_time is not None:
-            return self._side_of(show)
-        return self._standalone_side if show is self._slideshow else None
+            return self._side_of(slideshow)
+        return self._standalone_side if slideshow is self._slideshow else None
 
-    def reorder_show(self, show, latest: bool) -> None:
-        if not self._play_the_library(show, latest=latest, keep_slide=False):
-            show.note_voice_command("Nothing there to play", kind=WARNING)
+    def reorder_slideshow(self, slideshow, latest: bool) -> None:
+        if not self._play_the_library(slideshow, latest=latest, keep_slide=False):
+            slideshow.note_voice_command("Nothing there to play", kind=WARNING)
             return
-        show.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
+        slideshow.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
 
-    def browse_it_all(self, show) -> bool:
-        """The way out of a loop over a set that is one seed row: this show's
+    def browse_it_all(self, slideshow) -> bool:
+        """The way out of a loop over a set that is one seed row: this slideshow's
         shape of the library, in the order its panel says, from the slide up."""
         return self._play_the_library(
-            show, latest=show.hud_order_label == LATEST_LABEL, keep_slide=True)
+            slideshow, latest=slideshow.hud_order_label == LATEST_LABEL, keep_slide=True)
 
-    def _play_the_library(self, show, *, latest: bool, keep_slide: bool) -> bool:
-        side = self._base_side(show)
+    def _play_the_library(self, slideshow, *, latest: bool, keep_slide: bool) -> bool:
+        side = self._base_side(slideshow)
         key = oriented_key(_RECENTS_KEY, side) if latest else self.base_location(side)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
             return False
-        self._repoint(show, key)
-        show.set_levels(self.versions_of(rows))
-        show.reorder(items, latest=latest, enhanced_ids=self._enhanced_ids_of(rows),
+        self._repoint(slideshow, key)
+        slideshow.set_levels(self.versions_of(rows))
+        slideshow.reorder(items, latest=latest, enhanced_ids=self._enhanced_ids_of(rows),
                      keep_slide=keep_slide)
         return True
 
     def set_room_paused(self, paused: bool) -> None:
-        """The room's pause, applied to every open show and remembered for the
+        """The room's pause, applied to every open slideshow and remembered for the
         ones not opened yet (see :meth:`_present_surface`).  The gallery calls
         this on the pause's edges; the memory is what makes the freeze cover a
-        show the user opens mid-pause.
+        slideshow the user opens mid-pause.
 
-        Each show is its own step, and one that raises must not take the rest
-        with it: a freeze that stopped at the first show left the others running
+        Each slideshow is its own step, and one that raises must not take the rest
+        with it: a freeze that stopped at the first slideshow left the others running
         with no sign of why.
         """
         self._room_paused = paused
-        # Every show this window has open, taken from the list it keeps of them
-        # rather than from the region map: that map answers only for a show it
-        # considers VISIBLE, and a show the session has covered or parked is
-        # still a show that must not go on playing through a frozen room.
-        for show, _where in list(self._live_shows):
+        # Every slideshow this window has open, taken from the list it keeps of them
+        # rather than from the region map: that map answers only for a slideshow it
+        # considers VISIBLE, and a slideshow the session has covered or parked is
+        # still a slideshow that must not go on playing through a frozen room.
+        for slideshow, _where in list(self._live_slideshows):
             try:
-                show.set_paused(paused)
+                slideshow.set_paused(paused)
             except Exception:
-                logger.exception("Freezing a show failed")
+                logger.exception("Freezing a slideshow failed")
 
-    # --- keeping a running show current -------------------------------------
+    # --- keeping a running slideshow current -------------------------------------
 
     def note_finished(self, row: dict | None):
-        """A generation landed: it joins every open show that would be playing
-        it had that show opened now.
+        """A generation landed: it joins every open slideshow that would be playing
+        it had that slideshow opened now.
 
         Which is the whole point of watching a folder that is auto-generating —
-        the playlist is otherwise the fixed set the show opened with, so the
+        the playlist is otherwise the fixed set the slideshow opened with, so the
         items the loop makes while it runs are exactly the ones it never reaches.
-        Asked of each show's OWN location, remembered when it opened, rather
-        than of the view on screen: inside Fun Time the shows play on the
+        Asked of each slideshow's OWN location, remembered when it opened, rather
+        than of the view on screen: inside Fun Time the slideshows play on the
         satellite regions while the main window goes on being used, so by the
         time a generation lands the browser is usually somewhere else — and
-        there may be two shows, of two different folders, both keeping up.
+        there may be two slideshows, of two different folders, both keeping up.
         """
         if row is None:
             return
-        for show, location in list(self._live_shows):
+        for slideshow, location in list(self._live_slideshows):
             if not any(r["prompt_id"] == row["prompt_id"]
                        for r in self.rows_at(location)):
                 continue
             for item in self.items_of([row]):
-                # With what the show's two switches judge it by: whether it is
+                # With what the slideshow's two switches judge it by: whether it is
                 # favorited, and whether it carries an enhancement.
-                show.note_added(*item, favorite=bool(row.get("starred")),
+                slideshow.note_added(*item, favorite=bool(row.get("starred")),
                                 enhanced=gallery.is_enhanced_row(row))
 
     def note_generating(self, prompt_id: str, frame: bytes):
-        """A run streamed a frame: every open show playing its folder takes it in
+        """A run streamed a frame: every open slideshow playing its folder takes it in
         as a slide of that frame, right now, and keeps it current from there.
 
-        Waiting for the file is waiting minutes for the one thing the show is
+        Waiting for the file is waiting minutes for the one thing the slideshow is
         being watched for. The first iterations are already worth looking at, so
         the run joins on its first frame and swaps for the file when it lands.
 
-        A run the show holds answers for itself, and one it turned down is
+        A run the slideshow holds answers for itself, and one it turned down is
         asked again on its next frame, since the folder lists a new run a poll
         after it starts.
         """
-        for show, location in self._shows_open_to_runs():
-            if show.holds(prompt_id) or self._would_play(prompt_id, location):
-                show.note_generating(prompt_id, frame)
+        for slideshow, location in self._slideshows_open_to_runs():
+            if slideshow.holds(prompt_id) or self._would_play(prompt_id, location):
+                slideshow.note_generating(prompt_id, frame)
 
-    def _shows_open_to_runs(self) -> list[tuple]:
-        return [(show, location) for show, location in self._live_shows
-                if not show.is_live()]
+    def _slideshows_open_to_runs(self) -> list[tuple]:
+        return [(slideshow, location) for slideshow, location in self._live_slideshows
+                if not slideshow.is_live()]
 
     def _would_play(self, prompt_id: str, location=None) -> bool:
-        """Whether a show opened at *location* would be playing a generation
+        """Whether a slideshow opened at *location* would be playing a generation
         that has no file yet — the question :meth:`note_finished` asks of its
-        rows, asked a few minutes earlier.  A show opened on a preview has no
+        rows, asked a few minutes earlier.  A slideshow opened on a preview has no
         location, and is asked of the view on screen.
 
-        A folder's show answers off those rows as usual: the tree keeps a run in
+        A folder's slideshow answers off those rows as usual: the tree keeps a run in
         flight in the folder its settings put it in, so it is already among them.
         A collection's cannot — Recents is a collection of results and a run has none yet —
         so Recents answers for itself, by its own rule: every generation this app
@@ -1216,7 +1217,7 @@ class ShowDirector:
         search's hits are a set that was already asked for.
 
         An enhancement is nobody's slide, wherever it is running. It is a better
-        version of a picture the show may already be playing, and the HUD says
+        version of a picture the slideshow may already be playing, and the HUD says
         so beside that picture's name — a second slide of it half-rendered
         would be the same image twice, one of them worse.
         """
@@ -1247,34 +1248,34 @@ class ShowDirector:
                     and filter_rows([row], side))
 
     def note_in_flight(self, items):
-        """Tell every open show what is still being made, off the same in-flight
+        """Tell every open slideshow what is still being made, off the same in-flight
         list the queue plate in its corner is drawn from.
 
         Two things the frames alone can't say. A run whose frames began before the
-        show opened sends no new one for a while — the tail of a run is all decode
-        and save — and would otherwise be missing from a show of its own folder;
+        slideshow opened sends no new one for a while — the tail of a run is all decode
+        and save — and would otherwise be missing from a slideshow of its own folder;
         and a run that was cancelled or failed sends nothing ever again, leaving
         the half-rendered frame it got to in the pass forever.
         """
-        for show, location in self._shows_open_to_runs():
-            self._offer_the_frames(show, location, items)
-            show.note_in_flight({item.key for item in items})
+        for slideshow, location in self._slideshows_open_to_runs():
+            self._offer_the_frames(slideshow, location, items)
+            slideshow.note_in_flight({item.key for item in items})
 
-    def _offer_the_frames(self, show, location, items) -> None:
+    def _offer_the_frames(self, slideshow, location, items) -> None:
         for item in items:
             if item.reading.frame is not None and (
-                    show.holds(item.key) or self._would_play(item.key, location)):
-                show.note_generating(item.key, item.reading.frame)
+                    slideshow.holds(item.key) or self._would_play(item.key, location)):
+                slideshow.note_generating(item.key, item.reading.frame)
 
     def note_enhanced(self, row: dict | None):
-        """Hand a landed enhancement to every open show, so the item becomes
+        """Hand a landed enhancement to every open slideshow, so the item becomes
         the better version there rather than the version it was made from.
         Every one is told; each ignores an id it isn't holding — hosted, two
         run at once on the satellite regions.
 
         Not only while that item is the one on screen: an enhancement asked for
-        from a show lands minutes later, by which time it has long paged on, so an
-        upgrade it doesn't take here it never takes at all. The show also draws
+        from a slideshow lands minutes later, by which time it has long paged on, so an
+        upgrade it doesn't take here it never takes at all. The slideshow also draws
         each item small as a neighbor, so it takes the new thumbnail with the file.
         """
         if row is None:
@@ -1294,20 +1295,20 @@ class ShowDirector:
             surface.note_enhancing(statuses, frames)
 
     def note_queue(self, items, foreign_total: int) -> None:
-        """Hand an open show what is in flight, for the block its panel hangs at
+        """Hand an open slideshow what is in flight, for the block its panel hangs at
         its foot — the same line as the window's lower strip, saying the same
         thing."""
         if self._slideshow is not None:
             self._slideshow.set_queue(items, foreign_total)
 
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
-        """Put a spoken line in the show's own corner, if a show is up."""
+        """Put a spoken line in the slideshow's own corner, if a slideshow is up."""
         if self._slideshow is not None:
             self._slideshow.note_voice_command(message, kind=kind)
 
     def note_voice_run(self, prompt_id: str | None, message: str, *,
                        kind: str = NOTICE) -> None:
-        """Put a line about a launched run in the show's own corner."""
+        """Put a line about a launched run in the slideshow's own corner."""
         if self._slideshow is not None:
             self._slideshow.note_voice_run(prompt_id, message, kind=kind)
 
@@ -1317,52 +1318,52 @@ class ShowDirector:
         for surface in self.surfaces():
             surface.release_media(paths)
 
-    # --- the spoken words about a show --------------------------------------
+    # --- the spoken words about a slideshow --------------------------------------
 
     def answer(self, message: str, *, kind: str = NOTICE) -> None:
         """Say what a spoken command did, where the speaker is looking — the
-        show's own corner while one is up, since the window under it is covered
+        slideshow's own corner while one is up, since the window under it is covered
         by the very thing being talked to, and the gallery's caption otherwise."""
-        show = self._slideshow
-        if show is not None:
-            show.note_voice_command(message, kind=kind)
+        slideshow = self._slideshow
+        if slideshow is not None:
+            slideshow.note_voice_command(message, kind=kind)
         else:
             self._host.say(message)
 
-    def run_show_command(self, command: ShowCommand, side: str | None):
-        """Get the show going, pause it, or close it — on *side*'s region when
-        the utterance named one, else on the show that is up.
+    def run_slideshow_command(self, command: SlideshowCommand, side: str | None):
+        """Get the slideshow going, pause it, or close it — on *side*'s region when
+        the utterance named one, else on the slideshow that is up.
 
         Pausing is a pace of nought and starting is that pace back at the
-        standard number, because a show that never moves on is exactly what a
+        standard number, because a slideshow that never moves on is exactly what a
         stopped picture is here — there is no separate paused state to keep.
 
-        The pace is set through the show when there is one, not only posted to
-        the app-wide number: a show sitting at nought while that number already
+        The pace is set through the slideshow when there is one, not only posted to
+        the app-wide number: a slideshow sitting at nought while that number already
         reads four would get no word of a change that never happened, and would
         stay frozen through the very command meant to start it.
         """
-        show = self.surface_for(side)
-        if command is ShowCommand.STOP:
-            if show is None:
+        slideshow = self.surface_for(side)
+        if command is SlideshowCommand.STOP:
+            if slideshow is None:
                 self._host.say("🎤 no slideshow to close")
                 return
-            show.close()
+            slideshow.close()
             self._host.say("🎤 slideshow closed")
             return
-        seconds = 0 if command is ShowCommand.PAUSE else DEFAULT_IMAGE_DWELL_MS // 1000
-        if show is None:
-            self._pace.set_seconds(seconds)  # what the next show opens at
-            if command is ShowCommand.PAUSE:
+        seconds = 0 if command is SlideshowCommand.PAUSE else DEFAULT_IMAGE_DWELL_MS // 1000
+        if slideshow is None:
+            self._pace.set_seconds(seconds)  # what the next slideshow opens at
+            if command is SlideshowCommand.PAUSE:
                 self._host.say("🎤 no slideshow to pause")
                 return
             self.start(side=side)
             if self._slideshow is None:
                 self._host.say("🎤 nothing here to play")
             return
-        show.set_dwell_s(seconds)
-        show.note_voice_command(
-            "🎤 slideshow paused" if command is ShowCommand.PAUSE
+        slideshow.set_dwell_s(seconds)
+        slideshow.note_voice_command(
+            "🎤 slideshow paused" if command is SlideshowCommand.PAUSE
             else f"🎤 slideshow at {seconds}s"
         )
 
@@ -1371,18 +1372,18 @@ class ShowDirector:
 
         "Favorites" is the exception, and it is the Funestras' own meaning: on a
         Funestra that word is F-mode — narrow what is playing to the favorites —
-        so on a show it is the same switch, the one its HUD draws.  Opening the
-        collection as a fresh show instead would answer a word the HUD already has a
+        so on a slideshow it is the same switch, the one its HUD draws.  Opening the
+        collection as a fresh slideshow instead would answer a word the HUD already has a
         button for with something else entirely.
 
         The rest play: every collection belongs to one side, so a named side picks
         that side's copy and what lands on a region is homogeneous — exactly as
         it is when that collection's own slideshow button opens it — and Latest plays
-        newest-first the way that collection's own show does.  Standalone, and hosted
+        newest-first the way that collection's own slideshow does.  Standalone, and hosted
         with no side named, it is the collection on the side being browsed: there is
         no collection spanning both to fall back to, and the half you are looking at
         is the half the word meant.  The browser is left where it is: this
-        starts a show, it does not go browsing."""
+        starts a slideshow, it does not go browsing."""
         if command.collection_key == _FAVORITES_KEY:
             self.toggle_favorites_filter(command.side)
             return
@@ -1398,50 +1399,50 @@ class ShowDirector:
                   **self._order(command.collection_key == _RECENTS_KEY))
 
     def toggle_favorites_filter(self, side) -> None:
-        """The spoken "favorites": the show's own F-mode switch, flipped.
+        """The spoken "favorites": the slideshow's own F-mode switch, flipped.
 
         The same thing its HUD button does and the same thing the word does on
         a Funestra, so the readout — the lit button and the status line — says so
         without anything here having to draw it."""
-        show = self.surface_for(side)
-        if show is None:
-            self._host.say("🎤 F-mode needs a show to narrow")
+        slideshow = self.surface_for(side)
+        if slideshow is None:
+            self._host.say("🎤 F-mode needs a slideshow to narrow")
             return
-        show.toggle_favorites_filter()
-        self._host.say("🎤 F-mode on" if show.hud_favorites_filter else "🎤 F-mode off")
+        slideshow.toggle_favorites_filter()
+        self._host.say("🎤 F-mode on" if slideshow.hud_favorites_filter else "🎤 F-mode off")
 
     def filter_enhanced(self, enhanced_only: bool, side: str | None = None):
-        """Narrow the show in front of the speaker to its enhanced pictures, or
+        """Narrow the slideshow in front of the speaker to its enhanced pictures, or
         put them all back — the switch beside F-mode on its HUD, spoken.
 
-        The show's own switch, like the spoken "favorites": a word that set
+        The slideshow's own switch, like the spoken "favorites": a word that set
         some other filter would leave the HUD's button dark over a narrowed
-        show. Hosted, a named side takes that region's show, since two run at
-        once and neither is the active window. With no show up there is nothing
+        slideshow. Hosted, a named side takes that region's slideshow, since two run at
+        once and neither is the active window. With no slideshow up there is nothing
         for the word to narrow, and it says so rather than arming something.
 
         Answered with what is left rather than with the switch's name: a speaker
-        who has just narrowed a show wants to know there is still something in
+        who has just narrowed a slideshow wants to know there is still something in
         it, and "nothing here is enhanced" is the one answer worth hearing at
         once. Said even when the switch was already that way — a word that did
         nothing and said nothing reads as a mic that missed it.
 
         Turning it off takes F-mode and the act filter with it: said to a
-        show, "clear filter" is the way out of ALL of the narrowing.
+        slideshow, "clear filter" is the way out of ALL of the narrowing.
         """
-        show = self.surface_for(side)
-        if show is None:
-            self._host.say("🎤 the filter needs a show to narrow")
+        slideshow = self.surface_for(side)
+        if slideshow is None:
+            self._host.say("🎤 the filter needs a slideshow to narrow")
             return
         if not enhanced_only:
-            show.clear_modes()
-            show.note_voice_command("🎤 showing all of them")
+            slideshow.clear_modes()
+            slideshow.note_voice_command("🎤 showing all of them")
             return
-        if show.set_enhanced_mode(True) or show.hud_enhanced_mode:
-            show.note_voice_command(
-                f"🎤 enhanced only — {show.pass_size()} to play")
+        if slideshow.set_enhanced_mode(True) or slideshow.hud_enhanced_mode:
+            slideshow.note_voice_command(
+                f"🎤 enhanced only — {slideshow.pass_size()} to play")
         else:
-            show.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
+            slideshow.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
 
     def run_on_slide(self, command: AppCommand) -> None:
         """A word about the slide filling the screen: step off it either way,
@@ -1452,37 +1453,37 @@ class ShowDirector:
         whoever is speaking, and a word that means one thing there and another
         here is a word nobody can use.
         """
-        show = self._slideshow
+        slideshow = self._slideshow
         kind = NOTICE
         if command is AppCommand.BACK:
-            show.step(-1)
+            slideshow.step(-1)
             said = "🎤 back"
         elif command is AppCommand.FORWARD:
-            show.step(1)
+            slideshow.step(1)
             said = "🎤 next"
         elif command is AppCommand.CULL:
-            show.cull()
+            slideshow.cull()
             said = "🎤 gone"
         elif command is AppCommand.FAVORITE:
-            said, kind = (("🎤 favorited", FAVORITE) if show.favorite()
+            said, kind = (("🎤 favorited", FAVORITE) if slideshow.favorite()
                           else ("🎤 nothing here to favorite", WARNING))
         elif command is AppCommand.LOCK:
-            said, kind = (("🎤 locked this one", NOTICE) if show.set_locked(True)
+            said, kind = (("🎤 locked this one", NOTICE) if slideshow.set_locked(True)
                           else ("🎤 already locked", WARNING))
         else:  # UNLOCK
-            said, kind = (("🎤 let go", NOTICE) if show.set_locked(False)
+            said, kind = (("🎤 let go", NOTICE) if slideshow.set_locked(False)
                           else ("🎤 nothing was locked", WARNING))
         self.answer(said, kind=kind)
 
     # --- what the HUD's two switches judge items by -------------------------
 
     def _favorite_prompt_ids(self) -> set[str]:
-        """Which generations are favorites, for the shows' HUD: the star readout
+        """Which generations are favorites, for the slideshows' HUD: the star readout
         on the current item, and the favorites narrowing — the same concepts the
         Funestras' HUD wears, over the same items the Favorites collection lists.
 
         Those items, and not merely the marked rows: a folder bookmarked
-        there stands for everything under it, so a show narrowed to the
+        there stands for everything under it, so a slideshow narrowed to the
         favorites keeps what the collection would have shown.
         """
         marked = {row["prompt_id"] for row in self._db.list_generations()
@@ -1495,5 +1496,5 @@ class ShowDirector:
 
     def _enhanced_ids_of(self, rows) -> set[str]:
         """Which of *rows* carry an enhancement, for the switch beside F-mode
-        on a show's HUD — the question the thumbnails' yellow plus answers."""
+        on a slideshow's HUD — the question the thumbnails' yellow plus answers."""
         return {row["prompt_id"] for row in rows if gallery.is_enhanced_row(row)}

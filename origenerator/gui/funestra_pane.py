@@ -1,4 +1,4 @@
-"""The one Funestra a standalone Origenerator activates for a Slideshow, in a pane of the show's window.
+"""The one Funestra a standalone Origenerator activates for a Slideshow, in a pane of the slideshow's window.
 
 The Funestra is the family's window (:class:`funestra.funestra.Funestra`):
 it plays what it is handed, draws its own panel over the picture, answers the
@@ -126,7 +126,7 @@ class FunestraPane(QWidget):
         self._stack.setCurrentWidget(self._window)
         self._tick.start()
         self._mover = threading.Thread(target=self._move_until_closed,
-                                       name="show-mover", daemon=True)
+                                       name="slideshow-mover", daemon=True)
         self._mover.start()
         if self._on_open is not None:
             self._on_open()
@@ -145,7 +145,7 @@ class FunestraPane(QWidget):
             return MpvEngine(int(self._window.winId()), muted=self._muted,
                              loop_file=False, prefetch=True)
         except Exception:
-            logger.exception("A show could not open the Funestras' engine")
+            logger.exception("A slideshow could not open the Funestras' engine")
             return None
 
     def tick(self) -> None:
@@ -166,7 +166,7 @@ class FunestraPane(QWidget):
                 time.sleep(_TICK_MS / 1000)
                 self._engine.push_still()
         except Exception:
-            logger.exception("A show's picture stopped moving")
+            logger.exception("A slideshow's picture stopped moving")
 
     def set_audio_muted(self, muted: bool) -> None:
         self._muted = muted

@@ -1,7 +1,7 @@
 """How long a slide stays up — one number, app-wide.
 
 Genau's console carries a clip-seconds pair, and here the clips are the slides,
-so that pair on a show's panel sets this. It is app-wide rather than
+so that pair on a slideshow's panel sets this. It is app-wide rather than
 per-slideshow: set it while one is running and that one changes pace under you,
 and the next slideshow opens at it.
 

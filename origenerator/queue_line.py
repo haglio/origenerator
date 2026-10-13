@@ -9,12 +9,12 @@ wire.
 
 Three rules, and all three are about what the user is doing while the GPU works:
 
-* **What a show is locked on is made first:** the user is looking at it, so its
+* **What a slideshow is locked on is made first:** the user is looking at it, so its
   enhancement leads the line and nothing takes the machine from it.
 * **An image joins the front, newest first.** A picture is seconds of GPU and it
   is usually the thing being waited for — a fresh variation, an enhancement of
   what is on screen. Asking for one means "now", so it goes next, after only
-  what a show is locked on.
+  what a slideshow is locked on.
 * **A video joins the back.** Minutes of GPU, and asking for one means "later":
   it goes after every image, and after every video asked for before it. That
   is what keeps a handful of queued videos from taking the machine away from the

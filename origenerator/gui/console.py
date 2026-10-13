@@ -1,7 +1,7 @@
 """What this app tells the Funestras' console painter, and what a press on it means.
 
 The console is drawn in two places here — its OSR2 section alone at the top left
-of the main window, and that section with the pace on the panel a show wears — so
+of the main window, and that section with the pace on the panel a slideshow wears — so
 what goes ON the console and what a press takes OFF it are written once, here,
 rather than once per surface.
 
@@ -139,7 +139,7 @@ def console_hud(motion, *, device_on: bool = True,
     thing standing between a switched-off OSR2 and a console animating a blue
     wave nothing is riding.
     """
-    device = show_device(motion, device_on=device_on, control=control, script=script)
+    device = slideshow_device(motion, device_on=device_on, control=control, script=script)
     return ConsoleHud(
         console=ConsoleModel(
             main_mode=MainMode.GENAU,
@@ -152,11 +152,11 @@ def console_hud(motion, *, device_on: bool = True,
 
 
 @dataclass(frozen=True)
-class ShowDevice:
+class SlideshowDevice:
     """The device half of this app's console: the rows that aim the OSR2, who
-    has the device, and the motion being sent -- and on a show's panel, the pace.
+    has the device, and the motion being sent -- and on a slideshow's panel, the pace.
 
-    Handed to the one panel a show wears (:mod:`origenerator.gui.show_panel`) so
+    Handed to the one panel a slideshow wears (:mod:`origenerator.gui.slideshow_panel`) so
     it says all of it without a second panel underneath, and used to build the
     console's OSR2 section in the main window.
     """
@@ -173,9 +173,9 @@ class ShowDevice:
     rows: tuple = ()
 
 
-def show_device(motion, *, pace_s: int | None = None, device_on: bool = True,
-                control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ShowDevice:
-    """What the device is doing, as a panel takes it — see :class:`ShowDevice`.
+def slideshow_device(motion, *, pace_s: int | None = None, device_on: bool = True,
+                     control: str = OSR2_CONTROL_UNANSWERED, script=None) -> SlideshowDevice:
+    """What the device is doing, as a panel takes it — see :class:`SlideshowDevice`.
 
     ``script`` is the funscript driver, when this app has one: while it has the
     device the readout is the script's line rather than the motion's, and the
@@ -186,7 +186,7 @@ def show_device(motion, *, pace_s: int | None = None, device_on: bool = True,
     """
     scripted = script is not None and script.active and device_on
     driving = motion.active and device_on and not scripted
-    return ShowDevice(
+    return SlideshowDevice(
         osr2_control=control,
         rows=() if pace_s is None else (pace_row(pace_s),),
         osr2_rows=(aim_row(learned=motion.state.learned.active,

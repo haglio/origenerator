@@ -78,8 +78,8 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the two longest module preambles already under it: the fullscreen Funestra's 90
 # lines and the info pane's 71 are 30 and 31, which is what took the tree from
 # 19416 to here. What they keep is what a test cannot say -- where the creep into
-# a picture lives, why a run joins a show on its first frame and not before, why
-# a show wears one panel where Fun Time wears two, why the tab row carries no
+# a picture lives, why a run joins a slideshow on its first frame and not before, why
+# a slideshow wears one panel where Fun Time wears two, why the tab row carries no
 # "+" of its own, and that an edit is what a person did rather than what a load
 # did. Every rule cut was already a test named for the claim (161 of them across
 # the two files); each preamble now says so and names the file.
@@ -91,17 +91,17 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # pane's that each side's Favorites collects its own side's bookmarks
 # (test_favorites_collects_the_bookmarks_of_its_own_side).
 #
-# 19316 when a tab's preview stopped asking the show it opened a window's
-# question: its two notes on what builds that show, one of them calling it a
+# 19316 when a tab's preview stopped asking the slideshow it opened a window's
+# question: its two notes on what builds that slideshow, one of them calling it a
 # window, are the factory's one line now, and a pane wired to nothing opening
 # nothing is test_a_pane_with_nothing_wired_opens_nothing.
 #
-# 19310 when the pass Esc keeps became the playlist's, for a show on a
+# 19310 when the pass Esc keeps became the playlist's, for a slideshow on a
 # session's Funestra as for a window: what the window's note said is
 # test_esc_again_puts_back_everything_it_took_off and
-# test_a_show_of_a_run_in_flight_comes_back_as_a_show_of_the_folder.
+# test_a_slideshow_of_a_run_in_flight_comes_back_as_a_slideshow_of_the_folder.
 #
-# 19309 when a show's answers became the table the command file's published
+# 19309 when a slideshow's answers became the table the command file's published
 # lines are built from: what the old chain's notes said is
 # test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells.
 #
@@ -179,7 +179,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_launch_check_is_no_launch_in_the_crash_log.
 #
 # 19124 when the launch stopped asking Qt Quick for a render thread: nothing has
-# drawn with Qt Quick since the show moved onto the Funestras' engine, and the
+# drawn with Qt Quick since the slideshow moved onto the Funestras' engine, and the
 # module's note on why it asked went with it.
 #
 # 19121 when a picture the tab puts up itself started going through the very tail
@@ -245,17 +245,17 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # _after_a_job_ended_unfinished and
 # test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press.
 #
-# 18795 when what a show says about the picture on screen moved off the notice
+# 18795 when what a slideshow says about the picture on screen moved off the notice
 # across the top and onto the HUD after the picture's name: the fullscreen
 # Funestra's paragraphs on what that corner said and when are
 # test_the_hud_says_which_version_is_on_screen,
-# test_a_run_of_an_item_this_show_never_asked_about_is_named_all_the_same and
+# test_a_run_of_an_item_this_slideshow_never_asked_about_is_named_all_the_same and
 # test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer, and the
-# director's on telling only the show in front is
-# test_how_the_enhancements_are_going_reaches_every_show_that_is_up.
+# director's on telling only the slideshow in front is
+# test_how_the_enhancements_are_going_reaches_every_slideshow_that_is_up.
 #
 # 18775 when a session's Funestras took in the pictures still being made: the
-# Funestra show's lines on why it could not are gone, and the fullscreen show's
+# Funestra slideshow's lines on why it could not are gone, and the fullscreen slideshow's
 # on taking a run in once is
 # test_a_run_culled_from_the_funestra_does_not_come_back_on_its_next_frame.
 #
@@ -267,7 +267,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # takes instead is
 # test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_leading_with_it.
 #
-# 18767 when a show's arrivals began coming up in the order they arrived: what
+# 18767 when a slideshow's arrivals began coming up in the order they arrived: what
 # the playlist said about putting each one straight after the picture on
 # screen is test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it.
 #
@@ -311,10 +311,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # Recents collection's note on asking the queue for its word for an enhance is the
 # name JobKind.ENHANCE.
 #
-# 18408 when the Slideshow moved onto a Funestra: the window the show drew for
+# 18408 when the Slideshow moved onto a Funestra: the window the slideshow drew for
 # itself, the HUD it painted, the stills either side and the position line went
 # with the paragraphs that explained them; how the Funestra plays a pass, draws
-# the panel and places a press is funestra's to state, and what the show
+# the panel and places a press is funestra's to state, and what the slideshow
 # keeps of the set is tests/test_slideshow_view.py's, each claim a test's name.
 #
 # 18338 when closing the loading screen came to cancel the launch, taken down to

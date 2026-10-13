@@ -42,7 +42,7 @@ _TIPS = {
 } | {
     BOTH: ("Everything, both shapes together — its own collections, folders and "
            "library. A slideshow started here mixes portrait and landscape "
-           "pictures in the one show."),
+           "pictures in the one slideshow."),
 }
 _SEPARATE = "Separate"
 _TOGETHER = "Together"

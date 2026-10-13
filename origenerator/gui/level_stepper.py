@@ -1,14 +1,14 @@
 """Which version of the picture on screen is showing, and how to step it.
 
 An enhanced image is several files: the original, and each level made from it.
-Shift+Left/Right in a show moves within that one image rather than along the
+Shift+Left/Right in a slideshow moves within that one image rather than along the
 set, because a version is not a neighbor — you compare two versions of a picture
 by texture, which is exactly what cannot be told apart from memory or from a
 thumbnail.
 
 Three fields on :class:`~origenerator.gui.slideshow_view.SlideshowView` carried
 this — the map of versions, which picture is being stepped, and where in its
-versions the show is — read and written from five of its methods and shared with
+versions the slideshow is — read and written from five of its methods and shared with
 the thirty other fields around them. They are one object here, with no Qt in it.
 """
 
@@ -76,5 +76,5 @@ class LevelStepper:
     def index(self) -> int:
         """Which of those versions is showing, from the top. Nought is both the
         newest version and an image nobody has stepped, which is why a resumed
-        show can take it as the number of steps down to where it was."""
+        slideshow can take it as the number of steps down to where it was."""
         return self._index

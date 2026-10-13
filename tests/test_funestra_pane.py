@@ -133,7 +133,7 @@ def test_a_line_stands_where_the_picture_would_until_there_is_one(qtbot, tmp_pat
     assert pane.message() == ""
 
 
-def test_the_panel_the_show_hands_over_is_drawn_over_the_picture(qtbot, tmp_path):
+def test_the_panel_the_slideshow_hands_over_is_drawn_over_the_picture(qtbot, tmp_path):
     pane, engine, _running = _pane(qtbot, panel=lambda: HudModel(funestra="portrait"))
     pane.hand_over(_items(tmp_path, "one"))
 
@@ -142,7 +142,7 @@ def test_the_panel_the_show_hands_over_is_drawn_over_the_picture(qtbot, tmp_path
     assert HUD_OVERLAY_ID in engine.overlays
 
 
-def test_each_tick_gives_the_show_a_pass_of_its_own(qtbot, tmp_path):
+def test_each_tick_gives_the_slideshow_a_pass_of_its_own(qtbot, tmp_path):
     pane, _engine, running = _pane(qtbot)
     pane.hand_over(_items(tmp_path, "one"))
 
@@ -151,7 +151,7 @@ def test_each_tick_gives_the_show_a_pass_of_its_own(qtbot, tmp_path):
     assert running[0].ticks == 1
 
 
-def test_a_press_on_the_picture_reaches_the_show(qtbot, tmp_path):
+def test_a_press_on_the_picture_reaches_the_slideshow(qtbot, tmp_path):
     pane, _engine, running = _pane(qtbot)
     pane.hand_over(_items(tmp_path, "one"))
     pane.tick()
@@ -374,7 +374,7 @@ def test_a_line_said_once_a_pass_is_owed_does_not_stand_in_front_of_the_picture(
     assert pane.message() == ""
 
 
-def test_the_show_is_told_the_moment_its_funestra_opens(qtbot, tmp_path):
+def test_the_slideshow_is_told_the_moment_its_funestra_opens(qtbot, tmp_path):
     told = []
     engine = FakeEngine()
     pane = FunestraPane(user=lambda playback: _Running(playback), panel=lambda: None,

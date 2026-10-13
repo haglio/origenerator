@@ -2,18 +2,18 @@
 
 Launched with ``--fun-time``, Origenerator stops being a free-floating desktop
 app and becomes one of the session's managed windows: the main window occupies
-the rect Fun Time names (the Random Favs Browser's), each show goes to the
+the rect Fun Time names (the Random Favs Browser's), each slideshow goes to the
 portrait or landscape side by its subject's orientation, and everything OSR2 is
-left to Fun Time's Main Funestra.  Fun Time drives the shows through a command
+left to Fun Time's Main Funestra.  Fun Time drives the slideshows through a command
 file and reads back which sides are occupied through a status file — the same
 file-channel idioms its own Satellite Funestras speak
 (``funestra.file_channel``).
 
 What a side IS depends on what the session hands over.  A session that names
 each Funestra's own channel (:class:`FunestraChannel`) is handing this app its
-Funestras: a show is then a playlist written for one, a few verbs, and the panel
+Funestras: a slideshow is then a playlist written for one, a few verbs, and the panel
 this app publishes for it.  One that names none is an older session, whose
-shows open a window of this app's over each region instead.
+slideshows open a window of this app's over each region instead.
 
 This module is the pure half: the argv contract, the session dataclass, and the
 orientation policy that picks a region.  The Qt half — placing windows, polling
@@ -31,8 +31,8 @@ from pathlib import Path
 
 from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
-from origenerator.show_buttons import PANEL_PLACES, PRESSES, PRESSES_ABOUT_A_FILE
 from origenerator.slideshow import Slide
+from origenerator.slideshow_buttons import PANEL_PLACES, PRESSES, PRESSES_ABOUT_A_FILE
 from origenerator.win32 import process_creation_time, this_process_creation_time
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ MODULE = "origenerator"
 MODE_FLAG = "--fun-time"
 
 #: The main window's rect -- the Random Favs Browser's, which it covers -- and
-#: the two satellite regions a show of this app's opens over when the session
+#: the two satellite regions a slideshow of this app's opens over when the session
 #: hands no Funestra for that side.
 RECT_FIELDS = ("x", "y", "width", "height")
 MAIN_RECT_PREFIX = ""
@@ -115,13 +115,13 @@ CHECK_LAUNCH_FLAG = "--check-launch"
 #: Loading"), so a caption match cannot reach it.
 WINDOW_TITLE = "Origenerator"
 
-# The captions a host resolves the shows by (with the process pid), the way it
+# The captions a host resolves the slideshows by (with the process pid), the way it
 # resolves its own satellites by "Portrait AI Funestra"/"Landscape AI Funestra".
 # Per REGION, not per view class: whatever view occupies a region carries that
 # region's caption.
-PORTRAIT_SHOW_TITLE = "Origenerator Portrait"
-LANDSCAPE_SHOW_TITLE = "Origenerator Landscape"
-SHOW_TITLES = {"portrait": PORTRAIT_SHOW_TITLE, "landscape": LANDSCAPE_SHOW_TITLE}
+PORTRAIT_SLIDESHOW_TITLE = "Origenerator Portrait"
+LANDSCAPE_SLIDESHOW_TITLE = "Origenerator Landscape"
+SLIDESHOW_TITLES = {"portrait": PORTRAIT_SLIDESHOW_TITLE, "landscape": LANDSCAPE_SLIDESHOW_TITLE}
 
 #: Beside the launcher at the checkout root, which is the path a host is
 #: already told.  Running this module rewrites it.
@@ -152,7 +152,7 @@ def required_flags() -> tuple[str, ...]:
 
 
 def region_flags(side: str) -> tuple[str, ...]:
-    """One region's rect, for the show this app opens over it itself.
+    """One region's rect, for the slideshow this app opens over it itself.
 
     Not required: a host that names a Funestra for the side opens no window of
     ours there at all, so the rect it would take is beside the point.
@@ -199,7 +199,7 @@ def declaration() -> dict:
     return {
         "module": MODULE,
         "window_title": WINDOW_TITLE,
-        "show_titles": dict(SHOW_TITLES),
+        "show_titles": dict(SLIDESHOW_TITLES),
         "check_launch_flag": CHECK_LAUNCH_FLAG,
         "required_flags": list(required_flags()),
         "region_flags": {side: list(region_flags(side)) for side in SIDES},
@@ -404,7 +404,7 @@ def region_for_items(items) -> str:
             votes[region_for_size(*probed)] += 1
     side = "portrait" if votes["portrait"] > votes["landscape"] else "landscape"
     logger.info(
-        "Show routed to %s (portrait=%d landscape=%d of %d items)",
+        "Slideshow routed to %s (portrait=%d landscape=%d of %d items)",
         side, votes["portrait"], votes["landscape"], len(slides),
     )
     return side

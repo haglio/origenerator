@@ -7,7 +7,7 @@ of its own and streaming each sampled position as T-code, and parking the device
 when it stops. The gallery owns the one instance, app-global — every surface (the
 main window, the fullscreen slideshow) drives it through the shared key cluster in
 :mod:`origenerator.gui.motion_hud`, and the motion outlives any of them: closing
-a view leaves the device running until Space (or Esc in the gallery) stops it.
+a view leaves the device running until Space stops it.
 
 Two things make the motion read as motion rather than as lurching, and both were
 missing while this drove off a GUI-thread timer aimed at the present:

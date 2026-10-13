@@ -3,8 +3,8 @@
 It was a button in the toolbar until the Funestras' console grew a control-state
 group of its own -- control off, parked, retracted, driving -- and a second
 switch for one device is exactly what that group replaces. What is left is the
-switch itself, with no widget: the console sets it, and so do Space, Esc, a
-spoken word and a resumed session.
+switch itself, with no widget: the console sets it, and so do Space, a spoken
+word and a resumed session.
 
 It holds both of the app's drivers, because "what is the OSR2 doing" is one
 question and they are two halves of the answer: the funscript driver while a

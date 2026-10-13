@@ -116,7 +116,7 @@ _WASD_AS_ARROWS = {
 class SlideshowView(QWidget):
     # Enter on an item: leave the slideshow for that generation's own folder.
     open_requested = pyqtSignal(str)
-    # The slideshow was dismissed (Escape, Enter out, or culled empty) — the gallery
+    # The slideshow was dismissed (a double-click, Enter out, or culled empty) — the gallery
     # keeps voice-command listening tied to a fullscreen surface being up.
     closed = pyqtSignal()
     # A different item (or version) is on screen — re-aim the OSR2 drive.
@@ -1572,7 +1572,7 @@ class SlideshowView(QWidget):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self._move_the_panel(key)
         elif key == Qt.Key.Key_Escape:
-            self.close()
+            self._toggle_pause()
         elif key == Qt.Key.Key_Left:
             self._step_level(-1) if shifted else self._step(-1)
         elif key == Qt.Key.Key_Right:
@@ -1602,7 +1602,7 @@ class SlideshowView(QWidget):
     def closeEvent(self, event):
         """Leave, handing the gallery the slide that was on screen.
 
-        However the slideshow is left — Escape, a double-click, Enter, the spoken
+        However the slideshow is left — a double-click, Enter, the spoken
         "close", or ending on a locked slide — the picture you were looking at is
         the one you want to find afterwards, so the gallery picks it where the
         slideshow was playing. Only a slideshow with nothing on screen hands nothing over,

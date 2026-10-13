@@ -403,11 +403,11 @@ def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     assert not view._playlist.locked
 
 
-def test_escape_closes_the_view(qtbot):
+def test_esc_leaves_the_slideshow_up(qtbot):
     view = _view(qtbot)
     view.show()
     _press(view, Qt.Key.Key_Escape)
-    assert not view.isVisible()
+    assert view.isVisible()
 
 
 @_ARROW_KEYS_OR_WASD
@@ -446,10 +446,15 @@ def _collection_view(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
     view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
-    view.show()
+    _on_screen_wearing_its_panel(qtbot, view)
     opened = []
     view.open_requested.connect(opened.append)
     return view, opened
+
+
+def _leave_by_double_clicking_the_picture(qtbot, view):
+    gestures.double_click(view._pane._window, _on_the_picture(view))
+    qtbot.waitUntil(lambda: not view.isVisible())
 
 
 def test_ending_a_slideshow_on_a_locked_slide_hands_that_slide_over(qtbot):
@@ -460,19 +465,17 @@ def test_ending_a_slideshow_on_a_locked_slide_hands_that_slide_over(qtbot):
     _press(view, Qt.Key.Key_Right)  # onto the second slide
     _press(view, Qt.Key.Key_Down)   # lock it
 
-    _press(view, Qt.Key.Key_Escape)
+    _leave_by_double_clicking_the_picture(qtbot, view)
 
     assert opened == ["id-b"]
-    assert not view.isVisible()
 
 
 def test_ending_a_slideshow_on_an_unlocked_slide_hands_that_slide_over(qtbot):
-    # Escape is a way out like any other, and the picture on screen when you take
-    # it is the one you want to find afterwards.
+    # The picture on screen when you leave is the one you want to find afterwards.
     view, opened = _collection_view(qtbot)
     on_screen = view._playlist.current()[2]
 
-    _press(view, Qt.Key.Key_Escape)
+    _leave_by_double_clicking_the_picture(qtbot, view)
 
     assert opened == [on_screen]
 
@@ -1463,24 +1466,36 @@ def _click(view):
     view._pane.press(QPointF(view._pane.width() / 2, view._pane.height() / 2))
 
 
-def test_a_click_pauses_a_slideshow_with_no_room_to_ask_at_once_and_a_second_plays_it(qtbot):
+def _escape(view):
+    _press(view, Qt.Key.Key_Escape)
+
+
+_A_CLICK_OR_ESC = pytest.mark.parametrize("pause_press", [_click, _escape],
+                                          ids=["a click on the picture", "Esc"])
+
+
+@_A_CLICK_OR_ESC
+def test_a_pause_press_pauses_a_slideshow_with_no_room_to_ask_at_once_and_a_second_plays_it(
+        qtbot, pause_press):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
-    _click(view)
+    pause_press(view)
     assert not _will_move_on(view)
     assert _engine(view).paused is True
 
-    _click(view)
+    pause_press(view)
     assert _will_move_on(view)
     assert _engine(view).paused is False
 
 
-def test_a_click_asks_the_room_to_pause_rather_than_pausing_the_slideshow_alone(qtbot):
+@_A_CLICK_OR_ESC
+def test_a_pause_press_asks_the_room_to_pause_rather_than_pausing_the_slideshow_alone(
+        qtbot, pause_press):
     asked = []
     view = _view(qtbot, _KEYED, image_dwell_ms=4000,
                  on_omnipause=lambda: asked.append(True))
 
-    _click(view)
+    pause_press(view)
 
     assert asked == [True]
     assert _will_move_on(view)

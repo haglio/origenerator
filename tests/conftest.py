@@ -46,11 +46,15 @@ from origenerator import content as _content
 
 _content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT
 
+import errno
 import gc
 import json
 import os
 import struct
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 import winsound
 
 import pytest
@@ -249,6 +253,28 @@ class FakeVoiceSteering(QObject):
 def _no_real_mic(monkeypatch):
     """Point every voice router's steering at the inert stand-in above."""
     monkeypatch.setattr(voice_router, "VoiceSteering", FakeVoiceSteering)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _never_reach_the_comfyui_on_this_machine():
+    """Refuse every call to the real ComfyUI address, as a machine without one would.
+
+    Whatever reaches the ComfyUI running here is rendered into the folder the
+    app imports new pictures from at launch -- into the user's own gallery.
+    """
+    real_urlopen = urllib.request.urlopen
+    comfyui = (config.COMFYUI_HOST, config.COMFYUI_PORT)
+
+    def urlopen(url, *args, **kwargs):
+        target = urllib.parse.urlsplit(getattr(url, "full_url", url))
+        if (target.hostname, target.port) == comfyui:
+            raise urllib.error.URLError(ConnectionRefusedError(
+                errno.ECONNREFUSED, "the suite never reaches the ComfyUI on this machine"))
+        return real_urlopen(url, *args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(urllib.request, "urlopen", urlopen)
+        yield
 
 
 @pytest.fixture(autouse=True)

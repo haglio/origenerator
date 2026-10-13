@@ -10,7 +10,7 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QColor, QPixmap
-from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
 from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 
 import origenerator.workflows.derived_size as ds
@@ -125,6 +125,42 @@ def test_the_column_reads_preview_then_generate_then_settings(panel):
     assert preview_foot <= line_top
     assert line_foot <= generate_top
     assert generate_foot <= settings_top
+
+
+def test_a_thick_border_held_still_parts_generate_from_the_settings(panel):
+    """As thick as the border under the picture and as wide as the tab, but
+    no handle: dragging it could only move Generate the way the border above
+    it already does."""
+    panel.show()
+    panel.resize(700, 800)
+    QApplication.processEvents()
+
+    def span(widget):
+        top = widget.mapTo(panel, QPoint(0, 0)).y()
+        return top, top + widget.height()
+
+    border = panel._settings_border
+    _, generate_foot = span(panel._generate_btn.parentWidget())
+    border_top, border_foot = span(border)
+    settings_top, _ = span(panel._scroll)
+    assert generate_foot <= border_top
+    assert border_foot <= settings_top
+    assert border.height() == panel._media_split.handleWidth()
+    assert border.mapTo(panel, QPoint(0, 0)).x() == 0
+    assert border.width() == panel.width()
+    assert not isinstance(border, QSplitterHandle)
+
+
+def test_the_border_under_generate_wears_the_gray_of_the_one_above_it(app_chrome, panel):
+    panel.show()
+    panel.resize(700, 800)
+    QApplication.processEvents()
+
+    def gray(widget):
+        image = widget.grab().toImage()
+        return image.pixelColor(image.width() // 2, image.height() // 2)
+
+    assert gray(panel._settings_border) == gray(panel._media_split.handle(1))
 
 
 def test_the_picture_and_the_settings_share_the_column_by_what_each_asks_for(panel):
@@ -286,20 +322,24 @@ def test_the_pane_keeps_a_margin_round_its_contents(panel):
     assert panel.height() - lower - 1 == 8
 
 
-def test_generate_and_the_top_setting_keep_clear_of_what_is_above_them(panel):
-    """The thick line under the picture is a pane edge like any other, and the
-    first field once sat right against it; Generate is the next thing down from
-    it now, and the first field the next thing down from Generate."""
+def test_generate_and_the_top_setting_keep_clear_of_the_borders_round_them(panel):
+    """A thick border is a pane edge like any other, and the first field once
+    sat right against the one over the settings."""
     panel.show()
     panel.resize(700, 800)
+    QApplication.processEvents()
 
-    handle = panel._media_split.handle(1)
-    below_the_line = handle.mapTo(panel, handle.rect().bottomLeft()).y()
-    generate = panel._generate_btn.parentWidget()
-    assert generate.mapTo(panel, generate.rect().topLeft()).y() - below_the_line >= 8
-    below_generate = generate.mapTo(panel, generate.rect().bottomLeft()).y()
-    picker = panel._workflow_combo
-    assert picker.mapTo(panel, picker.rect().topLeft()).y() - below_generate >= 8
+    def span(widget):
+        top = widget.mapTo(panel, QPoint(0, 0)).y()
+        return top, top + widget.height()
+
+    _, line_foot = span(panel._media_split.handle(1))
+    generate_top, generate_foot = span(panel._generate_btn.parentWidget())
+    border_top, border_foot = span(panel._settings_border)
+    picker_top, _ = span(panel._workflow_combo)
+    assert generate_top - line_foot >= 8
+    assert border_top - generate_foot >= 8
+    assert picker_top - border_foot >= 8
 
 
 def test_the_settings_handle_reaches_the_panes_own_border(panel):

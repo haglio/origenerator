@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QFrame, QSplitter, QVBoxLayout, QWidget
 from shared_ui.spacing import MARGIN_STANDARD
+
+BORDER_WIDTH = 6
+BORDER_NAME = "paneBorder"
 
 
 def pane() -> tuple[QWidget, QVBoxLayout]:
@@ -13,6 +16,13 @@ def pane() -> tuple[QWidget, QVBoxLayout]:
     return widget, column
 
 
+def pane_border() -> QFrame:
+    border = QFrame()
+    border.setObjectName(BORDER_NAME)
+    border.setFixedHeight(BORDER_WIDTH)
+    return border
+
+
 class PaneSplitter(QSplitter):
     """Panes parted by the thick handle that is dragged to resize them, none of
     which can be dragged shut."""
@@ -20,7 +30,7 @@ class PaneSplitter(QSplitter):
     def __init__(self, orientation: Qt.Orientation):
         super().__init__(orientation)
         self.setChildrenCollapsible(False)
-        self.setHandleWidth(6)
+        self.setHandleWidth(BORDER_WIDTH)
 
     def hold_still(self, held: bool) -> None:
         for index in range(self.count()):

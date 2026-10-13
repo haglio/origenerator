@@ -32,8 +32,11 @@ from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests import gestures
 from tests.test_gallery_view import _select_first_leaf, _selected_folder, _shelf
 from tests.test_hard_to_miss import _faded_backgrounds
+
+_CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
 
 
 def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, taskbar=None):
@@ -135,6 +138,28 @@ def test_ctrl_alt_q_asks_first(qtbot, tmp_path, monkeypatch):
 
     assert len(asked) == 1
     assert win.isVisible()
+
+
+def test_ctrl_alt_q_in_a_slideshow_takes_the_show_down_with_the_app(
+        qtbot, tmp_path, monkeypatch):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+    _completed_image(Database(tmp_path / "t.db"))
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win._gallery_view.refresh()
+    _select_first_leaf(win._gallery_view)
+    win._gallery_view._shows.start()
+    show = win._gallery_view._shows.showing
+    qtbot.addWidget(show)
+    show.activateWindow()
+    qtbot.waitActive(show)
+
+    gestures.press_key(show, Qt.Key.Key_Q, _CTRL_ALT)
+
+    assert not win.isVisible()
+    assert not show.isVisible()
 
 
 def test_saying_no_hands_comfyui_nothing(qtbot, tmp_path, monkeypatch):

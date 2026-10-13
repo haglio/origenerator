@@ -9,10 +9,11 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from funestra.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
+from PyQt6.QtCore import QEvent, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 
@@ -1453,6 +1454,27 @@ def test_a_gallery_taken_into_a_session_opens_its_next_slideshow_on_a_region(qtb
     assert slideshow is not None
     qtbot.addWidget(slideshow)
     assert slideshow.windowTitle() == "Origenerator Portrait"
+
+
+def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_monitors_side(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100, count=2)
+    watched = view._slideshows.showing
+    qtbot.addWidget(watched)
+    portrait_monitor = SimpleNamespace(geometry=lambda: QRect(2560, 0, 1440, 2560))
+    monkeypatch.setattr(watched, "screen", lambda: portrait_monitor)
+
+    view.become_hosted(_session())
+    monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
+    view._slideshows.fill_the_regions()
+
+    carried = view.region_slideshow("portrait")
+    assert carried is not None
+    qtbot.addWidget(carried)
+    assert [slide.prompt_id for slide in carried.whole_set()] == ["id-wide-0", "id-wide-1"]
+    assert view.region_slideshow("landscape") is None
 
 
 def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_session(qtbot):

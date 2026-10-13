@@ -20,7 +20,7 @@ from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from origenerator.gui.generation_drag import GENERATION_MIME
+from origenerator.gui.generation_drag import dropped_generation
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
@@ -133,10 +133,8 @@ class DropSlot(QWidget):
 
     def _pid_from(self, mime) -> str | None:
         """The dropped generation's id if it carries our type and passes ``accepts``."""
-        if not mime.hasFormat(GENERATION_MIME):
-            return None
-        pid = bytes(mime.data(GENERATION_MIME)).decode("utf-8")
-        return pid if self._accepts(pid) else None
+        pid = dropped_generation(mime)
+        return pid if pid is not None and self._accepts(pid) else None
 
     def accepts(self, prompt_id: str) -> bool:
         """Whether this slot would take ``prompt_id`` (its kind gate)."""

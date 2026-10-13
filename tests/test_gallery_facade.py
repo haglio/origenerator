@@ -39,7 +39,7 @@ PUBLISHED = {
     "fix_params_for",
     "fold_completed_enhancements", "fold_enhancement",
     "folder_id", "folder_key_at_level", "folder_level", "folder_names_by_row", "generation_of_file",
-    "generation_seed", "group_level",
+    "generation_seed", "group_level", "input_image_reference",
     "is_enhance_product_row", "is_enhanceable_row",
     "is_enhanced_row", "is_image_conditioned", "is_in_progress",
     "item_label", "job_kind_label",

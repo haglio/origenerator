@@ -702,7 +702,13 @@ class ParamForm(QWidget):
             self._kind(pd).browse_filter,
         )
         if path:
-            self._widgets[key].setText(path)
+            self.put_file(key, path)
+
+    def has_field(self, key: str) -> bool:
+        return key in self._widgets
+
+    def put_file(self, key: str, path: str) -> None:
+        self._widgets[key].setText(path)
 
     @staticmethod
     def _initial_browse_path(current: str, home: Path | None = None) -> str:

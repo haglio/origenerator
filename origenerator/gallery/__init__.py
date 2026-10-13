@@ -106,6 +106,7 @@ from origenerator.gallery.labels import (
 from origenerator.gallery.output import (
     animated_preview_path,
     generation_of_file,
+    input_image_reference,
     is_in_progress,
     media_type_of_row,
     output_disk_files,
@@ -231,6 +232,7 @@ __all__ = [
     "generation_of_file",
     "generation_seed",
     "group_level",
+    "input_image_reference",
     "is_enhance_product_row",
     "is_enhanceable_row",
     "is_enhanced_row",

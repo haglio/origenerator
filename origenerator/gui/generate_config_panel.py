@@ -35,6 +35,7 @@ from origenerator.gallery import (
     describe_enhance_params,
     displayed_levels,
     enhance_params_for,
+    input_image_reference,
     item_label,
     level_matching_settings,
     media_type_of_row,
@@ -60,6 +61,7 @@ from origenerator.gui.export_lane import EXPORT_LANES
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
+from origenerator.gui.generation_drag import dropped_generation
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyPicker
 from origenerator.gui.inflight import (
     ALREADY_MAKING_ONE_TIP,
@@ -246,6 +248,34 @@ class GenerateConfigPanel(QWidget):
         self._go_to_folder.triggered.connect(self._on_go_to_folder)
         self._can_go_to_folder = None   # the gallery's; see set_folder_check
         self._build_ui()
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        self._answer_a_drag(event)
+
+    def dragMoveEvent(self, event):
+        self._answer_a_drag(event)
+
+    def _answer_a_drag(self, event) -> None:
+        if self._dropped_image(event.mimeData()) is None:
+            event.ignore()
+        else:
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        image = self._dropped_image(event.mimeData())
+        if image is None:
+            event.ignore()
+            return
+        self._param_form.put_file("input_image", image)
+        event.acceptProposedAction()
+
+    def _dropped_image(self, mime) -> str | None:
+        prompt_id = dropped_generation(mime)
+        form = self._param_form
+        if prompt_id is None or form is None or not form.has_field("input_image"):
+            return None
+        return input_image_reference(self._db.get_generation(prompt_id))
 
     @contextmanager
     def _loading(self):

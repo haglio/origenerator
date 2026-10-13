@@ -138,11 +138,7 @@ class CombineController(QObject):
         """Whether the image slot accepts a dropped generation: an image with a
         file to seed an i2v from (not merely anything that produced a file — a
         video's clip would satisfy that and can't be a start frame)."""
-        row = self._db.get_generation(prompt_id)
-        return bool(
-            row and gallery.media_type_of_row(row) == MediaType.IMAGE
-            and gallery.output_file_reference(gallery.row_output_files(row)) is not None
-        )
+        return gallery.input_image_reference(self._db.get_generation(prompt_id)) is not None
 
     def _rebuildable_video_row(self, row) -> bool:
         """Whether ``row`` is a video whose i2v recipe the app can rebuild — so its

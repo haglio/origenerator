@@ -43,18 +43,17 @@ WHEEL_NOTCH = 120
 
 
 class FunestraPane(QWidget):
-    def __init__(self, parent=None, *, user, panel, on_double_click=None, on_open=None,
-                 engine_for=None):
+    def __init__(self, parent=None, *, user, panel, on_open=None, engine_for=None):
         super().__init__(parent)
         self._user = user
         self._panel = panel
-        self._on_double_click = on_double_click
         self._on_open = on_open
         self._engine_for = engine_for
         self._engine = None
         self._funestra: Funestra | None = None
         self._owed: tuple[list[PlaylistItem], Path | None] | None = None
         self._muted = False
+        self._pressing_again = False
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         outer = QVBoxLayout(self)
@@ -193,6 +192,17 @@ class FunestraPane(QWidget):
         if self._funestra is not None:
             self._funestra.press(*self._device_point(position), window=self._device_size())
 
+    def press_again(self, position) -> None:
+        self._pressing_again = True
+        try:
+            self.press(position)
+        finally:
+            self._pressing_again = False
+
+    @property
+    def pressing_again(self) -> bool:
+        return self._pressing_again
+
     def release(self) -> None:
         if self._funestra is not None:
             self._funestra.release()
@@ -210,10 +220,6 @@ class FunestraPane(QWidget):
     def pointer_left(self) -> None:
         if self._funestra is not None:
             self._funestra.leave()
-
-    def double_clicked(self) -> None:
-        if self._on_double_click is not None:
-            self._on_double_click()
 
 
 def offer_the_copy_beside_the_checkouts() -> None:
@@ -270,7 +276,8 @@ class _FunestraWindow(QWidget):
         self._pane.wheel(event.position(), steps)
 
     def mouseDoubleClickEvent(self, event) -> None:
-        self._pane.double_clicked()
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pane.press_again(event.position())
 
     def leaveEvent(self, event) -> None:
         super().leaveEvent(event)

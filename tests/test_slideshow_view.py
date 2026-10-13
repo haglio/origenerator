@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from funestra.hud_overlay import HUD_OVERLAY_ID
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPointF, Qt
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QIcon, QKeyEvent
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
@@ -31,8 +32,10 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.stylesheet import dress_application
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE, ShowFilters, Slide, in_order
+from tests import gestures
 from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
+from tests.show_hud_support import panel_targets
 from tests.slideshow_support import ahead
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -1178,15 +1181,67 @@ def test_stepping_off_a_locked_slide_releases_it(qtbot):
     assert not view.locked
 
 
-def test_double_clicking_leaves_the_slideshow(qtbot):
-    # The way out of every other fullscreen view here, and the way it used to work.
-    view = _view(qtbot)
+def _on_screen_wearing_its_panel(qtbot, view):
+    view.resize(900, 700)
     view.show()
+    qtbot.waitExposed(view)
+    view.wear_the_hud("portrait")
+    view._pane.tick()
+    return view
+
+
+def _middle_of(view, rect) -> QPoint:
+    left, top, _pixels = _engine(view).overlays[HUD_OVERLAY_ID]
+    x, y, width, height = rect
+    scale = view._pane._window.devicePixelRatioF()
+    return QPoint(round((left + x + width / 2) / scale), round((top + y + height / 2) / scale))
+
+
+def _middle_of_the_button(view, command) -> QPoint:
+    rect, = [rect for rect, button in panel_targets(view).buttons if button.command == command]
+    return _middle_of(view, rect)
+
+
+def _middle_of_the_thumbnail(view, path) -> QPoint:
+    rect, = [rect for rect, target in panel_targets(view).click if target == path]
+    return _middle_of(view, rect)
+
+
+def _on_the_picture(view) -> QPoint:
+    """Clear of the panel in the upper left and of the corners that open it."""
+    window = view._pane._window
+    return QPoint(window.width() * 3 // 4, window.height() * 3 // 4)
+
+
+def test_double_clicking_the_picture_leaves_the_slideshow(qtbot):
+    # The way out of every other fullscreen view here, and the way it used to work.
+    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot))
     closes = []
     view.closed.connect(lambda: closes.append(True))
-    view._pane._on_double_click()
-    assert not view.isVisible()
+
+    gestures.double_click(view._pane._window, _on_the_picture(view))
+
+    qtbot.waitUntil(lambda: not view.isVisible())
     assert closes == [True]  # the dismissal reaches the gallery, like Escape's
+
+
+def test_double_clicking_a_thumbnail_on_the_map_locks_the_show_on_it(qtbot):
+    view = _on_screen_wearing_its_panel(
+        qtbot, _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around)))
+
+    gestures.double_click(view._pane._window, _middle_of_the_thumbnail(view, "b.png"))
+
+    assert view.isVisible()
+    assert (_media_on_screen(view), view.locked) == ("b.png", True)
+
+
+def test_two_quick_clicks_on_next_step_on_twice_and_leave_the_show_up(qtbot):
+    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot))
+
+    gestures.double_click(view._pane._window, _middle_of_the_button(view, "portrait_next"))
+
+    assert view.isVisible()
+    assert _media_on_screen(view) == "c.png"
 
 
 def test_a_spoken_fix_targets_the_slide_on_screen(qtbot):

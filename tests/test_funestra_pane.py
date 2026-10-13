@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import funestra_pane
 from origenerator.gui.funestra_pane import FunestraPane
+from tests import gestures
 from tests.funestra_fakes import FakeEngine
 
 
@@ -193,13 +194,22 @@ def test_the_wheel_is_counted_in_notches(qtbot, tmp_path, monkeypatch):
     assert turned == [-2, 1, 1]
 
 
-def test_a_double_click_reaches_the_show(qtbot):
-    twice = []
-    pane, _engine, _running = _pane(qtbot, on_double_click=lambda: twice.append(1))
+def test_a_double_click_is_two_presses_and_the_second_says_it_came_again(qtbot, tmp_path):
+    pane, _engine, running = _pane(qtbot)
+    pane.resize(600, 400)
+    pane.show()
+    qtbot.waitExposed(pane)
+    pane.hand_over(_items(tmp_path, "one"))
+    pane.tick()
+    again = []
+    answer = running[0].apply_command
+    running[0].apply_command = lambda command: again.append(pane.pressing_again) or answer(command)
 
-    pane.double_clicked()
+    gestures.double_click(pane._window, QPoint(450, 300))
 
-    assert twice == [1]
+    assert running[0].commands == [OMNIPAUSE_TOGGLE, OMNIPAUSE_TOGGLE]
+    assert again == [False, True]
+    assert not pane.pressing_again
 
 
 def test_a_pass_handed_over_before_there_is_a_window_waits_for_one(qtbot, tmp_path):

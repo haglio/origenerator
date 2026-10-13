@@ -48,6 +48,7 @@ from origenerator.gui.console import (
     post_pace_action,
     show_device,
 )
+from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane
 from origenerator.gui.hud_queue import QueuePointer, queue_section
@@ -171,11 +172,10 @@ class SlideshowView(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        # Already the fullscreen view, so a double-click leaves it rather than
-        # spawning a nested one. It plays sound, unlike the muted inline pane.
+        # It plays sound, unlike the muted inline pane.
         self._pane = FunestraPane(
             self, user=self._as_the_funestra_sees_it, panel=self._hud_model,
-            on_double_click=self.close, on_open=self._the_funestra_opened,
+            on_open=self._the_funestra_opened,
             engine_for=None if engine is None else (lambda _window_id: engine))
         layout.addWidget(self._pane, 1)
 
@@ -549,7 +549,7 @@ class SlideshowView(QWidget):
         — or, with no session under this show, onto the show as well
         (:meth:`_act_here`) — and the device's own verbs land on this window
         either way, the OSR2 being this app's to drive wherever the show is
-        drawn.  A press on the picture itself asks for the pause.
+        drawn.  A press on the picture asks for the pause, and a double-click there leaves.
         """
         verb, _, payload = command.partition("|")
         if verb in _FOOT_VERBS:
@@ -557,7 +557,7 @@ class SlideshowView(QWidget):
             self.refresh_panel()
             return True
         if verb == OMNIPAUSE_TOGGLE:
-            self._toggle_pause()
+            self._press_on_the_picture()
             return True
         action, path = side_press(self._hud_side, verb, payload)
         if action in COLLAPSES or action == OPENS_IN:
@@ -1271,6 +1271,12 @@ class SlideshowView(QWidget):
         """
         self._paused = paused
         self._apply_freeze()
+
+    def _press_on_the_picture(self) -> None:
+        if self._pane.pressing_again:
+            defer(self, self.close)
+        else:
+            self._toggle_pause()
 
     def _toggle_pause(self) -> None:
         if self._actions.omnipause is not None:

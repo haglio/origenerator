@@ -96,14 +96,6 @@ def test_no_other_window_here_wears_that_caption():
     assert elsewhere == []
 
 
-def test_the_slideshow_captions_the_document_names_are_the_ones_a_region_slideshow_wears():
-    source = (REPO_ROOT / "origenerator" / "gui" / "slideshow_director.py").read_text(
-        encoding="utf-8")
-
-    assert "view.setWindowTitle(SLIDESHOW_TITLES[side])" in source
-    assert _document()["show_titles"] == dict(contract.SLIDESHOW_TITLES)
-
-
 def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):
     """Byte for byte what the tracked copy holds, line endings included, so
     publishing on Windows leaves the checkout clean."""

@@ -8,7 +8,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app_support.win32 import is_mutex_held, mutex_name, try_acquire_mutex
-from PyQt6.QtWidgets import QMessageBox
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +45,9 @@ class Copies:
         handle = try_acquire_mutex(self._holding)
         return None if handle is None else LibraryClaim(handle, self._closing)
 
+    def one_holds_the_library(self) -> bool:
+        return is_mutex_held(self._holding)
+
     def one_is_closing(self) -> bool:
         return is_mutex_held(self._closing)
 
@@ -62,4 +64,6 @@ class Copies:
 
 
 def say_another_copy_is_running() -> None:
+    from PyQt6.QtWidgets import QMessageBox  # noqa: PLC0415
+
     QMessageBox.information(None, "Origenerator", "Another copy of Origenerator is already running.")

@@ -36,6 +36,10 @@ QT_FREE = (
     # whole job is over before the app it starts has drawn anything.
     "origenerator.app_link",
     "origenerator.windows_toast",
+    # What a closing copy starts to wait out its runs in flight, and the
+    # one-copy rule it asks whether the app is back.
+    "origenerator.landed_while_away",
+    "origenerator.single_instance",
     "origenerator.comfyui_api",
     "origenerator.completion",
     "origenerator.inflight",

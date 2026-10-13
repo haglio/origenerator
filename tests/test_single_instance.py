@@ -43,6 +43,15 @@ def test_another_library_is_claimed_beside_it(tmp_path, claims):
     assert all(claims)
 
 
+def test_the_claim_a_running_copy_holds_is_read_without_taking_it(tmp_path, claims):
+    copies = Copies(tmp_path / "state")
+    assert not copies.one_holds_the_library()
+    claims.append(copies.claim_the_library())
+
+    assert copies.one_holds_the_library()
+    assert copies.claim_the_library() is None
+
+
 def test_a_library_let_go_of_is_free_for_the_next_copy(tmp_path, claims):
     Copies(tmp_path / "state").claim_the_library().let_go()
 

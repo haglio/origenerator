@@ -4,14 +4,11 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
-import ctypes
 import json
-import os
-
-from app_support.win32 import mutex_name, try_acquire_mutex
 
 from origenerator import landed_while_away
 from origenerator.db import Database
+from origenerator.single_instance import Copies
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -122,18 +119,18 @@ def test_quitting_with_nothing_in_flight_starts_nothing(tmp_path):
     assert started == []
 
 
-def test_the_claim_a_running_copy_holds_is_read_without_taking_it(tmp_path, monkeypatch):
-    # The app refuses to start when something else holds this mutex, so the
-    # watcher opens it to ask and never claims it.
+def test_the_watcher_asks_whether_a_copy_holds_the_library_it_waits_for(tmp_path, monkeypatch):
     monkeypatch.setattr(landed_while_away, "LIBRARY_STATE_DIR", tmp_path)
-    assert landed_while_away.app_has_the_library() is False
-    name = mutex_name(r"Global\Origenerator",
-                      os.path.normcase(os.path.realpath(tmp_path)))
-    held = try_acquire_mutex(name)
-    assert held is not None
+    asked = {}
+    monkeypatch.setattr(landed_while_away, "watch",
+                        lambda db, api, *, announce, app_is_running: asked.update(
+                            app_is_running=app_is_running))
 
+    assert landed_while_away.main(["Origenerator"]) == 0
+
+    claim = Copies(tmp_path).claim_the_library()
     try:
-        assert landed_while_away.app_has_the_library() is True
-        assert try_acquire_mutex(name) is None   # still the one copy's
+        assert asked["app_is_running"]()
     finally:
-        ctypes.windll.kernel32.CloseHandle(held)
+        claim.let_go()
+    assert not asked["app_is_running"]()

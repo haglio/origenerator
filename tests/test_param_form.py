@@ -29,6 +29,7 @@ from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.seed_history import SeedUse
+from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, story_of
@@ -715,11 +716,15 @@ def test_a_form_sized_from_its_input_says_what_size_it_would_make(qtbot):
     assert form.output_size() == (464, 912)
 
 
-def _label_beside(form, key):
+def _label_cell(form, key):
     title = param_sections.section_title(key)
     row = form._present_keys[title].index(key)
     return form._sections[title].content_form().itemAt(
         row, QFormLayout.ItemRole.LabelRole).widget()
+
+
+def _label_beside(form, key):
+    return _label_cell(form, key).findChild(ElidingLabel)
 
 
 def _dimension_defs():
@@ -807,8 +812,8 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     # On the left — entirely clear of the input column.
     assert btn.right() <= width.left()
     # And clear of the words themselves: the labels start after its lane.
-    assert btn.right() <= _label_beside(form, "width").geometry().left()
-    assert btn.right() <= _label_beside(form, "height").geometry().left()
+    assert btn.right() <= _label_cell(form, "width").geometry().left()
+    assert btn.right() <= _label_cell(form, "height").geometry().left()
 
 
 # --- derived dimensions: the input-image size, shown locked & unlockable ----
@@ -901,8 +906,8 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     assert top.center().y() < btn.center().y() < lower.center().y()
 
     # The button is clear of both the labels and the fields — no overlap.
-    assert btn.right() <= _label_beside(form, "width").geometry().left()
-    assert btn.right() <= _label_beside(form, "height").geometry().left()
+    assert btn.right() <= _label_cell(form, "width").geometry().left()
+    assert btn.right() <= _label_cell(form, "height").geometry().left()
     assert btn.right() <= top.left()
 
 
@@ -2005,14 +2010,18 @@ def test_one_composition_focus_gives_both_passes_its_value(qtbot):
     assert (form.get_values()["shift_high"], form.get_values()["shift_low"]) == (6.0, 6.0)
 
 
+_STEPS_ADVICE = {"steps": Advice("Example Model's page recommends 20–40 steps.", 40)}
+
+
 def test_a_setting_off_its_recommendation_wears_a_warning_with_the_advice(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
     qtbot.addWidget(form)
 
-    form.set_warnings({"steps": "Example Model's page recommends 20–40 steps."})
+    form.set_warnings(_STEPS_ADVICE)
 
     assert not form._warning_marks["steps"].isHidden()
-    assert form._warning_marks["steps"].toolTip() == "Example Model's page recommends 20–40 steps."
+    assert form._warning_marks["steps"].toolTip() == (
+        "Example Model's page recommends 20–40 steps. Click to use 40.")
     assert form._warning_marks["cfg"].isHidden()
     form.set_warnings({})
     assert form._warning_marks["steps"].isHidden()
@@ -2032,26 +2041,38 @@ def _left(form, widget):
     return widget.mapTo(form, QPoint(0, 0)).x()
 
 
-def test_a_warning_mark_sits_between_its_label_and_its_field(qtbot):
+def test_clicking_a_warning_sets_its_setting_to_the_recommended_value(qtbot):
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
+    form.set_values({"steps": 50, "sampler_name": "heun"})
+    form.set_warnings({**_STEPS_ADVICE, "sampler_name": Advice(
+        "Example Model's page recommends euler_ancestral.", "euler_ancestral")})
+
+    qtbot.mouseClick(form._warning_marks["steps"], Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(form._warning_marks["sampler_name"], Qt.MouseButton.LeftButton)
+
+    values = form.get_values()
+    assert (values["steps"], values["sampler_name"]) == (40, "euler_ancestral")
+
+
+def test_a_warning_mark_sits_left_of_its_label(qtbot):
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
 
-    form.set_warnings({"steps": "Example Model's page recommends 20–40 steps."})
+    form.set_warnings(_STEPS_ADVICE)
     QApplication.processEvents()
 
-    label, mark = _label_beside(form, "steps"), form._warning_marks["steps"]
-    assert _left(form, label) + label.width() <= _left(form, mark)
-    assert _left(form, mark) + mark.width() <= _left(form, form._widgets["steps"])
+    mark = form._warning_marks["steps"]
+    assert _left(form, mark) + mark.width() <= _left(form, _label_beside(form, "steps"))
 
 
-def test_a_warning_appearing_moves_no_field(qtbot):
+def test_a_warning_appearing_moves_no_label_or_field(qtbot):
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
-    field = form._widgets["steps"]
-    before = field.geometry()
+    label, field = _label_beside(form, "steps"), form._widgets["steps"]
+    before = (_left(form, label), field.geometry())
 
-    form.set_warnings({"steps": "Example Model's page recommends 20–40 steps."})
+    form.set_warnings(_STEPS_ADVICE)
     QApplication.processEvents()
 
-    assert field.geometry() == before
+    assert (_left(form, label), field.geometry()) == before
 
 
 def test_a_row_shown_again_keeps_its_warning_mark_hidden(qtbot):
@@ -2065,6 +2086,23 @@ def test_a_row_shown_again_keeps_its_warning_mark_hidden(qtbot):
     assert form._warning_marks["lora_strength_high"].isHidden()
 
 
+def _shown_keys(form):
+    return [key for keys in form._present_keys.values() for key in keys
+            if _row_visible(form, key)]
+
+
+def test_every_warning_mark_sits_in_one_column_whether_or_not_its_row_can_warn(qtbot):
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
+                                      size_deriver=lambda values: (464, 912)))
+
+    outside_the_size_gutter = [key for key in _shown_keys(form)
+                               if param_sections.section_title(key) != "Size"]
+    lefts = {key: _left(form, form._warning_marks[key]) for key in outside_the_size_gutter}
+
+    assert {"steps", "noise_seed", "lora_strength_high", "scene_frames"} <= set(lefts)
+    assert len(set(lefts.values())) == 1, lefts
+
+
 def _gap_after_label(form, key):
     label = _label_beside(form, key)
     return _left(form, _field_of(form, key)) - _left(form, label) - label.width()
@@ -2074,9 +2112,7 @@ def test_every_field_starts_as_far_from_its_label_whether_or_not_it_can_warn(qtb
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
                                       size_deriver=lambda values: (464, 912)))
 
-    shown = [key for keys in form._present_keys.values() for key in keys
-             if _row_visible(form, key)]
-    gaps = {key: _gap_after_label(form, key) for key in shown}
+    gaps = {key: _gap_after_label(form, key) for key in _shown_keys(form)}
     assert {"steps", "noise_seed", "width", "scene_frames"} <= set(gaps)
     assert len(set(gaps.values())) == 1, gaps
 

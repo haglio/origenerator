@@ -25,6 +25,7 @@ from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
+from origenerator.gui.label_cells import LabelCell, LabelColumn, WarningMark
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import param_help
@@ -32,6 +33,7 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.seed_history import SeedHistory
+from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
@@ -162,7 +164,8 @@ class ParamForm(QWidget):
         # and the seeds, the read-only inspect pane's copy targets before it merged
         # into this editable form.
         self._copy_buttons: dict[str, CopyButton] = {}
-        self._warning_marks: dict[str, QLabel] = {}
+        self._warning_marks: dict[str, WarningMark] = {}
+        self._advice: dict[str, Advice] = {}
         # A single swap-width-and-height button, built only when the workflow has
         # both dimension params (t2i does; i2v derives its size in-graph). None
         # when absent, so callers can tell whether the control exists. It floats as
@@ -177,6 +180,7 @@ class ParamForm(QWidget):
         self._section_order: list[str] = []
         # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
+        self._label_columns: dict[str, LabelColumn] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         # A workflow that tells a story in scenes hands both prompts, the scene
         # lengths and the lines to one editor (see origenerator.gui.scenes_editor);
@@ -241,6 +245,7 @@ class ParamForm(QWidget):
             section.toggled.connect(self._position_dimension_controls)
             self._sections[title] = section
             self._present_keys[title] = []
+            self._label_columns[title] = LabelColumn()
             self._section_order.append(title)
             outer.addWidget(section)
         outer.addStretch(1)  # collect any slack at the foot, not between sections
@@ -280,7 +285,7 @@ class ParamForm(QWidget):
     def _add_row(self, key: str, label: str, field: QWidget, extras: Sequence[QWidget] = ()):
         """Insert one row (an input or a read-only value, then its ``extras``)
         into its section at the canonical position among the rows already there,
-        after the slot its warning mark shows in (see :meth:`_field_cell`).
+        its label after the slot its warning mark shows in.
 
         The row's help (see :mod:`origenerator.gui.param_help`) goes on its label
         as well as its input: the label is what you are looking at when you
@@ -295,7 +300,8 @@ class ParamForm(QWidget):
         index = self._insert_index(keys, key)
         form = self._sections[title].content_form()
         label_widget = ElidingLabel(label)
-        form.insertRow(index, label_widget, self._field_cell(key, field, extras))
+        form.insertRow(index, self._label_cell(key, label_widget, self._label_columns[title]),
+                       self._field_cell(field, extras))
         keys.insert(index, key)
         # A label cut short is one you most want spelled out, so the tip says the
         # whole thing when the param has nothing more useful to explain.
@@ -320,8 +326,8 @@ class ParamForm(QWidget):
             section.setVisible(bool(self._present_keys[title]))
         self._position_dimension_controls()
 
-    def _field_cell(self, key: str, field: QWidget, extras: Sequence[QWidget]) -> QHBoxLayout:
-        """The warning slot, the input, then its trailing controls.
+    def _field_cell(self, field: QWidget, extras: Sequence[QWidget]) -> QHBoxLayout:
+        """The input, then its trailing controls.
 
         The copy button leads (just right of the input), then the Random tick
         (seed) or the Browse button (image). Each sits in a shared cell so the
@@ -331,7 +337,6 @@ class ParamForm(QWidget):
         """
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
-        cell.addWidget(self._warning_slot(key))
         cell.addWidget(field, 1)
         multiline = isinstance(field, QPlainTextEdit)
         for extra in extras:
@@ -368,19 +373,15 @@ class ParamForm(QWidget):
             extras.append(browse)
         return extras
 
-    def _warning_slot(self, key: str) -> QWidget:
-        mark = QLabel("⚠")
-        mark.setObjectName("warningMark")
-        policy = mark.sizePolicy()
-        policy.setRetainSizeWhenHidden(True)
-        mark.setSizePolicy(policy)
-        mark.hide()
+    def _label_cell(self, key: str, label: QWidget, column: LabelColumn) -> LabelCell:
+        mark = WarningMark()
+        mark.pressed.connect(lambda: self._take_advice(key))
         self._warning_marks[key] = mark
-        slot = QWidget()
-        holder = QHBoxLayout(slot)
-        holder.setContentsMargins(0, 0, 0, 0)
-        holder.addWidget(mark)
-        return slot
+        return LabelCell(mark, label, column)
+
+    def _take_advice(self, key: str) -> None:
+        if key in self._advice:
+            self.set_values({key: self._advice[key].fix})
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
         for key, good in choices.items():
@@ -391,10 +392,12 @@ class ParamForm(QWidget):
                                          if dropdown.itemText(index) in good
                                          else icons.unmarked_icon())
 
-    def set_warnings(self, advice: dict[str, str]) -> None:
+    def set_warnings(self, advice: dict[str, Advice]) -> None:
+        self._advice = dict(advice)
         for key, mark in self._warning_marks.items():
-            mark.setToolTip(advice.get(key, ""))
-            mark.setHidden(key not in advice)
+            found = advice.get(key)
+            mark.setToolTip(f"{found.text} Click to use {found.fix_shown}." if found else "")
+            mark.setHidden(found is None)
 
     def show_prompt_diff(self, key: str, before: str, after: str) -> None:
         """Mark a prompt field with the change a spoken request made to it —

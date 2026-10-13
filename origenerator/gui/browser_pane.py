@@ -1185,11 +1185,8 @@ class BrowserPane(QObject):
 
     @staticmethod
     def _thumbnail_caption(row) -> str:
-        """A thumbnail's caption: its seed, else a snippet of its prompt."""
-        seed = row.get("seed")
-        if seed is not None:
-            return f"seed {seed}"
-        return (row.get("positive_prompt") or "")[:40] or "(no prompt)"
+        """A thumbnail's caption: its name, else a snippet of its prompt."""
+        return gallery.item_label(row) or (row.get("positive_prompt") or "")[:40] or "(no prompt)"
 
     # --- what the open collection gathers (the slideshow plays it) ----------
 

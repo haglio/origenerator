@@ -144,6 +144,10 @@ class InfoPaneTabs(QTabWidget):
             if isinstance((w := self.widget(i)), GenerateConfigPanel)
         ]
 
+    def show_drop_candidate(self, prompt_id: str | None = None) -> None:
+        for panel in self.config_panels():
+            panel.show_drop_candidate(prompt_id)
+
     def how_many(self) -> int:
         return self._how_many
 

@@ -17,7 +17,6 @@ from enum import StrEnum
 
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
-from origenerator.gallery.output import row_output_files
 from origenerator.gallery.signatures import (
     _basename,
     _frame_name,
@@ -105,19 +104,10 @@ def config_tab_title(workflow_name: str | None, params: dict) -> str:
 
 
 def item_label(row: dict | None) -> str:
-    """The name one generation wears where a single item has to be named — a
-    Generate tab's, say. The file it produced, which is what the info block
-    calls it by too, so an item reads the same wherever it is named.
-
-    ``""`` for a row with nothing on disk — a run still in flight, or one whose
-    files are gone — leaving the caller to name it by the folder it sits in
-    instead (:func:`config_folder_name`).
-    """
-    for file in row_output_files(row or {}):
-        name = _basename(file.get("filename") or "")
-        if name:
-            return name
-    return ""
+    """The name one generation wears wherever a single item is named: its seed,
+    never the file ComfyUI numbered. ``""`` for a row with no seed."""
+    seed = (row or {}).get("seed")
+    return f"seed {seed}" if seed is not None else ""
 
 
 def config_folder_key(workflow_name: str, signature: str) -> str:

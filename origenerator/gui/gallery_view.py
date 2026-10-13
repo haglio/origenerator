@@ -522,6 +522,8 @@ class GalleryView(QWidget):
         # so the drop target is obvious from the start of the gesture.
         self._browser.drag_started.connect(self._combine.drag_started)
         self._browser.drag_ended.connect(self._combine.drag_ended)
+        self._browser.drag_started.connect(lambda pid: self._info_tabs.show_drop_candidate(pid))
+        self._browser.drag_ended.connect(lambda: self._info_tabs.show_drop_candidate())
         # Everything spoken: the microphone, the caption that says what it heard,
         # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
         # caption is placed by _build_ui, and the bank it presses is bound to it
@@ -1101,6 +1103,8 @@ class GalleryView(QWidget):
         # browser thumbnail (see :meth:`CombineController.drag_started`).
         panel.preview_drag_started.connect(self._combine.drag_started)
         panel.preview_drag_ended.connect(self._combine.drag_ended)
+        panel.preview_drag_started.connect(self._info_tabs.show_drop_candidate)
+        panel.preview_drag_ended.connect(self._info_tabs.show_drop_candidate)
         panel.form_replaced.connect(self._retarget_find)
         # Every keystroke in a tab's form moves the text an open find is marking
         # up — re-run rather than leave highlights on words that shifted.

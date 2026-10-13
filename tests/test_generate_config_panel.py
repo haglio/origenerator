@@ -787,6 +787,32 @@ def test_an_image_dropped_on_the_start_image_becomes_it(qtbot, tmp_path):
     assert start_image.text() == "image/sdxl_img1.png [output]"
 
 
+def test_an_image_dropped_on_the_start_image_shows_there_by_its_name(qtbot, tmp_path):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path)
+    thumbnail = tmp_path / "thumb.png"
+    Image.new("RGB", (8, 8)).save(thumbnail)
+    _image_row(db, filename="sdxl_img1.png")
+    db.update_generation("img1", thumbnail_path=str(thumbnail))
+
+    _drop_on(start_image, "img1")
+
+    assert start_image._name.text() == "seed 1"
+    assert not start_image._well.pixmap().isNull()
+
+
+def test_the_start_image_lights_for_a_dragged_image_and_not_for_a_video(qtbot, tmp_path):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path)
+    _image_row(db)
+    _video_row(db, "vid1")
+    lit = []
+
+    for dragged in ("img1", "vid1", None):
+        panel.show_drop_candidate(dragged)
+        lit.append(start_image._well.property("dragActive"))
+
+    assert lit == [True, False, False]
+
+
 def test_a_video_dropped_on_the_start_image_is_turned_away(qtbot, tmp_path):
     panel, db, start_image = _start_image_tab(qtbot, tmp_path)
     _video_row(db, "vid1")
@@ -1117,13 +1143,13 @@ def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
     assert panel.title() == "Wizards"
 
 
-def test_a_displayed_item_names_the_tab_by_its_file(panel, tmp_path):
+def test_a_displayed_item_names_the_tab_by_its_seed_never_its_file(panel, tmp_path):
     row = _image_row(panel._db, filename="sdxl_img1.png")
     panel._preview.show_media = MagicMock()
 
     panel.show_saved_generation(row, [row])
 
-    assert panel.title() == "sdxl_img1.png"
+    assert panel.title() == "seed 1"
 
 
 def test_title_changed_when_the_shown_item_changes(panel):
@@ -1134,7 +1160,7 @@ def test_title_changed_when_the_shown_item_changes(panel):
 
     panel.show_saved_generation(row, [row])
 
-    assert titles and titles[-1] == "sdxl_img1.png"
+    assert titles and titles[-1] == "seed 1"
 
 
 def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):

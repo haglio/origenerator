@@ -824,9 +824,7 @@ class SlideshowDirector:
         row = self._host.row_for(prompt_id) if prompt_id else None
         if not row:
             return ""
-        seed = row.get("seed")
-        item = f"seed {seed}" if seed is not None else ""
-        return " / ".join(part for part in (self._folder_name(row), item) if part)
+        return " / ".join(part for part in (self._folder_name(row), gallery.item_label(row)) if part)
 
     def _folder_name(self, row: dict) -> str:
         """The folder *row* sits in, by the name the tree gives it: the one the

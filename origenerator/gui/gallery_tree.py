@@ -241,7 +241,7 @@ class GalleryTree:
         item.setToolTip(0, _tooltip_of(group, badge))
         self._register(item, oriented_key(group.key, side.side), parent_item,
                        folder_key=group.key)
-        if not isinstance(group, (gallery.SettingsGroup, gallery.MediaGroup)):
+        if not isinstance(group, gallery.SettingsGroup):
             self._add_collections(item, side, group.key)
         for child in gallery.child_groups(group):
             self._add_node(child, item, side)

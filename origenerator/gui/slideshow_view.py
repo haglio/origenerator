@@ -92,6 +92,7 @@ _FOLLOWED = "followed"
 _REFRESH_MS = 300
 _MOVING = frozenset({Osr2State.ROBOT_HAND, Osr2State.FUNSCRIPT})
 _FOOT_VERBS = frozenset({FOOT_PRESS, FOOT_DRAG, FOOT_RELEASE, FOOT_WHEEL})
+_RATE_STEPS = {"speed_up": RATE_STEP, "speed_down": -RATE_STEP}
 
 _PANEL_MOVES = {
     Qt.Key.Key_Left: "left",
@@ -573,6 +574,11 @@ class SlideshowView(QWidget):
         if self.press_console(verb):
             self.refresh_panel()
             return True
+        if action in _RATE_STEPS:
+            playback = self._pane.playback
+            if playback is not None:
+                playback.set_speed(playback.speed + _RATE_STEPS[action])
+            return True
         if self._dashboard_cmd_file is None:
             return self._act_here(action)
         allowed = ("satellites_kino_activate", "origenerator_activate",
@@ -609,17 +615,11 @@ class SlideshowView(QWidget):
         Standalone there is no command file to take the round trip a hosted
         press takes, so the press lands on the show through the same answers
         that round trip would have ended at.  Minimize is the one button only a
-        show on its own has, the show being the window here; the rate is the
-        Funestra's own, as on every Funestra.
+        show on its own has, the show being the window here.
         """
         if action == "minimize":
             self.window().showMinimized()
             return True  # nothing on the panel changed, and it is off screen anyway
-        if action in ("speed_up", "speed_down"):
-            playback = self._pane.playback
-            if playback is not None:
-                playback.set_speed(playback.speed + (RATE_STEP if action == "speed_up" else -RATE_STEP))
-            return True
         if answer(self, action):
             self.refresh_panel()  # the readout answers the press without waiting for the beat
             return True
@@ -1273,10 +1273,9 @@ class SlideshowView(QWidget):
         self._apply_freeze()
 
     def _press_on_the_picture(self) -> None:
+        self._toggle_pause()
         if self._pane.pressing_again:
             defer(self, self.close)
-        else:
-            self._toggle_pause()
 
     def _toggle_pause(self) -> None:
         if self._actions.omnipause is not None:

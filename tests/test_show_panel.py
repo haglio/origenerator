@@ -11,7 +11,7 @@ from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
 from funestra.satellite_hud import MARGIN
 from funestra.timeline import TIMELINE_HEIGHT
-from PyQt6.QtCore import QEvent, QPointF
+from PyQt6.QtCore import QEvent, QPoint, QPointF
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
@@ -23,9 +23,10 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.slideshow import in_order
+from tests import gestures
 from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
-from tests.show_hud_support import panel_targets
+from tests.show_hud_support import button_on_screen, panel_targets
 
 
 def _inflight(key="j1", status="queued", cancel=None, **kw):
@@ -550,3 +551,49 @@ class TestTheRowOnTheOnePanel:
         plain._pane.tick()
 
         assert self._track_fill(plain, 0.5) != self._track_fill(scripted, 0.5)
+
+
+class TestAShowOverASessionsRegion:
+    """A show over a session's region in a window of this app's hands the
+    transport to the session; what only it holds -- which version of the
+    picture is on screen, how fast its own Funestra plays -- it answers here."""
+
+    @staticmethod
+    def _show_over_a_region(qtbot, tmp_path, items, **kw):
+        show = _show(qtbot, items, **kw)
+        show.resize(900, 700)
+        show.show()
+        qtbot.waitExposed(show)
+        show.wear_the_hud("portrait", dashboard_cmd_file=tmp_path / "dashboard_cmd.txt")
+        show._pane.tick()
+        return show
+
+    def test_its_versions_button_steps_the_picture_on_screen(self, qtbot, tmp_path):
+        enhanced, original = str(tmp_path / "e1.png"), str(tmp_path / "src.png")
+        show = self._show_over_a_region(qtbot, tmp_path, [(enhanced, "image", "id-a")])
+        show.set_levels({enhanced: [(enhanced, "image", "Enhanced"), (original, "image", "Base")]})
+        show._pane.tick()
+
+        gestures.click(show._pane._window, button_on_screen(show, "portrait_cycle_version"))
+
+        assert show._showing_media[0] == original
+
+    def test_its_speed_buttons_change_how_fast_it_plays(self, qtbot, tmp_path):
+        show = self._show_over_a_region(qtbot, tmp_path, [("scene one.mp4", "video")])
+        before = show._pane.playback.speed
+
+        gestures.click(show._pane._window, button_on_screen(show, "portrait_speed_up"))
+
+        assert show._pane.playback.speed > before
+
+    def test_a_double_click_on_its_picture_leaves_the_room_as_it_was(self, qtbot, tmp_path):
+        asked = []
+        show = self._show_over_a_region(
+            qtbot, tmp_path, [("scene one.png", "image")],
+            actions=ShowActions(omnipause=lambda: asked.append("the room's pause")))
+        window = show._pane._window
+
+        gestures.double_click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
+
+        qtbot.waitUntil(lambda: not show.isVisible())
+        assert asked == ["the room's pause"] * 2  # the first click's pause, taken back

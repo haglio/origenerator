@@ -19,13 +19,13 @@ from origenerator.show_buttons import show_rows
 
 # The presses a show answers for itself wherever it is drawn: the two filters,
 # reset, the order pair, the loops, the expand mark, the map's own clicks and
-# its keys.  The transport is the other half, which a hosted window hands to
-# its session instead.
+# its keys, and the versions of the picture on screen.  The transport is the
+# other half, which a hosted window hands to its session instead.
 THE_SHOWS_OWN = frozenset({
     "fmode", "enhanced", "reset", "shuffle", "latest", "no_loop", "seed_loop",
     "action_loop", "loop", "more_seeds", "play_video", "lock_video", "filter",
     "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
-    "cycle_action",
+    "cycle_action", "cycle_version", "cycle_version_back",
 })
 
 COLLAPSES = {"hud_minimize": True, "hud_restore": False}

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, QPointF, Qt
+from PyQt6.QtCore import QMimeData, QPoint, QPointF, Qt
 from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
 from shared_ui.colors import hovered
 from shared_ui.testing import ground
@@ -195,6 +195,20 @@ def test_a_drag_the_slot_would_turn_away_does_not_light_it(qtbot):
 
     _drag_enter(slot, "vid1")
 
+    assert slot._label.property("dropTarget") is False
+
+
+def test_a_drag_carrying_no_gallery_item_is_turned_away(qtbot):
+    # A file dragged in from outside the app, say.
+    slot = _slot(qtbot)
+    mime = QMimeData()
+    mime.setText("elsewhere.png")
+    event = QDragEnterEvent(QPoint(1, 1), Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+
+    slot.dragEnterEvent(event)
+
+    assert not event.isAccepted()
     assert slot._label.property("dropTarget") is False
 
 

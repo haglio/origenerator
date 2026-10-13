@@ -329,10 +329,6 @@ class OrigeneratorWindow(QMainWindow):
             self._sit_at_the_sessions_rect(session.main_rect)
 
     def _dress_for_the_room(self, session: FunTimeSession) -> None:
-        """Frameless and in the topmost band for the rect a session on the
-        monitors names.  A headset room has neither, and Windows refuses to
-        resize a frameless topmost window past the rect it was given -- which
-        left the published picture at the session's small upright size."""
         managed = (Qt.WindowType.FramelessWindowHint
                    | Qt.WindowType.WindowStaysOnTopHint)
         flags = self.windowFlags()

@@ -476,7 +476,7 @@ class CombineController(QObject):
         situation to match lives — resolved from ``image_prompts`` (prompt_id → prompt,
         built once from the in-memory image rows, so no per-video query). Falls back to
         the video's own prompt when the start frame can't be resolved (e.g. an import)."""
-        source_id = gallery.find_source_image_id(video_row, self._host.image_rows())
+        source_id = gallery.source_image_id_in(video_row, self._host.image_config_index())
         if source_id and (image_prompts.get(source_id) or "").strip():
             return image_prompts[source_id]
         return video_row.get("positive_prompt") or ""

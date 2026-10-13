@@ -535,11 +535,10 @@ def test_the_mined_recipe_is_matched_against_its_start_frames_scene(combine,
     monkeypatch.setattr(module.recipe_match, "smart_recipe", smart)
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "find_source_image_id",
-                        lambda row, rows: "img")
-    image = _image("img", prompt="a doll on a couch")
+    image = _image("img", prompt="a doll on a couch", files=("frame.png",))
     controller, _host = combine(
-        FakeHost(rows=[image]), db=FakeDB([image, _video("clip")]))
+        FakeHost(rows=[image]),
+        db=FakeDB([image, _video("clip", source_image="frame.png [output]")]))
 
     controller.generate_category("img", "waving")
 

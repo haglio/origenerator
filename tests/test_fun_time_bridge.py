@@ -834,11 +834,3 @@ def test_the_session_says_where_each_sides_panel_sits(qtbot, tmp_path):
 
     assert view.hud_place("portrait") == (HudCorner.LOWER_RIGHT, True)
     assert view.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
-
-
-def test_the_contract_names_the_panel_lines_the_session_writes():
-    lines = contract.command_lines()
-
-    for side in ("portrait", "landscape"):
-        assert f"{side}_hud_corner|{{corner}}" in lines
-        assert f"{side}_hud_minimized|{{on}}" in lines

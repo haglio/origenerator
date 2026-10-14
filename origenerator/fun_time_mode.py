@@ -26,6 +26,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -199,6 +200,15 @@ def _lines_said_to(side: str) -> tuple[str, ...]:
     )
 
 
+_CARRIED = re.compile(r"(\{\w+\})")
+
+
+def command_patterns() -> tuple[str, ...]:
+    return tuple("(?i)" + "".join(".+" if _CARRIED.fullmatch(piece) else re.escape(piece)
+                                  for piece in _CARRIED.split(line))
+                 for line in command_lines())
+
+
 def declaration() -> dict:
     """The published document, as a host reads it."""
     return {
@@ -213,6 +223,7 @@ def declaration() -> dict:
         "headset_words": list(HEADSET_WORDS),
         "command_case_blind": True,
         "command_lines": list(command_lines()),
+        "command_patterns": list(command_patterns()),
     }
 
 

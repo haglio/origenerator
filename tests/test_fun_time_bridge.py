@@ -6,6 +6,7 @@ session's hotkeys reach the region slideshows and its choreography can see them.
 """
 from __future__ import annotations
 
+import re
 from unittest.mock import MagicMock
 
 import pytest
@@ -753,6 +754,13 @@ def _told_on_a_fresh_bridge(tmp_path, line: str) -> None:
     bridge._tick()
 
 
+def _a_line_like(template: str, tmp_path) -> str:
+    return template.format(
+        file=r"C:\library\scene one.png", row="alpha", words="favorites",
+        corner="lower_right", on="1",
+        frames=str(tmp_path / "frame.bin"), input=str(tmp_path / "input.txt"))
+
+
 def test_every_line_the_published_document_names_is_answered_here(qtbot, tmp_path, caplog):
     """A host sends what the document names, so a named line dropped here is a
     key that does nothing in the session -- in whichever case the host spells
@@ -761,14 +769,29 @@ def test_every_line_the_published_document_names_is_answered_here(qtbot, tmp_pat
     assert document["command_case_blind"]
 
     for template in document["command_lines"]:
-        line = template.format(
-            file=r"C:\library\scene one.png", row="alpha", words="favorites",
-            corner="lower_right", on="1",
-            frames=str(tmp_path / "frame.bin"), input=str(tmp_path / "input.txt"))
+        line = _a_line_like(template, tmp_path)
         for spelled in (line.lower(), line.upper()):
             _told_on_a_fresh_bridge(tmp_path, spelled)
 
     assert "dropped" not in caplog.text
+
+
+def test_a_host_matches_each_line_the_document_names_by_its_published_pattern(tmp_path):
+    document = contract.declaration()
+    lines = [_a_line_like(template, tmp_path) for template in document["command_lines"]]
+
+    unmatched = [spelled
+                 for line, pattern in zip(lines, document["command_patterns"], strict=True)
+                 for spelled in (line.lower(), line.upper())
+                 if not re.fullmatch(pattern, spelled)]
+
+    assert unmatched == []
+
+
+@pytest.mark.parametrize("line", ["sideways_next", "GO_TO|", "portrait_say:", "HAND_OVER||"])
+def test_a_line_naming_nothing_here_or_carrying_nothing_where_it_must_matches_no_pattern(line):
+    assert not any(re.fullmatch(pattern, line)
+                   for pattern in contract.declaration()["command_patterns"])
 
 
 def test_a_clip_the_session_names_lands_the_gallery_on_the_generation_it_copies(

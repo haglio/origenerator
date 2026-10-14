@@ -28,6 +28,12 @@ def _document() -> dict:
         contract.contract_path(REPO_ROOT).read_text(encoding="utf-8"))
 
 
+def flags_the_parser_accepts() -> set[str]:
+    return {option
+            for action in contract.build_parser()._actions
+            for option in action.option_strings} - {"-h", "--help"}
+
+
 def test_the_published_document_is_what_this_module_says():
     """Run this module when it fails: ``origenerator.fun_time_mode`` writes it."""
     published = contract.contract_path(REPO_ROOT)
@@ -47,11 +53,8 @@ def test_the_parser_accepts_exactly_the_flags_the_document_names():
         *document["headset_flags"],
         document["check_launch_flag"],
     }
-    accepted = {option
-                for action in contract.build_parser()._actions
-                for option in action.option_strings} - {"-h", "--help"}
 
-    assert accepted == declared
+    assert flags_the_parser_accepts() == declared
 
 
 def test_a_hosted_launch_short_of_a_required_flag_is_refused():

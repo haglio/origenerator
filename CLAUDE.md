@@ -165,9 +165,11 @@ has a matching half over there, and the two are one piece of work rather than a
 feature and a follow-up. Four shapes it takes: a verb in
 `fun_time_bridge.py` (sent by fun_time's dispatch table and its loop branches;
 `fun_time_mode.py` declares every line the command file answers and publishes
-them in `origenerator_contract.json`, which fun_time's
-`tests/test_vr_control_parity.py` holds everything its keys and phrases send
-here to), a switch on the shared HUD in `gui/slideshow_panel.py` (which posts a verb
+them in `origenerator_contract.json`, and fun_time publishes every line, launch
+flag and headset word it sends here in its `tests/origenerator_expectations.json`,
+which `tests/test_fun_time_expectations.py` holds this app to before it ships --
+so a line, flag or word fun_time still sends is retired on fun_time's side
+first), a switch on the shared HUD in `gui/slideshow_panel.py` (which posts a verb
 `fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
 `windows_bridge_startup.py`; that module declares the flags and the window

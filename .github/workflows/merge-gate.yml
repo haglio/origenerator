@@ -24,3 +24,11 @@ jobs:
       # 55 is as much as the queue's own 60-minute limit leaves room for.
       timeout-minutes: 55
       qt-platform: offscreen
+      # Fun Time, beside this checkout at its default branch: what it relies on of
+      # this app (its tests/origenerator_expectations.json) is held to this app
+      # by tests/test_fun_time_expectations.py, so a change that would break a
+      # room is refused here rather than after it ships. Cloned and not
+      # installed -- the check reads one document.
+      prepare: |
+        set -euo pipefail
+        git clone --quiet --depth 1 https://github.com/haglio/fun_time.git ../fun_time

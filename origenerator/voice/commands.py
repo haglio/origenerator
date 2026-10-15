@@ -1,9 +1,13 @@
 """The whole spoken vocabulary: what an utterance means, if anything.
 
-Three things can be said, and any of them may be led by a side:
+Three things can be said, and any of them may be led by a side: a command about
+the picture on screen (:mod:`origenerator.gallery.voice_commands`), one of the
+show's own controls (:mod:`origenerator.voice.show_commands`), or a shelf name,
+which plays that shelf the way its slideshow button would.
 
-* a command about the picture on screen — ``fix <part>`` or ``genau it``
-  (:mod:`origenerator.gallery.voice_commands` owns both).
+* a command about the picture on screen — ``fix <part>``, ``animate as <lane>
+  <act>`` or ``enhance`` (:mod:`origenerator.gallery.voice_commands` owns all
+  three).
 * ``start`` / ``pause`` / ``stop slideshow`` — the slideshow's own controls
   (:mod:`origenerator.voice.slideshow_commands`).
 * ``<collection>`` — play that collection, the way its slideshow button would.
@@ -65,8 +69,9 @@ _MAX_COLLECTION_WORDS = 3
 
 class SurfaceCommand(NamedTuple):
     """A command about the picture on screen — a
-    :class:`~origenerator.gallery.detail_parts.DetailPart` to fix or
-    :data:`~origenerator.gallery.voice_commands.GENAU_COMMAND` — aimed at
+    :class:`~origenerator.gallery.detail_parts.DetailPart` to fix, an
+    :class:`~origenerator.animate_command.AnimateRequest` or
+    :data:`~origenerator.gallery.voice_commands.ENHANCE_COMMAND` — aimed at
     *side*'s slideshow (``None`` — whichever slideshow is up)."""
     command: object
     side: str | None = None

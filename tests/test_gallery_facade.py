@@ -22,7 +22,7 @@ _PACKAGE = ROOT / "origenerator" / "gallery"
 PUBLISHED = {
     "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomGroup",
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
-    "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "GENERATION_SEED_KEYS",
+    "EnhanceLevel", "EnhanceSettings", "GENERATION_SEED_KEYS",
     "JobKind", "LoraGroup",
     "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
     "SettingsGroup",

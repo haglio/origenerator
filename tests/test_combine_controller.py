@@ -2,7 +2,7 @@
 
 The whole act used to be reachable only by building the app's central widget:
 which recipe a picked act resolves to, what a stand-in row does while the model
-thinks, and what a spoken "genau it" refuses. Here the host is a handful of recorded calls and the
+thinks, and what a spoken animation refuses. Here the host is a handful of recorded calls and the
 recipe match answers inline.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
@@ -15,12 +15,13 @@ import pytest
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import evolver_export, recipe_match
+from origenerator.animate_command import AnimateRequest
 from origenerator.gui import combine_controller as module
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.export_lane import GENAU
-from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
@@ -32,12 +33,14 @@ class FakePanel:
     class _Slot:
         def __init__(self):
             self.item = None
+            self.changed = _Signal()
 
         def current_id(self):
             return self.item
 
         def set_item(self, prompt_id):
             self.item = prompt_id
+            self.changed.emit()
 
     def __init__(self, accepts_image, accepts_video, preview):
         self.accepts_image = accepts_image
@@ -53,6 +56,7 @@ class FakePanel:
         self.lit_for = []
         self.cleared = 0
         self.combine_requested = _Signal()
+        self.animation_settings_requested = _Signal()
         self.intent_changed = _Signal()
         self.item_activated = _Signal()
 
@@ -229,7 +233,7 @@ class FakeHost:
 
 
 def _image(prompt_id="img", *, prompt="a doll on a couch", files=("one.png",),
-           source="generated"):
+           source="generated", state=None):
     return {
         "prompt_id": prompt_id,
         "workflow_name": IMAGE_WORKFLOW,
@@ -239,6 +243,7 @@ def _image(prompt_id="img", *, prompt="a doll on a couch", files=("one.png",),
         "thumbnail_path": f"{prompt_id}-thumb.png",
         "output_files": json.dumps([{"filename": name} for name in files]),
         "params_json": "{}",
+        "picture_state": state,
     }
 
 
@@ -570,82 +575,37 @@ def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
     assert panel.combination == Combination("img-thumb.png")
 
 
-# --- the spoken "genau it" ---------------------------------------------------
-
-
-def test_genau_it_reads_the_act_off_the_pictures_own_prompt(combine, monkeypatch):
-    monkeypatch.setattr(module.recipe_match, "category_for_prompt",
-                        lambda prompt: "waving")
-    monkeypatch.setattr(module.recipe_match, "available_categories",
-                        lambda rows, intent: ["waving"])
-    monkeypatch.setattr(module.recipe_match, "curated_recipe", lambda c, i: None)
-    monkeypatch.setattr(module.recipe_match, "smart_recipe", lambda *a, **k: None)
-    monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
-    controller, _host = combine(db=FakeDB([_image("img")]))
-
-    prompt_id, message, kind = controller.genau_it("img")
-
-    assert prompt_id == "img"
-    assert message == "🎤 animating as a “waving” flick"
-    assert kind == NOTICE
-
-
-def test_genau_it_declines_a_video(combine):
-    controller, _host = combine(db=FakeDB([_video("clip")]))
-
-    assert controller.genau_it("clip") == (
-        None, "🎤 only a picture can become a Genau flick", WARNING)
-
-
-def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(combine,
-                                                                    monkeypatch):
-    monkeypatch.setattr(module.recipe_match, "category_for_prompt", lambda p: None)
-    controller, _host = combine(db=FakeDB([_image("img")]))
-
-    _prompt_id, message, kind = controller.genau_it("img")
-
-    assert message == (
-        "🎤 this prompt doesn't say what's happening — no act to animate")
-    assert kind == WARNING
-
-
-def test_a_second_genau_it_over_a_picture_with_a_clip_coming_is_refused(combine,
-                                                                        monkeypatch):
-    # Saying it twice is what someone does when the first time appeared to do
-    # nothing, and it usually did: the clip waits its turn in the line and the
-    # picture on screen doesn't change.
-    monkeypatch.setattr(module.gallery, "find_source_image_id",
-                        lambda row, rows: "img")
-    db = FakeDB([_image("img"), _video("clip", status="running", requested="now")])
-    controller, _host = combine(db=db)
-
-    assert controller.genau_it("img") == (None, ALREADY_GENAUD, WARNING)
+# --- a spoken animation over the picture on screen ---------------------------
 
 
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(combine,
                                                                        monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch)
     monkeypatch.setattr(module.gallery, "find_source_image_id",
                         lambda row, rows: "img")
-    monkeypatch.setattr(module.recipe_match, "category_for_prompt", lambda p: None)
-    db = FakeDB([_image("img"),
+    db = FakeDB([_image("img", state="state one"),
                  _video("clip", status="error", requested="now", files=[])])
     controller, _host = combine(db=db)
 
-    # It gets as far as reading the act, which means the picture was not refused.
-    assert controller.genau_it("img")[1] != ALREADY_GENAUD
+    # It gets as far as launching, which means the picture was not refused.
+    assert controller.animate_it(
+        "img", AnimateRequest(recipe_match.GENAU, "waving"))[1] != ALREADY_GENAUD
 
 
 def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(combine,
                                                                         monkeypatch):
     # The mined tier asks a local model that thinks for several seconds, which is
     # exactly the silence a second command is said into.
-    monkeypatch.setattr(module.recipe_match, "curated_recipe", lambda c, i: None)
+    _paths(monkeypatch)
+    _no_mining(monkeypatch)
     said = []
 
     def slow_match(work, done):
-        said.append(controller.genau_it("img"))  # said into the wait
+        said.append(controller.animate_it(
+            "img", AnimateRequest(recipe_match.GENAU, "waving")))  # said into the wait
 
-    controller, _host = combine(FakeHost(), db=FakeDB([_image("img")]))
+    controller, _host = combine(FakeHost(), db=FakeDB([_image("img", state="state one")]))
     controller._host.off_thread = slow_match
 
     controller.generate_category("img", "waving", recipe_match.GENAU, send=True)
@@ -812,3 +772,229 @@ def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine,
     assert db.requested == ["the-run-already-going"]
     assert jobs.prepared == []
     assert [message for _pid, message, _kind in slideshows.runs_said] == [module.ALREADY_MAKING_ONE]
+# --- the spoken "animate as" -------------------------------------------------
+
+_PATHS = {
+    "animation_paths": {
+        recipe_match.VIDEO: {"waving": ["state one"], "leaning": ["state one"]},
+        recipe_match.GENAU: {"waving": ["state one"]},
+    },
+}
+
+
+def _paths(monkeypatch):
+    monkeypatch.setattr(module.animation_paths, "load_content", lambda: _PATHS)
+
+
+def _no_mining(monkeypatch, available=("waving",)):
+    monkeypatch.setattr(module.recipe_match, "available_categories",
+                        lambda rows, intent: list(available))
+    monkeypatch.setattr(module.recipe_match, "curated_recipe", lambda c, i: None)
+    monkeypatch.setattr(module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
+
+
+def test_animate_as_runs_the_act_it_names_in_the_lane_it_names(combine, monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch)
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+    launched = []
+    controller.generate_category = lambda *args, **kw: launched.append((args, kw))
+
+    answer = controller.animate_it("img", AnimateRequest(recipe_match.GENAU, "waving"))
+
+    assert answer == ("img", "🎤 animating as “waving”", NOTICE)
+    assert launched == [(("img", "waving", recipe_match.GENAU), {"send": True})]
+
+
+def test_animate_as_with_no_act_said_takes_the_one_the_picture_leaves(combine,
+                                                                      monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch)
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+    launched = []
+    controller.generate_category = lambda *args, **kw: launched.append((args, kw))
+
+    controller.animate_it("img", AnimateRequest(recipe_match.GENAU, ""))
+
+    assert launched == [(("img", "waving", recipe_match.GENAU), {"send": True})]
+
+
+def test_a_full_length_animation_is_left_in_the_gallery_rather_than_handed_on(
+        combine, monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch, available=("waving", "leaning"))
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+    launched = []
+    controller.generate_category = lambda *args, **kw: launched.append((args, kw))
+
+    controller.animate_it("img", AnimateRequest(recipe_match.VIDEO, "leaning"))
+
+    assert launched == [(("img", "leaning", recipe_match.VIDEO), {"send": False})]
+
+
+def test_an_act_this_picture_cannot_do_is_said_and_nothing_is_run(combine,
+                                                                  monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch)
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+
+    prompt_id, message, kind = controller.animate_it(
+        "img", AnimateRequest(recipe_match.GENAU, "leaning"))
+
+    assert prompt_id is None
+    assert "leaning" in message and kind == ERROR
+
+
+def test_a_picture_nobody_has_sorted_yet_is_asked_about_first(combine, monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch)
+    controller, _host = combine(db=FakeDB([_image("img")]))
+
+    prompt_id, message, kind = controller.animate_it(
+        "img", AnimateRequest(recipe_match.VIDEO, "waving"))
+
+    assert prompt_id is None
+    assert "sorted" in message and kind == WARNING
+
+
+def test_animate_as_declines_a_video(combine):
+    controller, _host = combine(db=FakeDB([_video("clip")]))
+
+    assert controller.animate_it("clip", AnimateRequest(recipe_match.VIDEO, "waving")) == (
+        None, "🎤 only a picture can be animated", WARNING)
+
+
+def test_an_act_with_no_recipe_under_it_yet_says_so(combine, monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch, available=())
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+
+    prompt_id, message, kind = controller.animate_it(
+        "img", AnimateRequest(recipe_match.GENAU, "waving"))
+
+    assert prompt_id is None
+    assert "waving" in message and kind == WARNING
+
+
+def test_a_second_loop_asked_for_over_a_picture_with_one_coming_is_refused(
+        combine, monkeypatch):
+    _paths(monkeypatch)
+    _no_mining(monkeypatch)
+    monkeypatch.setattr(module.gallery, "find_source_image_id", lambda row, rows: "img")
+    db = FakeDB([_image("img", state="state one"),
+                 _video("clip", status="running", requested="now")])
+    controller, _host = combine(db=db)
+
+    assert controller.animate_it("img", AnimateRequest(recipe_match.GENAU, "waving")) == (
+        None, ALREADY_GENAUD, WARNING)
+
+
+def test_the_acts_narrow_to_what_the_dropped_picture_can_start_from(combine,
+                                                                     monkeypatch):
+    _paths(monkeypatch)
+    monkeypatch.setattr(module.recipe_match, "available_categories",
+                        lambda rows, intent: {"waving", "leaning"})
+    controller, _host = combine(db=FakeDB([_image("img", state="state one"),
+                                           _video("clip")]))
+
+    controller.panel.image_slot.set_item("img")
+
+    assert sorted(controller.panel.available) == ["leaning", "waving"]
+
+    monkeypatch.setattr(module.animation_paths, "acts_for",
+                        lambda state, lane, **kw: ("waving",))
+    controller.picture_dropped()
+
+    assert sorted(controller.panel.available) == ["waving"]
+
+
+def test_a_picture_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
+    # Greying every act over a picture that says nothing about itself would read
+    # as the panel being broken.
+    _paths(monkeypatch)
+    monkeypatch.setattr(module.recipe_match, "available_categories",
+                        lambda rows, intent: {"waving", "leaning"})
+    controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
+
+    controller.panel.image_slot.set_item("img")
+
+    assert sorted(controller.panel.available) == ["leaning", "waving"]
+
+
+def test_the_settings_accepted_for_this_pictures_own_state_outrank_the_acts_pin(
+        combine, monkeypatch, tmp_path):
+    """The same act started from two situations is two runs, and the overlay's
+    per-act pin can only be right for one of them."""
+    pinned = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 4}}
+    accepted = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 24}}
+    monkeypatch.setattr(module.recipe_match, "curated_recipe", lambda c, i: pinned)
+    monkeypatch.setattr(module.animation_recipes, "recipe_for",
+                        lambda lane, act, state: accepted if state else None)
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+
+    built = controller._curated_combination("img", "waving")
+
+    assert built is not None
+    assert built[1]["steps"] == 24
+
+
+def test_a_picture_nobody_sorted_still_gets_the_acts_pin(combine, monkeypatch):
+    pinned = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 4}}
+    monkeypatch.setattr(module.recipe_match, "curated_recipe", lambda c, i: pinned)
+    monkeypatch.setattr(module.animation_recipes, "recipe_for",
+                        lambda lane, act, state: None)
+    controller, _host = combine(db=FakeDB([_image("img")]))
+
+    built = controller._curated_combination("img", "waving")
+
+    assert built is not None
+    assert built[1]["steps"] == 4
+
+
+def test_edit_default_opens_the_window_that_settles_each_animation(combine, monkeypatch, qtbot):
+    """His ask: reachable from inside the app, so the window he judges an
+    animation's settings in needs no launcher of its own."""
+    controller, _host = combine()
+    made = QWidget()
+    qtbot.addWidget(made)
+    monkeypatch.setattr(module, "the_animation_window", lambda: made)
+
+    controller.panel.animation_settings_requested.emit()
+
+    assert made.isVisible()
+
+
+def test_a_second_press_brings_that_window_back_rather_than_another(combine, monkeypatch, qtbot):
+    controller, _host = combine()
+    built = []
+
+    def one_more():
+        made = QWidget()
+        qtbot.addWidget(made)
+        built.append(made)
+        return made
+
+    monkeypatch.setattr(module, "the_animation_window", one_more)
+
+    controller.panel.animation_settings_requested.emit()
+    controller.panel.animation_settings_requested.emit()
+
+    assert len(built) == 1
+
+
+def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch):
+    """Every other test here drives a recorder in the panel's place, so the one
+    thing it cannot answer is whether the button he presses is wired at all."""
+    made = QWidget()
+    qtbot.addWidget(made)
+    monkeypatch.setattr(module, "the_animation_window", lambda: made)
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    controller = CombineController(
+        FakeHost(), parent=parent, db=FakeDB(), jobs=FakeReroll(), client=object(),
+        info_tabs_of=lambda: FakeTabs(), slideshows=FakeSlideshows())
+
+    controller.panel._defaults_btn.click()
+
+    assert made.isVisible()

@@ -12,7 +12,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.looping_preview import looping_movie
+from origenerator.gui.looping_preview import play_in
 
 _TILE = 132
 
@@ -75,7 +75,7 @@ class AnimatedVideoStrip(QWidget):
         tile = _VideoTile(prompt_id)
         tile.clicked.connect(self.video_activated)
         if movie_path:
-            tile.setMovie(looping_movie(movie_path, QSize(_TILE, _TILE), tile))
+            play_in(tile, movie_path, QSize(_TILE, _TILE))
         elif still_path:
             pixmap = QPixmap(str(still_path))
             if not pixmap.isNull():

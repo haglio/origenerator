@@ -404,7 +404,7 @@ class GalleryView(QWidget):
         before its first refresh.
         """
         self._image_rows: list[dict] = []
-        # Pictures whose spoken "genau it" is still choosing a recipe, so a
+        # Pictures whose spoken animation is still choosing a recipe, so a
         # second one said into that wait is refused rather than queued twice
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
@@ -504,7 +504,7 @@ class GalleryView(QWidget):
             self, db=db, browser=self._browser, jobs=self._jobs,
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time)
         # Combine: a video's recipe run again on a dropped picture, and the
-        # spoken "genau it" that asks for the same thing out loud
+        # spoken "animate as" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
         # which _build_ui places under the tree.
         self._combine = CombineController(
@@ -3333,9 +3333,10 @@ class GalleryView(QWidget):
         """Put the combine panel back the way a session left it."""
         self._combine.restore(saved)
 
-    def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
-        """Animate a picture as a Genau flick — what a spoken "genau it" runs."""
-        return self._combine.genau_it(image_id)
+    def animate_it(self, image_id: str | None,
+                   asked) -> tuple[str | None, str, str]:
+        """Animate a picture as a named act — what an "animate as" runs."""
+        return self._combine.animate_it(image_id, asked)
 
     def reveal_launch(self, key: str):
         """Show a just-launched combine. If its (image × settings) folder already

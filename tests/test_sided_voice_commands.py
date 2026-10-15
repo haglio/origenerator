@@ -20,7 +20,6 @@ from origenerator.gallery.collection import (
     REQUESTS_KEY,
     TRASH_KEY,
 )
-from origenerator.gallery.voice_commands import GENAU_COMMAND
 from origenerator.voice.commands import (
     CollectionCommand,
     SlideshowControl,
@@ -81,8 +80,8 @@ def test_anything_else_is_left_to_the_prompt_rewriter(text):
 def test_the_recognizer_is_asked_to_hear_the_whole_vocabulary():
     heard = spoken_phrases()
 
-    for phrase in ("fix teeth", "go now it", "enhance", "start slideshow", "favorites",
-                   "latest", "undo", "amp fifty", "mic off"):
+    for phrase in ("fix teeth", "animate as alpha", "enhance", "start slideshow",
+                   "favorites", "latest", "undo", "amp fifty", "mic off"):
         assert phrase in heard
 
 
@@ -107,15 +106,16 @@ def test_a_slideshow_command_can_name_the_side_it_means(text, side):
 
 
 @pytest.mark.parametrize("text, side", [
-    ("go now", None),
-    ("landscape go now", "landscape"),
-    ("portrait genau it", "portrait"),
+    ("enhance it", None),
+    ("landscape enhance", "landscape"),
+    ("portrait animate as video alpha", "portrait"),
 ])
-def test_a_genau_command_can_name_the_side_it_means(text, side):
-    """The other picture command takes a side for the same reason a fix does."""
+def test_the_other_picture_commands_can_name_the_side_they_mean(text, side):
+    """The other picture commands take a side for the same reason a fix does."""
     command = match_voice_command(text)
 
-    assert command == SurfaceCommand(GENAU_COMMAND, side)
+    assert isinstance(command, SurfaceCommand)
+    assert command.side == side
 
 
 @pytest.mark.parametrize("text, side, rest", [

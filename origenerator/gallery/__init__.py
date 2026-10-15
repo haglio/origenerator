@@ -160,7 +160,6 @@ from origenerator.gallery.tree import (
 )
 from origenerator.gallery.voice_commands import (
     ENHANCE_COMMAND,
-    GENAU_COMMAND,
     command_phrases,
     match_command,
     recognized_spelling,
@@ -178,7 +177,6 @@ __all__ = [
     "ENHANCE_COMMAND",
     "ENHANCE_SETTING_KEYS",
     "ENHANCE_WORKFLOW",
-    "GENAU_COMMAND",
     "GENERATION_SEED_KEYS",
     "MATCH_SOURCE_MODEL",
     "SELECTION_KEY",

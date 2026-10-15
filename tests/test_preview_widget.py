@@ -970,7 +970,7 @@ def test_narrowing_the_pane_wraps_the_plate_to_fit_inside_it(make_preview, tmp_p
 # --- a combination, before anything has been made from it --------------------
 
 def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, tmp_path):
-    # "Edit…" hands a tab a picture and a past video's settings. The
+    # "Edit individual…" hands a tab a picture and a past video's settings. The
     # idle line ("select a generation to preview") describes a tab pointed at
     # nothing, which is exactly what this is not.
     w = make_preview()

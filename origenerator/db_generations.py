@@ -1,13 +1,10 @@
 """Every image and video this app knows about: one row per generation.
 
-The largest of the six tables `Database` used to hold all of, and the one every
-other part of the app eventually reads. A row carries the run that made it (the
-workflow and its params, the prompts, the seed), what became of it (status,
-output files, thumbnail, how long it took), and the marks the user and the two
-export lanes leave on it.
-
-The DDL and the column list are in :mod:`origenerator.db_schema`; evolver reads
-seven of these columns read-only, so tests/test_db_schema.py holds them.
+A row carries the run that made it (the workflow and its params, the prompts, the
+seed), what became of it (status, output files, thumbnail, how long it took), and
+the marks the user and the two export lanes leave on it. The DDL and the column
+list are in :mod:`origenerator.db_schema`; evolver reads seven of these columns
+read-only, so tests/test_db_schema.py holds them.
 """
 from __future__ import annotations
 
@@ -28,6 +25,11 @@ LIFECYCLE_COLUMNS = frozenset({
     "thumbnail_path", "error_message", "completed_at", "duration_seconds",
     "progress_json",
 })
+
+#: Set while a sibling app is holding a copy of the row's clip, one column per
+#: lane it can be sent down (:meth:`GenerationStore._record_send` clears it
+#: again when the send is taken back).
+SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
 
 class GenerationStore(Store):
@@ -66,14 +68,9 @@ class GenerationStore(Store):
 
     def _record_send(self, prompt_id: str, at_column: str, unsent_column: str,
                      *, sent: bool):
-        """Say whether a sibling app is holding this clip — both stamps at once.
-
-        The pair is one fact read from two sides: this app's button asks whether
-        the clip is out there, and the app it went to asks whether to delete it.
-        Half-written, the row would either hide a copy the sibling still holds or
-        condemn one that was just handed over, so the two columns move in a
-        single statement rather than in two calls to :meth:`_stamp`.
-        """
+        """Say whether a sibling app is holding this clip — both stamps at once,
+        because half-written the row would either hide a copy the sibling still
+        holds or condemn one that was just handed over."""
         held, taken_back = ("datetime('now')", "NULL") if sent else ("NULL", "datetime('now')")
         with self._connect() as conn:
             conn.execute(
@@ -111,11 +108,9 @@ class GenerationStore(Store):
     def update_generation(self, prompt_id: str, **fields):
         """Move a job along: any of :data:`LIFECYCLE_COLUMNS`, in one statement.
 
-        A column outside that set is refused by name rather than dropped -- the
-        drop was silent, so a typo, or a caller reaching for a provenance field
-        this does not write, was a no-op with nothing said. Callers build the
-        field dict conditionally, so no fields at all is a normal outcome and
-        stays a no-op.
+        A column outside that set is refused by name rather than dropped, because
+        the drop was silent. Callers build the field dict conditionally, so no
+        fields at all is a normal outcome and stays a no-op.
         """
         refused = set(fields) - LIFECYCLE_COLUMNS
         if refused:
@@ -152,14 +147,9 @@ class GenerationStore(Store):
     def set_recipe_source(self, prompt_id: str, *, category: str | None = None,
                           video_prompt_id: str | None = None):
         """Record where a combine launch got its recipe: the act picked in the
-        dropdown, and the video whose settings the run re-uses.
-
-        Written straight after the launch rather than at insert time, because the
-        row goes in as the job is submitted and only the caller that built the
-        combination knows either of these. Empty values are stored as NULL, so a
-        dropped video (no act) and a curated act (no video) each record only the
-        half they have. Two columns in one statement, so it keeps its own.
-        """
+        dropdown, and the video whose settings the run re-uses. Written after the
+        launch, because only the caller that built the combination knows either;
+        empty values are stored as NULL, so each records the half it has."""
         with self._connect() as conn:
             conn.execute(
                 "UPDATE generations SET recipe_category = ?, recipe_video_id = ? "
@@ -210,6 +200,11 @@ class GenerationStore(Store):
         """
         self._set(prompt_id, "experiment_verdict", verdict)
 
+    def set_picture_state(self, prompt_id: str, state: str | None):
+        """Record what a still picture was sorted as showing, or ``None`` to take
+        the sorting back, which puts it among the ones still to be looked at."""
+        self._set(prompt_id, "picture_state", state or None)
+
     def mark_evolver_exported(self, prompt_id: str):
         """Record that this generation's video was sent to Evolver's inbox.
 
@@ -251,11 +246,10 @@ class GenerationStore(Store):
                           sent=False)
 
     def mark_genau_requested(self, prompt_id: str):
-        """Record that a spoken "genau it" started this run.
+        """Record that a spoken animation started this run.
 
         Stamped at launch, read at completion: it is what tells the finished clip
-        to hand itself to the Genau lane without a second ask. Only ever tested
-        for presence.
+        to hand itself to the Genau lane without a second ask.
         """
         self._stamp(prompt_id, "genau_requested_at")
 
@@ -297,14 +291,12 @@ class GenerationStore(Store):
     def highest_id_issued(self) -> int:
         """The largest id this table has ever handed out, deleted rows included.
 
-        ``max(id)`` answers a narrower question — what is still here — and the
-        gap between the two is every row that has been and gone: the transient
-        row an enhancement runs under is deleted the moment it folds, taking its
-        id out of the table but not out of the count. AUTOINCREMENT keeps the
-        real high-water mark in ``sqlite_sequence``, which is what says whether
-        an id recorded elsewhere could ever have been one of this table's own
-        (:func:`~origenerator.branch_session.disown_foreign_runs`). A table that
-        has issued nothing yet has no row there, and answers 0.
+        ``max(id)`` answers what is still here; the gap between the two is every
+        row that has been and gone, such as the transient row an enhancement runs
+        under. AUTOINCREMENT keeps the real high-water mark in ``sqlite_sequence``,
+        which says whether an id recorded elsewhere could ever have been one of
+        this table's own (:func:`~origenerator.branch_session.disown_foreign_runs`).
+        A table that has issued nothing answers 0.
         """
         with self._connect() as conn:
             for sql in ("SELECT seq FROM sqlite_sequence WHERE name = 'generations'",

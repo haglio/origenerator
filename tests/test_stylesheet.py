@@ -359,3 +359,13 @@ def test_a_preview_hands_the_app_its_letter_in_the_preview_ink(qapp):
         assert (side_of_the_o.red(), side_of_the_o.green(), side_of_the_o.blue()) == PREVIEW_INK
     finally:
         qapp.setWindowIcon(before)
+
+
+def test_a_radio_keeps_its_word_close_to_its_own_circle(qapp):
+    """At the stock six pixels each word sat nearer the next circle than its
+    own, which reads as labelling the wrong one."""
+    qapp.setStyleSheet(build_stylesheet())
+    radio = QRadioButton("Kino")
+
+    assert radio.style().pixelMetric(
+        QStyle.PixelMetric.PM_RadioButtonLabelSpacing, None, radio) == 3

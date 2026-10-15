@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
+from PyQt6.QtWidgets import QApplication, QComboBox, QLabel, QPushButton
 
-from origenerator.gui.eliding import ElidingButton, ElidingLabel
+from origenerator.gui.eliding import (
+    ElidingButton,
+    ElidingLabel,
+    open_the_list_in_full,
+)
 from origenerator.gui.stylesheet import build_stylesheet
 
 _LONG = "Show in Explorer"
@@ -100,3 +104,19 @@ def test_a_squeezed_label_elides_but_keeps_its_text(qtbot):
     assert label.display_text(whole) == _PHRASE
     assert label.display_text(whole // 3).endswith("…")
     assert label.text() == _PHRASE
+
+
+def test_a_dropdowns_list_keeps_room_for_its_longest_entry_and_a_scroll_bar(qtbot):
+    """What widens the list is a minimum on it, and the scroll bar is why the
+    minimum is not simply the longest entry: nineteen entries scroll, and the bar
+    takes its width out of the room the names are read in."""
+    combo = QComboBox()
+    combo.addItems(["short", "an entry far longer than the field is ever given"])
+    qtbot.addWidget(combo)
+    bar = combo.view().verticalScrollBar().sizeHint().width()
+    longest = combo.fontMetrics().horizontalAdvance(combo.itemText(1))
+    assert combo.view().minimumWidth() < longest  # nothing asks for it yet
+
+    open_the_list_in_full(combo)
+
+    assert combo.view().minimumWidth() >= longest + bar

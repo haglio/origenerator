@@ -4,12 +4,13 @@ from __future__ import annotations
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
 from shared_ui.colors import hovered
 from shared_ui.testing import ground
 
-from origenerator import recipe_match
-from origenerator.gui.combine_panel import CombinePanel, CombineRequest
+from origenerator import animation_paths, recipe_match
+from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
+from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.gui.stylesheet import build_stylesheet
 
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
@@ -38,6 +39,63 @@ def _pick_lane(panel, intent):
              else panel._video_radio)
     radio.setChecked(True)
 
+
+
+def test_the_two_edit_buttons_say_which_settings_each_one_edits(qtbot):
+    """His pair: one for the combination in the slots, one for the settings every
+    animation of an act runs."""
+    panel = _panel(qtbot)
+
+    assert panel._open_btn.text() == "Edit individual…"
+    assert panel._defaults_btn.text() == "Edit default…"
+
+
+def test_the_animation_settings_are_editable_with_nothing_in_the_slots(qtbot):
+    """What it opens is about the 93 animations, not about a dropped picture, so
+    it is not gated on one the way Generate and "Edit individual…" are."""
+    panel = _panel(qtbot)
+    asked = []
+    panel.animation_settings_requested.connect(lambda: asked.append(True))
+
+    panel._defaults_btn.click()
+
+    assert panel._defaults_btn.isEnabled()
+    assert asked == [True]
+
+
+def _acts(panel):
+    """The acts the Action list carries, the neutral first row aside."""
+    return [panel._category.itemText(i) for i in range(1, panel._category.count())]
+
+
+def test_the_action_list_carries_the_acts_that_lane_has_a_row_for(qtbot):
+    """One row per act per lane in his table; the list carried the same fixed set
+    under both lanes, in an order of its own."""
+    panel = _panel(qtbot)
+
+    assert _acts(panel) == ["alpha", "beta", "gamma", "delta", "epsilon", "dancing"]
+
+    _pick_lane(panel, recipe_match.GENAU)
+
+    assert _acts(panel) == ["alpha", "beta", "gamma"]
+
+
+def test_an_act_the_new_lane_has_no_row_for_is_not_left_picked(qtbot):
+    panel = _panel(qtbot)
+    _pick_act(panel, "delta")
+
+    _pick_lane(panel, recipe_match.GENAU)
+
+    assert panel.selected_category() == ""
+
+
+def test_an_act_both_lanes_carry_stays_picked_across_the_switch(qtbot):
+    panel = _panel(qtbot)
+    _pick_act(panel, "alpha")
+
+    _pick_lane(panel, recipe_match.GENAU)
+
+    assert panel.selected_category() == "alpha"
 
 
 def test_only_the_video_slot_is_drained_of_color(qtbot):
@@ -96,7 +154,7 @@ def test_clicking_generate_asks_for_the_dropped_pair(qtbot):
 
 
 def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
-    # "Edit…" needs the same ingredients as Generate — a source image
+    # "Edit individual…" needs the same ingredients as Generate — a source image
     # and a recipe — so it lights and dims in lockstep with the Generate button.
     panel = _panel(qtbot)
     assert not panel._open_btn.isEnabled()
@@ -172,7 +230,7 @@ def test_the_neutral_option_is_custom_leading_the_acts(qtbot):
     assert panel.selected_category() == ""  # neutral by default
     items = [panel._category.itemText(i) for i in range(panel._category.count())]
     assert items[0] == "(custom)"
-    assert items[1:] == list(recipe_match.CATEGORIES)   # the six acts follow it
+    assert items[1:] == list(animation_paths.acts(recipe_match.VIDEO))
 
 
 def _enabled(panel, text) -> bool:
@@ -212,9 +270,22 @@ def test_dropdown_sits_beside_the_video_slot_in_one_part(qtbot):
     panel = _panel(qtbot)
     # The dropdown configures the *video* recipe, so it shares one container with the
     # video slot — laid out side by side, not stacked, and not a peer of the image.
-    assert panel._category.parent() is panel.video_slot.parent()
+    assert panel._action_part.parent() is panel.video_slot.parent()
     assert panel.image_slot.parent() is not panel.video_slot.parent()
-    assert isinstance(panel._category.parent().layout(), QHBoxLayout)
+    assert isinstance(panel.video_slot.parent().layout(), QHBoxLayout)
+
+
+def test_the_word_action_sits_under_the_dropdown_it_names(qtbot):
+    """Beside a dropdown squeezed into a narrow pane the word does not fit, and
+    read as "Ac…"; the list opens upwards, so underneath stays clear."""
+    panel = _panel(qtbot)
+    column = panel._action_part.layout()
+    order = [column.itemAt(i).widget() for i in range(column.count())]
+    named = [w for w in order if isinstance(w, QLabel) and w.text() == ACTION_LABEL]
+
+    assert isinstance(column, QVBoxLayout)
+    assert len(named) == 1
+    assert order.index(named[0]) == order.index(panel._category) + 1
 
 
 def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
@@ -313,15 +384,15 @@ def test_generate_emits_the_picked_act(qtbot):
                                    intent=recipe_match.VIDEO)]
 
 
-# --- the Video/Genau radio: what the result is for ----------------------------
+# --- the Kino/Genau radio: what the result is for -----------------------------
 
 
-def test_the_lane_defaults_to_video(qtbot):
+def test_the_lane_defaults_to_kino(qtbot):
     # The long-standing behavior of this panel, and by far the more common ask, so
     # the Genau flick is the deliberate detour rather than the default.
     panel = _panel(qtbot)
     assert panel.selected_intent() == recipe_match.VIDEO
-    assert panel._video_radio.text() == "Video"
+    assert panel._video_radio.text() == "Kino"
     assert panel._video_radio.isChecked()
     assert not panel._genau_radio.isChecked()
 
@@ -336,14 +407,14 @@ def test_the_radio_sits_below_the_dropdown_it_changes(qtbot):
 def test_generate_carries_the_chosen_lane(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    _pick_act(panel, "delta")
+    _pick_act(panel, "alpha")  # one both lanes have a row for, so the pick stands
     _pick_lane(panel, recipe_match.GENAU)
     cats = []
     panel.combine_requested.connect(cats.append)
 
     panel._generate_btn.click()
 
-    assert cats == [CombineRequest(image_id="img1", category="delta",
+    assert cats == [CombineRequest(image_id="img1", category="alpha",
                                    intent=recipe_match.GENAU)]
 
 
@@ -391,3 +462,63 @@ def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
 
     assert panel.selected_category() == ""
     assert not panel._generate_btn.isEnabled()
+
+
+def test_the_act_list_is_labelled_the_way_a_pictures_own_action_is(qtbot):
+    """One word for the two halves of the same vocabulary: what a picture shows,
+    and what it can be made to do."""
+    panel = CombinePanel(lambda pid: True, lambda pid: True,
+                         lambda pid: (None, None))
+    qtbot.addWidget(panel)
+
+    assert ACTION_LABEL in [label.text() for label in panel.findChildren(QLabel)]
+
+
+def test_the_act_list_opens_wide_enough_for_the_longest_act(qtbot):
+    """The field is squeezed by the pane it sits in; the open list is not, or the
+    acts arrive cut short where they are read."""
+    combo = _panel(qtbot)._category
+    longest = max(combo.fontMetrics().horizontalAdvance(combo.itemText(i))
+                  for i in range(combo.count()))
+
+    assert combo.view().minimumWidth() > longest
+
+
+def test_the_word_action_keeps_its_own_height_under_the_dropdown(qtbot):
+    """Given the whole row's spare height it sat centered in a block three times
+    its own, a word adrift in the area rather than a label on the dropdown."""
+    panel = _panel(qtbot)
+    pane = QWidget()
+    qtbot.addWidget(pane)
+    panel.setParent(pane)
+    pane.resize(420, 460)
+    panel.setGeometry(0, 0, 420, 460)
+    pane.show()
+    panel.layout().activate()
+    named = [w for w in panel._action_part.findChildren(QLabel)
+             if w.text() == ACTION_LABEL][0]
+
+    assert named.height() == named.sizeHint().height()
+    assert named.y() == panel._category.y() + panel._category.height()
+
+
+def test_the_word_action_lines_up_with_the_words_in_the_dropdown(qtbot):
+    """Flush to the frame it read as a word in the corner rather than a label on
+    the dropdown, whose own text starts a few pixels in."""
+    panel = _panel(qtbot)
+    named = [w for w in panel._action_part.findChildren(QLabel)
+             if w.text() == ACTION_LABEL][0]
+
+    assert named.indent() == _text_inset(panel._category) > 0
+
+
+def test_the_two_radios_are_further_apart_than_a_circle_is_from_its_own_word(qtbot):
+    """"Kino" sat nearer Genau's circle than its own, which reads as labelling
+    the wrong one."""
+    panel = _panel(qtbot)
+    row = panel._intent_part.layout()
+
+    assert row.spacing() > panel._video_radio.style().pixelMetric(
+        QStyle.PixelMetric.PM_RadioButtonLabelSpacing, None, panel._video_radio)
+
+

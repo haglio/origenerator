@@ -102,6 +102,19 @@ def test_each_half_of_a_recipe_source_can_stand_alone(tmp_path):
     assert db.get_generation("curated")["recipe_video_id"] is None
 
 
+def test_a_picture_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="pic-001", workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}")
+    assert db.get_generation("pic-001")["picture_state"] is None
+
+    db.set_picture_state("pic-001", "state two")
+    assert db.get_generation("pic-001")["picture_state"] == "state two"
+
+    db.set_picture_state("pic-001", None)
+    assert db.get_generation("pic-001")["picture_state"] is None
+
+
 def test_update_generation(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(
@@ -859,7 +872,7 @@ def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
     row = db.get_generation("clip-001")
     assert row["genau_requested_at"] is None and row["genau_exported_at"] is None
 
-    db.mark_genau_requested("clip-001")   # a spoken "genau it" started this run
+    db.mark_genau_requested("clip-001")   # a spoken animation started this run
     db.mark_genau_exported("clip-001")    # and it was handed on once it existed
 
     reopened = Database(db_path).get_generation("clip-001")

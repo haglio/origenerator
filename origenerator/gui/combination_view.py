@@ -9,7 +9,7 @@ three places until ComfyUI streams a frame of the run itself, and three
 surfaces each drawing their own idea of it is what left one blurred, one blank
 and one missing its plus.
 
-What "Edit…" hands a tab is not a generation — it is a picture and a
+What "Edit individual…" hands a tab is not a generation — it is a picture and a
 past video's settings, and nothing has been made from them yet. The form below
 holds the settings, but the pane above it had nothing to show and said so, with
 the same "select a generation to preview" a tab that had been pointed at nothing

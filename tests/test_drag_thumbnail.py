@@ -12,7 +12,7 @@ from origenerator.gui.drag_thumbnail import (
     label_thumbnail,
     set_drag_thumbnail,
 )
-from origenerator.gui.looping_preview import looping_movie
+from origenerator.gui.looping_preview import play_in
 
 
 def _webp(path, size=(64, 48)):
@@ -61,8 +61,7 @@ def test_a_label_playing_a_movie_offers_the_frame_it_is_on(qtbot, tmp_path):
     # pixmap(), so a video tile asked the wrong way trailed nothing.
     label = QLabel()
     qtbot.addWidget(label)
-    movie = looping_movie(str(_webp(tmp_path / "v_anim.webp")), QSize(172, 160), label)
-    label.setMovie(movie)
+    movie = play_in(label, str(_webp(tmp_path / "v_anim.webp")), QSize(172, 160))
     movie.start()
 
     assert label.pixmap().isNull()          # the label itself has none

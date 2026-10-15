@@ -124,6 +124,6 @@ GENAU = ExportLane(
     hands_over_funscript=False,
 )
 
-# In the order they sit in the button bank. Named above as well, because the
-# spoken "genau it" hands its clip down this lane with no button to read it off.
+# In the order they sit in the button bank. Named above as well, because a
+# spoken animation hands its clip down this lane with no button to read it off.
 EXPORT_LANES = (EVOLVER, GENAU)

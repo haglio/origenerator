@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 from app_support.launcher import dry_run
+from shared_ui.preview import Preview
 
-from origenerator.branch_session import ENV_FLAG, is_branch_session
+from origenerator.branch_session import ENV_FLAG, is_branch_session, shown_as
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,6 +23,23 @@ def test_the_flag_marks_a_branch_session():
     assert is_branch_session({ENV_FLAG: "1"}) is True
     assert is_branch_session({ENV_FLAG: "0"}) is False
     assert is_branch_session({}) is False
+
+
+def test_a_branch_session_is_shown_as_the_preview_its_checkout_describes(monkeypatch):
+    described = Preview(feature="the new seed row")
+    monkeypatch.setenv(ENV_FLAG, "1")
+    monkeypatch.setattr("origenerator.branch_session.preview_of",
+                        lambda checkout: described)
+
+    assert shown_as(_REPO_ROOT) is described
+
+
+def test_the_production_app_is_shown_as_no_preview_wherever_it_runs_from(monkeypatch):
+    monkeypatch.delenv(ENV_FLAG, raising=False)
+    monkeypatch.setattr("origenerator.branch_session.preview_of",
+                        lambda checkout: Preview(feature="unused"))
+
+    assert shown_as(_REPO_ROOT) is None
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="the Windows script host")

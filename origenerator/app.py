@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.process_identity import ProcessNamer
-from shared_ui.preview import Preview, preview_of, taskbar_identity, window_title
+from shared_ui.preview import Preview, taskbar_identity, window_title
 
-from origenerator.branch_session import LAUNCHER, is_branch_session
+from origenerator.branch_session import LAUNCHER, shown_as
 
 # The persisted ComfyUI client id lives under this key in the UI state file.
 _CLIENT_ID_KEY = "comfyui_client_id"
@@ -43,10 +43,6 @@ def resolve_comfyui_client_id(app_state) -> str:
 
 
 CHECKOUT = Path(__file__).resolve().parent.parent
-
-
-def _shown_as() -> Preview | None:
-    return preview_of(CHECKOUT) if is_branch_session() else None
 
 
 def _the_preview_on_the_taskbar(preview: Preview | None, state_dir: Path):
@@ -675,7 +671,7 @@ def main(argv: list[str] | None = None) -> int:
         from origenerator.ui_scale import apply_room_scale
         apply_room_scale(in_a_headset=fun_time.in_a_headset)
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
-    preview = _shown_as()
+    preview = shown_as(CHECKOUT)
     _init_windows_taskbar_identity(fun_time and fun_time.taskbar_identity, preview)
     _name_this_process()
 

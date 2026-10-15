@@ -2,8 +2,8 @@
 
 The gallery's recipe match asks a local model which past recipe fits a dropped
 image. That is an HTTP round trip to a model that thinks for several seconds, and
-run inline it froze the whole window for exactly as long — most visibly on the
-spoken "genau it", where the window is a fullscreen picture and the freeze is all
+run inline it froze the whole window for exactly as long — most visibly on a
+spoken animation, where the window is a fullscreen picture and the freeze is all
 there is to look at.
 
 Deliberately tiny: Qt's global pool does the running, and the result crosses

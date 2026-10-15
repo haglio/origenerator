@@ -29,8 +29,8 @@ from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, prompt_edit
+from origenerator.animate_command import AnimateRequest
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
-from origenerator.content import genau_flick_word
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
@@ -77,6 +77,10 @@ logger = logging.getLogger(__name__)
 # saying: long enough to read one, short enough that it is gone by the next.
 _FLASH_MS = 4000
 
+# What an "animate as" wants, said with no picture up. Its own line rather
+# than the parts' own naming, because the command is a record rather than a word
+# and every act names itself differently.
+_WANTS_ANIMATING = "an animation"
 
 # The collection each spoken collection name stands you in. What to call it back is the
 # host's answer, so a row renamed is renamed in one place.
@@ -200,8 +204,11 @@ class VoiceHost(Protocol):
     def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
         """Queue a targeted detail fix, the same way."""
 
-    def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
-        """Animate a picture as a Genau flick, the same way."""
+    def animate_it(self, image_id: str | None,
+                   asked) -> tuple[str | None, str, str]:
+        """Animate a picture as the act an "animate as" named, in the lane it
+        named, the same way. The act may be unsaid, and what the picture
+        already shows is what settles it."""
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
         """Launch a revised generation, record the request under it, and answer
@@ -304,8 +311,9 @@ class VoiceRouter(QObject):
         self._switches.update({_AUDIO: audio, _DRIVE: drive, _MIC: mic})
 
     def bind_the_bank(self, *, auto, audio, drive, mic, actions, enhance) -> None:
-        """Bind the spoken vocabulary to the buttons it acts through, now that
-        the bank exists.
+        """Bind the spoken vocabulary to the buttons it acts through, by keyword
+        and by object rather than by attribute name: spelled as strings, a renamed
+        button broke the microphone silently.
 
         By keyword and by object, never by attribute name: spelled as strings —
         as they were — a renamed button or handler broke the microphone
@@ -682,13 +690,14 @@ class VoiceRouter(QObject):
                 # perfectly good thing to do.
                 self._press_bank_button(*self._enhance)
                 return
-            wants = (f"a Genau {genau_flick_word()}" if command.command == gallery.GENAU_COMMAND
+            wants = (_WANTS_ANIMATING
+                     if isinstance(command.command, AnimateRequest)
                      else f"a {name_parts(command.command)} fix")
             self._show(f"🎤 {wants} needs a picture on screen", transient=True)
             return
         target = slideshow.voice_target()
-        if command.command == gallery.GENAU_COMMAND:
-            prompt_id, message, kind = self._host.genau_it(target)
+        if isinstance(command.command, AnimateRequest):
+            prompt_id, message, kind = self._host.animate_it(target, command.command)
         elif command.command == gallery.ENHANCE_COMMAND:
             prompt_id, message, kind = self._host.enhance_it(target)
         else:

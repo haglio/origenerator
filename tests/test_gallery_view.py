@@ -56,6 +56,7 @@ from origenerator import (
     recipe_match,
     search,
 )
+from origenerator.animate_command import AnimateRequest
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -3102,6 +3103,16 @@ def test_recents_collection_stays_selected_across_a_refresh(qtbot):
 def _many_recents(count):
     """``count`` generated images, newest first, so the collection runs past one page."""
     return [_image(f"i{n}", "a cat", 50, n) for n in reversed(range(count))]
+
+
+def _scroll_into_view(widget):
+    """Bring *widget* into its scroll area's viewport, as a person scrolls to it."""
+    inside = widget.parentWidget()
+    while inside is not None and not isinstance(inside, QScrollArea):
+        inside = inside.parentWidget()
+    if inside is not None:
+        inside.ensureWidgetVisible(widget)
+        QApplication.processEvents()
 
 
 def _scroll_bar(view):
@@ -7181,19 +7192,19 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
 
 
 def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
-    # Whisper renders "genau" a dozen ways and the matcher answers to all of
+    # Whisper renders a command several ways and the matcher answers to all of
     # them, so printing the transcription showed a misspelling of a command that
-    # was understood perfectly well — "gunow it" over a caption that then went
-    # and made a Genau flick.
+    # was understood perfectly well — "enhanced it" over a caption that then went
+    # and enhanced the picture.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     view._bank.mic.setChecked(True)
 
-    view._voice.listener.heard.emit("Gunow it.")
-    assert "Genau it" in view._voice.status.text()
-    assert "Gunow" not in view._voice.status.text()
+    view._voice.listener.heard.emit("Enhanced it.")
+    assert "enhance it" in view._voice.status.text()
+    assert "Enhanced" not in view._voice.status.text()
 
     view._voice.listener.heard.emit("give her a wider hat")  # no command: as it was heard
     assert "give her a wider hat" in view._voice.status.text()
@@ -9131,6 +9142,10 @@ def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_pat
     gestures.click(thumb, thumb.rect().center())
     form = view._info_tabs.current_config_panel()._param_form
     header = next(iter(form._sections.values()))._header
+    # The row saying what the picture shows sits above the form, so in a window
+    # this short the first section header hangs below the fold, where a click
+    # would land on nothing and leave the focus where it was.
+    _scroll_into_view(header)
     gestures.click(header, header.rect().center())
 
     gestures.press_key(view, Qt.Key.Key_Delete)
@@ -10097,6 +10112,7 @@ def _combine_db(tmp_path):
     )
     db.update_generation("vid", status="completed",
                          output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
+    db.set_recipe_source("vid", category="dancing")
     return db
 
 
@@ -10193,7 +10209,7 @@ def test_combine_submits_the_recipe_on_the_dropped_picture_with_a_fresh_seed(qtb
 
 
 def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_path):
-    # "Edit…" builds the same combination Generate would, but hands it to
+    # "Edit individual…" builds the same combination Generate would, but hands it to
     # an editable tab to tweak first — so no job runs and the form is prefilled.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -10210,7 +10226,7 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
 
 
 def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):
-    # "Edit…" is the same "show me this" gesture a thumbnail click is:
+    # "Edit individual…" is the same "show me this" gesture a thumbnail click is:
     # it lands in the pane's untouched "New generation" tab rather than beside it,
     # and wears the slant that says the next open may replace it.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
@@ -10260,7 +10276,7 @@ def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, 
 
 
 def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
-    # An "Edit…" press reaches the view's open handler, so clicking it with a
+    # An "Edit individual…" press reaches the view's open handler, so clicking it with a
     # dropped video (or a picked act) opens an editable tab.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -14873,33 +14889,38 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
 
 
 def _genau_db(tmp_path):
-    """The combine DB plus a looping clip of the "dancing" act to mine as a recipe.
+    """The combine DB plus a looping clip launched as the "alpha" act to mine.
 
-    The long-form video the fixture already carries depicts the same act, so this
-    also pins that the Genau lane picks the loop over it.
+    The long-form video the fixture already carries was launched as the same act,
+    so this also pins that the Genau lane picks the loop over it. "state two" is
+    the one picture state the example overlay lets the Genau lane animate at all,
+    and "alpha" the one act it allows from it — so an "animate as go now" over
+    this picture needs no act said.
     """
     db = _combine_db(tmp_path)
     loop = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
     db.insert_generation(
         prompt_id="loop", workflow_name="wan22_flf2v_loop", workflow_version=loop.version,
-        positive_prompt="dancing, one cycle", seed=7,
+        positive_prompt="one cycle of it", seed=7,
         params_json=json.dumps(dict(loop.default_params(), seed=7, noise_seed=8,
-                                    positive_prompt="dancing, one cycle")),
+                                    positive_prompt="one cycle of it")),
         workflow_json="{}",
     )
     db.update_generation("loop", status="completed",
                          output_files=json.dumps([{"filename": "flf2v_loop_1.mp4", "subfolder": ""}]))
-    # A second image whose own prompt names an act, so a spoken "genau it" has
-    # something to read. The fixture's original "img" says only "a dog".
+    db.set_recipe_source("loop", category="alpha")
+    # A second image, sorted, so a spoken animation has a state to go by. The
+    # fixture's original "img" has not been sorted at all.
     db.insert_generation(
         prompt_id="img_act", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
-        positive_prompt="she is dancing by the window", seed=2,
+        positive_prompt="a picture by the window", seed=2,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=2,
-                                    positive_prompt="she is dancing by the window")),
+                                    positive_prompt="a picture by the window")),
         workflow_json="{}",
     )
     db.update_generation("img_act", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_act.png", "subfolder": ""}]))
+    db.set_picture_state("img_act", "state two")
     return db
 
 
@@ -14914,7 +14935,7 @@ def _genau_view(qtbot, tmp_path, monkeypatch):
 def test_the_genau_lane_runs_a_looping_recipe(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "alpha", recipe_match.GENAU)
 
     job = next(iter(view._live_jobs.values()))
     # The act has a long-form video too; the Genau lane can only use the loop.
@@ -14948,7 +14969,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))
 
-    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "alpha", recipe_match.GENAU)
     job = next(iter(view._live_jobs.values()))
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
 
@@ -14957,17 +14978,21 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
-# --- "genau it", spoken over a fullscreen picture -----------------------------
+# --- "animate as go now", spoken over a fullscreen picture -------------------
+
+_SPOKEN_LOOP = AnimateRequest(recipe_match.GENAU, "")
 
 
-def test_genau_it_reads_the_act_off_the_image_and_runs_the_loop(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_loop_takes_the_one_act_the_sorted_picture_leaves(qtbot, tmp_path,
+                                                                   monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    # "img_act"'s own prompt names the act; nothing is picked and nothing is dropped.
-    prompt_id, message, kind = view.genau_it("img_act")
+    # "img_act" is sorted, and its state leaves the Genau lane one act, so the
+    # command needs none said.
+    prompt_id, message, kind = view.animate_it("img_act", _SPOKEN_LOOP)
 
     assert prompt_id == "img_act"
-    assert "dancing" in message
+    assert "alpha" in message
     assert kind == NOTICE
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
@@ -14976,72 +15001,77 @@ def test_genau_it_reads_the_act_off_the_image_and_runs_the_loop(qtbot, tmp_path,
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"]
 
 
-def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_loop_over_an_unsorted_picture_asks_for_its_action(qtbot, tmp_path,
+                                                                    monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    prompt_id, message, kind = view.genau_it("img")  # its prompt is "a dog" — no act
+    prompt_id, message, kind = view.animate_it("img", _SPOKEN_LOOP)  # never sorted
 
     assert prompt_id is None
-    assert "doesn't say" in message
+    assert "hasn't been sorted" in message
     assert kind == WARNING
     assert not view._live_jobs  # nothing was launched on a guess
 
 
-def test_genau_it_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path,
+                                                                  monkeypatch):
     db = _genau_db(tmp_path)
-    # An image of an act the gallery holds no looping clip of.
+    # A sorted picture of a state whose act the gallery holds no looping clip of.
     db.insert_generation(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
-        positive_prompt="a delta form scene", seed=3,
+        positive_prompt="another picture", seed=3,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=3,
-                                    positive_prompt="a delta form scene")),
+                                    positive_prompt="another picture")),
         workflow_json="{}",
     )
     db.update_generation("img_delta", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_delta.png", "subfolder": ""}]))
+    db.set_picture_state("img_delta", "state two")
+    db.set_recipe_source("loop", category=None)  # nothing left to mine a loop from
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
-    prompt_id, message, kind = view.genau_it("img_delta")
+    prompt_id, message, kind = view.animate_it("img_delta", _SPOKEN_LOOP)
 
     assert prompt_id is None
-    assert "looping" in message
+    assert "recipe to base this on yet" in message
     assert kind == WARNING
     assert not view._live_jobs
 
 
-def test_genau_it_declines_a_video(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_loop_declines_a_video(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    prompt_id, message, kind = view.genau_it("loop")
+    prompt_id, message, kind = view.animate_it("loop", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "picture" in message
     assert kind == WARNING
 
 
-def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
+                                                                monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     # Answered in the surface's own corner, not in a dialog over it — the speaker
     # is looking at the picture, not at this pane.
     assert surface.noted[0] == "img_act"
-    assert "dancing" in surface.noted[1]
+    assert "alpha" in surface.noted[1]
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
 def _spoken_genau_rows(view):
-    """Every run a spoken "genau it" has launched, landed or not."""
+    """Every run a spoken animation has launched into the Genau lane, landed or not."""
     return [r for r in view._db.list_generations() if r.get("genau_requested_at")]
 
 
-def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, monkeypatch):
+def test_a_second_spoken_loop_over_the_same_picture_is_refused(qtbot, tmp_path, monkeypatch):
     # Saying it twice is what you do when the first time appeared to do nothing,
     # and it does appear to: the clip queues after whatever the machine is on
     # and the picture on screen doesn't change. Two identical runs would spend
@@ -15050,10 +15080,10 @@ def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, mon
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     assert len(_spoken_genau_rows(view)) == 1
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
     assert len(_spoken_genau_rows(view)) == 1
@@ -15071,8 +15101,8 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
     assert len(thinking) == 1
@@ -15089,7 +15119,7 @@ def test_the_picture_is_let_go_of_when_the_act_has_no_recipe(qtbot, tmp_path, mo
                         lambda *a, **k: None)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     assert view._combine._genau_resolving == set()
 
@@ -15102,12 +15132,12 @@ def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     (made,) = _spoken_genau_rows(view)
     view._db.update_generation(made["prompt_id"], status="completed",
                                output_files=json.dumps([{"filename": "loop_2.mp4"}]))
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
     assert len(_spoken_genau_rows(view)) == 1
@@ -15120,11 +15150,11 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     (failed,) = _spoken_genau_rows(view)
     view._jobs.job_for_prompt(failed["prompt_id"]).failed.emit("ComfyUI said no")
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     assert len(_spoken_genau_rows(view)) == 2
 
@@ -15134,10 +15164,10 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
     # Only a spoken one is stamped, and only a spoken one can be said again into
     # the wait: someone at the keyboard can see the queue they just joined.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
-    view._combine.generate_category("img_act", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img_act", "alpha", recipe_match.GENAU)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     assert len(_spoken_genau_rows(view)) == 1
 
@@ -15256,7 +15286,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     # says which picture is meant.
 
     assert match("enhance").command == gallery.ENHANCE_COMMAND
-    assert match("go now").command == gallery.GENAU_COMMAND
+    assert match("animate as alpha").command.act == "alpha"
     assert [part.name for part in match("fix teeth").command] == ["teeth"]
     assert match("start slideshow") is not None
     assert match("make her hair longer") is None    # steering, not a command
@@ -15265,7 +15295,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     assert match("weird") is None
 
 
-def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
     # The folder is read off the lane, so a spoken send and a pressed one cannot
     # differ about where a clip lands.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
@@ -15338,7 +15368,7 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
 
     monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", slow_match)
 
-    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "alpha", recipe_match.GENAU)
 
     qtbot.waitUntil(lambda: bool(view._live_jobs), timeout=5000)
     assert asked_on["thread"] != threading.main_thread().name

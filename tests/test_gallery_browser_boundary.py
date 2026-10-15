@@ -113,7 +113,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     and where each word lands -- twenty-five methods out and two in, the bank it
     presses now bound to it by keyword rather than looked up by name. 318 -> 291:
     the combine came out as `CombineController`, owning the panel it used to be
-    handed -- thirty-five methods out, eight in, and the spoken "genau it" going
+    handed -- thirty-five methods out, eight in, and the spoken animation going
     with the act it asks for rather than staying with the words. 291 -> 268: the
     standalone enhance came out as `EnhanceController`, owning its settings
     panel -- thirty methods out, eight in, and the bank button now lit from what
@@ -200,7 +200,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     and at each crossing. 275 -> 276: a folder Auto-Generate runs in takes a
     star, as a folder dropped onto Favorites does, so putting a folder's star
     where it is asked to be -- which the star's own toggle, that drop and the
-    loop all ask -- is one method.)"""
+    loop all ask -- is one method. 276 -> 277: a spoken "animate as" is
+    Combine's to answer, through a forwarder of its own. 277 -> 276: "genau it"
+    went with the prompt-read act it ran on, so that one forwarder answers every
+    spoken animation.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 276
     assert sum(isinstance(x, ast.FunctionDef)

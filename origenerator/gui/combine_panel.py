@@ -1,14 +1,10 @@
 """The gallery's image + video combine panel, sitting under the TOC folder tree.
 
-Drop an image into the top slot, then supply a *recipe* one of two ways — side by
-side in the video part: pick an act from the category dropdown and let the app find
-a fitting past video for you, or drop a specific i2v video for a custom action. A
-dropped video shows in gray: it is here for its settings, not as a second picture
-to be made. The two are mutually exclusive: picking an act clears a dropped video
-and hides the slot until "(custom)" is picked again, and dropping a video wipes the
-dropdown back to "(custom)".
-Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
-image now, while “Edit…” hands it to a generate tab to change first.
+Drop an image into the top slot, then supply a *recipe* either by picking an act
+from the Action list, which sends the app looking for a fitting past video, or by
+dropping a specific i2v video (shown in gray: it is here for its settings). The two
+are mutually exclusive. Generate re-runs the chosen recipe on the dropped image;
+“Edit individual…” hands it to a generate tab first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
 video (the default), or a Genau flick — one complete cycle, looping. That choice
@@ -16,17 +12,10 @@ picks which recipes the act is answered from, so the dropdown's usable acts chan
 with it: an act only the video lane can answer greys out under Genau, and acts that
 are no kind of cycle at all are not offered there.
 
-Acts with nothing to answer a pick — no video to mine a recipe from and no curated
-recipe in the content overlay — are greyed out
-(:meth:`CombinePanel.set_available_categories`).
-
-The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown, the
-intent radios and the two buttons, and reports what was asked for as one
-:class:`CombineRequest` on :attr:`combine_requested` — which recipe (a dropped video
-or a picked act), which lane, and whether the press was Generate or “Edit…”. Its
-controller (:mod:`origenerator.gui.combine_controller`) owns the database, the slot
-predicates, the category→recipe routing, and both the generation and the generator
-tab.
+The panel is pure UI, reporting what was asked for as one :class:`CombineRequest` on
+:attr:`combine_requested`; its controller
+(:mod:`origenerator.gui.combine_controller`) owns the database, the slot predicates,
+the routing and both the generation and the generator tab.
 """
 from __future__ import annotations
 
@@ -41,15 +30,20 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QRadioButton,
+    QStyle,
+    QStyleOptionComboBox,
     QVBoxLayout,
     QWidget,
 )
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
+from origenerator import animation_paths
 from origenerator.content import genau_flick_word
 from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.eliding import open_the_list_in_full
+from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.media import MediaType
-from origenerator.recipe_match import CATEGORIES, GENAU, VIDEO
+from origenerator.recipe_match import GENAU, VIDEO
 
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "(custom)"
@@ -59,9 +53,20 @@ _NEEDS_RECIPE = "Pick an act or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
 
 
+def _text_inset(combo: QComboBox) -> int:
+    """How far in from a dropdown's left edge its own text starts, so a label
+    under it lines up with the words rather than with the frame."""
+    opt = QStyleOptionComboBox()
+    combo.initStyleOption(opt)
+    field = combo.style().subControlRect(
+        QStyle.ComplexControl.CC_ComboBox, opt,
+        QStyle.SubControl.SC_ComboBoxEditField, combo)
+    return field.x() + 1  # the style insets the text a pixel before drawing it
+
+
 @dataclass(frozen=True)
 class CombineRequest:
-    """One press of Generate or “Edit…”: the picture, the recipe to run on it —
+    """One press of Generate or “Edit individual…”: the picture, the recipe —
     a dropped video or a picked act, never both — the lane it is answered from,
     and whether it is bound for the generator rather than for a run now."""
 
@@ -76,6 +81,7 @@ class CombinePanel(QWidget):
     """Image slot + a recipe (dropped video or picked act) + an intent + Generate."""
 
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
+    animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
     intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regrey the acts
     item_activated = pyqtSignal(str)  # a slot's picture or clip was clicked (prompt_id)
 
@@ -106,13 +112,26 @@ class CombinePanel(QWidget):
         # video for you. A neutral "(custom)" leads the list (index 0, the default) so
         # no act is forced; picking it again clears an act.
         self._category = QComboBox()
-        self._category.addItem(_NEUTRAL_LABEL)
-        self._category.addItems(CATEGORIES)
+        self._list_the_acts(VIDEO)
+        open_the_list_in_full(self._category)
         self._category.setToolTip(
             "Pick an act and Generate — the app reuses a fitting past video's recipe "
             "on the dropped image. Or pick (custom) and drop a specific video instead."
         )
         self._category.currentIndexChanged.connect(self._on_category_changed)
+
+        # The word under the dropdown: beside it this pane cuts it to "Ac…", and
+        # the list opens upwards, so underneath stays clear.
+        self._action_part = QWidget()
+        action_column = QVBoxLayout(self._action_part)
+        action_column.setContentsMargins(0, 0, 0, 0)
+        action_column.setSpacing(0)  # a word and the thing it names
+        action_column.addWidget(self._category)
+        named = QLabel(ACTION_LABEL)
+        named.setIndent(_text_inset(self._category))
+        action_column.addWidget(named)
+        # Or the row's spare height goes to the word, which then floats in it.
+        action_column.addStretch(1)
 
         # The video part: the two ways to supply the recipe, side by side in one
         # container so the dropdown reads as belonging to the video side, not the image.
@@ -120,14 +139,14 @@ class CombinePanel(QWidget):
         video_row = QHBoxLayout(self._video_part)
         video_row.setContentsMargins(0, 0, 0, 0)
         video_row.setSpacing(BUTTON_GAP)  # the family's gap inside a group
-        video_row.addWidget(self._category, 1)  # each takes half the video part's width
+        video_row.addWidget(self._action_part, 1)  # each takes half the part's width
         video_row.addWidget(self.video_slot, 1)
 
-        # What the result is for. Video is the default because it is the long-
+        # What the result is for. Kino is the default because it is the long-
         # standing behavior of this panel and by far the more common ask; Genau is
         # the deliberate detour. Under it the act list narrows, so the radio sits
         # directly beneath the dropdown it changes.
-        self._video_radio = QRadioButton("Video")
+        self._video_radio = QRadioButton("Kino")
         self._video_radio.setToolTip(
             "Make a full-length video for the Satellite Funestras."
         )
@@ -144,7 +163,9 @@ class CombinePanel(QWidget):
         self._intent_part = QWidget()
         intent_row = QHBoxLayout(self._intent_part)
         intent_row.setContentsMargins(0, 0, 0, 0)
-        intent_row.setSpacing(BUTTON_GAP)  # two radios are one group
+        # Wider than the gap a radio leaves between its own circle and its word,
+        # or each word reads as labelling the circle after it.
+        intent_row.setSpacing(BUTTON_GROUP_GAP)
         intent_row.addWidget(self._video_radio)
         intent_row.addWidget(self._genau_radio)
         intent_row.addStretch(1)
@@ -153,8 +174,13 @@ class CombinePanel(QWidget):
         # generator to tweak first. Both gate on the same "image + recipe" readiness.
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.clicked.connect(self._emit)
-        self._open_btn = QPushButton("Edit…")
+        self._open_btn = QPushButton("Edit individual…")
         self._open_btn.clicked.connect(self._emit_open)
+        self._defaults_btn = QPushButton("Edit default…")
+        self._defaults_btn.setToolTip(
+            "Settle what each animation runs: an act, in a lane, from each kind "
+            "of picture")
+        self._defaults_btn.clicked.connect(self.animation_settings_requested)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 4, 0, 0)
@@ -173,6 +199,7 @@ class CombinePanel(QWidget):
         layout.addWidget(self._intent_part)
         layout.addWidget(self._generate_btn)
         layout.addWidget(self._open_btn)
+        layout.addWidget(self._defaults_btn)
         self._sync()
 
     # --- intent (what the result is for) ----------------------------------
@@ -199,11 +226,19 @@ class CombinePanel(QWidget):
         on edge is passed along.
         """
         if checked:
+            self._list_the_acts(self.selected_intent())
             if not self.selected_category():
                 self._show_dropped()
             self.intent_changed.emit(self.selected_intent())
 
     # --- category ---------------------------------------------------------
+
+    def _list_the_acts(self, lane: str) -> None:
+        picked = self.selected_category() if self._category.count() else ""
+        self._category.clear()
+        self._category.addItem(_NEUTRAL_LABEL)
+        self._category.addItems(animation_paths.acts(lane))
+        self.set_category(picked)
 
     def selected_category(self) -> str:
         """The picked act, or "" when the neutral "(custom)" option (index 0) is selected."""
@@ -309,7 +344,7 @@ class CombinePanel(QWidget):
         self._dispatch(edit_first=False)
 
     def _emit_open(self):
-        """“Edit…”: hand the chosen recipe to a generate tab to change first."""
+        """“Edit individual…”: hand the recipe to a generate tab to change first."""
         self._dispatch(edit_first=True)
 
     def _dispatch(self, *, edit_first: bool):

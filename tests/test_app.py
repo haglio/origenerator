@@ -32,7 +32,6 @@ from origenerator.app import (
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
     _open_the_loading,
-    _shown_as,
     _taskbar_identity,
     _the_preview_on_the_taskbar,
     _tidy_video_previews,
@@ -264,21 +263,6 @@ def test_a_preview_claims_a_taskbar_button_of_its_own_and_leaves_the_pin_to_the_
 
     mock_set_id.assert_called_once_with("Origenerator.Preview")
     mock_stamp.assert_called_once_with("Origenerator", ["Origenerator"])
-
-
-def test_a_branch_session_wears_the_preview_its_checkout_describes(monkeypatch):
-    described = Preview(feature="the new seed row")
-    monkeypatch.setenv("ORIGENERATOR_BRANCH_SESSION", "1")
-    monkeypatch.setattr("origenerator.app.preview_of", lambda checkout: described)
-
-    assert _shown_as() is described
-
-
-def test_the_live_app_wears_no_preview_wherever_it_runs_from(monkeypatch):
-    monkeypatch.delenv("ORIGENERATOR_BRANCH_SESSION", raising=False)
-    monkeypatch.setattr("origenerator.app.preview_of", lambda checkout: Preview(feature="unused"))
-
-    assert _shown_as() is None
 
 
 def test_init_windows_taskbar_identity_noop_off_windows():

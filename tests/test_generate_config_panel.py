@@ -2792,7 +2792,7 @@ def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
                                                                 monkeypatch, lane):
-    # The row moved under a button still offering the send -- a spoken "genau it"
+    # The row moved under a button still offering the send -- a spoken animation
     # landing on this very clip. The press must do nothing at all: taking the
     # send back is the opposite of what the words under the cursor promised.
     panel, db = saved_panel
@@ -2934,3 +2934,35 @@ def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_p
                     if form._widgets[key].itemIcon(i).cacheKey() == icons.thumbs_up_icon().cacheKey()}
               for key in ("sampler_name", "scheduler")}
     assert marked == {"sampler_name": {"euler_ancestral"}, "scheduler": {"normal"}}
+def test_saying_what_the_shown_picture_shows_lands_on_its_row(saved_panel):
+    """The same column the sorting window writes, reachable from the tab the
+    picture is being looked at on."""
+    panel, db = saved_panel
+    image = _image_row(db, "img9")
+    states = panel._picture_state.offered()
+
+    panel.show_saved_generation(image, [image])
+    panel._picture_state.pick(states[1])
+
+    assert db.get_generation("img9")["picture_state"] == states[1]
+
+
+def test_taking_that_answer_back_leaves_the_picture_unsorted_again(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img9")
+    states = panel._picture_state.offered()
+    panel.show_saved_generation(image, [image])
+    panel._picture_state.pick(states[1])
+
+    panel._picture_state.pick("")
+
+    assert db.get_generation("img9")["picture_state"] is None
+
+
+def test_a_video_on_the_tab_is_offered_no_such_row(saved_panel):
+    panel, db = saved_panel
+    clip = _video_row(db, "vid9")
+
+    panel.show_saved_generation(clip, [])
+
+    assert panel._picture_state.isHidden()

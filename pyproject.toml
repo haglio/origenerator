@@ -93,6 +93,20 @@ venv = "primary"
 log = 'state\origenerator_launcher.log'
 environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
 
+[tool.haglio.launchers."sort_pictures.vbs"]
+app = "Origenerator (sorting pictures)"
+run = "-m origenerator.sort_pictures"
+venv = "primary"
+log = 'state\sort_pictures_launcher.log'
+environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
+
+[tool.haglio.launchers."check_animations.vbs"]
+app = "Origenerator (checking animations)"
+run = "-m origenerator.check_animations"
+venv = "primary"
+log = 'state\check_animations_launcher.log'
+environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
+
 # What Origenerator relies on Windows to keep: the shortcut it is pinned from.
 # `python -m app_support.windows_settings --write` makes this machine match
 # every checkout's list.

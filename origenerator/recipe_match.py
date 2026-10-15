@@ -1,33 +1,13 @@
 """Pick the recipe for a dropdown act, mined from the gallery, in two tiers.
 
-An act's videos are found by their stored prompt ("assume the prompt was respected",
-so it names what's happening) and grouped into recipes — ignoring the free-text
-prompt, the input image and the seeds, so the same setup on different frames counts
-once. Each recipe's chosen video supplies its full params (prompt included) to re-run
-on a dropped image via the gallery's combine launch.
-
-- :func:`smart_recipe` (primary) is situation-aware: the local LLM compares the
-  dropped image's scene to the *starting scene* each recipe is used with — where
-  "is the subject already in frame, and whose hand is on it" actually lives, since
-  start-frame property — and picks the recipe that fits.
-- :func:`best_recipe` (fallback, when the model is unreachable or finds no fit) is
-  the act's most-used recipe, image-independent.
-- :func:`curated_recipe` sits above both tiers: an act the content overlay pins a
-  hand-tuned workflow+params for skips mining entirely — its videos may all share
-  a weakness (mining can only reproduce the past), and the pin is the way out.
-- :func:`available_categories` reports which acts have any video at all (or a
-  curated recipe), so the dropdown can grey out the ones no tier could answer.
-- :func:`category_for_prompt` runs the same act test over a single prompt, so an
-  image can say what it depicts without the user picking from the dropdown.
-
-Every tier is asked for one *intent* — the long-form video the Satellite Funestras
-show (:data:`VIDEO`), or the short single-cycle loop Genau scrubs against the
-device's phase (:data:`GENAU`). The same act wants a different recipe for each, so
-the intent chooses both the overlay table consulted and, for ``GENAU``, narrows
-mining to videos a looping workflow made.
-
-The LLM boundary is one function, so the grouping and act-matching logic stays
-unit-testable without a live model, a database, or a widget.
+An act's videos are the ones launched as that act, grouped into recipes, and the
+chosen one supplies its full params to re-run on a dropped image.
+:func:`smart_recipe` asks the local LLM which recipe's starting scene fits;
+:func:`best_recipe` falls back to the act's most-used; :func:`curated_recipe` sits
+above both, for an act the overlay pins; :func:`available_categories` says which
+acts any tier could answer. Every tier is asked for one *intent* (:data:`VIDEO` or
+:data:`GENAU`), which chooses the overlay table consulted and, for ``GENAU``,
+narrows mining to videos a looping workflow made.
 """
 from __future__ import annotations
 
@@ -42,15 +22,8 @@ logger = logging.getLogger(__name__)
 
 _CONTENT = load_content()
 
-# The acts a prompt can depict, and the distinctive substrings that mark each
-# one, are library vocabulary rather than logic: they come from the content
-# overlay (content.example.json documents the shape).  Conservative by design —
-# a loose match would fire on unrelated words, and a prompt that dodges every
-# substring simply does not count toward its act.
+# Library vocabulary, so the overlay's (content.example.json documents the shape).
 CATEGORIES: tuple[str, ...] = tuple(_CONTENT["recipe_categories"])
-_CATEGORY_KEYWORDS = {
-    name: tuple(words) for name, words in _CONTENT["recipe_categories"].items()
-}
 
 # What a recipe is being made for. A long-form video for the Satellite Funestras,
 # or a Genau flick — one complete cycle, looping end to end, scrubbed against the
@@ -60,15 +33,9 @@ _CATEGORY_KEYWORDS = {
 VIDEO = "video"
 GENAU = "genau"
 
-# Optional hand-tuned recipes, also overlay vocabulary: an act named here runs
-# its pinned workflow+params instead of whatever the gallery mining would pick.
-# Mining can only ever reproduce past videos, so an act whose past videos all
-# share a weakness (the wrong LoRA, a speed-over-quality setup) is stuck with
-# it; a curated entry is how the overlay breaks that loop with a known-good
-# setup (a purpose-trained LoRA pair at its author's recommended settings).
-#
-# One table per intent, because the key is the act alone: a single table could
-# hold either the act's long-form recipe or its loop, never both.
+# An act named here runs its pinned workflow+params instead of whatever mining
+# would pick, which is the way out for an act whose past videos all share a
+# weakness. One table per intent, because the key is the act alone.
 _CURATED_BY_INTENT: dict[str, dict] = {
     VIDEO: _CONTENT.get("combine_recipes") or {},
     GENAU: _CONTENT.get("genau_recipes") or {},
@@ -76,50 +43,34 @@ _CURATED_BY_INTENT: dict[str, dict] = {
 
 
 def curated_recipe(category: str, intent: str = VIDEO) -> dict | None:
-    """The overlay's hand-tuned ``intent`` recipe for ``category``, else ``None``.
-
-    A usable entry is a dict naming a ``workflow`` (its ``params`` dict holds
-    the pinned settings; anything unnamed falls to the workflow's defaults).
-    Anything else — no entry, or a malformed one — returns ``None`` so the
-    caller falls back to mining the gallery rather than failing the act.
-    """
+    """The overlay's hand-tuned ``intent`` recipe for ``category``, else ``None``
+    -- including for a malformed entry, so the caller falls back to mining rather
+    than failing the act."""
     spec = _CURATED_BY_INTENT.get(intent, {}).get(category)
     if not isinstance(spec, dict) or not spec.get("workflow"):
         return None
     return spec
 
 
-def _loops(row) -> bool:
-    """Whether a looping workflow made ``row`` — its last frame meeting its first.
-
-    A Genau flick has to return to where it started, so only such a video can supply
-    a Genau recipe; mining the long-form ones would hand back a setup that produces
-    a clip with a visible jump at the wrap. The registry import is deferred because
-    it pulls in the whole workflow package, which this module otherwise never needs.
-    """
+def loops(row) -> bool:
+    """Whether a looping workflow made ``row`` — its last frame meeting its first,
+    which only such a video can supply a Genau recipe from. The registry import is
+    deferred: it pulls in the whole workflow package."""
     from origenerator.workflows import WORKFLOW_REGISTRY  # noqa: PLC0415 — keeps this module light
 
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
     return bool(workflow and workflow.looping)
 
-# Params that don't define a recipe: the free-text prompt, the start frame, the
-# seeds and bookkeeping — plus values that are incidental or derived, not deliberate
-# recipe choices: the output size (derived in-graph from the input image), the clip
-# length, and the dual-sampler split points (derived from ``steps``). Excluding them
-# keeps the signature on the real levers (model, LoRA, sampler regime) so the same
-# setup on different frames/lengths groups as one recipe instead of fragmenting.
+# Params that don't define a recipe: the prompt, the start frame, the seeds, the
+# bookkeeping, and the values derived rather than chosen (the output size, the clip
+# length, the dual-sampler split points). Excluding them keeps the signature on the
+# real levers, so one setup on different frames groups as one recipe.
 _RECIPE_EXCLUDE = frozenset((
     "positive_prompt", "negative_prompt", "input_image",
     "seed", "noise_seed", "filename_prefix", "batch_size",
     "width", "height", "length", "frame_count", "frame_rate",
     "start_at_step", "end_at_step",
 ))
-
-
-def _matches_category(category: str, prompt: str) -> bool:
-    """Whether ``prompt`` reads as depicting ``category`` by its keyword substrings."""
-    low = (prompt or "").lower()
-    return any(kw in low for kw in _CATEGORY_KEYWORDS.get(category, ()))
 
 
 def _hashable(value):
@@ -157,43 +108,21 @@ def _act_recipe_groups(category: str, video_rows, *, require_scene: bool = False
     ``loop_only`` keeps just the ones a looping workflow made (see :func:`_loops`)."""
     groups = defaultdict(list)
     for row in video_rows:
-        if not _matches_category(category, row.get("positive_prompt")):
+        if act_of(row) != category:
             continue
         if require_scene and not (row.get("start_scene") or "").strip():
             continue
-        if loop_only and not _loops(row):
+        if loop_only and not loops(row):
             continue
         groups[_recipe_signature(row)].append(row)
     return groups
 
 
-def category_for_prompt(prompt: str) -> str | None:
-    """The act ``prompt`` reads as depicting, or ``None`` when it names none.
-
-    The same conservative substring test mining uses, run over one prompt instead
-    of a gallery — what lets an image say what it depicts rather than having the act
-    picked for it. A prompt that trips several acts is answered by the longest
-    keyword it matched, the more specific reading winning over a broader one it
-    happens to contain. A prompt that trips none returns ``None`` rather than a
-    guess, so acting on an image whose prompt doesn't say what is happening asks
-    instead of animating the wrong act.
-    """
-    low = (prompt or "").lower()
-    best: str | None = None
-    best_length = 0
-    for name, keywords in _CATEGORY_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in low and len(keyword) > best_length:
-                best, best_length = name, len(keyword)
-    return best
-
-
 def act_of(row: dict) -> str:
-    """The act ``row`` shows: the one picked for it in Combine, else the one its
-    prompt reads as depicting, and "" for a prompt that names none."""
-    return (row.get("recipe_category")
-            or category_for_prompt(row.get("positive_prompt"))
-            or "")
+    """The act ``row`` shows, because somebody said so: a video's is the act it was
+    launched as, a picture's the action it was sorted as, and "" means nobody has
+    said. Never read off the prompt."""
+    return row.get("recipe_category") or row.get("picture_state") or ""
 
 
 def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
@@ -209,20 +138,14 @@ def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
     loop_only = intent == GENAU
     return {c for c in CATEGORIES
             if curated_recipe(c, intent) is not None
-            or any(_matches_category(c, row.get("positive_prompt"))
-                   and (not loop_only or _loops(row))
+            or any(act_of(row) == c and (not loop_only or loops(row))
                    for row in video_rows)}
 
 
 def best_recipe(category: str, video_rows, intent: str = VIDEO) -> str | None:
-    """The prompt_id of the exemplar for ``category``'s best recipe, or ``None``.
-
-    "Best" is the recipe (model + params) under the most of the user's videos of
-    that act; a tie goes to the recipe with the more recent video. The winning recipe
-    is represented by its most-recent video, whose full params (prompt included) the
-    caller re-runs on the dropped image. ``None`` when the gallery holds no video of
-    the act, so the caller can prompt the user to make one first.
-    """
+    """The prompt_id of the exemplar for ``category``'s best recipe, or ``None``
+    when the gallery holds no video of the act. "Best" is the recipe under the most
+    of the user's videos of it, ties to the more recent, shown by its newest."""
     groups = _act_recipe_groups(category, video_rows, loop_only=intent == GENAU)
     if not groups:
         return None
@@ -234,10 +157,8 @@ def best_recipe(category: str, video_rows, intent: str = VIDEO) -> str | None:
 
 
 def _recipe_representatives(category: str, video_rows, *, loop_only: bool = False) -> list:
-    """One representative video per recipe among ``category``'s videos: the most-recent
-    row of each recipe group that carries a ``start_scene`` (its input image's
-    prompt) to match on. A recipe with no start scene anywhere is left out — there's
-    nothing to compare the dropped image against."""
+    """One representative video per recipe among ``category``'s videos: each group's
+    newest row that carries a ``start_scene`` to match on."""
     groups = _act_recipe_groups(category, video_rows, require_scene=True, loop_only=loop_only)
     return [max(group, key=_created) for group in groups.values()]
 
@@ -286,11 +207,8 @@ def parse_choice(completion: dict, options: list) -> str | None:
 
 
 def _post_chat(base_url: str, model: str, messages: list, timeout: float) -> dict:
-    """POST one chat request to the local OpenAI-compatible endpoint; return its JSON.
-
-    The single I/O boundary — isolated so the matching above stays testable — over the
-    same stdlib ``urllib`` the ComfyUI client and voice rewrite use. Low temperature:
-    a lookup, not brainstorming."""
+    """POST one chat request to the local OpenAI-compatible endpoint; return its
+    JSON. The single I/O boundary, at a low temperature: a lookup."""
     url = base_url.rstrip("/") + "/chat/completions"
     payload = {
         "model": model,
@@ -310,14 +228,9 @@ def _post_chat(base_url: str, model: str, messages: list, timeout: float) -> dic
 def smart_recipe(category: str, image_scene: str, video_rows, *, base_url: str,
                  model: str, system_prompt: str, timeout: float = 20.0,
                  intent: str = VIDEO) -> str | None:
-    """The prompt_id of the recipe whose starting scene best fits the dropped image,
-    or ``None`` when there's nothing to pick or the model can't decide.
-
-    Offers the LLM one representative per recipe among ``category``'s videos (each
-    shown by the starting scene it's made for) and returns its choice. ``None`` when
-    the act has no scored recipe, the model deliberately reports no fit, or the call
-    fails — the caller then falls back to :func:`best_recipe`.
-    """
+    """The prompt_id of the recipe whose starting scene best fits the dropped
+    image, or ``None`` when the act has no scored recipe, the model reports no fit,
+    or the call fails -- and the caller falls back to :func:`best_recipe`."""
     representatives = _recipe_representatives(
         category, video_rows, loop_only=intent == GENAU,
     )

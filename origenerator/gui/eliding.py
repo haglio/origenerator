@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionButton,
     QStylePainter,
 )
+from shared_ui.spacing import MARGIN_STANDARD
 
 # What one of these asks for when there is nothing to spare: a letter or two and
 # the ellipsis that says the rest was cut.
@@ -140,3 +141,13 @@ class ElidingLabel(QLabel):
             painter, rect, int(self.alignment()), self.palette(), self.isEnabled(),
             self.display_text(rect.width()), QPalette.ColorRole.WindowText,
         )
+
+
+def open_the_list_in_full(combo) -> None:
+    """Let ``combo`` open its list wide enough for every entry, whole: the closed
+    field gives its width up to the pane, and the open list must not."""
+    view = combo.view()
+    advance = combo.fontMetrics().horizontalAdvance
+    widest = max((advance(combo.itemText(i)) for i in range(combo.count())), default=0)
+    view.setMinimumWidth(widest + view.verticalScrollBar().sizeHint().width()
+                         + 2 * view.frameWidth() + 2 * MARGIN_STANDARD)

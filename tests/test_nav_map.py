@@ -18,11 +18,13 @@ from origenerator.nav_map import (
 )
 
 
-def _image(prompt_id, prompt, *, seed, steps=50, checkpoint="model_a.safetensors"):
+def _image(prompt_id, prompt, *, seed, steps=50, checkpoint="model_a.safetensors",
+           shows=None):
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "positive_prompt": prompt,
+        "picture_state": shows,
         "seed": seed,
         "params_json": json.dumps({"positive_prompt": prompt, "seed": seed,
                                    "steps": steps, "checkpoint": checkpoint}),
@@ -132,7 +134,7 @@ def test_each_generation_names_its_own_row_by_the_act_it_shows():
 
 
 def test_a_source_picture_carries_the_act_it_shows_beside_being_a_source():
-    picture = _image("i1", "a fox in a beta form", seed=1)
+    picture = _image("i1", "a fox", seed=1, shows="beta")
     index = gallery.build_image_config_index([picture])
     runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
 
@@ -142,7 +144,7 @@ def test_a_source_picture_carries_the_act_it_shows_beside_being_a_source():
 
 
 def test_a_picture_nothing_was_animated_from_is_no_source_and_names_only_its_act():
-    shows_an_act = _image("i1", "a fox in a beta form", seed=1)
+    shows_an_act = _image("i1", "a fox", seed=1, shows="beta")
     shows_none = _image("i2", "a fox", seed=2)
     index = gallery.build_image_config_index([shows_an_act, shows_none])
     library = [shows_an_act, shows_none]
@@ -207,7 +209,7 @@ def test_an_action_loop_plays_the_picture_and_every_video_of_it_twins_included()
 
 
 def test_the_whole_library_says_what_each_generation_is_named_for():
-    source = _image("i1", "a fox in a beta form", seed=1)
+    source = _image("i1", "a fox", seed=1, shows="beta")
     plain = _image("i2", "a fox", seed=2)
     index = gallery.build_image_config_index([source, plain])
     runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")

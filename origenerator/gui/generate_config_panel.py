@@ -70,11 +70,13 @@ from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.picture_state_picker import PictureStatePicker
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
+from origenerator.picture_states import state_names
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
 from origenerator.timing import estimate_label
@@ -356,10 +358,22 @@ class GenerateConfigPanel(QWidget):
         it, at the top of the scroll (shown only while displaying a saved
         generation). Above the form, because it names what the settings below it
         made. Params — editable or read-only — all live in that form now, so
-        this block carries only those facts."""
+        this block carries only those facts.
+
+        What the picture shows sits with them, for the same reason: it is a fact
+        about the finished picture rather than a setting that made it, and it is
+        the one of these facts anyone can change."""
         self._metadata_block = MetadataBlock(go_to_folder=self._go_to_folder)
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
+        self._picture_state = PictureStatePicker(state_names())
+        self._picture_state.chosen.connect(self._on_picture_state_chosen)
+        body.addWidget(self._picture_state)
+
+    def _on_picture_state_chosen(self, prompt_id: str, state: str) -> None:
+        """Record what the picture on display shows — the same column the
+        sorting window writes, so a picture answered here is answered there."""
+        self._db.set_picture_state(prompt_id, state or None)
 
     def _build_workflow_header(self, body: QVBoxLayout) -> None:
         """The editable half: the workflow picker, its typical-time estimate, and
@@ -1426,6 +1440,7 @@ class GenerateConfigPanel(QWidget):
         the state of a tab with none on display: blank, following a run still
         being made, or holding a whole folder's rewrite."""
         self._metadata_block.hide()
+        self._picture_state.clear()
         self._related.clear()
         self._versions.hide()
         self._pending_enhancement = None  # nothing on display to be enhancing
@@ -1446,6 +1461,7 @@ class GenerateConfigPanel(QWidget):
         # than opening a bare gap above the form.
         self._metadata_block.setVisible(
             self._metadata_block.show_row(row, self._upscale_of(row)))
+        self._picture_state.show_row(row)
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()
         self._show_request_diff(request)
@@ -1684,7 +1700,7 @@ class GenerateConfigPanel(QWidget):
 
         Which of the two is read off the caption under the cursor rather than off
         the row, so a press does what it promised. Where the row has moved on
-        since it was drawn — a spoken "genau it" landing on this very clip — each
+        since it was drawn — a spoken animation landing on this very clip — each
         half re-checks and does nothing, rather than the opposite of what the
         words said.
         """

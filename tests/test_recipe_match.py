@@ -1,8 +1,12 @@
 """recipe_match: pick the one best recipe for a dropdown act from the gallery.
 
 Each act maps to a single recipe — the most-used model+params among the user's
-videos of that act — resolved fresh from the gallery rows. Pure and Qt-free, so the
-grouping and act-matching logic is exercised without a database or a widget.
+videos of that act — resolved fresh from the gallery rows. Which act a video is
+of is the one picked for it when it was launched, never a reading of its prompt.
+Pure and Qt-free, so the grouping and act-matching logic is exercised without a
+database or a widget.
+
+Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
@@ -11,44 +15,53 @@ import json
 from origenerator import recipe_match
 
 
-def _video(pid, prompt, created, **params):
-    """A completed i2v row: its prompt (which act it depicts), created_at (recency), and
+def _video(pid, act, created, **params):
+    """A completed i2v row: the act it was launched as, created_at (recency), and
     the params that define its recipe."""
     return {
         "prompt_id": pid,
         "workflow_name": "wan22_i2v",
-        "positive_prompt": prompt,
+        "recipe_category": act,
+        "positive_prompt": f"a picture of something, {pid}",
         "created_at": created,
-        "params_json": json.dumps({"positive_prompt": prompt, **params}),
+        "params_json": json.dumps({"positive_prompt": f"a picture of something, {pid}",
+                                   **params}),
     }
 
 
-def _loop(pid, prompt, created, **params):
+def _loop(pid, act, created, **params):
     """The same row from a looping workflow — the only kind a Genau recipe can
-    come from, since a Genau flick has to return to the frame it started on."""
-    return {**_video(pid, prompt, created, **params), "workflow_name": "wan22_flf2v_loop"}
+    come from, since a Genau clip has to return to the frame it started on."""
+    return {**_video(pid, act, created, **params), "workflow_name": "wan22_flf2v_loop"}
 
 
 def test_best_recipe_picks_the_most_used_recipe_for_the_act():
     rows = [
-        _video("a1", "a slow alpha", "2026-01-01", lora_high="X", steps=20),
-        _video("a2", "alpha form him off", "2026-01-02", lora_high="X", steps=20),  # same recipe as a1
-        _video("b1", "an alpha form scene", "2026-01-03", lora_high="Y", steps=20),    # a rarer recipe
-        _video("h1", "a beta", "2026-01-09", lora_high="Z", steps=20),        # a different act
+        _video("a1", "alpha", "2026-01-01", lora_high="X", steps=20),
+        _video("a2", "alpha", "2026-01-02", lora_high="X", steps=20),  # same recipe as a1
+        _video("b1", "alpha", "2026-01-03", lora_high="Y", steps=20),  # a rarer recipe
+        _video("h1", "beta", "2026-01-09", lora_high="Z", steps=20),   # a different act
     ]
     # recipe X (used twice) beats recipe Y (once); its most-recent row represents it.
     assert recipe_match.best_recipe("alpha", rows) == "a2"
 
 
 def test_an_act_no_video_does_has_no_best_recipe():
-    rows = [_video("h1", "a beta", "2026-01-01", lora_high="Z")]
+    rows = [_video("h1", "beta", "2026-01-01", lora_high="Z")]
     assert recipe_match.best_recipe("alpha", rows) is None
+
+
+def test_a_video_launched_as_no_act_counts_toward_none():
+    rows = [{**_video("n1", "", "2026-01-01", lora_high="X")},
+            _video("a1", "alpha", "2026-01-02", lora_high="X")]
+    assert recipe_match.best_recipe("alpha", rows) == "a1"
+    assert recipe_match.available_categories(rows) == {"alpha", "gamma"}
 
 
 def test_available_categories_are_those_with_a_video_to_mine_or_a_curated_recipe():
     rows = [
-        _video("h1", "a beta", "2026-01-01", lora_high="Z"),
-        _video("c1", "an epsilon form moment", "2026-01-02", lora_high="Z"),
+        _video("h1", "beta", "2026-01-01", lora_high="Z"),
+        _video("c1", "epsilon", "2026-01-02", lora_high="Z"),
     ]
     # The acts the gallery can mine a recipe for, plus "gamma" — the example
     # overlay curates a recipe for it, so it needs no past video. The rest have
@@ -84,9 +97,9 @@ def test_curated_recipe_is_none_for_a_malformed_entry(monkeypatch):
 
 def test_best_recipe_groups_ignoring_prompt_seed_and_input_image():
     rows = [
-        _video("a1", "alpha one", "2026-01-01", lora_high="X", seed=1, noise_seed=9, input_image="i1.png"),
-        _video("a2", "alpha two", "2026-01-02", lora_high="X", seed=2, noise_seed=8, input_image="i2.png"),
-        _video("b1", "alpha three", "2026-01-03", lora_high="Y", seed=3, input_image="i3.png"),
+        _video("a1", "alpha", "2026-01-01", lora_high="X", seed=1, noise_seed=9, input_image="i1.png"),
+        _video("a2", "alpha", "2026-01-02", lora_high="X", seed=2, noise_seed=8, input_image="i2.png"),
+        _video("b1", "alpha", "2026-01-03", lora_high="Y", seed=3, input_image="i3.png"),
     ]
     # a1 and a2 differ only in prompt/seed/frame — one recipe, used twice — so it wins.
     assert recipe_match.best_recipe("alpha", rows) == "a2"
@@ -96,11 +109,11 @@ def test_recipe_grouping_ignores_derived_size_and_length_params():
     # Same model+LoRA, but different output size (derived from the input image), clip
     # length, and sampler split points — none of which define the recipe.
     rows = [
-        _video("a1", "a alpha", "2026-01-01", lora_high="X", steps=20,
+        _video("a1", "alpha", "2026-01-01", lora_high="X", steps=20,
                width=512, height=768, frame_count=81, start_at_step=10, end_at_step=10000, frame_rate=16.0),
-        _video("a2", "a alpha", "2026-01-02", lora_high="X", steps=20,
+        _video("a2", "alpha", "2026-01-02", lora_high="X", steps=20,
                width=1024, height=576, frame_count=121, start_at_step=10, end_at_step=20, frame_rate=24.0),
-        _video("b1", "a alpha", "2026-01-03", lora_high="Y", steps=20),  # a real difference: the LoRA
+        _video("b1", "alpha", "2026-01-03", lora_high="Y", steps=20),  # a real difference: the LoRA
     ]
     # a1 and a2 are one recipe (used twice) despite differing size/length → it wins,
     # represented by the most recent (a2). Without the exclusions they'd each be a
@@ -110,44 +123,37 @@ def test_recipe_grouping_ignores_derived_size_and_length_params():
 
 def test_best_recipe_breaks_count_ties_by_recency():
     rows = [
-        _video("a1", "a alpha", "2026-01-01", lora_high="X"),  # a recipe used once, older
-        _video("b1", "alpha form", "2026-01-05", lora_high="Y"),       # a recipe used once, newer
+        _video("a1", "alpha", "2026-01-01", lora_high="X"),  # a recipe used once, older
+        _video("b1", "alpha", "2026-01-05", lora_high="Y"),  # a recipe used once, newer
     ]
     assert recipe_match.best_recipe("alpha", rows) == "b1"
 
 
-def test_best_recipe_reads_the_act_from_the_prompt_per_category():
+def test_best_recipe_keeps_each_act_to_the_videos_launched_as_it():
     rows = [
-        _video("f1", "hardcore delta, delta form", "2026-01-01", lora_high="X"),
-        _video("c1", "a big epsilon in frame", "2026-01-02", lora_high="Y"),
-        _video("d1", "she is dancing", "2026-01-03", lora_high="Z"),
+        _video("f1", "delta", "2026-01-01", lora_high="X"),
+        _video("c1", "epsilon", "2026-01-02", lora_high="Y"),
+        _video("d1", "dancing", "2026-01-03", lora_high="Z"),
     ]
     assert recipe_match.best_recipe("delta", rows) == "f1"
     assert recipe_match.best_recipe("epsilon", rows) == "c1"
     assert recipe_match.best_recipe("dancing", rows) == "d1"
-    assert recipe_match.best_recipe("beta", rows) is None  # nothing depicts this act
+    assert recipe_match.best_recipe("beta", rows) is None  # nothing was made as this act
 
 
 # --- smart_recipe: LLM picks the situation-fitting variant within an act ------
 
 
-def _scene_video(pid, prompt, start_scene, created, **params):
+def _scene_video(pid, act, start_scene, created, **params):
     """An act video plus the starting scene it's made for (its input image's prompt)."""
-    return {
-        "prompt_id": pid,
-        "workflow_name": "wan22_i2v",
-        "positive_prompt": prompt,
-        "start_scene": start_scene,
-        "created_at": created,
-        "params_json": json.dumps({"positive_prompt": prompt, **params}),
-    }
+    return {**_video(pid, act, created, **params), "start_scene": start_scene}
 
 
 def test_the_model_is_offered_one_video_per_recipe_and_its_pick_is_used(monkeypatch):
     rows = [
-        _scene_video("x1", "a alpha", "she kneels", "2026-01-01", lora_high="X"),
-        _scene_video("x2", "a alpha", "his anchor already in her grip", "2026-01-02", lora_high="X"),
-        _scene_video("y1", "a alpha", "she waits, no anchor in frame", "2026-01-03", lora_high="Y"),
+        _scene_video("x1", "alpha", "she kneels", "2026-01-01", lora_high="X"),
+        _scene_video("x2", "alpha", "his anchor already in her grip", "2026-01-02", lora_high="X"),
+        _scene_video("y1", "alpha", "she waits, no anchor in frame", "2026-01-03", lora_high="Y"),
     ]
     seen = {}
 
@@ -169,15 +175,15 @@ def test_the_model_is_offered_one_video_per_recipe_and_its_pick_is_used(monkeypa
 def test_an_act_no_video_does_is_not_put_to_the_model_at_all(monkeypatch):
     monkeypatch.setattr(recipe_match, "_post_chat",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call the model")))
-    rows = [_scene_video("h1", "a beta", "her hand on it", "2026-01-01", lora_high="Z")]
+    rows = [_scene_video("h1", "beta", "her hand on it", "2026-01-01", lora_high="Z")]
     assert recipe_match.smart_recipe("alpha", "x", rows,
                                      base_url="x", model="m", system_prompt="S", timeout=1) is None
 
 
 def test_smart_recipe_ignores_rows_lacking_a_start_scene(monkeypatch):
     rows = [
-        _scene_video("x1", "a alpha", "", "2026-01-01", lora_high="X"),          # no scene to match on
-        _scene_video("y1", "a alpha", "anchor in frame", "2026-01-02", lora_high="Y"),
+        _scene_video("x1", "alpha", "", "2026-01-01", lora_high="X"),          # no scene to match on
+        _scene_video("y1", "alpha", "anchor in frame", "2026-01-02", lora_high="Y"),
     ]
     monkeypatch.setattr(recipe_match, "_post_chat",
                         lambda *a, **k: {"choices": [{"message": {"content": '{"choice": 0}'}}]})
@@ -186,7 +192,7 @@ def test_smart_recipe_ignores_rows_lacking_a_start_scene(monkeypatch):
 
 
 def test_a_model_that_finds_no_fit_leaves_the_recipe_unchosen(monkeypatch):
-    rows = [_scene_video("x1", "a alpha", "she kneels", "2026-01-01", lora_high="X")]
+    rows = [_scene_video("x1", "alpha", "she kneels", "2026-01-01", lora_high="X")]
     monkeypatch.setattr(recipe_match, "_post_chat",
                         lambda *a, **k: {"choices": [{"message": {"content": '{"choice": -1}'}}]})
     assert recipe_match.smart_recipe("alpha", "x", rows,
@@ -194,7 +200,7 @@ def test_a_model_that_finds_no_fit_leaves_the_recipe_unchosen(monkeypatch):
 
 
 def test_a_model_that_fails_leaves_the_recipe_unchosen(monkeypatch):
-    rows = [_scene_video("x1", "a alpha", "she kneels", "2026-01-01", lora_high="X")]
+    rows = [_scene_video("x1", "alpha", "she kneels", "2026-01-01", lora_high="X")]
     monkeypatch.setattr(recipe_match, "_post_chat",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("model down")))
     assert recipe_match.smart_recipe("alpha", "x", rows,
@@ -206,23 +212,23 @@ def test_a_model_that_fails_leaves_the_recipe_unchosen(monkeypatch):
 
 def test_genau_mines_only_looping_videos():
     rows = [
-        _video("v1", "a beta", "2026-01-01", lora_high="Z"),   # long-form: not a loop
-        _loop("l1", "a beta", "2026-01-02", lora_high="Z"),
+        _video("v1", "beta", "2026-01-01", lora_high="Z"),   # long-form: not a loop
+        _loop("l1", "beta", "2026-01-02", lora_high="Z"),
     ]
     # The video lane sees both and prefers the newer of the one shared recipe;
     # the Genau lane can only use the loop, whatever else the act has under it.
     assert recipe_match.best_recipe("beta", rows) == "l1"
     assert recipe_match.best_recipe("beta", rows, recipe_match.GENAU) == "l1"
 
-    long_form_only = [_video("v1", "a beta", "2026-01-01", lora_high="Z")]
+    long_form_only = [_video("v1", "beta", "2026-01-01", lora_high="Z")]
     assert recipe_match.best_recipe("beta", long_form_only) == "v1"
     assert recipe_match.best_recipe("beta", long_form_only, recipe_match.GENAU) is None
 
 
 def test_genau_available_categories_need_a_loop_or_a_pinned_recipe():
     rows = [
-        _video("v1", "an epsilon form moment", "2026-01-01", lora_high="Z"),
-        _loop("l1", "a delta form", "2026-01-02", lora_high="Z"),
+        _video("v1", "epsilon", "2026-01-01", lora_high="Z"),
+        _loop("l1", "delta", "2026-01-02", lora_high="Z"),
     ]
     # epsilon has a video but no loop, so the Genau lane cannot answer it; delta can
     # be mined from the loop; beta is pinned in the example overlay's genau_recipes.
@@ -240,7 +246,7 @@ def test_the_two_curated_tables_are_independent():
     assert recipe_match.curated_recipe("beta") is None
 
 
-def test_smart_recipe_offers_the_genau_lane_only_loops(monkeypatch):
+def test_smart_recipe_offers_the_genau_lane_onlyloops(monkeypatch):
     seen = {}
 
     def _fake_post(base_url, model, messages, timeout):
@@ -249,8 +255,8 @@ def test_smart_recipe_offers_the_genau_lane_only_loops(monkeypatch):
 
     monkeypatch.setattr(recipe_match, "_post_chat", _fake_post)
     rows = [
-        {**_video("v1", "a beta", "2026-01-01", lora_high="Z"), "start_scene": "a long-form scene"},
-        {**_loop("l1", "a beta", "2026-01-02", lora_high="Z"), "start_scene": "a looping scene"},
+        _scene_video("v1", "beta", "a long-form scene", "2026-01-01", lora_high="Z"),
+        {**_loop("l1", "beta", "2026-01-02", lora_high="Z"), "start_scene": "a looping scene"},
     ]
     chosen = recipe_match.smart_recipe(
         "beta", "the dropped image", rows,
@@ -263,28 +269,6 @@ def test_smart_recipe_offers_the_genau_lane_only_loops(monkeypatch):
     assert "a looping scene" in seen["user"]
 
 
-# --- category_for_prompt: let the image say what it is ------------------------
-
-
-def test_category_for_prompt_reads_the_act_off_a_prompt():
-    assert recipe_match.category_for_prompt("a beta form, slowly") == "beta"
-    assert recipe_match.category_for_prompt("she is dancing on a table") == "dancing"
-
-
-def test_category_for_prompt_is_none_when_the_prompt_names_no_act():
-    assert recipe_match.category_for_prompt("a portrait by a window") is None
-    assert recipe_match.category_for_prompt("") is None
-    assert recipe_match.category_for_prompt(None) is None
-
-
-def test_category_for_prompt_prefers_the_more_specific_reading():
-    # "beta form" (both acts' keyword lists overlap on the shorter "beta") must not
-    # be decided by dict order: the longer, more specific keyword wins.
-    assert recipe_match.category_for_prompt("beta form") == "beta"
-    # A prompt naming two acts outright resolves to the longer keyword it matched.
-    assert recipe_match.category_for_prompt("striptease, then a beta") == "dancing"
-
-
 # --- act_of: what a generation shows -------------------------------------------
 
 
@@ -294,9 +278,10 @@ def test_a_generation_shows_the_act_picked_for_it_in_combine():
     assert recipe_match.act_of(row) == "beta"
 
 
-def test_a_generation_nothing_was_picked_for_shows_what_its_prompt_reads_as():
-    assert recipe_match.act_of({"positive_prompt": "a beta form, slowly"}) == "beta"
+def test_a_picture_shows_the_action_it_was_sorted_as():
+    assert recipe_match.act_of({"picture_state": "state two"}) == "state two"
 
 
-def test_a_generation_whose_prompt_names_no_act_shows_none():
-    assert recipe_match.act_of({"positive_prompt": "a portrait by a window"}) == ""
+def test_a_generation_nobody_has_said_an_act_for_shows_none():
+    assert recipe_match.act_of({"positive_prompt": "a beta form, slowly"}) == ""
+    assert recipe_match.act_of({}) == ""

@@ -8,7 +8,7 @@ it joins, so a pane built mid-freeze opens frozen because it asked, not because
 whoever built it remembered to say so.
 
 What a freeze reaches is registered rather than wired per widget:
-:func:`~origenerator.gui.looping_preview.looping_movie` builds every looping
+:func:`~origenerator.gui.looping_preview.play_in` builds every looping
 thumbnail in the app, so one call there covers the grid, the collections, a tab's
 history strip and the "Animated in" strip together.
 """

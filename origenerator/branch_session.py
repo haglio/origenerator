@@ -17,6 +17,9 @@ preview launcher sets it, and the primary's launcher never does.
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from shared_ui.preview import Preview, preview_of
 
 ENV_FLAG = "ORIGENERATOR_BRANCH_SESSION"
 LAUNCHER = "launch_preview_branch.vbs"
@@ -24,3 +27,10 @@ LAUNCHER = "launch_preview_branch.vbs"
 
 def is_branch_session(environ=os.environ) -> bool:
     return environ.get(ENV_FLAG) == "1"
+
+
+def shown_as(checkout: Path) -> Preview | None:
+    """What the copy running out of ``checkout`` shows itself as: a preview,
+    named after the session whose branch it is, or ``None`` for the production
+    app -- which is what decides its ink, its title and its taskbar group."""
+    return preview_of(checkout) if is_branch_session() else None

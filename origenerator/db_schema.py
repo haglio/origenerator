@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS generations (
     -- withdrawn here is deleted from Genau's own folder as well as from the
     -- pipeline that put it there.
     genau_unsent_at TEXT,
-    -- Set at launch on a run a spoken "genau it" started, so its completion hands
+    -- Set at launch on a run a spoken animation started, so its completion hands
     -- the clip on without being asked again. On the row rather than in memory
     -- because a restart mid-generation is routine, and it is the only thing
     -- separating such a run from the identical loop workflow started by hand,
@@ -108,7 +108,13 @@ CREATE TABLE IF NOT EXISTS generations (
     trimmed_from TEXT,
     -- What made the row, as a JSON block (origenerator.provenance): stamped at
     -- launch, or worked out later for a row from before launches were stamped.
-    provenance TEXT
+    provenance TEXT,
+    -- What a still picture was sorted as showing: one of the overlay's
+    -- picture_states, by name. The user's own reading of the finished picture
+    -- rather than anything its prompt asked for, which is why it is a column and
+    -- not a param: NULL until someone has looked, and free to differ between two
+    -- pictures of one settings folder. Never set on a video.
+    picture_state TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -226,6 +232,7 @@ ADDED_COLUMNS = {
         "enhance_of": "TEXT",
         "trimmed_from": "TEXT",
         "provenance": "TEXT",
+        "picture_state": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -251,7 +258,7 @@ GENERATION_COLUMNS = (
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
     "evolver_unsent_at", "genau_exported_at", "genau_unsent_at",
     "genau_requested_at", "recipe_category", "recipe_video_id",
-    "enhance_of", "trimmed_from", "provenance",
+    "enhance_of", "trimmed_from", "provenance", "picture_state",
 )
 
 

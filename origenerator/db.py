@@ -89,6 +89,9 @@ class Database:
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
         return self.generations.set_experiment_verdict(prompt_id, verdict)
 
+    def set_picture_state(self, prompt_id: str, state: str | None):
+        return self.generations.set_picture_state(prompt_id, state)
+
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)
 

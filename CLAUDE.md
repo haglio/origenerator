@@ -18,7 +18,7 @@ the suite when a **known** blocked term appears in the tracked tree, but a brand
 new performer name it has never seen passes every check and lands. The guard is a
 backstop for names already known; it cannot see the next one.
 
-So fabricate fully. Use `Jane Doe`, `Example Studio`, `scene one`, the
+So fabricate fully. Use `Jane Doe`, `Sample Studio`, `scene one`, the
 `alpha`/`beta`/`gamma` act placeholders the committed `content.example.json`
 already uses. The near miss that still counts: taking a real filename and
 changing a character or two — it is still that clip, still that performer. Make
@@ -116,29 +116,31 @@ The near miss that still counts: tightening a signature so an unfamiliar file
 lands in a family rather than in `None` — a confident wrong answer hides the
 model, where the honest shrug only leaves it listed.
 
-## An act keyword has to mean its act and nothing else in this library
+## What a generation shows is said by hand, never read off its prompt
 
-`recipe_categories` in the content overlay decides which act a prompt depicts,
-by plain substring, and that answer is now a name the user reads: a slideshow's HUD
-writes it into the gutter of every map row and onto that row's filter button
-(`nav_map.act_of`). So a keyword that is also ordinary describing vocabulary
-costs more than a wrong suggestion in Combine — it names rows for an act they
-do not show, and the name they should have read, their folder's short code,
-never appears at all. One such word — the act in one sense, a measurement of a
-face in the other — sat in the quality boilerplate of 853 of this library's
-3,884 pictures and named 472 rows for an act none of them shows, until the user
-reported it off the map (2026-09-21); it is out of the overlay now.
+Two columns answer it and nothing else does: a picture's `picture_state`, set in
+the sorting window or the Action list on a Generate tab, and a video's
+`recipe_category`, the act picked when it was launched. `recipe_match.act_of`
+reads those two and returns "" for a row nobody has said one for, which a
+slideshow's map draws as a row with no act name, in its gutter and on its filter
+button (`nav_map.act_of`).
 
-So a keyword is measured against the library before it goes in: count what it
-matches in the `positive_prompt` column of `state/origenerator.db` — the count
-alone, never the words themselves, which no agent on this project reads. A word
-that matches most of the library is firing inside the boilerplate every prompt
-here carries and is not distinctive, however plainly it names the act elsewhere;
-where the count leaves it genuinely in doubt, the reading is the user's, so ask
-him. The near miss that still counts: keeping such a word because some
-prompts do mean the act by it — those prompts nearly always say so another way
-too, which is what the act's other keywords are for, and a row has only one
-name.
+It used to be worked out from the prompt, by matching each act's keywords in
+`recipe_categories` against the stored text. That answer named every map row and
+narrowed the show's act filter, and it was wrong often enough to be worse than
+nothing: one keyword — the act in one sense, a measurement of a face in the other
+— sat in the quality boilerplate of 853 of this library's 3,884 pictures and
+named 472 rows for an act none of them shows, which the user found off the map
+(2026-09-21). He called the mechanism garbage and had it removed, with the spoken
+"genau it" that animated a picture as whatever its prompt read as (2026-09-22).
+`recipe_categories` is now a plain list of the act names.
+
+So nothing in this repo may go back to guessing from a prompt, however tempting a
+blank row looks: a blank says the picture has not been sorted, which is a thing to
+fix in the sorting window, not in code. The near miss that still counts: a
+"fallback" that reads the prompt only when the hand-set answer is missing — that
+is exactly the shape that was removed, and it leaves one question with two
+answers again.
 
 ## A video's filename is not the video
 
@@ -206,6 +208,42 @@ such a handshake is tried with a preview on each side before it is called
 done. The near miss that still counts: a fix that reaches the previews built
 after it and says nothing about the ones already handed over, which read only
 their own `state/` until their branches are brought up to date.
+## Two windows of this app's that the app has no button for
+
+Both are launched from a `.vbs` of their own beside `launch_origenerator.vbs`,
+both run the primary's venv with `ORIGENERATOR_BRANCH_SESSION=1`, and both read
+and write the LIVE install's library from whichever checkout starts them
+(`config.LIBRARY_STATE_DIR`). That last part is deliberate: a branch's own
+database is one nobody will ever animate from, so a run of either spent on it
+would be lost. `tests/test_launcher_contract.py` holds both to that.
+
+- `sort_pictures.vbs` -> `origenerator.sort_pictures` -- says what each picture
+  shows, a press apiece. The vocabulary is the overlay's `picture_states` and
+  the answer lands in `generations.picture_state`; which pictures are still
+  waiting and in what order is `picture_sorting`, what each press does is
+  `sorting_session`, and the window is `gui/sorting_window.py`. Each state's
+  button wears the user's own drawing of it, found by `picture_marks` under the
+  live install's `state/picture_states/`: his, and library subject matter, so
+  they are as uncommittable as the state names and live beside the library.
+- `check_animations.vbs` -> `origenerator.check_animations` -- settles what each
+  of the overlay's `animation_paths` entries runs, one at a time, against a video
+  the user already kept. `animation_samples` finds and orders them,
+  `animation_check_session` is the walk, `gui/animation_check_window.py` is the
+  window, and what is accepted goes to `animation_recipes` -- one recipe per
+  (lane, act, picture state) in a file of its own beside the library, which
+  `CombineController._curated_combination` asks before the overlay's per-act pin.
+
+  That per-act pin is on its way out, by the user's decision: it answered for a
+  whole act whatever the picture showed, and it did not animate well enough to
+  keep. So nothing new may be built on it or around it -- no editor for it, no
+  second place that writes it -- and the end state is settings per (lane, act,
+  picture state) and nothing else. Until every one of those is settled it stays
+  as one thing only: the starting position the window offers for an animation
+  nobody ever kept a video of, which is the last place `starting_point` looks.
+
+Neither can answer anything the other has not: an animation's samples are clips
+made from pictures already sorted, so the sorting window comes first and a fresh
+library shows every animation blank.
 
 ## The commands in `tools/`, and why each one is not a menu item
 
@@ -291,8 +329,8 @@ has neither.
 Re-copy as the LAST step before the link goes out, and then import the window
 chain against that copy (`from origenerator.gui.main_window import
 OrigeneratorWindow` in a fresh interpreter, no `PYTHONPATH`): `tests/
-test_launch_smoke.py` deliberately stands the committed example in for the
-local overlay, because a public checkout has only the example, so it cannot
+test_launch_smoke.py` deliberately stands the committed sample in for the
+local overlay, because a public checkout has only the sample, so it cannot
 see a local overlay the code can no longer read. A copy taken two hours
 earlier met exactly that on 2026-09-26 -- `recipe_categories` went from a
 list to a table of keywords on the machine 23 minutes after the copy, and the

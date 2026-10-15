@@ -28,6 +28,11 @@ from origenerator.spin_arrows import arrow_paths
 CHOSEN = "chosen"
 CHOSEN_CONTROL = f'QAbstractButton[{CHOSEN}="true"]:checked'
 
+# Set on the one button in a window that commits the decision the window exists
+# to make, so it wears the blue rather than sitting among its neighbors.
+COMMITS = "commits"
+COMMITTING_CONTROL = f'QPushButton[{COMMITS}="true"]'
+
 
 def _h(color) -> str:
     return color.name()
@@ -166,6 +171,11 @@ def build_stylesheet() -> str:
        (see _drawn_arrow_rules above); a gradient also stays crisp at any screen
        scale, and its two stops sit a hair apart rather than hard against each
        other so the disc's edge reads smooth instead of stepped. */
+    /* Half the stock six pixels: at six, each word sat nearer the next
+       circle than its own, which reads as labelling the wrong one. */
+    QRadioButton {{
+        spacing: 3px;
+    }}
     QRadioButton::indicator {{
         width: 14px;
         height: 14px;
@@ -245,7 +255,7 @@ def build_stylesheet() -> str:
     /* The one exception to the on-ground rule above: a control whose ON state
        means a choice has been made wears the blue every other selection does,
        keyed off the property rather than each control's name. */
-{control_ground(palette.BLUE, CHOSEN_CONTROL)}
+{control_ground(palette.BLUE, CHOSEN_CONTROL, COMMITTING_CONTROL)}
     QProgressBar {{
         background-color: {_h(BG_SECONDARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};

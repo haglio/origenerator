@@ -16,11 +16,13 @@ import pytest
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
+from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.voice_router import VoiceRouter
+from origenerator.recipe_match import GENAU, VIDEO
 from origenerator.voice.app_commands import (
     AppCommand,
     BarSetting,
@@ -236,7 +238,7 @@ class FakeHost:
         self.stood_in = []
         self.enhanced = []
         self.fixed = []
-        self.genaued = []
+        self.animated = []
         self.queued = []
 
     def working_prompts(self, key):
@@ -263,9 +265,9 @@ class FakeHost:
         self.fixed.append((prompt_id, parts))
         return prompt_id, "🎤 fixing hands…", NOTICE
 
-    def genau_it(self, image_id):
-        self.genaued.append(image_id)
-        return image_id, "🎤 making a clip…", NOTICE
+    def animate_it(self, image_id, asked):
+        self.animated.append((image_id, asked))
+        return image_id, f"🎤 animating as “{asked.act}”…", NOTICE
 
     def queue_request(self, row, workflow, params, spoken, revision):
         self.queued.append((row["prompt_id"], revision))
@@ -682,13 +684,24 @@ def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(rout
     assert slideshows.answers == ["🎤 Enhance 2 images"]
 
 
-def test_a_flick_asked_for_with_no_picture_on_screen_says_so(router):
+def test_an_animation_goes_to_the_picture_on_screen_with_the_lane_and_act_said(router):
+    slideshow = FakeSlideshow(target="g7")
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
+    asked = AnimateRequest(GENAU, "alpha")
+
+    voice.on_command(SurfaceCommand(asked, None))
+
+    assert host.animated == [("g7", asked)]
+    assert slideshow.runs == [("g7", "🎤 animating as “alpha”…", NOTICE)]
+
+
+def test_an_animation_asked_for_with_no_picture_on_screen_says_so(router):
     voice, host, _slideshows = router()
 
-    voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND, None))
+    voice.on_command(SurfaceCommand(AnimateRequest(VIDEO, "alpha"), None))
 
-    assert host.genaued == []
-    assert voice.status.text() == "🎤 a Genau flick needs a picture on screen"
+    assert host.animated == []
+    assert voice.status.text() == "🎤 an animation needs a picture on screen"
 
 
 # --- a request said over several breaths ------------------------------------

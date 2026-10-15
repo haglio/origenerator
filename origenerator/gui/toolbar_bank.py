@@ -206,7 +206,7 @@ class ToolbarBank(QWidget):
                 "Listen: bare words for the collections and this bank (“experiments”, "
                 "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
                 "“weird”, “lock”), orders about the picture (“enhance”, “fix "
-                "hands”, “genau it”), and prompt steering while a folder is "
+                "hands”, “animate as doggy”), and prompt steering while a folder is "
                 "auto-generating (left listening by Esc, which stops everything else)",
                 acts.toggle_mic, checkable=True,
             )

@@ -1109,7 +1109,7 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     tiles were wired to OmniPause and the other three kinds of looping preview
     were not, so a frozen room went on playing and nothing in the suite noticed.
     A sweep cannot miss the fourth one, and it fails the moment someone adds a
-    fifth that does not go through looping_movie.
+    fifth that does not go through looping_preview.
     """
     rows, webp = _a_looping_clip(tmp_path)
     view = _fun_time_view(qtbot, rows)

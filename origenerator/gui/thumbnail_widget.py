@@ -18,7 +18,7 @@ from origenerator.gui.corner_controls import (
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.inflight import TICK_MS, RunReading
-from origenerator.gui.looping_preview import looping_movie
+from origenerator.gui.looping_preview import play_in
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
@@ -102,12 +102,9 @@ class ThumbnailWidget(QWidget):
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # A video tile loops its short WebP preview; an image (or a video whose
-        # WebP couldn't be built) shows its static frame.  The preview runs (and
-        # holds, under a session's OmniPause) from looping_movie, which is where
-        # every one of these lives.
+        # WebP couldn't be built) shows its static frame.
         if movie_path and Path(movie_path).exists():
-            self._image_label.setMovie(
-                looping_movie(movie_path, _IMAGE_SIZE, self._image_label))
+            play_in(self._image_label, movie_path, _IMAGE_SIZE)
         elif thumb_path and Path(thumb_path).exists():
             pm = QPixmap(str(thumb_path))
             self._image_label.setPixmap(

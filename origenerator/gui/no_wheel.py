@@ -10,9 +10,7 @@ holds file names hundreds of pixels wide, and a plain combo cannot be laid out
 narrower than the widest of them — so a slim pane grew a horizontal scroll bar
 rather than let the field shrink. This one still asks for its full width and gets
 it wherever there is room; squeezed, it gives way down to a few characters and
-elides what it shows. Only the closed field shrinks: Qt opens the list at its
-items' own width, so the names stay whole where they are read — which matters for
-two model files that differ only near the end.
+elides what it shows.
 """
 from __future__ import annotations
 

@@ -58,6 +58,7 @@ import urllib.request
 import winsound
 
 import pytest
+from app_support import win32 as windows_api
 from PyQt6.QtCore import QCoreApplication, QEvent, QObject, Qt, pyqtSignal, qInstallMessageHandler
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
@@ -329,6 +330,7 @@ def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
     supplies its own stand-in over these.
     """
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
+    monkeypatch.setattr(windows_api, "dress_window", lambda *_a, **_kw: None)
     monkeypatch.setattr(desktop_notices, "register_notification_identity",
                         lambda *_a, **_kw: None)
     monkeypatch.setattr(desktop_notices, "register_link_handler",

@@ -10,10 +10,10 @@ model mines out of past clips that fit the picture's situation.
 Two things ride with it because nothing else has them. The stand-in row a press
 puts in the queue before there is a job: everything between the press and a real
 job takes seconds, and a button that seems to do nothing reads as an app that has
-died. And the spoken "genau it", which is this same act asked for out loud -- the
-act read off the picture's own prompt, the clip handed on the moment it exists,
-and the picture held from the moment the word is heard until its row exists, so
-saying it twice into that silence does not spend the GPU twice.
+died. And the spoken "animate as", which is this same act asked for out loud: the
+clip handed on the moment it exists, and the picture held from the moment the
+words are heard until its row exists, so saying it twice does not spend the GPU
+twice.
 
 What stays with the host is what a launch is *of* and where it lands: the folder
 key a config belongs to, the rows the gallery is holding, and the tree move that
@@ -28,7 +28,15 @@ from typing import Protocol
 
 from PyQt6.QtCore import QObject
 
-from origenerator import evolver_export, gallery, recipe_match
+from origenerator import (
+    animation_paths,
+    animation_recipes,
+    evolver_export,
+    gallery,
+    recipe_match,
+)
+from origenerator.animate_command import what_to_animate
+from origenerator.check_animations import the_animation_window
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     LOCAL_LLM_BASE_URL,
@@ -42,7 +50,7 @@ from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.prompts import VIDEO_SCENE_MATCH_SYSTEM_PROMPT
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -51,6 +59,12 @@ logger = logging.getLogger(__name__)
 
 ALREADY_GENAUD = "🎤 already Genau'd"
 ALREADY_MAKING_ONE = "🎤 already making it — handing that one over"
+
+# What a picture can be animated as is read off what it SHOWS, and a picture
+# nobody has said that about yet can be animated as nothing at all. Said
+# rather than guessed: the guess would be an act the picture cannot do, which
+# is minutes of the one machine spent on a clip that was never going to work.
+NOT_A_PICTURE = "🎤 only a picture can be animated"
 
 
 class CombineHost(Protocol):
@@ -114,7 +128,7 @@ class CombineController(QObject):
         # anything that can't be mistaken for a prompt id.
         self._launching: dict[str, InFlightItem] = {}
         self._launch_seq = 0
-        # Pictures a spoken "genau it" is still finding a recipe for: the mined
+        # Pictures a spoken animation is still finding a recipe for: the mined
         # tier asks a local model, which thinks for several seconds, and that is
         # exactly the silence a second command is said into.
         self._genau_resolving: set[str] = set()
@@ -126,11 +140,27 @@ class CombineController(QObject):
         # line first: the work between the press and a real job is seconds long,
         # and a button that seems to do nothing reads as an app that has died.
         self.panel.combine_requested.connect(self._on_request)
+        self._animation_settings = None
+        self.panel.animation_settings_requested.connect(self._on_animation_settings)
         self.panel.item_activated.connect(self._host.follow_link)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
         self.panel.intent_changed.connect(self._on_intent_changed)
+        # A picture dropped in narrows the acts too, so the list is re-asked
+        # for the moment one lands rather than only when the lane changes.
+        self.panel.image_slot.changed.connect(self.picture_dropped)
         self.panel.setVisible(client is not None)
+
+    def _on_animation_settings(self) -> None:
+        from origenerator.own_window import show_or_say  # noqa: PLC0415 -- Qt only
+
+        if self._animation_settings is not None and self._animation_settings.isVisible():
+            self._animation_settings.raise_()
+            self._animation_settings.activateWindow()
+            return
+        built = the_animation_window()
+        if not show_or_say("Checking animations", built, parent=self.panel):
+            self._animation_settings = built
 
     # --- what the slots take, and what the session keeps ---------------------
 
@@ -227,10 +257,27 @@ class CombineController(QObject):
                 and self._rebuildable_video_row(row)]
 
     def offer_the_acts(self, rows: list[dict]) -> None:
-        """Gray out the acts with no video under them: an act with no recipe to
-        mine should not be pickable only to answer "no recipe yet"."""
-        self.panel.set_available_categories(recipe_match.available_categories(
-            self.rebuildable_videos(rows), self.panel.selected_intent()))
+        """Gray out the acts this press could not answer: those with no video to
+        mine a recipe from, and -- once a picture is in the slot -- those
+        :mod:`origenerator.animation_paths` says it cannot start from. A picture
+        nobody has sorted yet narrows nothing."""
+        lane = self.panel.selected_intent()
+        offered = recipe_match.available_categories(
+            self.rebuildable_videos(rows), lane)
+        state = self._state_of(self.panel.image_slot.current_id())
+        if state:
+            offered &= set(animation_paths.acts_for(state, lane))
+        self.panel.set_available_categories(offered)
+
+    def _state_of(self, image_id: str | None) -> str:
+        """What the picture in the slot was sorted as showing, ``""`` for an
+        empty slot or a picture nobody has sorted yet."""
+        row = self._db.get_generation(image_id) if image_id else None
+        return (row or {}).get("picture_state") or ""
+
+    def picture_dropped(self) -> None:
+        """The picture in the slot changed: re-ask which acts it can start from."""
+        self.offer_the_acts(self._db.list_generations())
 
     def _on_intent_changed(self, _intent: str) -> None:
         """Re-gray the act list for the lane just chosen."""
@@ -295,18 +342,9 @@ class CombineController(QObject):
                         video_id: str | None = None,
                         intent: str = recipe_match.VIDEO) -> str:
         """Put a stand-in row at the back of the line for a Generate just pressed,
-        and return its key.
-
-        It carries everything already known about the run — the frame being
-        animated, the act, or the dropped video's clip in gray — so the row that
-        replaces it is the same row with its price filled in, rather than a
-        different-looking one appearing somewhere else. It offers no Cancel: there
-        is nothing on the server to stop yet, and a button that did nothing is what
-        this row exists to prevent.
-
-        At the back because that is where it will land: nothing has been submitted,
-        so every job already in the line is in front of it.
-        """
+        and return its key. It carries everything already known about the run, so
+        the row that replaces it is the same row with its price filled in, and it
+        offers no Cancel: there is nothing on the server to stop yet."""
         self._launch_seq += 1
         key = f"launching-{self._launch_seq}"
         image_row = self._db.get_generation(image_id) or {}
@@ -384,7 +422,7 @@ class CombineController(QObject):
     def _open_combination(self, image_id: str, video_id: str, category: str = "",
                           intent: str = recipe_match.VIDEO) -> None:
         """Open a dropped image + video's recipe as an editable generate tab instead
-        of running it — the combine panel's "Edit…" path. The tab is
+        of running it — the combine panel's "Edit individual…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
         and shows the pair it was opened with rather than an empty pane."""
         built = self._combined_params(image_id, video_id, intent, category)
@@ -424,11 +462,13 @@ class CombineController(QObject):
     def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
                               category: str = "",
                               intent: str = recipe_match.VIDEO) -> None:
-        """Generate a new video from a dropped image + a dropped video's recipe.
+        """Generate a new video from a dropped image + a dropped video's recipe,
+        landing it in the folder for that (image × settings) combination.
 
         ``send`` hands the clip to Genau the moment it exists, as a spoken
-        "genau it" asks. ``category`` names the act the dropdown was set to, when
-        one was picked.
+        animation asks, and takes no dialog at all, because such a command is
+        answered in the show's corner. ``category`` names the act the dropdown was
+        set to, when one was picked.
         """
         built = self._combined_params(image_id, video_id, intent, category)
         if built is None:
@@ -473,23 +513,14 @@ class CombineController(QObject):
 
     def _resolve_category(self, image_id: str, category: str, intent: str, then) -> None:
         """Find the recipe that fits ``category`` for the dropped image, then call
-        ``then(video_id)`` with a rebuildable video's ``prompt_id`` — or ``None``.
+        ``then(video_id)`` with a rebuildable video's ``prompt_id`` — or ``None``,
+        with a hint on screen so a click never silently does nothing.
 
-        The local LLM picks the recipe whose starting scene matches this image's
-        situation (:func:`recipe_match.smart_recipe`); if it's unreachable or finds no
-        fit, it falls back to the act's most-used recipe
-        (:func:`recipe_match.best_recipe`). ``None`` comes with a hint on screen, so a
-        click never silently does nothing.
-
-        Under ``GENAU`` both tiers see only the looping clips, so the hint names that
-        narrower pool: the act may have plenty of long-form video and still nothing
-        that could be made into a loop.
-
-        The match runs off the UI thread and answers through ``then``, because asking
-        the model is an HTTP round trip to something that thinks for several seconds
-        — 4 to 9 of them, measured here. Inline, the window froze for exactly that
-        long, worst of all on the spoken command, where the window is the picture
-        being looked at. Everything the model needs is gathered first, so the pool
+        :func:`recipe_match.smart_recipe` first, then
+        :func:`recipe_match.best_recipe`; under ``GENAU`` both see only the looping
+        clips, so the hint names that narrower pool. The match runs off the UI
+        thread and answers through ``then``, because the model thinks for 4 to 9
+        seconds, measured here; everything it needs is gathered first, so the pool
         thread touches neither the database nor a widget.
         """
         image_row = self._db.get_generation(image_id)
@@ -541,20 +572,28 @@ class CombineController(QObject):
         recipe on the dropped image — the pinned setup that outranks mining (see
         :func:`recipe_match.curated_recipe`), its seeds freshly rolled.
 
-        ``None`` sends the caller on to mining: the act has no curated entry, the
-        entry names an unknown or non-image-conditioned workflow, or the image
-        row is gone or has no output file to seed from.
+        ``None`` sends the caller on to mining: the act has no accepted settings
+        and no curated entry, the entry names an unknown or
+        non-image-conditioned workflow, or the image row is gone or has no
+        output file to seed from.
         """
-        spec = recipe_match.curated_recipe(category, intent)
+        image_row = self._db.get_generation(image_id)
+        if image_row is None:
+            return None
+        # The settings accepted for this act FROM THIS PICTURE'S OWN STATE come
+        # first: the same act started from two different situations is two
+        # different runs, and the overlay's per-act pin can only ever be right
+        # for one of them. It stays as the answer for a picture nobody has
+        # sorted, and for an animation nobody has accepted settings for yet.
+        spec = (animation_recipes.recipe_for(intent, category,
+                                             image_row.get("picture_state") or "")
+                or recipe_match.curated_recipe(category, intent))
         if spec is None:
             return None
         workflow = WORKFLOW_REGISTRY.get(spec.get("workflow") or "")
         if workflow is None or not gallery.is_image_conditioned(workflow.name):
             logger.warning("combine: category=%s curated workflow %r not usable",
                            category, spec.get("workflow"))
-            return None
-        image_row = self._db.get_generation(image_id)
-        if image_row is None:
             return None
         params = gallery.curated_params(spec, image_row, workflow)
         if params is None:
@@ -589,9 +628,9 @@ class CombineController(QObject):
     def _mark_for_sending(self, prompt_id: str, send: bool) -> None:
         """Stamp a just-launched run to hand its clip on the moment it exists.
 
-        Only a spoken "genau it" asks for this. Pressing Generate leaves the clip
+        Only a spoken animation asks for this. Pressing Generate leaves the clip
         in the gallery for Send-to-Genau, because someone at the keyboard can look
-        at it first; someone talking to a fullscreen picture cannot.
+        at it first.
         """
         if send:
             self._db.mark_genau_requested(prompt_id)
@@ -601,19 +640,12 @@ class CombineController(QObject):
                           launching: str | None = None) -> None:
         """Run the recipe that fits ``category`` on the dropped image: the
         overlay's curated recipe when one is pinned for the act, else the mined
-        exemplar handed off to the shared combine launch. ``intent`` chooses which
-        lane both tiers answer from; ``send`` hands the finished clip to Genau
-        without a second ask.
-
-        ``send`` also holds the picture until the launch is a row, because only a
-        spoken "genau it" sets it and only a spoken one can be said again into
-        the wait — see :meth:`_already_genaud`.
+        exemplar. ``intent`` chooses which lane both tiers answer from; ``send``
+        hands the finished clip to Genau without a second ask, and holds the
+        picture until the launch is a row (see :meth:`_already_genaud`).
 
         ``launching`` is the stand-in row the press already put in the line
-        (:meth:`_show_launching`), taken back off however this ends — launched,
-        answered by no recipe, or unresolvable. The mined path is where it earns
-        its keep: the act is answered by a local model that thinks for several
-        seconds, and until it does there is nothing to queue.
+        (:meth:`_show_launching`), taken back off however this ends.
         """
         if send:
             self._genau_resolving.add(image_id)
@@ -674,15 +706,10 @@ class CombineController(QObject):
     def send_to_genau_if_requested(self, row: dict | None) -> None:
         """Hand a just-finished clip to the Genau lane, if that is what it was for.
 
-        The last step of a spoken "genau it": the run was stamped at launch
-        (:meth:`_mark_for_sending`), so nothing here has to remember it. Only a
-        video with a file on disk that hasn't already gone is sent, and a failure
-        is logged rather than shown — the clip is safe in the gallery either way,
-        and Send-to-Genau is still there to retry with.
-
-        Where it goes is the inbox's to know, and the lane names the folder
-        inside it, so a spoken send and a pressed one cannot differ about where
-        a clip lands.
+        The run was stamped at launch (:meth:`_mark_for_sending`). Only a video
+        with a file on disk that has not already gone is sent, and a failure is
+        logged rather than shown: the clip is safe in the gallery either way. The
+        lane names the folder, so a spoken send and a pressed one land alike.
         """
         if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):
             return
@@ -699,28 +726,17 @@ class CombineController(QObject):
         logger.info("genau: sent %s down the Genau lane", preview[0].name)
 
     def _already_genaud(self, row: dict) -> bool:
-        """Whether this picture has been Genau'd — a clip made from it already,
-        or one on the way.
-
-        Saying it twice is what someone does when the first time appeared to do
-        nothing, and it usually did appear to: the clip queues after whatever
-        the machine is on and the picture on screen doesn't change. Answering
-        that with a second identical run spends minutes of the one GPU making a
-        clip that already exists, and sends both to Genau.
+        """Whether this picture has been Genau'd — a clip made from it already, or
+        one on the way. Saying it twice is what someone does when the first time
+        appeared to do nothing, and a second identical run spends minutes of the
+        one GPU on a clip that already exists.
 
         A run is a row stamped as spoken for (:meth:`_mark_for_sending`) and
-        matched to this picture by its start frame — counted whether it is still
-        coming (pending, running) or has landed, since both mean this picture
-        has its clip. Read from the database rather than the live jobs, so a run
-        reconnected after a restart still counts, and one made in a session
-        since closed counts forever. A row that errored counts as nothing: it
-        made no clip, and asking again is the only way to get one.
-
-        There is also a stretch with no row at all: the mined tier asks the
-        local model which recipe fits and that thinks for several seconds, which
-        is exactly the silence a second command is said into, so the picture is
-        held in :attr:`_genau_resolving` from the moment the command is heard
-        until its row exists.
+        matched to this picture by its start frame, counted whether it is still
+        coming or has landed, and read from the database so one reconnected after
+        a restart still counts. A row that errored counts as nothing. The stretch
+        with no row at all -- the model thinking about which recipe fits -- is held
+        in :attr:`_genau_resolving` instead.
         """
         if row.get("prompt_id") in self._genau_resolving:
             return True
@@ -731,40 +747,34 @@ class CombineController(QObject):
             for other in self._db.list_generations()
         )
 
-    def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
-        """Animate an image as a Genau flick: the act read off its own prompt.
+    def animate_it(self, image_id: str | None, asked) -> tuple[str | None, str, str]:
+        """Animate a picture as the act an "animate as" named, in the lane it
+        named: the id it launched on (``None`` when it didn't), the line the
+        speaking surface should say, and its kind.
 
-        Returns the id it launched on (``None`` when it didn't), the line the
-        speaking surface should say and its kind — the same shape as ``fix_parts``,
-        because the speaker is looking at the picture, not at the gallery's caption.
-
-        Nothing is picked and nothing is dropped: the act comes from the image's
-        prompt (:func:`recipe_match.category_for_prompt`), and from there this is
-        the Genau lane's ordinary category path. An unreadable prompt or an act
-        with no loop recipe under it says so rather than animating the wrong
-        thing. The run is stamped so its finished clip hands itself on without
-        being asked again — the whole point of saying it out loud is that the
-        picture is wanted moving *now*, and a second press to release it would be
-        one the speaker isn't near a keyboard to make.
+        An act left unsaid is settled by what the picture shows, through
+        :func:`~origenerator.animate_command.what_to_animate`. From there it is the
+        ordinary category path: the loop lane is stamped to hand its clip on and
+        guarded against being said twice (:meth:`_already_genaud`), and the
+        full-length lane is left in the gallery.
         """
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != MediaType.IMAGE:
-            return None, f"🎤 only a picture can become a Genau {genau_flick_word()}", WARNING
-        if self._already_genaud(row):
+            return None, NOT_A_PICTURE, WARNING
+        loop = asked.lane == recipe_match.GENAU
+        if loop and self._already_genaud(row):
             return None, ALREADY_GENAUD, WARNING
-        category = recipe_match.category_for_prompt(row.get("positive_prompt") or "")
-        if category is None:
-            return (None, "🎤 this prompt doesn't say what's happening — no act to animate",
-                    WARNING)
+        answer = what_to_animate(asked, row.get("picture_state") or "")
+        if answer.act is None:
+            return None, f"🎤 {answer.said}", ERROR if answer.unsupported else WARNING
+        act = answer.act
         available = recipe_match.available_categories(
-            self.rebuildable_videos(self._db.list_generations()), recipe_match.GENAU,
-        )
-        if category not in available:
-            return (None, f"🎤 no looping “{category}” {genau_flick_word()} to base a recipe "
-                          "on yet", WARNING)
-        logger.info("genau it: image=%s -> category=%s", image_id, category)
-        self.generate_category(image_id, category, recipe_match.GENAU, send=True)
-        return image_id, f"🎤 animating as a “{category}” {genau_flick_word()}", NOTICE
+            self.rebuildable_videos(self._db.list_generations()), asked.lane)
+        if act not in available:
+            return None, f"🎤 no “{act}” recipe to base this on yet", WARNING
+        logger.info("animate as: image=%s lane=%s -> act=%s", image_id, asked.lane, act)
+        self.generate_category(image_id, act, asked.lane, send=loop)
+        return image_id, f"🎤 animating as “{act}”", NOTICE
 
 
 def _the_row_this_run_will_make(video_row: dict, params: dict, workflow) -> dict:

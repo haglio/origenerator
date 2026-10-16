@@ -224,6 +224,7 @@ def declaration() -> dict:
         "command_case_blind": True,
         "command_lines": list(command_lines()),
         "command_patterns": list(command_patterns()),
+        "handoff": handoff(*_A_WINDOW),
     }
 
 
@@ -482,11 +483,38 @@ SHOWING_NAME = "fun_time_showing.txt"
 TAKEOVER_NAME = "fun_time_takeover.json"
 SESSION_NAME = "fun_time_session.txt"
 OFFER_STILL_STARTING = "starting"
+SESSION_CLAIM = re.compile(r"(\d+) (\d+)")
+TAKEOVER_PID = "pid"
+TAKEOVER_ARGS = "args"
+_A_WINDOW = (4242, 4343)
+
+
+def handoff(pid: int, created_at: int) -> dict:
+    return {
+        "offer": {"file": OFFER_NAME, "writes": [offer_of(pid, created_at),
+                                                 offer_of(pid, created_at, starting=True)]},
+        "showing": {"file": SHOWING_NAME, "writes": [slideshow_mark(pid, created_at)]},
+        "session": {"file": SESSION_NAME, "reads": {"pattern": SESSION_CLAIM.pattern}},
+        "takeover": {"file": TAKEOVER_NAME,
+                     "reads": {"keys": sorted((TAKEOVER_PID, TAKEOVER_ARGS))}},
+    }
+
+
+def offer_of(pid: int, created_at: int, *, starting: bool = False) -> str:
+    offer = f"{pid} {created_at}"
+    return f"{offer} {OFFER_STILL_STARTING}" if starting else offer
+
+
+def slideshow_mark(pid: int, created_at: int) -> str:
+    return offer_of(pid, created_at)
 
 
 def offer_of_this_process(*, starting: bool = False) -> str:
-    offer = f"{os.getpid()} {this_process_creation_time()}"
-    return f"{offer} {OFFER_STILL_STARTING}" if starting else offer
+    return offer_of(os.getpid(), this_process_creation_time(), starting=starting)
+
+
+def slideshow_mark_of_this_process() -> str:
+    return slideshow_mark(os.getpid(), this_process_creation_time())
 
 
 def offer_the_window_while_it_is_built(*state_dirs: Path) -> None:
@@ -515,11 +543,11 @@ def a_session_holds_the_device(state_dir: Path) -> bool:
     still keep off the one device it is driving.
     """
     try:
-        pid, created_at = map(int, (state_dir / SESSION_NAME)
-                              .read_text(encoding="utf-8").split())
-    except (OSError, ValueError):
+        claim = SESSION_CLAIM.fullmatch(
+            (state_dir / SESSION_NAME).read_text(encoding="utf-8").strip())
+    except OSError:
         return False
-    return process_creation_time(pid) == created_at
+    return claim is not None and process_creation_time(int(claim[1])) == int(claim[2])
 
 
 def _stayed_standalone(why: str) -> None:
@@ -533,8 +561,8 @@ def take_the_takeover(state_dir: Path, *, pid: int) -> FunTimeSession | None:
         return None
     try:
         asked = json.loads(takeover.read_text(encoding="utf-8"))
-        whose = asked["pid"]
-        args, unknown = build_parser().parse_known_args(asked["args"])
+        whose = asked[TAKEOVER_PID]
+        args, unknown = build_parser().parse_known_args(asked[TAKEOVER_ARGS])
     except (OSError, ValueError, TypeError, KeyError) as not_one:
         _stayed_standalone(f"it did not read as a session ({not_one!r})")
         return None

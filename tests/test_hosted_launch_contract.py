@@ -11,6 +11,7 @@ These hold the document to the parser and to the windows.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -18,6 +19,7 @@ import pytest
 from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
+from origenerator.win32 import this_process_creation_time
 from tests.test_main_window import _fun_time_session, _window
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -128,3 +130,41 @@ def test_a_region_rect_is_not_required_of_a_launch():
 
     assert session is not None
     assert session.region_rect("portrait") == contract.Rect(0, 0, 0, 0)
+
+
+def _handoff() -> dict:
+    return contract.declaration()["handoff"]
+
+
+def test_the_document_names_each_file_this_app_and_a_session_hand_each_other():
+    assert {side: entry["file"] for side, entry in _handoff().items()} == {
+        "offer": contract.OFFER_NAME, "showing": contract.SHOWING_NAME,
+        "session": contract.SESSION_NAME, "takeover": contract.TAKEOVER_NAME}
+
+
+def test_a_claim_on_the_device_is_read_exactly_when_the_document_says_it_is(tmp_path):
+    pattern = _handoff()["session"]["reads"]["pattern"]
+    live = f"{os.getpid()} {this_process_creation_time()}"
+
+    for claim, read in ((live, True), (f"{live} more", False), (live.replace(" ", ", "), False)):
+        (tmp_path / contract.SESSION_NAME).write_text(claim, encoding="utf-8")
+        assert (bool(re.fullmatch(pattern, claim)),
+                contract.a_session_holds_the_device(tmp_path)) == (read, read), claim
+
+
+def test_a_takeover_carrying_what_the_document_says_this_app_reads_is_taken(tmp_path):
+    asked = {contract.TAKEOVER_PID: os.getpid(), contract.TAKEOVER_ARGS: [contract.MODE_FLAG]}
+    (tmp_path / contract.TAKEOVER_NAME).write_text(json.dumps(asked), encoding="utf-8")
+
+    assert sorted(asked) == _handoff()["takeover"]["reads"]["keys"]
+    assert contract.take_the_takeover(tmp_path, pid=os.getpid()) is not None
+
+
+def test_every_offer_and_slideshow_mark_the_document_says_this_app_writes_is_one_it_writes():
+    pid, created_at = 4321, 8765
+
+    assert {side: entry["writes"] for side, entry in contract.handoff(pid, created_at).items()
+            if "writes" in entry} == {
+        "offer": [contract.offer_of(pid, created_at),
+                  contract.offer_of(pid, created_at, starting=True)],
+        "showing": [contract.slideshow_mark(pid, created_at)]}

@@ -14,6 +14,8 @@ import sys
 import time
 from pathlib import Path
 
+from app_support.logging_utils import configure_logging, install_exception_logging
+
 from origenerator import app_link
 from origenerator.comfyui_api import ComfyUIApi
 from origenerator.completion import extract_completion, mark_generation_completed
@@ -22,6 +24,7 @@ from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     COMFYUI_PORT,
     LIBRARY_STATE_DIR,
+    STATE_DIR,
     THUMB_DIR,
 )
 from origenerator.db import Database
@@ -75,6 +78,7 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
     while not app_is_running():
         waiting = runs_in_flight(db)
         if not waiting:
+            logger.info("Stopped waiting: every run left in flight has landed")
             return
         for row in waiting:
             try:
@@ -88,9 +92,11 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
             if notice is not None:
                 announce(notice)
         if now() >= giving_up_at:
-            logger.info("Gave up waiting on %d run(s)", len(runs_in_flight(db)))
+            logger.info("Stopped waiting: gave up on %d run(s) still in flight",
+                        len(runs_in_flight(db)))
             return
         sleep(poll_seconds)
+    logger.info("Stopped waiting: Origenerator is open again")
 
 
 def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
@@ -108,13 +114,15 @@ def _start_a_watcher(identity: str) -> None:
     """Start this module as a process of its own, outliving the window."""
     import subprocess  # noqa: PLC0415
     try:
-        subprocess.Popen(
+        watcher = subprocess.Popen(
             [str(app_link.windowless_interpreter()), "-m", __name__, identity],
             cwd=str(app_link.CHECKOUT),
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except OSError as e:
         logger.warning("Nothing will wait out the runs still in flight: %s", e)
+        return
+    logger.info("Process %d waits out the runs still in flight", watcher.pid)
 
 
 def _raise_on_the_desktop(notice: Notice, identity: str) -> None:
@@ -125,12 +133,18 @@ def _raise_on_the_desktop(notice: Notice, identity: str) -> None:
         logger.warning("Windows would not raise the notification: %s", e)
 
 
+def _log_into_the_apps_file() -> None:
+    configure_logging("", STATE_DIR / "origenerator.log")
+    install_exception_logging(logger)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Wait out the runs this checkout's app left in flight. What it starts."""
     argv = sys.argv[1:] if argv is None else argv
     identity = argv[0] if argv else os.environ.get(CARRIES_THE_IDENTITY, "")
     if not identity:
         return 2
+    _log_into_the_apps_file()
     db = Database(LIBRARY_STATE_DIR / "origenerator.db")
     watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT),
           announce=lambda notice: _raise_on_the_desktop(notice, identity),

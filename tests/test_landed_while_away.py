@@ -5,13 +5,21 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import json
+import logging
+import os
 import subprocess
+import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from origenerator import landed_while_away
 from origenerator.db import Database
 from origenerator.single_instance import Copies
 from origenerator.workflows import WORKFLOW_REGISTRY
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _in_flight(db, prompt_id="vid", workflow_name="wan22_i2v"):
@@ -102,6 +110,21 @@ def test_a_run_still_going_is_waited_out(tmp_path):
     assert [notice.title for notice in said] == ["Video ready"]
 
 
+@pytest.mark.parametrize(("landed", "over", "said"), [
+    ({"vid": _landed()}, {}, "every run"),
+    ({}, {"app_is_running": lambda: True}, "Origenerator is open again"),
+    ({}, {"patience_seconds": 0}, "gave up"),
+], ids=["all-landed", "app-back", "gave-up"])
+def test_the_watcher_says_in_the_log_how_it_stopped(tmp_path, caplog, landed, over, said):
+    db = Database(tmp_path / "t.db")
+    _in_flight(db)
+
+    with caplog.at_level(logging.INFO, logger=landed_while_away.__name__):
+        _watch(db, _Api(landed), tmp_path, **over)
+
+    assert f"Stopped waiting: {said}" in caplog.text
+
+
 def test_quitting_hands_the_runs_still_in_flight_to_a_process_of_its_own(tmp_path):
     db = Database(tmp_path / "t.db")
     _in_flight(db)
@@ -112,18 +135,39 @@ def test_quitting_hands_the_runs_still_in_flight_to_a_process_of_its_own(tmp_pat
     assert started == ["Origenerator.Preview"]
 
 
-def test_the_watcher_runs_on_an_interpreter_that_opens_no_console(tmp_path, monkeypatch):
+@pytest.fixture
+def started(monkeypatch):
+    """What the app asked Windows to start, each answered as process 4321."""
+    asked = []
+
+    def popen(args, **_named):
+        asked.append(args)
+        return SimpleNamespace(pid=4321)
+
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    return asked
+
+
+def test_the_watcher_runs_on_an_interpreter_that_opens_no_console(tmp_path, started):
     # The app runs on the console interpreter its launcher's log needs. Started on
     # that one, the watcher's own interpreter was handed a console window, left
     # open on his desktop until the runs in flight landed.
     db = Database(tmp_path / "t.db")
     _in_flight(db)
-    started = []
-    monkeypatch.setattr(subprocess, "Popen", lambda args, **_named: started.append(args))
 
     landed_while_away.hand_over_what_is_in_flight(db, "Origenerator")
 
     assert Path(started[0][0]).name == "pythonw.exe"
+
+
+def test_the_log_names_the_process_left_waiting_on_the_runs(tmp_path, started, caplog):
+    db = Database(tmp_path / "t.db")
+    _in_flight(db)
+
+    with caplog.at_level(logging.INFO, logger=landed_while_away.__name__):
+        landed_while_away.hand_over_what_is_in_flight(db, "Origenerator")
+
+    assert "4321" in caplog.text
 
 
 def test_quitting_with_nothing_in_flight_starts_nothing(tmp_path):
@@ -135,8 +179,30 @@ def test_quitting_with_nothing_in_flight_starts_nothing(tmp_path):
     assert started == []
 
 
+def test_what_the_watcher_says_lands_in_the_apps_log(tmp_path):
+    # Its process has no window and no console, so a line it logs anywhere else
+    # is read by nobody.
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
+    subprocess.run(
+        [sys.executable, "-c",
+         "from pathlib import Path\n"
+         "import origenerator.content as content\n"
+         "content.LOCAL_CONTENT = content.EXAMPLE_CONTENT\n"
+         "from origenerator import landed_while_away as watcher\n"
+         f"watcher.LIBRARY_STATE_DIR = watcher.STATE_DIR = Path({str(tmp_path)!r})\n"
+         "watcher.watch = lambda *_a, **_k: watcher.logger.info('said by the watcher')\n"
+         "watcher.main(['Origenerator'])\n"],
+        cwd=REPO_ROOT, env=env, check=True,
+    )
+
+    assert "said by the watcher" in (tmp_path / "origenerator.log").read_text(encoding="utf-8")
+
+
 def test_the_watcher_asks_whether_a_copy_holds_the_library_it_waits_for(tmp_path, monkeypatch):
     monkeypatch.setattr(landed_while_away, "LIBRARY_STATE_DIR", tmp_path)
+    monkeypatch.setattr(landed_while_away, "_log_into_the_apps_file", lambda: None)
     asked = {}
     monkeypatch.setattr(landed_while_away, "watch",
                         lambda db, api, *, announce, app_is_running: asked.update(

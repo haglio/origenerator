@@ -5,6 +5,8 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import json
+import subprocess
+from pathlib import Path
 
 from origenerator import landed_while_away
 from origenerator.db import Database
@@ -108,6 +110,20 @@ def test_quitting_hands_the_runs_still_in_flight_to_a_process_of_its_own(tmp_pat
     assert landed_while_away.hand_over_what_is_in_flight(
         db, "Origenerator.Preview", spawn=started.append) is True
     assert started == ["Origenerator.Preview"]
+
+
+def test_the_watcher_runs_on_an_interpreter_that_opens_no_console(tmp_path, monkeypatch):
+    # The app runs on the console interpreter its launcher's log needs. Started on
+    # that one, the watcher's own interpreter was handed a console window, left
+    # open on his desktop until the runs in flight landed.
+    db = Database(tmp_path / "t.db")
+    _in_flight(db)
+    started = []
+    monkeypatch.setattr(subprocess, "Popen", lambda args, **_named: started.append(args))
+
+    landed_while_away.hand_over_what_is_in_flight(db, "Origenerator")
+
+    assert Path(started[0][0]).name == "pythonw.exe"
 
 
 def test_quitting_with_nothing_in_flight_starts_nothing(tmp_path):

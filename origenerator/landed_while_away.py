@@ -105,17 +105,13 @@ def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
 
 
 def _start_a_watcher(identity: str) -> None:
-    """Start this module as a process of its own, outliving the window.
-
-    No console: Windows gives one to a console program started without it.
-    """
+    """Start this module as a process of its own, outliving the window."""
     import subprocess  # noqa: PLC0415
     try:
         subprocess.Popen(
-            [sys.executable, "-m", __name__, identity],
+            [str(app_link.windowless_interpreter()), "-m", __name__, identity],
             cwd=str(app_link.CHECKOUT),
-            creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                           | getattr(subprocess, "DETACHED_PROCESS", 0)),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except OSError as e:
         logger.warning("Nothing will wait out the runs still in flight: %s", e)

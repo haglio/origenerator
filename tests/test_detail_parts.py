@@ -315,7 +315,12 @@ def test_skin_and_hair_are_redrawn_inside_their_outlines_toward_their_own_words(
     assert "pores" in skin.prompt and "strands" in hair.prompt
     assert skin.avoid and hair.avoid
     assert not _part("faces").outline
-    assert _part("faces").prompt == "" and _part("faces").avoid == ""
+
+
+def test_every_part_this_app_names_is_redrawn_toward_words_of_its_own():
+    # The picture's prompt describes the picture; the part's own words describe
+    # what a good one of these looks like, which is what the redraw is for.
+    assert all(part.prompt and part.avoid for part in detail_parts.part_table({}))
 
 
 def test_an_overlay_part_can_be_an_outline_with_its_own_words(monkeypatch):

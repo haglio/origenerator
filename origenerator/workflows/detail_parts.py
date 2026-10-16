@@ -45,10 +45,22 @@ class DetailPart:
 # Fragments follow the naming the ADetailer-style YOLO models use in the wild,
 # so a model dropped into ComfyUI is recognized as-is.
 _BUILTIN_PARTS = (
-    DetailPart("faces", ("face", "faces"), ("face",)),
-    DetailPart("hands", ("hand", "hands"), ("hand",)),
-    DetailPart("teeth", ("teeth", "tooth", "mouth"), ("teeth", "tooth", "mouth")),
-    DetailPart("eyes", ("eye", "eyes"), ("eye",)),
+    DetailPart("faces", ("face", "faces"), ("face",),
+               prompt=("natural detailed face, natural proportions of the face, realistic skin "
+                       "texture, photographic detail"),
+               avoid="deformed face, distorted features, plastic skin, waxy, blurry"),
+    DetailPart("hands", ("hand", "hands"), ("hand",),
+               prompt=("natural hands, five fingers on each hand, realistic knuckles and "
+                       "fingernails, natural skin creases, photographic detail"),
+               avoid="extra fingers, missing fingers, fused fingers, deformed hands, blurry"),
+    DetailPart("teeth", ("teeth", "tooth", "mouth"), ("teeth", "tooth", "mouth"),
+               prompt=("natural teeth, distinct evenly sized teeth, natural gum line, "
+                       "realistic mouth, photographic detail"),
+               avoid="fused teeth, extra teeth, deformed mouth, blurry"),
+    DetailPart("eyes", ("eye", "eyes"), ("eye",),
+               prompt=("natural eyes, detailed iris, round pupils, natural catchlight, "
+                       "realistic eyelashes, photographic detail"),
+               avoid="cross-eyed, mismatched eyes, deformed pupils, blurry"),
     DetailPart("skin", ("skin",), ("skin",), outline=True,
                prompt=("natural skin texture, visible pores, fine lines, slight "
                        "imperfections, soft light under the skin, photographic detail"),

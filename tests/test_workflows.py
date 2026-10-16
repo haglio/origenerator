@@ -594,7 +594,7 @@ def test_a_third_part_is_a_third_pass_on_the_chain():
     assert len(_nodes_of(payload, "UltralyticsDetectorProvider")) == 3
 
 
-def test_the_detail_pass_borrows_the_enhances_model_prompts_and_vae():
+def test_the_detail_pass_borrows_the_enhances_model_settings_and_vae():
     # It is the same enhancement, spent where it matters: the checkpoint
     # refining the picture refines its faces too, steered by the same prompts,
     # so a redrawn mouth stays in the picture's own style rather than the
@@ -608,8 +608,6 @@ def test_the_detail_pass_borrows_the_enhances_model_prompts_and_vae():
     ckpt_id = _node_id(payload, "CheckpointLoaderSimple")
     assert detailer["model"] == sampler["model"] == [ckpt_id, 0]
     assert detailer["clip"] == [ckpt_id, 1]
-    assert detailer["positive"] == sampler["positive"]
-    assert detailer["negative"] == sampler["negative"]
     assert detailer["vae"] == _find_node(payload, "VAEEncode")["inputs"]["vae"]
     assert detailer["steps"] == sampler["steps"]
     assert detailer["cfg"] == sampler["cfg"]

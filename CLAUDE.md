@@ -128,9 +128,7 @@ button (`nav_map.act_of`).
 It used to be worked out from the prompt, by matching each act's keywords in
 `recipe_categories` against the stored text. That answer named every map row and
 narrowed the show's act filter, and it was wrong often enough to be worse than
-nothing: one keyword — the act in one sense, a measurement of a face in the other
-— sat in the quality boilerplate of 853 of this library's 3,884 pictures and
-named 472 rows for an act none of them shows, which the user found off the map
+nothing: it named rows for an act none of them shows, which the user found off the map
 (2026-09-21). He called the mechanism garbage and had it removed, with the spoken
 "genau it" that animated a picture as whatever its prompt read as (2026-09-22).
 `recipe_categories` is now a plain list of the act names.

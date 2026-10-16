@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import tempfile
 from pathlib import Path
 
@@ -92,14 +91,6 @@ def _the_marks_beside_a_notice() -> dict[bool, Path | None]:
     return marks
 
 
-def _the_windowless_interpreter() -> Path:
-    """The interpreter a click is answered by: this one's silent twin, which is
-    beside it in every venv. A console interpreter would open a console window
-    over whatever the user was doing, for the half second it takes to answer."""
-    silent = Path(sys.executable).with_name("pythonw.exe")
-    return silent if silent.exists() else Path(sys.executable)
-
-
 class DesktopNotices(QObject):
     """What reaches the desktop when a run ends, and what a click on it does."""
 
@@ -150,6 +141,6 @@ class DesktopNotices(QObject):
             app_link.SCHEME, name=APP_NAME,
             command=app_link.handler_command(
                 checkout=app_link.CHECKOUT,
-                interpreter=_the_windowless_interpreter(),
+                interpreter=app_link.windowless_interpreter(),
                 launcher=(app_link.PREVIEW_LAUNCHER if is_branch_session()
                           else app_link.LIVE_LAUNCHER)))

@@ -177,7 +177,9 @@ captions once and publishes them in the same document for the session to
 read, and `tests/test_hosted_launch_contract.py` holds the parser and the
 windows to what it says), and the offer, slideshow, takeover and session-claim
 files a standalone window meets a session through (`fun_time_mode.py` here,
-`standalone_origenerator.py` there) — renamed on one side only, every session
+`standalone_origenerator.py` there; each app's document says under `handoff`
+what it writes and reads in them, and `tests/test_fun_time_expectations.py`
+holds this app to Fun Time's) — renamed on one side only, every session
 quietly launches a second copy beside the one already open, and the copy it
 missed goes on driving the OSR2 the session is driving too. The claim is also
 a matter of where: a preview keeps a `state/` of its own, so it reads the

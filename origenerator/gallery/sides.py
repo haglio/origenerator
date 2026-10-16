@@ -11,19 +11,44 @@ with them, and a changed value would orphan every one.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
+
 PORTRAIT = "portrait"
 LANDSCAPE = "landscape"
 BOTH = "both"
 ORIENTATIONS = (PORTRAIT, LANDSCAPE)
 SIDES = (*ORIENTATIONS, BOTH)
 SIDE_LABELS = {PORTRAIT: "Portrait", LANDSCAPE: "Landscape", BOTH: "Both"}
+SEPARATE = ORIENTATIONS
+TOGETHER = (BOTH,)
+
+_EVERY_SHAPE = frozenset(ORIENTATIONS)
+_SHAPES_ON = {
+    PORTRAIT: frozenset({PORTRAIT}),
+    LANDSCAPE: frozenset({LANDSCAPE}),
+    BOTH: _EVERY_SHAPE,
+    None: _EVERY_SHAPE,  # no side at all, where nothing is narrowing
+}
 
 
 def orientation_of_size(width: int, height: int) -> str:
     return PORTRAIT if height > width else LANDSCAPE
 
 
-def side_holds(side: str | None, orientation: str) -> bool:
-    """Whether media of *orientation* belongs on *side* — every shape for Both,
-    and for no side at all (``None``, where nothing is narrowing)."""
-    return side is None or side in (BOTH, orientation)
+def side_holds(side: str | None, orientation: str | None) -> bool:
+    return orientation in _SHAPES_ON[side]
+
+
+def side_covers(side: str | None, other: str | None) -> bool:
+    return _SHAPES_ON[other] <= _SHAPES_ON[side]
+
+
+def side_holding(orientation: str | None, sides: Iterable[str]) -> str | None:
+    return next((side for side in sides if side_holds(side, orientation)), None)
+
+
+def on_side(things: Iterable, side: str | None, orientation_of: Callable) -> list:
+    shapes = _SHAPES_ON[side]
+    if shapes == _EVERY_SHAPE:
+        return list(things)
+    return [thing for thing in things if orientation_of(thing) in shapes]

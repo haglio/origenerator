@@ -1,27 +1,18 @@
-"""Two copies of the whole table of contents, one per shape.
+"""Which side of the folder list a generation sits on, and the keys that say so.
 
-A set of mixed-shape media has no one screen to play on.  A hosting Fun Time
-session shows portrait media on the portrait region and landscape on the
-landscape one, so "slideshow of this folder" was a routing guess that was wrong
-for half the items in it — and standalone the same set is routed by a majority
-vote, which letterboxes the losing half.  A mixed slideshow is a design space this
-app does not want to be in at all.
+A hosting Fun Time session shows portrait media on the portrait region and
+landscape on the landscape one, so the folder list is drawn a side per shape:
+the whole table of contents on each, built from that shape's rows alone, so
+whatever you stand on has exactly one region to play on, read off the key
+rather than measured back out of the items. On its own the app can draw it once
+over both shapes instead, for a slideshow that mixes them
+(:mod:`origenerator.gallery.sides` says what each side holds).
 
-So the table of contents exists twice over, once per shape: the TOC pane is two
-trees, Portrait and Landscape, each under a standing label and each carrying the
-ENTIRE contents — every collection, the All row, the media → workflow → model → LoRA
-→ settings hierarchy, and the folders the user composed — built from that
-shape's rows alone (:mod:`origenerator.gui.split_folder_tree` lays them out).
-Whatever you are standing on is one shape by construction, so its slideshow has
-exactly one region to go to, and which one is read off the key rather than
-measured back out of the items.
-
-The key scheme is what carries the shape: a row's tree key is its folder's own
-key with ``::portrait`` or ``::landscape`` appended (:func:`oriented_key`), and
-:func:`split_key` takes it apart again.  The *folder's* key is untouched by
-this — a star, a custom name, and a place in a folder the user composed all
-still hang off the plain key, because those are properties of the folder rather
-than of the side it is being looked at from.
+A row's tree key is its folder's own key with its side appended
+(:func:`oriented_key`), and :func:`split_key` takes it apart again. The
+*folder's* key is untouched by this: a star, a custom name and a place in a
+folder the user composed hang off the plain key, being the folder's rather than
+the side's.
 
 The shape is the folder's wherever its settings state a size: every picture of
 that folder sits on that side, a running one is placed before it has a
@@ -45,16 +36,7 @@ from PIL import Image
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
-from origenerator.gallery.sides import (  # noqa: F401
-    BOTH,
-    LANDSCAPE,
-    ORIENTATIONS,
-    PORTRAIT,
-    SIDE_LABELS,
-    SIDES,
-    orientation_of_size,
-    side_holds,
-)
+from origenerator.gallery.sides import LANDSCAPE, SIDES, on_side, orientation_of_size
 from origenerator.gallery.signatures import READINGS_KEPT, canonical_settings
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -82,9 +64,9 @@ _MEASURED_LIMIT = 20_000
 _measured: OrderedDict[str, str] = OrderedDict()
 
 
-def oriented_key(base_key: str, orientation: str) -> str:
-    """The tree key of *base_key*'s row on the *orientation* side."""
-    return f"{base_key}{_SEPARATOR}{orientation}"
+def oriented_key(base_key: str, side: str) -> str:
+    """The tree key of *base_key*'s row on *side*."""
+    return f"{base_key}{_SEPARATOR}{side}"
 
 
 def key_holds(outer: str, inner: str) -> bool:
@@ -186,8 +168,4 @@ def requested_orientation(params: dict) -> str | None:
 
 
 def filter_rows(rows, side: str | None) -> list[dict]:
-    """*rows* narrowed to the shape *side* holds — or as given, for the Both
-    side and for no side at all, which each hold every shape."""
-    if side is None or side == BOTH:
-        return list(rows)
-    return [row for row in rows if row_orientation(row) == side]
+    return on_side(rows, side, row_orientation)

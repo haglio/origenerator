@@ -59,6 +59,15 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     REQUESTS_KEY as _REQUESTS_KEY,
 )
+from origenerator.gallery.sides import (
+    LANDSCAPE as _LANDSCAPE,
+)
+from origenerator.gallery.sides import (
+    side_covers as _side_covers,
+)
+from origenerator.gallery.sides import (
+    side_holding as _side_holding,
+)
 from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.generation_config import (
     filled_params,
@@ -130,21 +139,12 @@ from origenerator.gui.toolbar_bank import (
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.media import MediaType
 from origenerator.orientation import (
-    BOTH as _BOTH,
-)
-from origenerator.orientation import (
-    LANDSCAPE as _LANDSCAPE,
-)
-from origenerator.orientation import (
     base_of as _base_of,
 )
 from origenerator.orientation import (
     filter_rows,
     oriented_key,
     requested_orientation,
-)
-from origenerator.orientation import (
-    side_holds as _side_holds,
 )
 from origenerator.orientation import (
     side_of as _side_of,
@@ -1815,7 +1815,7 @@ class GalleryView(QWidget):
             image_index=start_frames,
         )
         self._tree_view.populate(
-            self._build_sides(trees, rows), expanded, folder_meta=meta,
+            self._build_sides(trees), expanded, folder_meta=meta,
             # Where the work has lately been. The tree keeps the order the
             # recipes were tried in, so nothing else in it says so.
             recently_worked=gallery.recently_worked_folders(trees, listed, bumped=bumped),
@@ -1886,7 +1886,7 @@ class GalleryView(QWidget):
                     rows, meta, self._start_frames, self._both_kind_workflows, side)
         return self._start_frames, {side: self._lists_by_side[side] for side in sides}
 
-    def _build_sides(self, trees, rows):
+    def _build_sides(self, trees):
         """The sides the pane is drawing, in the order it draws them.
 
         A side is the whole table of contents over the rows it holds: its own
@@ -1898,15 +1898,11 @@ class GalleryView(QWidget):
         nobody can see, and filling it would cost every rebuild a table of
         contents for nothing.
         """
-        inflight = self._browser.inflight_orientations(rows)
         return [SideModel(
             side=side,
             tree_model=trees[side],
             custom_folders=self._custom_folders_by_side[side],
-            # Recents keeps a side up with no folders yet, so a first-ever
-            # generation of that shape is visible while it runs.
-            show_recents=bool(trees[side]) or any(_side_holds(side, shape)
-                                                  for shape in inflight),
+            show_recents=bool(trees[side]),
             collection_counts=self._browser.collection_counts(side),
         ) for side in self._tree.sides]
 
@@ -2121,7 +2117,7 @@ class GalleryView(QWidget):
             self._search.run()
             return
         self._re_aim()
-        base, orientation = _split_collection_key(self._tree_view.selected_folder_key())
+        base, side = _split_collection_key(self._tree_view.selected_folder_key())
         collection = folder_collection(base)
         self._experiments_bar.setVisible(collection is not None
                                          and collection.which == _EXPERIMENTS_KEY)
@@ -2133,7 +2129,7 @@ class GalleryView(QWidget):
             self._re_aim()
             return
         if collection is not None:
-            self._open_collection(collection, orientation, current)
+            self._open_collection(collection, side, current)
             return
         group = current.data(0, _GROUP_ROLE)
         # A folder's place in the tree is where the user is standing, side and
@@ -2176,13 +2172,13 @@ class GalleryView(QWidget):
         self._browser.apply_selection(first, Qt.KeyboardModifier.NoModifier)
         return first
 
-    def _open_collection(self, collection: FolderCollection, orientation: str | None, item):
+    def _open_collection(self, collection: FolderCollection, side: str | None, item):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
         self._folder_path.set_display(self._collection_title(collection, item))
         self._avg_label.setText("")
         self._clear_metadata()
-        self._browser.show_collection(collection.key, orientation)
+        self._browser.show_collection(collection.key, side)
         if collection.which == _REQUESTS_KEY:
             self._re_aim()
         self._navigation.record()
@@ -2446,13 +2442,11 @@ class GalleryView(QWidget):
 
         Every row lives under one, so this is only ever a fallback: nothing
         selected at all (a fresh window, a rebuild that found no target) reads
-        as Landscape, the roomier side and the one an unmeasurable item files
-        under everywhere else — or, where the list has collapsed to the one of
-        both shapes, that one, being the only side drawn.
+        as the side holding landscape, the roomier shape and the one an
+        unmeasurable item files under everywhere else.
         """
-        drawn = self._tree.sides
-        return _side_of(self.selected_folder_key()) or (
-            _LANDSCAPE if _LANDSCAPE in drawn else drawn[0])
+        return (_side_of(self.selected_folder_key())
+                or _side_holding(_LANDSCAPE, self._tree.sides))
 
     def _tree_item_for(self, key: str):
         """The tree row for ``key`` — a tree key resolves to its own row, and a
@@ -2484,9 +2478,9 @@ class GalleryView(QWidget):
         here = oriented_key(folder, self.side_in_view())
         return self._item_by_key[here if here in drawn else drawn[0]]
 
-    def _collection_item(self, collection_key: str, orientation: str | None = None):
+    def _collection_item(self, collection_key: str, side: str | None = None):
         """One side's copy of a collection row — the side being browsed by default."""
-        return self._tree_view.collection_item(collection_key, orientation or self.side_in_view())
+        return self._tree_view.collection_item(collection_key, side or self.side_in_view())
 
     def _folder_context(self, key: str) -> str:
         """Where folder ``key`` lives: the breadcrumb of its parent, or "" at the
@@ -3359,7 +3353,7 @@ class GalleryView(QWidget):
         """
         job = self._jobs.job_for(key)
         asked = requested_orientation(job.params) if job is not None else None
-        return asked if asked in self._tree.sides else self.side_in_view()
+        return _side_holding(asked, self._tree.sides) or self.side_in_view()
 
     # --- re-roll as the info-pane source ----------------------------------
 
@@ -3681,10 +3675,10 @@ class GalleryView(QWidget):
         with working():
             self._browser.restart_recents_listing()  # a new choice is a new listing
             self._recount_the_collections()
-            base, orientation = _split_collection_key(self.selected_folder_key())
+            base, side = _split_collection_key(self.selected_folder_key())
             collection = folder_collection(base)
             if collection is not None:
-                self._browser.show_collection(collection.key, orientation)
+                self._browser.show_collection(collection.key, side)
         # A collection the choice empties has no item to select, so the signal that
         # normally re-syncs the slideshow button never fires — and it went on
         # offering a slideshow of nothing.
@@ -3955,12 +3949,12 @@ class GalleryView(QWidget):
 
     def _redrew_the_favorites_collection(self) -> bool:
         self._recount_the_collections()
-        base, orientation = _split_collection_key(self.selected_folder_key())
+        base, side = _split_collection_key(self.selected_folder_key())
         collection = folder_collection(base)
         if collection is None or collection.which != _FAVORITES_KEY:
             return False
         place = self._browser.place()
-        self._browser.show_collection(collection.key, orientation)
+        self._browser.show_collection(collection.key, side)
         self._browser.return_to(place)
         return True
 
@@ -4464,18 +4458,15 @@ class GalleryView(QWidget):
 
 
 def _side_list(rows, meta, start_frames, both_kinds, side):
-    """One side's hierarchy — for Both the whole library's."""
-    return gallery.build_gallery_tree(rows if side == _BOTH else filter_rows(rows, side), meta,
+    return gallery.build_gallery_tree(filter_rows(rows, side), meta,
                                       image_index=start_frames,
                                       both_kinds=both_kinds)
 
 
 def _custom_folders_by_side(trees, records) -> dict[str, list]:
-    """Each side's copies of the folders the user composed: the ones saved on
-    that side, and on Both every one of them."""
     return {side: gallery.build_custom_folders(
                 tree, [record for record in records
-                       if _side_holds(side, record["side"] or _LANDSCAPE)])
+                       if _side_covers(side, record["side"] or _LANDSCAPE)])
             for side, tree in trees.items()}
 
 

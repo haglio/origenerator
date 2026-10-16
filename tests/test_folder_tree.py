@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 from shared_ui.colors import BLUE
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, RECENTS_KEY
+from origenerator.gallery.sides import LANDSCAPE
 from origenerator.gui import folder_tree, icons
 from origenerator.gui.folder_tree import (
     COUNT_ROLE,
@@ -17,7 +18,7 @@ from origenerator.gui.folder_tree import (
     _action_rects,
 )
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.orientation import LANDSCAPE, oriented_key
+from origenerator.orientation import oriented_key
 
 _ROLE = Qt.ItemDataRole.UserRole
 

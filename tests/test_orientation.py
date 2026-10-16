@@ -29,10 +29,13 @@ from origenerator.gallery.collection import (
     TRASH_LABEL,
 )
 from origenerator.gallery.sides import (
+    BOTH,
     LANDSCAPE,
     PORTRAIT,
+    SIDE_LABELS,
     SIDES,
     orientation_of_size,
+    side_covers,
     side_holds,
 )
 from origenerator.gui.gallery_tree import GROUP_ROLE
@@ -40,8 +43,6 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.orientation import (
-    BOTH,
-    SIDE_LABELS,
     base_of,
     filter_rows,
     oriented_key,
@@ -213,9 +214,9 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     view.refresh()
 
     # Each half carries the whole table of contents, not a slice of it.
-    for orientation in ("portrait", "landscape"):
-        assert _rows(view._tree, orientation) == ["All"]
-        assert _under_all(view._tree, orientation)[:5] == [
+    for side in ("portrait", "landscape"):
+        assert _rows(view._tree, side) == ["All"]
+        assert _under_all(view._tree, side)[:5] == [
             "Latest", "Favorites", "Experiments", "Requests", "Trash",
         ]
 
@@ -300,6 +301,20 @@ def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
     view._tree.setCurrentItem(view._item_by_key[oriented_key(folder, holding_the_folder)])
 
     assert set(view._browser._inflight_cards) == {"t2", "t3"}
+
+
+@pytest.mark.parametrize("side", SIDES)
+def test_a_folder_composed_on_one_side_is_drawn_on_each_side_covering_it(
+        qtbot, tmp_path, side):
+    db = FakeDB([_shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)])
+    db.create_custom_folder("Keepers", side=PORTRAIT)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _drawing(view, side)
+
+    assert ("Keepers" in _rows(view._tree, side)) == side_covers(side, PORTRAIT)
 
 
 def test_a_rows_shape_is_worked_out_once_however_often_it_is_asked():
@@ -440,8 +455,8 @@ def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_pat
     assert [_heading_name(section).text() for section in _sections(view)] == [
         SIDE_LABELS["portrait"], SIDE_LABELS["landscape"]]
     # And the label belongs to the pane, not to the scrolling list under it.
-    for orientation in ("portrait", "landscape"):
-        assert view._tree._trees[orientation].findChildren(QLabel) == []
+    for side in ("portrait", "landscape"):
+        assert view._tree._trees[side].findChildren(QLabel) == []
 
 
 def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
@@ -469,9 +484,9 @@ def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp
     qtbot.addWidget(view)
     view.refresh()
 
-    for section, orientation in zip(_sections(view), ("portrait", "landscape")):
+    for section, side in zip(_sections(view), ("portrait", "landscape")):
         heading = _heading(section)
-        assert orientation in heading.toolTip()
+        assert side in heading.toolTip()
         # Neither child claims one of its own, which is what lets the frame's
         # reach the cursor over either of them.
         assert [child.toolTip() for child in heading.findChildren(QLabel)] == ["", ""]

@@ -76,6 +76,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, SIDE_LABELS
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
@@ -111,14 +112,7 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
-from origenerator.orientation import (
-    LANDSCAPE,
-    PORTRAIT,
-    SIDE_LABELS,
-    base_of,
-    key_holds,
-    oriented_key,
-)
+from origenerator.orientation import base_of, key_holds, oriented_key
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
 from origenerator.slideshow_buttons import MODE_BUTTONS
@@ -438,14 +432,14 @@ def _find_next(view):
     step.click()
 
 
-def _side(tree, orientation=LANDSCAPE):
+def _side(tree, side=LANDSCAPE):
     """One section of the TOC pane — the Portrait tree, the Landscape one, or
     the one list of both shapes the radio over them collapses to (see
-    :mod:`origenerator.orientation`)."""
-    return tree._trees[orientation]
+    :mod:`origenerator.gallery.sides`)."""
+    return tree._trees[side]
 
 
-def _top_level(tree, orientation=LANDSCAPE):
+def _top_level(tree, side=LANDSCAPE):
     """One half's rows: its collections, its custom folders, its All.
 
     Landscape by default because that is where these fixtures land — a row with
@@ -453,14 +447,14 @@ def _top_level(tree, orientation=LANDSCAPE):
     read, and an unmeasurable item files under the roomier region everywhere in
     this app. A test about the split itself names the side it means.
     """
-    half = _side(tree, orientation)
+    half = _side(tree, side)
     return {half.topLevelItem(i).text(0): half.topLevelItem(i)
             for i in range(half.topLevelItemCount())}
 
 
-def _alls(tree, orientation=LANDSCAPE):
+def _alls(tree, side=LANDSCAPE):
     """What one half's All row holds: its collections, then its workflow folders."""
-    all_row = _top_level(tree, orientation)["All"]
+    all_row = _top_level(tree, side)["All"]
     return {all_row.child(i).text(0): all_row.child(i) for i in range(all_row.childCount())}
 
 
@@ -470,15 +464,15 @@ def _selected_folder(view):
     return base_of(view.selected_folder_key())
 
 
-def _collection(view, key, orientation=LANDSCAPE):
+def _collection(view, key, side=LANDSCAPE):
     """One side's copy of a collection row. Landscape by default, like _top_level."""
-    return view._tree_item_for(oriented_key(key, orientation))
+    return view._tree_item_for(oriented_key(key, side))
 
 
-def _side_rows(view, orientation):
+def _side_rows(view, side):
     """The prompt ids one side of the tree holds, from its All row down."""
     return [row["prompt_id"]
-            for row in view._slideshows.rows_at(oriented_key(gallery.ALL_KEY, orientation))]
+            for row in view._slideshows.rows_at(oriented_key(gallery.ALL_KEY, side))]
 
 
 def _key(item):

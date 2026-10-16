@@ -19,7 +19,6 @@ from origenerator import gallery, timing
 from origenerator.gui.generation_job import JobState, display_status
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
-from origenerator.orientation import row_orientation
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -132,7 +131,6 @@ class InFlightItems:
                 ),
                 reveal=lambda k=folder_key: self._on_reveal(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
-                orientation=row_orientation(row),  # the side its picture will land on
                 cancel=cancel,
                 # Its folder auto-looping makes that button "Next seed": the press
                 # discards this run and the loop launches another. A menu can

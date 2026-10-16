@@ -43,14 +43,10 @@ from origenerator.gallery.collection import (
     FolderCollection,
     folder_collection,
 )
+from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
-from origenerator.orientation import (
-    SIDE_LABELS,
-    oriented_key,
-    side_of,
-    split_key,
-)
+from origenerator.orientation import oriented_key, side_of, split_key
 
 # A search does not narrow this tree: a narrowed list of folder names is a poor
 # answer to "where is the one with the two of them on the couch", because a
@@ -212,7 +208,7 @@ class GalleryTree:
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
 
-    def _add_custom_folder(self, side_item, group, orientation) -> QTreeWidgetItem:
+    def _add_custom_folder(self, side_item, group, side) -> QTreeWidgetItem:
         """Add a row for one of the user's own folders: a collection-shaped row carrying
         its group (so the view's folder machinery — breadcrumb, tiles, slideshow —
         treats it like any other folder), and collecting the folders dropped onto
@@ -225,7 +221,7 @@ class GalleryTree:
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, count)
         item.setData(0, DROP_KEY_ROLE, group.key)  # the folder gathers, not the side
-        return self._register(item, oriented_key(group.key, orientation), side_item,
+        return self._register(item, oriented_key(group.key, side), side_item,
                               folder_key=group.key)
 
     def _add_node(self, group, parent_item, side) -> QTreeWidgetItem:
@@ -266,15 +262,15 @@ class GalleryTree:
             item.data(0, GROUP_ROLE).favorite = favorite
             item.emitDataChanged()
 
-    def collection_item(self, collection_key: str, orientation: str) -> QTreeWidgetItem | None:
+    def collection_item(self, collection_key: str, side: str) -> QTreeWidgetItem | None:
         """One side's copy of a collection row."""
-        return self.item_by_key.get(oriented_key(collection_key, orientation))
+        return self.item_by_key.get(oriented_key(collection_key, side))
 
-    def set_collection_counts(self, orientation: str, counts: dict[str, int]) -> None:
+    def set_collection_counts(self, side: str, counts: dict[str, int]) -> None:
         blocked = self._tree.blockSignals(True)
         for key, item in self.item_by_key.items():
-            base, side = split_key(key)
-            if side == orientation and folder_collection(base) is not None:
+            base, drawn_on = split_key(key)
+            if drawn_on == side and folder_collection(base) is not None:
                 item.setData(0, COUNT_ROLE, counts.get(base, 0))
         self._tree.blockSignals(blocked)
 

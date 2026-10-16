@@ -677,6 +677,7 @@ class WorkflowTemplate(ABC):
                 positive, negative = [positive_id, 0], [negative_id, 0]
             nodes[detailer_id] = {
                 "class_type": "DetailerForEach",
+                "_meta": {"title": f"{fix.part.name.capitalize()} fix"},
                 "inputs": {
                     "image": image_ref,
                     "segs": [segs_id, 0],

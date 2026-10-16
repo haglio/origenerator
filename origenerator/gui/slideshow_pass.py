@@ -11,15 +11,15 @@ from origenerator.funscript import funscript_of
 from origenerator.media import MediaType
 
 
-def playlist_item(path, media_type: str) -> PlaylistItem:
+def playlist_item(path, media_type: str, points_of_interest: tuple = ()) -> PlaylistItem:
     path = Path(str(path))
     if media_type != MediaType.VIDEO:
-        return PlaylistItem(path)
+        return PlaylistItem(path, points_of_interest=points_of_interest)
     return PlaylistItem(path, funscript_of(path, output_dir=COMFYUI_OUTPUT_DIR))
 
 
-def slide_item(slide) -> PlaylistItem:
-    return playlist_item(slide.path, slide.media_type)
+def slide_item(slide, points_of_interest: tuple = ()) -> PlaylistItem:
+    return playlist_item(slide.path, slide.media_type, points_of_interest)
 
 
 def rotated_onto(items: list, current) -> list:

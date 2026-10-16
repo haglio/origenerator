@@ -14,33 +14,59 @@ the thirty other fields around them. They are one object here, with no Qt in it.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
+
+class Version(NamedTuple):
+    path: object
+    media_type: str
+    label: str = ""
+    points_of_interest: tuple = ()
+
 
 class LevelStepper:
     """The versions of each image, and the place within one of them."""
 
     def __init__(self) -> None:
-        self._by_path: dict[str, list[tuple]] = {}
+        self._by_path: dict[str, list[Version]] = {}
         # The picture being stepped, once stepping has started. Kept separately
         # from what the caller offers, because the file on screen stops being
         # the one the set lists the image under the moment a level is showing.
         self._base: str | None = None
         self._index = 0
 
-    def arm(self, levels_by_path) -> None:
-        """Take the versions of every item that has more than itself.
+    def arm(self, levels_by_path) -> bool:
+        """Take the versions of every item that has more than itself, and say
+        whether that changed the places any item's newest version punches in on.
 
         ``levels_by_path`` maps the file the set shows an item under to that
-        item's versions, newest first, as ``(path, media_type, label)``. The
-        gallery rebuilds this on every poll and spells its paths either way, so
-        the keys are normalized and the lists copied — nothing here goes on
+        item's versions, newest first, as ``(path, media_type, label, places)``.
+        The gallery rebuilds this on every poll and spells its paths either way,
+        so the keys are normalized and the lists copied — nothing here goes on
         pointing at what the caller handed over.
         """
+        before = self._places()
         self._by_path = {}
-        self.add(levels_by_path)
+        self._take(levels_by_path)
+        return self._places() != before
 
-    def add(self, levels_by_path) -> None:
-        self._by_path.update({str(key): list(versions)
+    def add(self, levels_by_path) -> bool:
+        before = self._places()
+        self._take(levels_by_path)
+        return self._places() != before
+
+    def _take(self, levels_by_path) -> None:
+        self._by_path.update({str(key): [Version(*version) for version in versions]
                               for key, versions in levels_by_path.items()})
+
+    def points_of_interest(self, path) -> tuple:
+        versions = self._by_path.get(str(path))
+        return versions[0].points_of_interest if versions else ()
+
+    def _places(self) -> dict[str, tuple]:
+        return {key: versions[0].points_of_interest
+                for key, versions in self._by_path.items()
+                if versions and versions[0].points_of_interest}
 
     def restart(self) -> None:
         """Back to the top version, for a new picture — or for one whose
@@ -64,7 +90,7 @@ class LevelStepper:
         self._index = (self._index + delta) % len(versions)
         return versions[self._index]
 
-    def levels(self, *, base: str) -> list[tuple]:
+    def levels(self, *, base: str) -> list[Version]:
         """The versions of the picture on screen — what the corner counts off."""
         return self._by_path.get(self._base or base) or []
 

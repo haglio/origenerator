@@ -30,7 +30,7 @@ from funestra.modes import read_mode
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
-from origenerator import gallery
+from origenerator import gallery, points_of_interest
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     EVOLVER_SOURCE,
@@ -53,6 +53,7 @@ from origenerator.gallery.sides import (
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.level_stepper import Version
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
@@ -607,8 +608,9 @@ class SlideshowDirector:
             levels = gallery.displayed_levels(row, upscale)
             if len(levels) < 2:
                 continue
-            entries = [(gallery.output_file_path(level.file, COMFYUI_OUTPUT_DIR),
-                        media_type, level.label) for level in levels]
+            entries = [Version(gallery.output_file_path(level.file, COMFYUI_OUTPUT_DIR),
+                               media_type, level.label, points_of_interest.boxes_of(level.file))
+                       for level in levels]
             playlists[str(entries[0][0])] = entries
         return playlists
 

@@ -338,7 +338,7 @@ class SlideshowView(QWidget):
     def _funestra_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(self._file_of(slide))
-        return slide_item(slide)
+        return slide_item(slide, self._levels.points_of_interest(self._file_of(slide)))
 
     def _file_of(self, slide) -> Path:
         if slide.is_live:
@@ -468,11 +468,13 @@ class SlideshowView(QWidget):
         Left/Right still steps the set; the shifted pair moves within the one
         item — its own axis, because a version is not a neighbor.
         """
-        self._levels.arm(levels_by_path)
+        if self._levels.arm(levels_by_path):
+            self._hand_over(land=False)
         self.refresh_panel()
 
     def add_levels(self, levels_by_path: dict) -> None:
-        self._levels.add(levels_by_path)
+        if self._levels.add(levels_by_path):
+            self._hand_over(land=False)
         self.refresh_panel()
 
     # --- the panel this slideshow wears -------------------------------------
@@ -871,24 +873,24 @@ class SlideshowView(QWidget):
         against, and silently doing nothing is better than stepping the set
         when the shift was the whole point.
         """
-        level = self._levels.step(delta, base=self._current_base())
-        if level is None:
+        version = self._levels.step(delta, base=self._current_base())
+        if version is None:
             return
         self._live = False
         self._frames_on_screen = False
-        self._put_up(*level[:2])
+        self._put_up(version.path, version.media_type, version.points_of_interest)
         self.media_changed.emit()
 
-    def _put_up(self, path, media_type: str) -> None:
+    def _put_up(self, path, media_type: str, points_of_interest: tuple = ()) -> None:
         """Open a file on the Funestra in the slide's place -- one of the
         slide's own versions -- as the one it is standing on."""
-        item = playlist_item(path, media_type)
+        item = playlist_item(path, media_type, points_of_interest)
         self._showing = item.path
         self._showing_media = (path, media_type)
         self._frame_on_funestra = None
         playback = self._pane.playback
         if playback is not None:
-            playback.play_file(item.path, item.funscript)
+            playback.play_file(item.path, item.funscript, item.points_of_interest)
             self._loads_seen = playback.loads
 
     # --- opened over a generation still being made --------------------------

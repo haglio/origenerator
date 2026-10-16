@@ -1551,6 +1551,29 @@ def test_shift_arrows_step_the_versions_of_the_image_on_screen(qtbot, tmp_path):
     assert _media_on_screen(view) == enhanced
 
 
+FACE = ((0.4, 0.1, 0.6, 0.3),)
+
+
+def test_versions_that_arrive_with_places_hand_the_funestra_the_picture_on_screens(qtbot, tmp_path):
+    enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
+    view = _view(qtbot, [(enhanced, "image", "id-a")])
+
+    view.set_levels({enhanced: [(enhanced, "image", "Enhance 1", FACE), (original, "image")]})
+
+    assert _engine(view).points_told == [FACE]
+
+
+def test_a_version_stepped_to_goes_up_with_its_own_places(qtbot, tmp_path):
+    newest, older = (_png(tmp_path / n) for n in ("e2.png", "e1.png"))
+    view = _view(qtbot, [(newest, "image", "id-a")])
+    view.set_levels({newest: [(newest, "image", "Enhance 2", FACE),
+                              (older, "image", "Enhance 1", ((0.0, 0.0, 0.5, 0.5),))]})
+
+    _shift(view, Qt.Key.Key_Right)
+
+    assert _engine(view).points_told[-1] == ((0.0, 0.0, 0.5, 0.5),)
+
+
 @_ARROW_KEYS_OR_WASD
 def test_shift_left_steps_back_the_way_shift_right_came(qtbot, tmp_path, arrows):
     newest, middle, original = (_png(tmp_path / n) for n in ("e2.png", "e1.png", "src.png"))

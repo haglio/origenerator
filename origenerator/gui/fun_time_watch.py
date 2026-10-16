@@ -21,6 +21,7 @@ from origenerator.fun_time_mode import (
     FunTimeSession,
     a_session_holds_the_device,
     offer_of_this_process,
+    slideshow_mark_of_this_process,
     take_the_takeover,
     withdraw_the_offer,
 )
@@ -74,7 +75,7 @@ class FunTimeWatch(QObject):
         offer.write_text(mine, encoding="utf-8")
 
     def _mark_the_slideshow(self) -> None:
-        mark = offer_of_this_process() if self._showing() else None
+        mark = slideshow_mark_of_this_process() if self._showing() else None
         for state_dir in self._state_dirs:
             _stand(state_dir / SHOWING_NAME, mark)
 

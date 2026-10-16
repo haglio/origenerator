@@ -230,5 +230,35 @@
     "(?i)landscape_hud_minimized\\|.+",
     "(?i)filter_landscape_.+",
     "(?i)landscape_say:.+"
-  ]
+  ],
+  "handoff": {
+    "offer": {
+      "file": "fun_time_offer.txt",
+      "writes": [
+        "4242 4343",
+        "4242 4343 starting"
+      ]
+    },
+    "showing": {
+      "file": "fun_time_showing.txt",
+      "writes": [
+        "4242 4343"
+      ]
+    },
+    "session": {
+      "file": "fun_time_session.txt",
+      "reads": {
+        "pattern": "(\\d+) (\\d+)"
+      }
+    },
+    "takeover": {
+      "file": "fun_time_takeover.json",
+      "reads": {
+        "keys": [
+          "args",
+          "pid"
+        ]
+      }
+    }
+  }
 }

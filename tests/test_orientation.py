@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import QFrame, QLabel
@@ -27,7 +28,13 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
     TRASH_LABEL,
 )
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, orientation_of_size
+from origenerator.gallery.sides import (
+    LANDSCAPE,
+    PORTRAIT,
+    SIDES,
+    orientation_of_size,
+    side_holds,
+)
 from origenerator.gui.gallery_tree import GROUP_ROLE
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.split_folder_tree import SplitFolderTree
@@ -229,6 +236,70 @@ def test_the_pane_puts_both_shapes_in_one_list_when_asked(qtbot, tmp_path):
     assert view._tree.sides == (BOTH,)
     assert _rows(view._tree, BOTH) == ["All"]
     assert _side_rows(view, BOTH) == ["t1", "w1"]
+
+
+def _in_flight(prompt_id: str, width: int, height: int, status: str, seed: int = 1) -> dict:
+    """A picture still being made: no file yet, so its shape is the size it asked for."""
+    return _row(prompt_id, "sdxl_t2i",
+                {"positive_prompt": "scene six", "steps": 50, "seed": seed,
+                 "width": width, "height": height},
+                f"sdxl_t2i_{prompt_id}.png", status=status, output_files="[]")
+
+
+_RUNS = {"tall": PORTRAIT, "wide": LANDSCAPE}
+
+
+def _view_of_runs(qtbot):
+    view = GalleryView(FakeDB([_in_flight("tall", 720, 1280, "pending"),
+                               _in_flight("wide", 1280, 720, "running")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    return view
+
+
+def _drawing(view, side: str) -> None:
+    """The list on whichever of its arrangements draws *side*."""
+    (view._tree.together_button if side == BOTH else view._tree.separate_button).click()
+
+
+@pytest.mark.parametrize("side", SIDES)
+def test_every_sides_latest_leads_with_the_runs_in_flight_it_holds(qtbot, side):
+    """Queued or running, a run's card is on the Latest of each side that holds
+    its shape. Together's Latest once showed none at all: its cards were picked
+    by matching each run's shape against the side, which Both never matches."""
+    view = _view_of_runs(qtbot)
+    _drawing(view, side)
+
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, side)])
+
+    assert set(view._browser._inflight_cards) == {
+        run for run, shape in _RUNS.items() if side_holds(side, shape)}
+
+
+@pytest.mark.parametrize("opened_first", SIDES)
+def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
+        qtbot, tmp_path, opened_first):
+    """A folder's cards are the runs waiting in it. They were picked by the side
+    of the Latest opened last, so after Together's Latest no folder showed any,
+    and after Landscape's no portrait folder did."""
+    finished = _shaped(_image("t1", "scene six", 50, 1), tmp_path, 90, 160)
+    view = GalleryView(FakeDB([
+        finished,
+        _in_flight("t2", 90, 160, "pending", seed=2),
+        _in_flight("t3", 90, 160, "pending", seed=3),
+        _shaped(_image("w1", "scene seven", 50, 4), tmp_path, 160, 90),
+    ]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _drawing(view, opened_first)
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, opened_first)])
+    holding_the_folder = next(side for side in view._tree.sides
+                              if side_holds(side, PORTRAIT))
+    folder = gallery.settings_folder_key(finished, gallery.build_image_config_index([finished]))
+
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(folder, holding_the_folder)])
+
+    assert set(view._browser._inflight_cards) == {"t2", "t3"}
 
 
 def test_a_rows_shape_is_worked_out_once_however_often_it_is_asked():

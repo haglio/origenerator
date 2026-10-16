@@ -844,32 +844,21 @@ class BrowserPane(QObject):
         self._wired[prompt_id] = wiring
         return tile
 
-    def _visible_inflight_items(self, rows=None, requests=None) -> list:
-        """The in-flight items the collection draws: what the gallery's media-type
-        filter keeps and the side the collection belongs to, less the enhancements.
-        The full set still decides whether the collection exists at all; this narrows
-        only what is drawn.
+    def _card_items(self, rows=None, requests=None) -> list[InFlightItem]:
+        """The runs in flight that get a card: all but the enhancements, each of
+        which shows on the tile of the image it upgrades instead."""
+        return [item for item in self.inflight_items(rows, requests)
+                if item.job_kind != gallery.JobKind.ENHANCE]
 
-        A standalone enhance never earns a card of its own here, for the reason it
-        never earns a folder in the tree: it is not a result, it is an upgrade of
-        one, and the image it upgrades is already in this collection wearing the
-        "Enhancing…" scrim and streaming the run's frames. A card beside that tile
-        says a second thing is being made, and clicking it goes nowhere — the
-        folder it would open is the one the tree declines to grow. The lower
-        strip's queue still lists the job, which is where a run that has the GPU
-        belongs.
-        """
-        media_types = self._host.media_types()
-        side = self._collection_orientation
-        return [it for it in self.inflight_items(rows=rows, requests=requests)
-                if it.media_type in media_types
-                and it.job_kind != gallery.JobKind.ENHANCE
-                and (side is None or it.orientation == side)]
-
-    def _latest_inflight_items(self, rows=None, requests=None) -> list:
-        placement = self._placement(self._collection_orientation)
-        return [item for item in self._visible_inflight_items(rows, requests)
-                if placement.holds(self._collection_folder, item.key)]
+    def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
+        """The open Latest's cards: the runs it will list once they land, held to
+        its side, its folder and the kinds chosen exactly as its finished items are."""
+        if rows is None:
+            rows = self._db.list_generations()
+        held = {row["prompt_id"] for row in self._in_folder(
+            _Listing(row for row in rows if gallery.is_in_progress(row)),
+            self._collection_orientation, self._collection_folder)}
+        return [item for item in self._card_items(rows, requests) if item.key in held]
 
     def inflight_orientations(self, rows) -> set[str]:
         """Which sides have work in flight — what keeps a Recents collection up on a
@@ -905,7 +894,7 @@ class BrowserPane(QObject):
         if not self._inflight_cards and not self.showing_recents():
             return
         items = (self._latest_inflight_items(rows, requests) if self.showing_recents()
-                 else self._visible_inflight_items(rows, requests))
+                 else self._card_items(rows, requests))
         if (self.showing_recents()
                 and _inflight_signature(items) != self._inflight_signature):
             place = self.place()
@@ -1334,7 +1323,7 @@ class BrowserPane(QObject):
                    and row["prompt_id"] != in_front]
         if not waiting:
             return []
-        items = {item.key: item for item in self._visible_inflight_items()}
+        items = {item.key: item for item in self._card_items()}
         # A row no longer in flight by the time this drew has no item, and no card.
         return [items[pid] for pid in waiting if pid in items]
 

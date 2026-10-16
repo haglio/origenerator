@@ -37,7 +37,6 @@ from origenerator.gui.browser_pane import (
     TreeNavigation,
 )
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.orientation import LANDSCAPE, oriented_key
 
@@ -235,31 +234,27 @@ def test_latest_heads_each_batch_with_when_it_was_made(qtbot):
     assert _shown_in_order(scroll) == [first, "g1", "g2", second, "g3"]
 
 
-def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_it(
-        qtbot, monkeypatch):
-    rows = [_row("g1", 1, _ago(minutes=5))]
-    pane, scroll = _pane(qtbot, rows)
-    running = InFlightItem(key="j1", caption="scene one",
-                           reading=RunReading(status="running"),
-                           reveal=lambda: None, media_type="image")
-    monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [running])
-    _open_recents(pane, rows)
+def _running(prompt_id, seed, created_at=None):
+    """A fabricated run still going: no file of its own yet."""
+    return dict(_row(prompt_id, seed, created_at), status="running",
+                output_files=json.dumps([]))
 
-    [heading] = gallery.section_headings(rows)
+
+def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_it(qtbot):
+    finished = [_row("g1", 1, _ago(minutes=5))]
+    pane, scroll = _pane(qtbot, [_running("j1", 2), *finished])
+    _open_recents(pane, finished)
+
+    [heading] = gallery.section_headings(finished)
     assert _shown_in_order(scroll) == [heading, "InFlightCard", "g1"]
 
 
-def test_latest_puts_work_started_long_after_the_newest_picture_in_a_now_section(
-        qtbot, monkeypatch):
-    rows = [_row("g1", 1, _ago(hours=5))]
-    pane, scroll = _pane(qtbot, rows)
-    running = InFlightItem(key="j1", caption="scene one",
-                           reading=RunReading(status="running"),
-                           reveal=lambda: None, media_type="image")
-    monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [running])
-    _open_recents(pane, rows)
+def test_latest_puts_work_started_long_after_the_newest_picture_in_a_now_section(qtbot):
+    finished = [_row("g1", 1, _ago(hours=5))]
+    pane, scroll = _pane(qtbot, [_running("j1", 2), *finished])
+    _open_recents(pane, finished)
 
-    [heading] = gallery.section_headings(rows)
+    [heading] = gallery.section_headings(finished)
     assert _shown_in_order(scroll) == ["Now", "InFlightCard", heading, "g1"]
 
 
@@ -367,15 +362,10 @@ def test_the_run_in_front_stays_beside_the_plus_when_the_request_tile_stands_abo
                                        second, "g2"]
 
 
-def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(
-        qtbot, monkeypatch):
-    running = dict(_row("r1", 2, _ago(minutes=1)), status="running",
-                   output_files=json.dumps([]))
+def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(qtbot):
+    running = _running("r1", 2, _ago(minutes=1))
     finished = _row("g1", 1, _ago(hours=5))
     pane, scroll = _pane(qtbot, [running, finished])
-    card = InFlightItem(key="r1", caption="scene one", reading=RunReading(status="running"),
-                        reveal=lambda: None, media_type="image")
-    monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [card])
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one",
                                                rows=[running, finished]))
@@ -467,19 +457,12 @@ def _in_flight(prompt_id, checkpoint):
     return {**_made_with(prompt_id, checkpoint), "status": "running", "output_files": None}
 
 
-def _card(prompt_id):
-    return InFlightItem(key=prompt_id, caption="scene one", media_type="image",
-                        reading=RunReading(status="running"), reveal=lambda: None)
-
-
-def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot, monkeypatch):
+def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot):
     rows = [_made_with("a1", "alpha.safetensors"), _in_flight("a2", "alpha.safetensors"),
             _made_with("b1", "beta.safetensors"), _in_flight("b2", "beta.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     pane, _scroll = _pane(qtbot, rows)
     pane.set_model(rows[::2], {LANDSCAPE: tree}, rows, [], [])
-    monkeypatch.setattr(pane, "inflight_items",
-                        lambda rows=None, requests=None: [_card("a2"), _card("b2")])
 
     pane.show_collection(FolderCollection(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 

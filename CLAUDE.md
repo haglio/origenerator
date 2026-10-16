@@ -512,10 +512,13 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
   "automatically delete head branches" on. A branch you abandon without merging
   is still yours to remove: `git push origin --delete <branch>`.
 - **The `.git/agent-merge.lock` is retired here** — the GitHub queue serializes.
-- **Sync local checkouts by pulling.** `main` advances only on origin (via the
-  queue), so the production checkout and worktrees update with
-  `git pull --ff-only origin main`; the running app self-updates the same way.
-  The primary is only ever fast-forwarded — never reset or merged-into.
+- **The production updater moves the primary checkout; never pull it or install
+  into its venv yourself.** `main` advances only on origin (via the queue), and
+  app_support's production updater brings the primary checkout and its venv up
+  to it, the libraries it pins first, as soon as nothing of his runs from it;
+  every launcher here does the same just before it starts Origenerator. So a change
+  reaches him the next time he opens Origenerator, and worktrees update with
+  `git rebase origin/main`.
 - **A red required check** (`.github/workflows/merge-gate.yml`) can't land.
 
 Everything else in the global CLAUDE.md — work in a worktree, green tests before

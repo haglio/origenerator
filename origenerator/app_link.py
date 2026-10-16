@@ -15,6 +15,7 @@ import msvcrt
 import os
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -63,6 +64,14 @@ def channel_for(checkout: Path) -> str:
     """The name the app running out of *checkout* is handed a generation on."""
     home = os.path.normcase(os.path.abspath(checkout))
     return f"Origenerator-{hashlib.sha1(home.encode('utf-16-le')).hexdigest()[:12]}"
+
+
+def windowless_interpreter() -> Path:
+    """This interpreter's silent twin, beside it in every venv. Windows gives a
+    console interpreter with no console of its own a console window, over
+    whatever the user was doing."""
+    silent = Path(sys.executable).with_name("pythonw.exe")
+    return silent if silent.exists() else Path(sys.executable)
 
 
 def handler_command(*, checkout: Path, interpreter: Path, launcher: str) -> str:

@@ -1,7 +1,7 @@
 """The folder list's sections: one tree per side, each under a standing label.
 
 The marks over them are the radio: Portrait and Landscape apart, or one list of
-both shapes (:mod:`origenerator.orientation` says what a side is). Sections
+both shapes (:mod:`origenerator.gallery.sides` says what a side is). Sections
 rather than rows in one tree, so each scrolls alone and its label never scrolls
 away; one selection across them all, so the folder on screen is one folder.
 """
@@ -26,7 +26,14 @@ from shared_ui.spacing import (
     BUTTON_ROW_GAP,
 )
 
-from origenerator.gallery.sides import BOTH, ORIENTATIONS, SIDE_LABELS, SIDES
+from origenerator.gallery.sides import (
+    BOTH,
+    ORIENTATIONS,
+    SEPARATE,
+    SIDE_LABELS,
+    SIDES,
+    TOGETHER,
+)
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
@@ -44,8 +51,8 @@ _TIPS = {
            "library. A slideshow started here mixes portrait and landscape "
            "pictures in the one slideshow."),
 }
-_SEPARATE = "Separate"
-_TOGETHER = "Together"
+_SEPARATE_WORD = "Separate"
+_TOGETHER_WORD = "Together"
 _SEPARATE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
                  "slideshow started in one plays that shape alone")
 _TOGETHER_TIP = ("One list of both shapes, for a slideshow that mixes portrait and "
@@ -119,8 +126,8 @@ class SplitFolderTree(QWidget):
         super().__init__(parent)
         self._trees: dict[str, FolderTree] = {}
         self._sections: dict[str, QWidget] = {}   # each tree under its heading
-        self._sides = ORIENTATIONS
-        self._active = ORIENTATIONS[0]
+        self._sides = SEPARATE
+        self._active = SEPARATE[0]
 
         self._splitter = PaneSplitter(Qt.Orientation.Vertical)
         for side in SIDES:
@@ -135,19 +142,19 @@ class SplitFolderTree(QWidget):
         column.setSpacing(2)
         column.addWidget(self._build_radio())
         column.addWidget(self._splitter, 1)
-        self.set_sides(ORIENTATIONS)
+        self.set_sides(SEPARATE)
 
     def _build_radio(self) -> QWidget:
         """The two choices over the sections: a list per shape, or one of both."""
-        separate = _Choice(_SEPARATE, icons.separate_mark(BUTTON_MARK), _SEPARATE_TIP)
-        together = _Choice(_TOGETHER, icons.side_mark(BOTH, BUTTON_MARK), _TOGETHER_TIP)
+        separate = _Choice(_SEPARATE_WORD, icons.separate_mark(BUTTON_MARK), _SEPARATE_TIP)
+        together = _Choice(_TOGETHER_WORD, icons.side_mark(BOTH, BUTTON_MARK), _TOGETHER_TIP)
         self.separate_button = separate.button
         self.together_button = together.button
         radio = QButtonGroup(self)
         radio.setExclusive(True)
         self._choices = QWidget()
         FlowLayout(self._choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
-        for choice, sides in ((separate, ORIENTATIONS), (together, (BOTH,))):
+        for choice, sides in ((separate, SEPARATE), (together, TOGETHER)):
             choice.button.clicked.connect(lambda _checked, s=sides: self._pick_sides(s))
             radio.addButton(choice.button)
             self._choices.layout().addWidget(choice)
@@ -167,13 +174,13 @@ class SplitFolderTree(QWidget):
             section.setVisible(side in self._sides)
         if self._active not in self._sides:
             self._active = self._sides[0]
-        self.separate_button.setChecked(self._sides != (BOTH,))
-        self.together_button.setChecked(self._sides == (BOTH,))
+        self.separate_button.setChecked(self._sides == SEPARATE)
+        self.together_button.setChecked(self._sides == TOGETHER)
 
     def offer_separate_and_together(self, offered: bool) -> None:
         self._choices.setVisible(offered)
         if not offered:
-            self._pick_sides(ORIENTATIONS)
+            self._pick_sides(SEPARATE)
 
     def _pick_sides(self, sides) -> None:
         if tuple(sides) == self._sides:

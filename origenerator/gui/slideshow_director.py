@@ -47,6 +47,9 @@ from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
 from origenerator.gallery.collection import folder_collection
+from origenerator.gallery.sides import (
+    ORIENTATIONS as _ORIENTATIONS,
+)
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
@@ -60,9 +63,6 @@ from origenerator.nav_map import (
     beyond_the_row,
     one_per_stretch,
     surroundings,
-)
-from origenerator.orientation import (
-    ORIENTATIONS as _ORIENTATIONS,
 )
 from origenerator.orientation import (
     filter_rows,
@@ -303,9 +303,9 @@ class SlideshowDirector:
         and standing where the last slideshow was closed when that slide is in
         here."""
         location = self._host.slideshow_location()
-        base, orientation = _split_collection_key(location)
+        base, located_on = _split_collection_key(location)
         collection = folder_collection(base)
-        side = side or orientation
+        side = side or located_on
         # Favorites is not a set of its own: it is its folder with the
         # favorites switch held down, so the switch can be let go to widen and
         # the order pair means the folder rather than the bookmarks.
@@ -1380,16 +1380,15 @@ class SlideshowDirector:
         that side's copy and what lands on a region is homogeneous — exactly as
         it is when that collection's own slideshow button opens it — and Latest plays
         newest-first the way that collection's own slideshow does.  Standalone, and hosted
-        with no side named, it is the collection on the side being browsed: there is
-        no collection spanning both to fall back to, and the half you are looking at
-        is the half the word meant.  The browser is left where it is: this
-        starts a slideshow, it does not go browsing."""
+        with no side named, it is the collection on the side being browsed, the one
+        the word meant.  The browser is left where it is: this starts a slideshow,
+        it does not go browsing."""
         if command.collection_key == _FAVORITES_KEY:
             self.toggle_favorites_filter(command.side)
             return
-        orientation = (command.side if command.side and self._fun_time is not None
-                       else self._host.side_in_view())
-        key = oriented_key(command.collection_key, orientation)
+        side = (command.side if command.side and self._fun_time is not None
+                else self._host.side_in_view())
+        key = oriented_key(command.collection_key, side)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:

@@ -38,10 +38,6 @@ class InFlightItem:
     reading: RunReading          # how the run itself is going
     reveal: Callable[[], None]   # show the job's gallery folder and its live tile
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
-    # Which side of the tree the job belongs to, by the shape it was asked to
-    # come out: a running generation has no picture to measure, and its card has
-    # to sit in the collection its picture will land in rather than move there later.
-    orientation: str = "landscape"
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
     # End the loop its folder is on. What a menu's real stop calls before

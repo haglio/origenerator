@@ -203,8 +203,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     loop all ask -- is one method. 276 -> 277: a spoken "animate as" is
     Combine's to answer, through a forwarder of its own. 277 -> 276: "genau it"
     went with the prompt-read act it ran on, so that one forwarder answers every
-    spoken animation.)"""
+    spoken animation. And the pane 88 -> 87: work in flight already sits in its
+    side's folder list, which is what keeps that side's Latest up, so the shapes
+    the work in flight comes in are no longer asked for.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 276
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 88
+               for x in _class_def(PANE, "BrowserPane").body) == 87

@@ -28,6 +28,7 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
     FolderCollection,
 )
+from origenerator.gallery.sides import LANDSCAPE
 from origenerator.gui import browser_pane
 from origenerator.gui.browser_pane import (
     BrowserPane,
@@ -38,7 +39,7 @@ from origenerator.gui.browser_pane import (
 )
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.orientation import LANDSCAPE, oriented_key
+from origenerator.orientation import oriented_key
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier

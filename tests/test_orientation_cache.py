@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import pytest
 
 from origenerator import orientation
+from origenerator.gallery.sides import PORTRAIT
 
 
 class _FakeImage:
@@ -51,7 +52,7 @@ def _measure(name: str) -> str:
 
 def test_the_remembered_shapes_stop_piling_up():
     for n in range(orientation._MEASURED_LIMIT + 100):
-        assert _measure(f"m{n}") == orientation.PORTRAIT
+        assert _measure(f"m{n}") == PORTRAIT
 
     assert len(orientation._measured) <= orientation._MEASURED_LIMIT
 
@@ -68,7 +69,7 @@ def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypat
     monkeypatch.setattr(orientation.gallery, "resolve_preview",
                         lambda *args: looked_up.append(args))
 
-    assert orientation.row_orientation(row) == orientation.PORTRAIT
+    assert orientation.row_orientation(row) == PORTRAIT
     assert looked_up == []
 
 
@@ -81,7 +82,7 @@ def test_the_shape_a_recipe_asks_for_is_read_once_however_often_it_is_asked(monk
     row = {"workflow_name": "sdxl_t2i", "params_json": json.dumps({"width": 720, "height": 1281})}
 
     for _ in range(3):
-        assert orientation.row_orientation(dict(row)) == orientation.PORTRAIT
+        assert orientation.row_orientation(dict(row)) == PORTRAIT
 
     assert reads == ["sdxl_t2i"]
 

@@ -71,7 +71,7 @@ from origenerator.gui.pane_place import (
 from origenerator.gui.thumbnail_selection import ThumbnailSelection
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
-from origenerator.orientation import filter_rows, key_holds, row_orientation, split_key
+from origenerator.orientation import base_of, filter_rows, key_holds, split_key
 
 REROLL_VIDEO = "video"
 REROLL_IMAGE = "image"
@@ -355,8 +355,8 @@ class BrowserPane(QObject):
             FAVORITES_KEY: PaneCollection(
                 rows=self._combined_favorite_rows,
                 render=lambda: self._show_favorites(
-                    self._favorite_folders(self._collection_orientation, self._collection_folder),
-                    self._favorite_items(self._collection_orientation, self._collection_folder))),
+                    self._favorite_folders(self._collection_side, self._collection_folder),
+                    self._favorite_items(self._collection_side, self._collection_folder))),
             EXPERIMENTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._experiment_rows, side, folder),
                 render=self._render_experiments),
@@ -387,10 +387,7 @@ class BrowserPane(QObject):
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
         self._showing_search = False        # a query owns the pane, whatever the tree says
         self._requested_rows = _Listing()   # what spoken requests made
-        # Which side's collection is open ("portrait" / "landscape"), or None off the
-        # collections — set by each show_*_overview, read by the renderers and
-        # collection_rows. Every collection belongs to one side, so on one it is never None.
-        self._collection_orientation: str | None = None
+        self._collection_side: str | None = None
         self._collection_folder = gallery.ALL_KEY
         self._placements: dict[str | None, Placement] = {}
         self._image_index: dict = {}
@@ -403,7 +400,7 @@ class BrowserPane(QObject):
                   trash_rows, request_items=(), image_index=None):
         """Take the newly rebuilt gallery model the collections render from.
 
-        ``side_trees`` is per side (``{orientation: [folders]}``): a folder is
+        ``side_trees`` is per side (``{side: [folders]}``): a folder is
         drawn on whichever sides hold rows of that shape, so each Favorites collection
         collects the copies of the bookmarks its own side has.
         """
@@ -418,7 +415,7 @@ class BrowserPane(QObject):
                             for side, tree in side_trees.items()}
 
     def _open_collection_rows(self, collection: str) -> list[dict]:
-        return self._collections[collection].rows(self._collection_orientation,
+        return self._collections[collection].rows(self._collection_side,
                                                   self._collection_folder)
 
     def _in_folder(self, listing: _Listing, side: str | None, folder: str) -> list[dict]:
@@ -549,7 +546,7 @@ class BrowserPane(QObject):
 
     def _add_collection_tile(self, flow, key: str):
         rows = self.rows_for_collection(key)
-        collection = folder_collection(split_key(key)[0])
+        collection = folder_collection(base_of(key))
         tile = FolderTile(key, COLLECTION_LABELS[collection.which], _thumbnails_of(rows), len(rows),
                           badge=icons.collection_badge(collection.which))
         tile.clicked.connect(self._drill_into)
@@ -711,11 +708,11 @@ class BrowserPane(QObject):
 
     # --- the collections: Recents / Favorites / Experiments / Requests / Trash ---
 
-    def show_collection(self, key: str, orientation: str | None = None):
+    def show_collection(self, key: str, side: str | None = None):
         collection = folder_collection(key)
         if collection is None:
             return
-        self._collection_orientation = orientation
+        self._collection_side = side
         self._collection_folder = collection.folder
         self._collections[collection.which].render()
 
@@ -857,14 +854,8 @@ class BrowserPane(QObject):
             rows = self._db.list_generations()
         held = {row["prompt_id"] for row in self._in_folder(
             _Listing(row for row in rows if gallery.is_in_progress(row)),
-            self._collection_orientation, self._collection_folder)}
+            self._collection_side, self._collection_folder)}
         return [item for item in self._card_items(rows, requests) if item.key in held]
-
-    def inflight_orientations(self, rows) -> set[str]:
-        """Which sides have work in flight — what keeps a Recents collection up on a
-        side with no folders yet, so a first-ever generation of that shape is
-        visible while it runs."""
-        return {row_orientation(row) for row in rows if gallery.is_in_progress(row)}
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty collection, worded for the kinds it is
@@ -876,8 +867,7 @@ class BrowserPane(QObject):
                 "gallery re-roll — collect here, newest first.")
 
     def showing_recents(self) -> bool:
-        base, _orientation = split_key(self._tree.selected_folder_key())
-        return base == RECENTS_KEY
+        return base_of(self._tree.selected_folder_key()) == RECENTS_KEY
 
     def refresh_inflight(self, rows=None, requests=None):
         """Between rebuilds, keep the in-flight cards live: push each tracked
@@ -1122,8 +1112,7 @@ class BrowserPane(QObject):
                 "or delete it permanently when you're sure.")
 
     def showing_trash(self) -> bool:
-        base, _orientation = split_key(self._tree.selected_folder_key())
-        return base == TRASH_KEY
+        return base_of(self._tree.selected_folder_key()) == TRASH_KEY
 
     # --- the Favorites collection: every bookmark — items and folders — in one place ---
 
@@ -1235,11 +1224,11 @@ class BrowserPane(QObject):
         running slideshow fed — and answering a spoken "landscape favorites" — both
         need a collection's rows asked for by name.
         """
-        base, orientation = split_key(key)
+        base, side = split_key(key)
         collection = folder_collection(base)
         if collection is None:
             return None
-        return self._collections[collection.which].rows(orientation, collection.folder)
+        return self._collections[collection.which].rows(side, collection.folder)
 
     # --- the thumbnail grid: a settings leaf's generations ------------------
 

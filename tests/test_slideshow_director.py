@@ -19,10 +19,11 @@ import pytest
 from funestra.hud_placement import HudCorner
 from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PIL import Image
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QRect, Qt
 
 from origenerator import gallery
 from origenerator.gallery.collection import FAVORITES_KEY, RECENTS_KEY, FolderCollection
+from origenerator.gallery.sides import BOTH
 from origenerator.gui import slideshow_director as module
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_director import SlideshowDirector
@@ -39,6 +40,8 @@ ALL_PORTRAIT = oriented_key(gallery.ALL_KEY, PORTRAIT)
 ALL_LANDSCAPE = oriented_key(gallery.ALL_KEY, LANDSCAPE)
 LATEST_PORTRAIT = oriented_key(RECENTS_KEY, PORTRAIT)
 LATEST_LANDSCAPE = oriented_key(RECENTS_KEY, LANDSCAPE)
+PORTRAIT_MONITOR = QRect(2560, 0, 1440, 2560)
+LANDSCAPE_MONITOR = QRect(0, 0, 2560, 1440)
 
 
 class FakeSignal:
@@ -115,6 +118,7 @@ class FakeSlideshow:
         self.levels_added = []
         self.hud_order_label = ""
         self.locked_on = None
+        self.monitor = LANDSCAPE_MONITOR
 
     # what a slideshow is, and what it holds
     def is_live(self):
@@ -276,6 +280,9 @@ class FakeSlideshow:
 
     def winId(self):
         return 4242
+
+    def screen(self):
+        return SimpleNamespace(geometry=lambda: self.monitor)
 
     def raise_(self):
         self.raised += 1
@@ -616,14 +623,16 @@ def test_a_director_taken_into_a_session_closes_its_fullscreen_slideshow_for_the
     assert made[1].fullscreen == 0
 
 
-def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(slideshows):
+def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
+        slideshows, *, side=PORTRAIT, monitor=PORTRAIT_MONITOR):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
     director, _host, made = slideshows(FakeHost(rows=[_row("g1"), _row("g2")]),
                                        browser=browser)
     director.open([("g1.png", "image", "g1", None), ("g2.png", "image", "g2", None)],
-                  side=PORTRAIT, location="collection/a")
+                  side=side, location="collection/a")
     watched = made[0]
+    watched.monitor = monitor
     watched.dwell_s = 6
     watched.state_at_close = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
     watched.filters = SlideshowFilters(favorites=True)
@@ -642,6 +651,22 @@ def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_a
     assert carried.taken_up == (SlideshowFilters(favorites=True), False)
     assert carried.opened_with["image_dwell_ms"] == 6000
     assert [slide[2] for slide in director.region_slideshow(LANDSCAPE).items] == ["g5"]
+
+
+@pytest.mark.parametrize(("side", "monitor", "carried_to", "the_other", "its_library"), [
+    (LANDSCAPE, PORTRAIT_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
+    (PORTRAIT, LANDSCAPE_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
+    (BOTH, PORTRAIT_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
+])
+def test_a_slideshow_taken_over_opens_on_the_funestra_of_the_monitor_it_was_on(
+        slideshows, side, monitor, carried_to, the_other, its_library):
+    director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
+        slideshows, side=side, monitor=monitor)
+
+    director.fill_the_regions()
+
+    assert [slide[2] for slide in director.region_slideshow(carried_to).items] == ["g1", "g2"]
+    assert [slide[2] for slide in director.region_slideshow(the_other).items] == its_library
 
 
 def test_the_slideshow_a_session_took_over_is_put_back_on_the_first_opening_only(slideshows):
@@ -664,18 +689,21 @@ def test_a_window_handed_back_before_its_regions_opened_lets_go_of_the_slideshow
     assert [slide[2] for slide in director.region_slideshow(PORTRAIT).items] == ["g4"]
 
 
-def test_a_director_shows_a_slideshow_while_one_it_could_hand_a_session_is_up(slideshows):
+def test_a_director_names_the_monitor_a_slideshow_it_could_hand_a_session_is_showing_on(
+        slideshows):
     director, _host, made = slideshows()
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
     director.open([("a.png", "image", "g1", None)])
-    assert director.shows_a_slideshow()
+    assert director.slideshow_showing_on() == LANDSCAPE
+    made[0].monitor = PORTRAIT_MONITOR
+    assert director.slideshow_showing_on() == PORTRAIT
 
     made[0].live = True
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
     made[0].close()
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
 
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slideshows):

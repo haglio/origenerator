@@ -66,6 +66,7 @@ from origenerator.orientation import (
 )
 from origenerator.orientation import (
     filter_rows,
+    orientation_of_size,
     oriented_key,
     row_orientation,
 )
@@ -169,6 +170,11 @@ def _still_up(slideshow):
     return slideshow if slideshow is not None and slideshow.is_showing() else None
 
 
+def _orientation_of_the_monitor(window) -> str:
+    monitor = window.screen().geometry()
+    return orientation_of_size(monitor.width(), monitor.height())
+
+
 class SlideshowDirector:
     """Every fullscreen slideshow this window has open, and the words about them."""
 
@@ -220,7 +226,7 @@ class SlideshowDirector:
         self._taken_into_the_session: HeldSlideshow | None = None
 
     def become_hosted(self, session) -> None:
-        self._taken_into_the_session = self.held_slideshow()
+        self._taken_into_the_session = self._held_for_the_session()
         if self._slideshow is not None:
             self._slideshow.close()
         self._fun_time = session
@@ -901,8 +907,9 @@ class SlideshowDirector:
         slideshow = self._slideshow
         return None if slideshow is None or slideshow.is_live() else slideshow
 
-    def shows_a_slideshow(self) -> bool:
-        return self._slideshow_to_hold() is not None
+    def slideshow_showing_on(self) -> str | None:
+        slideshow = self._slideshow_to_hold()
+        return None if slideshow is None else _orientation_of_the_monitor(slideshow)
 
     def held_slideshow(self) -> HeldSlideshow | None:
         slideshow = self._slideshow_to_hold()
@@ -914,6 +921,12 @@ class SlideshowDirector:
                         side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
                         image_dwell_ms=slideshow.dwell_s * 1000, state=slideshow.state(),
                         filters=slideshow.filters)
+
+    def _held_for_the_session(self) -> HeldSlideshow | None:
+        held = self.held_slideshow()
+        if held is None:
+            return None
+        return replace(held, side=self.slideshow_showing_on())
 
     def put_back(self, held: HeldSlideshow):
         ids = (item.prompt_id for item in held.items if item.prompt_id is not None)
@@ -1024,13 +1037,10 @@ class SlideshowDirector:
 
     def _put_back_what_was_taken_over(self, side: str) -> bool:
         taken = self._taken_into_the_session
-        if taken is None:
-            return False
-        where = taken.side or region_for_items(taken.items)
-        if where != side:
+        if taken is None or taken.side != side:
             return False
         self._taken_into_the_session = None
-        if self.put_back(replace(taken, side=where)) is None:
+        if self.put_back(taken) is None:
             return False
         logger.info("The %s region takes up the slideshow that was up when the "
                     "session took this window over: %d items", side, len(taken.items))

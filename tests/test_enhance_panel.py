@@ -29,7 +29,7 @@ from origenerator.gallery import (
     EnhanceSettings,
     default_enhance_params,
 )
-from origenerator.gui import drag_thumbnail
+from origenerator.gui import drag_thumbnail, enhance_panel
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.enhance_panel import EnhancePanel
@@ -1164,3 +1164,44 @@ def test_the_panels_captions_use_plain_words(qtbot):
     captions = [w.text() for w in panel.findChildren(QLabel)]
     assert {"Model", "Upscaler", "Scale", "Steps", "Redraw Amount"} <= set(captions)
     assert not any("Denoise" in caption or caption.endswith(":") for caption in captions)
+
+
+def test_each_fixs_button_edits_the_words_it_redraws_toward(qtbot, monkeypatch):
+    panel, edits = _panel(qtbot)
+    hands = next(part for part in part_table() if part.name == "hands")
+    asked = []
+
+    def answer(_parent, part, prompt, avoid):
+        asked.append((part.name, prompt, avoid))
+        return "open palms", "fists"
+
+    monkeypatch.setattr(enhance_panel, "ask_fix_words", answer)
+    panel._fix_word_buttons["hands"].click()
+
+    assert asked == [("hands", hands.prompt, hands.avoid)]
+    assert edits[-1].params["enhance_fix_prompts"] == {
+        "hands": {"prompt": "open palms", "avoid": "fists"}}
+
+    panel.show_settings(edits[-1])
+    panel._fix_word_buttons["hands"].click()
+    assert asked[-1] == ("hands", "open palms", "fists")
+
+
+def test_a_fixs_words_window_closed_without_ok_changes_nothing(qtbot, monkeypatch):
+    panel, edits = _panel(qtbot)
+    monkeypatch.setattr(enhance_panel, "ask_fix_words", lambda *_args: None)
+
+    panel._fix_word_buttons["hands"].click()
+
+    assert edits == []
+
+
+def test_the_fix_words_window_hands_back_what_was_typed(qtbot):
+    hands = next(part for part in part_table() if part.name == "hands")
+    window = enhance_panel.FixWordsDialog(None, hands, "open palms", "fists")
+    qtbot.addWidget(window)
+
+    window.positive.setPlainText("relaxed fingers")
+
+    assert window.windowTitle() == "Hands fix prompts"
+    assert window.words() == ("relaxed fingers", "fists")

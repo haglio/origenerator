@@ -10,7 +10,7 @@ from typing import Any
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
-from origenerator.workflows.detail_parts import detail_fix_passes, finder_of
+from origenerator.workflows.detail_parts import detail_fix_passes, finder_of, fix_words
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
 
@@ -644,6 +644,7 @@ class WorkflowTemplate(ABC):
         the tail's output.
         """
         nodes: dict = {}
+        words = fix_words(params)
         for index, fix in enumerate(detail_fix_passes(params)):
             provider_id, segs_id, detailer_id = (
                 f"fix{index}_{role}" for role in ("detector", "segs", "detailer"))
@@ -668,12 +669,13 @@ class WorkflowTemplate(ABC):
                 },
             }
             positive, negative = positive_ref, negative_ref
-            if fix.part.prompt:
+            own = words[fix.part.name]
+            if own["prompt"] or own["avoid"]:
                 positive_id, negative_id = f"fix{index}_positive", f"fix{index}_negative"
                 nodes[positive_id] = _text_encode(
-                    clip_ref, _words_ahead_of(fix.part.prompt, params["positive_prompt"]))
+                    clip_ref, _words_ahead_of(own["prompt"], params["positive_prompt"]))
                 nodes[negative_id] = _text_encode(
-                    clip_ref, _words_ahead_of(fix.part.avoid, params["negative_prompt"]))
+                    clip_ref, _words_ahead_of(own["avoid"], params["negative_prompt"]))
                 positive, negative = [positive_id, 0], [negative_id, 0]
             nodes[detailer_id] = {
                 "class_type": "DetailerForEach",

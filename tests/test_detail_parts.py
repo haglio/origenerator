@@ -348,3 +348,15 @@ def test_a_part_redrawn_inside_its_outline_is_found_among_the_outline_detectors(
     assert detector_for_part(_part("skin")) == "skin_finder.pt"
     assert detail_parts.detector_folder(_part("skin")) == "models/ultralytics/segm"
     assert detail_parts.detector_folder(_part("hands")) == "models/ultralytics/bbox"
+
+
+def test_a_fix_redraws_toward_the_words_its_settings_give_it_or_else_its_own():
+    hands = _part("hands")
+    asked = {"enhance_detail_fixes": {"hands": 0.4, "teeth": 0.5}}
+    assert detail_parts.fix_words(asked)["hands"] == {"prompt": hands.prompt, "avoid": hands.avoid}
+
+    given = dict(asked, enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}})
+    assert detail_parts.fix_words(given)["hands"] == {"prompt": "open palms", "avoid": "fists"}
+    assert detail_parts.fix_words(given)["teeth"]["prompt"] == _part("teeth").prompt
+    # Words for a part the enhancement does not fix are kept, never run.
+    assert detail_parts.fix_words({"enhance_fix_prompts": {"hands": {"prompt": "x"}}}) == {}

@@ -2746,3 +2746,15 @@ def test_a_picture_with_no_prompt_leaves_a_part_its_own_words_alone():
     (detailer,) = _nodes_of(payload, "DetailerForEach")
     assert payload[detailer["inputs"]["positive"][0]]["inputs"]["text"] == skin.prompt
     assert payload[detailer["inputs"]["negative"][0]]["inputs"]["text"] == skin.avoid
+
+
+def test_a_fix_is_redrawn_toward_the_words_its_settings_give_it():
+    payload = _enhance_payload(
+        positive_prompt="a lantern on a jetty", negative_prompt="blurry",
+        enhance_detail_fixes={"hands": 0.45},
+        enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}},
+    )
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    assert payload[detailer["inputs"]["positive"][0]]["inputs"]["text"] == "open palms, a lantern on a jetty"
+    assert payload[detailer["inputs"]["negative"][0]]["inputs"]["text"] == "fists, blurry"

@@ -121,6 +121,7 @@ _PINNED = {
     "enhance": False,
     "enhance_denoise": 0.2,
     "enhance_detail_fixes": {},
+    "enhance_fix_prompts": {},
     "enhance_scale": 1.5,
     "enhance_steps": 12,
     "filename_prefix": "fingerprinted",

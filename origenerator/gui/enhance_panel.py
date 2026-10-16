@@ -28,12 +28,16 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -414,6 +418,8 @@ class EnhancePanel(QWidget):
         host.setSizePolicy(policy)
         self._fixes = {}
         self._fix_checks = {}
+        self._fix_word_buttons = {}
+        self._fix_words = {}
         for part in part_table():
             flow.addWidget(self._fix_field(part))
         return host
@@ -424,11 +430,16 @@ class EnhancePanel(QWidget):
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
         label = self._labeled(part.name.capitalize(), widget)
+        words = QToolButton()
+        words.setText("✎")
+        words.setToolTip(param_help("enhance_fix_prompts"))
+        words.clicked.connect(lambda _on=False, part=part: self._edit_fix_words(part))
         if detector_for_part(part) is None:
             reason = _NO_DETECTOR_TOOLTIP.format(part.name, part.matches[0],
                                                  detector_folder(part))
             check.setEnabled(False)
-            for one in (check, widget, label):
+            words.setEnabled(False)
+            for one in (check, widget, label, words):
                 one.setToolTip(reason)
         check.toggled.connect(lambda _on, name=part.name: self._fix_toggled(name))
 
@@ -436,14 +447,23 @@ class EnhancePanel(QWidget):
         grid = QGridLayout(column)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(2)
+        grid.addWidget(words, 0, 0, Qt.AlignmentFlag.AlignCenter)
         grid.addWidget(check, 0, 1, Qt.AlignmentFlag.AlignCenter)
         grid.addWidget(label, 1, 0)
         grid.addWidget(widget, 1, 1)
 
         self._fixes[part.name] = widget
         self._fix_checks[part.name] = check
+        self._fix_word_buttons[part.name] = words
         self._show_fix_on(part.name)
         return column
+
+    def _edit_fix_words(self, part) -> None:
+        current = self._fix_words.get(part.name, {"prompt": part.prompt, "avoid": part.avoid})
+        answer = ask_fix_words(self, part, current["prompt"], current["avoid"])
+        if answer is not None:
+            self._fix_words[part.name] = {"prompt": answer[0], "avoid": answer[1]}
+            self._emit()
 
     def _fix_toggled(self, name: str) -> None:
         """A part switched on or off: grey its name and number to match, and
@@ -571,6 +591,7 @@ class EnhancePanel(QWidget):
                 value = settings.params.get(key)
                 if value is not None:
                     _fill(widget, value)
+            self._fix_words = dict(settings.params.get("enhance_fix_prompts") or {})
             fixes = detail_fixes_of(settings.params)
             for name, widget in self._fixes.items():
                 # A part these settings don't name is off, its number left at
@@ -596,6 +617,7 @@ class EnhancePanel(QWidget):
             name: widget.value() for name, widget in self._fixes.items()
             if self._fix_checks[name].isChecked()
         }
+        params["enhance_fix_prompts"] = dict(self._fix_words)
         return EnhanceSettings(auto=self._auto.isChecked(), params=params)
 
     def _emit(self, *_args):
@@ -628,3 +650,29 @@ class EnhancePanel(QWidget):
         self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=merged))
         self._emit()
         event.acceptProposedAction()
+
+
+class FixWordsDialog(QDialog):
+    def __init__(self, parent, part, prompt: str, avoid: str):
+        super().__init__(parent)
+        self.setWindowTitle(f"{part.name.capitalize()} fix prompts")
+        layout = QVBoxLayout(self)
+        self.positive = QPlainTextEdit(prompt)
+        self.negative = QPlainTextEdit(avoid)
+        for caption, field in (("Positive Prompt", self.positive),
+                               ("Negative Prompt", self.negative)):
+            layout.addWidget(QLabel(caption))
+            layout.addWidget(field)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def words(self) -> tuple[str, str]:
+        return self.positive.toPlainText(), self.negative.toPlainText()
+
+
+def ask_fix_words(parent, part, prompt: str, avoid: str) -> tuple[str, str] | None:
+    window = FixWordsDialog(parent, part, prompt, avoid)
+    return window.words() if window.exec() == QDialog.DialogCode.Accepted else None

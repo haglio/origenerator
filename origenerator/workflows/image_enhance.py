@@ -65,6 +65,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "enhance_steps": 20,
             "enhance_denoise": 0.15,
             "enhance_detail_fixes": {},
+            "enhance_fix_prompts": {},
             "filename_prefix": "image/image_enhance",
         }
 

@@ -225,6 +225,22 @@ def detail_fixes_of(params: dict) -> dict:
     return dict.fromkeys(named or ["faces", "hands"], denoise)
 
 
+def fix_words(params: dict) -> dict:
+    """The words each part an enhancement fixes is redrawn toward and away from:
+    the ones its settings give that part, else the part's own."""
+    given = params.get("enhance_fix_prompts")
+    given = given if isinstance(given, dict) else {}
+    fixes = detail_fixes_of(params)
+    words = {}
+    for part in part_table():
+        if part.name in fixes:
+            named = given.get(part.name)
+            named = named if isinstance(named, dict) else {}
+            words[part.name] = {"prompt": str(named.get("prompt", part.prompt)),
+                                "avoid": str(named.get("avoid", part.avoid))}
+    return words
+
+
 @dataclass(frozen=True)
 class DetailFixPass:
     part: DetailPart

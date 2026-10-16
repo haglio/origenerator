@@ -21,7 +21,7 @@ from pathlib import PureWindowsPath
 
 from origenerator.content import load_content
 from origenerator.voice.text import sounds_like, words
-from origenerator.workflows.model_files import list_detector_files
+from origenerator.workflows.model_files import list_detector_files, list_outline_detector_files
 
 # Bold enough to actually re-form a part: the Enhance panel's fields start here.
 DEFAULT_FIX_DENOISE = 0.45
@@ -144,9 +144,17 @@ def _basename(filename: str) -> str:
     return PureWindowsPath(str(filename)).name.lower()
 
 
+def finder_of(part: DetailPart) -> str:
+    return "segm" if part.outline else "bbox"
+
+
+def detector_folder(part: DetailPart) -> str:
+    return f"models/ultralytics/{finder_of(part)}"
+
+
 def detector_for_part(part: DetailPart) -> str | None:
     """The first installed detector that finds ``part``, or ``None``."""
-    for name in list_detector_files():
+    for name in list_outline_detector_files() if part.outline else list_detector_files():
         base = _basename(name)
         if any(fragment in base for fragment in part.matches):
             return name

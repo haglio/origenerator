@@ -56,6 +56,7 @@ def _panel(qtbot, detectors=_FOUND_DETECTORS):
     edits = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parts, "list_detector_files", lambda: list(detectors))
+        mp.setattr(parts, "list_outline_detector_files", list)
         panel = EnhancePanel(edits.append)
     qtbot.addWidget(panel)
     return panel, edits
@@ -373,6 +374,7 @@ def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
     # this part needs is called.
     tooltip = panel._fix_checks["hands"].toolTip()
     assert "models/ultralytics/bbox" in tooltip
+    assert "models/ultralytics/segm" in panel._fix_checks["skin"].toolTip()
     assert "Impact Subpack" in tooltip
     assert "hand" in tooltip
     assert panel._label_for(panel._fixes["hands"]).toolTip() == tooltip

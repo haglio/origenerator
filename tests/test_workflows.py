@@ -517,7 +517,7 @@ def _nodes_of(payload: dict, class_type: str) -> list[dict]:
     return [n for n in payload.values() if n.get("class_type") == class_type]
 
 
-def _enhance_payload(installed=_FOUND_DETECTORS, **params):
+def _enhance_payload(installed=_FOUND_DETECTORS, outlined=(), **params):
     """An enhance payload built against a stated set of installed detectors.
 
     Stated rather than read off this machine's ComfyUI: the pass drops any part
@@ -526,6 +526,7 @@ def _enhance_payload(installed=_FOUND_DETECTORS, **params):
     wf = WORKFLOW_REGISTRY["image_enhance"]
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(detail_module, "list_detector_files", lambda: list(installed))
+        mp.setattr(detail_module, "list_outline_detector_files", lambda: list(outlined))
         return wf.build_api_payload(dict(wf.default_params(), input_image="pick.png",
                                          **params))
 
@@ -2703,7 +2704,7 @@ def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around
     # A box around the hair takes the face with it, and a box around the skin is
     # most of the picture; their detectors draw the part's outline, and the
     # redraw stays inside it.
-    payload = _enhance_payload(installed=["skin_finder.pt"], enhance_detail_fixes={"skin": 0.4})
+    payload = _enhance_payload(outlined=["skin_finder.pt"], enhance_detail_fixes={"skin": 0.4})
 
     (detailer,) = _nodes_of(payload, "DetailerForEach")
     segs = payload[detailer["inputs"]["segs"][0]]
@@ -2711,6 +2712,7 @@ def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around
     provider_id, output = segs["inputs"]["segm_detector"]
     assert payload[provider_id]["class_type"] == "UltralyticsDetectorProvider"
     assert output == 1
+    assert payload[provider_id]["inputs"]["model_name"] == "segm/skin_finder.pt"
     assert "bbox_detector" not in segs["inputs"]
     assert segs["inputs"]["image"] == detailer["inputs"]["image"]
 
@@ -2721,7 +2723,7 @@ def test_a_part_with_its_own_words_is_redrawn_toward_them_ahead_of_the_pictures_
     # since those are what say the skin's tone and the hair's color.
     skin = next(part for part in detail_module.part_table() if part.name == "skin")
     payload = _enhance_payload(
-        installed=["skin_finder.pt"], positive_prompt="a lantern on a jetty",
+        outlined=["skin_finder.pt"], positive_prompt="a lantern on a jetty",
         negative_prompt="blurry", enhance_detail_fixes={"skin": 0.4},
     )
 
@@ -2740,7 +2742,7 @@ def test_a_part_with_its_own_words_is_redrawn_toward_them_ahead_of_the_pictures_
 
 def test_a_picture_with_no_prompt_leaves_a_part_its_own_words_alone():
     skin = next(part for part in detail_module.part_table() if part.name == "skin")
-    payload = _enhance_payload(installed=["skin_finder.pt"], positive_prompt="",
+    payload = _enhance_payload(outlined=["skin_finder.pt"], positive_prompt="",
                                negative_prompt="", enhance_detail_fixes={"skin": 0.4})
 
     (detailer,) = _nodes_of(payload, "DetailerForEach")

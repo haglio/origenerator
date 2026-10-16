@@ -195,14 +195,14 @@ _VARIATIONS = {
     },
 }
 
-_INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt",
-                        "skin_detector.pt", "hair_detector.pt")
+_INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
+_INSTALLED_OUTLINE_DETECTORS = ("skin_detector.pt", "hair_detector.pt")
 
 # Changing the recipes above moves these without any graph changing: re-record
 # every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
-    ("image_enhance", "v003"): "8bcceaa6789877e1",
+    ("image_enhance", "v003"): "ca534891ae0d5371",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
     ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
@@ -220,6 +220,8 @@ def _variation_fingerprint(workflow, variation: dict) -> str:
 def _workflow_fingerprint(workflow) -> str:
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(detail_parts, "list_detector_files", lambda: list(_INSTALLED_DETECTORS))
+        patch.setattr(detail_parts, "list_outline_detector_files",
+                      lambda: list(_INSTALLED_OUTLINE_DETECTORS))
         graphs = {_variation_fingerprint(workflow, variation) for variation in _VARIATIONS.values()}
     return _digest(sorted(graphs))
 

@@ -10,7 +10,7 @@ from typing import Any
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
-from origenerator.workflows.detail_parts import detail_fix_passes
+from origenerator.workflows.detail_parts import detail_fix_passes, finder_of
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
 
@@ -647,13 +647,14 @@ class WorkflowTemplate(ABC):
         for index, fix in enumerate(detail_fix_passes(params)):
             provider_id, segs_id, detailer_id = (
                 f"fix{index}_{role}" for role in ("detector", "segs", "detailer"))
+            finder = finder_of(fix.part)
             nodes[provider_id] = {
                 "class_type": "UltralyticsDetectorProvider",
                 # The provider's own picker prefixes its detector models
-                # this way, and the value is matched against that list.
-                "inputs": {"model_name": f"bbox/{fix.detector}"},
+                # this way, and hands out an outline only for a segm/ one.
+                "inputs": {"model_name": f"{finder}/{fix.detector}"},
             }
-            finder, output = (("segm", 1) if fix.part.outline else ("bbox", 0))
+            output = 1 if fix.part.outline else 0
             nodes[segs_id] = {
                 "class_type": f"{finder.capitalize()}DetectorSEGS",
                 "inputs": {

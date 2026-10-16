@@ -67,6 +67,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
     detail_fixes_of,
+    detector_folder,
     detector_for_part,
     part_table,
 )
@@ -79,7 +80,7 @@ _AUTO_TOOLTIP = (
 _NO_DETECTOR_TOOLTIP = (
     "Unavailable: ComfyUI hasn't got a model that finds {}. Install the Impact "
     "Subpack node pack, put one whose name says \"{}\" in its "
-    "models/ultralytics/bbox folder, and restart it."
+    "{} folder, and restart it."
 )
 # What a fix field costs around its digits: the padding either side below, its
 # 1px border, and the pixels a spinner keeps for its cursor and its own inner
@@ -424,7 +425,8 @@ class EnhancePanel(QWidget):
         widget = self._fix_number()
         label = self._labeled(part.name.capitalize(), widget)
         if detector_for_part(part) is None:
-            reason = _NO_DETECTOR_TOOLTIP.format(part.name, part.matches[0])
+            reason = _NO_DETECTOR_TOOLTIP.format(part.name, part.matches[0],
+                                                 detector_folder(part))
             check.setEnabled(False)
             for one in (check, widget, label):
                 one.setToolTip(reason)

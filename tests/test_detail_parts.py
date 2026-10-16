@@ -332,3 +332,14 @@ def test_an_overlay_part_that_says_nothing_of_the_sort_is_a_box_on_the_pictures_
     (part,) = match_fix_command("fix zeta")
     assert part.outline is False
     assert part.prompt == "" and part.avoid == ""
+
+
+def test_a_part_redrawn_inside_its_outline_is_found_among_the_outline_detectors(monkeypatch):
+    # ComfyUI hands out a part's outline only for a model in its segm folder; the
+    # same file in the bbox folder gives boxes alone.
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["skin_finder.pt"])
+    assert detector_for_part(_part("skin")) is None
+    monkeypatch.setattr(detail_parts, "list_outline_detector_files", lambda: ["skin_finder.pt"])
+    assert detector_for_part(_part("skin")) == "skin_finder.pt"
+    assert detail_parts.detector_folder(_part("skin")) == "models/ultralytics/segm"
+    assert detail_parts.detector_folder(_part("hands")) == "models/ultralytics/bbox"

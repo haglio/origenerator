@@ -21,6 +21,7 @@ from origenerator.gui.enhance_controller import (
     Offer,
 )
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.workflows.detail_parts import DetailPart
 
 ENHANCE = gallery.ENHANCE_WORKFLOW
 
@@ -655,20 +656,20 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
     assert kind == NOTICE
 
 
-def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch):
-    class Part:
-        name = "teeth"
-
+@pytest.mark.parametrize("part, folder", [
+    (DetailPart("teeth", ("teeth",), ("teeth",)), "bbox"),
+    (DetailPart("skin", ("skin",), ("skin",), outline=True), "segm"),
+])
+def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch, part, folder):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "fix_params_for",
                         lambda row, parts, settings: None)
-    monkeypatch.setattr(module, "name_parts", lambda parts: "teeth")
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    _prompt_id, message, kind = controller.fix_parts("i1", [Part()])
+    _prompt_id, message, kind = controller.fix_parts("i1", [part])
 
-    assert message == ("🎤 no teeth detector installed "
-                       "(ComfyUI models/ultralytics/bbox)")
+    assert message == (f"🎤 no {part.name} detector installed "
+                       f"(ComfyUI models/ultralytics/{folder})")
     assert kind == WARNING
 
 

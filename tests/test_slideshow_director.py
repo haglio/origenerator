@@ -924,7 +924,21 @@ def test_shift_arrows_step_from_an_upscale_to_the_video_it_was_made_from(tmp_pat
     row, video, upscale = _evolver_upscaled_video(tmp_path, monkeypatch)
 
     assert _director().versions_of([row]) == {
-        str(upscale): [(upscale, "video", "Evolved"), (video, "video", "Original")]}
+        str(upscale): [(upscale, "video", "Evolved", ()), (video, "video", "Original", ())]}
+
+
+def test_each_version_of_an_enhanced_picture_brings_the_places_its_fixes_found(tmp_path, monkeypatch):
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    face = {"part": "faces", "left": 0.4, "top": 0.1, "right": 0.6, "bottom": 0.3}
+    row = {**_row("g1", files=()), "output_files": json.dumps([
+        {"filename": "enhanced.png", "subfolder": "image", "points_of_interest": [face]},
+        {"filename": "base.png", "subfolder": "image"}]),
+        "original_files": json.dumps([{"filename": "base.png", "subfolder": "image"}])}
+
+    ((_key, (enhanced, original)),) = _director().versions_of([row]).items()
+
+    assert enhanced.points_of_interest == ((0.4, 0.1, 0.6, 0.3),)
+    assert original.points_of_interest == ()
 
 
 def test_a_region_reset_re_points_what_feeds_it(slideshows):

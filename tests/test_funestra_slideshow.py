@@ -1480,3 +1480,37 @@ def test_the_loop_key_off_a_folder_on_a_funestra_leaves_it_in_one_press(qtbot, t
     slideshow.slideshow_loop_cycle()
 
     assert (widened, said) == ([slideshow], ["Loop off"])
+
+
+FACE = ((0.4, 0.1, 0.6, 0.3),)
+_PLACED = {"one.png": [("one.png", "image", "Enhance 1", FACE), ("one-base.png", "image", "Original")]}
+
+
+def test_a_picture_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+
+    slideshow.set_levels(_PLACED)
+
+    handed = {str(item.path): item.points_of_interest
+              for item in read_playlist(slideshow.channel.playlist)}
+    assert handed == {"one.png": FACE, "two.png": (), "three.png": ()}
+
+
+def test_versions_that_bring_no_places_leave_the_pass_where_it_was(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+    _sent(slideshow)
+
+    slideshow.set_levels(_LEVELS)
+
+    assert "RELOAD_PLAYLIST" not in _sent(slideshow)
+
+
+def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow.set_levels({"one.png": [("one.png", "image", "Enhance 2", FACE),
+                                      ("one-v1.png", "image", "Enhance 1", ((0.0, 0.0, 0.5, 0.5),))]})
+    _sent(slideshow)
+
+    slideshow.slideshow_step_version(1)
+
+    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one-v1.png\t\t0,0,0.5,0.5"]

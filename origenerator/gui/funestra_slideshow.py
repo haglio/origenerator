@@ -184,7 +184,7 @@ class FunestraSlideshow(QObject):
     def _funestra_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(Path(self._file_of(slide)))
-        return slide_item(slide)
+        return slide_item(slide, self._levels.points_of_interest(self._file_of(slide)))
 
     def _send(self, verb: str) -> None:
         if not append_command(self.channel.command_file, verb):
@@ -275,11 +275,13 @@ class FunestraSlideshow(QObject):
         item's versions, newest first, as ``(path, media_type, label)`` — the
         same map a window slideshow is armed with, from the same gallery.
         """
-        self._levels.arm(levels_by_path)
+        if self._levels.arm(levels_by_path):
+            self._hand_over()
         self._publish()
 
     def add_levels(self, levels_by_path: dict) -> None:
-        self._levels.add(levels_by_path)
+        if self._levels.add(levels_by_path):
+            self._hand_over()
         self._publish()
 
     @property
@@ -298,12 +300,12 @@ class FunestraSlideshow(QObject):
         within the versions is held here, ahead of the status the Funestra is
         still publishing.
         """
-        level = self._levels.step(delta, base=self._current_base())
-        if level is None:
+        version = self._levels.step(delta, base=self._current_base())
+        if version is None:
             return
-        path, media_type, _label = level
         self._keep_the_pace()
-        self._send(play_file(playlist_item(path, media_type)))
+        self._send(play_file(playlist_item(version.path, version.media_type,
+                                           version.points_of_interest)))
 
     def _leave_the_versions(self) -> None:
         self._levels.restart()

@@ -40,9 +40,13 @@ class FakeEngine:
         self.screenshot = None
         self.idle = False
         self.stopped = False
+        self.points_told: list[tuple] = []
 
     def tile_to_fill(self, window_width: int, window_height: int) -> None:
         pass
+
+    def set_points_of_interest(self, points: tuple) -> None:
+        self.points_told.append(points)
 
     def load(self, path: Path) -> None:
         self.opened.append(path)

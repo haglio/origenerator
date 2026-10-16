@@ -117,6 +117,30 @@ def test_a_second_pass_lands_where_it_is_told(qtbot, tmp_path):
     assert pane.playback.current_video == two.path
 
 
+FACE = ((0.4, 0.1, 0.6, 0.3),)
+
+
+def test_a_second_pass_brings_the_places_of_the_picture_on_screen(qtbot, tmp_path):
+    pane, engine, _running = _pane(qtbot)
+    one, two = _items(tmp_path, "one", "two")
+    pane.hand_over([one, two])
+
+    pane.hand_over([PlaylistItem(one.path, points_of_interest=FACE), two])
+
+    assert engine.points_told == [FACE]
+
+
+def test_a_pass_landing_on_a_picture_brings_its_places(qtbot, tmp_path):
+    pane, engine, _running = _pane(qtbot)
+    one, two = _items(tmp_path, "one", "two")
+    pane.hand_over([one, two])
+
+    pane.hand_over([one, PlaylistItem(two.path, points_of_interest=FACE)], land=two.path)
+
+    assert pane.playback.current_video == two.path
+    assert engine.points_told == [FACE]
+
+
 def test_a_pass_with_nothing_in_it_opens_nothing(qtbot):
     pane, _engine, _running = _pane(qtbot)
 

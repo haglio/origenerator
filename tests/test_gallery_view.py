@@ -15645,10 +15645,10 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
         [view.row_for(pid) for pid in view.visible_prompt_ids()]).items()
     levels = slideshow._levels.levels(base=key)
     assert levels == computed
-    assert [p.name for p, _kind, _label in levels] == \
+    assert [version.path.name for version in levels] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     # Each carries its label, so the note can say which version is on screen.
-    assert [label for _p, _kind, label in levels] == ["Enhancement 1/1", "Original"]
+    assert [version.label for version in levels] == ["Enhancement 1/1", "Original"]
     # And Down asks through the gallery, which holds the settings.
     assert slideshow._actions.enhance == view.enhance_from_slideshow
     slideshow.close()

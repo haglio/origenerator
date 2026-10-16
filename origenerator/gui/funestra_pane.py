@@ -101,10 +101,8 @@ class FunestraPane(QWidget):
         playback = self._funestra.playback
         landing = next((item for item in items if item.path == land), None)
         if landing is not None and playback.current_video != landing.path:
-            playback.play_file(landing.path, landing.funscript)
-        playback.replace_playlist([item.path for item in items],
-                                  {item.path: item.funscript for item in items
-                                   if item.funscript is not None})
+            playback.play_file(landing.path, landing.funscript, landing.points_of_interest)
+        playback.take_the_list(items)
 
     def show_message(self, text: str) -> None:
         self._message.setText(text)

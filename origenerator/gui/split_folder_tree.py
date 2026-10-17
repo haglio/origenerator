@@ -127,6 +127,8 @@ class SplitFolderTree(QWidget):
         self._trees: dict[str, FolderTree] = {}
         self._sections: dict[str, QWidget] = {}   # each tree under its heading
         self._sides = SEPARATE
+        self._chosen = SEPARATE
+        self._offered = True
         self._active = SEPARATE[0]
 
         self._splitter = PaneSplitter(Qt.Orientation.Vertical)
@@ -142,7 +144,7 @@ class SplitFolderTree(QWidget):
         column.setSpacing(2)
         column.addWidget(self._build_radio())
         column.addWidget(self._splitter, 1)
-        self.set_sides(SEPARATE)
+        self._show_sections(SEPARATE)
 
     def _build_radio(self) -> QWidget:
         """The two choices over the sections: a list per shape, or one of both."""
@@ -155,10 +157,9 @@ class SplitFolderTree(QWidget):
         self._choices = QWidget()
         FlowLayout(self._choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
         for choice, sides in ((separate, SEPARATE), (together, TOGETHER)):
-            choice.button.clicked.connect(lambda _checked, s=sides: self._pick_sides(s))
+            choice.button.clicked.connect(lambda _checked, s=sides: self.choose_sides(s))
             radio.addButton(choice.button)
             self._choices.layout().addWidget(choice)
-        self.separate_button.setChecked(True)
         return self._choices
 
     # --- which sides the pane draws -----------------------------------------
@@ -167,8 +168,27 @@ class SplitFolderTree(QWidget):
     def sides(self) -> tuple[str, ...]:
         return self._sides
 
-    def set_sides(self, sides) -> None:
-        """Draw a section for each of *sides* and hide the rest."""
+    @property
+    def chosen_sides(self) -> tuple[str, ...]:
+        return self._chosen
+
+    def choose_sides(self, sides) -> None:
+        self._chosen = tuple(sides)
+        self._redraw()
+
+    def offer_separate_and_together(self, offered: bool) -> None:
+        self._offered = offered
+        self._choices.setVisible(offered)
+        self._redraw()
+
+    def _redraw(self) -> None:
+        sides = self._chosen if self._offered else SEPARATE
+        if sides == self._sides:
+            return
+        self._show_sections(sides)
+        self.sides_changed.emit()
+
+    def _show_sections(self, sides) -> None:
         self._sides = tuple(sides)
         for side, section in self._sections.items():
             section.setVisible(side in self._sides)
@@ -176,17 +196,6 @@ class SplitFolderTree(QWidget):
             self._active = self._sides[0]
         self.separate_button.setChecked(self._sides == SEPARATE)
         self.together_button.setChecked(self._sides == TOGETHER)
-
-    def offer_separate_and_together(self, offered: bool) -> None:
-        self._choices.setVisible(offered)
-        if not offered:
-            self._pick_sides(SEPARATE)
-
-    def _pick_sides(self, sides) -> None:
-        if tuple(sides) == self._sides:
-            return
-        self.set_sides(sides)
-        self.sides_changed.emit()
 
     def _build_section(self, group_role, side: str) -> QWidget:
         section = QWidget()

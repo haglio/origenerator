@@ -1046,6 +1046,13 @@ def _workflow_labels(rows, meta=None, **kwargs):
     return {workflow.key: workflow.label for workflow in build_gallery_tree(rows, meta, **kwargs)}
 
 
+def test_a_retired_workflows_folder_keeps_the_name_it_had():
+    retired = dict(_LOOP_CLIP, prompt_id="old", workflow_name="wan21_ati_i2v")
+
+    assert _workflow_labels([retired]) == {
+        "video/wan21_ati_i2v": "WAN 2.1 Image-to-Video (Motion-Tracked)"}
+
+
 def test_a_recipe_that_made_both_kinds_names_each_copy_by_what_it_holds():
     assert _workflow_labels([_LOOP_STILL, _LOOP_CLIP]) == {
         "image/wan22_flf2v_loop": f"{_LOOPING} images",

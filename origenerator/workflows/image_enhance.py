@@ -86,10 +86,10 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
                      options=upscalers),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
-                     min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100),
+                     min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
+            ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
             ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
-                     min_val=0.0, max_val=1.0, step=0.05),
+                     min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
             # One denoise per part fixed, keyed by the part's name — the Enhance
             # panel's line of numbers, and the range those spinners take. A
             # part not named here is a part left alone; a part that IS named

@@ -185,6 +185,7 @@ class ParamDef:
     # to the other, so a clip's seconds don't move when its rate does.
     rate: float | None = None
     also_sets: tuple[str, ...] = ()
+    good: tuple[float, float] | None = None
 
     def __post_init__(self):
         self.type = ParamType(self.type)

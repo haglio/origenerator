@@ -38,7 +38,7 @@ def wan_expert_shift_param(defaults: dict) -> ParamDef:
     """One Composition Focus for both passes: two values would hand the
     picture over at mismatched noise."""
     return ParamDef("shift_high", "Composition Focus", ParamType.FLOAT, defaults["shift_high"],
-                    min_val=0.0, max_val=20.0, step=0.5, also_sets=("shift_low",))
+                    min_val=0.0, max_val=20.0, step=0.5, also_sets=("shift_low",), good=(5, 12))
 
 
 def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
@@ -49,10 +49,10 @@ def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
                  options=list_lora_files([defaults["lora_high"]],
                                          accepts=(WAN,), expert="high")),
         ParamDef("lora_strength_high", "LoRA Strength (First Pass)", ParamType.FLOAT,
-                 defaults["lora_strength_high"], min_val=0.0, max_val=2.0, step=0.05),
+                 defaults["lora_strength_high"], min_val=0.0, max_val=2.0, step=0.05, good=(0.6, 1.2)),
         ParamDef("lora_low", "LoRA (Second Pass)", ParamType.COMBO, defaults["lora_low"],
                  options=list_lora_files([defaults["lora_low"]],
                                          accepts=(WAN,), expert="low")),
         ParamDef("lora_strength_low", "LoRA Strength (Second Pass)", ParamType.FLOAT,
-                 defaults["lora_strength_low"], min_val=0.0, max_val=2.0, step=0.05),
+                 defaults["lora_strength_low"], min_val=0.0, max_val=2.0, step=0.05, good=(0.6, 1.2)),
     ]

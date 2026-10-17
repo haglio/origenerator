@@ -2926,6 +2926,16 @@ def test_a_setting_off_its_models_recommendation_shows_its_warning(blank_panel, 
     assert mark.toolTip() == "Default Model's page recommends 20–40 steps. Click to use 40."
 
 
+def test_a_number_outside_its_good_range_shows_its_warning_with_no_page_to_judge_it(panel):
+    mark = panel._param_form._warning_marks["steps"]
+    assert mark.isHidden()
+
+    panel._param_form._widgets["steps"].setValue(200)
+
+    assert not mark.isHidden()
+    assert mark.toolTip() == "Good range: 25–50. Click to use 50."
+
+
 def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 

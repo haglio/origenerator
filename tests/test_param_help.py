@@ -12,9 +12,15 @@ import re
 import pytest
 
 from origenerator.gallery import ENHANCE_SETTING_KEYS
-from origenerator.gui.param_help import PARAM_HELP, RECOMMENDED, option_help, param_help
+from origenerator.gui.param_help import (
+    PARAM_HELP,
+    RECOMMENDED,
+    definition_help,
+    option_help,
+    param_help,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import SAMPLER_OPTIONS, ParamType
+from origenerator.workflows.base import SAMPLER_OPTIONS, ParamDef, ParamType
 
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
@@ -104,8 +110,24 @@ def test_every_sampler_says_how_it_works_and_how_long_it_takes():
 def test_every_number_on_a_form_recommends_what_to_set_it_to(workflow_name):
     numbers = (ParamType.INT, ParamType.FLOAT)
     unadvised = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
-                       if pd.type in numbers and pd.key not in RECOMMENDED)
+                       if pd.type in numbers and pd.good is None and pd.key not in RECOMMENDED)
     assert unadvised == []
+
+
+@pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
+def test_a_numbers_good_range_is_one_the_app_holds_it_to_not_a_sentence(workflow_name):
+    numbers = (ParamType.INT, ParamType.FLOAT)
+    said = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
+                  if pd.type in numbers and pd.good is None
+                  and re.search(r"\d–\d", RECOMMENDED.get(pd.key, "")))
+    assert said == []
+
+
+@pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
+def test_a_forms_own_defaults_sit_inside_their_good_ranges(workflow_name):
+    outside = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
+                     if pd.good is not None and not pd.good[0] <= pd.default <= pd.good[1])
+    assert outside == []
 
 
 def test_the_sampler_step_spacing_and_fixes_recommend_what_to_set_them_to():
@@ -113,7 +135,9 @@ def test_the_sampler_step_spacing_and_fixes_recommend_what_to_set_them_to():
 
 
 def test_a_tooltip_ends_with_what_to_set_it_to():
-    assert param_help("steps") == f"{PARAM_HELP['steps']} {RECOMMENDED['steps']}"
+    steps = next(pd for pd in WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()
+                 if pd.key == "steps")
+    assert definition_help(steps) == f"{PARAM_HELP['steps']} Good range: 25–50."
 
 
 def test_one_value_is_recommended_as_advice_rather_than_as_a_range():
@@ -128,3 +152,14 @@ def test_every_span_of_numbers_is_called_a_good_range():
 
 def test_the_one_composition_focus_says_nothing_about_passes():
     assert "pass" not in param_help("shift_high")
+
+
+def test_a_definitions_good_range_is_said_in_its_tooltip():
+    pd = ParamDef("mystery_number", "Mystery", ParamType.INT, 30, good=(20, 40))
+    assert definition_help(pd) == "Good range: 20–40."
+
+
+def test_a_durations_good_range_is_said_in_seconds():
+    pd = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161, step=4,
+                  unit="s", rate=16, good=(81, 161))
+    assert " Good range: 5–10 s. " in definition_help(pd)

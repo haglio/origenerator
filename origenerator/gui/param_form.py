@@ -28,7 +28,7 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelColumn, WarningMark
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
-from origenerator.gui.param_help import option_help, param_help
+from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
@@ -306,11 +306,12 @@ class ParamForm(QWidget):
         keys.insert(index, key)
         # A label cut short is one you most want spelled out, so the tip says the
         # whole thing when the param has nothing more useful to explain.
-        help_text = param_help(key) or label
-        label_widget.setToolTip(help_text)
+        pd = next((p for p in self._param_defs if p.key == key), None)
+        explained = definition_help(pd) if pd is not None else param_help(key)
+        label_widget.setToolTip(explained or label)
         widget = self._widgets.get(key)
-        if widget is not None and param_help(key):
-            widget.setToolTip(help_text)
+        if widget is not None and explained:
+            widget.setToolTip(explained)
 
     @staticmethod
     def _insert_index(present: list[str], key: str) -> int:
@@ -730,6 +731,9 @@ class ParamForm(QWidget):
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
         return self._kind(pd).make(pd)
+
+    def definitions(self) -> list[ParamDef]:
+        return list(self._param_defs)
 
     def get_values(self) -> dict:
         return self._collect()

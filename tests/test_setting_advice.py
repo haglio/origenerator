@@ -4,6 +4,7 @@ import pytest
 
 import origenerator.setting_advice as advice_module
 from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
+from origenerator.workflows.base import ParamDef, ParamType
 
 MODELS = {
     "example_model.safetensors": {
@@ -146,3 +147,32 @@ def test_a_speed_loras_settings_are_set_to_what_its_page_recommends():
              "shift_high": 8.0}
     fixes = {key: advice.fix for key, advice in setting_advice(video).items()}
     assert fixes == {"lora_strength_high": 1, "steps": 8, "cfg_high": 1, "shift_high": 5}
+
+
+def test_a_number_outside_its_definitions_good_range_is_advised_against():
+    steps = ParamDef("steps", "Steps", ParamType.INT, 30, good=(20, 40))
+    advice = setting_advice({"steps": 50}, [steps])
+    assert (advice["steps"].text, advice["steps"].fix) == ("Good range: 20–40.", 40)
+
+
+def test_a_number_its_models_page_judges_is_not_held_to_its_definitions_range():
+    cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 4.0, good=(3, 4))
+    assert setting_advice(_picture(cfg=5.5), [cfg]) == {}
+    assert setting_advice(_picture(cfg=7.5), [cfg])["cfg"].text == (
+        "Example Model's page recommends 3–6.")
+
+
+def test_a_number_a_speed_loras_page_judges_is_not_held_to_its_definitions_range():
+    steps = ParamDef("steps", "Steps", ParamType.INT, 20, good=(20, 30))
+    video = {"lora_high": "example_speed_high.safetensors",
+             "lora_low": "example_speed_low.safetensors", "lora_strength_high": 1.0,
+             "lora_strength_low": 1.0, "steps": 6, "cfg_high": 1.0, "cfg_low": 1.0,
+             "shift_high": 5.0}
+    assert setting_advice(video, [steps]) == {}
+
+
+def test_a_durations_fix_is_shown_in_seconds():
+    duration = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161,
+                        step=4, unit="s", rate=16, good=(81, 161))
+    found = setting_advice({"frame_count": 201}, [duration])["frame_count"]
+    assert (found.fix, found.fix_shown) == (161, "10 s")

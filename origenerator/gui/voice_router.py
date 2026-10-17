@@ -127,14 +127,14 @@ _BARS = {
 # switch and a clicked one are the same event and the bank shows both. The
 # buttons themselves arrive in :meth:`VoiceRouter.bind_the_bank`, by keyword, so
 # a rename is a TypeError at launch rather than a word that quietly does nothing.
-_AUTO, _AUDIO, _DRIVE, _MIC = "auto", "audio", "drive", "mic"
+_AUTO, _RADIO, _DRIVE, _MIC = "auto", "radio", "drive", "mic"
 _SWITCHES = {
     AppCommand.AUTO: (_AUTO, None, "auto-generate"),
     AppCommand.AUTO_ON: (_AUTO, True, "auto-generate"),
     AppCommand.AUTO_OFF: (_AUTO, False, "auto-generate"),
-    AppCommand.AUDIO: (_AUDIO, None, "the audio bed"),
-    AppCommand.AUDIO_ON: (_AUDIO, True, "the audio bed"),
-    AppCommand.AUDIO_OFF: (_AUDIO, False, "the audio bed"),
+    AppCommand.RADIO: (_RADIO, None, "Origenerator Radio"),
+    AppCommand.RADIO_ON: (_RADIO, True, "Origenerator Radio"),
+    AppCommand.RADIO_OFF: (_RADIO, False, "Origenerator Radio"),
     AppCommand.DRIVE: (_DRIVE, None, "OSR2"),
     AppCommand.DRIVE_ON: (_DRIVE, True, "OSR2"),
     AppCommand.DRIVE_OFF: (_DRIVE, False, "OSR2"),
@@ -304,13 +304,13 @@ class VoiceRouter(QObject):
 
     def become_hosted(self) -> None:
         self._hold_the_motion(None)
-        self._switches.update(dict.fromkeys((_AUDIO, _DRIVE, _MIC)))
+        self._switches.update(dict.fromkeys((_RADIO, _DRIVE, _MIC)))
 
-    def become_standalone(self, motion, *, audio, drive, mic) -> None:
+    def become_standalone(self, motion, *, radio, drive, mic) -> None:
         self._hold_the_motion(motion)
-        self._switches.update({_AUDIO: audio, _DRIVE: drive, _MIC: mic})
+        self._switches.update({_RADIO: radio, _DRIVE: drive, _MIC: mic})
 
-    def bind_the_bank(self, *, auto, audio, drive, mic, actions, enhance) -> None:
+    def bind_the_bank(self, *, auto, radio, drive, mic, actions, enhance) -> None:
         """Bind the spoken vocabulary to the buttons it acts through, by keyword
         and by object rather than by attribute name: spelled as strings, a renamed
         button broke the microphone silently.
@@ -326,7 +326,7 @@ class VoiceRouter(QObject):
         :meth:`_flip_switch` can still answer that the session owns them, and
         the motion words find nothing to move rather than a driver that is absent.
         """
-        self._switches = {_AUTO: auto, _AUDIO: audio, _DRIVE: drive, _MIC: mic}
+        self._switches = {_AUTO: auto, _RADIO: radio, _DRIVE: drive, _MIC: mic}
         self._bank = dict(actions)
         self._enhance = enhance
 
@@ -597,7 +597,7 @@ class VoiceRouter(QObject):
         """
         switch, want, name = _SWITCHES[command]
         button = self._switches[switch]
-        if button is None:  # hosted: the session owns the audio bed and the mic
+        if button is None:  # hosted: the session owns the radio and the mic
             self._slideshows.answer(f"🎤 {name} is the session's here", kind=WARNING)
             return
         if not button.isEnabled():

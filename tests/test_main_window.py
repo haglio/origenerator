@@ -326,19 +326,19 @@ def test_persists_the_max_intensity_on_close(qtbot, tmp_path):
     assert state.get("max_intensity") == 35
 
 
-def test_restores_the_audio_switch_from_app_state(qtbot, tmp_path):
-    # Left on, the audio bed comes back on at the next launch — the same standing
+def test_restores_the_radio_switch_from_app_state(qtbot, tmp_path):
+    # Left on, the radio comes back on at the next launch — the same standing
     # preference the OSR2 and experiments switches are.
     state = AppState(tmp_path / "ui.json")
     state.set("audio_enabled", True)
     win = _window(qtbot, tmp_path, state)
-    assert win._gallery_view.audio_enabled() is True
+    assert win._gallery_view.radio_enabled() is True
 
 
-def test_persists_the_audio_switch_on_close(qtbot, tmp_path):
+def test_persists_the_radio_switch_on_close(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     win = _window(qtbot, tmp_path, state)
-    win._gallery_view.set_audio_enabled(True)
+    win._gallery_view.set_radio_enabled(True)
 
     win.close()  # closeEvent persists the session
     assert state.get("audio_enabled") is True
@@ -1581,7 +1581,7 @@ def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
     view = win._gallery_view
-    view.set_audio_enabled(True)
+    view.set_radio_enabled(True)
     view.osr2_control.set_state(OSR2_DRIVING)
     view.set_mic_enabled(True)
     view.osr2_control.set_max_intensity(35)
@@ -1727,13 +1727,13 @@ def test_a_window_handed_back_listens_again_but_leaves_the_sound_and_device_off(
     win = _window(qtbot, tmp_path)
     view = win._gallery_view
     view.set_mic_enabled(True)
-    view.set_audio_enabled(True)
+    view.set_radio_enabled(True)
     view.osr2_control.set_state(OSR2_DRIVING)
     win.become_hosted(_fun_time_session())
 
     win.become_standalone()
 
-    assert (view.mic_enabled(), view.audio_enabled(), view.osr2_control.state()) == (
+    assert (view.mic_enabled(), view.radio_enabled(), view.osr2_control.state()) == (
         True, False, OSR2_PARKED)
 
 

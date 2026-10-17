@@ -9,7 +9,7 @@ scripted video is in front, the self-generated motion otherwise, and neither
 while the device is parked.
 
 It wears a checkable button's three names on purpose. Every one of those
-callers flipped a button before, and the voice router still flips the audio bed
+callers flipped a button before, and the voice router still flips the radio
 and the microphone that way, so one shape across the four is one fewer thing to
 keep in step.
 """

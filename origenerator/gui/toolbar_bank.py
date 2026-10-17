@@ -27,7 +27,7 @@ from shared_ui.mark_button import fill_square_with_mark
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP, BUTTON_SIZE
 
 from origenerator import ui_scale
-from origenerator.config import AMBIENT_AUDIO_VOICES
+from origenerator.config import RADIO_STATIONS
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.link_tip import LinkTip, link
@@ -98,7 +98,7 @@ class BankActs(NamedTuple):
     enhance: Callable[[], None]
     group: Callable[[], None]
     delete: Callable[[], None]
-    toggle_audio: Callable[[bool], None]
+    toggle_radio: Callable[[bool], None]
     toggle_mic: Callable[[bool], None]
 
 
@@ -137,12 +137,13 @@ class ToolbarBank(QWidget):
     when it runs out of room is squeeze every button until the glyphs are
     unreadable: a row of smudges. Wrapped, a button is always its own size.
 
-    ``hosted`` builds no audio bed and no microphone: inside a Fun Time session
-    the Main Funestra owns the room's sound and the session owns the mic, so a
-    second switch for either would be a switch over something this window does
-    not hold. There is no OSR2 switch here at all any more: the Funestras' console
-    carries one, on driving and off parked, and that is where the device is
-    switched now, on every surface.
+    ``hosted`` builds no Origenerator Radio switch and no microphone: inside a
+    Fun Time session each Satellite Funestra plays its own stations, tuned in
+    while a picture is up, and the session owns the mic, so a switch for either
+    here would be a switch over something this window does not hold. There is
+    no OSR2 switch here at all any more: the Funestras' console carries one, on
+    driving and off parked, and that is where the device is switched now, on
+    every surface.
     """
 
     def __init__(self, acts: BankActs, *, hosted: bool):
@@ -185,18 +186,18 @@ class ToolbarBank(QWidget):
             "Group the selected folders into a folder of your own", acts.group)
         self.group.hide()
         self.delete = _tool_button(icons.delete_icon(), "Delete", acts.delete)
-        self.audio = None
+        self.radio = None
         self.mic = None
         if not hosted:
-            # While it's on, a few library clips play at once with only their
+            # While it's on, a few library videos play at once with only their
             # sound — something to work over, tied to nothing on screen.
-            self.audio = _tool_button(
-                icons.audio_icon(),
-                f"Play {AMBIENT_AUDIO_VOICES} library clips at once, sound only, "
-                "shuffling endlessly",
-                acts.toggle_audio, checkable=True,
+            self.radio = _tool_button(
+                icons.radio_icon(),
+                f"Origenerator Radio: play {RADIO_STATIONS} library videos at once, "
+                "sound only, shuffling endlessly",
+                acts.toggle_radio, checkable=True,
             )
-            self.audio.setStyleSheet(_LIT)
+            self.radio.setStyleSheet(_LIT)
             # The microphone stands apart from the switches above: those are what
             # the app is doing, and Esc turns all of them off at once — the mic is
             # the one thing it leaves alone, since speaking is how any of them get
@@ -221,7 +222,7 @@ class ToolbarBank(QWidget):
             (self.undo, self.redo),                  # what you did
             (self.group,),                           # …to the picked folders
             (self.favorite, self.enhance, self.delete),  # …to what's in front
-            (self.slideshow, self.auto, self.audio),  # what the app is doing,
+            (self.slideshow, self.auto, self.radio),  # what the app is doing,
                                                       # and Esc stops
             (self.mic,),                             # what it hears with
         ):
@@ -246,13 +247,13 @@ class ToolbarBank(QWidget):
 
     def become_hosted(self) -> None:
         self._draw_at_the_huds_scale(hosted=True)
-        self._room_switches = (self.audio, self.mic)
+        self._room_switches = (self.radio, self.mic)
         self._show_the_room_switches(False)
-        self.audio = self.mic = None
+        self.radio = self.mic = None
 
     def become_standalone(self) -> None:
         self._draw_at_the_huds_scale(hosted=False)
-        self.audio, self.mic = self._room_switches
+        self.radio, self.mic = self._room_switches
         self._show_the_room_switches(True)
 
     def _show_the_room_switches(self, shown: bool) -> None:

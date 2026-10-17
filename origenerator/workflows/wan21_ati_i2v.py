@@ -118,7 +118,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("audio_negative_prompt", "Negative Prompt", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("audio_seed", "Sound Seed", ParamType.SEED, defaults["audio_seed"]),
-            ParamDef("motion_hz", "Cycles per Second", ParamType.FLOAT, defaults["motion_hz"], min_val=0.2, max_val=4.0, step=0.1),
+            ParamDef("motion_hz", "Cycles per Second", ParamType.FLOAT, defaults["motion_hz"], min_val=0.2, max_val=4.0, step=0.1, good=(0.5, 2)),
             # Motion coordinates are authored in the 480×864 reference frame and
             # rescaled into the derived output size at payload build, so their
             # ranges are the reference frame's bounds (width for X, height for Y).
@@ -128,10 +128,10 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("anchor_x", "Still Point Across", ParamType.INT, defaults["anchor_x"], min_val=0, max_val=REFERENCE_WIDTH),
             ParamDef("anchor_y", "Still Point Down", ParamType.INT, defaults["anchor_y"], min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=113, step=4,
-                     options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
-            ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100),
-            ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("shift", "Composition Focus", ParamType.FLOAT, defaults["shift"], min_val=0.0, max_val=20.0, step=0.5),
+                     options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS, good=(81, 161)),
+            ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(20, 30)),
+            ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1, good=(3, 5)),
+            ParamDef("shift", "Composition Focus", ParamType.FLOAT, defaults["shift"], min_val=0.0, max_val=20.0, step=0.5, good=(5, 12)),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=models),
             *wan_expert_lora_params(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],

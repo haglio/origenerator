@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from origenerator.content import load_content
-from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS
+from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef
+from origenerator.workflows.duration import seconds_for_frames
 
 GOOD_STEP_SPACING = {
     "dpmpp_2m": ("karras", "exponential"),
@@ -26,10 +27,11 @@ _PASSES = ("high", "low")
 class Advice(NamedTuple):
     text: str
     fix: object
+    shown: str = ""
 
     @property
     def fix_shown(self) -> str:
-        return _shown(self.fix)
+        return self.shown or _shown(self.fix)
 
 
 def model_recommendations() -> dict:
@@ -56,15 +58,37 @@ def _model_page(params: dict) -> dict:
     return model_recommendations().get(params.get("checkpoint") or "") or {}
 
 
-def setting_advice(params: dict) -> dict[str, Advice]:
-    advice = _model_advice(params)
-    for key, found in _lora_advice(params).items():
+def setting_advice(params: dict, definitions=()) -> dict[str, Advice]:
+    advice, judged = _model_advice(params)
+    for key, found in _lora_advice(params, judged).items():
         advice.setdefault(key, found)
+    for pd in definitions:
+        if pd.key in judged or pd.key not in params:
+            continue
+        _hold(advice, judged, pd.key, params[pd.key], pd.good, good_range_text(pd),
+              shown=lambda fix: _in_seconds(fix, pd))
     return advice
 
 
-def _model_advice(params: dict) -> dict[str, Advice]:
+def _in_seconds(frames, pd: ParamDef) -> str:
+    if not pd.rate:
+        return ""
+    return f"{_shown(seconds_for_frames(frames, pd.rate, pd))} {pd.unit}"
+
+
+def _hold(advice: dict, judged: set, key: str, value, span, said: str,
+          shown=lambda fix: "") -> None:
+    if not span:
+        return
+    judged.add(key)
+    if _outside(value, span):
+        fix = _nearest(value, span)
+        advice[key] = Advice(said, fix, shown(fix))
+
+
+def _model_advice(params: dict) -> tuple[dict[str, Advice], set[str]]:
     advice: dict[str, Advice] = {}
+    judged: set[str] = set()
     sampler, spacing = params.get("sampler_name"), params.get("scheduler")
     page = _model_page(params)
     name, choices = page.get("name"), recommended_choices(params)
@@ -79,13 +103,13 @@ def _model_advice(params: dict) -> dict[str, Advice]:
                                      _nearest_choice(spacing, choices["scheduler"],
                                                      SCHEDULER_OPTIONS))
     for key, unit in (("steps", " steps"), ("cfg", "")):
-        if _outside(params.get(key), page.get(key)):
-            advice[key] = Advice(f"{name}'s page recommends {_span(page[key])}{unit}.",
-                                 _nearest(params[key], page[key]))
-    return advice
+        if page.get(key):
+            _hold(advice, judged, key, params.get(key), page[key],
+                  f"{name}'s page recommends {_span(page[key])}{unit}.")
+    return advice, judged
 
 
-def _lora_advice(params: dict) -> dict[str, Advice]:
+def _lora_advice(params: dict, judged: set[str]) -> dict[str, Advice]:
     loras = lora_recommendations()
     pages = {side: loras.get(params.get(f"lora_{side}") or "") for side in _PASSES
              if f"lora_{side}" in params}
@@ -94,28 +118,39 @@ def _lora_advice(params: dict) -> dict[str, Advice]:
         if page is None:
             continue
         strength_key = f"lora_strength_{side}"
-        if _outside(params.get(strength_key), page.get("strength")):
-            advice[strength_key] = Advice(
-                f"{page['name']}'s page recommends a strength of {_span(page['strength'])}.",
-                _nearest(params[strength_key], page["strength"]))
+        if page.get("strength"):
+            _hold(advice, judged, strength_key, params.get(strength_key), page["strength"],
+                  f"{page['name']}'s page recommends a strength of {_span(page['strength'])}.")
         cfg_key = f"cfg_{side}" if f"cfg_{side}" in params else "cfg"
-        if _outside(params.get(cfg_key), page.get("cfg")):
-            advice.setdefault(cfg_key, _with(page, "cfg", params[cfg_key]))
+        if page.get("cfg") and cfg_key not in advice:
+            _hold(advice, judged, cfg_key, params.get(cfg_key), page["cfg"],
+                  _with(page, "cfg"))
     shared = list(pages.values())
     if shared and all(page is not None for page in shared):
         page = shared[0]
-        if _outside(params.get("steps"), page.get("steps")):
-            advice["steps"] = _with(page, "steps", params["steps"], " steps")
+        if page.get("steps"):
+            _hold(advice, judged, "steps", params.get("steps"), page["steps"],
+                  _with(page, "steps", " steps"))
         shift_key = "shift_high" if "shift_high" in params else "shift"
-        if _outside(params.get(shift_key), page.get("shift")):
-            advice[shift_key] = _with(page, "shift", params[shift_key])
+        if page.get("shift"):
+            _hold(advice, judged, shift_key, params.get(shift_key), page["shift"],
+                  _with(page, "shift"))
     return advice
 
 
-def _with(page: dict, recommended: str, value, unit: str = "") -> Advice:
-    return Advice(f"With the {page['name']} LoRA, its page recommends "
-                  f"{_span(page[recommended])}{unit}.",
-                  _nearest(value, page[recommended]))
+def _with(page: dict, recommended: str, unit: str = "") -> str:
+    return (f"With the {page['name']} LoRA, its page recommends "
+            f"{_span(page[recommended])}{unit}.")
+
+
+def good_range_text(pd: ParamDef) -> str:
+    if pd.good is None:
+        return ""
+    low, high = pd.good
+    if pd.rate:
+        low, high = (seconds_for_frames(int(edge), pd.rate, pd) for edge in (low, high))
+    unit = f" {pd.unit}" if pd.unit else ""
+    return f"Good range: {_span((low, high))}{unit}."
 
 
 def _outside(value, span) -> bool:

@@ -62,7 +62,7 @@ from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,
     NoWheelSpinBox,
 )
-from origenerator.gui.param_help import param_help
+from origenerator.gui.param_help import definition_help, param_help
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -546,7 +546,7 @@ class EnhancePanel(QWidget):
             if isinstance(widget, NoWheelDoubleSpinBox):
                 widget.setDecimals(2)
             widget.setValue(pd.default)
-        widget.setToolTip(param_help(key))
+        widget.setToolTip(definition_help(pd) if pd is not None else param_help(key))
         widest = max(widget.textFromValue(widget.minimum()),
                      widget.textFromValue(widget.maximum()), key=len)
         widget.setMinimumWidth(widget.fontMetrics().horizontalAdvance(widest)

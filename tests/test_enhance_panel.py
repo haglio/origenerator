@@ -1162,3 +1162,9 @@ def test_the_panels_captions_use_plain_words(qtbot):
     captions = [w.text() for w in panel.findChildren(QLabel)]
     assert {"Model", "Upscaler", "Scale", "Steps", "Redraw Amount"} <= set(captions)
     assert not any("Denoise" in caption or caption.endswith(":") for caption in captions)
+
+
+def test_a_number_on_the_panel_says_its_good_range(qtbot):
+    panel, _edits = _panel(qtbot)
+    assert "Good range: 0.1–0.2." in panel._denoise.toolTip()
+    assert "Good range: 1.5–2." in panel._scale.toolTip()

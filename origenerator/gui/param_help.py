@@ -15,6 +15,9 @@ workflow's params explained and advised before a new one can ship.
 """
 from __future__ import annotations
 
+from origenerator.setting_advice import good_range_text
+from origenerator.workflows.base import ParamDef
+
 _COMPOSITION_FOCUS = (
     "How the steps split between composition (the layout, the poses and, in a video, "
     "the motion) and fine detail. Higher keeps the picture noisy for longer, so more "
@@ -260,32 +263,12 @@ PARAM_HELP: dict[str, str] = {
 
 
 RECOMMENDED: dict[str, str] = {
-    "lora_strength_high": (
-        "Good range: 0.6–1.2."
-    ),
-    "lora_strength_low": (
-        "Good range: 0.6–1.2."
-    ),
-    "steps": (
-        "Good range: 25–40 for SDXL pictures, 20–30 for Flux and WAN, and 4–8 when a "
-        "speed LoRA is loaded."
-    ),
-    "cfg": (
-        "Good range: 3–7 for SDXL pictures, where most model pages ask for 4–5; 3–5 "
-        "for WAN; 1 with a speed LoRA."
-    ),
-    "cfg_high": (
-        "Good range: 3–4, or 1 with a speed LoRA on this pass."
-    ),
-    "cfg_low": (
-        "Good range: 3–4, or 1 with a speed LoRA on this pass."
-    ),
     "split_step": (
         "Leave it at 0, which hands over halfway through the steps and suits a "
-        "Composition Focus of 8; set by hand, 40–60% of Steps is the usual good range."
+        "Composition Focus of 8; set by hand, between 40% and 60% of Steps is usual."
     ),
     "guidance": (
-        "Good range: 2.5–4.5; 3.5 is the usual start."
+        "3.5 is the usual start."
     ),
     "sampler_name": (
         "Good choices: euler_ancestral (Euler a on model pages), dpmpp_2m with Step "
@@ -297,33 +280,14 @@ RECOMMENDED: dict[str, str] = {
         "the dpmpp ones (DPM++ 2M Karras on model pages). To compare two, keep the "
         "seed and change only this, on two or three different prompts."
     ),
-    "denoise": (
-        "Leave it at 1.0 for a new picture; to keep more of a starting image, 0.4–0.7 "
-        "is the good range."
-    ),
     "shift": (
-        "Good range: 5–12; 8 is the usual start, 5 for a looping clip."
+        "8 is the usual start, 5 for a looping clip."
     ),
     "shift_high": (
-        "Good range: 5–12; 8 is the usual start, 5 for a looping clip."
-    ),
-    "enhance_scale": (
-        "Good range: 1.5–2x."
-    ),
-    "enhance_steps": (
-        "Good range: 15–25."
-    ),
-    "enhance_denoise": (
-        "Good range: 0.1–0.2."
+        "8 is the usual start, 5 for a looping clip."
     ),
     "enhance_detail_fixes": (
         "Good range: 0.3–0.5 for each part."
-    ),
-    "controlnet_strength": (
-        "Good range: 0.5–0.9."
-    ),
-    "controlnet_end": (
-        "Good range: 0.6–1.0."
     ),
     "width": (
         "Good sizes: about one megapixel in all for SDXL, such as 832×1216, 1024×1024 "
@@ -334,14 +298,14 @@ RECOMMENDED: dict[str, str] = {
         "or 1216×832; up to about two for Flux and WAN 2.2 Text-to-Image."
     ),
     "frame_count": (
-        "Good range: 5–10 s for a clip and 1–3 s for a loop; a longer clip is made in "
-        "pieces, each starting on the last frame of the one before, and can drift."
+        "A longer clip is made in pieces, each starting on the last frame of the one "
+        "before, and can drift."
     ),
     "frame_rate": (
         "Leave it at 16, as the model makes it, or use 32 for smoother motion."
     ),
     "motion_hz": (
-        "Good range: 0.5–2; 1.2 to start."
+        "1.2 to start."
     ),
     "motion_x": (
         "Best left at its starting value, so the app aims it from the Start Image "
@@ -471,6 +435,11 @@ def param_help(key: str) -> str:
     and an explanation that says nothing is worse than no explanation at all.
     """
     return " ".join(filter(None, (PARAM_HELP.get(key, ""), RECOMMENDED.get(key, ""))))
+
+
+def definition_help(pd: ParamDef) -> str:
+    return " ".join(filter(None, (PARAM_HELP.get(pd.key, ""), good_range_text(pd),
+                                  RECOMMENDED.get(pd.key, ""))))
 
 
 def option_help(key: str, option: str) -> str:

@@ -23,7 +23,7 @@ from origenerator.gui import icons, param_sections, seed_combo
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.param_form import ParamForm
-from origenerator.gui.param_help import option_help, param_help
+from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
@@ -33,7 +33,7 @@ from origenerator.seed_history import SeedUse
 from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import ParamDef, story_of
+from origenerator.workflows.base import ParamDef, ParamType, story_of
 from origenerator.workflows.model_files import NO_LORA
 
 
@@ -1383,11 +1383,22 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     # are looking at when you wonder what a setting does.
 
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
-    form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
+    definitions = wf.param_definitions()
+    form = ParamForm(definitions, hidden_keys=wf.enhance_keys())
     qtbot.addWidget(form)
-    for key, widget in form._widgets.items():
-        assert widget.toolTip() == param_help(key), key
-    assert _label_beside(form, "denoise").toolTip() == param_help("denoise")
+    for pd in definitions:
+        if pd.key in form._widgets:
+            assert form._widgets[pd.key].toolTip() == definition_help(pd), pd.key
+    denoise = next(pd for pd in definitions if pd.key == "denoise")
+    assert _label_beside(form, "denoise").toolTip() == definition_help(denoise)
+
+
+def test_a_field_with_a_good_range_says_it_in_its_tooltip(qtbot):
+    steps = ParamDef("steps", "Steps", ParamType.INT, 30, min_val=1, max_val=100, good=(20, 40))
+    form = ParamForm([steps])
+    qtbot.addWidget(form)
+    assert "Good range: 20–40." in form._widgets["steps"].toolTip()
+    assert "Good range: 20–40." in _label_beside(form, "steps").toolTip()
 
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):

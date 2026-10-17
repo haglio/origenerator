@@ -638,7 +638,7 @@ class GenerateConfigPanel(QWidget):
     def _show_advice(self):
         if self._param_form is not None:
             values = self._param_form.get_values()
-            self._param_form.set_warnings(setting_advice(values))
+            self._param_form.set_warnings(setting_advice(values, self._param_form.definitions()))
             self._param_form.mark_recommended(recommended_choices(values))
 
     def _detach_form(self):

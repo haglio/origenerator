@@ -294,6 +294,7 @@ class GenerateConfigPanel(QWidget):
         self._media_split.hold_still(self._fun_time is not None)
         layout.addWidget(self._media_split, 1)
         self._media_side_by_side = False
+        self._picture_border: list[int] | None = None
         # Lays out the empty state on a fresh panel — no form, no estimate, and a
         # Generate with nothing to run — and everything below the picker once a
         # workflow is chosen. Last, because everything it lays out has to exist.
@@ -1109,6 +1110,28 @@ class GenerateConfigPanel(QWidget):
             if self._param_form:
                 self._param_form.set_seed_random(snapshot.seed_is_random)
                 self._param_form.put_seeds(snapshot.params, is_random=snapshot.seed_is_random)
+
+    def saved_layout(self) -> dict:
+        if self._fun_time is None:
+            self._picture_border = self._media_split.dragged_sizes() or self._picture_border
+        return {"folds": self._param_form.folds() if self._param_form else {},
+                "enhancement_levels_folded": self._versions.is_collapsed(),
+                "details_folded": self._metadata_block.is_folded(),
+                "picture_border": self._picture_border}
+
+    def restore_layout(self, saved) -> None:
+        if not isinstance(saved, dict):
+            return
+        folds = saved.get("folds")
+        if self._param_form and isinstance(folds, dict):
+            self._param_form.set_folds(folds)
+        if isinstance(saved.get("enhancement_levels_folded"), bool):
+            self._versions.set_collapsed(saved["enhancement_levels_folded"])
+        if isinstance(saved.get("details_folded"), bool):
+            self._metadata_block.set_folded(saved["details_folded"])
+        self._picture_border = saved.get("picture_border")
+        if self._fun_time is None:
+            self._media_split.take_dragged_sizes(self._picture_border)
 
     # --- rewriting a whole folder's prompt ------------------------------------
 

@@ -64,6 +64,14 @@ for one thing cost four. So:
   and the clipboard. Genau's own videos are flicks in the code, and on
   screen they take the word the settings all of Haglio share give them,
   genau_flick_words.
+- **Where the screen names nothing, the code takes the user's word.** The
+  list of folders down the left of the gallery is the **TOC** (table of
+  contents), and the marks that open and shut its folders are its
+  **chevrons**: no label names either, and those are the words the user and
+  the app's designers use. So the code says `toc` and `chevron`, an agent
+  writing to the user says TOC and chevron, and the older names for the same
+  two things -- tree, folder list, folder tree, caret, arrow -- take nothing
+  new.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 
@@ -310,6 +318,34 @@ stamp. Run it once when such a change lands, from the production checkout, as
 `python -c "from origenerator.funscript_backfill import main; main()"`: spelled
 with `-m` it names the package first, and the hook that keeps the app's window
 off his screen refuses it.
+
+## A setting a person can change comes back after a restart
+
+Origenerator keeps every setting a person can change in one place and brings
+it back at the next launch, the way Fun Time does. The one place is the
+window's session, saved in `state/ui_state.json` through one table,
+`SESSION_UI_STATE` in `gui/main_window.py`: a key, what the view is asked for
+on the way out, what it is told on the way back in. A control added without a
+line there is forgotten at every launch with nothing failing, which is how
+Separate and Together, Images / Videos / Both, the folders left open in the
+TOC, the console's Speed, Amp, Center, shape and Human inspired, every
+dragged border and each tab's folded sections went unremembered until the
+user noticed one of them.
+
+`tests/test_remembered_settings.py` holds the window to it the way Fun
+Time's `test_session_resume.py` holds the session: it builds the window,
+counts every control a person can set and every press and bar on the
+console, and fails on one that neither a key of the table nor its short list
+of things that are no setting accounts for. So a new control is finished
+when it has its key, or its line there saying why it is no setting -- what is
+being searched for, what one picture shows, a nudge, and Auto-generate, which
+a restart leaves off, since a loop that came back on by itself could run
+unnoticed.
+
+Inside a Fun Time session the window draws what the session asks for -- one
+list per shape, its own borders held still, the room's device and sound --
+and leaves the standalone choices it overrides as it found them, so a window
+handed back, or the next launch on its own, is where he left it.
 
 ## Judging a branch before it lands
 

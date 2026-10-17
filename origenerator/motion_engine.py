@@ -36,10 +36,13 @@ from funestra.robot_hand import (
     position_fraction,
     set_amplitude,
     set_center,
+    set_dials,
     set_max_intensity,
     set_speed,
 )
 from funestra.robot_hand import trace_window as wave_trace_window
+
+_SHAPES_BY_NAME = {shape.value: shape for shape in WaveformShape}
 
 __all__ = [
     "MAX_SPEED",
@@ -62,6 +65,8 @@ __all__ = [
     "set_center",
     "set_max_intensity",
     "set_speed",
+    "settings_of",
+    "take_settings",
     "tick_learned_motion",
     "toggle_learned_motion",
     "trace_window",
@@ -116,6 +121,24 @@ def enable_learned_motion(motion: Motion) -> None:
 
 def disable_learned_motion(motion: Motion) -> None:
     learned_motion.disable_learned_motion(motion.learned)
+
+
+def settings_of(motion: Motion) -> dict:
+    bars = motion.state
+    return {"speed": bars.speed, "amplitude": bars.amplitude, "center": bars.intended_center,
+            "shape": bars.shape.value, "human_inspired": motion.learned.active}
+
+
+def take_settings(motion: Motion, saved) -> None:
+    if not isinstance(saved, dict):
+        return
+    speed, amplitude, center = (saved.get(name) for name in ("speed", "amplitude", "center"))
+    if all(type(number) is int for number in (speed, amplitude, center)):
+        set_dials(motion.state, speed=speed, amplitude=amplitude, center=center)
+    if saved.get("shape") in _SHAPES_BY_NAME:
+        motion.state.shape = _SHAPES_BY_NAME[saved["shape"]]
+    if saved.get("human_inspired") is True:
+        enable_learned_motion(motion)
 
 
 def quarter_offset(motion: Motion) -> None:

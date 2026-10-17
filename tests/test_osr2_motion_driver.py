@@ -4,6 +4,7 @@ from __future__ import annotations
 import threading
 import time
 
+import pytest
 from app_support.osr2_hold import PARK, RESUME, RETRACT
 from funestra.console import OSR2_PARKED, OSR2_RETRACTED
 from funestra.learned_model import LearnedModel, Phrase, classify
@@ -468,3 +469,16 @@ def test_a_motion_stopped_in_a_frozen_room_parks_now_and_stays_stopped(qtbot):
 
     assert broker.parked == 1
     assert len(broker.positions) == sent
+
+
+@pytest.mark.parametrize("saved", [
+    None,
+    "fast",
+    {"speed": "fast", "amplitude": 60, "center": 40, "shape": "wobble", "human_inspired": "yes"},
+])
+def test_settings_that_no_longer_read_leave_the_motion_where_it_opens(saved):
+    motion = motion_engine.Motion()
+
+    motion_engine.take_settings(motion, saved)
+
+    assert motion_engine.settings_of(motion) == motion_engine.settings_of(motion_engine.Motion())

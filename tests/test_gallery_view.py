@@ -617,7 +617,7 @@ def test_tree_rows_carry_a_recipe_level_badge(qtbot):
     source = _at(lora, 0)
     settings = _at(source, 0)
 
-    # Each level carries a chip as its row icon — right of the caret, reading as
+    # Each level carries a chip as its row icon — right of the chevron, reading as
     # the first character of the folder's name — and names itself in the tooltip.
     assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
@@ -653,7 +653,7 @@ def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
     assert _shown(source) == f"(1) {source.text(0)}"
 
 
-def test_every_tree_level_steps_by_one_caret_width(qtbot):
+def test_every_tree_level_steps_by_one_chevron_width(qtbot):
     # The tree is six levels deep by the time it reaches a settings folder and it
     # lives in the window's narrowest column, so every wasted pixel per level is
     # six wasted at the foot. Each step is one indentation and no more.
@@ -667,7 +667,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     _on_screen(qtbot, view, 1200, 800)
     tree = _side(view._tree)  # one half; both are the same widget class
     step = tree.indentation()
-    assert step <= 16   # a caret's width, not the platform's roomy default
+    assert step <= 16   # a chevron's width, not the platform's roomy default
 
     def name_x(item):
         return tree.visualRect(tree.indexFromItem(item)).left()
@@ -1891,14 +1891,14 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     # geometry belongs to whichever one the row is in.
     half = _side(tree, LANDSCAPE)
     row = half.visualRect(half.indexFromItem(images))
-    caret = QPoint(row.left() - half.indentation() // 2, row.center().y())
+    chevron = QPoint(row.left() - half.indentation() // 2, row.center().y())
 
-    qtbot.mouseClick(half.viewport(), Qt.MouseButton.RightButton, pos=caret)
+    qtbot.mouseClick(half.viewport(), Qt.MouseButton.RightButton, pos=chevron)
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMenu.exec",
         lambda menu, *a: next(act for act in menu.actions() if act.text() == "Favorite"),
     )
-    view._on_tree_context_menu(images, caret, LANDSCAPE)
+    view._on_tree_context_menu(images, chevron, LANDSCAPE)
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert _image_workflow(view._tree).isExpanded()

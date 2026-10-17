@@ -56,6 +56,16 @@ def test_a_folded_block_stays_folded_for_the_next_item_shown(qtbot, block):
     assert block.findChild(CollapsibleSection).is_collapsed()
 
 
+def test_a_fold_put_back_after_a_restart_folds_the_block_shown_and_the_next(block):
+    block.show_row(_row())
+
+    block.set_folded(True)
+    folded_now = block.findChild(CollapsibleSection).is_collapsed()
+    block.show_row(_row(created_at="2026-07-02"))
+
+    assert (folded_now, block.findChild(CollapsibleSection).is_collapsed()) == (True, True)
+
+
 def test_the_way_to_the_folder_leads_the_block(qtbot):
     # One button for the generation, over the lines about its files: each of
     # those names a file of its own, and every one of them is in that folder.

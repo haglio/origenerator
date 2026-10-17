@@ -114,11 +114,11 @@ class GalleryTree:
         # saved session's, a spoken collection name) can still find a row.
         self.keys_by_folder: dict[str, list[str]] = {}
         self._recently_worked: set[str] = set()  # tree keys wearing the mark
-        self._built = False  # whether a first populate has happened (see _open_all)
+        self._drawn_sides: frozenset[str] | None = None
+        self._folders_left_open: set[str] = set()
 
-    def populate(self, sides, expanded_keys, *, folder_meta=None,
-                 recently_worked=()):
-        """Rebuild the list from ``sides``, restoring the folders in ``expanded_keys``.
+    def populate(self, sides, *, folder_meta=None, recently_worked=()):
+        """Rebuild the list from ``sides``, with the folders left open opened again.
 
         ``sides`` are the :class:`SideModel`s of the sections the pane is
         drawing. ``folder_meta`` is the same label/star overlay the tree models
@@ -132,6 +132,7 @@ class GalleryTree:
         """
         self._recently_worked = {oriented_key(key, side)
                                  for side, key in recently_worked}
+        self._folders_left_open = self.folders_left_open()
         self._tree.blockSignals(True)
         self._tree.clear()
         self.item_by_key = {}
@@ -140,13 +141,13 @@ class GalleryTree:
         for side in sides:
             self._add_side(self._tree.root_for(side.side), side, folder_meta)
         # Folders default to collapsed; only restore folders the user had open.
-        for key in expanded_keys:
+        for key in self._folders_left_open:
             item = self.item_by_key.get(key)
             if item is not None:
                 item.setExpanded(True)
-        self._open_all(expanded_keys)
+        self._open_all()
         self._tree.blockSignals(False)
-        self._built = True
+        self._drawn_sides = frozenset(side.side for side in sides)
 
     def _add_side(self, root, side, folder_meta) -> None:
         """One side's whole table of contents, filling that side's section.
@@ -195,7 +196,7 @@ class GalleryTree:
             self.keys_by_folder.setdefault(folder_key, []).append(key)
         return item
 
-    def _open_all(self, expanded_keys) -> None:
+    def _open_all(self) -> None:
         """Open every side's All row on a gallery's first build.
 
         Every other folder defaults shut, but All shut is a side with nothing in
@@ -203,7 +204,7 @@ class GalleryTree:
         build: after that its state is the user's, saved and restored with every
         other folder's, so collapsing it sticks.
         """
-        if self._built or expanded_keys:
+        if self.built or self._folders_left_open:
             return
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
@@ -279,8 +280,25 @@ class GalleryTree:
         holding = [item for item in alls if gallery.child_groups(item.data(0, GROUP_ROLE))]
         return next(iter(holding or alls), None)
 
+    @property
+    def built(self) -> bool:
+        return self._drawn_sides is not None
+
+    @property
+    def drawn_sides(self) -> frozenset[str]:
+        return self._drawn_sides or frozenset()
+
     def expanded_keys(self) -> set[str]:
         return {key for key, item in self.item_by_key.items() if item.isExpanded()}
+
+    def folders_left_open(self) -> set[str]:
+        if not self.built:
+            return set(self._folders_left_open)
+        return ({key for key in self._folders_left_open if side_of(key) not in self.drawn_sides}
+                | self.expanded_keys())
+
+    def leave_folders_open(self, keys) -> None:
+        self._folders_left_open = set(keys)
 
     def selected_folder_key(self) -> str | None:
         """The tree key of the selected row — its folder's key with the side it is

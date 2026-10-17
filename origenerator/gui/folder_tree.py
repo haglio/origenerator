@@ -9,7 +9,7 @@ favorited leaf, an outline offered on hover otherwise, so clicking it to favorit
 a folder just leaves the star in place. Clicking an icon emits
 ``favorite_clicked`` / ``delete_clicked`` with the folder's key instead of
 selecting the row; the tree hit-tests clicks against the same rects it paints.
-Only a left click ever works the caret: a right one just picks the row it lands
+Only a left click ever works the chevron: a right one just picks the row it lands
 on, so opening a folder's menu never shuts the folder. Which group a row holds is
 injected, so this stays free of the gallery model.
 
@@ -106,7 +106,7 @@ class FolderTree(QTreeWidget):
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
         self.setItemDelegate(_CountBeforeName(self))
         self.setIconSize(QSize(_ICON, _ICON))  # each row's mark, the size of the star/delete
-        # One indentation per level, no wider than the caret that sits in it. The
+        # One indentation per level, no wider than the chevron that sits in it. The
         # tree is six levels deep by the time it reaches a settings folder and it
         # lives in the window's narrowest column, so the platform default spends
         # most of that column on empty margin: at Qt's 20px a leaf's label starts
@@ -180,8 +180,8 @@ class FolderTree(QTreeWidget):
 
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton:
-            # QTreeView toggles the caret under the cursor on a press of *any*
-            # button, so a right-click landing in the caret column shuts the row
+            # QTreeView toggles the chevron under the cursor on a press of *any*
+            # button, so a right-click landing in the chevron column shuts the row
             # it is opening a menu for. A folder with sub-folders carries no star
             # of its own (the row's actions are a leaf's), so that menu is the
             # only way to favorite one — and the menu pops over the tree, hiding the

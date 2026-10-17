@@ -12,6 +12,7 @@ import pytest
 from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
+from funestra.robot_hand import WaveformShape
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox
@@ -26,12 +27,16 @@ from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.sides import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import desktop_notices, main_window
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
+from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
+from origenerator.media import MediaType
+from origenerator.orientation import oriented_key
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
@@ -324,6 +329,87 @@ def test_persists_the_max_intensity_on_close(qtbot, tmp_path):
 
     win.close()
     assert state.get("max_intensity") == 35
+
+
+def test_a_border_dragged_between_the_panes_is_where_it_was_left_after_a_restart(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+    panes = first._gallery_view._arrangement.panes
+    panes.moveSplitter(panes.sizes()[0] - 150, 1)
+    dragged = panes.sizes()
+    first.close()
+
+    reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+
+    assert reopened._gallery_view._arrangement.panes.sizes() == dragged
+
+
+@pytest.mark.parametrize("border", [
+    "panes", "folder_panes", "left_column", "left_pane_sections", "browser_and_enhance",
+    "side_sections",
+])
+def test_every_border_dragged_in_the_window_is_where_it_was_left_after_a_restart(
+        qtbot, tmp_path, border):
+    path = tmp_path / "ui.json"
+    first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+    dragged = _drag_the_first_open_handle(first._gallery_view.findChild(PaneSplitter, border))
+    first.close()
+
+    reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+
+    assert reopened._gallery_view.findChild(PaneSplitter, border).sizes() == dragged
+
+
+def test_a_border_never_dragged_is_not_remembered(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path))).close()
+
+    assert AppState(path).get("pane_sizes") == {}
+
+
+def _drag_the_first_open_handle(splitter: PaneSplitter, by: int = 20) -> list[int]:
+    index = next(i for i in range(1, splitter.count())
+                 if splitter.widget(i - 1).isVisible() and splitter.widget(i).isVisible())
+    before = splitter.sizes()
+    splitter.moveSplitter(sum(before[:index]) - by, index)
+    assert splitter.sizes() != before
+    return splitter.sizes()
+
+
+def _shown_at_the_same_size(qtbot, win):
+    win.setGeometry(40, 50, 1600, 1600)
+    win.show()
+    qtbot.waitExposed(win)
+    return win
+
+
+def test_the_motion_reopens_at_the_speed_amp_center_and_shape_it_was_left_at(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    motion = first._gallery_view._osr2_motion
+    motion.set_amplitude(60)
+    motion.set_speed(70)
+    motion.set_center(40)
+    motion.cycle_shape()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    bars = reopened._gallery_view._osr2_motion.state.state
+    assert (bars.speed, bars.amplitude, bars.intended_center, bars.shape) == (
+        70, 60, 40, WaveformShape.TRIANGLE)
+
+
+def test_the_motion_reopens_human_inspired_when_it_was_left_human_inspired(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._osr2_motion.set_learned(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view._osr2_motion.state.learned.active
 
 
 def test_restores_the_audio_switch_from_app_state(qtbot, tmp_path):
@@ -1080,6 +1166,124 @@ def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_pa
     assert win._gallery_view.how_many() == 1
 
 
+def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    panel = first._gallery_view._info_tabs.currentWidget()
+    panel.prefill("sdxl_t2i", {})
+    sections = panel._param_form._sections
+    assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (False, True)
+    sections["Seed"]._header.click()
+    sections["Size"]._header.click()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    sections = reopened._gallery_view._info_tabs.currentWidget()._param_form._sections
+    assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (True, False)
+
+
+def test_a_tabs_enhancement_levels_and_details_come_back_folded(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    panel = first._gallery_view._info_tabs.currentWidget()
+    panel.prefill("sdxl_t2i", {})
+    panel._versions.set_collapsed(True)
+    panel._metadata_block.set_folded(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    panel = reopened._gallery_view._info_tabs.currentWidget()
+    assert (panel._versions.is_collapsed(), panel._metadata_block.is_folded()) == (True, True)
+
+
+def test_a_tabs_border_under_its_picture_is_where_it_was_left_after_a_restart(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+    first._gallery_view._info_tabs.currentWidget().prefill("sdxl_t2i", {})
+    dragged = _drag_the_first_open_handle(
+        first._gallery_view._info_tabs.currentWidget()._media_split)
+    first.close()
+
+    reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+
+    assert reopened._gallery_view._info_tabs.currentWidget()._media_split.sizes() == dragged
+
+
+def test_the_toc_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._tree.together_button.click()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view._tree.sides == (BOTH,)
+
+
+def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view.refresh()
+    first._gallery_view._tree.together_button.click()
+    folder = oriented_key("image/sdxl_t2i", BOTH)
+    first._gallery_view._tree.setCurrentItem(first._gallery_view._tree_item_for(folder))
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    reopened._gallery_view.refresh()
+
+    assert reopened._gallery_view.selected_folder_key() == folder
+
+
+def test_the_collections_reopen_listing_the_kinds_they_were_closed_on(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._videos_only.setChecked(True)  # as a click does
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view.media_types() == {MediaType.VIDEO}
+
+
+def test_a_collection_left_listing_videos_is_open_on_its_videos_after_a_restart(
+        qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    view = first._gallery_view
+    view.refresh()
+    latest = oriented_key(RECENTS_KEY, SEPARATE[1])
+    view._tree.setCurrentItem(view._tree_item_for(latest))
+    view._videos_only.setChecked(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    reopened._gallery_view.refresh()
+
+    assert reopened._gallery_view.selected_folder_key() == latest
+    assert reopened._gallery_view.visible_prompt_ids() == ["vid"]
+
+
+def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view.refresh()
+    first._gallery_view._tree.together_button.click()
+    folder = oriented_key("image/sdxl_t2i", BOTH)
+    first._gallery_view._tree_item_for(folder).setExpanded(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    reopened._gallery_view.refresh()
+
+    assert reopened._gallery_view._tree_item_for(folder).isExpanded()
+
+
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     # The end-to-end round trip: pick a picture, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane
@@ -1641,6 +1845,94 @@ def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_foun
     win.close()
 
     assert AppState(path).get("slideshows") == kept
+
+
+def test_a_window_a_session_launched_leaves_the_saved_borders_as_it_found_them(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    kept = {"panes": [600, 400]}
+    state = AppState(path)
+    state.set("pane_sizes", kept)
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    win.close()
+
+    assert AppState(path).get("pane_sizes") == kept
+
+
+def test_a_window_a_session_takes_keeps_the_borders_it_was_dragged_to(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win.setGeometry(QApplication.primaryScreen().availableGeometry())
+    win.show()
+    qtbot.waitExposed(win)
+    dragged = _drag_the_first_open_handle(win._gallery_view.findChild(PaneSplitter, "panes"))
+    win.become_hosted(_fun_time_session())
+
+    win.close()
+
+    assert AppState(path).get("pane_sizes")["panes"] == dragged
+
+
+def test_a_window_handed_back_from_a_session_puts_its_dragged_borders_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.setGeometry(QApplication.primaryScreen().availableGeometry())
+    win.show()
+    qtbot.waitExposed(win)
+    panes = win._gallery_view.findChild(PaneSplitter, "panes")
+    dragged = _drag_the_first_open_handle(panes, by=100)
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+    QApplication.sendPostedEvents()
+
+    sizes = panes.sizes()
+    assert sizes[0] / sum(sizes) == pytest.approx(dragged[0] / sum(dragged), abs=0.01)
+
+
+def test_a_window_a_session_launched_leaves_the_saved_motion_as_it_found_it(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    kept = {"speed": 70, "amplitude": 60, "center": 40, "shape": "triangle",
+            "human_inspired": True}
+    state = AppState(path)
+    state.set("motion", kept)
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    win.close()
+
+    assert AppState(path).get("motion") == kept
+
+
+def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_next_launch(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    state = AppState(path)
+    state.set("toc_sides", [BOTH])
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    assert win._gallery_view._tree.sides == SEPARATE
+    win.close()
+
+    assert AppState(path).get("toc_sides") == [BOTH]
+
+
+def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    folder = oriented_key("image/sdxl_t2i", BOTH)
+    state = AppState(path)
+    state.set("toc_sides", [BOTH])
+    state.set("open_folders", [folder])
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    win._gallery_view.refresh()
+    win.close()
+
+    assert folder in AppState(path).get("open_folders")
 
 
 def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):

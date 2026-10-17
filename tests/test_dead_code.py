@@ -289,7 +289,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_pane_with_no_room_for_a_track_draws_nothing.
 #
 # 18710 when every mark in the table of contents moved into its level's column:
-# the notes on drawing a collection's mark in the caret column under its folder's own,
+# the notes on drawing a collection's mark in the chevron column under its folder's own,
 # on starting its name where the folder's began, and on which rows go without a
 # mark, are test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_next,
 # test_a_picked_collection_row_is_blue_from_its_mark_to_its_name and

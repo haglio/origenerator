@@ -444,6 +444,21 @@ def test_clicking_a_choice_s_word_picks_it(qtbot, tmp_path):
     assert view._tree.sides == (BOTH,)
 
 
+def test_a_folder_open_on_together_is_open_again_after_a_turn_on_separate(qtbot, tmp_path):
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    view = GalleryView(FakeDB([tall]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.together_button.click()
+    folder = oriented_key("image/sdxl_t2i", BOTH)
+    view._tree_item_for(folder).setExpanded(True)
+
+    view._tree.separate_button.click()
+    view._tree.together_button.click()
+
+    assert view._tree_item_for(folder).isExpanded()
+
+
 def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_path):
     """The whole point of two panes: which library you are reading is on screen
     however far down its own rows you have scrolled."""

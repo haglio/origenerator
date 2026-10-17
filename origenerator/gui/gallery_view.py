@@ -63,6 +63,12 @@ from origenerator.gallery.sides import (
     LANDSCAPE as _LANDSCAPE,
 )
 from origenerator.gallery.sides import (
+    SEPARATE as _SEPARATE,
+)
+from origenerator.gallery.sides import (
+    TOGETHER as _TOGETHER,
+)
+from origenerator.gallery.sides import (
     side_covers as _side_covers,
 )
 from origenerator.gallery.sides import (
@@ -838,7 +844,7 @@ class GalleryView(QWidget):
             self._motion_pane, hud_column = pane()
             hud_column.addWidget(hud_scroll)
             sections.insert(0, self._motion_pane)
-        toc = PaneSplitter(Qt.Orientation.Vertical)
+        toc = PaneSplitter(Qt.Orientation.Vertical, "left_pane_sections")
         for section in sections:
             toc.addWidget(section)
         toc.setStretchFactor(sections.index(finding), 1)  # the folder list takes the height
@@ -904,6 +910,11 @@ class GalleryView(QWidget):
         self._videos_only = QRadioButton("Videos")
         self._both_kinds = QRadioButton("Both")
         self._both_kinds.setChecked(True)
+        self._kinds_by_button = {
+            self._images_only: (MediaType.IMAGE,),
+            self._videos_only: (MediaType.VIDEO,),
+            self._both_kinds: (MediaType.IMAGE, MediaType.VIDEO),
+        }
         self._kinds_bar = QWidget()
         kinds_row = QHBoxLayout(self._kinds_bar)
         kinds_row.setContentsMargins(0, 0, 0, 0)
@@ -948,7 +959,7 @@ class GalleryView(QWidget):
         # lands in, and this one doesn't.
         enhance, enhance_column = pane()
         enhance_column.addWidget(self._enhance.panel)
-        browsing = FootSplitter()
+        browsing = FootSplitter("browser_and_enhance")
         browsing.addWidget(browser)
         browsing.addWidget(enhance)
         browsing.setStretchFactor(0, 1)
@@ -1215,6 +1226,13 @@ class GalleryView(QWidget):
     def set_max_intensity(self, saved) -> None:
         if isinstance(saved, int):
             self.osr2_control.set_max_intensity(saved)
+
+    def motion_settings(self) -> dict | None:
+        return None if self._osr2_motion is None else self._osr2_motion.settings()
+
+    def set_motion_settings(self, saved) -> None:
+        if self._osr2_motion is not None:
+            self._osr2_motion.take_settings(saved)
 
     # --- the audio bed: one app-global switch, following nothing on screen ----
 
@@ -1734,7 +1752,6 @@ class GalleryView(QWidget):
     def _rebuild(self, rows, meta, *, new_listing: bool = False):
         self._folder_meta = meta
         self._drawn_version += 1
-        expanded = self._tree_view.expanded_keys()
         standing = self._tree_view.selected_folder_key()
         place = self._browser.place()
         if new_listing:
@@ -1811,7 +1828,7 @@ class GalleryView(QWidget):
             image_index=start_frames,
         )
         self._tree_view.populate(
-            self._build_sides(trees), expanded, folder_meta=meta,
+            self._build_sides(trees), folder_meta=meta,
             # Where the work has lately been. The tree keeps the order the
             # recipes were tried in, so nothing else in it says so.
             recently_worked=gallery.recently_worked_folders(trees, listed, bumped=bumped),
@@ -1902,6 +1919,19 @@ class GalleryView(QWidget):
             collection_counts=self._browser.collection_counts(side),
         ) for side in self._tree.sides]
 
+    def open_folders(self) -> list[str]:
+        return sorted(self._tree_view.folders_left_open())
+
+    def set_open_folders(self, saved) -> None:
+        if isinstance(saved, list):
+            self._tree_view.leave_folders_open(key for key in saved if isinstance(key, str))
+
+    def toc_sides(self) -> list[str]:
+        return list(self._tree.chosen_sides)
+
+    def set_toc_sides(self, saved) -> None:
+        self._tree.choose_sides(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
+
     def _on_sides_changed(self):
         """The radio over the list moved: draw the list again on the new sides.
 
@@ -1909,6 +1939,8 @@ class GalleryView(QWidget):
         contents is built from the rows that side holds — the one list of both
         shapes is a different hierarchy, not the two stacked.
         """
+        if not self._tree_view.built:
+            return
         with working():
             self.refresh()
         # The row that was selected is on a side nobody draws now, so the
@@ -3654,15 +3686,19 @@ class GalleryView(QWidget):
         return self._browser.visible_prompt_ids()
 
     def media_types(self) -> set[str]:
-        """The media types the gallery's two ticks currently include — what
-        the folder tree, every collection, the in-flight cards and the search index are
-        all built from. Both on (the default) means every type; both off means
-        none."""
-        if self._images_only.isChecked():
-            return {MediaType.IMAGE}
-        if self._videos_only.isChecked():
-            return {MediaType.VIDEO}
-        return {MediaType.IMAGE, MediaType.VIDEO}
+        """The media types the Images / Videos / Both choice lets through — what
+        the TOC, every collection, the in-flight cards and the search
+        index are all built from."""
+        return next(set(kinds) for button, kinds in self._kinds_by_button.items()
+                    if button.isChecked())
+
+    def collection_kinds(self) -> list[str]:
+        return sorted(self.media_types())
+
+    def set_collection_kinds(self, saved) -> None:
+        wanted = set(saved) if isinstance(saved, list) else set()
+        next((button for button, kinds in self._kinds_by_button.items()
+              if set(kinds) == wanted), self._both_kinds).setChecked(True)
 
     def _on_media_filter_changed(self, checked=True):
         """Another kind was chosen: list the collection again under it."""

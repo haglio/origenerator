@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
@@ -12,7 +11,8 @@ from origenerator import points_of_interest
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
-from origenerator.workflows.detail_parts import detail_fix_passes, detector_part
+from origenerator.workflows.detail_parts import detail_fix_passes
+from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
 
@@ -66,13 +66,9 @@ _RIFE_CACHE_FRAMES = 10
 UPSCALE_MODEL_FACTOR = 4.0
 
 # The detail pass's fixed shape (see :meth:`WorkflowTemplate.detail_fix_nodes`).
-# All of these are the detector/detailer nodes' own defaults, kept here as named
+# All of these are the detailer node's own defaults, kept here as named
 # constants rather than as settings: the pass already costs the user a tick and
 # a denoise, and every one of these is a value their answer would be a guess at.
-_DETECTOR_THRESHOLD = 0.5     # how sure the detector must be to call it a face
-_DETECTOR_DILATION = 10       # pixels grown around each rect, so edges are inside
-_DETECTOR_CROP_FACTOR = 3.0   # how much context around the rect the sampler sees
-_DETECTOR_DROP_SIZE = 10      # rects smaller than this are noise, not anatomy
 _DETAIL_GUIDE_SIZE = 512      # each crop is enlarged to this before sampling
 _DETAIL_MAX_SIZE = 1024       # …but never past this, which is where VRAM goes
 _DETAIL_FEATHER = 5           # pixels the repaint fades over on the way back in
@@ -668,31 +664,14 @@ class WorkflowTemplate(ABC):
         nodes: dict = {}
         picture = image_ref
         for index, (detector, denoise) in enumerate(detail_fix_passes(params)):
-            provider_id, segs_id, detailer_id = (
-                f"fix{index}_{role}" for role in ("detector", "segs", "detailer"))
-            nodes[provider_id] = {
-                "class_type": "UltralyticsDetectorProvider",
-                # The provider's own picker prefixes its detector models
-                # this way, and the value is matched against that list.
-                "inputs": {"model_name": f"bbox/{detector}"},
-            }
-            nodes[segs_id] = {
-                "class_type": "BboxDetectorSEGS",
-                "inputs": {
-                    "bbox_detector": [provider_id, 0],
-                    "image": image_ref,
-                    "threshold": _DETECTOR_THRESHOLD,
-                    "dilation": _DETECTOR_DILATION,
-                    "crop_factor": _DETECTOR_CROP_FACTOR,
-                    "drop_size": _DETECTOR_DROP_SIZE,
-                    "labels": "all",
-                },
-            }
+            found, segs_ref = finding_nodes(index, detector, image_ref, picture)
+            nodes.update(found)
+            detailer_id = f"fix{index}_detailer"
             nodes[detailer_id] = {
                 "class_type": "DetailerForEach",
                 "inputs": {
                     "image": image_ref,
-                    "segs": [segs_id, 0],
+                    "segs": segs_ref,
                     "model": model_ref,
                     "clip": clip_ref,
                     "vae": vae_ref,
@@ -716,7 +695,6 @@ class WorkflowTemplate(ABC):
                     "cycle": 1,
                 },
             }
-            nodes.update(points_of_interest.report_nodes(index, [segs_id, 0], picture))
             image_ref = [detailer_id, 0]
         return nodes, image_ref
 
@@ -903,8 +881,8 @@ class WorkflowTemplate(ABC):
         """
         outputs = history_data.get("outputs", {})
         files = list(outputs.get(self.output_node_id, {}).get(self.output_key, []))
-        places = points_of_interest.reported(outputs, _parts_fixed_in(history_data))
-        if files and places:
+        places = points_of_interest.reported(outputs, parts_found_by(history_data))
+        if files and places is not None:
             files[0] = {**files[0], points_of_interest.FILE_KEY: places}
         files += soundless_copies_of(files)
         if self.base_output_node_id is None:
@@ -933,17 +911,6 @@ class WorkflowTemplate(ABC):
                 },
             },
         }
-
-
-_FIX_DETECTOR = re.compile(r"fix(\d+)_detector")
-
-
-def _parts_fixed_in(history_data: dict) -> dict:
-    run = history_data.get("prompt")
-    graph = run[2] if isinstance(run, list | tuple) and len(run) > 2 and isinstance(run[2], dict) else {}
-    return {int(found[1]): part for node_id, node in graph.items()
-            if (found := _FIX_DETECTOR.fullmatch(str(node_id))) and isinstance(node, dict)
-            and (part := detector_part(str((node.get("inputs") or {}).get("model_name", "")))) is not None}
 
 
 def soundless_copies_of(saved: list[dict]) -> list[dict]:

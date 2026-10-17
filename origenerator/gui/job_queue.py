@@ -676,13 +676,15 @@ class JobQueue(QObject):
 
     @property
     def queue_order(self) -> list[str]:
-        """Prompt ids in the order they will run: what ComfyUI holds, then the line.
+        """Prompt ids in the order they will run: what ComfyUI holds, the run it
+        is making first, then the line.
 
         Whatever displays the queue orders itself by this rather than by when the
         rows were made — the rules that put an image in front of a video leave no
         mark on anything the database records.
         """
-        return [job.prompt_id for job in self._on_server + self._waiting]
+        making_first = sorted(self._on_server, key=lambda job: job.state != JobState.RUNNING)
+        return [job.prompt_id for job in making_first + self._waiting]
 
     def put_first(self, prompt_ids):
         self._first = frozenset(prompt_ids)

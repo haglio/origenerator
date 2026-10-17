@@ -1160,6 +1160,24 @@ def test_every_video_the_server_holds_is_pulled_back_for_the_image(qtbot, tmp_pa
     assert queue.queue_order == [image.prompt_id, "v-old", "v-new"]
 
 
+def test_the_run_comfyui_is_making_is_the_front_of_the_line(qtbot, tmp_path):
+    # Taken back after a restart, the runs the server holds come back oldest
+    # first, which need not be the order it makes them in.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    for pid in ("v-old", "v-new"):
+        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
+                             workflow_version=_I2V.version, positive_prompt="x", seed=1,
+                             params_json=json.dumps(_params(seed=1)), workflow_json="{}")
+        db.update_generation(pid, status="running")
+    queue = JobQueue(db, client)
+    queue.reconnect_running()
+
+    client.progress.emit("v-new", "s", 1, 10)
+
+    assert queue.queue_order == ["v-new", "v-old"]
+
+
 def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_again(
         qtbot, tmp_path):
     # The stop can reach the server after the video's last node has saved. Then

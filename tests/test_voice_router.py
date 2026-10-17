@@ -713,7 +713,15 @@ def test_an_opening_request_pauses_the_slideshow_and_says_so(router):
 
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
-    assert slideshow.pauses == [(True, "🎤 Request: no hat…")]
+    assert slideshow.pauses == [(True, "🎤 Request: no hat… — say “over” to submit")]
+
+
+def test_an_open_request_reminds_the_speaker_that_over_submits_it(router):
+    voice, _host, _slideshows = router()
+
+    voice.on_spoken_request(Spoken("no hat", listening=True))
+
+    assert voice.status.text().endswith("say “over” to submit")
 
 
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):
@@ -844,7 +852,7 @@ def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
     voice.listener.dictated = Spoken("no hat", listening=True)
 
     assert voice.run_spoken_command("portrait request no hat") is True
-    assert voice.status.text() == "🎤 Request: no hat…"
+    assert voice.status.text() == "🎤 Request: no hat… — say “over” to submit"
 
 
 def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(

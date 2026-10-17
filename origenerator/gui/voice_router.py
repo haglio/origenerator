@@ -747,11 +747,12 @@ class VoiceRouter(QObject):
         """Pause (or release) the slideshow while the sentence is being said, and say
         so — in the slideshow's own corner when one is up, since that is where the
         speaker is looking, and in this pane's voice caption otherwise."""
-        note = f"🎤 Request: {spoken.text}…" if spoken.listening else ""
+        note = (f"🎤 Request: {spoken.text}… — say “over” to submit"
+                if spoken.listening else "")
         if slideshow is not None:
             slideshow.pause_for_request(spoken.listening, note)
         elif spoken.listening:
-            self._show(note or "🎤 Request…", transient=False)
+            self._show(note, transient=False)
 
     def _answer_request(self, slideshow, message: str, spoken, *,
                         working: bool = False, kind: str = NOTICE) -> None:

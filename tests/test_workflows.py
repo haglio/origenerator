@@ -837,8 +837,15 @@ def test_the_places_say_which_part_found_them_and_eyes_found_together_are_one():
         {"left": 0.1, "top": 0.1, "right": 0.45, "bottom": 0.52, "part": "eyes"}]
 
 
-def test_an_enhancement_whose_fixes_found_nothing_carries_no_places():
+def test_an_enhancement_whose_fixes_found_nothing_says_it_looked_and_found_no_places():
     history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {"text": [WHOLE_PICTURE]}}}
+
+    assert WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history) == [
+        {**ENHANCED, "points_of_interest": []}]
+
+
+def test_an_enhancement_that_fixed_no_part_carries_no_places_at_all():
+    history = {"outputs": {"12": {"images": [ENHANCED]}}}
 
     assert WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history) == [ENHANCED]
 

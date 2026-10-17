@@ -60,10 +60,10 @@ def test_a_report_that_never_says_how_big_the_picture_is_gives_no_places():
     assert points_of_interest.reported(outputs) == []
 
 
-def test_a_node_that_is_no_report_of_a_fix_is_not_read_for_places():
+def test_a_run_whose_only_text_is_no_report_of_a_fix_reported_nothing():
     outputs = {"12": {"text": [json.dumps([0, 0, 10, 10]), json.dumps([0, 0, 20, 20])]}}
 
-    assert points_of_interest.reported(outputs) == []
+    assert points_of_interest.reported(outputs) is None
 
 
 def test_every_pass_shares_one_measure_of_the_picture_it_ran_on():

@@ -812,7 +812,7 @@ def test_an_unheld_deletion_is_simply_absent(tmp_path):
     db.forget_deletion("never")  # must not raise
 
 
-# --- spoken requests (what the Requests collection lists) --------------------
+# --- spoken requests, and the folder-wide one typed on a tab -----------------
 
 
 def _record(db, prompt_id, source="src-1", heard="Request, no hat, over."):

@@ -847,6 +847,16 @@ def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
     assert slideshows.answers == ["🎤 Latest"]
 
 
+def test_the_sessions_words_go_to_an_open_request_before_any_command(router):
+    voice, _host, slideshows = router()
+    voice.listener.bare = AppCommand.RECENTS
+    voice.listener.dictated = Spoken("recents", listening=True)
+
+    assert voice.run_spoken_command("portrait recents") is True
+    assert slideshows.answers == []
+    assert voice.status.text() == "🎤 Request: recents… — say “over” to submit"
+
+
 def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
     voice, _host, _slideshows = router()
     voice.listener.dictated = Spoken("no hat", listening=True)

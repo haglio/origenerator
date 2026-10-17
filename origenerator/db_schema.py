@@ -155,11 +155,9 @@ CREATE TABLE IF NOT EXISTS custom_folder_items (
 
 -- A request and the generation it queued: the item it was made about, what was
 -- heard, and the prompt pair before the edit (the pair after it is the queued
--- generation's own params). What the Requests collection lists, and the only record
--- of why that generation differs from the one it came from. Kept even when its
--- generation goes: a delete here is undoable, and a restored item should come
--- back with the request that made it, so the collection skips a record it can't
--- resolve rather than the record being dropped.
+-- generation's own params). The only record of why that generation differs from
+-- the one it came from. Kept even when its generation goes: a delete here is
+-- undoable, and a restored item should come back with the request that made it.
 --
 -- Spoken ("Request … over") or typed: a folder rewrite asks the same thing of
 -- every picture in a folder at once and records one of these per picture, which

@@ -41,9 +41,6 @@ from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
 from origenerator.gallery.collection import (
-    REQUESTS_KEY as _REQUESTS_KEY,
-)
-from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
 from origenerator.gallery.voice_commands import said_in
@@ -88,7 +85,6 @@ _COLLECTIONS = {
     AppCommand.RECENTS: _RECENTS_KEY,
     AppCommand.FAVORITES: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
-    AppCommand.REQUESTS: _REQUESTS_KEY,
     AppCommand.TRASH: _TRASH_KEY,
 }
 
@@ -483,27 +479,26 @@ class VoiceRouter(QObject):
         app's own vocabulary: the session cannot know which collections this tree
         has or which detail parts have detectors installed.
 
-        The order is this app's own mic's (``VoiceSteering._meaning``).  A
-        whole-utterance word is that command first — "landscape enhanced only"
-        turns the slideshow's switch, and left to the looser picture matcher it
-        would read as "enhance" with a word after it — so long as no request
-        is being said.  Then the request, which has first refusal over the
-        rest: "Request … over" runs to as many utterances as the speaker takes
-        breaths, so a matcher that only ever saw one at a time could not hear a
-        sentence said in three; while one is open the dictation swallows what
-        it hears, which is what keeps the words of a request from also matching
-        a command.  The side is split off for the dictation — it rides every
-        utterance the session posts, and fed in it would become the first word
-        of the request instead of the region the request is about.
+        The order is this app's own mic's (``VoiceSteering._meaning``).  The
+        request first, which has first refusal: "Request … over" runs to as many
+        utterances as the speaker takes breaths, so a matcher that only ever saw
+        one at a time could not hear a sentence said in three; while one is open
+        the dictation swallows what it hears, which is what keeps the words of a
+        request from also matching a command.  Then a whole-utterance word —
+        "landscape enhanced only" turns the slideshow's switch, and left to the
+        looser picture matcher it would read as "enhance" with a word after it.
+        The side is split off for the dictation — it rides every utterance the
+        session posts, and fed in it would become the first word of the request
+        instead of the region the request is about.
         """
-        bare = self.listener.bare_command(text)
-        if bare is not None:
-            self.on_command(bare)
-            return True
         side, rest = split_side(text)
         spoken = self.listener.push_dictation(rest)
         if spoken is not None:
             self.on_spoken_request(spoken, side=side)
+            return True
+        bare = self.listener.bare_command(text)
+        if bare is not None:
+            self.on_command(bare)
             return True
         matched = match_voice_command(text)
         if matched is None:

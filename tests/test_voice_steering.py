@@ -298,12 +298,12 @@ def test_closing_the_mic_drops_a_half_said_request(qtbot):
     assert not steering._dictation.listening
 
 
-# --- the bare vocabulary, which outranks an opening request ------------------
+# --- the bare vocabulary, asked once the request has passed -------------------
 
 
 def _bare_steering(says):
     """Steering wired as the gallery wires it: a dictation, a loose matcher, and
-    a strict whole-utterance one that gets its say before a request can open."""
+    a strict whole-utterance one."""
     listener = FakeListener(says)
     worker = VoiceWorker(lambda pos, neg, instr: (f"{pos}, {instr}", neg))
     steering = VoiceSteering(
@@ -316,9 +316,7 @@ def _bare_steering(says):
     return steering, listener
 
 
-def test_a_bare_command_word_beats_an_opening_request(qtbot):
-    # "requests" is a collection and "request" opens a dictation; whole and alone,
-    # the word is the command — otherwise the collection would be unreachable.
+def test_a_word_a_request_opens_on_opens_one_whatever_else_it_matches(qtbot):
     steering, listener = _bare_steering("requests")
     ran, spoken = [], []
     steering.request.connect(spoken.append)
@@ -326,9 +324,21 @@ def test_a_bare_command_word_beats_an_opening_request(qtbot):
 
     listener.hear()
 
-    assert ran == ["requests"]
+    assert ran == []
+    assert len(spoken) == 1
+    assert steering._dictation.listening
+
+
+def test_a_bare_command_word_is_the_command(qtbot):
+    steering, listener = _bare_steering("weird")
+    ran, spoken = [], []
+    steering.request.connect(spoken.append)
+    steering.start_commands(ran.append)
+
+    listener.hear()
+
+    assert ran == ["weird"]
     assert spoken == []
-    assert not steering._dictation.listening
 
 
 def test_an_open_request_takes_the_word_back(qtbot):

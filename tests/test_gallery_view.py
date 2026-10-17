@@ -71,7 +71,6 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.labels import workflow_label
@@ -101,7 +100,6 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.hud_queue import queue_section
-from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
@@ -317,7 +315,7 @@ class FakeDB:
     def forget_deletion(self, prompt_id):
         self._deletions.pop(prompt_id, None)
 
-    # --- spoken requests (what the Requests collection lists) --------------
+    # --- spoken requests, and the folder-wide one typed on a tab -----------
 
     def record_request(self, *, prompt_id, source_prompt_id, heard, **fields):
         self._requests[prompt_id] = {
@@ -491,7 +489,7 @@ def _at(item, *path):
     return item
 
 
-_COLLECTION_NAMES = ["Latest", "Favorites", "Experiments", "Requests", "Trash"]
+_COLLECTION_NAMES = ["Latest", "Favorites", "Experiments", "Trash"]
 
 
 def _collection_names(item):
@@ -14692,14 +14690,6 @@ def _finish_reroll(view, job):
     view.refresh()
 
 
-def test_the_tree_carries_a_requests_collection(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    assert "Requests" in _alls(view._tree)
-
-
 def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
@@ -14776,43 +14766,6 @@ def test_the_request_lands_on_the_slide_it_was_opened_over(
 
     (job,) = view._live_jobs.values()
     assert view._db.get_request(job.prompt_id)["source_prompt_id"] == "orig"
-
-
-def test_the_requests_collection_lists_what_was_asked_for_as_ordinary_tiles(
-        qtbot, tmp_path, monkeypatch):
-    # An item a request made is an ordinary generation that happens to have been
-    # asked for out loud, so it gets the tile every other collection gives one.
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
-    view._slideshows.showing.close()
-    (job,) = view._live_jobs.values()
-    _finish_reroll(view, job)
-
-    view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
-
-    assert view.visible_prompt_ids() == [job.prompt_id]
-    assert view._scroll.widget().findChildren(ThumbnailWidget)
-
-
-def test_a_request_still_generating_shows_as_a_live_card(
-        qtbot, tmp_path, monkeypatch):
-    # What "did it queue?" is answered by: the same in-flight card the Recents
-    # collection gives work that is still in flight.
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
-    view._slideshows.showing.close()
-
-    view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
-
-    assert view._scroll.widget().findChildren(InFlightCard)
-
-
-def test_the_collection_row_counts_what_is_waiting(qtbot, tmp_path, monkeypatch):
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-
-    _speak_request(view, qtbot, "Request, no hat, over.")
-
-    assert _shown(_alls(view._tree)["Requests"]) == "(1) Requests"
 
 
 def test_a_request_that_never_hears_over_says_so_and_resumes(
@@ -15443,20 +15396,6 @@ def test_a_spoken_collection_name_stands_you_in_that_collection(qtbot, tmp_path,
     view._voice.listener.speak(said)
 
     assert _selected_folder(view) == key
-
-
-def test_the_requests_collection_answers_the_plural_and_the_singular_still_dictates(
-        qtbot, tmp_path):
-    # "request" opens a spoken request and "requests" is a collection; one word
-    # cannot do both, so the plural navigates and the singular still opens.
-    view = _listening(qtbot, tmp_path)
-
-    view._voice.listener.speak("requests")
-    assert _selected_folder(view) == REQUESTS_KEY
-    assert not view._voice.listener._dictation.listening   # no request opened
-
-    view._voice.listener.speak("Request.")
-    assert view._voice.listener._dictation.listening       # the singular still opens one
 
 
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(

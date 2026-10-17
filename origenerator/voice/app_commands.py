@@ -25,13 +25,6 @@ otherwise, which is Fun Time's active-side idea with two sides: "back" steps a
 slide over a slideshow and walks the history in the gallery, because in both places
 it means the one before. The app-wide switches (the mic, the audio bed, the
 OSR2) and the motion's own bars belong to no surface and answer from either.
-
-One word is deliberately missing. The Requests collection answers to the plural
-"requests" and never to the singular, because "request" is what opens a spoken
-request (:mod:`origenerator.voice.dictation`) and a word cannot both open a
-sentence and navigate away from it. :class:`~origenerator.voice.steering.
-VoiceSteering` gives this vocabulary its say before a request can open, which is
-what lets the plural through; a bare singular still opens the dictation.
 """
 from __future__ import annotations
 
@@ -48,7 +41,6 @@ class AppCommand(Enum):
     RECENTS = "recents"
     FAVORITES = "favorites"
     EXPERIMENTS = "experiments"
-    REQUESTS = "requests"
     TRASH = "trash"
 
     # The transport, aimed at whichever surface has the floor: a slide either
@@ -161,9 +153,6 @@ _COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.RECENTS: ("recents", "recent"),
     AppCommand.FAVORITES: ("favorites",),
     AppCommand.EXPERIMENTS: ("experiments", "experiment"),
-    # The singular is the request dictation's opening word — see the module
-    # docstring. Only the plural, which is also what the row is labeled.
-    AppCommand.REQUESTS: ("requests",),
     AppCommand.TRASH: ("trash",),
 }
 _COLLECTION_VERBS = ("go to", "open", "show")

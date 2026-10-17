@@ -56,9 +56,6 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
-from origenerator.gallery.collection import (
-    REQUESTS_KEY as _REQUESTS_KEY,
-)
 from origenerator.gallery.sides import (
     LANDSCAPE as _LANDSCAPE,
 )
@@ -1799,7 +1796,6 @@ class GalleryView(QWidget):
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_folders))
         requests = self._db.list_requests()
-        requested = gallery.requested_generations(requests, listed)  # the Requests collection
         bumped = gallery.enhancement_recency(listed)
         self._browser.set_model(
             gallery.recent_generations(listed, bumped=bumped),
@@ -1807,7 +1803,6 @@ class GalleryView(QWidget):
             listed,
             unreviewed,
             held,
-            requested,
             image_index=start_frames,
         )
         self._tree_view.populate(
@@ -2175,8 +2170,6 @@ class GalleryView(QWidget):
         self._avg_label.setText("")
         self._clear_metadata()
         self._browser.show_collection(collection.key, side)
-        if collection.which == _REQUESTS_KEY:
-            self._re_aim()
         self._navigation.record()
 
     def _collection_title(self, collection: FolderCollection, item) -> str:
@@ -3144,7 +3137,7 @@ class GalleryView(QWidget):
             old_negative=revision.old_negative, new_positive=revision.positive,
             new_negative=revision.negative,
         )
-        self.refresh()  # the collection shows the request the moment it is spoken
+        self.refresh()  # the queue marks the job as a request the moment it is spoken
         return f"🎤 {revision.describe()} — generating", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
@@ -4296,20 +4289,12 @@ class GalleryView(QWidget):
         return next((r for r in self._held_rows if r["prompt_id"] == prompt_id), None)
 
     def _request_for(self, prompt_id: str) -> dict | None:
-        """The spoken request that made this generation, with the item it was
-        asked about resolved onto it — or ``None`` when nothing asked for it.
-
-        Read off the collection's own listing rather than the database, so the tab's
-        link and the collection's card can never disagree about what a request was
-        about.
-        """
-        return next((item for item in self._request_items()
-                     if item["prompt_id"] == prompt_id), None)
-
-    def _request_items(self) -> list[dict]:
-        """Every spoken request paired with what it made, newest first."""
-        return gallery.requested_generations(self._db.list_requests(),
-                                             self._db.list_generations())
+        """The request that made this generation, with the item it was asked
+        about as its ``source_row`` — or ``None`` when nothing asked for it."""
+        record = self._db.get_request(prompt_id)
+        if record is None:
+            return None
+        return {**record, "source_row": self._db.get_generation(record["source_prompt_id"])}
 
     def _on_thumbnail_clicked(self, prompt_id: str):
         """A generation was picked, wherever it was picked — in a folder, on a

@@ -9249,6 +9249,9 @@ class _FakeRerollJob:
     def take_backlog(self, foreign_ahead):
         pass  # the poll applies the queue position here; the fake's is fixed
 
+    def take_executing(self, executing):
+        pass  # and ComfyUI's word on whether it is making it; the fake's state is fixed
+
     def cancel(self):
         self.state = "canceled"
 
@@ -15734,17 +15737,54 @@ def test_the_poll_fetch_asks_only_what_each_jobs_state_deserves():
             calls.append(("queue", None))
             return ForeignQueue(running=[], pending=[])
 
+        def executing_prompts(self):
+            calls.append(("executing", None))
+            return {"q1"}
+
     facts = gallery_view_module._fetch_poll_facts(
         _Client(),
         [("q1", "queued"), ("r1", "running"), ("f1", "finished")])
 
     # /history for a job that may have quietly finished; a queue position only
-    # for one still waiting; nothing at all for a terminal job; the shared
-    # queue once.
+    # for one still waiting, and what ComfyUI is making once while any waits;
+    # nothing at all for a terminal job; the shared queue once.
     assert calls == [("history", "q1"), ("backlog", "q1"),
-                     ("history", "r1"), ("queue", None)]
+                     ("history", "r1"), ("executing", None), ("queue", None)]
     assert set(facts.histories) == {"q1", "r1"}
     assert facts.backlogs == {"q1": 2}
+    assert facts.executing == {"q1"}
+
+
+def test_the_poll_asks_nothing_of_what_comfyui_is_making_while_no_job_waits_there():
+    class _Client:
+        def fetch_history(self, prompt_id):
+            return {}
+
+        def foreign_queue(self):
+            return ForeignQueue(running=[], pending=[])
+
+        def executing_prompts(self):
+            raise AssertionError("asked with nothing waiting on the server")
+
+    facts = gallery_view_module._fetch_poll_facts(_Client(), [("r1", "running")])
+
+    assert facts.executing == frozenset()
+
+
+def test_the_poll_tells_each_job_whether_comfyui_is_making_it(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    jobs = [_FakeRerollJob(pid, "sdxl_t2i", {}, state="queued")
+            for pid in ("made", "waiting")]
+    heard = []
+    for job in jobs:
+        job.take_executing = lambda executing, pid=job.prompt_id: heard.append(
+            (pid, executing))
+
+    view._apply_poll_facts(
+        jobs, gallery_view_module._PollFacts({}, {}, None, frozenset({"made"})))
+
+    assert heard == [("made", True), ("waiting", False)]
 
 
 def test_the_poll_fetch_fails_soft_read_by_read():
@@ -15758,11 +15798,15 @@ def test_the_poll_fetch_fails_soft_read_by_read():
         def foreign_queue(self):
             raise OSError("connection refused")
 
+        def executing_prompts(self):
+            raise OSError("connection refused")
+
     facts = gallery_view_module._fetch_poll_facts(_Wedged(), [("q1", "queued")])
 
     assert facts.histories == {}          # nothing fetched: reconcile skips it
     assert facts.backlogs == {"q1": None}  # an unreadable position clears the count
     assert facts.foreign.total == 0        # an unreadable queue claims nothing
+    assert facts.executing == frozenset()  # and names nothing as being made
 
 
 def test_the_poll_fetch_reads_nothing_with_no_client():

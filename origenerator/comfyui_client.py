@@ -103,6 +103,9 @@ class ComfyUIClient(QThread):
     def fetch_queue(self) -> set[str]:
         return self.api.fetch_queue()
 
+    def executing_prompts(self) -> set[str]:
+        return self.api.executing_prompts()
+
     def foreign_backlog(self, prompt_id: str) -> int | None:
         return self.api.foreign_backlog(prompt_id)
 

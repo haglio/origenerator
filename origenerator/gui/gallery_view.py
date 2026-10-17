@@ -1732,6 +1732,7 @@ class GalleryView(QWidget):
             # And what another app has in front of a job ComfyUI hasn't
             # started, so that wait shows a number instead of an unmoving bar.
             job.take_backlog(facts.backlogs.get(job.prompt_id))
+            job.take_executing(job.prompt_id in facts.executing)
         if facts.foreign is not None:
             self._foreign_queue = facts.foreign
 
@@ -4487,6 +4488,7 @@ class _PollFacts(NamedTuple):
     histories: dict  # prompt_id -> its /history, for jobs that may have finished
     backlogs: dict   # prompt_id -> another app's jobs ahead of it (None unread)
     foreign: object  # the shared queue's state, or None for nothing-to-read
+    executing: frozenset = frozenset()  # what ComfyUI is making, while one waits there
 
 
 def _fetch_poll_facts(client, targets) -> _PollFacts:
@@ -4495,11 +4497,12 @@ def _fetch_poll_facts(client, targets) -> _PollFacts:
     ``targets`` is ``(prompt_id, state)`` per live job at tick time — names and
     strings rather than the job objects, so nothing here touches GUI-owned
     state. /history is pulled for a job whose completion could have been
-    missed, the queue position for one still waiting, and the shared queue once
-    for the strip. Each read fails soft, exactly as it did when made inline: a
-    fetch that raises leaves its entry unread rather than failing the tick.
+    missed, the queue position for one still waiting, what ComfyUI is making
+    once while any waits there, and the shared queue once for the strip. Each
+    read fails soft: a fetch that raises leaves its entry unread rather than
+    failing the tick.
     """
-    histories, backlogs = {}, {}
+    histories, backlogs, executing = {}, {}, frozenset()
     if client is not None:
         for prompt_id, state in targets:
             if state in ("queued", "running"):
@@ -4514,7 +4517,12 @@ def _fetch_poll_facts(client, targets) -> _PollFacts:
                     logger.debug("Could not read the queue position of %s: %s",
                                  prompt_id, e)
                     backlogs[prompt_id] = None
-    return _PollFacts(histories, backlogs, _read_foreign_queue(client))
+        if any(state == "queued" for _prompt_id, state in targets):
+            try:
+                executing = frozenset(client.executing_prompts())
+            except Exception as e:
+                logger.debug("Could not read what ComfyUI is making: %s", e)
+    return _PollFacts(histories, backlogs, _read_foreign_queue(client), executing)
 
 
 def _read_foreign_queue(client):

@@ -374,6 +374,9 @@ class ComfyUIApi:
         """
         return self._queue_ids("queue_running", "queue_pending")
 
+    def executing_prompts(self) -> set[str]:
+        return self._queue_ids("queue_running", timeout=_POLL_TIMEOUT_S)
+
     def foreign_backlog(self, prompt_id: str) -> int | None:
         """How many prompts from *other* clients ComfyUI will run before ``prompt_id``.
 
@@ -446,9 +449,9 @@ class ComfyUIApi:
             and _queue_client_id(item) != self.client_id
         ]
 
-    def _queue_ids(self, *sections: str) -> set[str]:
+    def _queue_ids(self, *sections: str, timeout: float = _HTTP_TIMEOUT_S) -> set[str]:
         """The prompt ids in the named ``/queue`` sections."""
-        data = self._fetch_queue_data()
+        data = self._fetch_queue_data(timeout=timeout)
         return {
             pid for key in sections for item in data.get(key, [])
             if (pid := _queue_prompt_id(item)) is not None

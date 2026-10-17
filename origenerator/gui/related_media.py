@@ -1,9 +1,9 @@
 """What else in the library a shown generation is tied to.
 
-Two links, stacked under a config tab's settings form: the item this row was
-built from, and the videos an image was animated into. They are mutually
-exclusive in practice — a video has a start frame and no animations, an image is
-the other way round — and both are hidden whenever the tab has no generation on
+Stacked under a config tab's settings form: the item this row was built from,
+what was heard when a spoken request made it, and the videos an image was
+animated into. A video has a start frame and no animations, an image the other
+way round, and all of it is hidden whenever the tab has no generation on
 display.
 
 "Built from" is one slot answering three relations, because they are one
@@ -21,8 +21,8 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.gallery import (
@@ -33,6 +33,7 @@ from origenerator.gallery import (
     videos_from_source_image,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
+from origenerator.gui.link_heading import link_heading
 from origenerator.gui.source_image_tile import SourceImageTile
 from origenerator.media import MediaType
 
@@ -68,6 +69,17 @@ class RelatedMedia(QWidget):
         self._source_tile = SourceImageTile()
         self._source_tile.activated.connect(self.source_activated)
         layout.addWidget(self._source_tile)
+        self._heard = QWidget()
+        heard = QVBoxLayout(self._heard)
+        heard.setContentsMargins(0, 0, 0, 0)
+        heard.setSpacing(4)
+        heard.addWidget(link_heading("Heard"))
+        self._heard_words = QLabel()
+        self._heard_words.setWordWrap(True)
+        self._heard_words.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        heard.addWidget(self._heard_words)
+        self._heard.hide()
+        layout.addWidget(self._heard)
         self._animated_strip = AnimatedVideoStrip()
         self._animated_strip.video_activated.connect(self.animated_activated)
         layout.addWidget(self._animated_strip)
@@ -80,13 +92,20 @@ class RelatedMedia(QWidget):
         the spoken request that made this row, when one did.
         """
         self._show_source_tile(row, image_rows, request)
+        self._show_heard(request)
         # Hides itself when empty, which for anything but an animated image it is.
         self._animated_strip.show_videos(self._animated_items(row))
 
     def clear(self) -> None:
-        """Put both links down — the tab has no generation on display."""
+        """Put every link down — the tab has no generation on display."""
         self._source_tile.clear()
+        self._heard.hide()
         self._animated_strip.hide()
+
+    def _show_heard(self, request) -> None:
+        words = (request or {}).get("heard") or ""
+        self._heard_words.setText(f"“{words}”")
+        self._heard.setVisible(bool(words))
 
     def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
         """Reveal the source tile for whatever this row was built from, else hide

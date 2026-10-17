@@ -14866,6 +14866,20 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
     assert panel._related._source_tile._prompt_id == "orig"
 
 
+def test_a_request_item_shows_what_was_heard_on_its_tab(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    _speak_request(view, qtbot, "Request, no hat, over.")
+    view._slideshows.showing.close()
+    (job,) = view._live_jobs.values()
+    _finish_reroll(view, job)
+
+    view._on_thumbnail_clicked(job.prompt_id)
+
+    related = view._info_tabs.current_config_panel()._related
+    assert not related._heard.isHidden()
+    assert related._heard_words.text() == "“Request, no hat, over.”"
+
+
 def test_a_request_item_marks_its_change_in_the_prompt_field(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)

@@ -212,7 +212,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     Together, Images / Videos / Both, the folders left open and the console's
     motion are saved with the session through that same pair, four pairs; where
     each border was dragged is the window's own, kept beside its geometry, and
-    which folders are open is the folder list's.)"""
+    which folders are open is the TOC's.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 285
     assert sum(isinstance(x, ast.FunctionDef)

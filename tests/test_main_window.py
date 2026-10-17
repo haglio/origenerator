@@ -33,6 +33,7 @@ from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
+from origenerator.media import MediaType
 from origenerator.orientation import oriented_key
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -1107,6 +1108,36 @@ def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp
     reopened._gallery_view.refresh()
 
     assert reopened._gallery_view.selected_folder_key() == folder
+
+
+def test_the_collections_reopen_listing_the_kinds_they_were_closed_on(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._videos_only.setChecked(True)  # as a click does
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view.media_types() == {MediaType.VIDEO}
+
+
+def test_a_collection_left_listing_videos_is_open_on_its_videos_after_a_restart(
+        qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    view = first._gallery_view
+    view.refresh()
+    latest = oriented_key(RECENTS_KEY, SEPARATE[1])
+    view._tree.setCurrentItem(view._tree_item_for(latest))
+    view._videos_only.setChecked(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    reopened._gallery_view.refresh()
+
+    assert reopened._gallery_view.selected_folder_key() == latest
+    assert reopened._gallery_view.visible_prompt_ids() == ["vid"]
 
 
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):

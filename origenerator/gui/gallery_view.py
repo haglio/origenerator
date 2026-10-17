@@ -910,6 +910,11 @@ class GalleryView(QWidget):
         self._videos_only = QRadioButton("Videos")
         self._both_kinds = QRadioButton("Both")
         self._both_kinds.setChecked(True)
+        self._kinds_by_button = {
+            self._images_only: (MediaType.IMAGE,),
+            self._videos_only: (MediaType.VIDEO,),
+            self._both_kinds: (MediaType.IMAGE, MediaType.VIDEO),
+        }
         self._kinds_bar = QWidget()
         kinds_row = QHBoxLayout(self._kinds_bar)
         kinds_row.setContentsMargins(0, 0, 0, 0)
@@ -3668,15 +3673,19 @@ class GalleryView(QWidget):
         return self._browser.visible_prompt_ids()
 
     def media_types(self) -> set[str]:
-        """The media types the gallery's two ticks currently include — what
-        the folder tree, every collection, the in-flight cards and the search index are
-        all built from. Both on (the default) means every type; both off means
-        none."""
-        if self._images_only.isChecked():
-            return {MediaType.IMAGE}
-        if self._videos_only.isChecked():
-            return {MediaType.VIDEO}
-        return {MediaType.IMAGE, MediaType.VIDEO}
+        """The media types the Images / Videos / Both choice lets through — what
+        the folder tree, every collection, the in-flight cards and the search
+        index are all built from."""
+        return next(set(kinds) for button, kinds in self._kinds_by_button.items()
+                    if button.isChecked())
+
+    def collection_kinds(self) -> list[str]:
+        return sorted(self.media_types())
+
+    def set_collection_kinds(self, saved) -> None:
+        wanted = set(saved) if isinstance(saved, list) else set()
+        next((button for button, kinds in self._kinds_by_button.items()
+              if set(kinds) == wanted), self._both_kinds).setChecked(True)
 
     def _on_media_filter_changed(self, checked=True):
         """Another kind was chosen: list the collection again under it."""

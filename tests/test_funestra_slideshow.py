@@ -136,6 +136,12 @@ def test_a_clip_is_handed_over_with_the_script_the_funestra_drives_the_osr2_by(
     assert handed == [None, scripts["clip.mp4"], None]
 
 
+def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
+
+    assert slideshow.video_on_screen() is None
+
+
 def test_the_funestra_is_told_to_read_the_list_and_how_long_a_picture_holds(qtbot, tmp_path):
     """Two verbs make the hand-over: read this list, and hold each picture for
     the pace this app's console sets — the Funestra owning the advance from

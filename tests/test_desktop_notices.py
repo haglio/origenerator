@@ -9,6 +9,7 @@ from xml.etree import ElementTree
 
 from PIL import Image
 from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QWidget
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 
@@ -201,3 +202,108 @@ def test_a_mark_that_cannot_be_written_leaves_the_notice_to_speak_for_itself(
 
     assert _lines(said) == ["Video ready", "WAN 2.2 Image-to-Video · 4:12"]
     assert _toast(said).find("./visual/binding/image") is None
+
+
+# --- a notice taken back once its video has been watched ----------------------
+
+_RUN = "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
+
+
+def _watching(monkeypatch, *, app_in_front=True, since_input=1.0):
+    taken_back = []
+    monkeypatch.setattr(desktop_notices, "app_in_front", lambda: app_in_front)
+    monkeypatch.setattr(desktop_notices, "seconds_since_input", lambda: since_input)
+    monkeypatch.setattr(notice_toast, "take_back",
+                        lambda app_id, **filing: taken_back.append((app_id, filing["tag"])))
+    return taken_back
+
+
+def _filed_tag(monkeypatch, notices):
+    raised = []
+    monkeypatch.setattr(notice_toast, "show",
+                        lambda app_id, xml, **filing: raised.append((app_id, filing["tag"])))
+    notices.note(_outcome(generation=_RUN))
+    return raised[-1]
+
+
+def test_a_video_watched_in_the_app_in_front_takes_its_notice_back(qapp, monkeypatch):
+    notices = DesktopNotices(QIcon(), video_in_front=lambda: _RUN)
+    filed = _filed_tag(monkeypatch, notices)
+    taken_back = _watching(monkeypatch)
+
+    notices.look()
+
+    assert taken_back == [filed]
+
+
+def test_a_video_playing_while_another_app_is_in_front_keeps_its_notice(qapp, monkeypatch):
+    notices = DesktopNotices(QIcon(), video_in_front=lambda: _RUN)
+    taken_back = _watching(monkeypatch, app_in_front=False)
+
+    notices.look()
+
+    assert taken_back == []
+
+
+def test_a_video_playing_while_the_user_is_away_keeps_its_notice(qapp, monkeypatch):
+    notices = DesktopNotices(QIcon(), video_in_front=lambda: _RUN)
+    taken_back = _watching(monkeypatch, since_input=desktop_notices.AWAY_AFTER_S + 1)
+
+    notices.look()
+
+    assert taken_back == []
+
+
+def test_a_user_whose_time_away_windows_will_not_say_is_taken_to_be_away(qapp, monkeypatch):
+    def refuse():
+        raise OSError("GetLastInputInfo failed")
+
+    notices = DesktopNotices(QIcon(), video_in_front=lambda: _RUN)
+    taken_back = _watching(monkeypatch)
+    monkeypatch.setattr(desktop_notices, "seconds_since_input", refuse)
+
+    notices.look()
+
+    assert taken_back == []
+
+
+def test_nothing_is_taken_back_while_no_video_is_in_front(qapp, monkeypatch):
+    notices = DesktopNotices(QIcon(), video_in_front=lambda: None)
+    taken_back = _watching(monkeypatch)
+
+    notices.look()
+
+    assert taken_back == []
+
+
+def test_a_video_watched_on_and_on_is_taken_back_once(qapp, monkeypatch):
+    notices = DesktopNotices(QIcon(), video_in_front=lambda: _RUN)
+    taken_back = _watching(monkeypatch)
+
+    notices.look()
+    notices.look()
+
+    assert len(taken_back) == 1
+
+
+def test_a_notice_raised_for_a_video_already_watched_is_taken_back_too(qapp, monkeypatch):
+    # The run lands in the tab being watched: what is on screen may be looked at
+    # a moment before the notice for it is raised.
+    notices = DesktopNotices(QIcon(), video_in_front=lambda: _RUN)
+    taken_back = _watching(monkeypatch)
+    notices.look()
+
+    filed = _filed_tag(monkeypatch, notices)
+    notices.look()
+
+    assert taken_back[-1] == filed
+    assert len(taken_back) == 2
+
+
+def test_the_app_looks_on_its_own_every_few_seconds(qtbot, monkeypatch):
+    window = QWidget()
+    qtbot.addWidget(window)
+    DesktopNotices(QIcon(), window, video_in_front=lambda: _RUN)
+    taken_back = _watching(monkeypatch)
+
+    qtbot.waitUntil(lambda: bool(taken_back), timeout=5000)

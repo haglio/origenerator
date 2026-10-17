@@ -27,7 +27,7 @@ from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import main_window
+from origenerator.gui import desktop_notices, main_window
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
@@ -1411,6 +1411,26 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     assert [text.text for text in toast.findall("./visual/binding/text")] == \
         ["Video ready", "WAN 2.2 Image-to-Video · 4:12"]
     assert app_link.generation_in(toast.get("launch")) == "alpha-1"
+
+
+def test_a_video_watched_in_the_window_takes_its_notice_back(qtbot, tmp_path, monkeypatch):
+    win = _window(qtbot, tmp_path)
+    filed, taken_back = [], []
+    monkeypatch.setattr(notice_toast, "show",
+                        lambda app_id, xml, **filing: filed.append(filing["tag"]))
+    monkeypatch.setattr(notice_toast, "take_back",
+                        lambda app_id, **filing: taken_back.append(filing["tag"]))
+    monkeypatch.setattr(desktop_notices, "app_in_front", lambda: True)
+    monkeypatch.setattr(desktop_notices, "seconds_since_input", lambda: 0.0)
+    win._gallery_view._jobs.run_ended.emit(
+        RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=252.0,
+                   ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
+    front_tab = win._gallery_view._info_tabs.current_config_panel()
+    monkeypatch.setattr(front_tab, "video_on_screen", lambda: "alpha-1")
+
+    win._notices.look()
+
+    assert taken_back == filed
 
 
 def test_answering_a_notice_brings_the_window_forward_and_opens_the_item(

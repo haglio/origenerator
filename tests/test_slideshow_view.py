@@ -1814,6 +1814,28 @@ def test_osr2_drive_target_is_none_for_an_unscripted_video(qtbot, tmp_path):
     assert view.osr2_drive_target() is None
 
 
+# --- the video on screen, by the run it came from ---------------------------
+
+def test_the_video_on_screen_is_named_by_the_run_it_came_from(qtbot):
+    view = _view(qtbot, [Slide("b.mp4", "video", "beta-1")])
+    assert view.video_on_screen() == "beta-1"
+
+
+def test_a_picture_or_the_frames_of_a_run_still_going_are_no_video_on_screen(qtbot, tmp_path):
+    assert _view(qtbot, [Slide(_png(tmp_path / "p.png"), "image", "alpha-1")]
+                 ).video_on_screen() is None
+    assert _view(qtbot, [], frame=_png_bytes()).video_on_screen() is None
+
+
+def test_the_video_on_screen_follows_the_slideshow_onto_the_next_item(qtbot, tmp_path):
+    view = _view(qtbot, [Slide(_png(tmp_path / "p.png"), "image", "alpha-1"),
+                         Slide("b.mp4", "video", "beta-1")])
+
+    _runs_out(view)
+
+    assert view.video_on_screen() == "beta-1"
+
+
 def test_stepping_re_aims_the_device(qtbot):
     view = _view(qtbot)
     changed = []

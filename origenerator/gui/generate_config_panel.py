@@ -1783,3 +1783,6 @@ class GenerateConfigPanel(QWidget):
         media player to follow, and the funscript actions beside it. ``None`` when the
         tab isn't showing a video, or that video has no funscript."""
         return drive_target_for(self._displayed_video_path(), self._preview.player())
+
+    def video_on_screen(self) -> str | None:
+        return self._preview.video_on_screen()

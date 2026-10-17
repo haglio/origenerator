@@ -12796,6 +12796,35 @@ def test_stepping_a_double_clicked_slideshow_re_aims_the_osr2(qtbot):
     slideshow.close()
 
 
+def test_a_slideshow_opened_with_the_switch_off_drives_nothing(qtbot):
+    # Double-clicking a clip open once took the device whatever the switch said.
+    view, driver, _panel = _osr2_view(qtbot)
+    slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
+
+    assert driver.started == []
+    slideshow.close()
+
+
+# --- the video in front, by the run it came from ------------------------------
+
+def test_the_video_in_front_is_the_front_tab_s_while_no_slideshow_is_up(qtbot):
+    view, _driver, panel = _osr2_view(qtbot)
+    panel.video_on_screen = lambda: "alpha-1"
+
+    assert view.video_in_front() == "alpha-1"
+
+
+def test_a_slideshow_up_is_what_is_in_front_of_the_tab(qtbot):
+    view, _driver, panel = _osr2_view(qtbot)
+    panel.video_on_screen = lambda: "alpha-1"
+    slideshow = _double_click_slideshow(view, qtbot)
+    slideshow.video_on_screen = lambda: "beta-1"
+
+    assert view.video_in_front() == "beta-1"
+    slideshow.close()
+    assert view.video_in_front() == "alpha-1"
+
+
 # --- watching a folder that is auto-generating, and the app-global motion -----
 
 class _SignalMotion(QObject):

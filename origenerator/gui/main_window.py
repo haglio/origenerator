@@ -124,7 +124,8 @@ class OrigeneratorWindow(QMainWindow):
         self.setCentralWidget(self._gallery_view)
         # Where a run that outlasted the user's attention reports itself: the
         # window's own icon, on a tray icon that lives as long as the app does.
-        self._notices = DesktopNotices(self.windowIcon(), parent=self, shown_as=preview)
+        self._notices = DesktopNotices(self.windowIcon(), parent=self, shown_as=preview,
+                                       video_in_front=self._gallery_view.video_in_front)
         self._gallery_view.run_ended.connect(self._notices.note)
         if fun_time is not None:
             # The session's channels: its verbs onto the region slideshows, the

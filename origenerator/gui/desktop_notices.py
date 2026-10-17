@@ -18,8 +18,9 @@ import os
 import tempfile
 from pathlib import Path
 
-from PyQt6.QtCore import QObject
-from PyQt6.QtGui import QIcon
+from app_support.win32 import seconds_since_input
+from PyQt6.QtCore import QObject, Qt, QTimer
+from PyQt6.QtGui import QGuiApplication, QIcon
 from PyQt6.QtWidgets import QApplication, QStyle, QSystemTrayIcon
 from shared_ui.preview import Preview, taskbar_identity, window_title
 from shared_ui.preview_icon_pil import in_preview_ink
@@ -27,7 +28,7 @@ from shared_ui.preview_icon_pil import in_preview_ink
 from origenerator import app_link
 from origenerator.branch_session import is_branch_session
 from origenerator.icon_design import render_icon
-from origenerator.notice_toast import raise_notice
+from origenerator.notice_toast import raise_notice, take_back_notice
 from origenerator.run_notice import RunOutcome, notice_for
 from origenerator.win32 import (
     APP_USER_MODEL_ID,
@@ -51,6 +52,20 @@ _GLYPHS = {
     True: ("notice-ready.png", QStyle.StandardPixmap.SP_MessageBoxInformation),
     False: ("notice-failed.png", QStyle.StandardPixmap.SP_MessageBoxWarning),
 }
+
+AWAY_AFTER_S = 120.0
+_LOOK_EVERY_MS = 2000
+
+
+def app_in_front() -> bool:
+    return QGuiApplication.applicationState() == Qt.ApplicationState.ApplicationActive
+
+
+def _away() -> bool:
+    try:
+        return seconds_since_input() > AWAY_AFTER_S
+    except OSError:
+        return True
 
 
 def _where_marks_live() -> Path:
@@ -91,9 +106,11 @@ def _the_marks_beside_a_notice() -> dict[bool, Path | None]:
 
 
 class DesktopNotices(QObject):
-    """What reaches the desktop when a run ends, and what a click on it does."""
+    """What reaches the desktop when a run ends, what a click on it does, and
+    taking it back once its video has been watched here."""
 
-    def __init__(self, icon: QIcon, parent=None, *, shown_as: Preview | None = None):
+    def __init__(self, icon: QIcon, parent=None, *, shown_as: Preview | None = None,
+                 video_in_front=lambda: None):
         super().__init__(parent)
         self._identity = taskbar_identity(APP_USER_MODEL_ID, shown_as)
         self._tray = QSystemTrayIcon(icon, self)
@@ -103,6 +120,11 @@ class DesktopNotices(QObject):
         self._marks = _the_marks_beside_a_notice()
         self._name_this_app_to_windows(shown_as)
         self._answer_clicks_here()
+        self._video_in_front = video_in_front
+        self._watched: set[str] = set()
+        self._looks = QTimer(self)
+        self._looks.timeout.connect(self.look)
+        self._looks.start(_LOOK_EVERY_MS)
 
     def note(self, outcome: RunOutcome) -> None:
         """Say what a run came to, if it is one worth interrupting for."""
@@ -113,7 +135,17 @@ class DesktopNotices(QObject):
         # beside each other, and whichever raised THIS one is the one a click on
         # it should reach.
         self._answer_clicks_here()
+        self._watched.discard(notice.generation)
         raise_notice(self._identity, notice, mark=self._marks.get(notice.ok))
+
+    def look(self) -> None:
+        video = self._video_in_front()
+        if video is None or video in self._watched:
+            return
+        if not app_in_front() or _away():
+            return
+        self._watched.add(video)
+        take_back_notice(self._identity, video)
 
     def _name_this_app_to_windows(self, shown_as: Preview | None) -> None:
         try:

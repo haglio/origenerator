@@ -774,6 +774,9 @@ class FunestraSlideshow(QObject):
         session the OSR2 is the Main Funestra's alone, and the clip is the
         satellite's to play."""
 
+    def video_on_screen(self) -> None:
+        """Nothing either: the clip plays in the session's window, not this app's."""
+
     # --- the session's own hands on the slideshow ---------------------------
 
     def set_paused(self, paused: bool) -> None:

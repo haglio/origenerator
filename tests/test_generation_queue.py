@@ -33,8 +33,9 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
           recipe_category="", recipe_thumbnail=None, recipe_prompt_edited=False,
-          starting=False):
+          starting=False, sent=None):
     return InFlightItem(key=key, caption=caption,
+                        sent=status == "running" if sent is None else sent,
                         reading=RunReading(status=status, frame=frame, progress=progress,
                                            started_at=started_at,
                                            typical_seconds=typical_seconds),
@@ -614,9 +615,19 @@ def test_the_job_being_made_cannot_be_picked_up(queue, monkeypatch):
     assert _press_and_drag(queue.rows()[0], monkeypatch) == []
 
 
+def test_a_run_comfyui_holds_cannot_be_picked_up_though_it_has_not_started(queue, monkeypatch):
+    # The line can only move what it has not sent yet: ComfyUI has no way to
+    # change the order of what it holds.
+    queue.set_items([_item(key="a", status="queued", sent=True),
+                     _item(key="b", status="queued")])
+
+    assert queue.rows()[0].movable is False
+    assert _press_and_drag(queue.rows()[0], monkeypatch) == []
+
+
 def test_the_head_of_a_queue_with_nothing_running_can_be_moved(queue, monkeypatch):
-    # It is only what is being *rendered* that is fixed. With nothing rendering,
-    # the user may still put the line in the order they want it run in.
+    # It is only what ComfyUI holds that is fixed. With nothing sent yet, the
+    # user may still put the line in the order they want it run in.
     queue.set_items([_item(key="a", status="queued"),
                      _item(key="b", status="queued")])
 

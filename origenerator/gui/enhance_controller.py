@@ -27,7 +27,7 @@ from origenerator import gallery
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
-from origenerator.gui.generation_job import JobState
+from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
@@ -502,13 +502,10 @@ class EnhanceController:
 
         The frame is the job's own latest, which a run that hasn't started has
         none of: a batch's queued jobs show as queued rather than borrowing the
-        picture of the one being rendered. "Queued" covers both waits the same
-        way, whether the job is still in this app's line or already sitting on
-        ComfyUI, since neither has a frame to show.
+        picture of the one being rendered.
         """
-        rendering = job.state == JobState.RUNNING
         return RunReading(
-            status=JobState.RUNNING if rendering else JobState.QUEUED,
+            status=display_status(job.state),
             frame=job.last_preview,
             progress=job.last_progress,
             pass_progress=job.last_pass_progress,

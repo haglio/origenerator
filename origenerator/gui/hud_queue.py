@@ -39,6 +39,7 @@ from shared_ui.palette import (
 from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
+    first_movable,
     foreign_queue_text,
     queue_lead_text,
     queue_lead_tooltip,
@@ -480,7 +481,7 @@ def _line(item) -> JobLine:
         tooltip=f"{item.caption}\n\n{queue_lead_tooltip(item)}",
         discard=discard_run_text(item.auto_generating) if item.cancel is not None else "",
         discard_tooltip=discard_run_tooltip(item.auto_generating),
-        movable=not item.reading.rendering,
+        movable=not item.sent,
         source=(str(frame) if frame is not None else None, item.recipe_thumbnail),
         recipe_edited=item.recipe_prompt_edited,
         folder=tuple(str(path) for path in item.folder_thumbnails[:FOLDER_CELLS]),
@@ -564,8 +565,8 @@ class QueuePointer:
 
     def drag(self, px: int, py: int) -> None:
         """A press on a row that travels is a drag, and the block marks where it
-        would land.  The row being rendered stays where it is: nothing can be
-        moved in front of what ComfyUI is already working on, itself included."""
+        would land.  A row ComfyUI already holds stays where it is, and nothing
+        can be moved in front of it."""
         if self._press is None:
             return
         key, start_x, start_y, draggable = self._press
@@ -573,7 +574,7 @@ class QueuePointer:
             if not draggable or abs(px - start_x) + abs(py - start_y) < _DRAG_START:
                 return
             item = self._item(key)
-            if item is None or item.reading.rendering:
+            if item is None or item.sent:
                 self._press = None
                 return
             self._drag = key
@@ -624,8 +625,8 @@ class QueuePointer:
     def _drag_to(self, key: str, target: int) -> None:
         """Re-line the queue with *key*'s row let go at *target*.
 
-        Nothing may be moved in front of what ComfyUI is already rendering, and
-        a row let go where it already was asks for nothing.
+        Nothing may be moved in front of what ComfyUI already holds, and a row
+        let go where it already was asks for nothing.
         """
         items = self._host.hud_queue[0]
         keys = [item.key for item in items]
@@ -635,8 +636,7 @@ class QueuePointer:
         # The slot was read with the dragged row still in place, so a drop below
         # it names one further along than it will end up in.
         target = min(target - 1 if target > source else target, len(keys) - 1)
-        first = next((index for index, item in enumerate(items)
-                      if not item.reading.rendering), len(items))
+        first = first_movable(items)
         if not first <= source or not first <= target:
             return
         moved = list(keys)

@@ -16,7 +16,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from origenerator import gallery, timing
-from origenerator.gui.generation_job import JobState, display_status
+from origenerator.generation_state import GenerationStatus
+from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -101,15 +102,13 @@ class InFlightItems:
                 started = job.started_at  # None until ComfyUI actually starts it
                 cancel = lambda p=pid: self._on_cancel(p)
                 stop_auto = lambda k=folder_key: self._auto.stop(k)
-                # A story's lines are spoken before the job is sent: the row
-                # already says running, and the card says what the wait is.
-                speaking = job.state == JobState.SPEAKING
+                state = job.state
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._image_rows())
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
-                pass_progress, stage, stop_auto, speaking = None, "", None, False
+                pass_progress, stage, stop_auto, state = None, "", None, row.get("status")
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
@@ -120,8 +119,7 @@ class InFlightItems:
                 key=pid,
                 caption=gallery.config_tab_title(workflow_name, params),
                 reading=RunReading(
-                    status=(JobState.SPEAKING if speaking
-                            else display_status(row.get("status"))),
+                    status=display_status(state),
                     frame=frame,
                     progress=progress,
                     pass_progress=pass_progress,
@@ -166,6 +164,7 @@ class InFlightItems:
                     recipe and workflow
                     and gallery.prompts_differ_from(params, recipe, workflow)),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
+                sent=row.get("status") == GenerationStatus.RUNNING,
             ))
         place = {pid: i for i, pid in enumerate(self._jobs.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),

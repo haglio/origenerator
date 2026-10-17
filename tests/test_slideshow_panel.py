@@ -513,23 +513,37 @@ class TestTheRowOnTheOnePanel:
 
         assert panel_targets(slideshow).row is not None
 
-    def test_a_slideshow_of_a_picture_draws_no_scrubber(self, qtbot):
+    def test_a_slideshow_of_a_picture_keeps_the_scrubber_on_the_panel(self, qtbot):
         slideshow = self._slideshow(qtbot, [("scene one.png", "image")])
         slideshow._pane._engine.showing_picture = True
 
-        assert panel_targets(slideshow).row is None
+        assert panel_targets(slideshow).row is not None
 
-    def test_pressing_the_middle_of_the_track_runs_the_video_to_its_middle(self, qtbot):
-        slideshow = self._slideshow(qtbot, [("scene one.mp4", "video")])
+    def _press_the_middle_of_the_track(self, slideshow):
         row = panel_targets(slideshow).row
         x, y, _width, height = row.rect
         track_x0, track_x1 = row.track
         left, top, _bgra = _panel(slideshow)
-
         slideshow._pane.press(QPointF(left + x + (track_x0 + track_x1) // 2,
                                       top + y + height - TIMELINE_HEIGHT // 2))
 
+    def test_pressing_the_middle_of_the_track_runs_the_video_to_its_middle(self, qtbot):
+        slideshow = self._slideshow(qtbot, [("scene one.mp4", "video")])
+
+        self._press_the_middle_of_the_track(slideshow)
+
         assert slideshow._pane._engine.position_ms == pytest.approx(30_000, abs=200)
+
+    def test_pressing_the_middle_of_a_pictures_track_takes_its_time_back_to_the_middle(
+            self, qtbot):
+        slideshow = self._slideshow(qtbot, [("scene one.png", "image")])
+        engine = slideshow._pane._engine
+        engine.showing_picture = True
+        engine.picture_time = (7_000.0, 8_000.0)
+
+        self._press_the_middle_of_the_track(slideshow)
+
+        assert engine.picture_seeks == [pytest.approx(4_000, abs=100)]
 
     def test_the_panel_follows_the_video_along_the_track(self, qtbot):
         slideshow = self._slideshow(qtbot, [("scene one.mp4", "video")])

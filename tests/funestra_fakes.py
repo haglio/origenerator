@@ -1,8 +1,8 @@
 """A stand-in for the Funestras' engine, for a Funestra in this app's window to run on.
 
 What :class:`funestra.mpv_engine.MpvEngine` offers a Funestra, answered
-from memory: the file it was handed, the one staged after it, the pace, the
-freeze, the sound, a still's move, and the overlays the panel and a picture
+from memory: the file it was handed, the one staged after it, the pace and a
+picture's hold, the freeze, the sound, a still's move, and the overlays the panel and a picture
 are composited with.
 """
 from __future__ import annotations
@@ -27,7 +27,11 @@ class FakeEngine:
         self.seeks: list[float] = []
         self.speed = 1.0
         self.pace_s: float | None = None
+        self.held_for: float | None = None
         self.showing_picture = False
+        self.showing_video = True
+        self.picture_time: tuple[float, float] | None = None
+        self.picture_seeks: list[float] = []
         self.source_dims = (0, 0)
         self.ab_loop: tuple[float, float] | None = None
         self.pushes = 0
@@ -79,6 +83,12 @@ class FakeEngine:
 
     def set_pace(self, seconds: float) -> None:
         self.pace_s = seconds
+
+    def hold_picture_for(self, seconds: float | None) -> None:
+        self.held_for = seconds
+
+    def seek_picture(self, ms: float) -> None:
+        self.picture_seeks.append(ms)
 
     def push_still(self) -> None:
         self.pushes += 1

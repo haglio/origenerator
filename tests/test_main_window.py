@@ -26,12 +26,14 @@ from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.sides import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import desktop_notices, main_window
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
+from origenerator.orientation import oriented_key
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
@@ -1080,6 +1082,33 @@ def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_pa
     assert win._gallery_view.how_many() == 1
 
 
+def test_the_folder_list_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._tree.together_button.click()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view._tree.sides == (BOTH,)
+
+
+def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view.refresh()
+    first._gallery_view._tree.together_button.click()
+    folder = oriented_key("image/sdxl_t2i", BOTH)
+    first._gallery_view._tree.setCurrentItem(first._gallery_view._tree_item_for(folder))
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    reopened._gallery_view.refresh()
+
+    assert reopened._gallery_view.selected_folder_key() == folder
+
+
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     # The end-to-end round trip: pick a picture, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane
@@ -1641,6 +1670,20 @@ def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_foun
     win.close()
 
     assert AppState(path).get("slideshows") == kept
+
+
+def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_next_launch(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    state = AppState(path)
+    state.set("folder_list_sides", [BOTH])
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    assert win._gallery_view._tree.sides == SEPARATE
+    win.close()
+
+    assert AppState(path).get("folder_list_sides") == [BOTH]
 
 
 def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):

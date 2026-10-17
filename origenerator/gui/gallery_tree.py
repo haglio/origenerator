@@ -279,6 +279,10 @@ class GalleryTree:
         holding = [item for item in alls if gallery.child_groups(item.data(0, GROUP_ROLE))]
         return next(iter(holding or alls), None)
 
+    @property
+    def built(self) -> bool:
+        return self._built
+
     def expanded_keys(self) -> set[str]:
         return {key for key, item in self.item_by_key.items() if item.isExpanded()}
 

@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.sides import SEPARATE, TOGETHER
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
@@ -1368,6 +1369,18 @@ def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed
 
     assert hosted == [False, False]
     assert [button.isVisibleTo(view) for button in buttons] == [True, True]
+
+
+def test_a_gallery_handed_back_from_a_session_draws_the_folder_list_as_it_was_left(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view._tree.together_button.click()
+
+    view.become_hosted(_session())
+    hosted = view._tree.sides
+    view.become_standalone()
+
+    assert (hosted, view._tree.sides) == (SEPARATE, TOGETHER)
 
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):

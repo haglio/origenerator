@@ -63,6 +63,12 @@ from origenerator.gallery.sides import (
     LANDSCAPE as _LANDSCAPE,
 )
 from origenerator.gallery.sides import (
+    SEPARATE as _SEPARATE,
+)
+from origenerator.gallery.sides import (
+    TOGETHER as _TOGETHER,
+)
+from origenerator.gallery.sides import (
     side_covers as _side_covers,
 )
 from origenerator.gallery.sides import (
@@ -1902,6 +1908,12 @@ class GalleryView(QWidget):
             collection_counts=self._browser.collection_counts(side),
         ) for side in self._tree.sides]
 
+    def folder_list_sides(self) -> list[str]:
+        return list(self._tree.chosen_sides)
+
+    def set_folder_list_sides(self, saved) -> None:
+        self._tree.choose_sides(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
+
     def _on_sides_changed(self):
         """The radio over the list moved: draw the list again on the new sides.
 
@@ -1909,6 +1921,8 @@ class GalleryView(QWidget):
         contents is built from the rows that side holds — the one list of both
         shapes is a different hierarchy, not the two stacked.
         """
+        if not self._tree_view.built:
+            return
         with working():
             self.refresh()
         # The row that was selected is on a side nobody draws now, so the

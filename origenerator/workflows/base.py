@@ -563,6 +563,21 @@ class WorkflowTemplate(ABC):
         return nodes, [union_id, 0]
 
     @staticmethod
+    def depth_map_nodes(loader_id: str, map_id: str, *, depth_model: str,
+                        image_ref) -> tuple[dict, list]:
+        nodes = {
+            loader_id: {
+                "class_type": "DownloadAndLoadDepthAnythingV2Model",
+                "inputs": {"model": depth_model},
+            },
+            map_id: {
+                "class_type": "DepthAnything_V2",
+                "inputs": {"da_model": [loader_id, 0], "images": image_ref},
+            },
+        }
+        return nodes, [map_id, 0]
+
+    @staticmethod
     def enhance_image_nodes(*, image_ref, model_ref, positive_ref, negative_ref,
                             vae_ref, params: dict,
                             rescale_to: tuple[int, int] | None = None) -> EnhanceTail:

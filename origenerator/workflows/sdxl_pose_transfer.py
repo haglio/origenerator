@@ -185,17 +185,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                 },
             }
             return nodes, ["8", 0]
-        nodes = {
-            "22": {
-                "class_type": "DownloadAndLoadDepthAnythingV2Model",
-                "inputs": {"model": params["depth_model"]},
-            },
-            "23": {
-                "class_type": "DepthAnything_V2",
-                "inputs": {"da_model": ["22", 0], "images": scaled_ref},
-            },
-        }
-        return nodes, ["23", 0]
+        return WorkflowTemplate.depth_map_nodes(
+            "22", "23", depth_model=params["depth_model"], image_ref=scaled_ref)
 
     def build_api_payload(self, params: dict) -> dict:
         # Size the still off the input image: derived in-graph at the SDXL

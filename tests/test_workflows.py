@@ -2033,6 +2033,18 @@ def test_a_controlnet_builds_under_its_callers_ids_with_the_head_the_caller_name
     assert list(nodes) == ["cn"]
 
 
+def test_a_depth_map_builds_under_its_callers_ids_from_the_image_the_caller_names():
+    nodes, ref = WorkflowTemplate.depth_map_nodes(
+        "da", "da_map", depth_model="a_depth_model.safetensors", image_ref=["pic", 0])
+    assert ref == ["da_map", 0]
+    assert nodes == {
+        "da": {"class_type": "DownloadAndLoadDepthAnythingV2Model",
+               "inputs": {"model": "a_depth_model.safetensors"}},
+        "da_map": {"class_type": "DepthAnything_V2",
+                   "inputs": {"da_model": ["da", 0], "images": ["pic", 0]}},
+    }
+
+
 def test_sdxl_pose_transfer_extract_output_info():
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     save_id = next(

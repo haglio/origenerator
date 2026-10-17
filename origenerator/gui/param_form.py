@@ -738,6 +738,14 @@ class ParamForm(QWidget):
     def get_values(self) -> dict:
         return self._collect()
 
+    def folds(self) -> dict[str, bool]:
+        return {title: section.is_collapsed() for title, section in self._sections.items()}
+
+    def set_folds(self, saved) -> None:
+        for title, collapsed in saved.items():
+            if title in self._sections and isinstance(collapsed, bool):
+                self._sections[title].set_collapsed(collapsed)
+
     def seed_is_random(self) -> bool:
         """True if any seed param's Random tick is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())

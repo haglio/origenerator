@@ -1101,17 +1101,27 @@ def test_only_entries_naming_a_workflow_the_app_still_has_survive():
     restored, _ = parse_tabs_state({"tabs": [
         "not a dict", _config_tab("deleted_wf"), _config_tab("wan22_i2v"),
     ]})
-    assert [snapshot.workflow_name for snapshot, _ in restored] == ["wan22_i2v"]
+    assert [tab.config.workflow_name for tab in restored] == ["wan22_i2v"]
 
 
 def test_a_tabs_launched_runs_survive_only_as_words():
     entry = _config_tab("wan22_i2v") | {"launched_runs": ["run-77", "", 5, None]}
     restored, _ = parse_tabs_state({"tabs": [entry]})
-    assert restored[0][1] == ["run-77"]
+    assert restored[0].launched_runs == ["run-77"]
 
     entry = _config_tab("wan22_i2v") | {"launched_runs": "run-77"}
     restored, _ = parse_tabs_state({"tabs": [entry]})
-    assert restored[0][1] == []
+    assert restored[0].launched_runs == []
+
+
+def test_a_tabs_layout_survives_only_as_a_table():
+    entry = _config_tab("wan22_i2v") | {"layout": {"folds": {"Seed": True}}}
+    restored, _ = parse_tabs_state({"tabs": [entry]})
+    assert restored[0].layout == {"folds": {"Seed": True}}
+
+    entry = _config_tab("wan22_i2v") | {"layout": "folded"}
+    restored, _ = parse_tabs_state({"tabs": [entry]})
+    assert restored[0].layout == {}
 
 
 def test_the_tab_to_stand_on_is_a_number_or_the_first():

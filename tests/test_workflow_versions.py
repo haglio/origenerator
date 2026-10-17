@@ -83,16 +83,13 @@ def test_a_graphs_fingerprint_follows_what_each_input_is_wired_to():
 
 
 def test_float_noise_past_the_sixth_decimal_moves_no_fingerprint():
-    def tracked(y: float, temperature: float) -> dict:
-        return {"1": {"class_type": "WanTrackToVideo", "inputs": {
-            "tracks": json.dumps([[{"x": 240.0, "y": y}]]),
-            "temperature": temperature,
-        }}}
+    def shifted(shift: float) -> dict:
+        return {"1": {"class_type": "ModelSamplingSD3", "inputs": {"shift": shift}}}
 
-    settled = _fingerprint(tracked(178.873796, 220.0))
+    settled = _fingerprint(shifted(8.123456))
 
-    assert _fingerprint(tracked(178.873796 + 1e-11, 220.0 + 1e-11)) == settled
-    assert _fingerprint(tracked(178.874, 220.0)) != settled
+    assert _fingerprint(shifted(8.123456 + 1e-11)) == settled
+    assert _fingerprint(shifted(8.1235)) != settled
 
 
 _PINNED = {
@@ -255,7 +252,7 @@ def test_a_workflows_graph_changes_only_with_its_version(name):
     pytest.param("wan22_i2v",
                  lambda patch: patch.setattr(wan22_i2v, "_SPEECH_STEPS", 8),
                  id="a spoken scene"),
-    pytest.param("wan21_ati_i2v",
+    pytest.param("wan22_i2v",
                  lambda patch: patch.setattr(base, "RIFE_CHECKPOINT", "another_rife.pth"),
                  id="the frames made in between"),
     pytest.param("wan22_i2v",

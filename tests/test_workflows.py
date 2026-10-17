@@ -959,7 +959,7 @@ def test_derived_display_size_measures_the_input_image(tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "wide.png", (1920, 1080))
 
-    for name in ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"):
+    for name in ("wan22_i2v", "wan22_flf2v_loop"):
         wf = WORKFLOW_REGISTRY[name]
         params = dict(wf.default_params(), input_image="wide.png")
         assert wf.derived_display_size(params) == scale_to_total_pixels(1920, 1080), name

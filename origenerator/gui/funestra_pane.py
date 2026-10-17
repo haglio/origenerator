@@ -17,7 +17,6 @@ label, which the picture replaces.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from contextlib import ExitStack
@@ -35,7 +34,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.config import project_dir
+from origenerator.funestras_engine import offer_the_copy_beside_the_checkouts
 from origenerator.running_ahead import ahead_while_playing
 
 logger = logging.getLogger(__name__)
@@ -225,27 +224,6 @@ class FunestraPane(QWidget):
     def pointer_left(self) -> None:
         if self._funestra is not None:
             self._funestra.leave()
-
-
-def offer_the_copy_beside_the_checkouts() -> None:
-    """Put the copy of the engine's file that sits beside the checkouts first.
-
-    The engine is one ~117 MB file, fetched once into a folder for the whole
-    machine, and a funestra checkout keeps its own copy beside it.  The
-    engine is found by walking the folders in PATH, and the machine-wide one
-    has answered "nothing here" to this app while answering for every other
-    process on the same machine -- with the file plainly sitting in it.  So the
-    copy beside the checkouts goes in front of it.
-    """
-    beside = project_dir("funestra") / "vendor"
-    try:
-        if not (beside / "libmpv-2.dll").is_file():
-            return
-    except OSError:
-        return
-    rest = [entry for entry in os.environ.get("PATH", "").split(os.pathsep)
-            if entry != str(beside)]
-    os.environ["PATH"] = os.pathsep.join([str(beside), *rest])
 
 
 class _FunestraWindow(QWidget):

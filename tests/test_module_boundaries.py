@@ -62,6 +62,7 @@ QT_FREE = (
     "origenerator.spin_arrows",
     "origenerator.slideshow_buttons",
     "origenerator.console_commands",
+    "origenerator.funestras_engine",
 )
 
 # The two that legitimately do, at import. `comfyui_client` is one because it is

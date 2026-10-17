@@ -1544,10 +1544,16 @@ class GalleryView(QWidget):
             # from, whether they were launched as opened or edited first — that
             # mark is the only thing telling the queue what act a video is of.
             category, video_id = launching.recipe_source()
+            asked = launching.asked()
             for prompt_id in launched:
                 if category or video_id:
                     self._db.set_recipe_source(prompt_id, category=category,
                                                video_prompt_id=video_id)
+                if asked is not None:
+                    self._db.record_request(
+                        prompt_id=prompt_id, heard="",
+                        new_positive=batch[0].get("positive_prompt", ""),
+                        new_negative=batch[0].get("negative_prompt", ""), **asked)
                 launching.note_launched(prompt_id)
         self._stand_on_the_run_in(key, rebuild=True)
 

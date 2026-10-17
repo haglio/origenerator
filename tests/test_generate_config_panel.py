@@ -28,7 +28,7 @@ from origenerator.funscript import (
 from origenerator.gallery.keys import settings_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls, icons
+from origenerator.gui import corner_controls, diff_text, icons
 from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_config_panel as gcp_module
@@ -2165,6 +2165,139 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
     panel._preview.show_message("Waiting for preview…", live=True)
 
     assert _notice(panel) == ""
+
+
+# --- the Request section: words the picture on display is asked to change by --
+
+
+def _request_made(db, prompt_id, source="src", asked="no hat"):
+    """Record that a spoken request made ``prompt_id`` out of a picture whose
+    prompts were "a cat, a hat" and "blurry"."""
+    db.record_request(prompt_id=prompt_id, source_prompt_id=source,
+                      heard=f"Request, {asked}, over.", asked=asked,
+                      old_positive="a cat, a hat", old_negative="blurry",
+                      new_positive="a cat", new_negative="blurry, hat")
+
+
+def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
+    """Stand a rewrite in for the local LLM, answering ``answer`` and keeping
+    every prompt pair and words it was asked about."""
+    calls = []
+
+    def rewrite(positive, negative, words, **_settings):
+        calls.append((positive, negative, words))
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(gcp_module, "rewrite_prompt", rewrite)
+    return calls
+
+
+def _ask(panel, qtbot, words):
+    field = panel._param_form.request_field()
+    field._words.clear()
+    qtbot.keyClicks(field._words, words)
+    return field
+
+
+def _positive(panel):
+    return diff_text.live_text(panel._param_form._widgets["positive_prompt"])
+
+
+def test_a_picture_a_request_made_shows_its_words_in_the_request_section(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+
+    panel.show_saved_generation(image, [image])
+
+    field = panel._param_form.request_field()
+    assert field._words.text() == "no hat"
+    assert field._words.isEnabled()
+
+
+def test_any_picture_on_display_can_be_asked_a_change_of(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+
+    panel.show_saved_generation(image, [image])
+
+    field = panel._param_form.request_field()
+    assert field._words.text() == ""
+    assert field._words.isEnabled()
+
+
+def test_a_tab_showing_nothing_has_nothing_to_ask_a_change_of(panel):
+    assert not panel._param_form.request_field()._words.isEnabled()
+
+
+def test_asking_rewrites_the_prompts_of_the_picture_on_display(saved_panel, qtbot, monkeypatch):
+    calls = _rewriting(monkeypatch)
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    panel.show_saved_generation(image, [image])
+
+    field = _ask(panel, qtbot, "two women")
+
+    qtbot.waitUntil(lambda: _positive(panel) == "two women on a couch", timeout=5000)
+    assert [(positive, words) for positive, _negative, words in calls] == [
+        ("a woman on a couch", "two women")]
+    assert field._status.isHidden()
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_new_words_for_a_requested_picture_redo_the_request_on_what_it_was_asked_of(
+        saved_panel, qtbot, monkeypatch):
+    calls = _rewriting(monkeypatch, answer=("a cat", "blurry, cap"))
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+    panel.show_saved_generation(image, [image])
+
+    _ask(panel, qtbot, "no cap")
+
+    qtbot.waitUntil(lambda: bool(calls), timeout=5000)
+    assert calls == [("a cat, a hat", "blurry", "no cap")]
+
+
+def test_the_words_that_made_the_picture_put_its_own_prompts_back(
+        saved_panel, qtbot, monkeypatch):
+    calls = _rewriting(monkeypatch, answer=("a cat, a cap", "blurry"))
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+    panel.show_saved_generation(image, [image])
+    _ask(panel, qtbot, "a cap")
+    qtbot.waitUntil(lambda: _positive(panel) == "a cat, a cap", timeout=5000)
+
+    _ask(panel, qtbot, "no hat")
+
+    qtbot.waitUntil(lambda: _positive(panel) == "a cat", timeout=5000)
+    assert len(calls) == 1
+
+
+def test_a_rewrite_that_fails_says_so_beside_the_words(saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=OSError("the model is down"))
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+
+    field = _ask(panel, qtbot, "two cats")
+
+    qtbot.waitUntil(lambda: "couldn't" in field._status.text(), timeout=5000)
+    assert _positive(panel) == "a cat"
+
+
+def test_an_answer_to_words_since_changed_is_dropped(saved_panel, monkeypatch):
+    _rewriting(monkeypatch)
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+
+    panel._on_rewritten((panel._asked + 1, "img1"), ("an old answer", ""))
+
+    assert _positive(panel) == "a cat"
 
 
 # --- Generate says when it will draw a fresh seed ---------------------------

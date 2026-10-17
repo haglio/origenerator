@@ -30,6 +30,7 @@ from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.request_field import RequestField
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
@@ -178,6 +179,7 @@ class ParamForm(QWidget):
         # reproduces them, without showing them.
         self._passthrough: dict = {}
         self._sections: dict[str, CollapsibleSection] = {}
+        self._request_field: RequestField | None = None
         self._section_order: list[str] = []
         # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
@@ -249,6 +251,8 @@ class ParamForm(QWidget):
             self._label_columns[title] = LabelColumn()
             self._section_order.append(title)
             outer.addWidget(section)
+            if title == "Prompts" and any(pd.key == "positive_prompt" for pd in self._param_defs):
+                outer.addWidget(self._build_request_section())
         outer.addStretch(1)  # collect any slack at the foot, not between sections
 
         # Fields in canonical order, so the workflow's own declaration order can't
@@ -272,6 +276,25 @@ class ParamForm(QWidget):
         self._build_derived_dimensions()
         self._announce_every_edit()
         self._refresh_section_visibility()
+
+    def _build_request_section(self) -> CollapsibleSection:
+        """The words the picture on display is asked to change by, right under
+        the prompts they rewrite."""
+        section = CollapsibleSection("Request")
+        self._request_field = RequestField()
+        section.content_form().addRow(self._request_field)
+        return section
+
+    def request_field(self) -> RequestField | None:
+        return self._request_field
+
+    def set_prompts(self, positive: str, negative: str) -> None:
+        """Write a prompt pair into its fields, as typing it in would."""
+        for pd in self._param_defs:
+            if pd.key == "positive_prompt":
+                self._write_field(pd, positive)
+            elif pd.key == "negative_prompt":
+                self._write_field(pd, negative)
 
     def _announce_every_edit(self):
         for pd in self._param_defs:

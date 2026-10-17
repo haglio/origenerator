@@ -1,4 +1,4 @@
-"""Working out what a spoken request changes, off the UI thread.
+"""Working out what a request changes, off the UI thread.
 
 Applying a request is arithmetic on two strings until the prompt doesn't happen
 to contain the words the speaker used — at which point the local LLM is asked

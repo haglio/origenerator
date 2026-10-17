@@ -10313,6 +10313,36 @@ def test_combining_a_pair_already_made_makes_another_video(qtbot, tmp_path):
     assert job.params["noise_seed"] != made["noise_seed"]
 
 
+def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("orig")
+    panel = view._info_tabs.current_config_panel()
+    panel._param_form.request_field()._words.setText("two cats")
+
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
+
+    (job,) = view._live_jobs.values()
+    record = db.get_request(job.prompt_id)
+    assert (record["asked"], record["heard"], record["source_prompt_id"]) == ("two cats", "", "orig")
+    assert (record["old_positive"], record["new_positive"]) == ("a cat", "two cats")
+
+
+def test_a_run_generated_with_no_request_records_none(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("orig")
+
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "a dog"}])
+
+    (job,) = view._live_jobs.values()
+    assert db.get_request(job.prompt_id) is None
+
+
 def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_path):
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
@@ -14836,7 +14866,8 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
     assert panel._related._source_tile._prompt_id == "orig"
 
 
-def test_a_request_item_shows_what_was_heard_on_its_tab(qtbot, tmp_path, monkeypatch):
+def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
+        qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._slideshows.showing.close()
@@ -14845,9 +14876,8 @@ def test_a_request_item_shows_what_was_heard_on_its_tab(qtbot, tmp_path, monkeyp
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    related = view._info_tabs.current_config_panel()._related
-    assert not related._heard.isHidden()
-    assert related._heard_words.text() == "“Request, no hat, over.”"
+    field = view._info_tabs.current_config_panel()._param_form.request_field()
+    assert field._words.text() == "no hat"
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(

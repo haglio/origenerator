@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import contextmanager
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QFormLayout,
@@ -25,6 +25,8 @@ from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
+    LOCAL_LLM_BASE_URL,
+    LOCAL_LLM_MODEL,
 )
 from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
@@ -73,13 +75,17 @@ from origenerator.gui.param_form import ParamForm
 from origenerator.gui.picture_state_picker import PictureStatePicker
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
+from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.picture_states import state_names
+from origenerator.prompts import VOICE_REWRITE_SYSTEM_PROMPT
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
 from origenerator.timing import estimate_label
+from origenerator.voice.dictation import words_of
+from origenerator.voice.rewrite import rewrite_prompt
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -117,6 +123,19 @@ _WAITING_NOTE = "Waiting for preview…"
 _MODIFY_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
+
+
+@dataclass(frozen=True)
+class _RequestAim:
+    """What the Request section asks its changes of: the picture on display, the
+    words that made it when a request did, the prompt pair those words were asked
+    of, the picture's own pair, and the picture a request made here is about."""
+
+    prompt_id: str
+    words: str
+    asked_of: tuple[str, str]
+    shown: tuple[str, str]
+    source_prompt_id: str
 
 
 def _nothing_to_start_from(missing_images: list[str]) -> str:
@@ -242,6 +261,10 @@ class GenerateConfigPanel(QWidget):
         self._fresh_form = False
         self._form_checkpoint = None
         self._autoshow_held = False   # see _point_elsewhere
+        self._request_aim: _RequestAim | None = None
+        self._asked = 0  # how many times the Request has been edited, so a late answer can tell
+        self._rewriter = RevisionWorker(self._rewrite, parent=self)
+        self._rewriter.revised.connect(self._on_rewritten)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
         self._go_to_folder.setVisible(False)  # until the gallery says there is a folder
@@ -681,6 +704,8 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self.refresh_generate_caption)
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
+        if form.request_field() is not None:
+            form.request_field().asked.connect(self._on_request_asked)
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
@@ -1414,7 +1439,77 @@ class GenerateConfigPanel(QWidget):
                     self._param_form.clear_prompt_rewrites()
                 else:
                     self._param_form.track_prompt_rewrites(self._displayed_config.params)
+            self._aim_the_request()
         self.refresh_modified_notice()
+
+    # --- the Request section: words the picture on display is asked to change by
+
+    def _aim_the_request(self) -> None:
+        """Point the Request section at the picture on display: the words a
+        request made it with, ready to be edited, or nothing for one nobody asked
+        for -- and nothing to ask of at all with no picture up."""
+        field = self._param_form.request_field()
+        if field is None:
+            return
+        row, config = self._displayed_row, self._displayed_config
+        if row is None or config is None:
+            self._request_aim = None
+            field.set_available(False)
+            return
+        shown = (config.params.get("positive_prompt") or "",
+                 config.params.get("negative_prompt") or "")
+        record = self._db.get_request(row["prompt_id"])
+        words = words_of(record)
+        self._request_aim = _RequestAim(
+            prompt_id=row["prompt_id"], words=words,
+            asked_of=((record.get("old_positive") or "", record.get("old_negative") or "")
+                      if words else shown),
+            shown=shown,
+            source_prompt_id=record["source_prompt_id"] if words else row["prompt_id"])
+        field.set_available(True)
+        field.show_words(words)
+
+    def asked(self) -> dict | None:
+        """The request this tab's Generate is making, for the gallery to record
+        beside each run it launches -- ``None`` while the Request is empty."""
+        field = self._param_form.request_field() if self._param_form is not None else None
+        aim = self._request_aim
+        if field is None or aim is None or not field.words():
+            return None
+        return {"asked": field.words(), "source_prompt_id": aim.source_prompt_id,
+                "old_positive": aim.asked_of[0], "old_negative": aim.asked_of[1]}
+
+    def _rewrite(self, positive: str, negative: str, words: str) -> tuple[str, str]:
+        return rewrite_prompt(positive, negative, words, base_url=LOCAL_LLM_BASE_URL,
+                              model=LOCAL_LLM_MODEL, system_prompt=VOICE_REWRITE_SYSTEM_PROMPT)
+
+    def _on_request_asked(self, words: str) -> None:
+        """Rewrite the prompts to say what the Request now asks, off the UI
+        thread, since that is a call to the local LLM. The words that made the
+        picture put its own prompts back, and no words put back the ones they
+        were asked of, neither of which needs asking anyone."""
+        aim = self._request_aim
+        if aim is None:
+            return
+        self._asked += 1
+        if words == aim.words or not words:
+            self._param_form.set_prompts(*(aim.shown if words == aim.words else aim.asked_of))
+            self._param_form.request_field().done()
+            return
+        QThreadPool.globalInstance().start(ReviseTask(
+            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words))
+
+    def _on_rewritten(self, context, pair) -> None:
+        asked, prompt_id = context
+        aim = self._request_aim
+        if asked != self._asked or aim is None or aim.prompt_id != prompt_id:
+            return  # the words, or the picture, have changed since it was asked
+        field = self._param_form.request_field()
+        if pair is None:
+            field.failed()
+            return
+        self._param_form.set_prompts(*pair)
+        field.done()
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:
         current = self.current_config()

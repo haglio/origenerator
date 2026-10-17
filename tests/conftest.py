@@ -68,6 +68,7 @@ from origenerator import config, osr2_driver, osr2_motion_driver
 from origenerator.gui import desktop_notices, motion_panel, omnipause, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.workflows import detail_parts
 
 pytest_plugins = ("shared_ui.testing",)
 
@@ -593,3 +594,8 @@ def _context_menus_open_on_release(qapp):
     opens fine for the user can open over the wrong widget in a test.
     """
     qapp.styleHints().setContextMenuTrigger(Qt.ContextMenuTrigger.Release)
+
+
+@pytest.fixture(autouse=True)
+def _no_outline_detector_but_the_ones_a_test_installs(monkeypatch):
+    monkeypatch.setattr(detail_parts, "list_outline_detector_files", list)

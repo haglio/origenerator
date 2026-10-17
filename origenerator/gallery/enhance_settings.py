@@ -17,7 +17,7 @@ import json
 from dataclasses import dataclass, field
 
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.detail_parts import detail_fixes_of
+from origenerator.workflows.detail_parts import detail_fixes_of, fix_words
 
 # The standalone workflow one enhancement runs. Machinery rather than a
 # generation of its own: its defaults are where an unconfigured folder starts.
@@ -29,7 +29,7 @@ ENHANCE_WORKFLOW = "image_enhance"
 # being enhanced, and the seed is re-rolled per launch like any variation.
 ENHANCE_SETTING_KEYS = (
     "checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
-    "enhance_denoise", "enhance_detail_fixes",
+    "enhance_denoise", "enhance_detail_fixes", "enhance_fix_prompts",
 )
 
 # What a folder's settings leave to the source image rather than pinning: the
@@ -66,6 +66,8 @@ def level_settings(params: dict) -> dict:
         settings["enhance_detail_fixes"] = fixes
     else:
         settings.pop("enhance_detail_fixes", None)
+    if "enhance_fix_prompts" in params:
+        settings["enhance_fix_prompts"] = fix_words(params)
     return settings
 
 

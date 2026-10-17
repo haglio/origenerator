@@ -29,6 +29,7 @@ from origenerator.gallery.enhance_settings import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    level_settings,
 )
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
@@ -580,3 +581,33 @@ def test_a_repeated_spoken_fix_reads_as_the_duplicate_it_is(tmp_path, monkeypatc
     # different enhancement and runs.
     assert level_matching_params(row, fix_params_for(row, _spoken("fix teeth"))) == 0
     assert level_matching_params(row, fix_params_for(row, _spoken("fix eyes"))) is None
+
+
+def test_the_words_a_fix_ran_with_are_part_of_what_its_level_is():
+    hands = next(part for part in detail_parts.part_table() if part.name == "hands")
+    ran = {"enhance_detail_fixes": {"hands": 0.45}, "enhance_fix_prompts": {}}
+    edited = dict(ran, enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}})
+
+    assert level_settings(ran)["enhance_fix_prompts"] == {
+        "hands": {"prompt": hands.prompt, "avoid": hands.avoid}}
+    assert level_settings(ran) != level_settings(edited)
+    # A fix made before a fix had words of its own was made without any.
+    assert "enhance_fix_prompts" not in level_settings({"enhance_detail_fixes": {"hands": 0.45}})
+
+
+def test_a_folders_words_for_a_fix_are_kept_with_its_settings():
+    words = {"hands": {"prompt": "open palms", "avoid": "fists"}}
+    stored = EnhanceSettings(params={"enhance_fix_prompts": words}).to_json()
+
+    assert EnhanceSettings.parse(stored).params["enhance_fix_prompts"] == words
+
+
+def test_a_spoken_fix_redraws_toward_the_words_the_panel_gives_that_part(monkeypatch):
+    _install_detectors(monkeypatch, "hand_yolov8s.pt", "teeth_yolov8n.pt")
+    panel = EnhanceSettings(params={"enhance_fix_prompts": {
+        "hands": {"prompt": "open palms", "avoid": "fists"},
+        "teeth": {"prompt": "even teeth", "avoid": "gaps"}}})
+
+    params = fix_params_for(_source_row(), _spoken("fix hands"), panel)
+
+    assert params["enhance_fix_prompts"] == {"hands": {"prompt": "open palms", "avoid": "fists"}}

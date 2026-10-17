@@ -58,7 +58,10 @@
       ],
       "matches": [
         "zeta"
-      ]
+      ],
+      "outline": false,
+      "prompt": "fine zeta texture",
+      "avoid": "smooth zeta"
     }
   ],
   "detector_labels": {

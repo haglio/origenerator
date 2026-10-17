@@ -32,7 +32,7 @@ from origenerator.gui.inflight import RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.detail_parts import name_parts
+from origenerator.workflows.detail_parts import detector_folder, name_parts
 
 logger = logging.getLogger(__name__)
 
@@ -395,8 +395,8 @@ class EnhanceController:
             return None, f"🎤 only a finished image can get a {asked} fix", WARNING
         params = gallery.fix_params_for(row, parts, self._settings)
         if params is None:
-            return None, (f"🎤 no {asked} detector installed "
-                          "(ComfyUI models/ultralytics/bbox)"), WARNING
+            folders = " or ".join(sorted({detector_folder(part) for part in parts}))
+            return None, f"🎤 no {asked} detector installed (ComfyUI {folders})", WARNING
         if gallery.level_matching_params(row, params) is not None:
             return None, f"🎤 already has this {asked} fix", WARNING
         fixing = name_parts(

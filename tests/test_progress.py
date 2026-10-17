@@ -187,7 +187,7 @@ def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_
     fixes = stage_names(fixed)
     tail = _ids(fixed, "KSampler")[0]
     assert [fixes[tail], *(fixes[n] for n in _ids(fixed, "DetailerForEach"))] == [
-        "Enhance", "Detail fix", "Detail fix"]
+        "Enhance", "Faces fix", "Hands fix"]
 
 
 def test_the_minutes_before_the_first_step_are_named_too():
@@ -359,3 +359,4 @@ def test_snapshot_is_json_serializable():
 def test_current_is_zero_when_total_is_unknown():
     # No recognized sampler: nothing to seed a percentage from.
     assert ProgressTracker(0).current() == (0, 0)
+

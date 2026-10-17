@@ -121,6 +121,7 @@ _PINNED = {
     "enhance": False,
     "enhance_denoise": 0.2,
     "enhance_detail_fixes": {},
+    "enhance_fix_prompts": {},
     "enhance_scale": 1.5,
     "enhance_steps": 12,
     "filename_prefix": "fingerprinted",
@@ -175,6 +176,10 @@ _VARIATIONS = {
         "enhance": True,
         "enhance_detail_fixes": {"faces": 0.4, "hands": 0.55},
     },
+    "enhanced, with the skin and hair redrawn inside their outlines": {
+        "enhance": True,
+        "enhance_detail_fixes": {"skin": 0.4, "hair": 0.35},
+    },
     "a spoken story, chained and smoothed": {
         "positive_prompt": "a quiet harbor\n---\nthe tide comes in",
         "negative_prompt": "blurry\n---\ncrowded",
@@ -192,12 +197,13 @@ _VARIATIONS = {
 }
 
 _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
+_INSTALLED_OUTLINE_DETECTORS = ("skin_detector.pt", "hair_detector.pt")
 
 # Changing the recipes above moves these without any graph changing: re-record
 # every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
-    ("image_enhance", "v003"): "228ccee5269454ec",
+    ("image_enhance", "v004"): "a4009a11a944a1ca",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
     ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
@@ -215,6 +221,8 @@ def _variation_fingerprint(workflow, variation: dict) -> str:
 def _workflow_fingerprint(workflow) -> str:
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(detail_parts, "list_detector_files", lambda: list(_INSTALLED_DETECTORS))
+        patch.setattr(detail_parts, "list_outline_detector_files",
+                      lambda: list(_INSTALLED_OUTLINE_DETECTORS))
         graphs = {_variation_fingerprint(workflow, variation) for variation in _VARIATIONS.values()}
     return _digest(sorted(graphs))
 

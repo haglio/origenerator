@@ -16,6 +16,7 @@ from origenerator.workflows.model_files import (
     list_detector_files,
     list_lora_files,
     list_model_files,
+    list_outline_detector_files,
 )
 
 
@@ -245,3 +246,13 @@ def test_is_no_lora_recognizes_the_sentinel_and_empty_values():
     assert is_no_lora("")
     assert is_no_lora(None)
     assert not is_no_lora("real_lora.safetensors")
+
+
+def test_the_detectors_that_draw_outlines_come_from_the_ultralytics_segm_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    assert list_outline_detector_files() == []
+
+    segm = tmp_path / "models" / "ultralytics" / "segm"
+    segm.mkdir(parents=True)
+    (segm / "skin_finder.pt").touch()
+    assert list_outline_detector_files() == ["skin_finder.pt"]

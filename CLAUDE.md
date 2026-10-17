@@ -311,6 +311,32 @@ stamp. Run it once when such a change lands, from the production checkout, as
 with `-m` it names the package first, and the hook that keeps the app's window
 off his screen refuses it.
 
+## A setting a person can change comes back after a restart
+
+His words (2026-10-16): "I expect Origenerator to work much like Fun Time
+insofar as all the user settings are stored in one place and get remembered
+from one session to the next." The one place is the window's session, saved
+in `state/ui_state.json` through one table, `SESSION_UI_STATE` in
+`gui/main_window.py`: a key, what the view is asked for on the way out, what
+it is told on the way back in. A control added without a line there is
+forgotten at every launch with nothing failing, which is how Separate and
+Together, Images / Videos / Both, the folders left open, the console's
+Speed, Amp, Center, shape and Human inspired, every dragged border and each
+tab's folded sections went unremembered until he noticed one of them.
+
+`tests/test_remembered_settings.py` holds the window to it the way Fun
+Time's `test_session_resume.py` holds the session: it builds the window,
+counts every control a person can set and every press and bar on the
+console, and fails on one that neither a key of the table nor its short list
+of things that are no setting accounts for. So a new control is finished
+when it has its key, or its line there saying why it is no setting -- what is
+being searched for, what one picture shows, a nudge.
+
+Inside a Fun Time session the window draws what the session asks for -- one
+list per shape, its own borders held still, the room's device and sound --
+and leaves the standalone choices it overrides as it found them, so a window
+handed back, or the next launch on its own, is where he left it.
+
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it

@@ -1930,6 +1930,15 @@ def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
     assert story["scene_frames"] == [161, 81]
 
 
+@pytest.mark.parametrize("name", ["sdxl_t2i", "sdxl_pose_transfer"])
+def test_the_redraw_amount_that_left_the_form_still_keys_every_sdxl_folder(name):
+    # A folder's key hashes every default-normalized setting, so the default
+    # outlives the field: dropping it would re-key every SDXL folder and part
+    # each one from its name, its star and its Enhance settings.
+    assert canonical_settings(name, {})["denoise"] == 1.0
+    assert canonical_settings(name, {"denoise": 0.4})["denoise"] == 0.4
+
+
 def _worked_tree(*leaf_ids):
     """One workflow folder over one settings leaf per id, the id standing for
     where that leaf's generation falls in the library's order."""

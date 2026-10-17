@@ -308,6 +308,18 @@ def test_sdxl_t2i_build_api_payload_structure():
     assert payload["7"]["class_type"] == "SaveImage"
 
 
+@pytest.mark.parametrize("name", ["sdxl_t2i", "sdxl_pose_transfer"])
+def test_a_picture_drawn_from_nothing_is_always_drawn_fully(name):
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(wf.default_params(), input_image="x.png", denoise=0.4))
+
+    latent_id = _node_id(payload, "EmptyLatentImage")
+    sampler = next(n for n in payload.values() if n["class_type"] == "KSampler"
+                   and n["inputs"]["latent_image"] == [latent_id, 0])
+    assert sampler["inputs"]["denoise"] == 1.0
+    assert "denoise" not in {pd.key for pd in wf.param_definitions()}
+
+
 def test_sdxl_t2i_extract_output_info():
     wf = SdxlT2iWorkflow()
     history = {
@@ -1774,7 +1786,7 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     assert sampler["inputs"]["positive"] == [apply_id, 0]
     assert sampler["inputs"]["negative"] == [apply_id, 1]
     assert sampler["inputs"]["seed"] == 77
-    assert sampler["inputs"]["denoise"] == params["denoise"]
+    assert sampler["inputs"]["denoise"] == 1.0
     ckpt = _find_node(payload, "CheckpointLoaderSimple")
     assert ckpt["inputs"]["ckpt_name"] == params["checkpoint"]
 

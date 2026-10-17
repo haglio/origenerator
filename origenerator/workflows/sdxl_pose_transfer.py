@@ -132,7 +132,6 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=200, good=(25, 50)),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5, good=(3, 8)),
             *sampler_params(defaults),
-            ParamDef("denoise", "Redraw Amount", ParamType.FLOAT, defaults["denoise"], min_val=0.0, max_val=1.0, step=0.01, good=(1.0, 1.0)),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
             ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
                      options=upscalers),
@@ -269,7 +268,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                     "cfg": params["cfg"],
                     "sampler_name": params["sampler_name"],
                     "scheduler": params["scheduler"],
-                    "denoise": params["denoise"],
+                    "denoise": 1.0,
                 },
             },
             "12": {

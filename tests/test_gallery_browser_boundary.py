@@ -205,8 +205,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     went with the prompt-read act it ran on, so that one forwarder answers every
     spoken animation. And the pane 88 -> 87: work in flight already sits in its
     side's folder list, which is what keeps that side's Latest up, so the shapes
-    the work in flight comes in are no longer asked for.)"""
+    the work in flight comes in are no longer asked for. 276 -> 277: the surface
+    in front -- a slideshow while one is up, else the front tab -- is one method
+    the OSR2 and a "Video ready" notice both ask, in place of the OSR2's own, and
+    the video playing on it is the other.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 276
+               for x in _class_def(VIEW, "GalleryView").body) == 277
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

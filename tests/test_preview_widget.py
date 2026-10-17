@@ -306,6 +306,25 @@ def test_show_frame_ignores_undecodable_bytes(make_preview):
     assert w._image_label.pixmap().isNull()
 
 
+# --- the video on screen, by the run it came from ---------------------------
+
+def test_the_video_on_screen_is_named_by_the_run_it_came_from(make_preview, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "clip.mp4", "alpha-1")
+    assert w.video_on_screen() == "alpha-1"
+
+
+def test_a_picture_or_the_frames_of_a_run_still_going_are_no_video_on_screen(
+        make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"), "alpha-1")
+    assert w.video_on_screen() is None
+
+    w.show_video(tmp_path / "clip.mp4", "alpha-1")
+    w.show_frame(_png_bytes())
+    assert w.video_on_screen() is None
+
+
 # --- a video loops ---------------------------------------------------------
 
 def test_a_video_loops(make_preview):

@@ -1558,6 +1558,9 @@ class SlideshowView(QWidget):
         the gallery can point its one driver at whichever surface is foreground."""
         return drive_target_for(self._current_video_path(), self._pane)
 
+    def video_on_screen(self) -> str | None:
+        return self._current_prompt_id() if self._showing_a_video() else None
+
     def _move_the_panel(self, key) -> None:
         direction = _PANEL_MOVES.get(key)
         if direction is not None and self._actions.move_hud is not None:

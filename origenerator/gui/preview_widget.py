@@ -427,6 +427,9 @@ class PreviewWidget(QWidget):
     def is_showing_video(self) -> bool:
         return self._stack.currentWidget() is self._video
 
+    def video_on_screen(self) -> str | None:
+        return self._generation if self.is_showing_video() else None
+
     def media_rect(self) -> QRect:
         """Where the media is actually drawn inside this pane, in its coordinates.
 

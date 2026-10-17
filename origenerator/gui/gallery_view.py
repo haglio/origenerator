@@ -1143,8 +1143,10 @@ class GalleryView(QWidget):
         self._reconciling_osr2 = True
         try:
             held = self._osr2_motion.held is not None
-            target = (self._osr2_drive_source()
-                      if self.osr2_control.engaged() and not held else None)
+            in_front = self._surface_in_front()
+            target = (in_front.osr2_drive_target()
+                      if in_front is not None and self.osr2_control.engaged() and not held
+                      else None)
             wants_motion = self.osr2_control.engaged() and target is None
             # Whoever gives the device up goes first: each driver puts back what
             # it found on taking over, and must not find the other still there.
@@ -1169,23 +1171,16 @@ class GalleryView(QWidget):
         finally:
             self._reconciling_osr2 = False
 
-    def _osr2_drive_source(self):
-        """The funscript target to follow, or ``None`` when there is none to
-        follow — in which case the motion is what drives (see
-        :meth:`reconcile_osr2`). The surface in front answers: a slideshow while one
-        is up, else the front tab.
+    def video_in_front(self) -> str | None:
+        surface = self._surface_in_front()
+        return surface.video_on_screen() if surface is not None else None
 
-        The switch governs both surfaces alike: double-clicking a clip open used
-        to take the device on its own, so a clip watched with the switch off
-        drove anyway — the switch is what decides now, whichever surface the
-        video is on."""
+    def _surface_in_front(self):
+        """A slideshow while one is up, else the front tab."""
         slideshow = self._slideshows.surface_for(None)
         if slideshow is not None:
-            return slideshow.osr2_drive_target()
-        panel = self._info_tabs.current_config_panel()
-        if panel is not None:
-            return panel.osr2_drive_target()
-        return None
+            return slideshow
+        return self._info_tabs.current_config_panel()
 
     def group_for_key(self, key: str):
         """The folder ``key`` names, as the side it is being looked at holds it."""

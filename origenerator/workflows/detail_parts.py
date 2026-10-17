@@ -45,6 +45,7 @@ class DetailPart:
     prompt: str = ""
     avoid: str = ""
     dilation: int = 10  # pixels grown around each rect, so edges are inside
+    framed_together: bool = False
 
 
 # Fragments follow the naming the ADetailer-style YOLO models use in the wild,
@@ -62,7 +63,7 @@ _BUILTIN_PARTS = (
                prompt=("natural teeth, distinct evenly sized teeth, natural gum line, "
                        "realistic mouth, photographic detail"),
                avoid="fused teeth, extra teeth, deformed mouth, blurry"),
-    DetailPart("eyes", ("eye", "eyes"), ("eye",),
+    DetailPart("eyes", ("eye", "eyes"), ("eye",), framed_together=True,
                prompt=("natural eyes, detailed iris, round pupils, natural catchlight, "
                        "realistic eyelashes, photographic detail"),
                avoid="cross-eyed, mismatched eyes, deformed pupils, blurry"),
@@ -193,14 +194,17 @@ def fixable_parts(parts) -> tuple:
     return tuple(part for part in parts if detector_for_part(part) is not None)
 
 
+def detector_part(filename: str) -> DetailPart | None:
+    base = _basename(filename)
+    return next((part for part in part_table() if any(fragment in base for fragment in part.matches)),
+                None)
+
+
 def detector_part_label(filename: str) -> str:
     """The part a detector file finds, or its own stem for a file the table
     doesn't recognize — better named oddly than mislabeled as another part."""
-    base = _basename(filename)
-    for part in part_table():
-        if any(fragment in base for fragment in part.matches):
-            return part.name
-    return PureWindowsPath(str(filename)).stem
+    part = detector_part(filename)
+    return part.name if part is not None else PureWindowsPath(str(filename)).stem
 
 
 def name_parts(parts) -> str:

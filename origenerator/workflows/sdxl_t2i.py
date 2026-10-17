@@ -5,6 +5,7 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    enhance_hold_params,
     sampler_params,
 )
 from origenerator.workflows.model_arch import SD15, SDXL
@@ -62,6 +63,8 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             # and skin folds into wounds/disfigurements (user-reported). 0.15
             # refines texture without redrawing anatomy.
             "enhance_denoise": 0.15,
+            "enhance_controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
+            "enhance_controlnet_strength": 0.0,
             "filename_prefix": "image/sdxl_t2i",
         }
 
@@ -96,6 +99,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100),
             ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
+            *enhance_hold_params(defaults),
         ]
 
     def build_api_payload(self, params: dict) -> dict:

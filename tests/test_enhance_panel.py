@@ -43,6 +43,7 @@ from origenerator.gui.enhance_versions import (
     enhance_level_mime,
     params_from_mime,
 )
+from origenerator.gui.param_help import param_help
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 
@@ -452,6 +453,24 @@ def test_settings_survive_a_load_and_read_back(qtbot):
                                                       enhance_denoise=0.22))
     panel.show_settings(original)
     assert panel.settings() == original
+
+
+def test_the_panel_offers_the_structure_model_and_strength_and_round_trips_them(qtbot):
+    panel, edits = _panel(qtbot)
+    captions = [w.text() for w in panel.findChildren(QLabel)]
+    assert {"Structure Model", "Structure Strength"} <= set(captions)
+    assert panel._structure_model.toolTip() == param_help("enhance_controlnet")
+    assert panel._structure_strength.toolTip() == param_help("enhance_controlnet_strength")
+
+    panel.show_settings(EnhanceSettings(params={
+        "enhance_controlnet": "a_union_controlnet.safetensors",
+        "enhance_controlnet_strength": 0.6,
+    }))
+    assert panel.settings().params["enhance_controlnet"] == "a_union_controlnet.safetensors"
+    assert panel.settings().params["enhance_controlnet_strength"] == 0.6
+
+    panel._structure_strength.setValue(0.8)
+    assert edits[-1].params["enhance_controlnet_strength"] == 0.8
 
 
 # --- the version list ------------------------------------------------------

@@ -508,6 +508,87 @@ def test_image_enhance_honors_an_unlocked_size_override():
     assert _find_node(payload, "VAEEncode")["inputs"]["pixels"] == [scale_id, 0]
 
 
+def test_the_tail_holds_the_picture_to_its_own_layout_when_asked():
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    params = dict(wf.default_params(), input_image="pick.png",
+                  positive_prompt="warm window light", negative_prompt="grainy",
+                  enhance_controlnet="a_union_controlnet.safetensors",
+                  enhance_controlnet_strength=0.6)
+    payload = wf.build_api_payload(params)
+
+    loader_id = _node_id(payload, "ControlNetLoader")
+    assert payload[loader_id]["inputs"]["control_net_name"] == "a_union_controlnet.safetensors"
+    union_id = _node_id(payload, "SetUnionControlNetType")
+    assert payload[union_id]["inputs"] == {"control_net": [loader_id, 0], "type": "tile"}
+    encodes = {n["inputs"]["text"]: nid for nid, n in payload.items()
+               if n["class_type"] == "CLIPTextEncode"}
+    hold_id = _node_id(payload, "ControlNetApplyAdvanced")
+    assert payload[hold_id]["inputs"] == {
+        "positive": [encodes["warm window light"], 0],
+        "negative": [encodes["grainy"], 0],
+        "control_net": [union_id, 0],
+        "image": [_node_id(payload, "ImageScaleBy"), 0],
+        "strength": 0.6,
+        "start_percent": 0.0,
+        "end_percent": 1.0,
+    }
+    sampler = _find_node(payload, "KSampler")
+    assert sampler["inputs"]["positive"] == [hold_id, 0]
+    assert sampler["inputs"]["negative"] == [hold_id, 1]
+
+
+def test_a_plain_controlnet_holds_the_tail_without_a_union_node():
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), input_image="pick.png",
+        enhance_controlnet="a_tile_controlnet.safetensors",
+        enhance_controlnet_strength=0.6))
+
+    assert _find_node(payload, "SetUnionControlNetType") is None
+    hold = _find_node(payload, "ControlNetApplyAdvanced")
+    assert hold["inputs"]["control_net"] == [_node_id(payload, "ControlNetLoader"), 0]
+
+
+def test_at_no_hold_the_tail_is_enhance_as_it_was():
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    payload = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png"))
+
+    assert [n for n in payload.values() if n["class_type"].startswith("ControlNet")] == []
+    sampler = _find_node(payload, "KSampler")
+    assert payload[sampler["inputs"]["positive"][0]]["class_type"] == "CLIPTextEncode"
+    assert payload[sampler["inputs"]["negative"][0]]["class_type"] == "CLIPTextEncode"
+
+
+def _tail_sampler(payload: dict) -> dict:
+    encode_id = _node_id(payload, "VAEEncode")
+    return next(n["inputs"] for n in payload.values()
+                if n["class_type"] == "KSampler"
+                and n["inputs"]["latent_image"] == [encode_id, 0])
+
+
+@pytest.mark.parametrize("name", [*_ENHANCE_TOGGLE_WORKFLOWS, "image_enhance"])
+def test_every_enhance_capable_workflows_tail_takes_the_same_hold(name):
+    wf = WORKFLOW_REGISTRY[name]
+    plain = wf.build_api_payload(dict(wf.default_params(), enhance=True))
+    payload = wf.build_api_payload(dict(wf.default_params(), enhance=True,
+                                        enhance_controlnet_strength=0.6))
+
+    rescale_id = _node_id(payload, "ImageScaleBy")
+    hold_id, hold = next((nid, n["inputs"]) for nid, n in payload.items()
+                         if n["class_type"] == "ControlNetApplyAdvanced"
+                         and n["inputs"]["image"] == [rescale_id, 0])
+    assert hold["positive"] == _tail_sampler(plain)["positive"]
+    assert hold["negative"] == _tail_sampler(plain)["negative"]
+    assert hold["strength"] == 0.6
+    union = payload[hold["control_net"][0]]
+    assert union["class_type"] == "SetUnionControlNetType"
+    assert union["inputs"]["type"] == "tile"
+    loader = payload[union["inputs"]["control_net"][0]]
+    assert loader["inputs"]["control_net_name"] == wf.default_params()["enhance_controlnet"]
+    assert _tail_sampler(payload)["positive"] == [hold_id, 0]
+    assert _tail_sampler(payload)["negative"] == [hold_id, 1]
+
+
 # ---- The detail pass (each part re-sampled where it is) ----
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt", "teeth_finder.pt")
@@ -747,6 +828,26 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         assert denoise.default == 0.15
 
 
+@pytest.mark.parametrize("name", [*_ENHANCE_TOGGLE_WORKFLOWS, "image_enhance"])
+def test_every_enhance_capable_workflow_offers_the_hold_among_its_enhance_settings(
+        name, installed_models):
+    installed_models.add("controlnet", "an_sdxl_controlnet.safetensors", arch="sdxl")
+    installed_models.add("controlnet", "an_sd15_controlnet.safetensors", arch="sd15")
+    wf = WORKFLOW_REGISTRY[name]
+
+    by_key = {pd.key: pd for pd in wf.param_definitions()}
+
+    model = by_key["enhance_controlnet"]
+    assert (model.label, model.type) == ("Structure Model", "combo")
+    assert model.options == ["an_sdxl_controlnet.safetensors"]
+    assert model.default == wf.default_params()["enhance_controlnet"]
+    strength = by_key["enhance_controlnet_strength"]
+    assert (strength.label, strength.type) == ("Structure Strength", "float")
+    assert (strength.min_val, strength.max_val, strength.step) == (0.0, 2.0, 0.05)
+    assert strength.default == 0.0
+    assert {"enhance_controlnet", "enhance_controlnet_strength"} <= set(wf.enhance_keys())
+
+
 _FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "ltx")
 # The categories that hold more than one architecture. upscale_models is left
 # out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
@@ -810,17 +911,15 @@ def test_enhance_keys_cover_every_param_only_the_tail_reads():
     # The gallery drops these from a row's identity, so an enhanced render shares
     # its unenhanced twin's folder. A tail param left off the list would silently
     # split that folder again, so every workflow's list must cover its whole tail.
+    tail = {"enhance", "enhance_scale", "enhance_steps", "enhance_denoise",
+            "enhance_controlnet", "enhance_controlnet_strength"}
     for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i"):
         wf = WORKFLOW_REGISTRY[name]
-        assert set(wf.enhance_keys()) == {
-            "enhance", "upscale_model", "enhance_scale", "enhance_steps", "enhance_denoise",
-        }, name
+        assert set(wf.enhance_keys()) == tail | {"upscale_model"}, name
     # Flux keeps upscale_model in its recipe: with the toggle OFF that same
     # param drives the plain 4x upscale this workflow is named for, so it is a
     # real difference between two of its renders.
-    assert set(WORKFLOW_REGISTRY["flux_t2i_upscaled"].enhance_keys()) == {
-        "enhance", "enhance_scale", "enhance_steps", "enhance_denoise",
-    }
+    assert set(WORKFLOW_REGISTRY["flux_t2i_upscaled"].enhance_keys()) == tail
     # A workflow with no tail at all declares nothing.
     assert WORKFLOW_REGISTRY["wan22_i2v"].enhance_keys() == ()
 
@@ -872,6 +971,7 @@ def test_a_shared_fragment_never_builds_under_an_id_a_hand_numbered_graph_could_
         base._SIZE_SCALE, base._SIZE_GET,
         base._ENH_LOADER, base._ENH_UPSCALE, base._ENH_RESCALE,
         base._ENH_ENCODE, base._ENH_SAMPLER, base._ENH_DECODE,
+        base._ENH_CONTROLNET, base._ENH_UNION, base._ENH_HOLD,
     }
     assert not any(node_id.isdigit() for node_id in fragment_ids)
 

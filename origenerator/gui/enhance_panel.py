@@ -335,22 +335,23 @@ class EnhancePanel(QWidget):
         )
         self._widgets["checkpoint"] = self._model
 
-        self._upscaler = NoWheelComboBox()
-        self._upscaler.addItems(self._options("upscale_model"))
-        self._upscaler.currentIndexChanged.connect(self._emit)
-        self._upscaler.setToolTip(param_help("upscale_model"))
-        self._widgets["upscale_model"] = self._upscaler
+        self._upscaler = self._picker("upscale_model")
+        self._structure_model = self._picker("enhance_controlnet")
 
         self._scale = self._number("enhance_scale", NoWheelDoubleSpinBox())
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
+        self._structure_strength = self._number("enhance_controlnet_strength",
+                                                NoWheelDoubleSpinBox())
         settings_column.addLayout(_FieldGrid(
             pickers=[(self._labeled(label, widget), widget)
                      for label, widget in (("Model", self._model),
-                                           ("Upscaler", self._upscaler))],
+                                           ("Upscaler", self._upscaler),
+                                           ("Structure Model", self._structure_model))],
             numbers=[(self._labeled(label, widget), widget)
                      for label, widget in (("Scale", self._scale), ("Steps", self._steps),
-                                           ("Redraw Amount", self._denoise))],
+                                           ("Redraw Amount", self._denoise),
+                                           ("Structure Strength", self._structure_strength))],
         ))
 
         # The detail pass: a tick and a number per part it can be aimed at, the
@@ -534,6 +535,14 @@ class EnhancePanel(QWidget):
         """The installed files a picker offers, from the enhancer's own ParamDef."""
         pd = self._defs.get(key)
         return list(pd.options or []) if pd is not None else []
+
+    def _picker(self, key: str) -> NoWheelComboBox:
+        widget = NoWheelComboBox()
+        widget.addItems(self._options(key))
+        widget.currentIndexChanged.connect(self._emit)
+        widget.setToolTip(param_help(key))
+        self._widgets[key] = widget
+        return widget
 
     def _number(self, key: str, widget):
         """One numeric setting, ranged from the enhancer's own ParamDef."""

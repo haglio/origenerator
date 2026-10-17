@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from origenerator.gallery.enhance_graph import graph_level_params
 
 _KEYS = ("checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
-         "enhance_denoise", "enhance_detail_fixes")
+         "enhance_denoise", "enhance_controlnet", "enhance_controlnet_strength",
+         "enhance_detail_fixes")
 
 
 def _row(graph):
@@ -133,3 +136,44 @@ def test_a_graph_that_cannot_be_read_gives_up_nothing():
 def test_a_graph_of_things_that_are_not_nodes_gives_up_nothing():
     assert graph_level_params(_row({"1": "not a node", "2": {"inputs": 7}}),
                               _KEYS) == {}
+
+
+def _held(graph, node_id, controlnet, strength, *, union):
+    """The hold the enhance tail lays down: the ControlNet, through the node
+    that picks a union file's head, applied to the rescaled picture."""
+    graph[str(node_id)] = {"class_type": "ControlNetLoader",
+                           "inputs": {"control_net_name": controlnet}}
+    applied = [str(node_id), 0]
+    if union:
+        graph[str(node_id + 1)] = {"class_type": "SetUnionControlNetType",
+                                   "inputs": {"control_net": applied, "type": "tile"}}
+        applied = [str(node_id + 1), 0]
+    graph[str(node_id + 2)] = {"class_type": "ControlNetApplyAdvanced",
+                               "inputs": {"control_net": applied, "image": ["3", 0],
+                                          "strength": strength}}
+    return graph
+
+
+@pytest.mark.parametrize("union", [True, False])
+def test_a_held_graph_gives_up_its_strength_and_the_model_it_was_held_with(union):
+    graph = _held(_sampler_graph(), 20, "example_controlnet.safetensors", 0.6, union=union)
+
+    found = graph_level_params(_row(graph), _KEYS)
+
+    assert found["enhance_controlnet_strength"] == 0.6
+    assert found["enhance_controlnet"] == "example_controlnet.safetensors"
+
+
+def test_a_structure_pass_on_a_depth_or_pose_hint_is_not_a_hold():
+    graph = _sampler_graph()
+    graph["10"] = {"class_type": "ControlNetLoader",
+                   "inputs": {"control_net_name": "example_controlnet.safetensors"}}
+    graph["11"] = {"class_type": "DepthAnything_V2", "inputs": {"images": ["2", 0]}}
+    graph["12"] = {"class_type": "ControlNetApplyAdvanced",
+                   "inputs": {"control_net": ["10", 0], "image": ["11", 0],
+                              "strength": 0.8}}
+
+    found = graph_level_params(_row(graph), _KEYS)
+
+    assert "enhance_controlnet_strength" not in found
+    assert "enhance_controlnet" not in found

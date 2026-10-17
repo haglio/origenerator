@@ -1140,6 +1140,22 @@ def test_a_collection_left_listing_videos_is_open_on_its_videos_after_a_restart(
     assert reopened._gallery_view.visible_prompt_ids() == ["vid"]
 
 
+def test_a_folder_left_open_in_the_folder_list_is_open_after_a_restart(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view.refresh()
+    first._gallery_view._tree.together_button.click()
+    folder = oriented_key("image/sdxl_t2i", BOTH)
+    first._gallery_view._tree_item_for(folder).setExpanded(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    reopened._gallery_view.refresh()
+
+    assert reopened._gallery_view._tree_item_for(folder).isExpanded()
+
+
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     # The end-to-end round trip: pick a picture, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane
@@ -1715,6 +1731,22 @@ def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_n
     win.close()
 
     assert AppState(path).get("folder_list_sides") == [BOTH]
+
+
+def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    folder = oriented_key("image/sdxl_t2i", BOTH)
+    state = AppState(path)
+    state.set("folder_list_sides", [BOTH])
+    state.set("open_folders", [folder])
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    win._gallery_view.refresh()
+    win.close()
+
+    assert folder in AppState(path).get("open_folders")
 
 
 def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):

@@ -388,7 +388,7 @@ def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
 
     queue.start_prepared("user-key", _I2V, _params(seed=7))
 
-    client.interrupt.assert_called_once()  # reconnected jobs report as running
+    client.interrupt.assert_called_once()  # stopped on the server, started or not
     assert db.get_generation("exp-rr") is None
 
 

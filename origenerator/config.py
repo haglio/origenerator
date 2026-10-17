@@ -102,7 +102,14 @@ LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 RECORDS_COPY_DIR = LIBRARY_ROOT / "origenerator_records"
 
 COMFYUI_DIR = LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
-COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"
+
+
+def comfyui_output_dir(settings: dict[str, Any], comfyui_dir: Path) -> Path:
+    named = settings.get("comfyui_output_dir")
+    return Path(named) if named else comfyui_dir / "output"
+
+
+COMFYUI_OUTPUT_DIR = comfyui_output_dir(haglio_settings.load(), COMFYUI_DIR)
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 # Where ComfyUI keeps a ``name [temp]`` LoadImage source -- a preview or a
 # node's scratch output, the third place its LoadImage can point.

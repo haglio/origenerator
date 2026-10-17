@@ -316,8 +316,9 @@ off his screen refuses it.
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
 runs THAT worktree's code as its own app instance: the production checkout's
 venv, and `ORIGENERATOR_BRANCH_SESSION=1`. Under that flag the app opens the
-**production app's own library** — the production checkout's database,
-thumbnails and trash (`config.LIBRARY_STATE_DIR`) — so every instance, production
+**production app's own library** — the production checkout's database
+(`config.LIBRARY_STATE_DIR`) and the thumbnails and trash kept in the library
+itself (`config.RECORDS_DIR`) — so every instance, production
 or preview, shows every generation whichever of them made it, and a delete in
 one is a delete in all; only the window's own state and logs stay in the
 worktree's `state/`. What a preview still leaves to the production app is

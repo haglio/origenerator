@@ -19,7 +19,8 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 # next one drew.  Every path below hangs off it, and every module that binds
 # one of them at import gets the same answer, which a test's monkeypatch of
 # this module never could.
-STATE_DIR = Path(os.environ.get("ORIGENERATOR_STATE_DIR") or PROJECT_DIR / "state")
+_TOLD_WHERE_STATE_IS = os.environ.get("ORIGENERATOR_STATE_DIR")
+STATE_DIR = Path(_TOLD_WHERE_STATE_IS or PROJECT_DIR / "state")
 UI_STATE_PATH = STATE_DIR / "ui_state.json"
 FRAMES_BEING_MADE_DIR = STATE_DIR / "frames_being_made"
 _BRANCH_SESSION = is_branch_session()
@@ -84,14 +85,16 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
 
 
-# The library's own state -- the database, the thumbnails, the trash -- is the
-# production app's wherever this app runs from, so every instance shows every
-# generation. Only what is about this window alone (UI_STATE_PATH, the logs)
-# stays in the checkout that runs it.
+# The library's database is the production app's wherever this app runs from,
+# so every instance shows every generation; its thumbnails and Trash live in the
+# library itself, beside the copy of its records. Only what is about this
+# window alone (UI_STATE_PATH, the logs) stays in the checkout that runs it.
+RECORDS_DIR = LIBRARY_ROOT / "app_data" / "origenerator"
 LIBRARY_STATE_DIR = project_dir("origenerator") / "state" if _BRANCH_SESSION else STATE_DIR
 DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
-THUMB_DIR = LIBRARY_STATE_DIR / "thumbnails"
-TRASH_DIR = LIBRARY_STATE_DIR / "trash"
+_LIBRARY_FILES_DIR = STATE_DIR if _TOLD_WHERE_STATE_IS else RECORDS_DIR
+THUMB_DIR = _LIBRARY_FILES_DIR / "thumbnails"
+TRASH_DIR = _LIBRARY_FILES_DIR / "trash"
 LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 
 
@@ -99,8 +102,6 @@ LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 # location is private, so it comes from the content overlay. ComfyUI is not one
 # of the suite's own repos and did not move with them, so it stays on the suite
 # root rather than coming from the project roots.
-RECORDS_COPY_DIR = LIBRARY_ROOT / "origenerator_records"
-
 COMFYUI_DIR = LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 
 

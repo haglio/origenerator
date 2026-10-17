@@ -218,7 +218,7 @@ def _copy_the_records_for_backup(library: Library):
     from origenerator.records_copy import copy_the_records
 
     return len(copy_the_records(
-        library.db.path, config.LIBRARY_OVERLAY_PATH, config.RECORDS_COPY_DIR))
+        library.db.path, config.LIBRARY_OVERLAY_PATH, config.RECORDS_DIR))
 
 
 def _reconnect_to_running_generations(library: Library):

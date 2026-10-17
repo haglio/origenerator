@@ -28,7 +28,7 @@ def test_the_records_are_copied_where_the_backup_will_find_them(tmp_path):
     records = _a_database(tmp_path / "state" / "origenerator.db")
     overlay = tmp_path / "content.local.json"
     overlay.write_text(json.dumps({"library_root": "D:/example"}), encoding="utf-8")
-    kept = tmp_path / "library" / "origenerator_records"
+    kept = tmp_path / "library" / "app_data" / "origenerator"
 
     copied = copy_the_records(records, overlay, kept)
 

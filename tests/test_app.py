@@ -1429,7 +1429,7 @@ class TestAnOverlayShortOfAKey:
     keeps this from being a demand to configure things you do not use.
     """
 
-    SHORT = ("detector_labels", "speech_python")
+    SHORT = ("detail_fix_parts", "speech_python")
 
     def test_the_launch_stops_and_no_window_is_built(self, qapp):
         window = MagicMock()

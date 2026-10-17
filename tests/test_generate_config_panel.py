@@ -424,16 +424,17 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
         "steps": 7,  # an edit — flf2v's default is 4
     })
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
 
     values = panel._param_form.get_values()
     assert values["positive_prompt"] == "slow beta"
     assert values["input_image"] == "start.png"
     assert values["audio_prompt"] == "wet rhythm"
     assert values["steps"] == 7
-    ati_defaults = WORKFLOW_REGISTRY["wan21_ati_i2v"].default_params()
-    assert values["cfg"] == ati_defaults["cfg"]        # flf2v's 1.0 didn't leak
-    assert values["motion_hz"] == ati_defaults["motion_hz"]
+    loop_defaults = WORKFLOW_REGISTRY["wan22_flf2v_loop"].default_params()
+    i2v_defaults = WORKFLOW_REGISTRY["wan22_i2v"].default_params()
+    assert values["shift_high"] == i2v_defaults["shift_high"] != loop_defaults["shift_high"]
+    assert values["cfg_high"] == i2v_defaults["cfg_high"]
 
 
 def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
@@ -981,13 +982,13 @@ def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
     assert panel._param_form.seed_is_random() is True
 
 
-def test_a_pinned_seed_stays_pinned_across_a_switch_to_a_clip_workflow(panel):
-    panel.prefill("sdxl_t2i", {"seed": 99})
+def test_a_pinned_seed_stays_pinned_across_a_switch_to_a_video_workflow(panel):
+    panel.prefill("wan22_t2i", {"noise_seed": 99})
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
 
-    assert panel._param_form.get_values()["seed"] == 99
-    assert "seed" not in panel._param_form.random_seed_keys()
+    assert panel._param_form.get_values()["noise_seed"] == 99
+    assert "noise_seed" not in panel._param_form.random_seed_keys()
 
 
 def test_restore_config_reapplies_workflow_params_and_random_seed(panel):

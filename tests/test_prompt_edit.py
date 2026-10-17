@@ -164,25 +164,6 @@ def test_a_revision_carries_the_prompts_it_started_from():
     assert revision.changed
 
 
-def test_the_revision_says_what_it_did():
-    revision = apply_request("a woman, freckles", "", "no freckles")
-    assert "freckles" in revision.describe()
-
-
-def test_taking_a_term_out_of_the_negative_prompt_says_so_in_those_words():
-    revision = apply_request("a woman", "blurry, hat", "a hat")
-
-    assert revision.action == ALLOWED
-    assert revision.describe() == "“hat” taken out of the negative prompt"
-
-
-def test_leaning_harder_on_an_excluded_term_says_where_its_weight_went():
-    revision = apply_request("a woman", "blurry, hat", "no hat")
-
-    assert revision.action == PUSHED
-    assert revision.describe() == "“hat” raised to 1.1 in the negative prompt"
-
-
 # --- catching a term the prompt names in its own words ----------------------
 
 

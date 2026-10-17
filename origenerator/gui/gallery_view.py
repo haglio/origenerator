@@ -3138,7 +3138,7 @@ class GalleryView(QWidget):
             new_negative=revision.negative,
         )
         self.refresh()  # the queue marks the job as a request the moment it is spoken
-        return f"🎤 {revision.describe()} — generating", NOTICE
+        return "🎤 Request submitted", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
         """Bin some of one image's versions, from the info pane's version list.

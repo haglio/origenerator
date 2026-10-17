@@ -14715,6 +14715,14 @@ def test_a_finished_request_queues_the_revision_with_the_same_seed(
     assert job.params["negative_prompt"] == "blurry"
 
 
+def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    assert view._slideshows.showing._note.text() == "🎤 Request submitted"
+
+
 def test_a_request_for_something_absent_goes_to_the_negative_prompt(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt="a woman, soft light")

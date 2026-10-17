@@ -299,21 +299,6 @@ class PromptRevision:
         return (self.positive != self.old_positive
                 or self.negative != self.old_negative)
 
-    def describe(self) -> str:
-        """What was done, as a line to say back to the speaker."""
-        quoted = f"“{self.term}”"
-        if self.action == DROPPED:
-            return f"dropped {quoted}"
-        if self.action == PUSHED:
-            return f"{quoted} raised to {_format_weight(self.weight)} in the negative prompt"
-        if self.action == EXCLUDED:
-            return f"{quoted} added to the negative prompt"
-        if self.action == RAISED:
-            return f"{quoted} raised to {_format_weight(self.weight)}"
-        if self.action == ALLOWED:
-            return f"{quoted} taken out of the negative prompt"
-        return f"{quoted} added to the prompt"
-
 
 def apply_request(positive: str, negative: str, request: str,
                   match=None) -> PromptRevision | None:

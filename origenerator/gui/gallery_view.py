@@ -1228,6 +1228,13 @@ class GalleryView(QWidget):
         if isinstance(saved, int):
             self.osr2_control.set_max_intensity(saved)
 
+    def motion_settings(self) -> dict | None:
+        return None if self._osr2_motion is None else self._osr2_motion.settings()
+
+    def set_motion_settings(self, saved) -> None:
+        if self._osr2_motion is not None:
+            self._osr2_motion.take_settings(saved)
+
     # --- the audio bed: one app-global switch, following nothing on screen ----
 
     def _on_audio_toggle(self, on: bool):

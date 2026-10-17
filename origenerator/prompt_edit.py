@@ -269,17 +269,17 @@ def _format_weight(weight: float) -> str:
     return f"{round(weight, 2):g}"
 
 
-def _reweighted(prompt: str, index: int, delta: float) -> tuple:
-    """``prompt`` with segment ``index`` re-weighted by ``delta``, and the weight
-    it now carries. The segment is rewritten in the explicit ``(term:weight)``
-    form whatever it was in before, so the number it ends on is readable."""
+def _reweighted(prompt: str, index: int, delta: float) -> str:
+    """``prompt`` with segment ``index`` re-weighted by ``delta``. The segment
+    is rewritten in the explicit ``(term:weight)`` form whatever it was in
+    before, so the number it ends on is readable."""
     segments = _segments(prompt)
     segment = segments[index]
     term, weight = _unwrap(segment)
     weight = round(weight + delta, 2)
     lead = segment[:len(segment) - len(segment.lstrip())]
     segments[index] = f"{lead}({term}:{_format_weight(weight)})"
-    return _tidy(",".join(segments)), weight
+    return _tidy(",".join(segments))
 
 
 def _plus(prompt: str, term: str) -> str:
@@ -300,7 +300,6 @@ class PromptRevision:
     term: str
     polarity: str
     action: str
-    weight: float | None = None  # what a re-weighting landed on, else None
 
     @property
     def changed(self) -> bool:
@@ -361,9 +360,9 @@ def _revised(positive: str, negative: str, request: str, parsed: tuple,
              match, rewrite) -> PromptRevision:
     polarity, term = parsed
 
-    def made(new_positive, new_negative, action, weight=None) -> PromptRevision:
+    def made(new_positive, new_negative, action) -> PromptRevision:
         return PromptRevision(positive, negative, new_positive, new_negative,
-                              term, polarity, action, weight)
+                              term, polarity, action)
 
     def rewritten() -> PromptRevision | None:
         if rewrite is None:
@@ -386,16 +385,14 @@ def _revised(positive: str, negative: str, request: str, parsed: tuple,
                     or made(_without(positive, index), negative, DROPPED))
         index = _index_of(negative, term, None)
         if index is not None:
-            revised, weight = _reweighted(negative, index, WEIGHT_STEP)
-            return made(positive, revised, PUSHED, weight)
+            return made(positive, _reweighted(negative, index, WEIGHT_STEP), PUSHED)
         return made(positive, _plus(negative, term), EXCLUDED)
     index = _index_of(negative, term, None)
     if index is not None:
         return made(positive, _without(negative, index), ALLOWED)
     index = _index_of(positive, term, None)
     if index is not None:
-        revised, weight = _reweighted(positive, index, WEIGHT_STEP)
-        return made(revised, negative, RAISED, weight)
+        return made(_reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
     return rewritten() or made(_plus(positive, term), negative, ADDED)
 
 

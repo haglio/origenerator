@@ -90,7 +90,6 @@ def test_against_something_already_excluded_leans_on_it_harder():
                              "no silver earrings")
 
     assert revision.negative == "blurry, (silver earrings:1.1)"
-    assert revision.weight == pytest.approx(1.1)
     assert revision.action == PUSHED
 
 
@@ -98,7 +97,6 @@ def test_a_second_push_climbs_from_the_weight_already_there():
     revision = apply_request("a woman", "(freckles:1.2)", "no freckles")
 
     assert revision.negative == "(freckles:1.3)"
-    assert revision.weight == pytest.approx(1.3)
 
 
 def test_for_something_already_wanted_raises_its_weight():

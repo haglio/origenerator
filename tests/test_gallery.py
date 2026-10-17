@@ -128,7 +128,7 @@ def test_job_kind_separates_a_video_from_a_picture():
 def test_every_video_workflow_is_one_kind_of_job():
     # Each of them animates a start image, so the queue has one kind of video to
     # name, and names it in a word rather than the model card's shorthand.
-    videos = ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v")
+    videos = ("wan22_i2v", "wan22_flf2v_loop")
     assert {job_kind_label(name) for name in videos} == {"Video"}
 
 

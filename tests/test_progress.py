@@ -83,7 +83,7 @@ def test_every_video_workflow_costs_its_audio_pass_against_its_video_one():
     # The audio sampler's 50 steps are a fixed count, so the shorter the video
     # schedule the more of the bar they used to take: a 4-step loop spent 93% of
     # its reported steps on the pass that takes seconds.
-    for name in ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"):
+    for name in ("wan22_i2v", "wan22_flf2v_loop"):
         payload = _payload(name, steps=4)
         costs = sampler_costs(payload)
         audio = sum(steps * cost for node, (steps, cost) in costs.items()

@@ -113,19 +113,9 @@ def test_the_overlay_is_read_once_however_many_modules_want_it():
 
 
 def test_a_workflow_imports_on_an_overlay_that_is_missing_what_it_wants(tmp_path):
-    """`workflows/__init__` is imported by twelve modules, and reached the
-    overlay at import through one workflow module\'s detector labels — with no
-    .get and no try. The overlay replaces the committed example rather than
-    merging with it, so an overlay written before `detector_labels` existed, or
-    edited to drop it, took the whole app down with a bare KeyError: no window,
-    and nothing said about which key or which file.
-
-    The control on this is in tests/test_motion_aim.py — the same overlay, read
-    where the labels are actually used, still refuses.
-    """
     incomplete = tmp_path / "content.local.json"
     complete = json.loads((REPO_ROOT / "content.example.json").read_text())
-    complete.pop("detector_labels")
+    complete.pop("detail_fix_parts")
     incomplete.write_text(json.dumps(complete), encoding="utf-8")
 
     result = _run_in_a_fresh_interpreter(
@@ -161,11 +151,11 @@ def test_a_local_overlay_missing_a_key_the_example_documents_is_named(tmp_path):
     complete = json.loads((REPO_ROOT / "content.example.json").read_text())
     local = tmp_path / "content.local.json"
     local.write_text(json.dumps(
-        {k: v for k, v in complete.items() if k not in ("detector_labels", "speech_python")}),
+        {k: v for k, v in complete.items() if k not in ("detail_fix_parts", "speech_python")}),
         encoding="utf-8")
 
     assert content.missing_overlay_keys(local, REPO_ROOT / "content.example.json") == (
-        "detector_labels", "speech_python")
+        "detail_fix_parts", "speech_python")
 
 
 def test_a_complete_overlay_is_missing_nothing(tmp_path):

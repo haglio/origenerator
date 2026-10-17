@@ -55,6 +55,7 @@ class DetailPart:
     name: str
     spoken: tuple
     matches: tuple
+    framed_together: bool = False
 
 
 # The published vocabulary. Fragments follow the naming the ADetailer-style
@@ -64,7 +65,7 @@ _BUILTIN_PARTS = (
     DetailPart("faces", ("face", "faces"), ("face",)),
     DetailPart("hands", ("hand", "hands"), ("hand",)),
     DetailPart("teeth", ("teeth", "tooth", "mouth"), ("teeth", "tooth", "mouth")),
-    DetailPart("eyes", ("eye", "eyes"), ("eye",)),
+    DetailPart("eyes", ("eye", "eyes"), ("eye",), framed_together=True),
 )
 
 
@@ -214,17 +215,20 @@ def fixable_parts(parts) -> tuple:
     return tuple(part for part in parts if detector_for_part(part) is not None)
 
 
+def detector_part(filename: str) -> DetailPart | None:
+    base = _basename(filename)
+    return next((part for part in part_table() if any(fragment in base for fragment in part.matches)),
+                None)
+
+
 def detector_part_label(filename: str) -> str:
     """The part a detector file finds, as the word a caption uses.
 
     A file the table doesn't recognize keeps its own stem — an exotic detector
     is better named oddly than mislabeled as some other part.
     """
-    base = _basename(filename)
-    for part in part_table():
-        if any(fragment in base for fragment in part.matches):
-            return part.name
-    return PureWindowsPath(str(filename)).stem
+    part = detector_part(filename)
+    return part.name if part is not None else PureWindowsPath(str(filename)).stem
 
 
 def name_parts(parts) -> str:

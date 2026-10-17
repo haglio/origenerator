@@ -639,6 +639,22 @@ def test_the_places_the_fixes_found_ride_with_the_picture_they_were_found_in_in_
     assert files == [{**ENHANCED, "points_of_interest": [FACE_PLACE, HAND_PLACE]}]
 
 
+def test_the_places_say_which_part_found_them_and_eyes_found_together_are_one():
+    history = {
+        "prompt": [3, "run", {"fix0_detector": {"class_type": "UltralyticsDetectorProvider",
+                                                 "inputs": {"model_name": "bbox/eye_finder.pt"}}}, {}, []],
+        "outputs": {
+            "12": {"images": [ENHANCED]},
+            "fix0_points": {"text": [_region(200, 100, 600, 500), _region(500, 120, 900, 520), WHOLE_PICTURE]},
+        },
+    }
+
+    files = WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history)
+
+    assert files[0]["points_of_interest"] == [
+        {"left": 0.1, "top": 0.1, "right": 0.45, "bottom": 0.52, "part": "eyes"}]
+
+
 def test_an_enhancement_whose_fixes_found_nothing_carries_no_places():
     history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {"text": [WHOLE_PICTURE]}}}
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 
 FILE_KEY = "points_of_interest"
 _EDGES = ("left", "top", "right", "bottom")
@@ -29,10 +30,39 @@ def report_nodes(fix_index: int, segs_ref, picture_ref) -> dict:
     }
 
 
-def reported(outputs: dict) -> list[dict]:
+def reported(outputs: dict, parts: Mapping | None = None) -> list[dict]:
     reports = sorted((int(found[1]), output) for node_id, output in outputs.items()
                      if (found := _REPORT_ID.fullmatch(str(node_id))))
-    return [place for _order, output in reports for place in _places_in(output)]
+    return [place for index, output in reports
+            for place in _of_part(_places_in(output), (parts or {}).get(index))]
+
+
+def _of_part(places: list[dict], part) -> list[dict]:
+    if part is None:
+        return places
+    if part.framed_together:
+        places = _overlaps_joined(places)
+    return [{**place, "part": part.name} for place in places]
+
+
+def _overlaps_joined(places: list[dict]) -> list[dict]:
+    joined: list[dict] = []
+    for place in places:
+        while (other := next((kept for kept in joined if _overlap(kept, place)), None)) is not None:
+            joined.remove(other)
+            place = _union(other, place)
+        joined.append(place)
+    return joined
+
+
+def _overlap(one: dict, other: dict) -> bool:
+    return (one["left"] < other["right"] and other["left"] < one["right"]
+            and one["top"] < other["bottom"] and other["top"] < one["bottom"])
+
+
+def _union(one: dict, other: dict) -> dict:
+    return {"left": min(one["left"], other["left"]), "top": min(one["top"], other["top"]),
+            "right": max(one["right"], other["right"]), "bottom": max(one["bottom"], other["bottom"])}
 
 
 def _places_in(output) -> list[dict]:

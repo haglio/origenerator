@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
@@ -11,7 +12,7 @@ from origenerator import points_of_interest
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
-from origenerator.workflows.detail_parts import detail_fix_passes
+from origenerator.workflows.detail_parts import detail_fix_passes, detector_part
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
 
@@ -902,7 +903,7 @@ class WorkflowTemplate(ABC):
         """
         outputs = history_data.get("outputs", {})
         files = list(outputs.get(self.output_node_id, {}).get(self.output_key, []))
-        places = points_of_interest.reported(outputs)
+        places = points_of_interest.reported(outputs, _parts_fixed_in(history_data))
         if files and places:
             files[0] = {**files[0], points_of_interest.FILE_KEY: places}
         files += soundless_copies_of(files)
@@ -932,6 +933,17 @@ class WorkflowTemplate(ABC):
                 },
             },
         }
+
+
+_FIX_DETECTOR = re.compile(r"fix(\d+)_detector")
+
+
+def _parts_fixed_in(history_data: dict) -> dict:
+    run = history_data.get("prompt")
+    graph = run[2] if isinstance(run, list | tuple) and len(run) > 2 and isinstance(run[2], dict) else {}
+    return {int(found[1]): part for node_id, node in graph.items()
+            if (found := _FIX_DETECTOR.fullmatch(str(node_id))) and isinstance(node, dict)
+            and (part := detector_part(str((node.get("inputs") or {}).get("model_name", "")))) is not None}
 
 
 def soundless_copies_of(saved: list[dict]) -> list[dict]:

@@ -214,9 +214,7 @@ def render_base_now(client, workflow, params: dict, *,
         if not history:
             continue
         files, _thumb, _duration = extract_completion(
-            workflow, history, COMFYUI_OUTPUT_DIR, THUMB_DIR, prompt_id,
-            params=params,
-        )
+            workflow, history, COMFYUI_OUTPUT_DIR, THUMB_DIR, prompt_id)
         return files
     logger.warning("Base re-render %s did not land within %ss",
                    prompt_id, RENDER_TIMEOUT_SECONDS)

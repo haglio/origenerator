@@ -204,9 +204,9 @@ def _back_of_the_line_first(items, keys) -> list:
 
 
 def _inflight_signature(items) -> tuple:
-    """The identity of the in-flight set — its job keys — so a frame-only change
-    refreshes cards in place while an added or removed job forces a re-render."""
-    return tuple(sorted(it.key for it in items))
+    """The in-flight runs in the order drawn, so a frame-only change refreshes
+    cards in place while a run added, taken away or moved forces a re-render."""
+    return tuple(it.key for it in items)
 
 
 def _time_heading(text: str) -> QLabel:

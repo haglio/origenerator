@@ -2110,7 +2110,7 @@ def test_the_absence_batch_can_be_handed_a_policy_of_its_own(qtbot):
 
     A test wanting a known batch had to reach for the module's `random` or for
     `queue_experiments`; it hands in a policy now, the way the client, the motion
-    and the audio bed are handed in.
+    and the radio are handed in.
     """
     class NothingToTry:
         """A policy with no proposal in it, which is answer enough: what is under
@@ -4326,7 +4326,7 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[0] == (view._bank.back, view._bank.forward)
     assert groups[1] == (view._bank.undo, view._bank.redo)
     assert groups[3] == (view._bank.favorite, view._bank.enhance, view._bank.delete)
-    assert view._bank.auto in groups[4] and view._bank.audio in groups[4]
+    assert view._bank.auto in groups[4] and view._bank.radio in groups[4]
     # The mic has a space of its own: the group beside it is what Esc turns off,
     # and the mic is the one switch it leaves listening.
     assert groups[5] == (view._bank.mic,) and view._bank.mic not in groups[4]
@@ -12639,8 +12639,8 @@ def test_a_session_saved_under_retracted_or_control_off_reopens_parked(qtbot):
         assert view.osr2_state() == OSR2_PARKED, saved
 
 
-class _FakeAmbientAudio:
-    """Stands in for the audio bed so a gallery test never opens a media backend."""
+class _FakeRadio:
+    """Stands in for Origenerator Radio so a gallery test never opens an engine."""
 
     def __init__(self):
         self.starts = 0
@@ -12657,45 +12657,45 @@ class _FakeAmbientAudio:
         self.frozen = frozen
 
 
-def _audio_view(qtbot):
-    bed = _FakeAmbientAudio()
-    view = GalleryView(FakeDB([]), actions=FakeActions(), ambient_audio=bed)
+def _radio_view(qtbot):
+    radio = _FakeRadio()
+    view = GalleryView(FakeDB([]), actions=FakeActions(), radio=radio)
     qtbot.addWidget(view)
-    return view, bed
+    return view, radio
 
 
-def test_the_audio_switch_starts_and_silences_the_bed(qtbot):
-    view, bed = _audio_view(qtbot)
-    assert (bed.starts, bed.stops) == (0, 0)  # off until asked
+def test_the_radio_switch_tunes_the_radio_in_and_silences_it(qtbot):
+    view, radio = _radio_view(qtbot)
+    assert (radio.starts, radio.stops) == (0, 0)  # off until asked
 
-    view._bank.audio.setChecked(True)
-    assert bed.starts == 1
+    view._bank.radio.setChecked(True)
+    assert radio.starts == 1
 
-    view._bank.audio.setChecked(False)
-    assert bed.stops == 1
-
-
-def test_audio_enabled_state_round_trips_for_persistence(qtbot):
-    view, bed = _audio_view(qtbot)
-    assert view.audio_enabled() is False
-
-    view.set_audio_enabled(True)
-
-    assert view.audio_enabled() is True and view._bank.audio.isChecked()
-    assert bed.starts == 1  # restoring the switch actually starts it playing
+    view._bank.radio.setChecked(False)
+    assert radio.stops == 1
 
 
-def test_the_rooms_pause_reaches_the_audio_bed_and_the_motion(qtbot):
-    bed, motion = _FakeAmbientAudio(), _SignalMotion()
-    view = GalleryView(FakeDB([]), actions=FakeActions(), ambient_audio=bed,
+def test_the_radio_switch_round_trips_for_persistence(qtbot):
+    view, radio = _radio_view(qtbot)
+    assert view.radio_enabled() is False
+
+    view.set_radio_enabled(True)
+
+    assert view.radio_enabled() is True and view._bank.radio.isChecked()
+    assert radio.starts == 1  # restoring the switch actually starts it playing
+
+
+def test_the_rooms_pause_reaches_the_radio_and_the_motion(qtbot):
+    radio, motion = _FakeRadio(), _SignalMotion()
+    view = GalleryView(FakeDB([]), actions=FakeActions(), radio=radio,
                        osr2_motion=motion)
     qtbot.addWidget(view)
 
     view.set_room_paused(True)
-    assert (bed.frozen, motion.frozen) == (True, True)
+    assert (radio.frozen, motion.frozen) == (True, True)
 
     view.set_room_paused(False)
-    assert (bed.frozen, motion.frozen) == (False, False)
+    assert (radio.frozen, motion.frozen) == (False, False)
 
 
 def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch):
@@ -12987,29 +12987,29 @@ def _click_the_picture(slideshow):
 
 def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_pictures_with_it(
         qtbot, monkeypatch):
-    bed, motion = _FakeAmbientAudio(), _SignalMotion()
-    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
+    radio, motion = _FakeRadio(), _SignalMotion()
+    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio,
                                                         osr2_motion=motion)
 
     _click_the_picture(slideshow)
-    assert (slideshow._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
+    assert (slideshow._paused, motion.frozen, radio.frozen, omnipause.frozen()) == (
         True, True, True, True)
 
     _click_the_picture(slideshow)
-    assert (slideshow._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
+    assert (slideshow._paused, motion.frozen, radio.frozen, omnipause.frozen()) == (
         False, False, False, False)
     slideshow.close()
 
 
 def test_closing_a_paused_slideshow_plays_the_room_again(qtbot, monkeypatch):
-    bed, motion = _FakeAmbientAudio(), _SignalMotion()
-    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
+    radio, motion = _FakeRadio(), _SignalMotion()
+    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio,
                                                         osr2_motion=motion)
     _click_the_picture(slideshow)
 
     slideshow.close()
 
-    assert (motion.frozen, bed.frozen, omnipause.frozen()) == (False, False, False)
+    assert (motion.frozen, radio.frozen, omnipause.frozen()) == (False, False, False)
 
 
 def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
@@ -13189,7 +13189,7 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     assert view._find_bar.isVisible()
 
     assert view._handle_escape() is False
-    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
+    assert not view._bank.radio.isChecked() and view._slideshows.showing is None
 
 
 def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
@@ -13204,7 +13204,7 @@ def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(QApplication, "focusWidget", staticmethod(lambda: positive))
 
     assert view._handle_escape() is False
-    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
+    assert not view._bank.radio.isChecked() and view._slideshows.showing is None
 
 
 def test_the_console_hints_that_esc_stops_the_device(qtbot):
@@ -13263,38 +13263,38 @@ def _startable_view(qtbot, tmp_path, monkeypatch):
     and what Esc has to be able to start from."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: ("g0.png", "image"))
-    bed = _FakeAmbientAudio()
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), ambient_audio=bed)
+    radio = _FakeRadio()
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), radio=radio)
     qtbot.addWidget(view)
     _keys_are_the_gallerys(view)
     view.refresh()
-    return view, bed, _select_first_leaf(view)
+    return view, radio, _select_first_leaf(view)
 
 
 def _stoppable_view(qtbot, tmp_path, monkeypatch):
     """That gallery with everything Esc is meant to stop actually running: a loop,
-    the audio bed, and a fullscreen slideshow — plus the mic, which it is meant to
+    the radio, and a fullscreen slideshow — plus the mic, which it is meant to
     leave alone."""
-    view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
+    view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
     view._toggle_auto(True)
-    view._bank.audio.setChecked(True)
+    view._bank.radio.setChecked(True)
     view._bank.mic.setChecked(True)
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing)
-    return view, bed, key
+    return view, radio, key
 
 
 def test_esc_turns_off_everything_the_app_is_doing(qtbot, tmp_path, monkeypatch):
     # One key for the whole room: the loop, the sound, and the slideshow all stop
     # together, so there is no second thing still going after the panic-stop.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    assert view._auto.is_active(key) and bed.starts == 1 and view._slideshows.showing is not None
+    view, radio, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    assert view._auto.is_active(key) and radio.starts == 1 and view._slideshows.showing is not None
 
     handled = _press_escape(view)
 
     assert handled is True
     assert not view._auto.is_active(key)
-    assert not view._bank.audio.isChecked() and bed.stops == 1
+    assert not view._bank.radio.isChecked() and radio.stops == 1
     assert view._slideshows.showing is None
 
 
@@ -13314,7 +13314,7 @@ def test_esc_over_the_slideshow_stops_what_is_running_behind_it(qtbot, tmp_path,
     # The slideshow is a window of ours, and Esc closes it — but on its own that left
     # the loop and the sound running under it, which is the opposite of what
     # the key means. So this one window doesn't take the key away.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    view, radio, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     slideshow = view._slideshows.showing
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: slideshow))
     view._other_window_owns_keys = lambda: True  # the slideshow is up and active
@@ -13322,13 +13322,13 @@ def test_esc_over_the_slideshow_stops_what_is_running_behind_it(qtbot, tmp_path,
     handled = _press_escape(view)
 
     assert handled is True
-    assert view._slideshows.showing is None and not view._auto.is_active(key) and bed.stops == 1
+    assert view._slideshows.showing is None and not view._auto.is_active(key) and radio.stops == 1
 
 
 def test_esc_over_the_slideshow_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path,
                                                                       monkeypatch):
     # A dropdown or dialog opened over the slideshow owns Esc, as it does everywhere.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    view, radio, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     slideshow = view._slideshows.showing
     popup = QWidget()
     qtbot.addWidget(popup)
@@ -13337,7 +13337,7 @@ def test_esc_over_the_slideshow_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp
     view._other_window_owns_keys = lambda: True
 
     assert _press_escape(view) is False
-    assert view._slideshows.showing is slideshow and view._auto.is_active(key) and bed.stops == 0
+    assert view._slideshows.showing is slideshow and view._auto.is_active(key) and radio.stops == 0
     slideshow.close()
 
 
@@ -13345,13 +13345,13 @@ def test_esc_on_a_freshly_opened_app_starts_everything(qtbot, tmp_path, monkeypa
     # Nothing running and nothing held back — the app as it opens. The key is the
     # one thing to reach for either way, so it starts the room rather than
     # waiting to be taught what the room was by a stop it never saw.
-    view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
+    view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
+    assert not view._bank.radio.isChecked() and view._slideshows.showing is None
 
     assert _press_escape(view) is True
 
     assert view._auto.is_active(key)
-    assert view._bank.audio.isChecked() and bed.starts == 1
+    assert view._bank.radio.isChecked() and radio.starts == 1
     assert view.osr2_control.isChecked()
     assert view._slideshows.showing is not None
     qtbot.addWidget(view._slideshows.showing)
@@ -13360,14 +13360,14 @@ def test_esc_on_a_freshly_opened_app_starts_everything(qtbot, tmp_path, monkeypa
 def test_the_standing_start_is_stopped_by_the_next_press(qtbot, tmp_path, monkeypatch):
     # What it started, it takes away again — the key alternates from a standing
     # start exactly as it does from a stop.
-    view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
+    view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
     _press_escape(view)
     qtbot.addWidget(view._slideshows.showing)
 
     assert _press_escape(view) is True
 
     assert not view._auto.is_active(key) and view._slideshows.showing is None
-    assert not view._bank.audio.isChecked() and bed.stops == 1
+    assert not view._bank.radio.isChecked() and radio.stops == 1
     assert not view.osr2_control.isChecked()
 
 
@@ -13375,7 +13375,7 @@ def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch
     # The other half of the panic-stop: press it once and the room goes quiet,
     # press it again and it comes back as it was — the way leaving an OmniPause
     # hands the room back rather than leaving every switch to be found again.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    view, radio, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     playlist = view._slideshows.showing._playlist
     playing = (playlist.in_play_order(), playlist.current())
 
@@ -13385,7 +13385,7 @@ def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch
     assert _press_escape(view) is True
 
     assert view._auto.is_active(key)
-    assert view._bank.audio.isChecked() and bed.starts == 2
+    assert view._bank.radio.isChecked() and radio.starts == 2
     assert view._slideshows.showing is not None
     qtbot.addWidget(view._slideshows.showing)
     playlist = view._slideshows.showing._playlist
@@ -13455,7 +13455,7 @@ def test_the_resumed_loop_runs_its_own_folder_not_the_one_on_screen(qtbot, tmp_p
 def test_esc_goes_on_alternating_stop_and_start(qtbot, tmp_path, monkeypatch):
     # What is put back is put back for good: a third press stops it all over
     # again rather than the key doing nothing from there on.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    view, radio, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
 
     _press_escape(view)
     _press_escape(view)
@@ -13464,7 +13464,7 @@ def test_esc_goes_on_alternating_stop_and_start(qtbot, tmp_path, monkeypatch):
 
     assert _press_escape(view) is True
     assert not view._auto.is_active(key)
-    assert not view._bank.audio.isChecked() and bed.stops == 2
+    assert not view._bank.radio.isChecked() and radio.stops == 2
     assert view._slideshows.showing is None
 
 
@@ -13493,12 +13493,12 @@ def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
     # away, and all the one after that puts back.
     view, _bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     _press_escape(view)
-    view._bank.audio.setChecked(True)  # by hand, with everything else still off
+    view._bank.radio.setChecked(True)  # by hand, with everything else still off
 
     _press_escape(view)
     _press_escape(view)
 
-    assert view._bank.audio.isChecked()
+    assert view._bank.radio.isChecked()
     assert not view._auto.is_active(key) and view._slideshows.showing is None
 
 
@@ -13518,14 +13518,14 @@ def test_esc_puts_back_a_motion_that_was_running_without_the_switch(qtbot,
     assert view._osr2_motion.active and not view.osr2_control.isChecked()
 
 
-def test_esc_stops_the_audio_bed_on_its_own(qtbot):
+def test_esc_stops_the_radio_on_its_own(qtbot):
     # Nothing else running: the switch alone is enough for Esc to have acted.
-    view, bed = _audio_view(qtbot)
+    view, radio = _radio_view(qtbot)
     _keys_are_the_gallerys(view)
-    view._bank.audio.setChecked(True)
+    view._bank.radio.setChecked(True)
 
     assert _press_escape(view) is True
-    assert not view._bank.audio.isChecked() and bed.stops == 1
+    assert not view._bank.radio.isChecked() and radio.stops == 1
 
 
 # --- folders the user composes: multi-select, group, drop, remove -------------

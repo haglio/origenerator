@@ -23,7 +23,7 @@ back from the one matcher, and the caller tells them apart by type.
 target. A fullscreen slideshow has the floor while one is up and the gallery has it
 otherwise, which is Fun Time's active-side idea with two sides: "back" steps a
 slide over a slideshow and walks the history in the gallery, because in both places
-it means the one before. The app-wide switches (the mic, the audio bed, the
+it means the one before. The app-wide switches (the mic, Origenerator Radio, the
 OSR2) and the motion's own bars belong to no surface and answer from either.
 
 One word is deliberately missing. The Requests collection answers to the plural
@@ -70,9 +70,9 @@ class AppCommand(Enum):
     AUTO = "auto"
     AUTO_ON = "auto_on"
     AUTO_OFF = "auto_off"
-    AUDIO = "audio"
-    AUDIO_ON = "audio_on"
-    AUDIO_OFF = "audio_off"
+    RADIO = "radio"
+    RADIO_ON = "radio_on"
+    RADIO_OFF = "radio_off"
     DRIVE = "drive"
     DRIVE_ON = "drive_on"
     DRIVE_OFF = "drive_off"
@@ -195,7 +195,7 @@ _say(AppCommand.GROUP, "group", "group folders")
 # which way — the same three shapes Fun Time gives its own toggles.
 for _words, (_toggle, _on, _off) in (
     (("auto", "auto generate"), (AppCommand.AUTO, AppCommand.AUTO_ON, AppCommand.AUTO_OFF)),
-    (("audio", "ambient"), (AppCommand.AUDIO, AppCommand.AUDIO_ON, AppCommand.AUDIO_OFF)),
+    (("radio",), (AppCommand.RADIO, AppCommand.RADIO_ON, AppCommand.RADIO_OFF)),
     (("drive", "motion"), (AppCommand.DRIVE, AppCommand.DRIVE_ON, AppCommand.DRIVE_OFF)),
 ):
     for _word in _words:

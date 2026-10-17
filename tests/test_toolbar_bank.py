@@ -53,13 +53,10 @@ def bank(qtbot):
 
 
 def test_the_room_s_own_appliances_are_absent_when_a_session_owns_them(bank):
-    # Hosted, the session's Main Funestra owns the room's sound and the session
-    # owns the mic, so a second switch for either would be a switch over
-    # something this window does not hold.
     hosted = bank(hosted=True)
 
-    assert hosted.audio is None and hosted.mic is None
-    assert bank().audio is not None
+    assert hosted.radio is None and hosted.mic is None
+    assert bank().radio is not None
 
 
 def test_the_bank_holds_no_osr2_switch_at_all(bank):
@@ -79,7 +76,7 @@ def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(bank):
         return sorted(button.toolTip() for button in made.findChildren(QToolButton)
                       if not button.isHidden())
 
-    assert taken.audio is None and taken.mic is None
+    assert taken.radio is None and taken.mic is None
     assert shown(taken) == shown(built_hosted)
 
 
@@ -90,7 +87,7 @@ def test_a_bank_handed_back_from_a_session_has_its_room_switches_again(bank):
     taken.become_standalone()
 
     assert all(switch is not None and not switch.isHidden()
-               for switch in (taken.audio, taken.mic))
+               for switch in (taken.radio, taken.mic))
 
 
 def test_the_bank_opens_with_its_optional_buttons_away(bank):
@@ -201,10 +198,10 @@ def test_every_button_presses_its_own_handler(bank):
 
 def test_a_switch_hands_its_handler_the_state_it_landed_in(bank):
     heard = []
-    made = bank(_acts(toggle_audio=heard.append))
+    made = bank(_acts(toggle_radio=heard.append))
 
-    made.audio.setChecked(True)
-    made.audio.setChecked(False)
+    made.radio.setChecked(True)
+    made.radio.setChecked(False)
 
     assert heard == [True, False]
 

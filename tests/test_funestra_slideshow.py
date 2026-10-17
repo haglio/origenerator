@@ -1073,76 +1073,40 @@ def test_a_slideshow_picked_back_up_plays_what_is_being_made_before_where_it_lef
     assert "PLAY_FILE three.png" in _sent(slideshow)
 
 
-def _clocked_slideshow(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> FunestraSlideshow:
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
-                           **fields)
+def _being_enhanced_on_screen(qtbot, tmp_path, image_dwell_ms=4000) -> FunestraSlideshow:
+    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=image_dwell_ms,
+                           hud=HudFacts(enhancing={"id-1": "running"}))
     _says(slideshow, video="one.png")
     slideshow.tick()
-    _sent(slideshow)
     return slideshow
 
 
-def test_an_item_being_enhanced_is_moved_on_after_half_the_pace(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+def test_an_item_being_enhanced_is_held_for_half_the_pace_on_the_funestra(qtbot, tmp_path):
+    """So the Funestra moves on from it early, and its scrubber counts that half."""
+    slideshow = _being_enhanced_on_screen(qtbot, tmp_path)
 
-    now[0] = 1.9
-    slideshow.tick()
-    assert _sent(slideshow) == []
-    now[0] = 2.1
-    slideshow.tick()
-    assert _sent(slideshow) == ["NEXT"]
+    assert "HOLD_PICTURE 2" in _sent(slideshow)
 
 
-def test_the_time_a_frozen_funestra_holds_an_item_being_made_does_not_count(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+def test_an_item_being_made_makes_its_move_at_the_ordinary_pace(qtbot, tmp_path):
+    slideshow = _being_enhanced_on_screen(qtbot, tmp_path)
 
-    _says(slideshow, video="one.png", paused=True)
-    now[0] = 5.0
-    slideshow.tick()
-    _says(slideshow, video="one.png")
-    now[0] = 6.0
+    assert [verb for verb in _sent(slideshow) if verb.startswith("SET_PACE")] == ["SET_PACE 4"]
+
+
+def test_an_item_nothing_is_being_made_of_holds_for_the_whole_pace(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+
+    _says(slideshow, video="two.png")
     slideshow.tick()
 
-    assert _sent(slideshow) == []
-
-
-def test_an_item_being_made_that_the_funestra_holds_is_not_moved_on(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
-
-    _says(slideshow, video="one.png", locked=True)
-    now[0] = 5.0
-    slideshow.tick()
-
-    assert _sent(slideshow) == []
+    assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
 
 
 def test_an_item_being_made_under_a_pace_of_nought_is_held_like_any_other(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=0, clock=lambda: now[0],
-                           hud=HudFacts(enhancing={"id-1": "running"}))
-    _sent(slideshow)
+    slideshow = _being_enhanced_on_screen(qtbot, tmp_path, image_dwell_ms=0)
 
-    _says(slideshow, video="one.png")
-    slideshow.tick()
-    now[0] = 5.0
-    slideshow.tick()
-
-    assert _sent(slideshow) == []
-
-
-def test_an_item_being_made_is_not_moved_on_while_a_request_is_spoken_over_it(
-        qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
-
-    slideshow.pause_for_request(True)
-    now[0] = 5.0
-    slideshow.tick()
-
-    assert "NEXT" not in _sent(slideshow)
+    assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
 
 
 def test_a_slideshow_told_to_lead_with_what_is_being_made_sends_the_funestra_there(qtbot, tmp_path):
@@ -1156,14 +1120,12 @@ def test_a_slideshow_told_to_lead_with_what_is_being_made_sends_the_funestra_the
 
 
 def test_an_item_whose_enhancement_starts_while_it_is_up_keeps_its_whole_time(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now)
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     slideshow.note_enhancing({"id-1": "running"})
-    now[0] = 2.5
     slideshow.tick()
 
-    assert "NEXT" not in _sent(slideshow)
+    assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
 
 
 def test_a_picture_enhanced_during_the_slideshow_steps_its_versions_on_the_funestra(qtbot, tmp_path):

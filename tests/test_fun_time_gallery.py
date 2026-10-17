@@ -33,7 +33,7 @@ from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
-    _FakeAmbientAudio,
+    _FakeRadio,
     _image,
     _keys_are_the_gallerys,
     _press_escape,
@@ -93,10 +93,10 @@ def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
     switch for either would be a switch over something this window does not
     hold."""
     view = _fun_time_view(qtbot)
-    assert view._bank.audio is None
+    assert view._bank.radio is None
     assert view._bank.mic is None
-    view.set_audio_enabled(True)   # a stale standalone session key must not crash
-    assert view.audio_enabled() is False
+    view.set_radio_enabled(True)   # a stale standalone session key must not crash
+    assert view.radio_enabled() is False
 
 
 def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
@@ -1278,7 +1278,7 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
     view.become_hosted(_session())
 
     built = _fun_time_view(qtbot)
-    assert (view._bank.audio, view._bank.mic) == (None, None)
+    assert (view._bank.radio, view._bank.mic) == (None, None)
     assert (view._osr2_motion, view._osr2_driver, view._motion_panel) == (None, None, None)
     assert not view.osr2_control.isEnabled() and not built.osr2_control.isEnabled()
     assert view._motion_pane.isHidden()
@@ -1384,15 +1384,15 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
 
 
 def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_again(qtbot):
-    bed = _FakeAmbientAudio()
-    view = GalleryView(FakeDB([]), ambient_audio=bed)
+    radio = _FakeRadio()
+    view = GalleryView(FakeDB([]), radio=radio)
     qtbot.addWidget(view)
     view.become_hosted(_session())
 
     view.become_standalone()
-    view._voice.on_command(AppCommand.AUDIO_ON)
+    view._voice.on_command(AppCommand.RADIO_ON)
 
-    assert view._bank.audio.isChecked() and bed.starts == 1
+    assert view._bank.radio.isChecked() and radio.starts == 1
 
 
 def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_monitor(qtbot, tmp_path, monkeypatch):
@@ -1426,10 +1426,10 @@ def test_a_gallery_handed_back_from_a_frozen_session_lets_its_pictures_move_agai
 
 
 def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qtbot):
-    bed, motion = _FakeAmbientAudio(), _SignalMotion()
-    view = GalleryView(FakeDB([]), ambient_audio=bed, osr2_motion=motion)
+    radio, motion = _FakeRadio(), _SignalMotion()
+    view = GalleryView(FakeDB([]), radio=radio, osr2_motion=motion)
     qtbot.addWidget(view)
-    view._bank.audio.setChecked(True)
+    view._bank.radio.setChecked(True)
     view.osr2_control.setChecked(True)
     view._bank.mic.setChecked(True)
     listener = view._voice.listener
@@ -1437,7 +1437,7 @@ def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qt
 
     view.become_hosted(_session())
 
-    assert bed.stops == 1
+    assert radio.stops == 1
     assert not motion.active
     assert not listener.commands_on
 
@@ -1474,11 +1474,11 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
                         lambda line, kind=None: answers.append((line, kind)))
 
     view.become_hosted(_session())
-    for word in (AppCommand.AUDIO_ON, AppCommand.DRIVE_ON, AppCommand.MIC_OFF):
+    for word in (AppCommand.RADIO_ON, AppCommand.DRIVE_ON, AppCommand.MIC_OFF):
         view._voice.on_command(word)
 
     assert answers == [(f"🎤 {name} is the session's here", WARNING)
-                       for name in ("the audio bed", "OSR2", "the mic")]
+                       for name in ("Origenerator Radio", "OSR2", "the mic")]
 
 
 def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(

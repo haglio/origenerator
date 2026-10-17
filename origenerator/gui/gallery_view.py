@@ -31,7 +31,6 @@ from origenerator import (
     recovery,
     timing,
 )
-from origenerator.ambient_audio_players import AmbientAudio
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
 from origenerator.branch_session import is_branch_session
@@ -154,6 +153,7 @@ from origenerator.orientation import (
 )
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
+from origenerator.radio import OrigeneratorRadio
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -192,7 +192,7 @@ class _Running(NamedTuple):
     osr2: bool = False       # the device switch: a funscript, or the motion under it
     motion: bool = False     # the bare motion, running with the switch off
     auto: str | None = None  # the folder looping, if one is
-    audio: bool = False      # the audio bed
+    radio: bool = False      # Origenerator Radio
     slideshow: bool = False       # a fullscreen slideshow is up
     # ...and that slideshow, to put back as it was. A slideshow following a generation in
     # flight has nothing to put back, which is why this is asked separately from
@@ -201,7 +201,7 @@ class _Running(NamedTuple):
 
     @property
     def anything(self) -> bool:
-        return bool(self.osr2 or self.motion or self.auto or self.audio or self.slideshow)
+        return bool(self.osr2 or self.motion or self.auto or self.radio or self.slideshow)
 
 
 class _SearchScope(NamedTuple):
@@ -248,7 +248,7 @@ class GalleryView(QWidget):
                  client: ComfyUIClient | None = None,
                  actions: GalleryActions | None = None,
                  osr2_motion: Osr2MotionDriver | None = None,
-                 ambient_audio: AmbientAudio | None = None,
+                 radio: OrigeneratorRadio | None = None,
                  search_expander: SearchExpander | None = None,
                  experiment_policy: ExperimentPolicy | None = None,
                  fun_time: FunTimeSession | None = None,
@@ -263,13 +263,11 @@ class GalleryView(QWidget):
         # the layout goes vertical, the fullscreen surfaces land on the satellite
         # regions, and the OSR2 is Fun Time's alone (see origenerator.fun_time_mode).
         self._fun_time = fun_time
-        # The app-global audio bed under the toolbar's audio switch: several
-        # library clips at once, sound only. Injectable so tests never open a
-        # real media backend. Built before _build_ui, whose switch drives it.
-        self._ambient_audio = (
-            ambient_audio if ambient_audio is not None else AmbientAudio(parent=self)
-        )
-        omnipause.holds(self._ambient_audio)
+        # Origenerator Radio, under the toolbar's switch of that name: several
+        # library videos at once, sound only. Injectable so tests never open a
+        # real engine. Built before _build_ui, whose switch drives it.
+        self._radio = radio if radio is not None else OrigeneratorRadio()
+        omnipause.holds(self._radio)
         # The one app-global motion driver (genau's engine, no funscript needed):
         # every surface — this window and whatever slideshow is up —
         # drives it through the shared motion keys, and while it holds the device
@@ -323,7 +321,7 @@ class GalleryView(QWidget):
         self._stopped_by_escape: _Running | None = None
         self._build_ui()
         self._voice.bind_the_bank(
-            auto=self._bank.auto, audio=self._bank.audio,
+            auto=self._bank.auto, radio=self._bank.radio,
             drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic,
             enhance=(self._bank.enhance, self._enhance.enhance_the_selection),
@@ -600,7 +598,7 @@ class GalleryView(QWidget):
     def _handle_escape(self) -> bool:
         """Esc turns off everything the app is doing, wherever focus is: the OSR2
         drive (a funscript or the genau motion), the auto-generate loop, the
-        fullscreen slideshow, and the audio bed. Pressed with all of it off, it
+        fullscreen slideshow, and Origenerator Radio. Pressed with all of it off, it
         starts the room instead: what the last press took away — the same folder
         looping, the same slideshow on the same picture, the sound, the device — or,
         with nothing to put back, all four from a standing start. So the key is
@@ -655,7 +653,7 @@ class GalleryView(QWidget):
             motion=(self._osr2_motion is not None and self._osr2_motion.active
                     and not self.osr2_control.engaged()),
             auto=self._auto.active_key(),
-            audio=self._bank.audio is not None and self._bank.audio.isChecked(),
+            radio=self._bank.radio is not None and self._bank.radio.isChecked(),
             slideshow=slideshow is not None,
             slideshow_held=self._slideshows.held_slideshow(),
         )
@@ -672,7 +670,7 @@ class GalleryView(QWidget):
         # The folder's own key, side stripped: a loop belongs to the folder, and
         # both sides of the tree draw the same one.
         return _Running(osr2=True, auto=_base_of(self.selected_folder_key()),
-                        audio=True, slideshow=True)
+                        radio=True, slideshow=True)
 
     def _stop_running(self, running: _Running) -> None:
         """Take all of ``running`` off."""
@@ -686,9 +684,9 @@ class GalleryView(QWidget):
             self._auto.stop_all()
         if running.slideshow:
             self._slideshows.showing.close()  # the director lets it go
-        if running.audio:
-            if self._bank.audio is not None:
-                self._bank.audio.setChecked(False)  # drives _on_audio_toggle → silence
+        if running.radio:
+            if self._bank.radio is not None:
+                self._bank.radio.setChecked(False)  # drives _on_radio_toggle → silence
 
     def _resume(self, stopped: _Running) -> None:
         """Put back what Esc took away.
@@ -706,9 +704,9 @@ class GalleryView(QWidget):
         flight: that one has no pass to take up, and what it was watching has
         landed or gone by now.
         """
-        if stopped.audio:
-            if self._bank.audio is not None:
-                self._bank.audio.setChecked(True)
+        if stopped.radio:
+            if self._bank.radio is not None:
+                self._bank.radio.setChecked(True)
         if stopped.slideshow_held is not None:
             self._slideshows.put_back(stopped.slideshow_held)
         elif stopped.slideshow:
@@ -870,7 +868,7 @@ class GalleryView(QWidget):
                 enhance=self._enhance.enhance_the_selection,
                 group=self._group_selection,
                 delete=self._delete_selection,
-                toggle_audio=self._on_audio_toggle,
+                toggle_radio=self._on_radio_toggle,
                 toggle_mic=self._voice.mic_toggled,
             ),
             hosted=self._fun_time is not None,
@@ -998,9 +996,8 @@ class GalleryView(QWidget):
             if self._osr2_driver is not None:
                 app.aboutToQuit.connect(self._osr2_driver.stop)
                 app.aboutToQuit.connect(self._osr2_motion.stop)
-            # Same reason the preview releases its player: a live media player at
-            # Qt/Python shutdown can deadlock the real (WMF) backend.
-            app.aboutToQuit.connect(self._ambient_audio.stop)
+            # The radio's stations let their engines go before the process does.
+            app.aboutToQuit.connect(self._radio.stop)
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder and navigate there, its generating tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
@@ -1016,7 +1013,7 @@ class GalleryView(QWidget):
         return info_pane
 
     def become_hosted(self, session) -> None:
-        for switch in (self._bank.audio, self._bank.mic):
+        for switch in (self._bank.radio, self._bank.mic):
             if switch is not None:
                 switch.setChecked(False)
         self.osr2_control.drive_with(None, None)
@@ -1057,7 +1054,7 @@ class GalleryView(QWidget):
         self._info_tabs.become_standalone()
         self._bank.become_standalone()
         self._voice.become_standalone(
-            self._osr2_motion, audio=self._bank.audio,
+            self._osr2_motion, radio=self._bank.radio,
             drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic)
         self.wear_the_room(None)
@@ -1216,27 +1213,27 @@ class GalleryView(QWidget):
         if isinstance(saved, int):
             self.osr2_control.set_max_intensity(saved)
 
-    # --- the audio bed: one app-global switch, following nothing on screen ----
+    # --- Origenerator Radio: one app-global switch, following nothing on screen --
 
-    def _on_audio_toggle(self, on: bool):
-        """Start or silence the audio bed. Unlike the OSR2's switch it has nothing
-        to re-aim: it plays under whatever the user is doing, so the toggle is the
-        whole of it."""
+    def _on_radio_toggle(self, on: bool):
+        """Tune Origenerator Radio in, or silence it. Unlike the OSR2's switch it
+        has nothing to re-aim: it plays under whatever the user is doing, so the
+        toggle is the whole of it."""
         if on:
-            self._ambient_audio.start()
+            self._radio.start()
         else:
-            self._ambient_audio.stop()
+            self._radio.stop()
 
-    def audio_enabled(self) -> bool:
-        """Whether the audio bed's switch is on (for session persistence)."""
-        return self._bank.audio is not None and self._bank.audio.isChecked()
+    def radio_enabled(self) -> bool:
+        """Whether Origenerator Radio's switch is on (for session persistence)."""
+        return self._bank.radio is not None and self._bank.radio.isChecked()
 
-    def set_audio_enabled(self, enabled):
-        """Restore the audio bed's switch from a saved session.  With no switch
-        (hosted by Fun Time, whose Main Funestra owns the room's sound) a stale
-        saved value has nothing to restore."""
-        if self._bank.audio is not None:
-            self._bank.audio.setChecked(bool(enabled))  # drives _on_audio_toggle → start
+    def set_radio_enabled(self, enabled):
+        """Restore Origenerator Radio's switch from a saved session.  With no
+        switch (hosted by Fun Time, where each Satellite Funestra plays its own
+        stations) a stale saved value has nothing to restore."""
+        if self._bank.radio is not None:
+            self._bank.radio.setChecked(bool(enabled))  # drives _on_radio_toggle → start
 
     # --- the microphone: the one switch Esc leaves alone ---------------------
 
@@ -3188,7 +3185,7 @@ class GalleryView(QWidget):
         The director keeps its own flag for a slideshow not opened yet, because a
         slideshow is built from a set rather than held as a widget. Everything else
         that moves or sounds in this window — every looping thumbnail, the
-        video a generate tab plays, the audio bed and the OSR2 — asks
+        video a generate tab plays, Origenerator Radio and the OSR2 — asks
         :mod:`~origenerator.gui.omnipause`, so one write here reaches the ones
         built after it as well.
 

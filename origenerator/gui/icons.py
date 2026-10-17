@@ -156,8 +156,8 @@ def mic_icon() -> QIcon:
     return glyph_icon("mic", size=_SIZE)
 
 
-def audio_icon() -> QIcon:
-    """A speaker sounding off — the audio bed's on/off switch."""
+def radio_icon() -> QIcon:
+    """A speaker sounding off — Origenerator Radio's on/off switch."""
     return glyph_icon("speaker", size=_SIZE)
 
 

@@ -13,6 +13,7 @@ import pytest
 from funestra.file_channel import consume_command_file
 from funestra.hud_placement import HudCorner
 from funestra.playlist import read_playlist
+from funestra.radio import radio_file_for, read_radio
 from funestra.satellite_hud import parse_hud
 from PIL import Image
 
@@ -834,3 +835,65 @@ def test_the_session_says_where_each_sides_panel_sits(qtbot, tmp_path):
 
     assert view.hud_place("portrait") == (HudCorner.LOWER_RIGHT, True)
     assert view.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
+
+
+def _radio_clips(tmp_path, count=6):
+    clips = tmp_path / "radio"
+    clips.mkdir()
+    for index in range(count):
+        (clips / f"clip{index}.mp4").touch()
+    return clips
+
+
+def _view_with_funestras_and_bridge(qtbot, tmp_path):
+    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view, radio_dir=_radio_clips(tmp_path))
+    return view, bridge
+
+
+def _stations_dealt(tmp_path) -> list[int]:
+    return [len(read_radio(radio_file_for(tmp_path / f"{side}.tsv")))
+            for side in ("portrait", "landscape")]
+
+
+def test_the_moment_this_app_is_up_each_funestra_it_was_handed_is_dealt_its_radio(
+        qtbot, tmp_path):
+    _view, bridge = _view_with_funestras_and_bridge(qtbot, tmp_path)
+    assert not radio_file_for(tmp_path / "portrait.tsv").exists()
+
+    bridge._tick()
+
+    assert _stations_dealt(tmp_path) == [3, 3]
+
+
+def test_the_radio_is_dealt_once_however_often_this_app_says_it_is_up(qtbot, tmp_path):
+    _view, bridge = _view_with_funestras_and_bridge(qtbot, tmp_path)
+    bridge._tick()
+    dealt = radio_file_for(tmp_path / "portrait.tsv").read_text(encoding="utf-8")
+    (tmp_path / "origenerator_status.txt").unlink()  # the session opening the mode again
+
+    for _ in range(5):
+        bridge._tick()
+
+    assert radio_file_for(tmp_path / "portrait.tsv").read_text(encoding="utf-8") == dealt
+
+
+def test_an_app_handed_back_takes_its_funestras_radio_with_it(qtbot, tmp_path):
+    _view, bridge = _view_with_funestras_and_bridge(qtbot, tmp_path)
+    bridge._tick()
+
+    bridge._apply(contract.RELEASE)
+
+    assert not radio_file_for(tmp_path / "portrait.tsv").exists()
+    assert not radio_file_for(tmp_path / "landscape.tsv").exists()
+
+
+def test_an_app_closing_takes_its_funestras_radio_with_it(qtbot, tmp_path):
+    _view, bridge = _view_with_funestras_and_bridge(qtbot, tmp_path)
+    bridge._tick()
+
+    bridge.take_the_radio_back()
+
+    assert _stations_dealt(tmp_path) == [0, 0]
+    assert not radio_file_for(tmp_path / "portrait.tsv").exists()

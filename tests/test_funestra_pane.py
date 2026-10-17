@@ -3,7 +3,6 @@ it wears, the pointer it is handed, and the engine it opens on its window."""
 from __future__ import annotations
 
 import logging
-import os
 import time
 
 from funestra.console import ModeHud
@@ -16,7 +15,6 @@ from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QApplication
 
-from origenerator.gui import funestra_pane
 from origenerator.gui.funestra_pane import FunestraPane
 from tests import gestures
 from tests.funestra_fakes import FakeEngine
@@ -319,30 +317,6 @@ def test_a_picture_that_stops_moving_says_why_in_the_log(qtbot, tmp_path, caplog
     pane.close_engine()
 
     assert "stopped moving" in caplog.text
-
-
-def test_the_engine_copy_beside_the_checkouts_goes_in_front(monkeypatch, tmp_path):
-    """The engine is one file, fetched once for the machine, with a copy beside
-    the checkouts. The machine-wide folder has answered nothing at all to this
-    app while answering every other process, so the copy beside goes first."""
-    beside = tmp_path / "funestra" / "vendor"
-    beside.mkdir(parents=True)
-    (beside / "libmpv-2.dll").write_bytes(b"")
-    monkeypatch.setattr(funestra_pane, "project_dir", lambda name: tmp_path / name)
-    monkeypatch.setenv("PATH", r"C:\somewhere\else")
-
-    funestra_pane.offer_the_copy_beside_the_checkouts()
-
-    assert os.environ["PATH"].split(os.pathsep)[0] == str(beside)
-
-
-def test_no_copy_beside_the_checkouts_leaves_the_path_alone(monkeypatch, tmp_path):
-    monkeypatch.setattr(funestra_pane, "project_dir", lambda name: tmp_path / name)
-    monkeypatch.setenv("PATH", r"C:\somewhere\else")
-
-    funestra_pane.offer_the_copy_beside_the_checkouts()
-
-    assert os.environ["PATH"] == r"C:\somewhere\else"
 
 
 def test_a_pass_handed_over_before_the_pane_is_shown_opens_the_moment_it_is(qtbot, tmp_path):

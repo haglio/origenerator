@@ -1390,6 +1390,18 @@ def test_a_new_pace_reaches_a_locked_slide_without_opening_it_again(qtbot):
     assert _engine(view).opened == opened
 
 
+def test_a_new_pace_reaches_the_picture_on_screen_without_opening_it_again(qtbot):
+    # The engine takes a new pace on the picture it has up, so the picture
+    # keeps its place on its move and on its scrubber, as a locked one does.
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    opened = list(_engine(view).opened)
+
+    view.set_dwell_s(8)
+
+    assert _engine(view).pace_s == 8
+    assert _engine(view).opened == opened
+
+
 def test_a_slideshow_reopened_on_a_locked_slide_opens_it_locked(qtbot):
     closed = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(closed, Qt.Key.Key_Down)
@@ -2311,12 +2323,7 @@ def test_a_slideshow_opened_while_a_picture_of_it_is_being_enhanced_opens_on_it(
 def test_a_picture_being_enhanced_holds_the_screen_for_half_the_pace(qtbot):
     view = _view(qtbot, _THREE, image_dwell_ms=4000, enhancing={"id-a": "running"})
 
-    assert view._moves_on_early is True
-    _time_passes(view, 1.9)
-    assert view._playlist.current()[2] == "id-a"
-    _time_passes(view, 0.2)
-    assert view._playlist.current()[2] == "id-b"
-    assert view._moves_on_early is False
+    assert _engine(view).held_for == 2
 
 
 def test_a_picture_being_made_makes_its_move_at_the_ordinary_pace(qtbot):
@@ -2331,18 +2338,16 @@ def test_the_better_version_landing_on_screen_holds_for_the_whole_pace(qtbot):
     view.note_enhanced("id-a", "a_enhanced.png")
 
     assert _media_on_screen(view) == "a_enhanced.png"
-    assert _engine(view).pace_s == 4
-    assert view._moves_on_early is False
+    assert (_engine(view).pace_s, _engine(view).held_for) == (4, None)
 
 
-def test_a_picture_still_being_generated_moves_on_after_half_the_pace(qtbot):
+def test_a_picture_still_being_generated_holds_the_screen_for_half_the_pace(qtbot):
     view = _view(qtbot, _THREE, image_dwell_ms=4000)
     view.note_generating("id-run", _png_bytes())
+
     view.step(1)
 
-    _time_passes(view, 2.1)
-
-    assert view._playlist.current()[2] == "id-b"
+    assert (view._playlist.current()[2], _engine(view).held_for) == ("id-run", 2)
 
 
 def test_a_picture_still_being_generated_under_a_pace_of_nought_is_held(qtbot):
@@ -2362,13 +2367,11 @@ def test_a_frozen_room_holds_a_picture_still_being_generated_until_it_thaws(qtbo
     view.step(1)
 
     view.set_paused(True)
-    _time_passes(view, 3)
     frozen = (_engine(view).paused, view._playlist.current()[2])
     view.set_paused(False)
-    _time_passes(view, 3)
 
     assert frozen == (True, "id-run")
-    assert (_engine(view).paused, view._playlist.current()[2]) == (False, "id-b")
+    assert (_engine(view).paused, _engine(view).held_for) == (False, 2)
 
 
 def test_a_slideshow_picked_back_up_opens_on_what_is_being_made_then_where_it_left_off(qtbot):
@@ -2505,7 +2508,7 @@ def test_a_locked_picture_being_enhanced_is_held_by_the_lock_not_moved_on_early(
     _runs_out(view)
     _time_passes(view, 10)
 
-    assert (_engine(view).pace_s, view._moves_on_early) == (4, False)
+    assert (_engine(view).pace_s, _engine(view).loop_file) == (4, True)
     assert view._playlist.current()[2] == "id-a"
 
 
@@ -2537,7 +2540,7 @@ def test_a_picture_whose_enhancement_stops_takes_the_whole_pace_again(qtbot):
 
     view.note_enhancing({})
 
-    assert view._moves_on_early is False
+    assert _engine(view).held_for is None
 
 
 def test_a_picture_whose_enhancement_is_waiting_shows_as_itself(qtbot):

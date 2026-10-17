@@ -146,7 +146,7 @@ def test_a_switch_takes_a_flip_and_an_explicit_way():
     assert match_app_command("auto on") is AppCommand.AUTO_ON
     assert match_app_command("auto off") is AppCommand.AUTO_OFF
     assert match_app_command("drive off") is AppCommand.DRIVE_OFF
-    assert match_app_command("audio on") is AppCommand.AUDIO_ON
+    assert match_app_command("radio on") is AppCommand.RADIO_ON
 
 
 @pytest.mark.parametrize("said", [

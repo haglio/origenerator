@@ -35,11 +35,13 @@ LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 PROJECT_ROOTS = haglio_settings.project_roots()
 
 
-def ambient_audio_dir(settings: dict[str, Any] | None = None) -> Path | None:
-    """The folder the audio switch shuffles clips out of, or ``None`` for none.
+def radio_dir(settings: dict[str, Any] | None = None) -> Path | None:
+    """The folder Origenerator Radio deals its stations out of, or ``None`` for none.
 
     *Which* folder of the library it is describes the library, so it comes from
-    the settings all of Haglio shares rather than from source. A relative value
+    the settings all of Haglio shares rather than from source, under the name
+    it had before the radio was called the radio: every copy of every app reads
+    that file, so a name in it outlives the code that chose it. A relative value
     hangs off ``library_root`` -- where it in fact sits -- and an absolute one is
     taken as given, so a folder outside the library tree works too.
     """
@@ -51,7 +53,7 @@ def ambient_audio_dir(settings: dict[str, Any] | None = None) -> Path | None:
     return path if path.is_absolute() else Path(settings["library_root"]) / path
 
 
-AMBIENT_AUDIO_DIR = ambient_audio_dir()
+RADIO_DIR = radio_dir()
 
 
 def speech_python(content: dict[str, Any] | None = None) -> Path | None:
@@ -70,9 +72,9 @@ def speech_python(content: dict[str, Any] | None = None) -> Path | None:
 
 
 SPEECH_PYTHON = speech_python()
-# How many clips the audio bed plays at once. Each voice walks its own shuffled
-# pass of the folder, so they drift apart the moment two clip lengths differ.
-AMBIENT_AUDIO_VOICES = 3
+# How many stations Origenerator Radio deals: Standalone hears them all at
+# once, and inside a session each Satellite Funestra is dealt this many of its own.
+RADIO_STATIONS = 3
 
 
 def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:

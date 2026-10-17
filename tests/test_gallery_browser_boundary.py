@@ -208,8 +208,12 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the work in flight comes in are no longer asked for. 276 -> 277: the surface
     in front -- a slideshow while one is up, else the front tab -- is one method
     the OSR2 and a "Video ready" notice both ask, in place of the OSR2's own, and
-    the video playing on it is the other.)"""
+    the video playing on it is the other. 277 -> 285: Separate or
+    Together, Images / Videos / Both, the folders left open and the console's
+    motion are saved with the session through that same pair, four pairs; where
+    each border was dragged is the window's own, kept beside its geometry, and
+    which folders are open is the folder list's.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 277
+               for x in _class_def(VIEW, "GalleryView").body) == 285
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

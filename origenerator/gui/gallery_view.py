@@ -483,8 +483,6 @@ class GalleryView(QWidget):
         self._drawn_version = 0
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
-        self._folders_left_open: set[str] = set()
-        self._remembered_pane_sizes: dict[str, list[int]] = {}
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
@@ -1045,7 +1043,6 @@ class GalleryView(QWidget):
             self._motion_pane.hide()
         self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
         self._osr2_motion = self._osr2_driver = self._motion_panel = None
-        self._remembered_pane_sizes.update(self._dragged_pane_sizes())
         self.wear_the_room(session)
         hold_the_borders_still(self, True)
 
@@ -1075,33 +1072,7 @@ class GalleryView(QWidget):
             drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic)
         self.wear_the_room(None)
-        self._put_the_borders_back()
         hold_the_borders_still(self, False)
-
-    def pane_sizes(self) -> dict[str, list[int]]:
-        if self._fun_time is None:
-            self._remembered_pane_sizes.update(self._dragged_pane_sizes())
-        return dict(self._remembered_pane_sizes)
-
-    def set_pane_sizes(self, saved) -> None:
-        if isinstance(saved, dict):
-            self._remembered_pane_sizes = {
-                name: sizes for name, sizes in saved.items()
-                if isinstance(name, str) and isinstance(sizes, list)}
-        if self._fun_time is None:
-            self._put_the_borders_back()
-
-    def _dragged_pane_sizes(self) -> dict[str, list[int]]:
-        return {splitter.remembered_as: sizes for splitter in self._remembered_borders()
-                if (sizes := splitter.dragged_sizes()) is not None}
-
-    def _put_the_borders_back(self) -> None:
-        for splitter in self._remembered_borders():
-            splitter.take_dragged_sizes(self._remembered_pane_sizes.get(splitter.remembered_as))
-
-    def _remembered_borders(self) -> list[PaneSplitter]:
-        return [splitter for splitter in self.findChildren(PaneSplitter)
-                if splitter.remembered_as]
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
@@ -1781,7 +1752,6 @@ class GalleryView(QWidget):
     def _rebuild(self, rows, meta, *, new_listing: bool = False):
         self._folder_meta = meta
         self._drawn_version += 1
-        self._folders_left_open = expanded = self._folders_open_on_every_side()
         standing = self._tree_view.selected_folder_key()
         place = self._browser.place()
         if new_listing:
@@ -1858,7 +1828,7 @@ class GalleryView(QWidget):
             image_index=start_frames,
         )
         self._tree_view.populate(
-            self._build_sides(trees), expanded, folder_meta=meta,
+            self._build_sides(trees), folder_meta=meta,
             # Where the work has lately been. The tree keeps the order the
             # recipes were tried in, so nothing else in it says so.
             recently_worked=gallery.recently_worked_folders(trees, listed, bumped=bumped),
@@ -1950,18 +1920,11 @@ class GalleryView(QWidget):
         ) for side in self._tree.sides]
 
     def open_folders(self) -> list[str]:
-        return sorted(self._folders_open_on_every_side())
-
-    def _folders_open_on_every_side(self) -> set[str]:
-        if not self._tree_view.built:
-            return self._folders_left_open
-        drawn = self._tree_view.drawn_sides
-        return ({key for key in self._folders_left_open if _side_of(key) not in drawn}
-                | self._tree_view.expanded_keys())
+        return sorted(self._tree_view.folders_left_open())
 
     def set_open_folders(self, saved) -> None:
         if isinstance(saved, list):
-            self._folders_left_open = {key for key in saved if isinstance(key, str)}
+            self._tree_view.leave_folders_open(key for key in saved if isinstance(key, str))
 
     def folder_list_sides(self) -> list[str]:
         return list(self._tree.chosen_sides)

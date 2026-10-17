@@ -3,6 +3,8 @@ no setting, and a control that is neither fails -- the way a Fun Time setting
 nobody has said either of does."""
 from __future__ import annotations
 
+import json
+
 from PyQt6 import sip
 from PyQt6.QtWidgets import (
     QAbstractButton,
@@ -22,7 +24,6 @@ from PyQt6.QtWidgets import (
 from origenerator.app_state import AppState
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.console import OSR2_CONTROL_BY_COMMAND
-from origenerator.gui.main_window import SESSION_UI_STATE
 from origenerator.gui.panes import PaneSplitter
 from tests.test_main_window import _seed_combine_db, _window
 
@@ -140,7 +141,10 @@ def test_every_control_on_the_console_comes_back_after_a_restart_or_is_no_settin
     assert offered <= named, f"say how a restart brings back {sorted(offered - named)}"
 
 
-def test_what_the_census_counts_as_remembered_is_what_the_session_saves():
-    saved = {key for key, _getter, _setter in SESSION_UI_STATE}
+def test_what_the_census_counts_as_remembered_is_what_the_window_saves(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    _window(qtbot, tmp_path, AppState(path)).close()
+
+    saved = set(json.loads(path.read_text(encoding="utf-8")))
 
     assert set(REMEMBERED) | set(CONSOLE_PRESSES_REMEMBERED_AS) <= saved

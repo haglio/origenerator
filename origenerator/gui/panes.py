@@ -58,6 +58,35 @@ def hold_the_borders_still(within: QWidget, held: bool) -> None:
         splitter.hold_still(held)
 
 
+class RememberedBorders:
+    """Where each remembered border of a window was last dragged, kept while the
+    window's panes stand in a shape that is not theirs."""
+
+    def __init__(self, window: QWidget):
+        self._window = window
+        self._sizes: dict[str, list[int]] = {}
+
+    def sizes(self) -> dict[str, list[int]]:
+        return dict(self._sizes)
+
+    def keep_where_they_are(self) -> None:
+        self._sizes.update({splitter.remembered_as: sizes for splitter in self._borders()
+                            if (sizes := splitter.dragged_sizes()) is not None})
+
+    def take(self, saved) -> None:
+        if isinstance(saved, dict):
+            self._sizes = {name: sizes for name, sizes in saved.items()
+                           if isinstance(name, str) and isinstance(sizes, list)}
+
+    def put_back(self) -> None:
+        for splitter in self._borders():
+            splitter.take_dragged_sizes(self._sizes.get(splitter.remembered_as))
+
+    def _borders(self) -> list[PaneSplitter]:
+        return [splitter for splitter in self._window.findChildren(PaneSplitter)
+                if splitter.remembered_as]
+
+
 class FootSplitter(PaneSplitter):
     """Panes stacked over a foot that opens at the foot's own height and follows
     it as that changes, until its handle is dragged."""

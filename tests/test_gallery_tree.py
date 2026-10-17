@@ -52,8 +52,7 @@ def _gallery_tree(qtbot, rows, folders_of_your_own=()):
     tree.populate(
         [SideModel(LANDSCAPE, gallery.build_gallery_tree(rows),
                    custom_folders=list(folders_of_your_own), show_recents=True),
-         SideModel(PORTRAIT, [])],
-        expanded_keys=())
+         SideModel(PORTRAIT, [])])
     return pane, tree
 
 

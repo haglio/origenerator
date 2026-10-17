@@ -1113,6 +1113,7 @@ class GenerateConfigPanel(QWidget):
             if index >= 0:
                 self._workflow_combo.setCurrentIndex(index)
             if self._param_form:
+                self._param_form.clear_prompt_rewrites()
                 self._param_form.set_values(params)
             # Now that the settings match a real folder, show its newest result (the
             # workflow may not have changed above, so this doesn't ride on that signal).

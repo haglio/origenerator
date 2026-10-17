@@ -2018,6 +2018,26 @@ def test_editing_a_shown_picture_s_prompt_marks_how_it_now_differs(saved_panel, 
     assert _notice(panel) == "(not yet generated with modifications)"
 
 
+def test_showing_the_next_picture_never_reaches_the_marks_as_typing(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    first = _image_row(db, "img1", prompt="a cat on a couch")
+    second = _image_row(db, "img2", prompt="a dog in a park", filename="sdxl_img2.png")
+    typed = []
+    follow = _Tracker._on_contents_change
+
+    def following(tracker, *change):
+        if not tracker._writing:
+            typed.append(change)
+        follow(tracker, *change)
+
+    monkeypatch.setattr(_Tracker, "_on_contents_change", following)
+    panel.show_saved_generation(first, [first])
+
+    panel.show_saved_generation(second, [second])
+
+    assert typed == []
+
+
 def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
     # The field already shows the next run's seed, so what just finished is not
     # what Generate would make now.

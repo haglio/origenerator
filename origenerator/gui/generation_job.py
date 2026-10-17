@@ -292,12 +292,13 @@ class GenerationJob(QObject):
 
     @classmethod
     def reconnect(cls, client, workflow, params, prompt_id, *, progress_state=None, **kwargs):
-        """Rebind to a job already running in ComfyUI under ``prompt_id``.
+        """Rebind to a job ComfyUI holds under ``prompt_id``.
 
         Used after a restart to pick a re-roll back up from its persisted running
-        row without re-submitting it: the job attaches to the client's signals and
-        reports as running, so its progress, preview and completion flow through
-        exactly as they would for a job started this session.
+        row without re-submitting it: the job attaches to the client's signals, so
+        its progress, preview and completion flow through exactly as they would
+        for a job started this session -- being made if it had started, else
+        waiting its turn there.
 
         ``progress_state`` (a :meth:`progress_state` snapshot persisted while the job
         last ran) seeds the resumed job's progress, so the bar shows its last position
@@ -308,7 +309,7 @@ class GenerationJob(QObject):
         if progress_state:
             job._restore_progress(progress_state)
         job._attach()
-        job._state = JobState.RUNNING
+        job._state = JobState.QUEUED if job.started_at is None else JobState.RUNNING
         return job
 
     @classmethod
@@ -501,9 +502,6 @@ class GenerationJob(QObject):
         return prompt_id == self.prompt_id
 
     def _mark_running(self):
-        # Stamped outside the queued->running guard on purpose: a job reconnected
-        # from a row persisted before this was recorded arrives already "running"
-        # with no start time, and would otherwise never get one.
         if self._started_at is None:
             self._started_at = time.time()
         if self._state == JobState.QUEUED:

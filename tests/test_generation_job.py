@@ -328,13 +328,33 @@ def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
     )
     client.submit_job.assert_not_called()  # already on the server; don't resubmit
     assert job.prompt_id == "running-id"
-    assert job.state == "running"
 
     # Live signals for that id now flow through, ending in a normal completion.
     finished = []
     job.finished.connect(lambda files, thumb, dur: finished.append(files))
     client.job_completed.emit("running-id", SDXL_HISTORY)
     assert len(finished) == 1
+
+
+def test_a_job_taken_back_with_no_start_recorded_waits_on_the_server(qtbot, tmp_path):
+    # Closing the app sends ComfyUI every run still waiting, and ComfyUI makes
+    # them one at a time, so most of what a reopened app finds there is queued.
+    job = GenerationJob.reconnect(
+        _client(), SDXL, _params(), "pid",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+
+    assert job.state == "queued"
+
+
+def test_a_job_taken_back_that_had_started_is_still_being_made(qtbot, tmp_path):
+    job = GenerationJob.reconnect(
+        _client(), SDXL, _params(), "pid",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+        progress_state={"last_progress": [30, 70], "started_at": time.time() - 60},
+    )
+
+    assert job.state == "running"
 
 
 def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
@@ -388,10 +408,25 @@ def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path
     assert job.started_at == began
 
 
+def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot, tmp_path):
+    # ComfyUI can be making a prompt before the call that sent it has returned,
+    # and the clock counts from its first word about it, not from the return.
+    client = _client()
+    job = GenerationJob(client, SDXL, _params(),
+                        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
+    job.prompt_id = "comfy-A"
+    heard_at = []
+    client.submit_job.side_effect = lambda payload, prompt_id: (
+        heard_at.append(time.time()), client.progress.emit(prompt_id, "5", 1, 50))
+
+    job.start()
+
+    assert job.started_at is not None and job.started_at <= heard_at[0] + 1
+
+
 def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_path):
-    # A row persisted before the start time was recorded arrives already running,
-    # so the queued->running flip that normally stamps it never happens. It gets
-    # one anyway — an undercount beats a job that never shows a clock at all.
+    # Taken back with no start time, it waits for ComfyUI's word, and the first
+    # tick stamps one: an undercount beats a job that never shows a clock at all.
     job = GenerationJob.reconnect(
         _client(), SDXL, _params(), "pid",
         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",

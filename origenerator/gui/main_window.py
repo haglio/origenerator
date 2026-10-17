@@ -23,6 +23,7 @@ from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
+from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.win32 import (
@@ -81,14 +82,15 @@ SESSION_UI_STATE = (
     ("generations_failed_as_it_closed", GalleryView.generations_failed_as_it_closed,
      GalleryView.say_generations_failed_as_it_closed),
     ("how_many", GalleryView.how_many, GalleryView.set_how_many),
-    ("pane_sizes", GalleryView.pane_sizes, GalleryView.set_pane_sizes),
 )
 
-# The two the view does not own. Geometry is the window's own, and the prompt
-# heights are a module-level store read before the first form is built (see
-# __init__), so neither is a view getter and neither belongs in the table.
+# The three the view does not own. Geometry and where each border was dragged
+# are the window's own, and the prompt heights are a module-level store read
+# before the first form is built (see __init__), so none is a view getter and
+# none belongs in the table.
 _GEOMETRY_KEY = "window_geometry"
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
+_PANE_SIZES_KEY = "pane_sizes"
 _KEYS_THE_SESSION_OWNS = frozenset(
     {"audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity", "motion", "slideshows"})
 
@@ -142,6 +144,7 @@ class OrigeneratorWindow(QMainWindow):
                 FunTimeBridge(fun_time, self._gallery_view, parent=self))
         self.hands_its_window_over: HeadsetWindow | None = None
         self._found: tuple[QByteArray, float, bool] | None = None
+        self._borders = RememberedBorders(self)
         if fun_time is not None and fun_time.in_a_headset:
             self._hand_the_window_over(fun_time)
 
@@ -179,6 +182,9 @@ class OrigeneratorWindow(QMainWindow):
             self._restore_geometry()
         for key, _getter, setter in SESSION_UI_STATE:
             setter(self._gallery_view, self._app_state.get(key))
+        self._borders.take(self._app_state.get(_PANE_SIZES_KEY))
+        if self._fun_time is None:
+            self._borders.put_back()
 
     def _persist_the_session_as_it_changes(self) -> None:
         saver = QTimer(self)
@@ -316,6 +322,7 @@ class OrigeneratorWindow(QMainWindow):
         if self._taskbar is not None:
             self._taskbar.leave()
         self._gallery_view.become_standalone()
+        self._borders.put_back()
         self._gallery_view.set_mic_enabled(self._app_state.get("mic_enabled"))
         self._stand_where_found(*self._found)
         self.handed_back.emit()
@@ -409,6 +416,9 @@ class OrigeneratorWindow(QMainWindow):
                 continue
             self._app_state.set(key, getter(self._gallery_view))
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())
+        if self._fun_time is None:
+            self._borders.keep_where_they_are()
+        self._app_state.set(_PANE_SIZES_KEY, self._borders.sizes())
         if self._fun_time is None and self.isVisible():
             # Hosted, the geometry is the session's to decide, so remembering
             # this launch's would overwrite the window the user actually sizes.

@@ -42,6 +42,7 @@ from functools import partial
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT, VOICE_REWRITE_SYSTEM_PROMPT
 from origenerator.voice.rewrite import rewrite_prompt
+from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
 
@@ -332,8 +333,33 @@ def apply_request(positive: str, negative: str, request: str,
     parsed = parse_request(request)
     if parsed is None:
         return None
-    polarity, term = parsed
     positive, negative = positive or "", negative or ""
+    scenes, negatives = scene_prompts(positive), scene_prompts(negative)
+    if len(scenes) == 1:
+        return _revised(positive, negative, request, parsed, match, rewrite)
+    each_negative = [scene_text(negatives, index) for index in range(len(scenes))]
+    revisions = [_revised(scene, scene_negative, request, parsed, match, rewrite)
+                 for scene, scene_negative in zip(scenes, each_negative)]
+    polarity, term = parsed
+    return PromptRevision(positive, negative,
+                          story_of([revision.positive for revision in revisions]),
+                          _negative_story(negative, each_negative,
+                                          [revision.negative for revision in revisions]),
+                          term, polarity,
+                          ", ".join(dict.fromkeys(revision.action for revision in revisions)))
+
+
+def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
+    if after == before:
+        return negative
+    if len(set(after)) == 1:
+        return after[0]
+    return story_of(after)
+
+
+def _revised(positive: str, negative: str, request: str, parsed: tuple,
+             match, rewrite) -> PromptRevision:
+    polarity, term = parsed
 
     def made(new_positive, new_negative, action, weight=None) -> PromptRevision:
         return PromptRevision(positive, negative, new_positive, new_negative,

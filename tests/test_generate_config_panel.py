@@ -41,6 +41,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
 
 
@@ -2298,6 +2299,20 @@ def test_an_answer_to_words_since_changed_is_dropped(saved_panel, monkeypatch):
     panel._on_rewritten((panel._asked + 1, "img1"), ("an old answer", ""))
 
     assert _positive(panel) == "a cat"
+
+
+def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=RuntimeError("no model here"))
+    panel, db = saved_panel
+    video = _video_row(db, positive_prompt=story_of(["a dog running", "a dog asleep"]),
+                       scene_frames=[81, 81], frame_count=161)
+    panel.show_saved_generation(video, [])
+
+    _ask(panel, qtbot, "more grass")
+
+    scenes = panel._param_form._widgets["positive_prompt"]
+    qtbot.waitUntil(lambda: [diff_text.live_text(field) for field in scenes.fields("positive_prompt")]
+                    == ["a dog running, grass", "a dog asleep, grass"], timeout=5000)
 
 
 # --- Generate says when it will draw a fresh seed ---------------------------

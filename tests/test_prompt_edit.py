@@ -27,6 +27,7 @@ from origenerator.prompt_edit import (
     parse_request,
     smart_match,
 )
+from origenerator.workflows.base import story_of
 
 # --- reading the request ----------------------------------------------------
 
@@ -233,6 +234,52 @@ def test_a_revision_carries_the_prompts_it_started_from():
     assert revision.old_positive == "a woman, freckles"
     assert revision.old_negative == "blurry"
     assert revision.changed
+
+
+# --- a video told in scenes: the story is one prompt per scene ---------------
+
+
+def test_a_wish_for_something_new_reaches_every_scene_of_a_story():
+    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry",
+                             "more grass")
+
+    assert revision.positive == story_of(["a dog running, grass", "a dog asleep, grass"])
+
+
+def test_each_scene_answers_a_request_against_something_by_its_own_prompts():
+    revision = apply_request(story_of(["a woman, beach", "a woman, sea"]), "blurry",
+                             "no beach")
+
+    assert revision.positive == story_of(["a woman", "a woman, sea"])
+    assert revision.negative == story_of(["blurry", "blurry, beach"])
+
+
+def test_a_negative_every_scene_shares_stays_one_while_the_scenes_change_it_alike():
+    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry", "no hat")
+
+    assert revision.negative == "blurry, hat"
+
+
+def test_a_storys_revision_names_each_rule_its_scenes_used_once():
+    revision = apply_request(story_of(["a woman, beach", "a woman, sea", "beach, dusk"]),
+                             "blurry", "no beach")
+
+    assert revision.action == f"{DROPPED}, {EXCLUDED}"
+
+
+def test_the_model_rewrites_each_scene_from_that_scenes_own_prompts():
+    asked = []
+
+    def rewrite(positive, negative, words):
+        asked.append((positive, negative, words))
+        return f"two of {positive}", negative
+
+    revision = apply_request(story_of(["a man reading", "a man asleep"]), "blurry",
+                             "two men", rewrite=rewrite)
+
+    assert asked == [("a man reading", "blurry", "two men"),
+                     ("a man asleep", "blurry", "two men")]
+    assert revision.positive == story_of(["two of a man reading", "two of a man asleep"])
 
 
 # --- catching a term the prompt names in its own words ----------------------

@@ -7,11 +7,13 @@ AppUserModelId entry that gives a notice its heading and its mark is also what
 makes a toast raisable at all, measured on 2026-09-21 against a docstring that
 said this route needs a Start menu shortcut.
 
-Called through ctypes rather than a package: four objects and five calls.
+Called through ctypes rather than a package. Where each call sits in its table
+is read off the Windows SDK's windows.ui.notifications.h.
 """
 from __future__ import annotations
 
 import ctypes
+from contextlib import contextmanager
 from pathlib import Path
 from xml.sax.saxutils import escape, quoteattr
 
@@ -23,7 +25,9 @@ _TOAST = "Windows.UI.Notifications.ToastNotification"
 _XML_DOCUMENT = "Windows.Data.Xml.Dom.XmlDocument"
 
 _MANAGER_STATICS = "50ac103f-d235-4598-bbef-98fe4d1a3ad4"
+_MANAGER_HISTORY_STATICS = "7ab93c52-0e48-4750-ba9d-1a4113981847"
 _TOAST_FACTORY = "04124b20-82c6-4229-b109-fd9ed4662b53"
+_TOAST_FILING = "9dfb9fd1-143a-490e-90bf-b9fba7132de7"
 _XML_DOCUMENT_IO = "6cd0e74e-ee65-4489-9ebf-ca43e87ba637"
 _XML_DOCUMENT_IID = "f7f3a506-1e87-42d6-bcfb-b8c809fa5494"
 
@@ -36,6 +40,10 @@ _CREATE_NOTIFIER_WITH_ID = 7
 _LOAD_XML = 6
 _CREATE_TOAST = 6
 _SHOW = 6
+_PUT_TAG = 6
+_PUT_GROUP = 8
+_GET_HISTORY = 6
+_REMOVE_FILED = 8
 
 _RO_INIT_MULTITHREADED = 1
 
@@ -57,16 +65,51 @@ def toast_xml(title: str, body: str, *, link: str, mark: Path | None = None) -> 
     )
 
 
-def show(app_id: str, xml: str) -> None:
-    """Raise the notification *xml* describes, as the app *app_id* names."""
+def show(app_id: str, xml: str, *, tag: str, group: str) -> None:
+    """Raise the notification *xml* describes, as the app *app_id* names, filed
+    under *tag* and *group* for :func:`take_back` to find."""
     notifier = _notifier_for(app_id)
+    try:
+        with filed(xml, tag=tag, group=group) as toast:
+            _call(notifier, _SHOW, toast, types=(ctypes.c_void_p,))
+    finally:
+        _release(notifier)
+
+
+@contextmanager
+def filed(xml: str, *, tag: str, group: str):
     document = document_of(xml)
     toast = _toast_of(document)
     try:
-        _call(notifier, _SHOW, toast, types=(ctypes.c_void_p,))
+        filing = _as(toast, _TOAST_FILING)
+        try:
+            for put, value in ((_PUT_TAG, tag), (_PUT_GROUP, group)):
+                with _text(value) as named:
+                    _call(filing, put, named, types=(ctypes.c_void_p,))
+        finally:
+            _release(filing)
+        yield toast
     finally:
-        for held in (toast, document, notifier):
-            _release(held)
+        _release(toast)
+        _release(document)
+
+
+def take_back(app_id: str, *, tag: str, group: str) -> None:
+    """Take the notification filed under *tag* and *group* out of the list
+    Windows keeps of *app_id*'s, if it is still there."""
+    statics = _factory(_TOAST_MANAGER, _MANAGER_HISTORY_STATICS)
+    history = ctypes.c_void_p()
+    try:
+        _call(statics, _GET_HISTORY, ctypes.byref(history),
+              types=(ctypes.POINTER(ctypes.c_void_p),))
+    finally:
+        _release(statics)
+    try:
+        with _text(tag) as filed_under, _text(group) as filed_with, _text(app_id) as named:
+            _call(history, _REMOVE_FILED, filed_under, filed_with, named,
+                  types=(ctypes.c_void_p,) * 3)
+    finally:
+        _release(history)
 
 
 def document_of(xml: str):

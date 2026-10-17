@@ -64,7 +64,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from pytestqt.qtbot import QtBot
 
-from origenerator import config, osr2_driver, osr2_motion_driver
+from origenerator import config, notice_toast, osr2_driver, osr2_motion_driver
 from origenerator.gui import desktop_notices, motion_panel, omnipause, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
@@ -335,7 +335,8 @@ def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
                         lambda *_a, **_kw: None)
     monkeypatch.setattr(desktop_notices, "register_link_handler",
                         lambda *_a, **_kw: None)
-    monkeypatch.setattr(desktop_notices, "show_toast", lambda *_a, **_kw: None)
+    monkeypatch.setattr(notice_toast, "show", lambda *_a, **_kw: None)
+    monkeypatch.setattr(notice_toast, "take_back", lambda *_a, **_kw: None)
 
 
 @pytest.fixture(autouse=True)

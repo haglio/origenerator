@@ -12,7 +12,7 @@ from PyQt6.QtGui import QIcon
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 
-from origenerator import app_link
+from origenerator import app_link, notice_toast
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import desktop_notices
 from origenerator.gui.desktop_notices import DesktopNotices
@@ -29,8 +29,8 @@ def _outcome(**over):
 
 def _raised(monkeypatch):
     said = []
-    monkeypatch.setattr(desktop_notices, "show_toast",
-                        lambda app_id, xml: said.append((app_id, xml)))
+    monkeypatch.setattr(notice_toast, "show",
+                        lambda app_id, xml, **_filing: said.append((app_id, xml)))
     return said
 
 
@@ -128,13 +128,13 @@ def test_the_handler_windows_runs_is_one_that_opens_no_console(qapp, monkeypatch
 
 
 def test_windows_refusing_the_notification_costs_the_app_nothing(qapp, monkeypatch, caplog):
-    def refuse(app_id, xml):
+    def refuse(app_id, xml, **_filing):
         raise OSError("the notification platform is not listening")
 
     notices = DesktopNotices(QIcon())
-    monkeypatch.setattr(desktop_notices, "show_toast", refuse)
+    monkeypatch.setattr(notice_toast, "show", refuse)
 
-    with caplog.at_level("WARNING", logger="origenerator.gui.desktop_notices"):
+    with caplog.at_level("WARNING", logger="origenerator.notice_toast"):
         notices.note(_outcome())
 
     assert "not listening" in caplog.text

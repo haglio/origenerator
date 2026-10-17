@@ -8181,6 +8181,22 @@ def test_a_run_the_slideshow_watched_becomes_the_file_it_lands_as(qtbot, monkeyp
     slideshow.close()
 
 
+def test_a_run_on_screen_when_it_lands_stays_on_screen_as_its_file(qtbot, monkeypatch):
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+    slideshow.step(1)
+
+    db.get_generation("i2").update(_image("i2", "a cat", 50, 2))
+    view._on_reroll_finished("some-key", "i2")
+
+    assert slideshow._playlist.current() == ("i2.png", "image", "i2", None)
+    slideshow.close()
+
+
 def test_a_run_that_stopped_being_made_leaves_the_open_slideshow(qtbot, monkeypatch):
     # Cancelled or failed: no file is coming, and the half-rendered frame it got
     # to would otherwise hold a place in the pass forever.

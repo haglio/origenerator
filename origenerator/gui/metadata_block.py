@@ -57,6 +57,7 @@ class MetadataBlock(QWidget):
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._container: QWidget | None = None
+        self._block: CollapsibleSection | None = None
         self._folded = False
 
     def show_row(self, row: dict, upscale=None) -> bool:
@@ -87,15 +88,24 @@ class MetadataBlock(QWidget):
         layout.setContentsMargins(2, 2, 2, 2)
         layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._block = None
         if section is not None or self._go_to_folder is not None:
-            block = _build_section(section, self._go_to_folder, collapsed=self._folded)
-            block.toggled.connect(lambda: self._keep_the_fold(block))
-            layout.addWidget(block)
+            self._block = _build_section(section, self._go_to_folder, collapsed=self._folded)
+            self._block.toggled.connect(self._keep_the_fold)
+            layout.addWidget(self._block)
         self._container = container
         self._outer.addWidget(container)
 
-    def _keep_the_fold(self, block: CollapsibleSection) -> None:
-        self._folded = block.is_collapsed()
+    def _keep_the_fold(self) -> None:
+        self._folded = self._block.is_collapsed()
+
+    def is_folded(self) -> bool:
+        return self._folded
+
+    def set_folded(self, folded: bool) -> None:
+        self._folded = folded
+        if self._block is not None:
+            self._block.set_collapsed(folded)
 
 
 def _build_section(section: MetaSection | None, go_to_folder: QAction | None = None,

@@ -18,6 +18,7 @@ restart, so the tabs carry no job state at all.
 from __future__ import annotations
 
 import time
+from typing import NamedTuple
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QMenu, QTabWidget
@@ -38,7 +39,13 @@ from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
-def parse_tabs_state(state) -> tuple[list[tuple[ConfigSnapshot, list[str]]], int]:
+class SavedTab(NamedTuple):
+    config: ConfigSnapshot
+    launched_runs: list[str]
+    layout: dict
+
+
+def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
     """What survives a saved tab strip: each tab's config with the runs it
     started, and which tab was in front.
 
@@ -59,10 +66,12 @@ def parse_tabs_state(state) -> tuple[list[tuple[ConfigSnapshot, list[str]]], int
         if snapshot.workflow_name not in WORKFLOW_REGISTRY:
             continue
         launched = entry.get("launched_runs")
-        restored.append((
+        layout = entry.get("layout")
+        restored.append(SavedTab(
             snapshot,
             [run for run in launched if isinstance(run, str) and run]
             if isinstance(launched, list) else [],
+            layout if isinstance(layout, dict) else {},
         ))
     current = state.get("current", 0)
     return restored, current if isinstance(current, int) else 0
@@ -586,6 +595,7 @@ class InfoPaneTabs(QTabWidget):
             {
                 "config": panel.current_config().to_dict(),
                 "launched_runs": panel.launched_runs(),
+                "layout": panel.saved_layout(),
             }
             for panel in self.config_panels()
         ]
@@ -603,9 +613,10 @@ class InfoPaneTabs(QTabWidget):
         if not restored:
             return  # keep the initial tab rather than leaving no tabs at all
         self._discard_all_subtabs()  # clear every tab before rebuilding from the snapshot
-        for snapshot, launched in restored:
+        for snapshot, launched, layout in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)
+            panel.restore_layout(layout)
             # Runs this tab started and the app was closed on: the gallery
             # reconnects them, and this is how the tab knows they are its own.
             for origin in launched:

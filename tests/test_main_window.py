@@ -1166,6 +1166,51 @@ def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_pa
     assert win._gallery_view.how_many() == 1
 
 
+def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    panel = first._gallery_view._info_tabs.currentWidget()
+    panel.prefill("sdxl_t2i", {})
+    sections = panel._param_form._sections
+    assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (False, True)
+    sections["Seed"]._header.click()
+    sections["Size"]._header.click()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    sections = reopened._gallery_view._info_tabs.currentWidget()._param_form._sections
+    assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (True, False)
+
+
+def test_a_tabs_enhancement_levels_and_details_come_back_folded(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    panel = first._gallery_view._info_tabs.currentWidget()
+    panel.prefill("sdxl_t2i", {})
+    panel._versions.set_collapsed(True)
+    panel._metadata_block.set_folded(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    panel = reopened._gallery_view._info_tabs.currentWidget()
+    assert (panel._versions.is_collapsed(), panel._metadata_block.is_folded()) == (True, True)
+
+
+def test_a_tabs_border_under_its_picture_is_where_it_was_left_after_a_restart(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+    first._gallery_view._info_tabs.currentWidget().prefill("sdxl_t2i", {})
+    dragged = _drag_the_first_open_handle(
+        first._gallery_view._info_tabs.currentWidget()._media_split)
+    first.close()
+
+    reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+
+    assert reopened._gallery_view._info_tabs.currentWidget()._media_split.sizes() == dragged
+
+
 def test_the_folder_list_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))

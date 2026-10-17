@@ -1890,6 +1890,23 @@ def test_sdxl_pose_transfer_union_type_node_only_wraps_union_controlnets():
     assert apply["inputs"]["control_net"] == [cn_loader_id, 0]
 
 
+def test_a_controlnet_builds_under_its_callers_ids_with_the_head_the_caller_names():
+    nodes, ref = WorkflowTemplate.controlnet_nodes(
+        "cn", "cn_head", controlnet="a_union_controlnet.safetensors", head="tile")
+    assert ref == ["cn_head", 0]
+    assert nodes == {
+        "cn": {"class_type": "ControlNetLoader",
+               "inputs": {"control_net_name": "a_union_controlnet.safetensors"}},
+        "cn_head": {"class_type": "SetUnionControlNetType",
+                    "inputs": {"control_net": ["cn", 0], "type": "tile"}},
+    }
+
+    nodes, ref = WorkflowTemplate.controlnet_nodes(
+        "cn", "cn_head", controlnet="a_tile_controlnet.safetensors", head="tile")
+    assert ref == ["cn", 0]
+    assert list(nodes) == ["cn"]
+
+
 def test_sdxl_pose_transfer_extract_output_info():
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     save_id = next(

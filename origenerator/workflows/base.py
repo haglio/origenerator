@@ -527,6 +527,29 @@ class WorkflowTemplate(ABC):
         return SizedInput(nodes, [_SIZE_SCALE, 0], [_SIZE_GET, 0], [_SIZE_GET, 1])
 
     @staticmethod
+    def controlnet_nodes(loader_id: str, union_id: str, *, controlnet: str,
+                         head: str) -> tuple[dict, list]:
+        """The ControlNet loading subgraph and the CONTROL_NET ref to apply.
+
+        A union file gets a SetUnionControlNetType picking ``head``; a plain
+        single-purpose ControlNet is passed straight through, because it
+        crashes on the union node's extra argument.
+        """
+        nodes = {
+            loader_id: {
+                "class_type": "ControlNetLoader",
+                "inputs": {"control_net_name": controlnet},
+            },
+        }
+        if "union" not in controlnet.lower():
+            return nodes, [loader_id, 0]
+        nodes[union_id] = {
+            "class_type": "SetUnionControlNetType",
+            "inputs": {"control_net": [loader_id, 0], "type": head},
+        }
+        return nodes, [union_id, 0]
+
+    @staticmethod
     def enhance_image_nodes(*, image_ref, model_ref, positive_ref, negative_ref,
                             vae_ref, params: dict,
                             rescale_to: tuple[int, int] | None = None) -> EnhanceTail:

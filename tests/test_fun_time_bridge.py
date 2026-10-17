@@ -6,6 +6,7 @@ session's hotkeys reach the region slideshows and its choreography can see them.
 """
 from __future__ import annotations
 
+import json
 import re
 from unittest.mock import MagicMock
 
@@ -22,6 +23,7 @@ from origenerator import gallery
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import FAVORITES_KEY
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
@@ -696,7 +698,7 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
     assert _told(tmp_path, "portrait") == []
 
 
-def test_a_double_click_over_a_run_still_being_made_leaves_the_funestras_alone(
+def test_a_double_click_over_frames_of_no_run_in_flight_leaves_the_funestras_alone(
         qtbot, tmp_path, monkeypatch):
     view = _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     playing = (tmp_path / "landscape.tsv").read_text(encoding="utf-8")
@@ -708,27 +710,44 @@ def test_a_double_click_over_a_run_still_being_made_leaves_the_funestras_alone(
     assert _told(tmp_path, "portrait") == []
 
 
-def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch):
+def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_folder=False,
+                                 tall=False):
     """A session with its Funestras handed over, a run going in the tab in front,
     and that tab's preview double-clicked on the run's first frame."""
     def by_id(row, output_dir):
+        if row.get("status") != "completed":
+            return None
         return str(tmp_path / f"{row['prompt_id']}.png"), "image"
 
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
     monkeypatch.setattr(gcp_module, "resolve_preview", by_id)
+    db = _seeded_db(tmp_path)
+    if tall:
+        params = json.loads(db.get_generation("orig")["params_json"])
+        db.set_params_json("orig", json.dumps({**params, "width": 720, "height": 1280}))
     client = _reroll_client()
-    view = GalleryView(_seeded_db(tmp_path), client=client,
-                       fun_time=_funestras_session(tmp_path))
+    view = GalleryView(db, client=client, fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     view.refresh()
     _press(bridge, tmp_path, "OPEN_SHOWS")
-    _key, job = _running_reroll(view)
+    _key, job = _running_reroll(view, PORTRAIT if tall else LANDSCAPE)
+    if alone_in_its_folder:
+        db.delete_generation("orig")
     view.refresh()  # the poll's rebuild, which puts the run in its folder
     _generating_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
     _preview_of(view).open_fullscreen()
     return client, job
+
+
+def test_a_run_alone_in_its_folder_double_clicked_goes_to_the_funestra_of_its_shape(
+        qtbot, tmp_path, monkeypatch):
+    _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, alone_in_its_folder=True,
+                                 tall=True)
+
+    shown = read_playlist(tmp_path / "portrait.tsv")[0].path
+    assert shown.is_file() and shown.read_bytes() == _png_bytes()
 
 
 def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made(

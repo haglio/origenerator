@@ -12731,8 +12731,7 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
 
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
     # Left/Right step through the folder: the slideshow is built from the visible
-    # items' media, in the browser's order, starting on the one already shown —
-    # and held at nought, so nothing moves until an arrow does.
+    # items' media, in the browser's order, starting on the one already shown.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())

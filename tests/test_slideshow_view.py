@@ -1267,11 +1267,9 @@ def test_closing_announces_itself(qtbot):
     assert closes == [True]
 
 
-# --- a pace of nought: what double-clicking a picture opens ------------------
+# --- a pace of nought: the slide held until an arrow moves it ---------------
 
 def test_a_pace_of_nought_holds_the_slide_with_no_timer(qtbot):
-    # The shape a double-clicked picture opens in: one slideshow, standing still,
-    # rather than a second full-screen viewer with its own keys to learn.
     view = _view(qtbot, image_dwell_ms=0)
     assert view.dwell_s == 0
     assert not _will_move_on(view)
@@ -1294,8 +1292,8 @@ def test_a_clip_replays_rather_than_advancing_at_nought(qtbot):
 
 
 def test_turning_the_console_pace_up_sets_a_held_slideshow_going(qtbot):
-    # The console's clip-seconds pair is what starts a double-clicked picture
-    # moving, and the number it sets is the app-wide one.
+    # The console's clip-seconds pair is what starts a held slideshow moving, and
+    # the number it sets is the app-wide one.
     pace = SlideshowPace(parent=None)
     view = _view(qtbot, image_dwell_ms=0, pace=pace)
 

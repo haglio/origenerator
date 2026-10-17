@@ -134,6 +134,7 @@ class FunestraSlideshow(QObject):
         if image_dwell_ms is None:
             image_dwell_ms = self._pace.dwell_ms
         self._dwell_s = image_dwell_ms // 1000
+        self._following = None
         self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
                                  start=start, hud=hud, on_pass_change=self._pass_changed,
                                  neighbors=self._actions.neighbors, widen=self._actions.widen,
@@ -160,7 +161,19 @@ class FunestraSlideshow(QObject):
             # Before the reload, which then keeps it: after, it would load twice.
             self._send(play_file(self._funestra_item(current)))
         self._send(RELOAD_PLAYLIST)
-        self._send(f"{SET_PACE} {self._dwell_s}")
+        self._tell_the_pace()
+
+    def _tell_the_pace(self) -> None:
+        self._pace_told = self._funestra_pace()
+        self._send(f"{SET_PACE} {self._pace_told}")
+
+    def _funestra_pace(self) -> int:
+        """The slideshow's pace, or nought while something holds the slide on
+        screen still: a spoken request, or the run it was opened over."""
+        current = self._set.playlist.current()
+        on_the_run = (current is not None and current.is_live
+                      and current.prompt_id == self._following)
+        return 0 if self._request_holds_it or on_the_run else self._dwell_s
 
     def _file_of(self, slide) -> str:
         if slide.is_live:
@@ -204,7 +217,7 @@ class FunestraSlideshow(QObject):
             return
         self._dwell_s = seconds
         self._set.playlist.image_dwell_ms = seconds * 1000
-        self._send(f"{SET_PACE} {seconds}")
+        self._tell_the_pace()
 
     def _pass_changed(self, kept: bool) -> None:
         """A fresh pass was dealt: the Funestra is playing the old one, so it is
@@ -235,6 +248,8 @@ class FunestraSlideshow(QObject):
         elif not (status.paused or status.locked or self._request_holds_it):
             self._held_s += now - self._last_tick
         self._last_tick = now
+        if self._funestra_pace() != self._pace_told:
+            self._tell_the_pace()
         self._move_on_early_from_what_is_being_made()
         self._publish()
 
@@ -250,7 +265,7 @@ class FunestraSlideshow(QObject):
         self._send(CLEAR_FRAME if path is None else f"{SHOW_FRAME} {path}")
 
     def _move_on_early_from_what_is_being_made(self) -> None:
-        if not (self._moves_on_early and self._dwell_s):
+        if not (self._moves_on_early and self._funestra_pace()):
             return
         if self._held_s >= self._set.pace_for(self._set.playlist.current(), self._dwell_s):
             self._moves_on_early = False
@@ -740,6 +755,14 @@ class FunestraSlideshow(QObject):
             self._hand_over(land=True)
             self._publish()
 
+    def follow_what_is_being_made(self) -> None:
+        """Opened over a run being made: lead with it, and hold the Funestra on it
+        until it lands as the file it is frames of."""
+        self._set.lead_with_what_is_being_made()
+        self._following = self._set.current_prompt_id()
+        self._hand_over(land=True)
+        self._publish()
+
     # --- what a Funestra cannot do yet ----------------------------------------
     # Each of these is a window slideshow's, and the last step of this move is what
     # gives them to a Funestra.  Answered rather than left off, because a slideshow is
@@ -792,7 +815,7 @@ class FunestraSlideshow(QObject):
         seconds would hand the words to whatever came up next.
         """
         self._request_holds_it = paused
-        self._send(f"{SET_PACE} {0 if paused else self._dwell_s}")
+        self._tell_the_pace()
         if note:
             self._note(note)
 

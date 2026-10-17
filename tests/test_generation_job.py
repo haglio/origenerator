@@ -478,6 +478,21 @@ def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
     client.cancel_prompt.assert_not_called()
 
 
+def test_a_waiting_job_comfyui_says_it_is_making_is_being_made(qtbot, tmp_path):
+    # The server's own word, read by the poll, for a run whose start the job
+    # never heard: one taken back after it started with no copy of the app
+    # listening, whose next word can be a whole sampler step away.
+    job, _client = _started_job(tmp_path)
+    started = []
+    job.started.connect(lambda: started.append(True))
+
+    job.take_executing(False)
+    assert (job.state, started) == ("queued", [])
+
+    job.take_executing(True)
+    assert (job.state, started) == ("running", [True])
+
+
 # --- what another app is holding ComfyUI with, ahead of a job it hasn't started
 
 def test_take_backlog_holds_another_apps_count_while_the_job_waits(qtbot, tmp_path):

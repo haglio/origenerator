@@ -252,6 +252,10 @@ class GenerationJob(QObject):
         """
         self._foreign_ahead = foreign_ahead if self._state == JobState.QUEUED else None
 
+    def take_executing(self, executing: bool) -> None:
+        if executing:
+            self._mark_running()
+
     def progress_state(self) -> dict:
         """A JSON-able snapshot of this job's live progress, to persist on its row.
 

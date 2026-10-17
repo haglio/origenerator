@@ -267,6 +267,14 @@ def test_cancel_prompts_deletes_a_whole_backlog_in_one_call():
     assert m.call_count == 1
     assert json.loads(m.call_args[0][0].data) == {"delete": ["a", "b", "c"]}
 
+def test_the_queue_names_the_prompts_comfyui_is_making():
+    client, urlopen = _queue_client({
+        "queue_running": [_entry(0, "ours", "ours-client")],
+        "queue_pending": [_entry(1, "ours-next", "ours-client")],
+    })
+    with urlopen:
+        assert client.executing_prompts() == {"ours"}
+
 def test_queue_reads_on_the_poll_path_use_the_short_timeout():
     # These run on the GUI thread every couple of seconds. Under the generous
     # _HTTP_TIMEOUT_S a wedged server would freeze the window half a minute at a
@@ -274,7 +282,8 @@ def test_queue_reads_on_the_poll_path_use_the_short_timeout():
 
     assert _POLL_TIMEOUT_S < _HTTP_TIMEOUT_S
     client, urlopen = _queue_client({"queue_running": [], "queue_pending": []})
-    for call in (client.foreign_queue, lambda: client.foreign_backlog("x")):
+    for call in (client.foreign_queue, lambda: client.foreign_backlog("x"),
+                 client.executing_prompts):
         with urlopen as m:
             call()
         assert m.call_args.kwargs.get("timeout") == _POLL_TIMEOUT_S

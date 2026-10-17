@@ -119,6 +119,8 @@ _PINNED = {
     "denoise": 1.0,
     "depth_model": "a_depth_model.safetensors",
     "enhance": False,
+    "enhance_controlnet": "a_union_controlnet.safetensors",
+    "enhance_controlnet_strength": 0.0,
     "enhance_denoise": 0.2,
     "enhance_detail_fixes": {},
     "enhance_scale": 1.5,
@@ -175,6 +177,10 @@ _VARIATIONS = {
         "enhance": True,
         "enhance_detail_fixes": {"faces": 0.4, "hands": 0.55},
     },
+    "enhanced, held to its own layout": {
+        "enhance": True,
+        "enhance_controlnet_strength": 0.6,
+    },
     "a spoken story, chained and smoothed": {
         "positive_prompt": "a quiet harbor\n---\nthe tide comes in",
         "negative_prompt": "blurry\n---\ncrowded",
@@ -197,9 +203,9 @@ _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 # every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
-    ("image_enhance", "v003"): "228ccee5269454ec",
-    ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
-    ("sdxl_t2i", "v004"): "906cfa8824d0524d",
+    ("image_enhance", "v003"): "8c7c9de4ccbabcc4",
+    ("sdxl_pose_transfer", "v004"): "c44818dd5d9042a2",
+    ("sdxl_t2i", "v004"): "7b761d95f114a7bb",
     ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
     ("wan22_flf2v_loop", "v009"): "3cc07d12a40c7995",
     ("wan22_i2v", "v007"): "ce72e0c5e1342c10",
@@ -212,10 +218,18 @@ def _variation_fingerprint(workflow, variation: dict) -> str:
     return _fingerprint(workflow.build_api_payload(copy.deepcopy({**pinned, **variation})))
 
 
+def _variations_of(workflow) -> list[dict]:
+    """The shapes a workflow can take: a held redraw only where its tail offers one."""
+    return [variation for variation in _VARIATIONS.values()
+            if "enhance_controlnet_strength" not in variation
+            or "enhance_controlnet" in workflow.default_params()]
+
+
 def _workflow_fingerprint(workflow) -> str:
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(detail_parts, "list_detector_files", lambda: list(_INSTALLED_DETECTORS))
-        graphs = {_variation_fingerprint(workflow, variation) for variation in _VARIATIONS.values()}
+        graphs = {_variation_fingerprint(workflow, variation)
+                  for variation in _variations_of(workflow)}
     return _digest(sorted(graphs))
 
 
@@ -267,6 +281,10 @@ def test_a_workflows_graph_changes_only_with_its_version(name):
     pytest.param("sdxl_pose_transfer",
                  lambda patch: patch.setitem(_PINNED, "pose_estimator", "another_estimator.pt"),
                  id="a pose skeleton"),
+    pytest.param("image_enhance",
+                 lambda patch: patch.setitem(_PINNED, "enhance_controlnet",
+                                             "another_union_controlnet.safetensors"),
+                 id="a held redraw"),
 ])
 def test_a_change_to_a_part_the_pinned_recipe_leaves_out_still_moves_the_fingerprint(
         name, change, monkeypatch):

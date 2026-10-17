@@ -120,6 +120,19 @@ def test_the_detail_pass_is_one_of_the_settings_the_panel_sets():
     assert unset["enhance_detail_fixes"] == {}
 
 
+def test_the_hold_is_one_of_the_settings_the_panel_sets():
+    settings = EnhanceSettings(params={
+        "enhance_controlnet": "a_union_controlnet.safetensors",
+        "enhance_controlnet_strength": 0.6,
+    })
+    params = enhance_params_for(_source_row(), settings)
+    assert params["enhance_controlnet"] == "a_union_controlnet.safetensors"
+    assert params["enhance_controlnet_strength"] == 0.6
+    unset = enhance_params_for(_source_row(), EnhanceSettings())
+    assert unset["enhance_controlnet_strength"] == 0.0
+    assert default_enhance_params()["enhance_controlnet_strength"] == 0.0
+
+
 def test_the_default_model_leaves_the_source_image_its_own_checkpoint():
     # An enhanced image should stay in its own style, so the panel's default
     # defers to whichever checkpoint made the image rather than pinning one.
@@ -311,6 +324,15 @@ def test_describe_names_a_pinned_model_but_not_the_source_matching_default():
         "enhance_scale": 2.0, "checkpoint": "driftwood_v1.safetensors",
     }) == "2x · driftwood_v1.safetensors"
     assert describe_enhance_params({}) == ""
+
+
+def test_describe_names_the_hold_a_level_ran_with():
+    assert describe_enhance_params({
+        "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.5,
+        "enhance_controlnet_strength": 0.6,
+    }) == "2x · 20 steps · 0.5 redraw · held 0.6"
+    assert describe_enhance_params({
+        "enhance_scale": 2.0, "enhance_controlnet_strength": 0.0}) == "2x"
 
 
 # --- what the info pane lists, and what deleting a level leaves ------

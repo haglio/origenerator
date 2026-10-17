@@ -164,11 +164,6 @@ PARAM_HELP: dict[str, str] = {
         "so more of the run goes to fine detail. It matters less than the Sampler and "
         "goes with it."
     ),
-    "denoise": (
-        "How much of the starting image is redrawn (the denoise strength). 1.0 "
-        "generates from pure noise; lower keeps more of what was there and only "
-        "re-imagines the rest."
-    ),
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
 
@@ -193,6 +188,18 @@ PARAM_HELP: dict[str, str] = {
         "cannot, since nothing outside the regions found is touched: around 0.45 "
         "actually re-forms a bad hand, while below 0.3 it only tidies the one it was "
         "given."
+    ),
+    "enhance_controlnet": (
+        "Which model holds the picture's layout while Enhance redraws its surface (a "
+        "ControlNet). Only the SDXL ones installed are offered, since the refining "
+        "model is SDXL whatever made the picture."
+    ),
+    "enhance_controlnet_strength": (
+        "How firmly the picture's own layout is held while Enhance redraws its surface "
+        "(a tile ControlNet on the enlarged picture). 0 holds nothing and is Enhance as "
+        "it was. Held, the Redraw Amount can go to 0.5 or 0.6 and a photo model redraws "
+        "the skin, hair and light while the pose, the face and the hands stay where "
+        "they were."
     ),
 
     # --- structure transfer ---
@@ -297,10 +304,6 @@ RECOMMENDED: dict[str, str] = {
         "the dpmpp ones (DPM++ 2M Karras on model pages). To compare two, keep the "
         "seed and change only this, on two or three different prompts."
     ),
-    "denoise": (
-        "Leave it at 1.0 for a new picture; to keep more of a starting image, 0.4–0.7 "
-        "is the good range."
-    ),
     "shift": (
         "Good range: 5–12; 8 is the usual start, 5 for a looping clip."
     ),
@@ -318,6 +321,13 @@ RECOMMENDED: dict[str, str] = {
     ),
     "enhance_detail_fixes": (
         "Good range: 0.3–0.5 for each part."
+    ),
+    "enhance_controlnet": (
+        "The union one; its tile head is what a redraw is held with."
+    ),
+    "enhance_controlnet_strength": (
+        "Good range: 0.5–0.8 once the Redraw Amount is 0.3 or more; 0 below that, where "
+        "there is nothing to hold against."
     ),
     "controlnet_strength": (
         "Good range: 0.5–0.9."

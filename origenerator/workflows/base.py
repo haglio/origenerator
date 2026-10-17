@@ -12,7 +12,8 @@ from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.detail_parts import detail_fix_passes
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
-from origenerator.workflows.model_files import is_no_lora
+from origenerator.workflows.model_arch import SDXL
+from origenerator.workflows.model_files import is_no_lora, list_model_files
 
 # ComfyUI's KSampler vocabulary, which the SDXL pair's pickers offer.
 SAMPLER_OPTIONS = [
@@ -86,6 +87,7 @@ _DETAIL_FEATHER = 5           # pixels the repaint fades over on the way back in
 _SIZE_SCALE, _SIZE_GET = "size_scale", "size_get"
 _ENH_LOADER, _ENH_UPSCALE, _ENH_RESCALE = "enh_loader", "enh_upscale", "enh_rescale"
 _ENH_ENCODE, _ENH_SAMPLER, _ENH_DECODE = "enh_encode", "enh_sampler", "enh_decode"
+_ENH_CONTROLNET, _ENH_UNION, _ENH_HOLD = "enh_controlnet", "enh_union", "enh_hold"
 
 
 @dataclass(frozen=True)
@@ -196,6 +198,18 @@ def sampler_params(defaults: dict) -> list[ParamDef]:
                  options=SAMPLER_OPTIONS),
         ParamDef("scheduler", "Step Spacing", ParamType.COMBO, defaults["scheduler"],
                  options=SCHEDULER_OPTIONS),
+    ]
+
+
+def enhance_hold_params(defaults: dict) -> list[ParamDef]:
+    controlnets = list_model_files(
+        "controlnet", [defaults["enhance_controlnet"]], accepts=(SDXL,),
+    )
+    return [
+        ParamDef("enhance_controlnet", "Structure Model", ParamType.COMBO,
+                 defaults["enhance_controlnet"], options=controlnets),
+        ParamDef("enhance_controlnet_strength", "Structure Strength", ParamType.FLOAT,
+                 defaults["enhance_controlnet_strength"], min_val=0.0, max_val=2.0, step=0.05),
     ]
 
 
@@ -526,6 +540,29 @@ class WorkflowTemplate(ABC):
         return SizedInput(nodes, [_SIZE_SCALE, 0], [_SIZE_GET, 0], [_SIZE_GET, 1])
 
     @staticmethod
+    def controlnet_nodes(loader_id: str, union_id: str, *, controlnet: str,
+                         head: str) -> tuple[dict, list]:
+        """The ControlNet loading subgraph and the CONTROL_NET ref to apply.
+
+        A union file gets a SetUnionControlNetType picking ``head``; a plain
+        single-purpose ControlNet is passed straight through, because it
+        crashes on the union node's extra argument.
+        """
+        nodes = {
+            loader_id: {
+                "class_type": "ControlNetLoader",
+                "inputs": {"control_net_name": controlnet},
+            },
+        }
+        if "union" not in controlnet.lower():
+            return nodes, [loader_id, 0]
+        nodes[union_id] = {
+            "class_type": "SetUnionControlNetType",
+            "inputs": {"control_net": [loader_id, 0], "type": head},
+        }
+        return nodes, [union_id, 0]
+
+    @staticmethod
     def enhance_image_nodes(*, image_ref, model_ref, positive_ref, negative_ref,
                             vae_ref, params: dict,
                             rescale_to: tuple[int, int] | None = None) -> EnhanceTail:
@@ -574,6 +611,8 @@ class WorkflowTemplate(ABC):
                     "crop": "disabled",
                 },
             }
+        held, positive_ref, negative_ref = WorkflowTemplate._hold_nodes(
+            positive_ref, negative_ref, params)
         nodes = {
             _ENH_LOADER: {
                 "class_type": "UpscaleModelLoader",
@@ -588,6 +627,7 @@ class WorkflowTemplate(ABC):
                 "class_type": "VAEEncode",
                 "inputs": {"pixels": [_ENH_RESCALE, 0], "vae": vae_ref},
             },
+            **held,
             _ENH_SAMPLER: {
                 "class_type": "KSampler",
                 "inputs": {
@@ -609,6 +649,27 @@ class WorkflowTemplate(ABC):
             },
         }
         return EnhanceTail(nodes, [_ENH_DECODE, 0], [_ENH_UPSCALE, 0])
+
+    @staticmethod
+    def _hold_nodes(positive_ref, negative_ref, params: dict) -> tuple[dict, list, list]:
+        strength = params.get("enhance_controlnet_strength") or 0
+        if strength <= 0:
+            return {}, positive_ref, negative_ref
+        nodes, controlnet_ref = WorkflowTemplate.controlnet_nodes(
+            _ENH_CONTROLNET, _ENH_UNION, controlnet=params["enhance_controlnet"], head="tile")
+        nodes[_ENH_HOLD] = {
+            "class_type": "ControlNetApplyAdvanced",
+            "inputs": {
+                "positive": positive_ref,
+                "negative": negative_ref,
+                "control_net": controlnet_ref,
+                "image": [_ENH_RESCALE, 0],
+                "strength": strength,
+                "start_percent": 0.0,
+                "end_percent": 1.0,
+            },
+        }
+        return nodes, [_ENH_HOLD, 0], [_ENH_HOLD, 1]
 
     @staticmethod
     def detail_fix_nodes(*, image_ref, model_ref, clip_ref, vae_ref,

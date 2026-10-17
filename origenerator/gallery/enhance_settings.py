@@ -29,7 +29,8 @@ ENHANCE_WORKFLOW = "image_enhance"
 # being enhanced, and the seed is re-rolled per launch like any variation.
 ENHANCE_SETTING_KEYS = (
     "checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
-    "enhance_denoise", "enhance_detail_fixes",
+    "enhance_denoise", "enhance_controlnet", "enhance_controlnet_strength",
+    "enhance_detail_fixes",
 )
 
 # What a folder's settings leave to the source image rather than pinning: the
@@ -132,6 +133,9 @@ def describe_enhance_params(params: dict) -> str:
     denoise = params.get("enhance_denoise")
     if denoise is not None:
         bits.append(f"{float(denoise):g} redraw")
+    held = params.get("enhance_controlnet_strength")
+    if held:
+        bits.append(f"held {float(held):g}")
     # Each part the pass redrew, at its own amount — "teeth 0.5", or
     # "faces 0.45 & hands 0.6" where several ran.
     fixes = detail_fixes_of(params)

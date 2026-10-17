@@ -1387,7 +1387,7 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     qtbot.addWidget(form)
     for key, widget in form._widgets.items():
         assert widget.toolTip() == param_help(key), key
-    assert _label_beside(form, "denoise").toolTip() == param_help("denoise")
+    assert _label_beside(form, "steps").toolTip() == param_help("steps")
 
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):

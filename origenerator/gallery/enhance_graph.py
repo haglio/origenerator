@@ -40,6 +40,9 @@ _SETTINGS_BY_NODE = {
 }
 
 _DETAIL_PASS = "DetailerForEach"
+_HOLD = "ControlNetApplyAdvanced"
+_UNION_HEAD = "SetUnionControlNetType"
+_RESCALE = ("ImageScaleBy", "ImageScale")
 
 
 def graph_level_params(row: dict, keys) -> dict:
@@ -53,6 +56,7 @@ def graph_level_params(row: dict, keys) -> dict:
     found = {}
     for _node_id, inputs, node_type in _nodes_of(graph):
         found.update(_SETTINGS_BY_NODE.get(node_type, lambda _inputs: {})(inputs))
+    found.update(_hold(graph))
     fixes = _detail_fixes(graph)
     if fixes:
         found["enhance_detail_fixes"] = fixes
@@ -116,8 +120,26 @@ def _node_order(node_id) -> int:
         return 1 << 30
 
 
-def _linked_inputs(graph: dict, ref) -> dict:
-    """The inputs of the node one input links to, or ``{}`` where there is none.
+def _hold(graph: dict) -> dict:
+    for _node_id, inputs, node_type in _nodes_of(graph):
+        if node_type != _HOLD:
+            continue
+        if _linked_node(graph, inputs.get("image")).get("class_type") not in _RESCALE:
+            continue
+        held_with = _linked_node(graph, inputs.get("control_net"))
+        if held_with.get("class_type") == _UNION_HEAD:
+            held_with = _linked_node(graph, _inputs_of(held_with).get("control_net"))
+        strength = inputs.get("strength")
+        return {
+            "enhance_controlnet_strength": (
+                strength if isinstance(strength, (int, float)) else None),
+            "enhance_controlnet": _inputs_of(held_with).get("control_net_name"),
+        }
+    return {}
+
+
+def _linked_node(graph: dict, ref) -> dict:
+    """The node one input links to, or ``{}`` where there is none.
 
     A ComfyUI link is ``[node_id, output_index]``; anything else on an input is
     a literal.
@@ -125,5 +147,13 @@ def _linked_inputs(graph: dict, ref) -> dict:
     if not (isinstance(ref, (list, tuple)) and ref and isinstance(ref[0], (str, int))):
         return {}
     node = graph.get(str(ref[0]))
-    inputs = node.get("inputs") if isinstance(node, dict) else None
+    return node if isinstance(node, dict) else {}
+
+
+def _inputs_of(node: dict) -> dict:
+    inputs = node.get("inputs")
     return inputs if isinstance(inputs, dict) else {}
+
+
+def _linked_inputs(graph: dict, ref) -> dict:
+    return _inputs_of(_linked_node(graph, ref))

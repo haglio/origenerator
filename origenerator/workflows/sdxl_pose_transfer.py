@@ -6,6 +6,7 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    enhance_hold_params,
     sampler_params,
 )
 from origenerator.workflows.derived_size import measure_derived_size
@@ -96,6 +97,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             # and skin folds into wounds/disfigurements (user-reported). 0.15
             # refines texture without redrawing anatomy.
             "enhance_denoise": 0.15,
+            "enhance_controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
+            "enhance_controlnet_strength": 0.0,
             "filename_prefix": "image/sdxl_pose_transfer",
         }
 
@@ -132,7 +135,6 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=200),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5),
             *sampler_params(defaults),
-            ParamDef("denoise", "Redraw Amount", ParamType.FLOAT, defaults["denoise"], min_val=0.0, max_val=1.0, step=0.01),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
             ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
                      options=upscalers),
@@ -141,6 +143,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100),
             ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
+            *enhance_hold_params(defaults),
         ]
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:
@@ -194,31 +197,6 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         }
         return nodes, ["23", 0]
 
-    @staticmethod
-    def _controlnet_nodes(params: dict) -> tuple[dict, list]:
-        """The ControlNet loading subgraph and the CONTROL_NET ref to apply.
-
-        A union file gets a SetUnionControlNetType picking the mode's head; a
-        plain single-purpose ControlNet is passed straight through, because it
-        crashes on the union node's extra argument.
-        """
-        nodes = {
-            "7": {
-                "class_type": "ControlNetLoader",
-                "inputs": {"control_net_name": params["controlnet"]},
-            },
-        }
-        if "union" not in params["controlnet"].lower():
-            return nodes, ["7", 0]
-        nodes["21"] = {
-            "class_type": "SetUnionControlNetType",
-            "inputs": {
-                "control_net": ["7", 0],
-                "type": "openpose" if params["control_mode"] == "pose" else "depth",
-            },
-        }
-        return nodes, ["21", 0]
-
     def build_api_payload(self, params: dict) -> dict:
         # Size the still off the input image: derived in-graph at the SDXL
         # budget by default, or scaled to the user's explicit WxH when the
@@ -227,7 +205,10 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         size_nodes, scaled_ref = sized.nodes, sized.image
         width_ref, height_ref = sized.width, sized.height
         structure, hint_ref = self._structure_nodes(params, scaled_ref)
-        controlnet, controlnet_ref = self._controlnet_nodes(params)
+        controlnet, controlnet_ref = self.controlnet_nodes(
+            "7", "21", controlnet=params["controlnet"],
+            head="openpose" if params["control_mode"] == "pose" else "depth",
+        )
         enhance_nodes: dict = {}
         enhanced_ref = ["13", 0]  # enhance off: save the plain decode
         if params.get("enhance"):
@@ -291,7 +272,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                     "cfg": params["cfg"],
                     "sampler_name": params["sampler_name"],
                     "scheduler": params["scheduler"],
-                    "denoise": params["denoise"],
+                    "denoise": 1.0,
                 },
             },
             "12": {

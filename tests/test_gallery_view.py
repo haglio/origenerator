@@ -504,10 +504,10 @@ def _collection_names(item):
     return names
 
 
-def _workflow_rows(tree, media=None):
+def _workflow_rows(tree, media=None, side=LANDSCAPE):
     """The workflow rows, which hang under the All row that tops the tree, by
     label — narrowed to one media type ("image"/"video") when ``media`` says so."""
-    all_row = _top_level(tree).get("All")
+    all_row = _top_level(tree, side).get("All")
     if all_row is None:
         return {}
     rows = _subs(all_row)
@@ -516,9 +516,9 @@ def _workflow_rows(tree, media=None):
     return {row.text(0): row for row in rows}
 
 
-def _image_workflow(tree):
+def _image_workflow(tree, side=LANDSCAPE):
     """The sole image workflow's row — where a one-recipe gallery starts."""
-    (row,) = _workflow_rows(tree, "image").values()
+    (row,) = _workflow_rows(tree, "image", side).values()
     return row
 
 
@@ -6091,9 +6091,9 @@ def _tile_kinds_in_order(view):
     return [type(layout.itemAt(index).widget()) for index in range(layout.count())]
 
 
-def _select_first_leaf(view):
+def _select_first_leaf(view, side=LANDSCAPE):
     # workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
-    leaf = _at(_image_workflow(view._tree), 0, 0, 0)
+    leaf = _at(_image_workflow(view._tree, side), 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
 
@@ -8444,9 +8444,9 @@ def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
 # --- re-roll preview mirrored into the info pane ----------------------------
 
 
-def _running_reroll(view):
+def _running_reroll(view, side=LANDSCAPE):
     """Start a re-roll and return (key, job) for the freshly launched job."""
-    key = _select_first_leaf(view)
+    key = _select_first_leaf(view, side)
     _reroll_tile(view).add_requested.emit()
     return key, view._live_jobs[key]
 

@@ -404,15 +404,19 @@ class SlideshowDirector:
         to land it on inside Fun Time, for a slideshow asked for by side rather than
         routed by its own shape.
         """
-        # Which side this slideshow belongs to: the one asked for, else the one this
-        # set's own shape belongs on.  Standalone it names nothing but the
-        # panel's own verbs, since the monitor is the whole screen.
-        where = side or region_for_items(items or folder_items or [])
+        # Which side this slideshow belongs to: the one asked for, else the shape of
+        # the run it is opened over, else the one its set's own shape belongs on.
+        # Standalone it names nothing but the panel's own verbs, since the monitor is
+        # the whole screen.
+        run = (self._run_being_made_at(location)
+               if self._fun_time is not None and not items else None)
+        where = side or (row_orientation(run) if run is not None
+                         else region_for_items(items or folder_items or []))
         # And what that side IS: one of the session's Funestras, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None
         follows_a_run = channel is not None and not items
-        if follows_a_run and not folder_items:
+        if follows_a_run and not folder_items and run is None:
             return None
         if (channel is not None and where not in self._regions_wanted
                 and self._session_channel is not None):
@@ -1275,10 +1279,19 @@ class SlideshowDirector:
             slideshow.note_in_flight({item.key for item in items})
 
     def _offer_the_frames(self, slideshow, location, items) -> None:
-        for item in items:
-            if item.reading.frame is not None and (
-                    slideshow.holds(item.key) or self._would_play(item.key, location)):
-                slideshow.note_generating(item.key, item.reading.frame)
+        for item in self._runs_shown_at(location, items, slideshow):
+            slideshow.note_generating(item.key, item.reading.frame)
+
+    def _runs_shown_at(self, location, items, slideshow=None) -> list:
+        """The runs in flight among *items* whose frames a slideshow at *location*
+        takes in, in the order it takes them."""
+        return [item for item in items if item.reading.frame is not None and (
+            (slideshow is not None and slideshow.holds(item.key))
+            or self._would_play(item.key, location))]
+
+    def _run_being_made_at(self, location) -> dict | None:
+        shown = self._runs_shown_at(location, self._host.queue_now()[0])
+        return self._db.get_generation(shown[0].key) if shown else None
 
     def note_enhanced(self, row: dict | None):
         """Hand a landed enhancement to every open slideshow, so the item becomes

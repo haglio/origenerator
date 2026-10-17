@@ -197,7 +197,7 @@ _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 # every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
-    ("image_enhance", "v003"): "228ccee5269454ec",
+    ("image_enhance", "v004"): "f60bb46ff758910b",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
     ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",

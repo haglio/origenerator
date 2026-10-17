@@ -378,7 +378,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 17395 when a folder of your own came to show its folders under it in the TOC.
 # 17393 when a settings folder came to be keyed by the model its run recorded, and
 # the settings folders' builder lost a tooltip detail it no longer makes.
-MAX_PROSE_LINES = 17393
+# 17181 when the motion-tracked video workflow left the app, taken down
+# to what the tree measured.
+MAX_PROSE_LINES = 17181
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

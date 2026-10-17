@@ -199,6 +199,10 @@ _SEEDS_TILE = "folder with re-rolls"
 _TRASH_TILE = "trash"
 
 
+def _back_of_the_line_first(items, keys) -> list:
+    return [item for item in reversed(items) if item.key in keys]
+
+
 def _inflight_signature(items) -> tuple:
     """The identity of the in-flight set — its job keys — so a frame-only change
     refreshes cards in place while an added or removed job forces a re-render."""
@@ -855,7 +859,7 @@ class BrowserPane(QObject):
         held = {row["prompt_id"] for row in self._in_folder(
             _Listing(row for row in rows if gallery.is_in_progress(row)),
             self._collection_side, self._collection_folder)}
-        return [item for item in self._card_items(rows, requests) if item.key in held]
+        return _back_of_the_line_first(self._card_items(rows, requests), held)
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty collection, worded for the kinds it is
@@ -1260,11 +1264,10 @@ class BrowserPane(QObject):
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
 
-        # The re-roll tile leads the flow so it sits beside the newest item
-        # (thumbnails are sorted newest-first). The run in front of this folder's
-        # line has the generating tile after it, where its picture will land: the
-        # running row is left out of the static grid below rather than drawn as a
-        # broken, output-less thumbnail.
+        # The + leads, and the run in front of this folder's line stands last,
+        # where its picture will land; the runs waiting after it stand before it.
+        # Rows still in flight stay out of the grid below rather than standing in
+        # it as broken, output-less thumbnails.
         finished = [row for row in group.rows if gallery.produced_output(row)]
         headings = gallery.section_headings(finished)
         lead = self._host.lead_tiles(group)
@@ -1277,12 +1280,13 @@ class BrowserPane(QObject):
             flow.addWidget(lead.request)
 
         def draw_leading():
-            for tile in (lead.reroll, None if request_above else lead.request,
-                         lead.generating):
+            for tile in (lead.reroll, None if request_above else lead.request):
                 if tile is not None:
                     flow.addWidget(tile)
             for item in cards:
                 self._add_inflight_card(flow, item)
+            if lead.generating is not None:
+                flow.addWidget(lead.generating)
 
         _open_sections(flow, headings, opens_now=opens_now, draw_leading=draw_leading)
         _draw_between_headings(flow, finished, headings, draw)
@@ -1298,23 +1302,12 @@ class BrowserPane(QObject):
         the folder shows them all, each on the image it was asked of
         (:mod:`origenerator.gui.blurred`), and each turns into its own
         thumbnail where it stands.
-
-        Newest first, like everything else in the grid: an in-flight row is
-        the newest thing in the folder, so the cards lead the finished
-        pictures. Costs nothing in a folder with nothing in flight, which is
-        almost all of them — the listing under the cards is only built once
-        there is a card to build.
         """
         leading = self._jobs.job_for(group.key)
         in_front = leading.prompt_id if leading is not None else None
-        waiting = [row["prompt_id"] for row in group.rows
-                   if not gallery.produced_output(row)
-                   and row["prompt_id"] != in_front]
-        if not waiting:
-            return []
-        items = {item.key: item for item in self._card_items()}
-        # A row no longer in flight by the time this drew has no item, and no card.
-        return [items[pid] for pid in waiting if pid in items]
+        waiting = {row["prompt_id"] for row in group.rows
+                   if not gallery.produced_output(row) and row["prompt_id"] != in_front}
+        return _back_of_the_line_first(self._card_items(), waiting) if waiting else []
 
     def _add_inflight_card(self, flow, item):
         card = InFlightCard(item)

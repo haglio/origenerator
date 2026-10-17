@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 from PyQt6 import sip
 from PyQt6.QtCore import Qt
@@ -87,12 +88,13 @@ class _StubDB:
 
 
 class _StubJobQueue:
-    def __init__(self):
+    def __init__(self, order=(), leading=None):
         self.jobs_by_folder = {}
-        self.queue_order = []
+        self.queue_order = list(order)
+        self._leading = leading
 
     def job_for(self, key):
-        return None
+        return None if self._leading is None else SimpleNamespace(prompt_id=self._leading)
 
 
 class _StubAuto:
@@ -100,12 +102,12 @@ class _StubAuto:
         return False
 
 
-def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None):
+def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, jobs=None):
     if scroll is None:
         scroll = BrowserScrollArea()
         qtbot.addWidget(scroll)
     pane = BrowserPane(
-        scroll, _StubDB(rows), _StubJobQueue(), _StubAuto(),
+        scroll, _StubDB(rows), jobs or _StubJobQueue(), _StubAuto(),
         TreeNavigation(
             selected_folder_key=lambda: None,
             folder_context=lambda key: "",
@@ -250,6 +252,24 @@ def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_i
     assert _shown_in_order(scroll) == [heading, "InFlightCard", "g1"]
 
 
+def _waiting(prompt_id, seed, created_at=None):
+    """A fabricated run still in this app's line."""
+    return dict(_running(prompt_id, seed, created_at), status="pending")
+
+
+def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtbot):
+    # Latest reads newest first, and the run being made is the next to land, so
+    # its card stands beside the newest finished item, where it will go; the
+    # last run in the line stands farthest from it.
+    finished = [_row("g1", 1, _ago(minutes=5))]
+    rows = [_running("j1", 2), _waiting("j2", 3), _waiting("j3", 4), *finished]
+    pane, _scroll = _pane(qtbot, rows, jobs=_StubJobQueue(order=["j1", "j2", "j3"]))
+
+    _open_recents(pane, finished)
+
+    assert list(pane._inflight_cards) == ["j3", "j2", "j1"]
+
+
 def test_latest_puts_work_started_long_after_the_newest_picture_in_a_now_section(qtbot):
     finished = [_row("g1", 1, _ago(hours=5))]
     pane, scroll = _pane(qtbot, [_running("j1", 2), *finished])
@@ -361,6 +381,23 @@ def test_the_run_in_front_stays_beside_the_plus_when_the_request_tile_stands_abo
     first, second = gallery.section_headings(rows)
     assert _shown_in_order(scroll) == ["request", first, "new", "generating", "g1",
                                        second, "g2"]
+
+
+def test_a_folder_draws_its_runs_back_of_the_line_first_and_the_one_in_front_last(qtbot):
+    # The run in front lands next, beside the newest picture, so the runs
+    # waiting after it stand before it rather than between it and that picture.
+    finished = _row("g1", 1, _ago(minutes=5))
+    rows = [_running("r1", 2), _waiting("r2", 3), _waiting("r3", 4), finished]
+    tiles = LeadTiles(reroll=QLabel("new"), generating=QLabel("generating"))
+    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles,
+                         jobs=_StubJobQueue(order=["r1", "r2", "r3"], leading="r1"))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    [heading] = gallery.section_headings([finished])
+    assert _shown_in_order(scroll) == [heading, "new", "InFlightCard", "InFlightCard",
+                                       "generating", "g1"]
+    assert list(pane._inflight_cards) == ["r3", "r2"]
 
 
 def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(qtbot):

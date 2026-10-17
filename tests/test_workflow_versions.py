@@ -202,14 +202,14 @@ _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 # Changing the recipes above moves these without any graph changing: re-record
 # every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
-    ("flux_t2i_upscaled", "v002"): "9fc408c0725a035e",
+    ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
     ("image_enhance", "v003"): "8c7c9de4ccbabcc4",
     ("sdxl_pose_transfer", "v004"): "c44818dd5d9042a2",
     ("sdxl_t2i", "v004"): "7b761d95f114a7bb",
     ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
     ("wan22_flf2v_loop", "v009"): "3cc07d12a40c7995",
     ("wan22_i2v", "v007"): "ce72e0c5e1342c10",
-    ("wan22_t2i", "v002"): "fc3596d1959ad260",
+    ("wan22_t2i", "v002"): "f0794cae55c3e05d",
 }
 
 
@@ -218,10 +218,18 @@ def _variation_fingerprint(workflow, variation: dict) -> str:
     return _fingerprint(workflow.build_api_payload(copy.deepcopy({**pinned, **variation})))
 
 
+def _variations_of(workflow) -> list[dict]:
+    """The shapes a workflow can take: a held redraw only where its tail offers one."""
+    return [variation for variation in _VARIATIONS.values()
+            if "enhance_controlnet_strength" not in variation
+            or "enhance_controlnet" in workflow.default_params()]
+
+
 def _workflow_fingerprint(workflow) -> str:
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(detail_parts, "list_detector_files", lambda: list(_INSTALLED_DETECTORS))
-        graphs = {_variation_fingerprint(workflow, variation) for variation in _VARIATIONS.values()}
+        graphs = {_variation_fingerprint(workflow, variation)
+                  for variation in _variations_of(workflow)}
     return _digest(sorted(graphs))
 
 

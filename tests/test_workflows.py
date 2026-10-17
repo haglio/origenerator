@@ -341,6 +341,8 @@ def test_sdxl_t2i_extract_output_info():
 # Every image-producing workflow carries the enhance toggle; these are they.
 _ENHANCE_TOGGLE_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer",
                              "flux_t2i_upscaled", "wan22_t2i")
+# The tails whose sampler runs on an SDXL model, which an SDXL ControlNet can hold.
+_HELD_TAIL_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer", "image_enhance")
 
 
 def test_image_workflows_carry_the_enhance_toggle_off_by_default():
@@ -578,8 +580,8 @@ def _tail_sampler(payload: dict) -> dict:
                 and n["inputs"]["latent_image"] == [encode_id, 0])
 
 
-@pytest.mark.parametrize("name", [*_ENHANCE_TOGGLE_WORKFLOWS, "image_enhance"])
-def test_every_enhance_capable_workflows_tail_takes_the_same_hold(name):
+@pytest.mark.parametrize("name", _HELD_TAIL_WORKFLOWS)
+def test_every_tail_that_refines_on_an_sdxl_model_takes_the_same_hold(name):
     wf = WORKFLOW_REGISTRY[name]
     plain = wf.build_api_payload(dict(wf.default_params(), enhance=True))
     payload = wf.build_api_payload(dict(wf.default_params(), enhance=True,
@@ -599,6 +601,17 @@ def test_every_enhance_capable_workflows_tail_takes_the_same_hold(name):
     assert loader["inputs"]["control_net_name"] == wf.default_params()["enhance_controlnet"]
     assert _tail_sampler(payload)["positive"] == [hold_id, 0]
     assert _tail_sampler(payload)["negative"] == [hold_id, 1]
+
+
+@pytest.mark.parametrize("name", ["flux_t2i_upscaled", "wan22_t2i"])
+def test_a_tail_that_refines_on_a_flux_or_wan_model_takes_no_hold(name):
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(wf.default_params(), enhance=True))
+
+    assert [n for n in payload.values() if n["class_type"].startswith("ControlNet")] == []
+    hold = {"enhance_controlnet", "enhance_controlnet_strength"}
+    assert hold.isdisjoint(wf.default_params())
+    assert hold.isdisjoint(pd.key for pd in wf.param_definitions())
 
 
 # ---- The detail pass (each part re-sampled where it is) ----
@@ -840,8 +853,8 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         assert denoise.default == 0.15
 
 
-@pytest.mark.parametrize("name", [*_ENHANCE_TOGGLE_WORKFLOWS, "image_enhance"])
-def test_every_enhance_capable_workflow_offers_the_hold_among_its_enhance_settings(
+@pytest.mark.parametrize("name", _HELD_TAIL_WORKFLOWS)
+def test_every_workflow_whose_tail_can_be_held_offers_the_hold_among_its_enhance_settings(
         name, installed_models):
     installed_models.add("controlnet", "an_sdxl_controlnet.safetensors", arch="sdxl")
     installed_models.add("controlnet", "an_sd15_controlnet.safetensors", arch="sd15")
@@ -923,11 +936,12 @@ def test_enhance_keys_cover_every_param_only_the_tail_reads():
     # The gallery drops these from a row's identity, so an enhanced render shares
     # its unenhanced twin's folder. A tail param left off the list would silently
     # split that folder again, so every workflow's list must cover its whole tail.
-    tail = {"enhance", "enhance_scale", "enhance_steps", "enhance_denoise",
-            "enhance_controlnet", "enhance_controlnet_strength"}
-    for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i"):
+    tail = {"enhance", "enhance_scale", "enhance_steps", "enhance_denoise"}
+    held = tail | {"enhance_controlnet", "enhance_controlnet_strength"}
+    for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
-        assert set(wf.enhance_keys()) == tail | {"upscale_model"}, name
+        assert set(wf.enhance_keys()) == held | {"upscale_model"}, name
+    assert set(WORKFLOW_REGISTRY["wan22_t2i"].enhance_keys()) == tail | {"upscale_model"}
     # Flux keeps upscale_model in its recipe: with the toggle OFF that same
     # param drives the plain 4x upscale this workflow is named for, so it is a
     # real difference between two of its renders.

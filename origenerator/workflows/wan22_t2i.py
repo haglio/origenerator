@@ -1,12 +1,7 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import (
-    ParamDef,
-    ParamType,
-    WorkflowTemplate,
-    enhance_hold_params,
-)
+from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.wan_experts import wan_expert_shift_param
 
 
@@ -58,8 +53,6 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             "enhance_denoise": 0.15,
-            "enhance_controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
-            "enhance_controlnet_strength": 0.0,
             "filename_prefix": "image/wan22_t2i",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "vae_name": "wan_2.1_vae.safetensors",
@@ -84,7 +77,6 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100),
             ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
-            *enhance_hold_params(defaults),
         ]
 
     def build_api_payload(self, params: dict) -> dict:

@@ -27,14 +27,13 @@ from shared_ui.preview_icon_pil import in_preview_ink
 from origenerator import app_link
 from origenerator.branch_session import is_branch_session
 from origenerator.icon_design import render_icon
+from origenerator.notice_toast import raise_notice
 from origenerator.run_notice import RunOutcome, notice_for
 from origenerator.win32 import (
     APP_USER_MODEL_ID,
     register_link_handler,
     register_notification_identity,
 )
-from origenerator.windows_toast import show as show_toast
-from origenerator.windows_toast import toast_xml
 
 logger = logging.getLogger(__name__)
 
@@ -114,15 +113,7 @@ class DesktopNotices(QObject):
         # beside each other, and whichever raised THIS one is the one a click on
         # it should reach.
         self._answer_clicks_here()
-        try:
-            show_toast(self._identity,
-                       toast_xml(notice.title, notice.body,
-                                 link=app_link.link_to(notice.generation),
-                                 mark=self._marks.get(notice.ok)))
-        except OSError as e:
-            # A run nobody hears about is a shame; a run that takes the app down
-            # as it lands is worse.
-            logger.warning("Windows would not raise the notification: %s", e)
+        raise_notice(self._identity, notice, mark=self._marks.get(notice.ok))
 
     def _name_this_app_to_windows(self, shown_as: Preview | None) -> None:
         try:

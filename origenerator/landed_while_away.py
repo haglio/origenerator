@@ -30,10 +30,9 @@ from origenerator.config import (
 from origenerator.db import Database
 from origenerator.gallery import parse_params
 from origenerator.generation_state import GenerationStatus
+from origenerator.notice_toast import raise_notice
 from origenerator.run_notice import Notice, notice_for, outcome_of_row
 from origenerator.single_instance import Copies
-from origenerator.windows_toast import show as show_toast
-from origenerator.windows_toast import toast_xml
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -125,14 +124,6 @@ def _start_a_watcher(identity: str) -> None:
     logger.info("Process %d waits out the runs still in flight", watcher.pid)
 
 
-def _raise_on_the_desktop(notice: Notice, identity: str) -> None:
-    try:
-        show_toast(identity, toast_xml(notice.title, notice.body,
-                                       link=app_link.link_to(notice.generation)))
-    except OSError as e:
-        logger.warning("Windows would not raise the notification: %s", e)
-
-
 def _log_into_the_apps_file() -> None:
     configure_logging("", STATE_DIR / "origenerator.log")
     install_exception_logging(logger)
@@ -147,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     _log_into_the_apps_file()
     db = Database(LIBRARY_STATE_DIR / "origenerator.db")
     watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT),
-          announce=lambda notice: _raise_on_the_desktop(notice, identity),
+          announce=lambda notice: raise_notice(identity, notice),
           app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library)
     return 0
 

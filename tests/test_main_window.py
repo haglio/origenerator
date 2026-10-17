@@ -17,7 +17,7 @@ from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from shared_ui.preview import Preview
 
-from origenerator import app_link, gallery, recipe_match, ui_scale
+from origenerator import app_link, gallery, notice_toast, recipe_match, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -27,7 +27,7 @@ from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import desktop_notices, main_window
+from origenerator.gui import main_window
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
@@ -1400,8 +1400,8 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     # the notices, and Windows shows it wherever the user has got to.
     win = _window(qtbot, tmp_path)
     said = []
-    monkeypatch.setattr(desktop_notices, "show_toast",
-                        lambda app_id, xml: said.append(xml))
+    monkeypatch.setattr(notice_toast, "show",
+                        lambda app_id, xml, **_filing: said.append(xml))
 
     win._gallery_view._jobs.run_ended.emit(
         RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=252.0,

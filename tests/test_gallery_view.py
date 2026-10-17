@@ -504,10 +504,10 @@ def _collection_names(item):
     return names
 
 
-def _workflow_rows(tree, media=None):
+def _workflow_rows(tree, media=None, side=LANDSCAPE):
     """The workflow rows, which hang under the All row that tops the tree, by
     label — narrowed to one media type ("image"/"video") when ``media`` says so."""
-    all_row = _top_level(tree).get("All")
+    all_row = _top_level(tree, side).get("All")
     if all_row is None:
         return {}
     rows = _subs(all_row)
@@ -516,9 +516,9 @@ def _workflow_rows(tree, media=None):
     return {row.text(0): row for row in rows}
 
 
-def _image_workflow(tree):
+def _image_workflow(tree, side=LANDSCAPE):
     """The sole image workflow's row — where a one-recipe gallery starts."""
-    (row,) = _workflow_rows(tree, "image").values()
+    (row,) = _workflow_rows(tree, "image", side).values()
     return row
 
 
@@ -6091,9 +6091,9 @@ def _tile_kinds_in_order(view):
     return [type(layout.itemAt(index).widget()) for index in range(layout.count())]
 
 
-def _select_first_leaf(view):
+def _select_first_leaf(view, side=LANDSCAPE):
     # workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
-    leaf = _at(_image_workflow(view._tree), 0, 0, 0)
+    leaf = _at(_image_workflow(view._tree, side), 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
 
@@ -8181,6 +8181,22 @@ def test_a_run_the_slideshow_watched_becomes_the_file_it_lands_as(qtbot, monkeyp
     slideshow.close()
 
 
+def test_a_run_on_screen_when_it_lands_stays_on_screen_as_its_file(qtbot, monkeypatch):
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+    slideshow.step(1)
+
+    db.get_generation("i2").update(_image("i2", "a cat", 50, 2))
+    view._on_reroll_finished("some-key", "i2")
+
+    assert slideshow._playlist.current() == ("i2.png", "image", "i2", None)
+    slideshow.close()
+
+
 def test_a_run_that_stopped_being_made_leaves_the_open_slideshow(qtbot, monkeypatch):
     # Cancelled or failed: no file is coming, and the half-rendered frame it got
     # to would otherwise hold a place in the pass forever.
@@ -8428,9 +8444,9 @@ def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
 # --- re-roll preview mirrored into the info pane ----------------------------
 
 
-def _running_reroll(view):
+def _running_reroll(view, side=LANDSCAPE):
     """Start a re-roll and return (key, job) for the freshly launched job."""
-    key = _select_first_leaf(view)
+    key = _select_first_leaf(view, side)
     _reroll_tile(view).add_requested.emit()
     return key, view._live_jobs[key]
 
@@ -12715,8 +12731,7 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
 
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
     # Left/Right step through the folder: the slideshow is built from the visible
-    # items' media, in the browser's order, starting on the one already shown —
-    # and held at nought, so nothing moves until an arrow does.
+    # items' media, in the browser's order, starting on the one already shown.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())

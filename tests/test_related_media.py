@@ -109,6 +109,13 @@ def test_a_requested_row_points_at_the_item_it_was_asked_about(related):
     assert related._source_tile._prompt_id == "img1"
 
 
+def test_a_picture_a_folders_modify_made_points_at_the_one_it_was_modified_from(related):
+    related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [],
+                     request={"source_row": _image_row(), "heard": ""})
+
+    assert related._source_tile._heading.text() == "Modified from"
+
+
 def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
     image = _image_row()
     related = make_related(_video_row())

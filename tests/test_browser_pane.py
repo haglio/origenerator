@@ -25,7 +25,6 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
     FolderCollection,
 )
@@ -340,61 +339,61 @@ def test_a_folder_made_lately_keeps_its_new_tile_in_the_newest_section(qtbot):
     assert _shown_in_order(scroll) == [heading, "new", "g1"]
 
 
-def test_the_request_tile_stands_above_a_folders_sections_when_it_has_several(qtbot):
+def test_the_modify_tile_stands_above_a_folders_sections_when_it_has_several(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     first, second = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == ["request", first, "new", "g1", second, "g2"]
+    assert _shown_in_order(scroll) == ["modify", first, "new", "g1", second, "g2"]
 
 
-def test_a_now_section_counts_toward_putting_the_request_tile_above_the_sections(qtbot):
+def test_a_now_section_counts_toward_putting_the_modify_tile_above_the_sections(qtbot):
     rows = [_row("g1", 1, _ago(hours=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     [heading] = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == ["request", "Now", "new", heading, "g1"]
+    assert _shown_in_order(scroll) == ["modify", "Now", "new", heading, "g1"]
 
 
-def test_the_request_tile_stays_with_a_folders_only_section(qtbot):
+def test_the_modify_tile_stays_with_a_folders_only_section(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     [heading] = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == [heading, "new", "request", "g1"]
+    assert _shown_in_order(scroll) == [heading, "new", "modify", "g1"]
 
 
-def test_the_run_in_front_stands_after_the_request_tile_where_its_picture_will_land(qtbot):
+def test_the_run_in_front_stands_after_the_modify_tile_where_its_picture_will_land(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"),
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"),
                       generating=QLabel("generating"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     [heading] = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == [heading, "new", "request", "generating", "g1"]
+    assert _shown_in_order(scroll) == [heading, "new", "modify", "generating", "g1"]
 
 
-def test_the_run_in_front_stays_beside_the_plus_when_the_request_tile_stands_above(qtbot):
+def test_the_run_in_front_stays_beside_the_plus_when_the_modify_tile_stands_above(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"),
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"),
                       generating=QLabel("generating"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     first, second = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == ["request", first, "new", "generating", "g1",
+    assert _shown_in_order(scroll) == ["modify", first, "new", "generating", "g1",
                                        second, "g2"]
 
 
@@ -436,17 +435,6 @@ def test_the_experiments_collection_heads_each_batch_it_collected(qtbot):
 
     first, second = gallery.section_headings(rows)
     assert _shown_in_order(scroll) == [first, "e1", second, "e2"]
-
-
-def test_the_requests_collection_heads_each_batch_of_what_was_asked_for(qtbot):
-    rows = [_row("r1", 1, "2026-09-12 23:00:00"), _row("r2", 2, "2026-09-12 19:00:00")]
-    pane, scroll = _pane(qtbot, rows)
-    pane.set_model([], {}, [], [], [], request_items=[{"row": row} for row in rows])
-
-    pane.show_collection(REQUESTS_KEY)
-
-    first, second = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == [first, "r1", second, "r2"]
 
 
 def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot):
@@ -555,18 +543,6 @@ def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):
     assert pane.visible_prompt_ids() == ["b2"]
 
 
-def test_a_folders_requests_are_the_ones_that_landed_in_it(qtbot):
-    rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
-    tree = gallery.build_gallery_tree(rows)
-    pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [],
-                   request_items=[{"row": row} for row in rows])
-
-    pane.show_collection(FolderCollection(REQUESTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
-
-    assert pane.visible_prompt_ids() == ["a1"]
-
-
 def _failed(prompt_id, checkpoint, prompt):
     return {**_made_with(prompt_id, checkpoint, prompt=prompt), "status": "error",
             "output_files": None}
@@ -673,14 +649,13 @@ def test_each_folders_collection_counts_what_that_collection_lists(qtbot):
         leaf.favorite = leaf.rows[0]["prompt_id"] == "b2"
     deleted = [_made_with("a4", "alpha.safetensors"), _made_with("b4", "beta.safetensors")]
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, listed, [rows[1]], deleted,
-                   request_items=[{"row": rows[2]}, {"row": listed[4]}])
+    pane.set_model(rows, {LANDSCAPE: tree}, listed, [rows[1]], deleted)
 
     counts = pane.collection_counts(LANDSCAPE)
 
     assert counts[FolderCollection(TRASH_KEY, _models(tree)["alpha"].key).key] == 1
     for folder in _folders_of_folders(tree):
-        for collection in (FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY):
+        for collection in (FAVORITES_KEY, EXPERIMENTS_KEY, TRASH_KEY):
             key = FolderCollection(collection, folder).key
             listing = pane.rows_for_collection(oriented_key(key, LANDSCAPE))
             assert counts.get(key, 0) == len(listing), key

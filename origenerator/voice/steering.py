@@ -21,14 +21,6 @@ While one is open it swallows what it hears — which is exactly what keeps the
 words of a request from steering the prompt or matching a command — and each
 step of it is re-emitted as :attr:`VoiceSteering.request`.
 
-One thing outranks even that, and only while no request is open: an injected
-``bare_matcher``, the strict whole-utterance vocabulary
-(:mod:`origenerator.voice.app_commands`). A word that IS a command, whole and
-alone, is a command — which is what lets "requests" reach the Requests collection
-though "request" is the word a dictation opens on. Once one is open the
-dictation is back in front, because a command word said mid-sentence belongs to
-the sentence.
-
 """
 from __future__ import annotations
 
@@ -133,18 +125,12 @@ class VoiceSteering(QObject):
     def bare_command(self, text: str):
         """The whole-utterance command *text* is, or ``None`` — asked of a
         transcription the HOSTING session heard, the way :meth:`_meaning`
-        asks it of this app's own mic: first, and only while no request is
-        being said.  Without this the session's "enhanced only" reached the
-        looser picture matcher, which reads it as "enhance" with a word after
-        it and spends a generation on it.  Same lock as :meth:`push_dictation`,
-        for the same reason.
+        asks it of this app's own mic: once the request has passed on it, and
+        before the looser matchers.  Without this the session's "enhanced only"
+        reached the looser picture matcher, which reads it as "enhance" with a
+        word after it and spends a generation on it.
         """
-        if self._bare_matcher is None:
-            return None
-        with self._lock:
-            if self._dictation is not None and self._dictation.listening:
-                return None
-            return self._bare_matcher(text)
+        return self._bare_matcher(text) if self._bare_matcher is not None else None
 
     def push_dictation(self, text: str):
         """Feed the open request one transcription heard somewhere else, and
@@ -187,26 +173,21 @@ class VoiceSteering(QObject):
     def _meaning(self, text: str):
         """What one transcription meant, or ``None`` to let it steer the prompt.
 
-        An utterance that is nothing but a command word is that command, so long
-        as no request is already being said — that is the one thing ahead of the
-        dictation, and it is what keeps a collection named by the dictation's own
-        opening word reachable. Then the open dictation, which has first refusal
-        over everything else because it is collecting a sentence and half of one
-        landing in the prompt would be worse than either use alone. Then the
-        general command matcher, which only answers while a surface is listening
-        for commands.
+        The dictation first, which has first refusal because it is collecting a
+        sentence and half of one landing in the prompt would be worse than
+        either use alone. Then, while a surface is listening for commands, the
+        whole-utterance vocabulary and after it the general command matcher.
         """
         with self._lock:
-            collecting = self._dictation is not None and self._dictation.listening
-            if not collecting and self._listening_for_commands():
-                bare = self._bare_matcher(text) if self._bare_matcher is not None else None
-                if bare is not None:
-                    return bare
             spoken = self._dictation.push(text) if self._dictation is not None else None
         if spoken is not None:
             return spoken
-        if self._listening_for_commands() and self._matcher is not None:
-            return self._matcher(text)
+        if not self._listening_for_commands():
+            return None
+        for matcher in (self._bare_matcher, self._matcher):
+            matched = matcher(text) if matcher is not None else None
+            if matched is not None:
+                return matched
         return None
 
     def _listening_for_commands(self) -> bool:

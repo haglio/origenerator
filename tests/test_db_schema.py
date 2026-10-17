@@ -103,6 +103,7 @@ SCHEMA = {
         ("new_positive", "TEXT", 0, None, 0),
         ("new_negative", "TEXT", 0, None, 0),
         ("created_at", "TEXT", 1, "datetime('now')", 0),
+        ("asked", "TEXT", 0, None, 0),
     ),
     "seed_uses": (
         ("id", "INTEGER", 0, None, 1),

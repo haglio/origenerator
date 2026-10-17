@@ -71,7 +71,6 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.labels import workflow_label
@@ -82,7 +81,6 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     combine_controller,
     corner_controls,
-    diff_text,
     icons,
     off_thread,
     omnipause,
@@ -94,14 +92,13 @@ from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
-from origenerator.gui.folder_request_tile import FolderRequestTile
+from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE, _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.hud_queue import queue_section
-from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
@@ -317,7 +314,7 @@ class FakeDB:
     def forget_deletion(self, prompt_id):
         self._deletions.pop(prompt_id, None)
 
-    # --- spoken requests (what the Requests collection lists) --------------
+    # --- spoken requests, and the folder-wide one typed on a tab -----------
 
     def record_request(self, *, prompt_id, source_prompt_id, heard, **fields):
         self._requests[prompt_id] = {
@@ -491,7 +488,7 @@ def _at(item, *path):
     return item
 
 
-_COLLECTION_NAMES = ["Latest", "Favorites", "Experiments", "Requests", "Trash"]
+_COLLECTION_NAMES = ["Latest", "Favorites", "Experiments", "Trash"]
 
 
 def _collection_names(item):
@@ -6251,8 +6248,8 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
 
     assert not _reroll_tile(view).isEnabled()
     kinds = _tile_kinds_in_order(view)
-    assert kinds.index(FolderRequestTile) == kinds.index(RerollTile) + 1
-    assert kinds.index(GeneratingTile) == kinds.index(FolderRequestTile) + 1
+    assert kinds.index(FolderModifyTile) == kinds.index(RerollTile) + 1
+    assert kinds.index(GeneratingTile) == kinds.index(FolderModifyTile) + 1
 
 
 def _press_at(qtbot, view, spot):
@@ -6295,11 +6292,11 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
-# --- the folder-wide request: same seeds, changed words ---------------------
+# --- Modify (all seeds): same seeds, changed words --------------------------
 
 
 def _request_card(view):
-    cards = view._scroll.widget().findChildren(FolderRequestTile)
+    cards = view._scroll.widget().findChildren(FolderModifyTile)
     return cards[0] if cards else None
 
 
@@ -6328,7 +6325,7 @@ def _rewritten(view, key, prompt="a dog on a couch"):
     """Press a rewrite of the folder ``key`` names, saying ``prompt`` instead."""
     params = dict(_SDXL.default_params(), seed=7, positive_prompt=prompt,
                   negative_prompt="blurry")
-    view._on_changes_requested(key, "sdxl_t2i", params)
+    view._on_modify_requested(key, "sdxl_t2i", params)
 
 
 def test_a_folder_offers_a_request_card_beside_its_reroll_tile(qtbot, tmp_path):
@@ -6364,7 +6361,7 @@ def test_the_card_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
     _request_card(view).clicked.emit()
 
     panel = view._info_tabs.current_config_panel()
-    assert panel._folder_request.folder_key == key
+    assert panel._folder_modify.folder_key == key
     assert panel._preview._stack.currentWidget() is panel._preview._sheet
     client.submit_job.assert_not_called()  # an edit to make, not a run to start
 
@@ -9789,7 +9786,8 @@ def test_a_job_a_spoken_request_queued_says_so(qtbot):
     # hardest to recognize later in the line.
     db = FakeDB([_image("src", "a kite", 50, 1)])
     db.add(_running_row("asked", prompt="a kite, no string"))
-    db.record_request(prompt_id="asked", source_prompt_id="src", heard="no string")
+    db.record_request(prompt_id="asked", source_prompt_id="src",
+                      heard="Request, no string, over.")
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -10313,6 +10311,36 @@ def test_combining_a_pair_already_made_makes_another_video(qtbot, tmp_path):
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "wan22_i2v"
     assert job.params["noise_seed"] != made["noise_seed"]
+
+
+def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("orig")
+    panel = view._info_tabs.current_config_panel()
+    panel._param_form.request_field()._words.setText("two cats")
+
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
+
+    (job,) = view._live_jobs.values()
+    record = db.get_request(job.prompt_id)
+    assert (record["asked"], record["heard"], record["source_prompt_id"]) == ("two cats", "", "orig")
+    assert (record["old_positive"], record["new_positive"]) == ("a cat", "two cats")
+
+
+def test_a_run_generated_with_no_request_records_none(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("orig")
+
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "a dog"}])
+
+    (job,) = view._live_jobs.values()
+    assert db.get_request(job.prompt_id) is None
 
 
 def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_path):
@@ -14692,14 +14720,6 @@ def _finish_reroll(view, job):
     view.refresh()
 
 
-def test_the_tree_carries_a_requests_collection(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    assert "Requests" in _alls(view._tree)
-
-
 def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
@@ -14725,6 +14745,14 @@ def test_a_finished_request_queues_the_revision_with_the_same_seed(
     assert job.params["negative_prompt"] == "blurry"
 
 
+def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    assert view._slideshows.showing._note.text() == "🎤 Request submitted"
+
+
 def test_a_request_for_something_absent_goes_to_the_negative_prompt(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt="a woman, soft light")
@@ -14747,6 +14775,15 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
     assert record["heard"] == "Request, no hat, over."
     assert record["old_positive"] == "a woman, a hat, soft light"
     assert record["new_positive"] == "a woman, soft light"
+
+
+def test_a_queued_request_keeps_its_words_without_the_markers(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    assert view._db.get_request(job.prompt_id)["asked"] == "no hat"
 
 
 def test_a_queued_request_is_logged_by_the_pictures_it_joins_never_by_its_words(
@@ -14776,43 +14813,6 @@ def test_the_request_lands_on_the_slide_it_was_opened_over(
 
     (job,) = view._live_jobs.values()
     assert view._db.get_request(job.prompt_id)["source_prompt_id"] == "orig"
-
-
-def test_the_requests_collection_lists_what_was_asked_for_as_ordinary_tiles(
-        qtbot, tmp_path, monkeypatch):
-    # An item a request made is an ordinary generation that happens to have been
-    # asked for out loud, so it gets the tile every other collection gives one.
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
-    view._slideshows.showing.close()
-    (job,) = view._live_jobs.values()
-    _finish_reroll(view, job)
-
-    view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
-
-    assert view.visible_prompt_ids() == [job.prompt_id]
-    assert view._scroll.widget().findChildren(ThumbnailWidget)
-
-
-def test_a_request_still_generating_shows_as_a_live_card(
-        qtbot, tmp_path, monkeypatch):
-    # What "did it queue?" is answered by: the same in-flight card the Recents
-    # collection gives work that is still in flight.
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
-    view._slideshows.showing.close()
-
-    view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
-
-    assert view._scroll.widget().findChildren(InFlightCard)
-
-
-def test_the_collection_row_counts_what_is_waiting(qtbot, tmp_path, monkeypatch):
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-
-    _speak_request(view, qtbot, "Request, no hat, over.")
-
-    assert _shown(_alls(view._tree)["Requests"]) == "(1) Requests"
 
 
 def test_a_request_that_never_hears_over_says_so_and_resumes(
@@ -14866,7 +14866,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
     assert panel._related._source_tile._prompt_id == "orig"
 
 
-def test_a_request_item_marks_its_change_in_the_prompt_field(
+def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
@@ -14876,11 +14876,8 @@ def test_a_request_item_marks_its_change_in_the_prompt_field(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    field = view._info_tabs.current_config_panel()._param_form._widgets["positive_prompt"]
-    # The field shows what went as well as what stayed…
-    assert "a hat" in field.toPlainText()
-    # …while its value is the prompt that would actually generate.
-    assert diff_text.live_text(field) == "a woman, soft light"
+    field = view._info_tabs.current_config_panel()._param_form.request_field()
+    assert field._words.text() == "no hat"
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(
@@ -15429,20 +15426,6 @@ def test_a_spoken_collection_name_stands_you_in_that_collection(qtbot, tmp_path,
     view._voice.listener.speak(said)
 
     assert _selected_folder(view) == key
-
-
-def test_the_requests_collection_answers_the_plural_and_the_singular_still_dictates(
-        qtbot, tmp_path):
-    # "request" opens a spoken request and "requests" is a collection; one word
-    # cannot do both, so the plural navigates and the singular still opens.
-    view = _listening(qtbot, tmp_path)
-
-    view._voice.listener.speak("requests")
-    assert _selected_folder(view) == REQUESTS_KEY
-    assert not view._voice.listener._dictation.listening   # no request opened
-
-    view._voice.listener.speak("Request.")
-    assert view._voice.listener._dictation.listening       # the singular still opens one
 
 
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(

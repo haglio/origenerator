@@ -164,12 +164,12 @@ class Database:
                        term: str | None = None, polarity: str | None = None,
                        action: str | None = None, old_positive: str = "",
                        old_negative: str = "", new_positive: str = "",
-                       new_negative: str = ""):
+                       new_negative: str = "", asked: str | None = None):
         return self.requests.record_request(
             prompt_id=prompt_id, source_prompt_id=source_prompt_id, heard=heard,
             term=term, polarity=polarity, action=action,
             old_positive=old_positive, old_negative=old_negative,
-            new_positive=new_positive, new_negative=new_negative)
+            new_positive=new_positive, new_negative=new_negative, asked=asked)
 
     def list_requests(self) -> list[dict]:
         return self.requests.list_requests()

@@ -75,7 +75,7 @@ class InfoPaneTabs(QTabWidget):
     generate_requested = pyqtSignal(str, list)  # any tab's Generate: (workflow_name, each one's params)
     # A rewrite tab's Generate: (source folder key, workflow_name, params) — one
     # run per picture in that folder rather than one run of these settings.
-    changes_requested = pyqtSignal(str, str, dict)
+    modify_requested = pyqtSignal(str, str, dict)
     # A tab's "Go to folder": the key of the folder its settings have been
     # generating into. The tab names it; the gallery, which owns the tree, goes.
     folder_requested = pyqtSignal(str)
@@ -180,7 +180,7 @@ class InfoPaneTabs(QTabWidget):
         panel.generate_requested.connect(  # relay every tab's Generate
             lambda name, batch, p=panel: self._on_panel_generate(p, name, batch)
         )
-        panel.changes_requested.connect(  # ...and a rewrite tab's, which asks for more
+        panel.modify_requested.connect(  # ...and a rewrite tab's, which asks for more
             lambda key, name, params, p=panel: self._on_panel_changes(p, key, name, params)
         )
         self.setCurrentIndex(index)
@@ -424,7 +424,7 @@ class InfoPaneTabs(QTabWidget):
         launched tab is kept: the runs are its, and a later click replacing it
         would take their Cancel and their progress away mid-batch."""
         self._pin_panel(panel)
-        self.changes_requested.emit(folder_key, workflow_name, params)
+        self.modify_requested.emit(folder_key, workflow_name, params)
 
     def tabInserted(self, index: int):  # Qt hook: every add path lands here
         super().tabInserted(index)
@@ -460,10 +460,10 @@ class InfoPaneTabs(QTabWidget):
         self.setCurrentWidget(panel)
         return panel
 
-    def open_folder_request(self, folder_key: str, label: str, workflow_name: str,
+    def open_folder_modify(self, folder_key: str, label: str, workflow_name: str,
                       params: dict, pictures: list) -> GenerateConfigPanel | None:
         """Open a folder's prompt rewrite in a tab (see
-        :meth:`GenerateConfigPanel.open_folder_request`).
+        :meth:`GenerateConfigPanel.open_folder_modify`).
 
         Lands where an open lands, then keeps the tab upright: a rewrite is
         something being written, not a generation being looked at, so the next
@@ -474,7 +474,7 @@ class InfoPaneTabs(QTabWidget):
         if self._client is None:
             return None
         panel = self._landing_panel()
-        panel.open_folder_request(folder_key, label, workflow_name, params, pictures)
+        panel.open_folder_modify(folder_key, label, workflow_name, params, pictures)
         self._pin_panel(panel)
         self.setCurrentWidget(panel)
         return panel

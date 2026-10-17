@@ -20,12 +20,14 @@ from origenerator.prompt_edit import (
     PUSHED,
     RAISED,
     REMOVE,
+    REWRITTEN,
     apply_request,
     build_match_messages,
     parse_match,
     parse_request,
     smart_match,
 )
+from origenerator.workflows.base import story_of
 
 # --- reading the request ----------------------------------------------------
 
@@ -88,7 +90,6 @@ def test_against_something_already_excluded_leans_on_it_harder():
                              "no silver earrings")
 
     assert revision.negative == "blurry, (silver earrings:1.1)"
-    assert revision.weight == pytest.approx(1.1)
     assert revision.action == PUSHED
 
 
@@ -96,7 +97,6 @@ def test_a_second_push_climbs_from_the_weight_already_there():
     revision = apply_request("a woman", "(freckles:1.2)", "no freckles")
 
     assert revision.negative == "(freckles:1.3)"
-    assert revision.weight == pytest.approx(1.3)
 
 
 def test_for_something_already_wanted_raises_its_weight():
@@ -111,6 +111,76 @@ def test_for_something_in_neither_prompt_adds_it():
 
     assert revision.positive == "a woman, soft light, freckles"
     assert revision.action == ADDED
+
+
+def test_something_in_neither_prompt_is_worked_into_the_whole_prompt_by_the_rewrite():
+    # "two women" over a prompt describing one woman: appended, the prompt would
+    # ask for both at once, so the local model rewrites what the words contradict.
+    asked = []
+
+    def rewrite(positive, negative, words):
+        asked.append((positive, negative, words))
+        return "two women on a couch", "blurry"
+
+    revision = apply_request("a woman on a couch", "blurry", "two women", rewrite=rewrite)
+
+    assert asked == [("a woman on a couch", "blurry", "two women")]
+    assert (revision.positive, revision.negative) == ("two women on a couch", "blurry")
+    assert revision.action == REWRITTEN
+    assert revision.changed
+
+
+def test_a_rewrite_that_fails_leaves_the_words_appended(caplog):
+    def rewrite(positive, negative, words):
+        raise OSError("the model is down")
+
+    with caplog.at_level(logging.WARNING):
+        revision = apply_request("a woman, soft light", "blurry", "freckles", rewrite=rewrite)
+
+    assert revision.positive == "a woman, soft light, freckles"
+    assert revision.action == ADDED
+
+
+def test_a_term_inside_a_longer_phrase_is_cut_out_of_it_by_the_rewrite():
+    # Dropped whole, "a woman wearing a straw hat" would take the woman with it.
+    asked = []
+
+    def rewrite(positive, negative, words):
+        asked.append(words)
+        return "a woman, freckles", "hat"
+
+    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat",
+                             rewrite=rewrite)
+
+    assert asked == ["no hat"]
+    assert (revision.positive, revision.negative) == ("a woman, freckles", "hat")
+
+
+def test_a_rewrite_that_changes_nothing_leaves_the_rules_own_edit():
+    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat",
+                             rewrite=lambda positive, negative, words: (positive, negative))
+
+    assert revision.positive == "freckles"
+    assert revision.action == DROPPED
+
+
+def test_a_phrase_that_is_the_whole_term_is_dropped_by_the_rules_alone():
+    def rewrite(positive, negative, words):
+        raise AssertionError("not asked")
+
+    revision = apply_request("a woman, freckles, beach", "", "no freckles", rewrite=rewrite)
+
+    assert revision.positive == "a woman, beach"
+    assert revision.action == DROPPED
+
+
+def test_an_edit_the_rules_are_sure_of_never_asks_the_rewrite():
+    def rewrite(positive, negative, words):
+        raise AssertionError("not asked")
+
+    revision = apply_request("a woman", "blurry, freckles", "more freckles", rewrite=rewrite)
+
+    assert revision.action == ALLOWED
 
 
 def test_for_something_being_excluded_stops_excluding_it():
@@ -156,7 +226,7 @@ def test_a_request_naming_nothing_yields_no_revision():
 
 
 def test_a_revision_carries_the_prompts_it_started_from():
-    # What the Requests collection diffs against, so the record stands alone.
+    # What the tab marks the prompt's change against, so the record stands alone.
     revision = apply_request("a woman, freckles", "blurry", "no freckles")
 
     assert revision.old_positive == "a woman, freckles"
@@ -164,9 +234,50 @@ def test_a_revision_carries_the_prompts_it_started_from():
     assert revision.changed
 
 
-def test_the_revision_says_what_it_did():
-    revision = apply_request("a woman, freckles", "", "no freckles")
-    assert "freckles" in revision.describe()
+# --- a video told in scenes: the story is one prompt per scene ---------------
+
+
+def test_a_wish_for_something_new_reaches_every_scene_of_a_story():
+    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry",
+                             "more grass")
+
+    assert revision.positive == story_of(["a dog running, grass", "a dog asleep, grass"])
+
+
+def test_each_scene_answers_a_request_against_something_by_its_own_prompts():
+    revision = apply_request(story_of(["a woman, beach", "a woman, sea"]), "blurry",
+                             "no beach")
+
+    assert revision.positive == story_of(["a woman", "a woman, sea"])
+    assert revision.negative == story_of(["blurry", "blurry, beach"])
+
+
+def test_a_negative_every_scene_shares_stays_one_while_the_scenes_change_it_alike():
+    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry", "no hat")
+
+    assert revision.negative == "blurry, hat"
+
+
+def test_a_storys_revision_names_each_rule_its_scenes_used_once():
+    revision = apply_request(story_of(["a woman, beach", "a woman, sea", "beach, dusk"]),
+                             "blurry", "no beach")
+
+    assert revision.action == f"{DROPPED}, {EXCLUDED}"
+
+
+def test_the_model_rewrites_each_scene_from_that_scenes_own_prompts():
+    asked = []
+
+    def rewrite(positive, negative, words):
+        asked.append((positive, negative, words))
+        return f"two of {positive}", negative
+
+    revision = apply_request(story_of(["a man reading", "a man asleep"]), "blurry",
+                             "two men", rewrite=rewrite)
+
+    assert asked == [("a man reading", "blurry", "two men"),
+                     ("a man asleep", "blurry", "two men")]
+    assert revision.positive == story_of(["two of a man reading", "two of a man asleep"])
 
 
 # --- catching a term the prompt names in its own words ----------------------
@@ -214,6 +325,17 @@ def test_a_matcher_that_finds_nothing_leaves_the_words_to_stand_alone():
 
     assert revision.negative == "blurry, earrings"
     assert revision.action == EXCLUDED
+
+
+def test_only_what_to_take_out_of_the_prompt_is_looked_for_by_meaning():
+    # Asked which of "blurry" meant "two women", a model once answered blurry,
+    # and the negative prompt lost it. A wish for something is only ever read
+    # in the words themselves.
+    revision = apply_request("a woman on a couch", "blurry", "two women",
+                             match=lambda terms, term: 0)
+
+    assert revision.negative == "blurry"
+    assert revision.action == ADDED
 
 
 def test_a_matcher_answering_out_of_range_is_ignored():

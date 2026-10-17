@@ -172,6 +172,23 @@ class RequestDictation:
         return SpokenRequest(COMPLETED, body.strip(), heard)
 
 
+def request_words(heard: str) -> str:
+    """The request a transcript of it asked for: everything heard between the
+    opening word and "over"."""
+    return _strip_trailing_word(_strip_leading_word(heard)).strip()
+
+
+def words_of(record: dict | None) -> str:
+    """What a recorded request asked for in its own words, or "" for a folder's
+    Modify, which said what it wanted by rewriting the prompt instead. A record
+    from before the words were kept reads them back out of what was heard."""
+    if not record:
+        return ""
+    if record.get("asked") is not None:
+        return record["asked"]
+    return request_words(record.get("heard") or "")
+
+
 def request_bias() -> str:
     """The request markers as whisper's initial prompt.
 

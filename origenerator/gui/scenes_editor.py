@@ -48,7 +48,13 @@ from origenerator.gui.icons import tab_close_icon
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
-from origenerator.workflows.base import ParamDef, chained_frames, scene_prompts, story_of
+from origenerator.workflows.base import (
+    ParamDef,
+    chained_frames,
+    scene_prompts,
+    scene_text,
+    story_of,
+)
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 
 LINES_PLACEHOLDER = "What she says in this scene, spoken in the voice set under Audio"
@@ -280,7 +286,7 @@ class ScenesEditor(QWidget):
             self._resize_to(len(texts))
         for index, field in enumerate(self.fields(key)):
             diff_text.forget(field)
-            field.setPlainText(texts[min(index, len(texts) - 1)])
+            field.setPlainText(scene_text(texts, index))
 
     def scene_frames(self) -> list[int]:
         return [scene.frames() for scene in self._scenes]

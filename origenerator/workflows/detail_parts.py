@@ -40,6 +40,10 @@ from origenerator.workflows.model_files import list_detector_files
 # that part switched off uses it. Bold enough to actually re-form the part,
 # which is the whole point of a pass that touches nothing outside what it found.
 DEFAULT_FIX_DENOISE = 0.45
+# How much harder a part is fixed each time a fix of it is asked for again, and
+# the hardest a fix goes.
+FIX_STEP = 0.1
+FIX_MAX = 1.0
 
 
 @dataclass(frozen=True)

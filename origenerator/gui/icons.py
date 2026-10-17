@@ -56,7 +56,6 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.groups import SettingsGroup, folder_level
@@ -254,7 +253,7 @@ def flask_icon() -> QIcon:
 def collection_icon(collection: str) -> QIcon:
     return {
         RECENTS_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
-        EXPERIMENTS_KEY: flask_icon, REQUESTS_KEY: mic_icon, TRASH_KEY: trash_icon,
+        EXPERIMENTS_KEY: flask_icon, TRASH_KEY: trash_icon,
     }[collection]()
 
 

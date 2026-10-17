@@ -17,6 +17,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_SUBTLE
 
+from origenerator.gui.link_heading import link_heading
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.media import MediaType
 
@@ -45,8 +46,7 @@ class SourceImageTile(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(4)
-        self._heading = QLabel(_DEFAULT_HEADING)
-        self._heading.setStyleSheet("font-weight: 600;")
+        self._heading = link_heading(_DEFAULT_HEADING)
         column.addWidget(self._heading)
 
         self._thumb = QLabel()

@@ -34,8 +34,6 @@ from origenerator.gallery.collection import (
     FAVORITES_LABEL,
     RECENTS_KEY,
     RECENTS_LABEL,
-    REQUESTS_KEY,
-    REQUESTS_LABEL,
     TRASH_KEY,
     TRASH_LABEL,
 )
@@ -58,7 +56,6 @@ COLLECTION_KEYS: dict[str, str] = {
     RECENTS_LABEL.lower(): RECENTS_KEY,
     FAVORITES_LABEL.lower(): FAVORITES_KEY,
     EXPERIMENTS_LABEL.lower(): EXPERIMENTS_KEY,
-    REQUESTS_LABEL.lower(): REQUESTS_KEY,
     TRASH_LABEL.lower(): TRASH_KEY,
 }
 

@@ -142,6 +142,10 @@ def scene_prompts(text: str) -> list[str]:
     return scenes
 
 
+def scene_text(texts: list[str], scene: int) -> str:
+    return texts[min(scene, len(texts) - 1)]
+
+
 class ParamType(StrEnum):
     STR = "str"
     INT = "int"
@@ -374,7 +378,7 @@ class WorkflowTemplate(ABC):
         without a break is one scene, so every segment shares the node the
         graph always had; a scene past the last text carries the last text on.
         """
-        text = scenes[min(scene, len(scenes) - 1)]
+        text = scene_text(scenes, scene)
         if index == 0 or text == scenes[0]:
             return {}, first_ref
         node_id = f"s{index}_{role}"

@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import contextmanager
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QFormLayout,
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
 
-from origenerator import evolver_export
+from origenerator import evolver_export, prompt_edit
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
@@ -58,7 +58,7 @@ from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
 from origenerator.gui.export_lane import EXPORT_LANES
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_request import FolderRequest
+from origenerator.gui.folder_modify import FolderModify
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyPicker
 from origenerator.gui.inflight import (
@@ -73,6 +73,7 @@ from origenerator.gui.param_form import ParamForm
 from origenerator.gui.picture_state_picker import PictureStatePicker
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
+from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
@@ -80,6 +81,7 @@ from origenerator.picture_states import state_names
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
 from origenerator.timing import estimate_label
+from origenerator.voice.dictation import words_of
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -110,13 +112,26 @@ _MODIFIED_NOTICE = "(not yet generated with modifications)"
 # where the gallery has nothing more specific to say about the wait.
 _WAITING_NOTE = "Waiting for preview…"
 
-# What a tab opened on a folder-wide request says on its Generate and above
+# What a tab opened on a folder's Modify (all seeds) says on its Generate and above
 # its tabs. The count is in the hover rather than on the face: the press does
 # submit that many runs at once, which is worth being able to read, but what
 # the button asks for is one thing — this folder, said the way it now reads.
-_REQUEST_GUARD = "Rewrite the prompt first"
+_MODIFY_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
+
+
+@dataclass(frozen=True)
+class _RequestAim:
+    """What the Request section asks its changes of: the picture on display, the
+    words that made it when a request did, the prompt pair those words were asked
+    of, the picture's own pair, and the picture a request made here is about."""
+
+    prompt_id: str
+    words: str
+    asked_of: tuple[str, str]
+    shown: tuple[str, str]
+    source_prompt_id: str
 
 
 def _nothing_to_start_from(missing_images: list[str]) -> str:
@@ -160,7 +175,7 @@ class GenerateConfigPanel(QWidget):
     # Generate clicked on a folder rewrite: (source folder key, workflow_name, form
     # params). A separate signal because it asks for something else entirely — one
     # run per picture in that folder, each keeping its own seed.
-    changes_requested = pyqtSignal(str, str, dict)
+    modify_requested = pyqtSignal(str, str, dict)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     how_many_chosen = pyqtSignal(int)
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
@@ -214,7 +229,7 @@ class GenerateConfigPanel(QWidget):
         # configuration: the folder being rewritten, what to call it, how many
         # pictures the press will run, and the settings it opened on — which is
         # what says whether anything has actually been rewritten yet.
-        self._folder_request: FolderRequest | None = None
+        self._folder_modify: FolderModify | None = None
         # Where this tab's settings came from, when the Combine panel opened them
         # here: the act picked in its dropdown and the video whose recipe they
         # are, as (category, video_prompt_id). Carried so a run launched from this
@@ -242,6 +257,10 @@ class GenerateConfigPanel(QWidget):
         self._fresh_form = False
         self._form_checkpoint = None
         self._autoshow_held = False   # see _point_elsewhere
+        self._request_aim: _RequestAim | None = None
+        self._asked = 0  # how many times the Request has been edited, so a late answer can tell
+        self._rewriter = RevisionWorker(prompt_edit.work_out, parent=self)
+        self._rewriter.revised.connect(self._on_rewritten)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
         self._go_to_folder.setVisible(False)  # until the gallery says there is a folder
@@ -559,7 +578,7 @@ class GenerateConfigPanel(QWidget):
         # the workflow and the form is rebuilt from scratch — the tracked prompt
         # fields with it — so what is left is an ordinary config, not a rewrite
         # of anything.
-        self._end_folder_request()
+        self._end_folder_modify()
         self._fresh_form = False
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
@@ -681,6 +700,8 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self.refresh_generate_caption)
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
+        if form.request_field() is not None:
+            form.request_field().asked.connect(self._on_request_asked)
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
@@ -720,10 +741,10 @@ class GenerateConfigPanel(QWidget):
 
     def _apply_generate_caption(self):
         """Say on the button what a press will do, and why, or leave it plain."""
-        self._generate_pair.offer_how_many(self._folder_request is None)
-        if self._folder_request is not None:
-            self._generate_btn.set_caption(self._folder_request.caption())
-            self._generate_btn.setToolTip(self._folder_request.tooltip())
+        self._generate_pair.offer_how_many(self._folder_modify is None)
+        if self._folder_modify is not None:
+            self._generate_btn.set_caption(self._folder_modify.caption())
+            self._generate_btn.setToolTip(self._folder_modify.tooltip())
             return
         wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
         config = self.current_config()
@@ -754,14 +775,14 @@ class GenerateConfigPanel(QWidget):
         if key not in WORKFLOW_REGISTRY:
             return
         params = self._param_form.get_values()
-        if self._folder_request is not None:
+        if self._folder_modify is not None:
             # A request that asked for nothing would re-run every seed in the
             # folder to re-create the folder, so the press says what it still
             # needs rather than filling the queue with copies.
-            if self._folder_request.is_unchanged(self.current_config()):
-                self._generate_btn.flash_guard(_REQUEST_GUARD)
+            if self._folder_modify.is_unchanged(self.current_config()):
+                self._generate_btn.flash_guard(_MODIFY_GUARD)
                 return
-            self.changes_requested.emit(self._folder_request.folder_key, key, params)
+            self.modify_requested.emit(self._folder_modify.folder_key, key, params)
             return
         if self._would_remake_what_it_shows():
             self.use_random_seed()
@@ -1039,8 +1060,8 @@ class GenerateConfigPanel(QWidget):
         Named after what it is showing rather than after its settings, so the row
         of tabs reads as the things you have open.
         """
-        if self._folder_request is not None:
-            return self._folder_request.title()
+        if self._folder_modify is not None:
+            return self._folder_modify.title()
         name = item_label(self._displayed_row)
         if not name:
             key = self.workflow_and_signature()
@@ -1066,7 +1087,7 @@ class GenerateConfigPanel(QWidget):
     def prefill(self, workflow_name: str, params: dict):
         # Seeding the form with one configuration is the end of any folder-wide
         # rewrite this tab was holding: the prompts it lands are a recipe to run,
-        # not a change to a folder's. (:meth:`open_folder_request` prefills first and
+        # not a change to a folder's. (:meth:`open_folder_modify` prefills first and
         # arms the rewrite afterwards, so it is not undoing itself.) It is the end
         # of following a run, too: the next frame would land over the picture
         # these settings just put up. (A tab pointed at a run is re-seeded first
@@ -1077,7 +1098,7 @@ class GenerateConfigPanel(QWidget):
         # not a tab someone has worked in.
         with self._loading():
             self._fresh_form = False
-            self._end_folder_request()
+            self._end_folder_modify()
             self._forget_watch()
             # Switch to the matching workflow. A registered workflow the picker
             # normally hides (machinery, selectable False) is added on demand, so
@@ -1092,6 +1113,7 @@ class GenerateConfigPanel(QWidget):
             if index >= 0:
                 self._workflow_combo.setCurrentIndex(index)
             if self._param_form:
+                self._param_form.clear_prompt_rewrites()
                 self._param_form.set_values(params)
             # Now that the settings match a real folder, show its newest result (the
             # workflow may not have changed above, so this doesn't ride on that signal).
@@ -1112,7 +1134,7 @@ class GenerateConfigPanel(QWidget):
 
     # --- rewriting a whole folder's prompt ------------------------------------
 
-    def open_folder_request(self, folder_key: str, label: str, workflow_name: str,
+    def open_folder_modify(self, folder_key: str, label: str, workflow_name: str,
                       params: dict, pictures: list) -> None:
         """Open this tab as a rewrite of one folder's prompt.
 
@@ -1124,7 +1146,7 @@ class GenerateConfigPanel(QWidget):
         it, so the count in the hover is of images rather than of readable files.
         """
         self.prefill(workflow_name, params)  # ends any rewrite already here
-        self._folder_request = FolderRequest(
+        self._folder_modify = FolderModify(
             folder_key=folder_key, label=label, count=len(pictures),
             # What the tab opened on, so a press can tell a rewrite from a
             # re-run of the folder it was rewriting.
@@ -1140,16 +1162,16 @@ class GenerateConfigPanel(QWidget):
         self._apply_generate_caption()
         self._emit_title()
 
-    def _end_folder_request(self) -> None:
+    def _end_folder_modify(self) -> None:
         """Stop this tab being a folder rewrite, leaving an ordinary config.
 
         The prompt fields go back to plain inputs holding the prompts they show —
         a marked-up field left over would go on measuring edits against a
         folder the tab is no longer about, and would keep its undo switched off.
         """
-        if self._folder_request is None:
+        if self._folder_modify is None:
             return
-        self._folder_request = None
+        self._folder_modify = None
         if self._param_form is not None:
             self._param_form.clear_prompt_rewrites()
         self._apply_generate_caption()
@@ -1183,7 +1205,7 @@ class GenerateConfigPanel(QWidget):
         self._hide_footer()
         self._preview.clear()          # whatever was up is not this run's
         self._set_displayed_row(None)  # a running generation isn't a saved one
-        self._displayed_config = None  # ...so no settings for a notice to deviate from
+        self._note_displayed_config()  # ...so no settings for a notice to deviate from
         self._emit_title()
 
     def _point_elsewhere(self, row: dict):
@@ -1199,7 +1221,7 @@ class GenerateConfigPanel(QWidget):
         self.forget_launched()
         self._forget_watch()
         self._forget_recipe_source()
-        self._end_folder_request()  # a workflow this app can't rebuild never reaches prefill
+        self._end_folder_modify()  # a workflow this app can't rebuild never reaches prefill
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
             self._autoshow_held = True
@@ -1218,7 +1240,7 @@ class GenerateConfigPanel(QWidget):
         A tab holding a folder rewrite takes none of it: its batch lands a picture
         at a time, and each would swap the wall of pictures for the last to finish.
         """
-        if self._folder_request is not None:
+        if self._folder_modify is not None:
             return
         self._display_result(row, image_rows, made_with=merge_denormalized(row))
 
@@ -1408,7 +1430,79 @@ class GenerateConfigPanel(QWidget):
         self._displayed_config = (
             self._item_config(made_with) if self._displayed_row is not None else None
         )
+        if self._param_form is not None:
+            with self._loading():  # marking the fields is no edit of them
+                if self._displayed_config is None:
+                    self._param_form.clear_prompt_rewrites()
+                else:
+                    self._param_form.track_prompt_rewrites(self._displayed_config.params)
+            self._aim_the_request()
         self.refresh_modified_notice()
+
+    # --- the Request section: words the picture on display is asked to change by
+
+    def _aim_the_request(self) -> None:
+        """Point the Request section at the picture on display: the words a
+        request made it with, ready to be edited, or nothing for one nobody asked
+        for -- and nothing to ask of at all with no picture up."""
+        field = self._param_form.request_field()
+        if field is None:
+            return
+        row, config = self._displayed_row, self._displayed_config
+        if row is None or config is None:
+            self._request_aim = None
+            field.set_available(False)
+            return
+        shown = (config.params.get("positive_prompt") or "",
+                 config.params.get("negative_prompt") or "")
+        record = self._db.get_request(row["prompt_id"])
+        words = words_of(record)
+        self._request_aim = _RequestAim(
+            prompt_id=row["prompt_id"], words=words,
+            asked_of=((record.get("old_positive") or "", record.get("old_negative") or "")
+                      if words else shown),
+            shown=shown,
+            source_prompt_id=record["source_prompt_id"] if words else row["prompt_id"])
+        field.set_available(True)
+        field.show_words(words)
+
+    def asked(self) -> dict | None:
+        """The request this tab's Generate is making, for the gallery to record
+        beside each run it launches -- ``None`` while the Request is empty."""
+        field = self._param_form.request_field() if self._param_form is not None else None
+        aim = self._request_aim
+        if field is None or aim is None or not field.words():
+            return None
+        return {"asked": field.words(), "source_prompt_id": aim.source_prompt_id,
+                "old_positive": aim.asked_of[0], "old_negative": aim.asked_of[1]}
+
+    def _on_request_asked(self, words: str) -> None:
+        """Rewrite the prompts to say what the Request now asks, off the UI
+        thread, since that is a call to the local LLM. The words that made the
+        picture put its own prompts back, and no words put back the ones they
+        were asked of, neither of which needs asking anyone."""
+        aim = self._request_aim
+        if aim is None:
+            return
+        self._asked += 1
+        if words == aim.words or not words:
+            self._param_form.set_prompts(*(aim.shown if words == aim.words else aim.asked_of))
+            self._param_form.request_field().done()
+            return
+        QThreadPool.globalInstance().start(ReviseTask(
+            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words))
+
+    def _on_rewritten(self, context, revision) -> None:
+        asked, prompt_id = context
+        aim = self._request_aim
+        if asked != self._asked or aim is None or aim.prompt_id != prompt_id:
+            return  # the words, or the picture, have changed since it was asked
+        field = self._param_form.request_field()
+        if revision is None:
+            field.failed()
+            return
+        self._param_form.set_prompts(revision.positive, revision.negative)
+        field.done()
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:
         current = self.current_config()
@@ -1464,7 +1558,6 @@ class GenerateConfigPanel(QWidget):
         self._picture_state.show_row(row)
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()
-        self._show_request_diff(request)
         for lane in self._lanes.values():
             self._update_export_button(lane, preview)
 
@@ -1639,26 +1732,6 @@ class GenerateConfigPanel(QWidget):
                                      self._displayed_row["prompt_id"])
             self._arm_preview_actions()  # still the same generation, still actionable
             self.refresh_modified_notice()  # a version of the same generation, same notice
-
-    def _show_request_diff(self, request):
-        """Mark the prompt fields with what a spoken request changed — struck
-        through where words went, lit where they arrived.
-
-        In the fields themselves, because that is where the prompt is: a change
-        described anywhere else has to be carried back to the words it is about.
-        Nothing marked when this row wasn't asked for, so the fields clear as
-        the tab moves on to an ordinary generation.
-        """
-        if self._param_form is None:
-            return
-        self._param_form.clear_prompt_diffs()
-        if not request:
-            return
-        for key, before, after in (
-            ("positive_prompt", request.get("old_positive"), request.get("new_positive")),
-            ("negative_prompt", request.get("old_negative"), request.get("new_negative")),
-        ):
-            self._param_form.show_prompt_diff(key, before or "", after or "")
 
     def _video_rows(self) -> list[dict]:
         return self._library.now().video_rows

@@ -1,10 +1,9 @@
 """What else in the library a shown generation is tied to.
 
 Two links, stacked under a config tab's settings form: the item this row was
-built from, and the videos an image was animated into. They are mutually
-exclusive in practice — a video has a start frame and no animations, an image is
-the other way round — and both are hidden whenever the tab has no generation on
-display.
+built from, and the videos an image was animated into. A video has a start
+frame and no animations, an image the other way round, and both are hidden
+whenever the tab has no generation on display.
 
 "Built from" is one slot answering three relations, because they are one
 question: a video's start frame, the item a spoken request revised, and — for the
@@ -35,6 +34,7 @@ from origenerator.gallery import (
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.source_image_tile import SourceImageTile
 from origenerator.media import MediaType
+from origenerator.voice.dictation import words_of
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,8 @@ class RelatedMedia(QWidget):
                 return frame, None, MediaType.IMAGE
         if request is not None and request.get("source_row"):
             asked_about = request["source_row"]
-            return asked_about, "Requested from", media_type_of_row(asked_about)
+            heading = "Requested from" if words_of(request) else "Modified from"
+            return asked_about, heading, media_type_of_row(asked_about)
         return None, None, None
 
     def _animated_items(self, row: dict) -> list[tuple]:

@@ -348,8 +348,7 @@ class SlideshowDirector:
 
         ``media`` is the file the pane is showing, or ``None`` while a generation
         is still running under it — in which case the slideshow opens over ``frame``,
-        that run's latest, and goes on following it until the pane hands over the
-        file it lands as.
+        that run's latest, and goes on following it until it lands.
         """
         listed = self._folder_rows()
         folder_items = None
@@ -365,7 +364,6 @@ class SlideshowDirector:
                 items, start = [(media[0], media[1], generation, None)], 0
                 rows = [row for row in [self._host.row_for(generation)] if row is not None]
         return self.open(items, rows=rows, start=start, frame=frame,
-                         image_dwell_ms=0 if self._fun_time is not None else None,
                          shuffle=in_order,
                          folder_items=folder_items,
                          hud=HudFacts(
@@ -388,7 +386,7 @@ class SlideshowDirector:
         """Build, wire and show a fullscreen slideshow of ``items``.
 
         The one place a slideshow is made, however it was asked for, so the toolbar's
-        and a double-click's differ only in the order and the pace they pass.
+        and a double-click's differ only in the order they pass.
         ``folder_items`` is what to arm a slideshow that opened over a running
         generation with, since that one has no items of its own yet, and
         ``resume`` where a closed slideshow left off, for one picking that back up
@@ -413,10 +411,9 @@ class SlideshowDirector:
         # And what that side IS: one of the session's Funestras, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None
-        if channel is not None and not items:
-            if not folder_items:
-                return None
-            items, kwargs["start"] = folder_items, None
+        follows_a_run = channel is not None and not items
+        if follows_a_run and not folder_items:
+            return None
         if (channel is not None and where not in self._regions_wanted
                 and self._session_channel is not None):
             self._asked_for[where] = partial(
@@ -424,6 +421,8 @@ class SlideshowDirector:
                 side=where, resume=resume, filters=filters, **kwargs)
             ask_for_the_funestra(self._session_channel, where)
             return None
+        if follows_a_run:
+            items, kwargs["start"] = folder_items, None
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
@@ -455,7 +454,10 @@ class SlideshowDirector:
             slideshow.resume(resume)
         if kwargs.get("start") is None:
             self._offer_the_frames(slideshow, location, self._host.queue_now()[0])
-            slideshow.lead_with_what_is_being_made()
+            if follows_a_run:
+                slideshow.follow_what_is_being_made()
+            else:
+                slideshow.lead_with_what_is_being_made()
         if not already_live:
             slideshow.open_requested.connect(self._pick_where_it_played)
             slideshow.closed.connect(lambda s=slideshow: self._on_closed(s))

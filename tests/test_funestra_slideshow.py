@@ -1145,6 +1145,58 @@ def test_an_item_being_made_is_not_moved_on_while_a_request_is_spoken_over_it(
     assert "NEXT" not in _sent(slideshow)
 
 
+def test_a_slide_a_request_is_spoken_over_stays_held_through_a_new_list(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow.pause_for_request(True)
+
+    slideshow.note_added("four.png", "image", "id-4")
+
+    assert _paces(_sent(slideshow))[-1] == "SET_PACE 0"
+
+
+def _slideshow_following_a_run(qtbot, tmp_path, now) -> FunestraSlideshow:
+    slideshow = _clocked_slideshow(qtbot, tmp_path, now)
+    slideshow.note_generating("id-run", FRAME)
+    slideshow.follow_what_is_being_made()
+    _says(slideshow, video=str(read_playlist(slideshow.channel.playlist)[0].path))
+    slideshow.tick()
+    _sent(slideshow)
+    return slideshow
+
+
+def test_a_run_the_slideshow_follows_is_held_on_the_funestra_while_it_is_made(qtbot, tmp_path):
+    now = [0.0]
+    slideshow = _slideshow_following_a_run(qtbot, tmp_path, now)
+
+    now[0] = 30.0
+    slideshow.tick()
+
+    assert "NEXT" not in _sent(slideshow)
+
+
+def _paces(sent: list[str]) -> list[str]:
+    return [verb for verb in sent if verb.startswith("SET_PACE")]
+
+
+def test_a_run_the_slideshow_follows_that_stops_leaves_it_paging_at_its_pace(qtbot, tmp_path):
+    slideshow = _slideshow_following_a_run(qtbot, tmp_path, [0.0])
+
+    slideshow.note_in_flight(set())
+
+    assert _paces(_sent(slideshow))[-1] == f"SET_PACE {slideshow.dwell_s}"
+
+
+def test_a_run_the_slideshow_follows_lets_go_once_the_funestra_is_stepped_off_it(
+        qtbot, tmp_path):
+    slideshow = _slideshow_following_a_run(qtbot, tmp_path, [0.0])
+
+    slideshow.slideshow_step(1)
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+
+    assert _paces(_sent(slideshow)) == [f"SET_PACE {slideshow.dwell_s}"]
+
+
 def test_a_slideshow_told_to_lead_with_what_is_being_made_sends_the_funestra_there(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     slideshow.note_enhancing({"id-3": "running"})

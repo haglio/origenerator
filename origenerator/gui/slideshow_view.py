@@ -938,8 +938,7 @@ class SlideshowView(QWidget):
 
     @property
     def dwell_s(self) -> int:
-        """The seconds this slideshow leaves an unlocked slide up — nought while it is
-        standing on one picture, which is how a double-clicked one opens."""
+        """The seconds this slideshow leaves an unlocked slide up; nought holds it."""
         return self._dwell_s
 
     @property

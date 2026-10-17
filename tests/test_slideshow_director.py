@@ -112,6 +112,7 @@ class FakeSlideshow:
         self.state_at_close = "where-it-got-to"
         self.played = []
         self.leads = 0
+        self.follows = 0
         self.levels_added = []
         self.hud_order_label = ""
         self.locked_on = None
@@ -178,6 +179,9 @@ class FakeSlideshow:
 
     def lead_with_what_is_being_made(self):
         self.leads += 1
+
+    def follow_what_is_being_made(self):
+        self.follows += 1
 
     def add_levels(self, levels):
         self.levels_added.append(levels)
@@ -2068,7 +2072,7 @@ def test_a_latest_slideshow_turns_down_a_run_asked_for_in_the_other_shape(slides
     assert made[0].generating == []
 
 
-def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_leading_with_it(slideshows):
+def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_following_it(slideshows):
     host = FakeHost(rows=[_row("g1"), _row("g-run")])
     director, host, made = slideshows(host, db=FakeDB([_row("g-run")]), fun_time=FakeSession(
         funestras={PORTRAIT: object(), LANDSCAPE: object()}))
@@ -2079,4 +2083,4 @@ def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_leadin
 
     assert made[0].items == [("a.png", "image", "g1", None)]
     assert made[0].generating == [("g-run", b"frame")]
-    assert made[0].leads == 1
+    assert (made[0].follows, made[0].leads) == (1, 0)

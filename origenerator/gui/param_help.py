@@ -164,11 +164,6 @@ PARAM_HELP: dict[str, str] = {
         "so more of the run goes to fine detail. It matters less than the Sampler and "
         "goes with it."
     ),
-    "denoise": (
-        "How much of the starting image is redrawn (the denoise strength). 1.0 "
-        "generates from pure noise; lower keeps more of what was there and only "
-        "re-imagines the rest."
-    ),
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
 
@@ -308,10 +303,6 @@ RECOMMENDED: dict[str, str] = {
         "Good choices: normal or simple with euler and euler_ancestral, karras with "
         "the dpmpp ones (DPM++ 2M Karras on model pages). To compare two, keep the "
         "seed and change only this, on two or three different prompts."
-    ),
-    "denoise": (
-        "Leave it at 1.0 for a new picture; to keep more of a starting image, 0.4–0.7 "
-        "is the good range."
     ),
     "shift": (
         "Good range: 5–12; 8 is the usual start, 5 for a looping clip."

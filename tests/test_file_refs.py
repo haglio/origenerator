@@ -63,8 +63,8 @@ def test_reference_path_routes_the_way_comfyuis_loadimage_does(tmp_path):
 def test_reference_path_routes_a_temp_reference_under_the_temp_dir(tmp_path):
     """The third annotation ComfyUI's LoadImage writes.  A ``[temp]`` name was
     a valid frame name to the gallery and resolved to nothing here, so the
-    derived size, the Dimensions field and the ATI auto-aim silently did
-    nothing for that image (bug 28)."""
+    derived size and the Dimensions field silently did nothing for that image
+    (bug 28)."""
     out_dir, in_dir, temp_dir = tmp_path / "output", tmp_path / "input", tmp_path / "temp"
     for d in (out_dir, in_dir, temp_dir):
         d.mkdir()

@@ -8,7 +8,7 @@ motion track — the diffusion model's motion lives only in the pixels — so ra
 measuring the finished video, this authors a motion *with* it from what the generation
 already knows: the video's duration. The result is a rhythm, not a
 pixel-accurate script; the whole generator is one function so a later swap to a
-measured (FunGen) or authored (ATI) source touches nothing else.
+measured (FunGen) source touches nothing else.
 
 The scripts have a folder of their own -- ``<output dir>/funscript`` -- laid out
 like the output folder around it, each script named for its video's whole

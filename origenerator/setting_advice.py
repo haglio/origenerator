@@ -159,8 +159,7 @@ def _loras_recommend(params: dict) -> dict:
         if page.get("steps"):
             rules["steps"] = _Range(_with(page, "steps", " steps"), page["steps"])
         if page.get("shift"):
-            rules["shift_high" if "shift_high" in params else "shift"] = _Range(
-                _with(page, "shift"), page["shift"])
+            rules["shift_high"] = _Range(_with(page, "shift"), page["shift"])
     return rules
 
 

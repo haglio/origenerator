@@ -4,9 +4,9 @@ WAN 2.2 samples in two stages against two halves of one model — a high-noise
 expert and a low-noise one — and a slot must offer only its own half: a file
 whose name claims the other is the one pick that is certainly wrong there.
 That convention is what these rows encode, and it lives here rather than in
-each workflow because every workflow sampling in those two stages, WAN 2.1's
-motion-tracked one included, has to agree about it, and a convention spelled
-out twice is a convention that can be changed in one place only.
+each workflow because every workflow sampling in those two stages has to agree
+about it, and a convention spelled out twice is a convention that can be
+changed in one place only.
 
 Two functions rather than one, because the order the rows come back in is the
 order the Generate form shows and the gallery info pane groups by: the models

@@ -64,7 +64,7 @@ _IMAGE_STEP_SECONDS = 0.5
 _DETAIL_STEP_SECONDS = 0.15
 
 # The inputs every latent builder that measures a clip carries together —
-# WanImageToVideo, WanFirstLastFrameToVideo, WanTrackToVideo,
+# WanImageToVideo, WanFirstLastFrameToVideo,
 # EmptyHunyuanLatentVideo. Matched on that shape rather than on a list of class
 # names, so a video workflow written next year is sized as one without anyone
 # remembering to add it here; a name list that goes stale sizes a clip's samplers
@@ -195,7 +195,6 @@ _STAGE_NAMES = {
     "BboxDetectorSEGS": "Finding the parts",
     "WanImageToVideo": "Preparing the clip",
     "WanFirstLastFrameToVideo": "Preparing the clip",
-    "WanTrackToVideo": "Preparing the clip",
     "EmptyHunyuanLatentVideo": "Preparing the clip",
     "VAEEncode": "Preparing",
     "ImageUpscaleWithModel": "Upscaling",

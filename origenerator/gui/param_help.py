@@ -18,12 +18,6 @@ from __future__ import annotations
 from origenerator.setting_advice import good_range_text
 from origenerator.workflows.base import ParamDef
 
-_COMPOSITION_FOCUS = (
-    "How the steps split between composition (the layout, the poses and, in a video, "
-    "the motion) and fine detail. Higher keeps the picture noisy for longer, so more "
-    "of the steps decide composition; lower gives more of them to texture and detail."
-)
-
 # Keyed by param name: what the setting does.
 PARAM_HELP: dict[str, str] = {
     # --- prompts and the picture a run starts from ---
@@ -173,8 +167,11 @@ PARAM_HELP: dict[str, str] = {
         "goes with it. To compare two, keep the seed and change only this, on two or "
         "three different prompts."
     ),
-    "shift": _COMPOSITION_FOCUS,
-    "shift_high": _COMPOSITION_FOCUS,
+    "shift_high": (
+        "How the steps split between composition (the layout, the poses and, in a video, "
+        "the motion) and fine detail. Higher keeps the picture noisy for longer, so more "
+        "of the steps decide composition; lower gives more of them to texture and detail."
+    ),
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (
@@ -239,26 +236,6 @@ PARAM_HELP: dict[str, str] = {
         "settles onto the nearest."
     ),
 
-    # --- the authored motion (track-conditioned video) ---
-    "motion_hz": (
-        "How many up-and-down cycles per second the generated motion runs at."
-    ),
-    "motion_x": (
-        "The horizontal line the motion travels along, in pixels across the frame."
-    ),
-    "motion_ceiling": (
-        "The pixel row the motion reaches at the high end of its travel."
-    ),
-    "motion_floor": (
-        "The pixel row the motion reaches at the low end of its travel."
-    ),
-    "anchor_x": (
-        "The horizontal position of the point that stays put while the motion moves."
-    ),
-    "anchor_y": (
-        "The vertical position of the point that stays put while the motion moves."
-    ),
-
     # --- sound ---
     "audio_prompt": (
         "What the generated soundtrack should be — the sounds themselves, not the "
@@ -285,9 +262,6 @@ RECOMMENDED: dict[str, str] = {
         "Good choices: normal or simple with euler and euler_ancestral, karras with "
         "the dpmpp ones (DPM++ 2M Karras on model pages)."
     ),
-    "shift": (
-        "8 is the usual start, 5 for a looping clip."
-    ),
     "shift_high": (
         "8 is the usual start, 5 for a looping clip."
     ),
@@ -308,29 +282,6 @@ RECOMMENDED: dict[str, str] = {
     ),
     "frame_rate": (
         "Leave it at 16, as the model makes it, or use 32 for smoother motion."
-    ),
-    "motion_hz": (
-        "1.2 to start."
-    ),
-    "motion_x": (
-        "Best left at its starting value, so the app aims it from the Start Image "
-        "itself; set by hand, keep it on the part that moves."
-    ),
-    "motion_ceiling": (
-        "Best left at its starting value, so the app aims it from the Start Image "
-        "itself; set by hand, keep it on the part that moves."
-    ),
-    "motion_floor": (
-        "Best left at its starting value, so the app aims it from the Start Image "
-        "itself; set by hand, keep it on the part that moves."
-    ),
-    "anchor_x": (
-        "Best left at its starting value, so the app aims it from the Start Image "
-        "itself; set by hand, keep it on the part that moves."
-    ),
-    "anchor_y": (
-        "Best left at its starting value, so the app aims it from the Start Image "
-        "itself; set by hand, keep it on the part that moves."
     ),
 }
 

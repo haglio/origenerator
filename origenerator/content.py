@@ -1,10 +1,10 @@
 """Content overlay — the values that must not be published, loaded at runtime.
 
-The act vocabulary the recipe matcher scores prompts against and the detector's
-class labels describe the library this tool serves, so they live in
+The act vocabulary the recipe matcher scores prompts against describes the
+library this tool serves, so it lives in
 ``content.local.json`` (git-ignored) rather than in source.  A
 committed ``content.example.json`` documents the shape and is what a fresh or
-public checkout loads; every consumer reads them through here, so the matcher,
+public checkout loads; every consumer reads it through here, so the matcher,
 the workflows and the tests behave the same whichever is present.
 
 **The read is cached; the parse is not.** Five module scopes across four packages
@@ -82,21 +82,6 @@ def missing_overlay_keys(
     """
     return _overlay.missing_keys(LOCAL_CONTENT if local_path is None else local_path,
                                  EXAMPLE_CONTENT if example_path is None else example_path)
-
-
-# The named refusal is the family's; what is this repo's is which file it names.
-MissingOverlayKey = _overlay.MissingOverlayKey
-
-
-def overlay_value(content: dict[str, Any], *keys: str) -> Any:
-    """The value at *keys*, or :class:`MissingOverlayKey` naming what is absent.
-
-    For the values a consumer genuinely cannot work without. Where it can — a
-    list of optional entries, a folder that may not be configured — read the
-    overlay tolerantly instead (``content.get(key) or default``), the way
-    ``workflows.detail_parts`` does.
-    """
-    return _overlay.overlay_value(content, *keys, path=overlay_path())
 
 
 def genau_flick_word() -> str:

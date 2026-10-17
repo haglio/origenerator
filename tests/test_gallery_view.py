@@ -9563,9 +9563,10 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
     assert [it.key for it in view._inflight_items()] == ["going", "waiting"]
 
 
-def _queued_job(prompt_id):
-    """A stand-in for a job waiting in the queue's line, as the display reads it."""
-    return SimpleNamespace(prompt_id=prompt_id, media_type="image", source="generated")
+def _queued_job(prompt_id, state="idle"):
+    """A stand-in for a job in the queue's line, as the display reads it."""
+    return SimpleNamespace(prompt_id=prompt_id, media_type="image", source="generated",
+                           state=state)
 
 
 def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
@@ -9701,7 +9702,7 @@ def test_dragging_a_queue_row_asks_the_queue_for_that_order(qtbot):
     with patch.object(JobQueue, "reorder") as reorder:
         view = GalleryView(db)
         qtbot.addWidget(view)
-        view._jobs._on_server = [_queued_job("running-one")]
+        view._jobs._on_server = [_queued_job("running-one", state="running")]
         view._jobs._waiting = [_queued_job("w1"), _queued_job("w2")]
         view.refresh()
 

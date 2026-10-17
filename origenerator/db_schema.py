@@ -15,7 +15,6 @@ from origenerator.db_seed_uses import (
     forget_the_seeds_tabs_picked_for_their_next_press,
     give_old_seed_uses_their_kind,
 )
-from origenerator.param_keys import migrate_stored_params
 
 SCHEMA = """\
 CREATE TABLE IF NOT EXISTS generations (
@@ -337,6 +336,5 @@ def migrate(conn) -> None:
     # What each worktree's copied database had bookmarked, kept for adoption at
     # the next live launch; a branch session runs on this database now.
     conn.execute("DROP TABLE IF EXISTS branch_curation")
-    migrate_stored_params(conn)
     give_old_seed_uses_their_kind(conn)
     forget_the_seeds_tabs_picked_for_their_next_press(conn)

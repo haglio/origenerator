@@ -35,8 +35,9 @@ from funestra.file_channel import (
     publish_whole,
     read_paused_state,
 )
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QObject, QTimer, pyqtSignal
 
+from origenerator.config import RADIO_DIR
 from origenerator.console_commands import side_press, side_spoken_to, spelled_for
 from origenerator.fun_time_mode import (
     CLOSE_SLIDESHOW,
@@ -53,6 +54,7 @@ from origenerator.fun_time_mode import (
     TAKE_BACK,
     FunTimeSession,
 )
+from origenerator.radio import deal_to_the_funestras
 from origenerator.slideshow_buttons import (
     ORIGENERATOR_MODE,
     PANEL_PLACES,
@@ -103,9 +105,12 @@ class FunTimeBridge(QObject):
     hand_over_asked = pyqtSignal(Path, Path)  # the frames file, the input file
     take_back_asked = pyqtSignal()
 
-    def __init__(self, session: FunTimeSession, gallery, parent=None):
+    def __init__(self, session: FunTimeSession, gallery, parent=None, *, radio_dir=RADIO_DIR):
         super().__init__(parent)
         self._session = session
+        self._radio_dir = radio_dir
+        # The radio files dealt to the session's Funestras, None until dealt.
+        self._radio: list[Path] | None = None
         self._gallery = gallery
         self._paused = False
         self._published = False
@@ -122,6 +127,9 @@ class FunTimeBridge(QObject):
         }
         self._request_side: str | None = None
         self._released = False
+        application = QCoreApplication.instance()
+        if application is not None:
+            application.aboutToQuit.connect(self.take_the_radio_back)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self._tick)
@@ -131,8 +139,32 @@ class FunTimeBridge(QObject):
         self._drain_commands()
         if self._released:
             return
+        self._deal_the_radio_once()
         self._apply_paused()
         self._publish_status()
+
+    # --- Origenerator Radio --------------------------------------------------
+
+    def _deal_the_radio_once(self) -> None:
+        """Deal each Funestra the session handed over its own stations, the
+        moment this app is up: they play on out of earshot from then, so a
+        picture tunes in wherever its station has got to."""
+        if self._radio is not None:
+            return
+        playlists = {side: channel.playlist for side in SIDES
+                     if (channel := self._session.funestra(side)) is not None}
+        self._radio = deal_to_the_funestras(playlists, clips_dir=self._radio_dir)
+
+    def take_the_radio_back(self) -> None:
+        """Silence the stations dealt to the session's Funestras: this app is
+        going, and a radio with nothing of this app's to tune in for is six
+        streams played for no one."""
+        for path in self._radio or ():
+            try:
+                path.unlink(missing_ok=True)
+            except OSError as refused:
+                logger.warning("Could not take back the radio dealt in %s: %s", path, refused)
+        self._radio = []
 
     # --- commands in --------------------------------------------------------
 
@@ -222,6 +254,7 @@ class FunTimeBridge(QObject):
         self._drop_the_request_said_to(self._request_side)
         self._released = True
         self._timer.stop()
+        self.take_the_radio_back()
         self.released.emit()
 
     def _filter_enhanced(self) -> None:

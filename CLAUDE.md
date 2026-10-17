@@ -558,13 +558,13 @@ instance the user is running from the launch lines at the top of each state
 dir's log — the "main app" can be on pre-merge code.
 
 A script that builds the gallery outside the suite holds the real OSR2 and
-the real sound bed: `GalleryView` makes its own `Osr2MotionDriver` and
-`AmbientAudio` unless it is handed them, and a restored session turns both
+the real Origenerator Radio: `GalleryView` makes its own `Osr2MotionDriver` and
+`OrigeneratorRadio` unless it is handed them, and a restored session turns both
 back on. A walk through the folder path, run that way on a copy of the
 library, moved the device for a fifth of a second twice while the user was
 using it, through a key sent to a window that was never shown and activated.
-So such a script replaces the drivers' broker and tick thread and the sound
-bed's start the way `tests/conftest.py` does, and shows and activates its
+So such a script replaces the drivers' broker and tick thread and the
+radio's start the way `tests/conftest.py` does, and shows and activates its
 window before it sends a key. The near miss that still counts: cutting off
 the sound alone, since a restored session brings the OSR2 switch back with
 it.

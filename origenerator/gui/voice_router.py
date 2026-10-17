@@ -53,9 +53,6 @@ from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.prompt_edit import apply_request
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import (
-    AUDIO_SWITCH as _AUDIO,
-)
-from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
 )
 from origenerator.voice.app_commands import (
@@ -66,6 +63,9 @@ from origenerator.voice.app_commands import (
 )
 from origenerator.voice.app_commands import (
     MOTION_MOVES as _MOTION,
+)
+from origenerator.voice.app_commands import (
+    RADIO_SWITCH as _RADIO,
 )
 from origenerator.voice.app_commands import (
     SWITCHES as _SWITCHES,
@@ -285,11 +285,11 @@ class VoiceRouter(QObject):
         self._hold_the_motion(None)
         self._switches.update(dict.fromkeys(SWITCHES_A_HOST_HOLDS))
 
-    def become_standalone(self, motion, *, audio, drive, mic) -> None:
+    def become_standalone(self, motion, *, radio, drive, mic) -> None:
         self._hold_the_motion(motion)
-        self._switches.update({_AUDIO: audio, _DRIVE: drive, _MIC: mic})
+        self._switches.update({_RADIO: radio, _DRIVE: drive, _MIC: mic})
 
-    def bind_the_bank(self, *, auto, audio, drive, mic, actions, enhance) -> None:
+    def bind_the_bank(self, *, auto, radio, drive, mic, actions, enhance) -> None:
         """Bind the spoken vocabulary to the buttons it acts through, by keyword
         and by object rather than by attribute name: spelled as strings, a renamed
         button broke the microphone silently.
@@ -305,7 +305,7 @@ class VoiceRouter(QObject):
         :meth:`_flip_switch` can still answer that the session owns them, and
         the motion words find nothing to move rather than a driver that is absent.
         """
-        self._switches = {_AUTO: auto, _AUDIO: audio, _DRIVE: drive, _MIC: mic}
+        self._switches = {_AUTO: auto, _RADIO: radio, _DRIVE: drive, _MIC: mic}
         self._bank = dict(actions)
         self._enhance = enhance
 
@@ -576,7 +576,7 @@ class VoiceRouter(QObject):
         """
         switch, want, name = _SWITCHES[command]
         button = self._switches[switch]
-        if button is None:  # hosted: the session owns the audio bed and the mic
+        if button is None:  # hosted: the session owns the radio and the mic
             self._slideshows.answer(f"🎤 {name} is the session's here", kind=WARNING)
             return
         if not button.isEnabled():

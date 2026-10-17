@@ -258,7 +258,7 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
 
 def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
-              icons.delete_icon, icons.latest_icon, icons.audio_icon,
+              icons.delete_icon, icons.latest_icon, icons.radio_icon,
               icons.autoloop_icon, icons.slideshow_icon, icons.enhance_icon,
               icons.custom_folder_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
@@ -280,7 +280,7 @@ def test_the_bank_glyphs_are_all_different_marks(qtbot):
             ("undo", icons.undo_icon), ("redo", icons.redo_icon),
             ("auto", icons.autoloop_icon), ("slideshow", icons.slideshow_icon),
             ("enhance", icons.enhance_icon), ("delete", icons.delete_icon),
-            ("audio", icons.audio_icon),
+            ("radio", icons.radio_icon),
             ("group", icons.custom_folder_icon),
             ("star", lambda: icons.star_icon(filled=True)),
         )
@@ -373,7 +373,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
         (icons.slideshow_icon(), "slideshow", TEXT_PRIMARY),
         (icons.enhance_icon(), "plus", AMBER),
         (icons.mic_icon(), "mic", TEXT_PRIMARY),
-        (icons.audio_icon(), "speaker", TEXT_PRIMARY),
+        (icons.radio_icon(), "speaker", TEXT_PRIMARY),
         (icons.trash_icon(), "trash", TEXT_PRIMARY),
         (icons.delete_icon(), "trash", RED),
         (icons.star_icon(filled=True), "star", GREEN),

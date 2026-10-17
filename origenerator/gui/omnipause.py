@@ -1,8 +1,8 @@
 """The room's freeze: one flag, asked rather than remembered.
 
 A hosting Fun Time session's OmniPause stops the room, and so does a click on a
-slideshow standing on its own; a room with looping thumbnails, playing videos, an
-audio bed or a moving OSR2 still going in it is not stopped.  Whatever is held
+slideshow standing on its own; a room with looping thumbnails, playing videos,
+Origenerator Radio or a moving OSR2 still going in it is not stopped.  Whatever is held
 here is told when the room freezes, and is told the current answer the moment
 it joins, so a pane built mid-freeze opens frozen because it asked, not because
 whoever built it remembered to say so.

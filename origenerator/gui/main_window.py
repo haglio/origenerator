@@ -64,7 +64,9 @@ SESSION_UI_STATE = (
     ("max_intensity", GalleryView.max_intensity, GalleryView.set_max_intensity),
     ("motion", GalleryView.motion_settings, GalleryView.set_motion_settings),
     ("experiments_enabled", GalleryView.experiments_enabled, GalleryView.set_experiments_enabled),
-    ("audio_enabled", GalleryView.audio_enabled, GalleryView.set_audio_enabled),
+    # Origenerator Radio's switch, under the name it was saved by before it was
+    # the radio: a saved session keeps the word it was written with.
+    ("audio_enabled", GalleryView.radio_enabled, GalleryView.set_radio_enabled),
     # The mic switch. Absent from a session saved before it was persisted — and
     # from a first launch — which is the app's default of on (see set_mic_enabled).
     ("mic_enabled", GalleryView.mic_enabled, GalleryView.set_mic_enabled),

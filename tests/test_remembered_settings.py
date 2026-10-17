@@ -66,7 +66,7 @@ REMEMBERED = {
     "enhance_settings": lambda view: _within(view._enhance.panel),
     "search_sort": lambda view: [view._search._sort_combo],
     "gallery_combine": lambda view: _within(view._combine.panel),
-    "audio_enabled": lambda view: [view._bank.audio],
+    "audio_enabled": lambda view: [view._bank.radio],
     "mic_enabled": lambda view: [view._bank.mic],
 }
 

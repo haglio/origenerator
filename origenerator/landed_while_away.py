@@ -28,7 +28,6 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.db import Database
-from origenerator.gallery import parse_params
 from origenerator.generation_state import GenerationStatus
 from origenerator.notice_toast import raise_notice
 from origenerator.run_notice import Notice, notice_for, outcome_of_row
@@ -61,8 +60,7 @@ def take_what_landed(db, api, row: dict, *, output_dir: Path, thumb_dir: Path) -
     if not history:
         return None
     files, thumb, duration = extract_completion(
-        workflow, history, output_dir, thumb_dir, prompt_id,
-        params=parse_params(row.get("params_json")))
+        workflow, history, output_dir, thumb_dir, prompt_id)
     mark_generation_completed(db, prompt_id, files, thumb, duration)
     return notice_for(outcome_of_row(db.get_generation(prompt_id) or row,
                                      ok=True, seconds=duration))

@@ -343,7 +343,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 17887 when cruise control left the app, taken down to what the tree measured.
 # 17882 when the window a headset room has stayed off the monitors.
 # 17855 when the OSR2's switch came in and its holds went to the broker.
-MAX_PROSE_LINES = 17855
+# 17643 when the motion-tracked video workflow left the app, taken down by the
+# 212 lines that left with it.
+MAX_PROSE_LINES = 17643
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

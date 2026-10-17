@@ -738,6 +738,12 @@ class ParamForm(QWidget):
     def get_values(self) -> dict:
         return self._collect()
 
+    def choices_not_offered(self, keys: Sequence[str]) -> list[str]:
+        chosen = self._collect()
+        return [chosen[pd.key] for pd in self._param_defs
+                if pd.key in keys and pd.options and chosen.get(pd.key)
+                and not is_no_lora(chosen[pd.key]) and chosen[pd.key] not in pd.options]
+
     def seed_is_random(self) -> bool:
         """True if any seed param's Random tick is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())

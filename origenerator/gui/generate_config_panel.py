@@ -44,6 +44,7 @@ from origenerator.gallery import (
     settings_signature,
     workflow_output_type,
 )
+from origenerator.gallery.labels import model_file_name
 from origenerator.gallery.sides import PORTRAIT, orientation_of_size
 from origenerator.generation_config import (
     ConfigSnapshot,
@@ -80,7 +81,7 @@ from origenerator.picture_states import state_names
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
 from origenerator.timing import estimate_label
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import RETIRED_WORKFLOW_NAMES, WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,30 @@ def _nothing_to_start_from(missing_images: list[str]) -> str:
     named = " and ".join(missing_images)
     article = "an" if named[:1].lower() in "aeiou" else "a"
     return f"Nothing to start from — pick {article} {named} first"
+
+
+def _cannot_be_remade_notice(workflow_name: str) -> str | None:
+    if workflow_name in WORKFLOW_REGISTRY:
+        return None
+    retired = RETIRED_WORKFLOW_NAMES.get(workflow_name)
+    if retired is None:
+        return "(made with a workflow Origenerator doesn't have, so no new ones can be made)"
+    return f"(made with {retired}, which has been retired, so no new ones can be made)"
+
+
+def _the_models(names: list[str]) -> tuple[str, str, str]:
+    shown = " and ".join(model_file_name(name) for name in names)
+    return (shown, "isn't", "it") if len(names) == 1 else (shown, "aren't", "them")
+
+
+def _made_with_what_is_not_installed(names: list[str]) -> str:
+    shown, isnt, it = _the_models(names)
+    return f"(made with {shown}, which {isnt} installed anymore, so no new ones can be made with {it})"
+
+
+def _nothing_made_with(names: list[str]) -> str:
+    shown, isnt, it = _the_models(names)
+    return f"({shown} {isnt} installed anymore, so nothing can be made with {it})"
 
 
 class GenerateConfigPanel(QWidget):
@@ -527,13 +552,43 @@ class GenerateConfigPanel(QWidget):
         return (self._client is not None
                 and self._workflow_combo.currentData() is not None
                 and not self._folder_generating
-                and not self._missing_images())
+                and self._why_generate_is_blocked() is None)
 
     def _sync_generate(self) -> None:
         self._generate_pair.setEnabled(self._can_generate())
-        missing = self._missing_images()
-        if missing:
-            self._generate_btn.setToolTip(_nothing_to_start_from(missing))
+        blocked = self._why_generate_is_blocked()
+        if blocked:
+            self._generate_btn.setToolTip(blocked)
+
+    def _why_generate_is_blocked(self) -> str | None:
+        models = self._models_not_installed()
+        images = self._missing_images()
+        return (self._form_still_beside_an_item_that_cannot_be_remade()
+                or (_nothing_made_with(models) if models else None)
+                or (_nothing_to_start_from(images) if images else None))
+
+    def _shown_item_cannot_be_remade(self) -> str | None:
+        shown = self._displayed_row
+        if not shown:
+            return None
+        workflow_name = shown.get("workflow_name") or ""
+        if workflow_name not in WORKFLOW_REGISTRY:
+            return _cannot_be_remade_notice(workflow_name)
+        if workflow_name != self._workflow_combo.currentData():
+            return None
+        missing = self._models_not_installed()
+        return _made_with_what_is_not_installed(missing) if missing else None
+
+    def _models_not_installed(self) -> list[str]:
+        wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData() or "")
+        if wf is None or self._param_form is None:
+            return []
+        return self._param_form.choices_not_offered((*wf.model_keys, *wf.lora_keys))
+
+    def _form_still_beside_an_item_that_cannot_be_remade(self) -> str | None:
+        shown = self._displayed_row
+        gone = shown and _cannot_be_remade_notice(shown.get("workflow_name") or "")
+        return gone if gone and self._would_remake_what_it_shows() else None
 
     def set_how_many(self, count: int) -> None:
         self._how_many.set_how_many(count)
@@ -739,11 +794,10 @@ class GenerateConfigPanel(QWidget):
         )
         self._generate_btn.set_caption(
             _RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
-        missing = self._missing_images()
         self._generate_btn.setToolTip(
-            _nothing_to_start_from(missing) if missing
-            else ALREADY_MAKING_ONE_TIP if self._folder_generating
-            else _RANDOM_SEED_TIP if duplicate else "")
+            self._why_generate_is_blocked()
+            or (ALREADY_MAKING_ONE_TIP if self._folder_generating
+                else _RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder,
@@ -1363,6 +1417,7 @@ class GenerateConfigPanel(QWidget):
             # over the very frames it had been standing over. Only re-asserted,
             # because the picture put up above took the notice off with the old one.
             self.refresh_modified_notice()
+        self._sync_generate()
         self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
@@ -1406,7 +1461,9 @@ class GenerateConfigPanel(QWidget):
         (see :meth:`_display_result`).
         """
         self._displayed_config = (
-            self._item_config(made_with) if self._displayed_row is not None else None
+            None if self._displayed_row is None
+            else self.current_config() if self._shown_item_cannot_be_remade()
+            else self._item_config(made_with)
         )
         self.refresh_modified_notice()
 
@@ -1427,6 +1484,10 @@ class GenerateConfigPanel(QWidget):
         version list re-shows a level of the same row from outside the form, which
         clears the notice, so whoever did that re-asserts it.
         """
+        cannot_be_remade = self._shown_item_cannot_be_remade()
+        if cannot_be_remade:
+            self._preview.set_notice(cannot_be_remade)
+            return
         modified = (self._displayed_config is not None
                     and not self._would_remake_what_it_shows())
         self._preview.set_notice(_MODIFIED_NOTICE if modified else None)

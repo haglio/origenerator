@@ -30,6 +30,7 @@ from origenerator.gallery.signatures import (
     workflow_output_type,
 )
 from origenerator.media import MediaType
+from origenerator.workflows import RETIRED_WORKFLOW_NAMES
 
 # File extensions stripped from a model filename to make a tidy folder label.
 MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
@@ -38,10 +39,12 @@ MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
 def workflow_label(workflow_name: str | None) -> str:
     """Human-facing folder name for a workflow: its display name, else the key."""
     wf = _registered(workflow_name)
-    return wf.display_name if wf else (workflow_name or "unknown")
+    if wf:
+        return wf.display_name
+    return RETIRED_WORKFLOW_NAMES.get(workflow_name or "") or workflow_name or "unknown"
 
 
-def _model_name(value) -> str:
+def model_file_name(value) -> str:
     """A model file's display form: final path segment, model extension stripped."""
     base = _basename(str(value))
     for ext in MODEL_EXTS:
@@ -56,7 +59,7 @@ def _joined_file_label(keys: tuple[str, ...], params: dict, fallback: str) -> st
     Shared by the model and LoRA folder labels: both name a folder after one or
     more model-file params, differing only in which keys and the empty fallback.
     """
-    parts = [_model_name(params[key]) for key in keys if params.get(key)]
+    parts = [model_file_name(params[key]) for key in keys if params.get(key)]
     return " / ".join(parts) or fallback
 
 

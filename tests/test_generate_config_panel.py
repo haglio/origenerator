@@ -428,16 +428,17 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
         "steps": 7,  # an edit — flf2v's default is 4
     })
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
 
     values = panel._param_form.get_values()
     assert values["positive_prompt"] == "slow beta"
     assert values["input_image"] == "start.png"
     assert values["audio_prompt"] == "wet rhythm"
     assert values["steps"] == 7
-    ati_defaults = WORKFLOW_REGISTRY["wan21_ati_i2v"].default_params()
-    assert values["cfg"] == ati_defaults["cfg"]        # flf2v's 1.0 didn't leak
-    assert values["motion_hz"] == ati_defaults["motion_hz"]
+    loop_defaults = WORKFLOW_REGISTRY["wan22_flf2v_loop"].default_params()
+    i2v_defaults = WORKFLOW_REGISTRY["wan22_i2v"].default_params()
+    assert values["shift_high"] == i2v_defaults["shift_high"] != loop_defaults["shift_high"]
+    assert values["cfg_high"] == i2v_defaults["cfg_high"]
 
 
 def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
@@ -940,13 +941,13 @@ def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
     assert panel._param_form.seed_is_random() is True
 
 
-def test_a_pinned_seed_stays_pinned_across_a_switch_to_a_clip_workflow(panel):
-    panel.prefill("sdxl_t2i", {"seed": 99})
+def test_a_pinned_seed_stays_pinned_across_a_switch_to_a_video_workflow(panel):
+    panel.prefill("wan22_t2i", {"noise_seed": 99})
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
 
-    assert panel._param_form.get_values()["seed"] == 99
-    assert "seed" not in panel._param_form.random_seed_keys()
+    assert panel._param_form.get_values()["noise_seed"] == 99
+    assert "noise_seed" not in panel._param_form.random_seed_keys()
 
 
 def test_restore_config_reapplies_workflow_params_and_random_seed(panel):
@@ -1988,6 +1989,134 @@ def test_putting_the_setting_back_clears_the_mark(saved_panel):
     _set_prompt(panel, "a cat")
 
     assert _notice(panel) == ""
+
+
+def _video_of_a_workflow_the_app_lacks(db, workflow_name, prompt_id="old1"):
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name=workflow_name, workflow_version="v001",
+        positive_prompt="scene one", seed=5,
+        params_json=json.dumps({"positive_prompt": "scene one", "seed": 5}), workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="completed",
+                         output_files=json.dumps([{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
+    return db.get_generation(prompt_id)
+
+
+def test_a_video_from_a_retired_workflow_says_no_new_ones_can_be_made(saved_panel):
+    panel, db = saved_panel
+    video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
+
+    panel.show_saved_generation(video, [])
+
+    assert _notice(panel) == ("(made with WAN 2.1 Image-to-Video (Motion-Tracked), which has been "
+                              "retired, so no new ones can be made)")
+
+
+def test_an_import_from_a_workflow_the_app_never_had_says_no_new_ones_can_be_made(saved_panel):
+    panel, db = saved_panel
+    video = _video_of_a_workflow_the_app_lacks(db, "unknown")
+
+    panel.show_saved_generation(video, [])
+
+    assert _notice(panel) == ("(made with a workflow Origenerator doesn't have, so no new ones "
+                              "can be made)")
+
+
+def test_generate_is_grayed_out_while_a_video_that_cannot_be_remade_is_shown(saved_panel):
+    panel, db = saved_panel
+    assert panel._generate_pair.isEnabled()
+    video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
+
+    panel.show_saved_generation(video, [])
+
+    assert not panel._generate_pair.isEnabled()
+    assert panel._generate_btn.toolTip() == _notice(panel)
+
+
+def test_generate_keeps_saying_why_once_its_caption_is_read_again(saved_panel):
+    panel, db = saved_panel
+    video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
+    panel.show_saved_generation(video, [])
+
+    panel._apply_generate_caption()
+
+    assert panel._generate_btn.toolTip() == _notice(panel)
+
+
+def test_picking_a_workflow_after_such_a_video_brings_generate_back(saved_panel):
+    panel, db = saved_panel
+    video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
+    panel.show_saved_generation(video, [])
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_t2i"))
+
+    assert panel._generate_pair.isEnabled()
+
+
+def _picture_made_with(db, checkpoint, prompt_id="img9"):
+    params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                  positive_prompt="scene one", seed=1, checkpoint=checkpoint)
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="scene one", seed=1, params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="completed",
+                         output_files=json.dumps([{"filename": f"{prompt_id}.png", "subfolder": "image"}]))
+    return db.get_generation(prompt_id)
+
+
+def test_a_picture_made_with_a_model_that_is_not_installed_says_so(installed_models, saved_panel):
+    panel, db = saved_panel
+    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
+
+    panel.show_saved_generation(picture, [picture])
+
+    assert _notice(panel) == ("(made with retired_checkpoint, which isn't installed anymore, "
+                              "so no new ones can be made with it)")
+
+
+def test_generate_is_grayed_out_while_the_form_names_a_model_that_is_not_installed(
+        installed_models, saved_panel):
+    panel, db = saved_panel
+    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
+    panel.show_saved_generation(picture, [picture])
+
+    _set_prompt(panel, "scene two")
+
+    assert not panel._generate_pair.isEnabled()
+    assert panel._generate_btn.toolTip() == ("(retired_checkpoint isn't installed anymore, "
+                                             "so nothing can be made with it)")
+
+
+def test_picking_an_installed_model_brings_generate_back(installed_models, saved_panel):
+    panel, db = saved_panel
+    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
+    panel.show_saved_generation(picture, [picture])
+    checkpoint = panel._param_form._widgets["checkpoint"]
+
+    checkpoint.setCurrentIndex(
+        checkpoint.findText(WORKFLOW_REGISTRY["sdxl_t2i"].default_params()["checkpoint"]))
+
+    assert panel._generate_pair.isEnabled()
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_a_video_made_with_two_models_that_are_not_installed_names_both(installed_models, saved_panel):
+    panel, db = saved_panel
+    params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(), positive_prompt="scene one",
+                  unet_high="retired_high.safetensors", unet_low="retired_low.safetensors")
+    db.insert_generation(
+        prompt_id="vid9", workflow_name="wan22_i2v", workflow_version="v002",
+        positive_prompt="scene one", seed=5, params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation("vid9", status="completed",
+                         output_files=json.dumps([{"filename": "vid9.mp4", "subfolder": "video"}]))
+    video = db.get_generation("vid9")
+
+    panel.show_saved_generation(video, [])
+
+    assert _notice(panel) == ("(made with retired_high and retired_low, which aren't installed "
+                              "anymore, so no new ones can be made with them)")
 
 
 def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):

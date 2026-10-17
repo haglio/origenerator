@@ -113,7 +113,7 @@ def test_job_kind_separates_a_video_from_a_picture():
 def test_every_video_workflow_is_one_kind_of_job():
     # Each of them animates a start image, so the queue has one kind of video to
     # name, and names it in a word rather than the model card's shorthand.
-    videos = ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v")
+    videos = ("wan22_i2v", "wan22_flf2v_loop")
     assert {job_kind_label(name) for name in videos} == {"Video"}
 
 
@@ -1044,6 +1044,13 @@ _LOOPING = workflow_label("wan22_flf2v_loop")
 
 def _workflow_labels(rows, meta=None, **kwargs):
     return {workflow.key: workflow.label for workflow in build_gallery_tree(rows, meta, **kwargs)}
+
+
+def test_a_retired_workflows_folder_keeps_the_name_it_had():
+    retired = dict(_LOOP_CLIP, prompt_id="old", workflow_name="wan21_ati_i2v")
+
+    assert _workflow_labels([retired]) == {
+        "video/wan21_ati_i2v": "WAN 2.1 Image-to-Video (Motion-Tracked)"}
 
 
 def test_a_recipe_that_made_both_kinds_names_each_copy_by_what_it_holds():

@@ -30,12 +30,6 @@ dependencies = [
     "opencv-python>=4.8,<6",
     "websockets>=17,<18",
     "numpy>=2.5,<3",
-    # Auto-aiming the ATI motion track: a censor-detection YOLO finds the anchor
-    # in a start frame so the user never places coordinates by hand
-    # (workflows/motion_aim). onnxruntime executes it; huggingface_hub fetches
-    # and caches its weights.
-    "onnxruntime>=1,<2",
-    "huggingface_hub>=1,<2",
 ]
 
 [project.scripts]

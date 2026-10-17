@@ -3,6 +3,7 @@ from __future__ import annotations
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
+from origenerator.workflows.detail_parts import FIX_MAX
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
@@ -97,7 +98,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             # rejects a zero denoise, and a pass that repaints nothing is a
             # slower way of not running one).
             ParamDef("enhance_detail_fixes", "Fixes", ParamType.FIXES, defaults["enhance_detail_fixes"],
-                     min_val=0.05, max_val=1.0, step=0.05),
+                     min_val=0.05, max_val=FIX_MAX, step=0.05),
         ]
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:

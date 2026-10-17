@@ -655,6 +655,21 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
     assert kind == NOTICE
 
 
+def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch):
+    class Part:
+        name = "hands"
+
+    monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
+    monkeypatch.setattr(module.gallery, "fix_params_for",
+                        lambda row, parts, settings: {"enhance_detail_fixes": {"hands": 1.0}})
+    monkeypatch.setattr(module.gallery, "level_matching_params", lambda row, params: 0)
+    monkeypatch.setattr(module, "name_parts", lambda parts: "hands")
+    controller, _host = enhance(db=FakeDB([_image("i1")]))
+
+    assert controller.fix_parts("i1", [Part()]) == (
+        None, "🎤 hands already fixed as hard as a fix goes", WARNING)
+
+
 def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch):
     class Part:
         name = "teeth"

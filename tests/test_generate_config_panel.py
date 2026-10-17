@@ -16,7 +16,7 @@ from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PR
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
-from origenerator import evolver_export, gallery, osr2_driver
+from origenerator import evolver_export, gallery, osr2_driver, prompt_edit
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
@@ -2190,7 +2190,7 @@ def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
             raise answer
         return answer
 
-    monkeypatch.setattr(gcp_module, "rewrite_prompt", rewrite)
+    monkeypatch.setattr(prompt_edit, "rewrite_prompt", rewrite)
     return calls
 
 
@@ -2249,7 +2249,7 @@ def test_asking_rewrites_the_prompts_of_the_picture_on_display(saved_panel, qtbo
 
 def test_new_words_for_a_requested_picture_redo_the_request_on_what_it_was_asked_of(
         saved_panel, qtbot, monkeypatch):
-    calls = _rewriting(monkeypatch, answer=("a cat", "blurry, cap"))
+    _rewriting(monkeypatch)
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     _request_made(db, "img1")
@@ -2257,19 +2257,19 @@ def test_new_words_for_a_requested_picture_redo_the_request_on_what_it_was_asked
 
     _ask(panel, qtbot, "no cap")
 
-    qtbot.waitUntil(lambda: bool(calls), timeout=5000)
-    assert calls == [("a cat, a hat", "blurry", "no cap")]
+    # Asked of "a cat, a hat" / "blurry", the picture the hat was taken off.
+    qtbot.waitUntil(lambda: _positive(panel) == "a cat, a hat", timeout=5000)
 
 
 def test_the_words_that_made_the_picture_put_its_own_prompts_back(
         saved_panel, qtbot, monkeypatch):
-    calls = _rewriting(monkeypatch, answer=("a cat, a cap", "blurry"))
+    calls = _rewriting(monkeypatch, answer=("a cat in a cap", "blurry"))
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     _request_made(db, "img1")
     panel.show_saved_generation(image, [image])
     _ask(panel, qtbot, "a cap")
-    qtbot.waitUntil(lambda: _positive(panel) == "a cat, a cap", timeout=5000)
+    qtbot.waitUntil(lambda: _positive(panel) == "a cat in a cap", timeout=5000)
 
     _ask(panel, qtbot, "no hat")
 
@@ -2277,13 +2277,13 @@ def test_the_words_that_made_the_picture_put_its_own_prompts_back(
     assert len(calls) == 1
 
 
-def test_a_rewrite_that_fails_says_so_beside_the_words(saved_panel, qtbot, monkeypatch):
-    _rewriting(monkeypatch, answer=OSError("the model is down"))
+def test_words_that_ask_for_nothing_say_so_beside_them(saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch)
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
 
-    field = _ask(panel, qtbot, "two cats")
+    field = _ask(panel, qtbot, "please")
 
     qtbot.waitUntil(lambda: "couldn't" in field._status.text(), timeout=5000)
     assert _positive(panel) == "a cat"

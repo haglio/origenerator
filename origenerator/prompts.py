@@ -35,7 +35,17 @@ VOICE_REWRITE_SYSTEM_PROMPT = (
     "to describe two), and keep everything else exactly as it is.\n"
     "- Reply with ONLY JSON: {\"positive\": \"<full positive>\", \"negative\": "
     "\"<full negative>\"}. Always include both fields, echoing one unchanged if the "
-    "instruction didn't touch it."
+    "instruction didn't touch it.\n"
+    "Examples (instruction, then the prompts before -> after):\n"
+    "- \"no hat\": {\"positive\": \"a man in a blue hat, beach\", \"negative\": "
+    "\"blurry\"} -> {\"positive\": \"a man, beach\", \"negative\": \"blurry, hat\"}\n"
+    "- \"more grass\": {\"positive\": \"a dog, grass\", \"negative\": \"blurry\"} -> "
+    "{\"positive\": \"a dog, (grass:1.2)\", \"negative\": \"blurry\"}\n"
+    "- \"three dogs\": {\"positive\": \"a dog running, park\", \"negative\": "
+    "\"blurry\"} -> {\"positive\": \"three dogs running, park\", \"negative\": "
+    "\"blurry\"}\n"
+    "- \"at night\": {\"positive\": \"a street, sunny afternoon\", \"negative\": "
+    "\"blurry\"} -> {\"positive\": \"a street, at night\", \"negative\": \"blurry\"}"
 )
 
 # --- Gallery search → widened vocabulary ----------------------------------

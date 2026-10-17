@@ -20,6 +20,7 @@ from origenerator.prompt_edit import (
     PUSHED,
     RAISED,
     REMOVE,
+    REWRITTEN,
     apply_request,
     build_match_messages,
     parse_match,
@@ -111,6 +112,76 @@ def test_for_something_in_neither_prompt_adds_it():
 
     assert revision.positive == "a woman, soft light, freckles"
     assert revision.action == ADDED
+
+
+def test_something_in_neither_prompt_is_worked_into_the_whole_prompt_by_the_rewrite():
+    # "two women" over a prompt describing one woman: appended, the prompt would
+    # ask for both at once, so the local model rewrites what the words contradict.
+    asked = []
+
+    def rewrite(positive, negative, words):
+        asked.append((positive, negative, words))
+        return "two women on a couch", "blurry"
+
+    revision = apply_request("a woman on a couch", "blurry", "two women", rewrite=rewrite)
+
+    assert asked == [("a woman on a couch", "blurry", "two women")]
+    assert (revision.positive, revision.negative) == ("two women on a couch", "blurry")
+    assert revision.action == REWRITTEN
+    assert revision.changed
+
+
+def test_a_rewrite_that_fails_leaves_the_words_appended(caplog):
+    def rewrite(positive, negative, words):
+        raise OSError("the model is down")
+
+    with caplog.at_level(logging.WARNING):
+        revision = apply_request("a woman, soft light", "blurry", "freckles", rewrite=rewrite)
+
+    assert revision.positive == "a woman, soft light, freckles"
+    assert revision.action == ADDED
+
+
+def test_a_term_inside_a_longer_phrase_is_cut_out_of_it_by_the_rewrite():
+    # Dropped whole, "a woman wearing a straw hat" would take the woman with it.
+    asked = []
+
+    def rewrite(positive, negative, words):
+        asked.append(words)
+        return "a woman, freckles", "hat"
+
+    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat",
+                             rewrite=rewrite)
+
+    assert asked == ["no hat"]
+    assert (revision.positive, revision.negative) == ("a woman, freckles", "hat")
+
+
+def test_a_rewrite_that_changes_nothing_leaves_the_rules_own_edit():
+    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat",
+                             rewrite=lambda positive, negative, words: (positive, negative))
+
+    assert revision.positive == "freckles"
+    assert revision.action == DROPPED
+
+
+def test_a_phrase_that_is_the_whole_term_is_dropped_by_the_rules_alone():
+    def rewrite(positive, negative, words):
+        raise AssertionError("not asked")
+
+    revision = apply_request("a woman, freckles, beach", "", "no freckles", rewrite=rewrite)
+
+    assert revision.positive == "a woman, beach"
+    assert revision.action == DROPPED
+
+
+def test_an_edit_the_rules_are_sure_of_never_asks_the_rewrite():
+    def rewrite(positive, negative, words):
+        raise AssertionError("not asked")
+
+    revision = apply_request("a woman", "blurry, freckles", "more freckles", rewrite=rewrite)
+
+    assert revision.action == ALLOWED
 
 
 def test_for_something_being_excluded_stops_excluding_it():
@@ -209,6 +280,17 @@ def test_a_matcher_that_finds_nothing_leaves_the_words_to_stand_alone():
 
     assert revision.negative == "blurry, earrings"
     assert revision.action == EXCLUDED
+
+
+def test_only_what_to_take_out_of_the_prompt_is_looked_for_by_meaning():
+    # Asked which of "blurry" meant "two women", a model once answered blurry,
+    # and the negative prompt lost it. A wish for something is only ever read
+    # in the words themselves.
+    revision = apply_request("a woman on a couch", "blurry", "two women",
+                             match=lambda terms, term: 0)
+
+    assert revision.negative == "blurry"
+    assert revision.action == ADDED
 
 
 def test_a_matcher_answering_out_of_range_is_ignored():

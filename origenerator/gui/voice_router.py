@@ -22,7 +22,6 @@ part of it, make a Genau flick of it -- stay with the seams that run them.
 from __future__ import annotations
 
 import logging
-from functools import partial
 from typing import Protocol
 
 from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
@@ -30,7 +29,6 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, prompt_edit
 from origenerator.animate_command import AnimateRequest
-from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
@@ -47,8 +45,6 @@ from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
-from origenerator.prompt_edit import apply_request
-from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import (
     AppCommand,
     BarSetting,
@@ -241,16 +237,9 @@ class VoiceRouter(QObject):
         self.listener.edited.connect(self._on_edited)
         self.listener.error.connect(self._on_error)
         self.listener.request.connect(self.on_spoken_request)
-        # A finished request is worked out on the pool: the prompt may not
-        # contain the words the speaker used ("no earrings" against a prompt
-        # that says "silver ear studs"), and finding out which of its own terms
-        # they meant is a call to the local LLM.
-        self._revision = RevisionWorker(partial(
-            apply_request,
-            match=partial(prompt_edit.smart_match,
-                          base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-                          system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
-        ), parent=self)
+        # A finished request is worked out on the pool, since that can be a call
+        # to the local LLM (prompt_edit.work_out).
+        self._revision = RevisionWorker(prompt_edit.work_out, parent=self)
         self._revision.revised.connect(self._on_revised)
         # The folder whose loop an open mic is steering the prompt of, or None
         # with no loop to steer.

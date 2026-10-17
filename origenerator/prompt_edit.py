@@ -14,8 +14,11 @@ Each is the smallest change that answers the request, which is why the mirror is
 "take it out of the negative prompt" rather than "take it out and also add it":
 ask twice and the second pass, finding it in neither prompt, adds it.
 
-The policy is deterministic — no model decides what happens to a term. What a
-model *is* needed for is finding the term at all: "no earrings" is about a
+The policy is deterministic for every term a prompt already holds. A term in
+neither prompt is the one thing it can only append, and the prompt may say the
+opposite ("two women" over a prompt describing one), so that is handed to the
+local LLM to work into the whole pair (``rewrite``). The other thing a model is
+needed for is finding the term at all: "no earrings" is about a
 prompt that says "silver ear studs", and no amount of string matching gets from
 one to the other. So the two are split. :func:`literal_match` reads a prompt for
 the words themselves and is what runs by default; :func:`smart_match` asks the
@@ -34,6 +37,11 @@ import logging
 import re
 import urllib.request
 from dataclasses import dataclass
+from functools import partial
+
+from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
+from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT, VOICE_REWRITE_SYSTEM_PROMPT
+from origenerator.voice.rewrite import rewrite_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +61,7 @@ EXCLUDED = "excluded"    # added to the negative prompt
 RAISED = "raised"        # already wanted, now wanted harder
 ADDED = "added"          # added to the positive prompt
 ALLOWED = "allowed"      # taken out of the negative prompt
+REWRITTEN = "rewritten"  # in neither prompt, so worked into the whole of it
 
 def _both_spellings(words: set) -> frozenset:
     """``words`` plus the same words with their apostrophes dropped.
@@ -301,12 +310,20 @@ class PromptRevision:
 
 
 def apply_request(positive: str, negative: str, request: str,
-                  match=None) -> PromptRevision | None:
-    """Apply a spoken ``request`` to a prompt pair, by the policy up top.
+                  match=None, rewrite=None) -> PromptRevision | None:
+    """Apply a ``request`` to a prompt pair, by the policy up top.
 
-    ``match(terms, term)`` is how a prompt that doesn't say the words the
-    speaker said is still searched — see :func:`smart_match`. Without one, only
-    the words themselves are looked for.
+    ``match(terms, term)`` is how a positive prompt that doesn't say the words
+    a request against something said is still searched — see
+    :func:`smart_match`. Every other lookup reads the words themselves only: a
+    model asked which of "blurry" meant "two women" answered blurry.
+
+    ``rewrite(positive, negative, request)`` answers what the policy can only
+    do bluntly: something in neither prompt, which the prompt may contradict
+    ("two women" over a prompt describing one), and something to take out of a
+    phrase that says more than it ("a woman wearing a straw hat"), so the local
+    model reworks the whole pair. A rewrite that fails leaves the policy's own
+    edit standing.
 
     ``None`` when the request names nothing to act on ("request … over" with
     only filler between the markers), so the caller can say it didn't catch a
@@ -322,23 +339,50 @@ def apply_request(positive: str, negative: str, request: str,
         return PromptRevision(positive, negative, new_positive, new_negative,
                               term, polarity, action, weight)
 
+    def rewritten() -> PromptRevision | None:
+        if rewrite is None:
+            return None
+        try:
+            new_positive, new_negative = rewrite(positive, negative, request)
+        except Exception as exc:  # model down / unreadable: the rules' own edit stands
+            logger.warning("prompt_edit: could not rewrite the prompts for a request (%s)",
+                           type(exc).__name__)
+            return None
+        if (new_positive, new_negative) == (positive, negative):
+            return None  # it did nothing, which is no answer to a request
+        return made(new_positive, new_negative, REWRITTEN)
+
     if polarity == REMOVE:
         index = _index_of(positive, term, match)
         if index is not None:
-            return made(_without(positive, index), negative, DROPPED)
-        index = _index_of(negative, term, match)
+            within = bare_terms(positive)[index].lower() != term.lower()
+            return ((within and rewritten())
+                    or made(_without(positive, index), negative, DROPPED))
+        index = _index_of(negative, term, None)
         if index is not None:
             revised, weight = _reweighted(negative, index, WEIGHT_STEP)
             return made(positive, revised, PUSHED, weight)
         return made(positive, _plus(negative, term), EXCLUDED)
-    index = _index_of(negative, term, match)
+    index = _index_of(negative, term, None)
     if index is not None:
         return made(positive, _without(negative, index), ALLOWED)
-    index = _index_of(positive, term, match)
+    index = _index_of(positive, term, None)
     if index is not None:
         revised, weight = _reweighted(positive, index, WEIGHT_STEP)
         return made(revised, negative, RAISED, weight)
-    return made(_plus(positive, term), negative, ADDED)
+    return rewritten() or made(_plus(positive, term), negative, ADDED)
+
+
+def work_out(positive: str, negative: str, request: str) -> PromptRevision | None:
+    """``request`` applied as every request is, spoken or typed: the local LLM
+    finding a term the prompt names in its own words, and rewriting the pair for
+    one in neither prompt."""
+    return apply_request(
+        positive, negative, request,
+        match=partial(smart_match, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+                      system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
+        rewrite=partial(rewrite_prompt, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+                        system_prompt=VOICE_REWRITE_SYSTEM_PROMPT))
 
 
 # --- the one I/O boundary: which of a prompt's terms the request means -------

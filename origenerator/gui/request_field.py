@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QWidget
 _ASK = "What to change, e.g. two women"
 _NOTHING_TO_ASK_OF = "Pick a picture to ask a change of"
 _UPDATING = "updating…"
-_FAILED = "couldn't update the prompts — see the log"
+_FAILED = "couldn't work that into the prompts"
 
 
 class RequestField(QWidget):

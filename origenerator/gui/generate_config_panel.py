@@ -19,14 +19,12 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
 
-from origenerator import evolver_export
+from origenerator import evolver_export, prompt_edit
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
-    LOCAL_LLM_BASE_URL,
-    LOCAL_LLM_MODEL,
 )
 from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
@@ -80,12 +78,10 @@ from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.picture_states import state_names
-from origenerator.prompts import VOICE_REWRITE_SYSTEM_PROMPT
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
 from origenerator.timing import estimate_label
 from origenerator.voice.dictation import words_of
-from origenerator.voice.rewrite import rewrite_prompt
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -263,7 +259,7 @@ class GenerateConfigPanel(QWidget):
         self._autoshow_held = False   # see _point_elsewhere
         self._request_aim: _RequestAim | None = None
         self._asked = 0  # how many times the Request has been edited, so a late answer can tell
-        self._rewriter = RevisionWorker(self._rewrite, parent=self)
+        self._rewriter = RevisionWorker(prompt_edit.work_out, parent=self)
         self._rewriter.revised.connect(self._on_rewritten)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
@@ -1479,10 +1475,6 @@ class GenerateConfigPanel(QWidget):
         return {"asked": field.words(), "source_prompt_id": aim.source_prompt_id,
                 "old_positive": aim.asked_of[0], "old_negative": aim.asked_of[1]}
 
-    def _rewrite(self, positive: str, negative: str, words: str) -> tuple[str, str]:
-        return rewrite_prompt(positive, negative, words, base_url=LOCAL_LLM_BASE_URL,
-                              model=LOCAL_LLM_MODEL, system_prompt=VOICE_REWRITE_SYSTEM_PROMPT)
-
     def _on_request_asked(self, words: str) -> None:
         """Rewrite the prompts to say what the Request now asks, off the UI
         thread, since that is a call to the local LLM. The words that made the
@@ -1499,16 +1491,16 @@ class GenerateConfigPanel(QWidget):
         QThreadPool.globalInstance().start(ReviseTask(
             self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words))
 
-    def _on_rewritten(self, context, pair) -> None:
+    def _on_rewritten(self, context, revision) -> None:
         asked, prompt_id = context
         aim = self._request_aim
         if asked != self._asked or aim is None or aim.prompt_id != prompt_id:
             return  # the words, or the picture, have changed since it was asked
         field = self._param_form.request_field()
-        if pair is None:
+        if revision is None:
             field.failed()
             return
-        self._param_form.set_prompts(*pair)
+        self._param_form.set_prompts(revision.positive, revision.negative)
         field.done()
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:

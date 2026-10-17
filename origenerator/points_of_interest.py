@@ -27,9 +27,11 @@ def report_nodes(fix_index: int, segs_ref, picture_ref) -> dict:
     }
 
 
-def reported(outputs: dict, parts: Mapping | None = None) -> list[dict]:
+def reported(outputs: dict, parts: Mapping | None = None) -> list[dict] | None:
     reports = sorted((int(found[1]), output) for node_id, output in outputs.items()
                      if (found := _REPORT_ID.fullmatch(str(node_id))))
+    if not reports:
+        return None
     return [place for index, output in reports
             for place in _of_part(_places_in(output), (parts or {}).get(index))]
 

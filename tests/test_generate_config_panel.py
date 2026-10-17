@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtGui import QColor, QPixmap, QTextCursor
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
 from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 
@@ -1990,6 +1990,33 @@ def test_putting_the_setting_back_clears_the_mark(saved_panel):
     assert _notice(panel) == ""
 
 
+def _struck_and_lit(field) -> tuple[str, str]:
+    """What a prompt field shows struck through, and what it shows lit."""
+    cursor = QTextCursor(field.document())
+    struck = lit = ""
+    for position in range(len(field.toPlainText())):
+        cursor.setPosition(position)
+        cursor.setPosition(position + 1, QTextCursor.MoveMode.KeepAnchor)
+        fmt = cursor.charFormat()
+        if fmt.fontStrikeOut():
+            struck += cursor.selectedText()
+        elif fmt.background().style() != Qt.BrushStyle.NoBrush:
+            lit += cursor.selectedText()
+    return struck.strip(), lit.strip()
+
+
+def test_editing_a_shown_picture_s_prompt_marks_how_it_now_differs(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+    field = panel._param_form._widgets["positive_prompt"]
+
+    field.setPlainText("a dog on a couch")
+
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
 def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
     # The field already shows the next run's seed, so what just finished is not
     # what Generate would make now.
@@ -2470,12 +2497,11 @@ def test_showing_a_generation_ends_the_modify(modifying, tmp_path):
 
     modifying.show_saved_generation(row, [])
 
-    assert not any(w.findChildren(_Tracker)
-                   for w in modifying._param_form.text_fields())
+    assert modifying._folder_modify is None
     assert modifying._generate_btn.text() == "Generate"
 
 
-def test_ending_the_request_gives_the_prompts_their_undo_back(modifying):
+def test_ending_the_modify_gives_the_prompts_their_undo_back(modifying):
     # Undo is off while a field is tracked, since the document is rewritten under
     # the typist; a field left over must not keep that.
     assert not _positive_field(modifying).isUndoRedoEnabled()

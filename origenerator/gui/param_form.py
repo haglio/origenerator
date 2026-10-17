@@ -406,46 +406,21 @@ class ParamForm(QWidget):
             mark.setToolTip(f"{found.text} Click to use {found.fix_shown}." if found else "")
             mark.setHidden(found is None)
 
-    def show_prompt_diff(self, key: str, before: str, after: str) -> None:
-        """Mark a prompt field with the change a spoken request made to it —
-        struck through where words went, lit where they arrived.
-
-        The field's *value* stays the revised prompt throughout (see
-        :mod:`origenerator.gui.diff_text`); this only adds what it replaced, so
-        the change reads where the prompt itself is rather than in a panel
-        beside it. Silently ignores a key this form has no text field for, so a
-        workflow without one of the prompts costs the caller no branch.
-        """
-        widget = self._widgets.get(key)
-        if widget is self._scenes and widget is not None:
-            # A story of one scene is marked like any prompt; one of several
-            # takes the revised text as scenes, since a diff over the breaks
-            # would strike the story's own structure through.
-            fields = widget.fields(key)
-            if len(fields) == 1:
-                diff_text.show_diff(fields[0], before, after)
-            else:
-                widget.set_story(key, after)
-            return
-        if isinstance(widget, QPlainTextEdit):
-            diff_text.show_diff(widget, before, after)
-
-    def clear_prompt_diffs(self) -> None:
-        """Collapse every marked field back to its plain prompt."""
-        for widget in self.text_fields():
-            diff_text.clear_diff(widget)
-
-    def track_prompt_rewrites(self) -> None:
-        """Mark every prompt on the form as a rewrite of what it says right now —
-        arriving words lit as they are typed, departing ones struck through once
-        the field is left (:mod:`origenerator.gui.tracked_prompt`).
+    def track_prompt_rewrites(self, made_with: dict | None = None) -> None:
+        """Mark every prompt on the form as a rewrite of ``made_with``'s text for
+        it, or of what it says right now where that holds none — arriving words
+        lit as they are typed, departing ones struck through once the typing
+        stops (:mod:`origenerator.gui.tracked_prompt`).
 
         Every prompt rather than a named pair: a workflow that grows another one
         (the Foley audio prompts did) is marked the day it lands, for the same
         reason :meth:`text_fields` asks the widgets what they are.
         """
+        key_of = {id(widget): key for key, widget in self._widgets.items()}
         for widget in self.text_fields():
-            tracked_prompt.track(widget, diff_text.live_text(widget))
+            was = (made_with or {}).get(key_of.get(id(widget)))
+            tracked_prompt.track(
+                widget, was if isinstance(was, str) else diff_text.live_text(widget))
 
     def clear_prompt_rewrites(self) -> None:
         """Stop tracking every field, leaving each an ordinary prompt input."""

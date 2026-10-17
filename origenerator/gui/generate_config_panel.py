@@ -1183,7 +1183,7 @@ class GenerateConfigPanel(QWidget):
         self._hide_footer()
         self._preview.clear()          # whatever was up is not this run's
         self._set_displayed_row(None)  # a running generation isn't a saved one
-        self._displayed_config = None  # ...so no settings for a notice to deviate from
+        self._note_displayed_config()  # ...so no settings for a notice to deviate from
         self._emit_title()
 
     def _point_elsewhere(self, row: dict):
@@ -1408,6 +1408,12 @@ class GenerateConfigPanel(QWidget):
         self._displayed_config = (
             self._item_config(made_with) if self._displayed_row is not None else None
         )
+        if self._param_form is not None:
+            with self._loading():  # marking the fields is no edit of them
+                if self._displayed_config is None:
+                    self._param_form.clear_prompt_rewrites()
+                else:
+                    self._param_form.track_prompt_rewrites(self._displayed_config.params)
         self.refresh_modified_notice()
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:
@@ -1464,7 +1470,6 @@ class GenerateConfigPanel(QWidget):
         self._picture_state.show_row(row)
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()
-        self._show_request_diff(request)
         for lane in self._lanes.values():
             self._update_export_button(lane, preview)
 
@@ -1639,26 +1644,6 @@ class GenerateConfigPanel(QWidget):
                                      self._displayed_row["prompt_id"])
             self._arm_preview_actions()  # still the same generation, still actionable
             self.refresh_modified_notice()  # a version of the same generation, same notice
-
-    def _show_request_diff(self, request):
-        """Mark the prompt fields with what a spoken request changed — struck
-        through where words went, lit where they arrived.
-
-        In the fields themselves, because that is where the prompt is: a change
-        described anywhere else has to be carried back to the words it is about.
-        Nothing marked when this row wasn't asked for, so the fields clear as
-        the tab moves on to an ordinary generation.
-        """
-        if self._param_form is None:
-            return
-        self._param_form.clear_prompt_diffs()
-        if not request:
-            return
-        for key, before, after in (
-            ("positive_prompt", request.get("old_positive"), request.get("new_positive")),
-            ("negative_prompt", request.get("old_negative"), request.get("new_negative")),
-        ):
-            self._param_form.show_prompt_diff(key, before or "", after or "")
 
     def _video_rows(self) -> list[dict]:
         return self._library.now().video_rows

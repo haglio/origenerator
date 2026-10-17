@@ -81,7 +81,6 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     combine_controller,
     corner_controls,
-    diff_text,
     icons,
     off_thread,
     omnipause,
@@ -14839,23 +14838,6 @@ def test_a_request_item_shows_what_was_heard_on_its_tab(qtbot, tmp_path, monkeyp
     related = view._info_tabs.current_config_panel()._related
     assert not related._heard.isHidden()
     assert related._heard_words.text() == "“Request, no hat, over.”"
-
-
-def test_a_request_item_marks_its_change_in_the_prompt_field(
-        qtbot, tmp_path, monkeypatch):
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
-    view._slideshows.showing.close()
-    (job,) = view._live_jobs.values()
-    _finish_reroll(view, job)
-
-    view._on_thumbnail_clicked(job.prompt_id)
-
-    field = view._info_tabs.current_config_panel()._param_form._widgets["positive_prompt"]
-    # The field shows what went as well as what stayed…
-    assert "a hat" in field.toPlainText()
-    # …while its value is the prompt that would actually generate.
-    assert diff_text.live_text(field) == "a woman, soft light"
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(

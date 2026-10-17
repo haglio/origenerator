@@ -274,6 +274,14 @@ class Osr2MotionDriver(QObject):
         with self._lock:
             motion_engine.cycle_shape(self._state.state, step)
 
+    def settings(self) -> dict:
+        with self._lock:
+            return motion_engine.settings_of(self._state)
+
+    def take_settings(self, saved) -> None:
+        with self._lock:
+            motion_engine.take_settings(self._state, saved)
+
     def toggle_learned(self) -> None:
         """Hands off to the scripts: the learned motion takes the motion over
         (genau's ``;``)."""

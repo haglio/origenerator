@@ -12,6 +12,7 @@ import pytest
 from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
+from funestra.robot_hand import WaveformShape
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox
@@ -327,6 +328,34 @@ def test_persists_the_max_intensity_on_close(qtbot, tmp_path):
 
     win.close()
     assert state.get("max_intensity") == 35
+
+
+def test_the_motion_reopens_at_the_speed_amp_center_and_shape_it_was_left_at(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    motion = first._gallery_view._osr2_motion
+    motion.set_amplitude(60)
+    motion.set_speed(70)
+    motion.set_center(40)
+    motion.cycle_shape()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    bars = reopened._gallery_view._osr2_motion.state.state
+    assert (bars.speed, bars.amplitude, bars.intended_center, bars.shape) == (
+        70, 60, 40, WaveformShape.TRIANGLE)
+
+
+def test_the_motion_reopens_human_inspired_when_it_was_left_human_inspired(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._osr2_motion.set_learned(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view._osr2_motion.state.learned.active
 
 
 def test_restores_the_audio_switch_from_app_state(qtbot, tmp_path):
@@ -1717,6 +1746,20 @@ def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_foun
     win.close()
 
     assert AppState(path).get("slideshows") == kept
+
+
+def test_a_window_a_session_launched_leaves_the_saved_motion_as_it_found_it(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    kept = {"speed": 70, "amplitude": 60, "center": 40, "shape": "triangle",
+            "human_inspired": True}
+    state = AppState(path)
+    state.set("motion", kept)
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    win.close()
+
+    assert AppState(path).get("motion") == kept
 
 
 def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_next_launch(

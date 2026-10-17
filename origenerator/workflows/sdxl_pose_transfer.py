@@ -194,31 +194,6 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         }
         return nodes, ["23", 0]
 
-    @staticmethod
-    def _controlnet_nodes(params: dict) -> tuple[dict, list]:
-        """The ControlNet loading subgraph and the CONTROL_NET ref to apply.
-
-        A union file gets a SetUnionControlNetType picking the mode's head; a
-        plain single-purpose ControlNet is passed straight through, because it
-        crashes on the union node's extra argument.
-        """
-        nodes = {
-            "7": {
-                "class_type": "ControlNetLoader",
-                "inputs": {"control_net_name": params["controlnet"]},
-            },
-        }
-        if "union" not in params["controlnet"].lower():
-            return nodes, ["7", 0]
-        nodes["21"] = {
-            "class_type": "SetUnionControlNetType",
-            "inputs": {
-                "control_net": ["7", 0],
-                "type": "openpose" if params["control_mode"] == "pose" else "depth",
-            },
-        }
-        return nodes, ["21", 0]
-
     def build_api_payload(self, params: dict) -> dict:
         # Size the still off the input image: derived in-graph at the SDXL
         # budget by default, or scaled to the user's explicit WxH when the
@@ -227,7 +202,10 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         size_nodes, scaled_ref = sized.nodes, sized.image
         width_ref, height_ref = sized.width, sized.height
         structure, hint_ref = self._structure_nodes(params, scaled_ref)
-        controlnet, controlnet_ref = self._controlnet_nodes(params)
+        controlnet, controlnet_ref = self.controlnet_nodes(
+            "7", "21", controlnet=params["controlnet"],
+            head="openpose" if params["control_mode"] == "pose" else "depth",
+        )
         enhance_nodes: dict = {}
         enhanced_ref = ["13", 0]  # enhance off: save the plain decode
         if params.get("enhance"):

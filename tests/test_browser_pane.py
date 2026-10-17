@@ -339,61 +339,61 @@ def test_a_folder_made_lately_keeps_its_new_tile_in_the_newest_section(qtbot):
     assert _shown_in_order(scroll) == [heading, "new", "g1"]
 
 
-def test_the_request_tile_stands_above_a_folders_sections_when_it_has_several(qtbot):
+def test_the_modify_tile_stands_above_a_folders_sections_when_it_has_several(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     first, second = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == ["request", first, "new", "g1", second, "g2"]
+    assert _shown_in_order(scroll) == ["modify", first, "new", "g1", second, "g2"]
 
 
-def test_a_now_section_counts_toward_putting_the_request_tile_above_the_sections(qtbot):
+def test_a_now_section_counts_toward_putting_the_modify_tile_above_the_sections(qtbot):
     rows = [_row("g1", 1, _ago(hours=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     [heading] = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == ["request", "Now", "new", heading, "g1"]
+    assert _shown_in_order(scroll) == ["modify", "Now", "new", heading, "g1"]
 
 
-def test_the_request_tile_stays_with_a_folders_only_section(qtbot):
+def test_the_modify_tile_stays_with_a_folders_only_section(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     [heading] = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == [heading, "new", "request", "g1"]
+    assert _shown_in_order(scroll) == [heading, "new", "modify", "g1"]
 
 
-def test_the_run_in_front_stands_after_the_request_tile_where_its_picture_will_land(qtbot):
+def test_the_run_in_front_stands_after_the_modify_tile_where_its_picture_will_land(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"),
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"),
                       generating=QLabel("generating"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     [heading] = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == [heading, "new", "request", "generating", "g1"]
+    assert _shown_in_order(scroll) == [heading, "new", "modify", "generating", "g1"]
 
 
-def test_the_run_in_front_stays_beside_the_plus_when_the_request_tile_stands_above(qtbot):
+def test_the_run_in_front_stays_beside_the_plus_when_the_modify_tile_stands_above(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
-    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"),
+    tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"),
                       generating=QLabel("generating"))
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     first, second = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == ["request", first, "new", "generating", "g1",
+    assert _shown_in_order(scroll) == ["modify", first, "new", "generating", "g1",
                                        second, "g2"]
 
 

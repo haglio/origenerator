@@ -191,15 +191,25 @@ def test_a_cards_cancel_and_reveal_are_the_callers_own(build):
     assert (cancelled, revealed) == (["g1"], [key])
 
 
-def test_a_run_asked_for_of_a_picture_stands_under_that_picture(build):
-    # A folder-wide request queues a run per image and every one of them animates
-    # nothing, so the thing it was asked about is the only picture it has.
+def test_a_run_a_folders_modify_queued_stands_under_the_picture_it_rewrites(build):
+    # A Modify (all seeds) queues a run per image and every one of them animates
+    # nothing, so the picture it rewrites is the only one it has.
     rows = [_row("asked-of"), _row("g1")]
-    items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of"}])
+    items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
+                                   "heard": ""}])
 
     card = next(item for item in items if item.key == "g1")
-    assert card.requested
+    assert card.modified and not card.requested
     assert card.source_picture == "asked-of.jpg"
+
+
+def test_a_run_a_request_queued_is_marked_as_one(build):
+    rows = [_row("asked-of"), _row("g1")]
+    items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
+                                   "heard": "Request, no hat, over."}])
+
+    card = next(item for item in items if item.key == "g1")
+    assert card.requested and not card.modified
 
 
 def test_a_queued_run_with_no_picture_shows_what_its_folder_already_holds(build):

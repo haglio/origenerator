@@ -159,11 +159,11 @@ CREATE TABLE IF NOT EXISTS custom_folder_items (
 -- the one it came from. Kept even when its generation goes: a delete here is
 -- undoable, and a restored item should come back with the request that made it.
 --
--- Spoken ("Request … over") or typed: a folder rewrite asks the same thing of
--- every picture in a folder at once and records one of these per picture, which
--- is what links each result to the one it was rewritten from. Such a record has
--- nothing heard and no single term — it says what it wanted by rewriting the
--- prompt, which the old/new pair holds — so `heard` is empty there and
+-- A request records one, and so does a folder's Modify (all seeds), which
+-- rewrites every picture in a folder at once and records one per picture,
+-- linking each result to the one it was rewritten from. A Modify has nothing
+-- heard and no single term — it says what it wanted by rewriting the prompt,
+-- which the old/new pair holds — so `heard` is empty there and
 -- `term`/`polarity`/`action` are unset.
 CREATE TABLE IF NOT EXISTS requests (
     prompt_id        TEXT PRIMARY KEY,

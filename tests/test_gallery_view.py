@@ -93,7 +93,7 @@ from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
-from origenerator.gui.folder_request_tile import FolderRequestTile
+from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE, _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
@@ -6249,8 +6249,8 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
 
     assert not _reroll_tile(view).isEnabled()
     kinds = _tile_kinds_in_order(view)
-    assert kinds.index(FolderRequestTile) == kinds.index(RerollTile) + 1
-    assert kinds.index(GeneratingTile) == kinds.index(FolderRequestTile) + 1
+    assert kinds.index(FolderModifyTile) == kinds.index(RerollTile) + 1
+    assert kinds.index(GeneratingTile) == kinds.index(FolderModifyTile) + 1
 
 
 def _press_at(qtbot, view, spot):
@@ -6293,11 +6293,11 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
-# --- the folder-wide request: same seeds, changed words ---------------------
+# --- Modify (all seeds): same seeds, changed words --------------------------
 
 
 def _request_card(view):
-    cards = view._scroll.widget().findChildren(FolderRequestTile)
+    cards = view._scroll.widget().findChildren(FolderModifyTile)
     return cards[0] if cards else None
 
 
@@ -6326,7 +6326,7 @@ def _rewritten(view, key, prompt="a dog on a couch"):
     """Press a rewrite of the folder ``key`` names, saying ``prompt`` instead."""
     params = dict(_SDXL.default_params(), seed=7, positive_prompt=prompt,
                   negative_prompt="blurry")
-    view._on_changes_requested(key, "sdxl_t2i", params)
+    view._on_modify_requested(key, "sdxl_t2i", params)
 
 
 def test_a_folder_offers_a_request_card_beside_its_reroll_tile(qtbot, tmp_path):
@@ -6362,7 +6362,7 @@ def test_the_card_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
     _request_card(view).clicked.emit()
 
     panel = view._info_tabs.current_config_panel()
-    assert panel._folder_request.folder_key == key
+    assert panel._folder_modify.folder_key == key
     assert panel._preview._stack.currentWidget() is panel._preview._sheet
     client.submit_job.assert_not_called()  # an edit to make, not a run to start
 

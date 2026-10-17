@@ -87,8 +87,8 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.deferred import defer
 from origenerator.gui.enhance_controller import EnhanceController, Offer
+from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.folder_path_header import FolderPathHeader
-from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.gallery_navigation import NavigationController
 from origenerator.gui.gallery_search import GallerySearchController
@@ -1001,7 +1001,7 @@ class GalleryView(QWidget):
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder and navigate there, its generating tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
-        self._info_tabs.changes_requested.connect(self._on_changes_requested)
+        self._info_tabs.modify_requested.connect(self._on_modify_requested)
         # ...and its right-click's "Go to folder" goes the other way: from a
         # tab's settings across to the pictures they have made.
         self._info_tabs.folder_requested.connect(self._go_to_folder)
@@ -2511,8 +2511,8 @@ class GalleryView(QWidget):
         plus.add_requested.connect(lambda: self._start_reroll(group.key))
         return LeadTiles(
             reroll=plus,
-            request=(self._folder_request_tile_for(group)
-                     if self._can_request_changes(group) else None),
+            modify=(self._folder_modify_tile_for(group)
+                     if self._can_modify(group) else None),
             generating=None if job is None else self._generating_tile_for(group.key, job))
 
     def _forget_generating_tile(self):
@@ -2562,19 +2562,19 @@ class GalleryView(QWidget):
             self._auto.stop(key)
             self._cancel_reroll(key)
 
-    # --- the folder-wide request: same seeds, changed words ----------------
+    # --- Modify (all seeds): same seeds, changed words --------------------
 
-    def _can_request_changes(self, group) -> bool:
+    def _can_modify(self, group) -> bool:
         """True when this folder can be run again with its prompt rewritten.
 
         Everything a re-roll needs, plus at least one image to rewrite: the
         request reproduces the folder seed for seed, so a folder holding nothing
         finished yet has nothing to reproduce.
         """
-        return self._can_reroll(group) and bool(self._folder_request_rows(group))
+        return self._can_reroll(group) and bool(self._folder_modify_rows(group))
 
     @staticmethod
-    def _folder_request_rows(group) -> list[dict]:
+    def _folder_modify_rows(group) -> list[dict]:
         """The generations a request over ``group`` would re-run: the ones that
         actually produced an image.
 
@@ -2587,21 +2587,21 @@ class GalleryView(QWidget):
             return []
         return [row for row in group.rows if gallery.produced_output(row)]
 
-    def _folder_request_tile_for(self, group) -> FolderRequestTile:
-        tile = FolderRequestTile()
-        tile.clicked.connect(lambda g=group: self._open_folder_request(g))
+    def _folder_modify_tile_for(self, group) -> FolderModifyTile:
+        tile = FolderModifyTile()
+        tile.clicked.connect(lambda g=group: self._open_folder_modify(g))
         return tile
 
-    def _open_folder_request(self, group):
+    def _open_folder_modify(self, group):
         """Open this folder's prompt in a tab, ready to be rewritten.
 
         Nothing is launched: the card is the start of an edit made by hand, which
         is the whole reason it is typed rather than spoken. The tab carries the
         folder's settings, its prompts marked against themselves, and its images
         tiled in the preview — see
-        :meth:`GenerateConfigPanel.open_folder_request`.
+        :meth:`GenerateConfigPanel.open_folder_modify`.
         """
-        rows = self._folder_request_rows(group)
+        rows = self._folder_modify_rows(group)
         workflow = WORKFLOW_REGISTRY.get(rows[0].get("workflow_name") or "") if rows else None
         if workflow is None or self._client is None:
             return
@@ -2609,11 +2609,11 @@ class GalleryView(QWidget):
         # in the hover is the number of images and not of readable files.
         pictures = [row.get("thumbnail_path") for row in rows]
         self._clear_reroll_selection()  # the tab is about the folder, not a live run
-        self._info_tabs.open_folder_request(group.key, group.label, workflow.name,
+        self._info_tabs.open_folder_modify(group.key, group.label, workflow.name,
                                       filled_params(rows[0], workflow), pictures)
 
-    def _on_changes_requested(self, folder_key: str, workflow_name: str, params: dict):
-        """A request tab's Generate: run every image of ``folder_key`` again with
+    def _on_modify_requested(self, folder_key: str, workflow_name: str, params: dict):
+        """A Modify tab's Generate: run every image of ``folder_key`` again with
         its own seed and the rewritten prompt, and land on the folder they make.
 
         One job per image, all of them into the one new settings folder — the
@@ -2632,7 +2632,7 @@ class GalleryView(QWidget):
         # the key a tab carries is the folder's own, with no side on it.
         item = self._tree_item_for(folder_key)
         group = item.data(0, _GROUP_ROLE) if item is not None else None
-        rows = self._folder_request_rows(group) if group is not None else []
+        rows = self._folder_modify_rows(group) if group is not None else []
         if self._client is None or wf is None or not rows:
             return
         params = {**wf.default_params(), **params}  # form values win over defaults
@@ -2672,9 +2672,9 @@ class GalleryView(QWidget):
         """A file showing what ``job`` came from, for the tile to stand blurred
         under the wait until the run streams a frame of its own.
 
-        The image it was requested of first — a folder-wide request queues a run
-        per image and none of them animates anything, so what it was asked about
-        is the only picture it has — then the start frame an i2v or an enhance is
+        The image it was requested or modified from first — a folder's Modify
+        queues a run per image and none of them animates anything, so what it
+        rewrites is the only picture it has — then the start frame an i2v or an enhance is
         built on. ``None`` for a run that came from nothing, which keeps the
         plain plate: a queued image looks like every other queued image because
         it genuinely is.

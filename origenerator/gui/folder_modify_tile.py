@@ -6,11 +6,9 @@ mirror — it keeps the seeds and changes the words, running the folder again wi
 the prompt rewritten, so what comes back is the same set of images said another
 way rather than a new set of images.
 
-It is the spoken "Request … over", made of a whole folder and typed. Pressing it
-launches nothing: it opens the request in a config tab, where the folder's own
-prompt is there to be edited by hand and the folder's images fill the preview
-above it — the careful edit a typed request is for, as against a spoken one the
-app has to interpret.
+Pressing it launches nothing: it opens a config tab where the folder's own
+prompt is there to be edited by hand, the folder's images filling the preview
+above it.
 """
 from __future__ import annotations
 
@@ -19,7 +17,7 @@ from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from origenerator.gui import grid_card
 
-_IDLE_FRAME_CSS = grid_card.idle_css("folderRequestTile")
+_IDLE_FRAME_CSS = grid_card.idle_css("folderModifyTile")
 
 # A pencil rather than a plus: the card next door makes another one of these, and
 # this one writes on them. Smaller than the plus, which is a bare line — a
@@ -27,21 +25,21 @@ _IDLE_FRAME_CSS = grid_card.idle_css("folderRequestTile")
 _GLYPH = "✎"
 _GLYPH_PT = 48
 
-_CAPTION = "Request (same seeds)"
+_CAPTION = "Modify (all seeds)"
 _TOOLTIP = (
     "Rewrite this folder's prompt and run every image in it again with the same "
     "seed, so the new folder is this one said differently."
 )
 
 
-class FolderRequestTile(QFrame):
+class FolderModifyTile(QFrame):
     """A card that opens this folder's prompt for a rewrite."""
 
     clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("folderRequestTile")
+        self.setObjectName("folderModifyTile")
         self.setFixedSize(*grid_card.card_size())
         self.setStyleSheet(_IDLE_FRAME_CSS)
         self.setCursor(Qt.CursorShape.PointingHandCursor)

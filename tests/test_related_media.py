@@ -117,6 +117,13 @@ def test_a_spoken_request_shows_what_was_heard(related):
     assert related._heard_words.text() == "“Request, no hat, over”"
 
 
+def test_a_picture_a_folders_modify_made_points_at_the_one_it_was_modified_from(related):
+    related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [],
+                     request={"source_row": _image_row(), "heard": ""})
+
+    assert related._source_tile._heading.text() == "Modified from"
+
+
 def test_a_request_typed_over_a_whole_folder_has_nothing_heard_to_show(related):
     related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [],
                      request={"source_row": _image_row(), "heard": ""})

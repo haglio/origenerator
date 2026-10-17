@@ -74,9 +74,8 @@ class InFlightItems:
                          for job in jobs}
         # Which of these were asked for, and of what. One listing rather than a
         # lookup per job: the table is small and the queue rarely is.
-        requested = {r["prompt_id"]: r["source_prompt_id"]
-                     for r in (self._db.list_requests()
-                               if requests is None else requests)}
+        records = {r["prompt_id"]: r for r in (self._db.list_requests()
+                                               if requests is None else requests)}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
@@ -137,7 +136,8 @@ class InFlightItems:
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,
                 job_kind=kind,
-                requested=pid in requested,
+                requested=bool((records.get(pid) or {}).get("heard")),
+                modified=pid in records and not records[pid].get("heard"),
                 # Only where the start frame is what the run is *of*: a video
                 # animating a picture, and an enhancement of one. An image
                 # workflow that happens to take an input (the pose transfer's
@@ -148,7 +148,8 @@ class InFlightItems:
                 # What to stand under the wait: the image this run was
                 # requested of, else the frame it animates or enhances.
                 source_picture=self._source_picture(
-                    requested.get(pid), row_by_id, params, kind),
+                    (records.get(pid) or {}).get("source_prompt_id"), row_by_id,
+                    params, kind),
                 # What the Combine panel was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, being the recipe
@@ -176,9 +177,9 @@ class InFlightItems:
                         kind: str) -> str | None:
         """A file showing what a queued run came from, or ``None``.
 
-        The image a request was made of comes first: a folder-wide request
+        The image a request or a Modify was made of comes first: a Modify
         queues a run per image and every one of them animates nothing, so the
-        thing it was asked about is the only picture it has. Failing that, the
+        picture it rewrites is the only one it has. Failing that, the
         start frame a video or an enhance is built on.
         """
         asked_of = (row_by_id.get(requested_of) or {}).get("thumbnail_path")

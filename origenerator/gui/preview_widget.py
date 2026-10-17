@@ -308,7 +308,7 @@ class PreviewWidget(QWidget):
         """Show a whole folder at once: every picture in ``paths``, tiled to fill.
 
         What a tab about a folder rather than a generation puts in the pane —
-        the rewrite a folder's Request card opens. There is no one file on display, so
+        the rewrite a folder's Modify (all seeds) opens. There is no one file on display, so
         nothing here is draggable, openable fullscreen, or scripted; the wall is
         the folder, and the folder is what the settings below it are about — and
         no one of them is what the corner controls would act on, which is why

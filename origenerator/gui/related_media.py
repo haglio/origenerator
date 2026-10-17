@@ -150,7 +150,8 @@ class RelatedMedia(QWidget):
                 return frame, None, MediaType.IMAGE
         if request is not None and request.get("source_row"):
             asked_about = request["source_row"]
-            return asked_about, "Requested from", media_type_of_row(asked_about)
+            heading = "Requested from" if request.get("heard") else "Modified from"
+            return asked_about, heading, media_type_of_row(asked_about)
         return None, None, None
 
     def _animated_items(self, row: dict) -> list[tuple]:

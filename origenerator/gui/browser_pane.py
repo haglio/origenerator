@@ -237,7 +237,7 @@ def _draw_between_headings(flow, rows, headings, draw, *, start=0):
 @dataclass(frozen=True)
 class LeadTiles:
     reroll: QWidget | None = None
-    request: QWidget | None = None
+    modify: QWidget | None = None
     generating: QWidget | None = None
 
 
@@ -1226,12 +1226,12 @@ class BrowserPane(QObject):
         opens_now = ((lead.reroll is not None or bool(cards))
                      and gallery.new_work_opens_a_section(finished))
         sections = opens_now + sum(1 for heading in headings if heading)
-        request_above = lead.request is not None and sections > 1
-        if request_above:
-            flow.addWidget(lead.request)
+        modify_above = lead.modify is not None and sections > 1
+        if modify_above:
+            flow.addWidget(lead.modify)
 
         def draw_leading():
-            for tile in (lead.reroll, None if request_above else lead.request):
+            for tile in (lead.reroll, None if modify_above else lead.modify):
                 if tile is not None:
                     flow.addWidget(tile)
             for item in cards:

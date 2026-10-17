@@ -195,11 +195,11 @@ PARAM_HELP: dict[str, str] = {
         "model is SDXL whatever made the picture."
     ),
     "enhance_controlnet_strength": (
-        "How firmly the picture's own layout is held while Enhance redraws its surface "
-        "(a tile ControlNet on the enlarged picture). 0 holds nothing and is Enhance as "
-        "it was. Held, the Redraw Amount can go to 0.5 or 0.6 and a photo model redraws "
-        "the skin, hair and light while the pose, the face and the hands stay where "
-        "they were."
+        "How firmly the picture's own layout is held while Enhance redraws its surface, "
+        "as a depth map of the enlarged picture (a ControlNet on that map). 0 holds "
+        "nothing and is Enhance as it was. Held, the Redraw Amount can go to 0.5 or 0.6 "
+        "and a photo model redraws the skin, hair and light while the pose, the face "
+        "and the hands stay where they were."
     ),
 
     # --- structure transfer ---
@@ -323,7 +323,7 @@ RECOMMENDED: dict[str, str] = {
         "Good range: 0.3–0.5 for each part."
     ),
     "enhance_controlnet": (
-        "The union one; its tile head is what a redraw is held with."
+        "The union one; its depth head is what a redraw is held with."
     ),
     "enhance_controlnet_strength": (
         "Good range: 0.5–0.8 once the Redraw Amount is 0.3 or more; 0 below that, where "

@@ -62,7 +62,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     output_type = MediaType.IMAGE
     derives_size_from_input = True
     model_keys = ("checkpoint",)
-    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
+    extra_enhance_keys = ("upscale_model", "enhance_depth_model")  # only the tail loads them
     output_node_id = "14"
     # The pre-enhance render, saved when the tail runs. 21 is the union
     # ControlNet and 22/23 the depth pair, so this sits clear of both.
@@ -99,6 +99,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "enhance_denoise": 0.15,
             "enhance_controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
             "enhance_controlnet_strength": 0.0,
+            "enhance_depth_model": "depth_anything_v2_vitl_fp32.safetensors",
             "filename_prefix": "image/sdxl_pose_transfer",
         }
 

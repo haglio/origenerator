@@ -88,6 +88,7 @@ _SIZE_SCALE, _SIZE_GET = "size_scale", "size_get"
 _ENH_LOADER, _ENH_UPSCALE, _ENH_RESCALE = "enh_loader", "enh_upscale", "enh_rescale"
 _ENH_ENCODE, _ENH_SAMPLER, _ENH_DECODE = "enh_encode", "enh_sampler", "enh_decode"
 _ENH_CONTROLNET, _ENH_UNION, _ENH_HOLD = "enh_controlnet", "enh_union", "enh_hold"
+_ENH_DEPTH_LOADER, _ENH_DEPTH = "enh_depth_loader", "enh_depth"
 
 
 @dataclass(frozen=True)
@@ -671,14 +672,18 @@ class WorkflowTemplate(ABC):
         if strength <= 0:
             return {}, positive_ref, negative_ref
         nodes, controlnet_ref = WorkflowTemplate.controlnet_nodes(
-            _ENH_CONTROLNET, _ENH_UNION, controlnet=params["enhance_controlnet"], head="tile")
+            _ENH_CONTROLNET, _ENH_UNION, controlnet=params["enhance_controlnet"], head="depth")
+        depth, depth_ref = WorkflowTemplate.depth_map_nodes(
+            _ENH_DEPTH_LOADER, _ENH_DEPTH, depth_model=params["enhance_depth_model"],
+            image_ref=[_ENH_RESCALE, 0])
+        nodes.update(depth)
         nodes[_ENH_HOLD] = {
             "class_type": "ControlNetApplyAdvanced",
             "inputs": {
                 "positive": positive_ref,
                 "negative": negative_ref,
                 "control_net": controlnet_ref,
-                "image": [_ENH_RESCALE, 0],
+                "image": depth_ref,
                 "strength": strength,
                 "start_percent": 0.0,
                 "end_percent": 1.0,

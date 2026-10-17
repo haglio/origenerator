@@ -42,7 +42,9 @@ _SETTINGS_BY_NODE = {
 _DETAIL_PASS = "DetailerForEach"
 _HOLD = "ControlNetApplyAdvanced"
 _UNION_HEAD = "SetUnionControlNetType"
+_DEPTH_MAP = "DepthAnything_V2"
 _RESCALE = ("ImageScaleBy", "ImageScale")
+_MODEL_UPSCALE = "ImageUpscaleWithModel"
 
 
 def graph_level_params(row: dict, keys) -> dict:
@@ -124,7 +126,12 @@ def _hold(graph: dict) -> dict:
     for _node_id, inputs, node_type in _nodes_of(graph):
         if node_type != _HOLD:
             continue
-        if _linked_node(graph, inputs.get("image")).get("class_type") not in _RESCALE:
+        depth_map = _linked_node(graph, inputs.get("image"))
+        rescaled = _linked_node(graph, _inputs_of(depth_map).get("images"))
+        enlarged = _linked_node(graph, _inputs_of(rescaled).get("image"))
+        if (depth_map.get("class_type") != _DEPTH_MAP
+                or rescaled.get("class_type") not in _RESCALE
+                or enlarged.get("class_type") != _MODEL_UPSCALE):
             continue
         held_with = _linked_node(graph, inputs.get("control_net"))
         if held_with.get("class_type") == _UNION_HEAD:

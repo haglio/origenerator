@@ -52,6 +52,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     derives_size_from_input = True
     selectable = False
     model_keys = ("checkpoint",)
+    extra_enhance_keys = ("enhance_depth_model",)  # only the tail loads it
     output_node_id = "12"
 
     def default_params(self) -> dict:
@@ -71,6 +72,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "enhance_denoise": 0.15,
             "enhance_controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
             "enhance_controlnet_strength": 0.0,
+            "enhance_depth_model": "depth_anything_v2_vitl_fp32.safetensors",
             "enhance_detail_fixes": {},
             "filename_prefix": "image/image_enhance",
         }

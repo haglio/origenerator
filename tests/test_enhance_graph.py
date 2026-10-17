@@ -29,8 +29,11 @@ def _sampler_graph():
               "inputs": {"ckpt_name": "example_model_v2.safetensors"}},
         "2": {"class_type": "UpscaleModelLoader",
               "inputs": {"model_name": "example_upscaler_4x.pth"}},
-        "3": {"class_type": "ImageScaleBy", "inputs": {"scale_by": 0.5}},
+        "3": {"class_type": "ImageScaleBy", "inputs": {"image": ["5", 0], "scale_by": 0.5}},
         "4": {"class_type": "KSampler", "inputs": {"steps": 20, "denoise": 0.15}},
+        "5": {"class_type": "ImageUpscaleWithModel",
+              "inputs": {"upscale_model": ["2", 0], "image": ["6", 0]}},
+        "6": {"class_type": "LoadImage", "inputs": {"image": "sample.png"}},
     }
 
 
@@ -140,16 +143,23 @@ def test_a_graph_of_things_that_are_not_nodes_gives_up_nothing():
 
 def _held(graph, node_id, controlnet, strength, *, union):
     """The hold the enhance tail lays down: the ControlNet, through the node
-    that picks a union file's head, applied to the rescaled picture."""
+    that picks a union file's head, applied to a depth map of the rescaled
+    picture."""
     graph[str(node_id)] = {"class_type": "ControlNetLoader",
                            "inputs": {"control_net_name": controlnet}}
     applied = [str(node_id), 0]
     if union:
         graph[str(node_id + 1)] = {"class_type": "SetUnionControlNetType",
-                                   "inputs": {"control_net": applied, "type": "tile"}}
+                                   "inputs": {"control_net": applied, "type": "depth"}}
         applied = [str(node_id + 1), 0]
-    graph[str(node_id + 2)] = {"class_type": "ControlNetApplyAdvanced",
-                               "inputs": {"control_net": applied, "image": ["3", 0],
+    graph[str(node_id + 2)] = {"class_type": "DownloadAndLoadDepthAnythingV2Model",
+                               "inputs": {"model": "example_depth_model.safetensors"}}
+    graph[str(node_id + 3)] = {"class_type": "DepthAnything_V2",
+                               "inputs": {"da_model": [str(node_id + 2), 0],
+                                          "images": ["3", 0]}}
+    graph[str(node_id + 4)] = {"class_type": "ControlNetApplyAdvanced",
+                               "inputs": {"control_net": applied,
+                                          "image": [str(node_id + 3), 0],
                                           "strength": strength}}
     return graph
 
@@ -171,6 +181,23 @@ def test_a_structure_pass_on_a_depth_or_pose_hint_is_not_a_hold():
     graph["11"] = {"class_type": "DepthAnything_V2", "inputs": {"images": ["2", 0]}}
     graph["12"] = {"class_type": "ControlNetApplyAdvanced",
                    "inputs": {"control_net": ["10", 0], "image": ["11", 0],
+                              "strength": 0.8}}
+
+    found = graph_level_params(_row(graph), _KEYS)
+
+    assert "enhance_controlnet_strength" not in found
+    assert "enhance_controlnet" not in found
+
+
+def test_a_structure_pass_whose_depth_map_is_of_the_scaled_input_is_not_a_hold():
+    graph = _sampler_graph()
+    graph["10"] = {"class_type": "ImageScale",
+                   "inputs": {"image": ["6", 0], "width": 832, "height": 1216}}
+    graph["11"] = {"class_type": "DepthAnything_V2", "inputs": {"images": ["10", 0]}}
+    graph["12"] = {"class_type": "ControlNetLoader",
+                   "inputs": {"control_net_name": "example_controlnet.safetensors"}}
+    graph["13"] = {"class_type": "ControlNetApplyAdvanced",
+                   "inputs": {"control_net": ["12", 0], "image": ["11", 0],
                               "strength": 0.8}}
 
     found = graph_level_params(_row(graph), _KEYS)

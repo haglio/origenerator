@@ -122,6 +122,7 @@ _PINNED = {
     "enhance_controlnet": "a_union_controlnet.safetensors",
     "enhance_controlnet_strength": 0.0,
     "enhance_denoise": 0.2,
+    "enhance_depth_model": "a_depth_model.safetensors",
     "enhance_detail_fixes": {},
     "enhance_scale": 1.5,
     "enhance_steps": 12,
@@ -203,9 +204,9 @@ _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 # every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
-    ("image_enhance", "v003"): "8c7c9de4ccbabcc4",
-    ("sdxl_pose_transfer", "v004"): "c44818dd5d9042a2",
-    ("sdxl_t2i", "v004"): "7b761d95f114a7bb",
+    ("image_enhance", "v003"): "f3eaff53dbd502ef",
+    ("sdxl_pose_transfer", "v004"): "ef937a80389e54b3",
+    ("sdxl_t2i", "v004"): "1ff8c970fa595d13",
     ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
     ("wan22_flf2v_loop", "v009"): "3cc07d12a40c7995",
     ("wan22_i2v", "v007"): "ce72e0c5e1342c10",

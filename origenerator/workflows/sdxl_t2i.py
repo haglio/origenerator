@@ -36,7 +36,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     display_name = "SDXL Text-to-Image"
     output_type = MediaType.IMAGE
     model_keys = ("checkpoint",)
-    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
+    extra_enhance_keys = ("upscale_model", "enhance_depth_model")  # only the tail loads them
     output_node_id = "7"
     base_output_node_id = "15"  # the pre-enhance render, saved when the tail runs
 
@@ -65,6 +65,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "enhance_denoise": 0.15,
             "enhance_controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
             "enhance_controlnet_strength": 0.0,
+            "enhance_depth_model": "depth_anything_v2_vitl_fp32.safetensors",
             "filename_prefix": "image/sdxl_t2i",
         }
 

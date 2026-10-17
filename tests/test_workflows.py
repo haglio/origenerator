@@ -522,7 +522,7 @@ def test_image_enhance_honors_an_unlocked_size_override():
     assert _find_node(payload, "VAEEncode")["inputs"]["pixels"] == [scale_id, 0]
 
 
-def test_the_tail_holds_the_picture_to_its_own_layout_when_asked():
+def test_the_tail_holds_the_picture_by_the_depth_of_its_enlargement_when_asked():
     wf = WORKFLOW_REGISTRY["image_enhance"]
     params = dict(wf.default_params(), input_image="pick.png",
                   positive_prompt="warm window light", negative_prompt="grainy",
@@ -533,7 +533,14 @@ def test_the_tail_holds_the_picture_to_its_own_layout_when_asked():
     loader_id = _node_id(payload, "ControlNetLoader")
     assert payload[loader_id]["inputs"]["control_net_name"] == "a_union_controlnet.safetensors"
     union_id = _node_id(payload, "SetUnionControlNetType")
-    assert payload[union_id]["inputs"] == {"control_net": [loader_id, 0], "type": "tile"}
+    assert payload[union_id]["inputs"] == {"control_net": [loader_id, 0], "type": "depth"}
+    depth_loader_id = _node_id(payload, "DownloadAndLoadDepthAnythingV2Model")
+    assert payload[depth_loader_id]["inputs"] == {"model": params["enhance_depth_model"]}
+    depth_id = _node_id(payload, "DepthAnything_V2")
+    assert payload[depth_id]["inputs"] == {
+        "da_model": [depth_loader_id, 0],
+        "images": [_node_id(payload, "ImageScaleBy"), 0],
+    }
     encodes = {n["inputs"]["text"]: nid for nid, n in payload.items()
                if n["class_type"] == "CLIPTextEncode"}
     hold_id = _node_id(payload, "ControlNetApplyAdvanced")
@@ -541,7 +548,7 @@ def test_the_tail_holds_the_picture_to_its_own_layout_when_asked():
         "positive": [encodes["warm window light"], 0],
         "negative": [encodes["grainy"], 0],
         "control_net": [union_id, 0],
-        "image": [_node_id(payload, "ImageScaleBy"), 0],
+        "image": [depth_id, 0],
         "strength": 0.6,
         "start_percent": 0.0,
         "end_percent": 1.0,
@@ -588,15 +595,20 @@ def test_every_tail_that_refines_on_an_sdxl_model_takes_the_same_hold(name):
                                         enhance_controlnet_strength=0.6))
 
     rescale_id = _node_id(payload, "ImageScaleBy")
+    depth_id, depth = next((nid, n["inputs"]) for nid, n in payload.items()
+                           if n["class_type"] == "DepthAnything_V2"
+                           and n["inputs"]["images"] == [rescale_id, 0])
+    depth_loader = payload[depth["da_model"][0]]
+    assert depth_loader["inputs"]["model"] == wf.default_params()["enhance_depth_model"]
     hold_id, hold = next((nid, n["inputs"]) for nid, n in payload.items()
                          if n["class_type"] == "ControlNetApplyAdvanced"
-                         and n["inputs"]["image"] == [rescale_id, 0])
+                         and n["inputs"]["image"] == [depth_id, 0])
     assert hold["positive"] == _tail_sampler(plain)["positive"]
     assert hold["negative"] == _tail_sampler(plain)["negative"]
     assert hold["strength"] == 0.6
     union = payload[hold["control_net"][0]]
     assert union["class_type"] == "SetUnionControlNetType"
-    assert union["inputs"]["type"] == "tile"
+    assert union["inputs"]["type"] == "depth"
     loader = payload[union["inputs"]["control_net"][0]]
     assert loader["inputs"]["control_net_name"] == wf.default_params()["enhance_controlnet"]
     assert _tail_sampler(payload)["positive"] == [hold_id, 0]
@@ -940,7 +952,7 @@ def test_enhance_keys_cover_every_param_only_the_tail_reads():
     held = tail | {"enhance_controlnet", "enhance_controlnet_strength"}
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
-        assert set(wf.enhance_keys()) == held | {"upscale_model"}, name
+        assert set(wf.enhance_keys()) == held | {"upscale_model", "enhance_depth_model"}, name
     assert set(WORKFLOW_REGISTRY["wan22_t2i"].enhance_keys()) == tail | {"upscale_model"}
     # Flux keeps upscale_model in its recipe: with the toggle OFF that same
     # param drives the plain 4x upscale this workflow is named for, so it is a
@@ -998,6 +1010,7 @@ def test_a_shared_fragment_never_builds_under_an_id_a_hand_numbered_graph_could_
         base._ENH_LOADER, base._ENH_UPSCALE, base._ENH_RESCALE,
         base._ENH_ENCODE, base._ENH_SAMPLER, base._ENH_DECODE,
         base._ENH_CONTROLNET, base._ENH_UNION, base._ENH_HOLD,
+        base._ENH_DEPTH_LOADER, base._ENH_DEPTH,
     }
     assert not any(node_id.isdigit() for node_id in fragment_ids)
 

@@ -90,6 +90,7 @@ app = "Origenerator"
 run = "-m origenerator"
 named-interpreter = "Origenerator-Origenerator.exe"
 log = 'state\origenerator_launcher.log'
+loading-screen = ["Updating Origenerator..."]
 
 [tool.haglio.launchers."launch_preview_branch.vbs"]
 app = "Origenerator (branch preview)"
@@ -97,6 +98,7 @@ run = "-m origenerator"
 venv = "primary"
 log = 'state\origenerator_launcher.log'
 environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
+loading-screen = ["Updating Origenerator..."]
 
 [tool.haglio.launchers."sort_pictures.vbs"]
 app = "Origenerator (sorting pictures)"

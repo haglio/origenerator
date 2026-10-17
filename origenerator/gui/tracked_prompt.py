@@ -154,6 +154,9 @@ class _Tracker(QObject):
         self._layout = spans
         text = "".join(piece for _kind, piece in spans)
         with self._own_write():
+            # What the field is worth, whenever that is no longer what it says.
+            diff_text.hold_value(self._edit,
+                                 None if text == self._value else self._value)
             self._edit.setPlainText(text)
             _unmark(self._edit)
             cursor = QTextCursor(self._edit.document())
@@ -165,9 +168,6 @@ class _Tracker(QObject):
                     cursor.mergeCharFormat(diff_text.added_format() if kind == ADDED
                                            else diff_text.removed_format())
                 cursor.setPosition(end)
-            # What the field is worth, whenever that is no longer what it says.
-            diff_text.hold_value(self._edit,
-                                 None if text == self._value else self._value)
             place = QTextCursor(self._edit.document())
             place.setPosition(min(self._document_offset(caret), len(text)))
             self._edit.setTextCursor(place)

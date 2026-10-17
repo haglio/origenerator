@@ -2018,6 +2018,21 @@ def test_editing_a_shown_picture_s_prompt_marks_how_it_now_differs(saved_panel, 
     assert _notice(panel) == "(not yet generated with modifications)"
 
 
+def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+    field = panel._param_form._widgets["positive_prompt"]
+    field.moveCursor(QTextCursor.MoveOperation.End)
+    qtbot.keyClicks(field, "s")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("couch", "couchs"), timeout=5000)
+
+    qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    qtbot.waitUntil(lambda: diff_text.live_text(field) == "a cat on a couch", timeout=5000)
+    assert _notice(panel) == ""
+
+
 def test_showing_the_next_picture_never_reaches_the_marks_as_typing(saved_panel, monkeypatch):
     panel, db = saved_panel
     first = _image_row(db, "img1", prompt="a cat on a couch")

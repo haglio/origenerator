@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import json as _json
 import re
 
 import pytest
@@ -12,7 +10,6 @@ import origenerator.workflows.detail_parts as detail_module
 import origenerator.workflows.flux_t2i_upscaled as flux
 import origenerator.workflows.sdxl_pose_transfer as pose
 import origenerator.workflows.sdxl_t2i as t2i
-import origenerator.workflows.wan21_ati_i2v as ati
 import origenerator.workflows.wan_experts as experts
 from origenerator import config
 from origenerator.comfy_graph import dual_sampler_model_files
@@ -36,10 +33,8 @@ from origenerator.workflows.frame_rate import (
 )
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
 from origenerator.workflows.model_files import NO_LORA
-from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
 from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
-from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
 from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
@@ -236,7 +231,7 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # covered the day it is registered.
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"}
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop"}
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
     # ...and the split is the media, not a list anyone has to remember to add to.
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
@@ -928,14 +923,14 @@ def test_wan22_default_params_has_required_keys():
 
 
 def test_i2v_workflows_have_no_manual_width_height_controls():
-    # Every input_image-taking workflow derives its output size from that image
-    # (in-graph for the 2.2 pair, app-side for ATI), so none exposes a manual
-    # width/height control. Asserted across the whole registry, not just the 2.2
-    # pair, so a new i2v can't silently regress to hardcoded dimensions.
+    # Every input_image-taking workflow derives its output size from that image,
+    # so none exposes a manual width/height control. Asserted across the whole
+    # registry, not just the 2.2 pair, so a new i2v can't silently regress to
+    # hardcoded dimensions.
     i2v_workflows = [
         wf for wf in WORKFLOW_REGISTRY.values() if "input_image" in wf.default_params()
     ]
-    assert len(i2v_workflows) >= 3               # the 2.2 pair + ATI, at least
+    assert len(i2v_workflows) >= 2               # the 2.2 pair, at least
     for wf in i2v_workflows:
         keys = [d.key for d in wf.param_definitions()]
         assert "width" not in keys and "height" not in keys, wf.name
@@ -1046,24 +1041,6 @@ def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
     assert frame["start_image"] == [scale_id, 0]
     assert frame["end_image"] == [scale_id, 0]
     assert frame["width"] == 848 and frame["height"] == 480
-
-
-def test_wan21_ati_i2v_honors_an_unlocked_size_override():
-    # An explicit WxH wins over the input image's derived size, and the motion is
-    # rescaled into the overridden space — so an unlock overrides derivation even
-    # when the (here nonexistent) image would otherwise be measured or fall back.
-
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    params = dict(wf.default_params(), input_image="whatever.png", width=720, height=480)
-    track = _find_node(wf.build_api_payload(params), "WanTrackToVideo")
-
-    assert track["inputs"]["width"] == 720
-    assert track["inputs"]["height"] == 480
-    sx, sy = 720 / REFERENCE_WIDTH, 480 / REFERENCE_HEIGHT
-    anchor = json.loads(track["inputs"]["tracks"])[3][0]
-    assert anchor == pytest.approx(
-        {"x": params["anchor_x"] * sx, "y": params["anchor_y"] * sy}
-    )
 
 
 def test_wan22_flf2v_payload_generates_synced_foley_audio():
@@ -1305,386 +1282,8 @@ def test_wan22_i2v_extract_output_info_uses_images_key():
     assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
 
 
-# ---- WAN 2.1 ATI (motion-tracked image-to-video) ----
-
-def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
-    # The ATI workflow flips motion authorship: WanTrackToVideo conditions the
-    # video on a motion track built from the motion params, so the pixels follow
-    # the track instead of the track guessing at pixels. The track is ATI's
-    # fixed 121-point/24fps convention: a 3-point cluster riding the authored
-    # sine between motion_ceiling and motion_floor, plus one static point holding
-    # the anchor (e.g. a anchor base) in place.
-
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    assert wf.__class__ is Wan21AtiI2vWorkflow
-    assert wf.output_type == "video"
-    assert wf.looping is False
-    assert wf.model_keys == ("unet",)
-
-    params = dict(
-        wf.default_params(),
-        positive_prompt="slow steady rhythm",
-        input_image="start.png",
-        seed=7,
-        audio_seed=8,
-        motion_hz=1.0,
-        motion_x=200,
-        motion_ceiling=400,
-        motion_floor=600,
-        anchor_x=180,
-        anchor_y=700,
-    )
-    payload = wf.build_api_payload(params)
-
-    track_node = _find_node(payload, "WanTrackToVideo")
-    assert track_node is not None
-    assert _find_node(payload, "WanImageToVideo") is None
-    # "start.png" isn't a real file, so the size falls back to the reference
-    # frame (scale 1.0), leaving the motion coordinates below unscaled.
-    assert track_node["inputs"]["width"] == REFERENCE_WIDTH
-    assert track_node["inputs"]["height"] == REFERENCE_HEIGHT
-    assert track_node["inputs"]["length"] == params["frame_count"]
-
-    tracks = json.loads(track_node["inputs"]["tracks"])
-    assert len(tracks) == 4                      # 3 motion points + 1 static anchor
-    assert all(len(t) == 121 for t in tracks)    # ATI's fixed track convention
-    cluster = tracks[:3]
-    ys = [pt["y"] for pt in cluster[1]]          # the centered motion point
-    assert ys[0] == pytest.approx(400, abs=1)    # starts at the motion's ceiling
-    assert min(ys) == pytest.approx(400, abs=2)  # tops ride near motion_ceiling...
-    assert 575 <= max(ys) <= 601                 # ...troughs near motion_floor
-    anchor = tracks[3]
-    assert all(pt == {"x": 180.0, "y": 700.0} for pt in anchor)  # pinned still
-
-    # Two-stage sampling on the single ATI UNET (the high/low LoRA split; see
-    # test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras), seeded once.
-    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
-    assert len(samplers) == 2
-    assert all(n["inputs"]["noise_seed"] == 7 for n in samplers)
-    assert _find_node(payload, "KSampler") is None
-    unet = _find_node(payload, "UNETLoader")
-    assert unet["inputs"]["unet_name"] == params["unet"]
-
-    # The foley pass rides the decoded frames and CreateVideo muxes it, exactly
-    # like the other video workflows.
-    sampler_id = _node_id(payload, "HunyuanFoleySampler")
-    decode_id = _node_id(payload, "VAEDecode")
-    assert payload[sampler_id]["inputs"]["image"] == [decode_id, 0]
-    assert payload[sampler_id]["inputs"]["seed"] == 8
-    assert _find_node(payload, "CreateVideo")["inputs"]["audio"] == [sampler_id, 0]
-
-
-def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
-    # The funscript is the track's own reversal points — the exact turnarounds
-    # the pixel track eases between — mapped onto video time (the 121-point
-    # track always spans 5.0s of track time stretched over the clip's real
-    # duration) and normalized to travel depth. Each top-of-cycle action must
-    # land where the track's y actually crests. No pixel measurement anywhere.
-
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    params = dict(wf.default_params(), motion_hz=1.2, frame_count=81, frame_rate=16.0, seed=42)
-    actions = wf.authored_actions(params)
-    payload = wf.build_api_payload(params)
-    tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
-    ys = [pt["y"] for pt in tracks[1]]           # the centered cluster point
-    top, floor = params["motion_ceiling"], params["motion_floor"]
-    depth = floor - top
-
-    assert actions[0] == {"at": 0, "pos": 100}   # the motion starts at its ceiling
-    assert actions[-1]["at"] <= 81 / 16.0 * 1000
-    assert all(0 <= a["pos"] <= 100 for a in actions)
-    scale = (81 / 16.0) / 5.0
-    pos = [a["pos"] for a in actions]
-    crests = [
-        i for i in range(1, len(actions) - 1)
-        if pos[i] > pos[i - 1] and pos[i] >= pos[i + 1] and pos[i] >= 75
-    ]
-    assert crests, "the script must reach the motion's ceiling repeatedly"
-    for i in crests:                             # a top-of-cycle reversal
-        s = round(actions[i]["at"] / 1000 / scale * 24)  # nearest track sample
-        window = ys[max(0, s - 1):s + 2]
-        assert min(window) <= top + 0.20 * depth  # the track crests there too
-
-    # Workflows without an authored track say so with None, keeping the
-    # metronome fallback for them.
-    assert Wan22I2vWorkflow().authored_actions(Wan22I2vWorkflow().default_params()) is None
-
-
-def test_one_seeds_authored_motion_is_the_same_motion_it_has_always_been():
-    # Every ATI clip already in the library carries a funscript written from
-    # this sequence, and the video's pixels were generated from the very same
-    # reversals. So the numbers are an on-disk contract, not an implementation
-    # detail: a change to the wobble, the easing or the shaping point would
-    # leave every stored script describing a motion its video no longer makes.
-    # Pinned exactly, at one seed, so a move or a rewrite has to reproduce it.
-
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    params = dict(wf.default_params(), seed=4242, frame_count=81, motion_hz=1.2,
-                  motion_ceiling=200, motion_floor=700, motion_x=240,
-                  anchor_x=210, anchor_y=520)
-
-    actions = wf.authored_actions(params)
-    assert len(actions) == 25
-    assert actions[:6] == [
-        {"at": 0, "pos": 100}, {"at": 262, "pos": 24}, {"at": 477, "pos": 7},
-        {"at": 670, "pos": 78}, {"at": 827, "pos": 93}, {"at": 1044, "pos": 19},
-    ]
-    assert actions[-2:] == [{"at": 4684, "pos": 80}, {"at": 4863, "pos": 94}]
-
-    tracks = _json.loads(_find_node(wf.build_api_payload(params),
-                                    "WanTrackToVideo")["inputs"]["tracks"])
-    assert (len(tracks), len(tracks[0])) == (4, 121)
-    assert [round(point["y"], 6) for point in tracks[0][:5]] == [
-        170.0, 178.873796, 204.81428, 245.830993, 298.776647,
-    ]
-
-
-def test_wan21_ati_i2v_funscript_is_sparse_enough_for_the_osr2_driver():
-    # The OSR2 driver re-sends "next action, time until it" on a 50ms poll, so
-    # a dense script becomes a new target every tick and the device spasms
-    # (user-reported: "unusably spastic... going to break my OSR2"). Actions
-    # are reversals plus at most one shaping point per half-cycle, so every
-    # gap stays far above the poll period at the default cadence.
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    params = dict(wf.default_params(), seed=42)
-    actions = wf.authored_actions(params)
-    gaps = [b["at"] - a["at"] for a, b in zip(actions, actions[1:])]
-    assert min(gaps) >= 120
-    cycles = 1.2 * (81 / 16.0)                   # authored cycles in the clip
-    assert len(actions) <= 2 * cycles * 2 + 2    # reversals + shaping, no more
-
-
-def test_wan21_ati_i2v_motion_decelerates_into_reversals_and_wobbles_like_a_hand():
-    # Organic, not metronomic: each long-enough half-cycle carries a shaping
-    # point at 55% time / 82% travel, so the device covers most of the distance
-    # early and decelerates into the reversal; and the pacing wobbles per
-    # half-cycle, seeded by the generation seed — deterministic per run,
-    # re-rolled with it.
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    params = dict(wf.default_params(), seed=42)
-    actions = wf.authored_actions(params)
-    assert actions == wf.authored_actions(dict(params))             # deterministic
-    assert actions != wf.authored_actions(dict(params, seed=43))    # seed re-rolls it
-
-    pos = [a["pos"] for a in actions]
-    ats = [a["at"] for a in actions]
-    reversal_idx = [
-        i for i in range(1, len(pos) - 1)
-        if (pos[i] - pos[i - 1]) * (pos[i + 1] - pos[i]) < 0
-    ]
-    assert reversal_idx, "the motion must actually reverse"
-    # Deceleration: between reversals, the leg INTO the reversal moves less
-    # distance per millisecond than the leg leaving the previous one.
-    decelerating = 0
-    for i in reversal_idx:
-        if i >= 2:
-            speed_in = abs(pos[i] - pos[i - 1]) / max(1, ats[i] - ats[i - 1])
-            speed_out = abs(pos[i - 1] - pos[i - 2]) / max(1, ats[i - 1] - ats[i - 2])
-            if speed_in < speed_out:
-                decelerating += 1
-    assert decelerating >= len(reversal_idx) // 2
-
-    # Human wobble: the spacing between successive top-of-cycle peaks varies.
-    peaks = [ats[i] for i in reversal_idx if pos[i] > 75]
-    gaps = {round((b - a) / 25) for a, b in zip(peaks, peaks[1:])}
-    assert len(gaps) > 1
-
-
-def test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras(monkeypatch):
-    # The LoRA ecosystem ships high/low-noise pairs, so the ATI workflow takes
-    # one of each like the 2.2 workflows do — emulated on its single 2.1 base
-    # by splitting the denoise into two KSamplerAdvanced stages at steps//2:
-    # the high-noise LoRA patches the early-step model, the low-noise LoRA the
-    # late-step one, both branching off the one UNET. Each slot is optional
-    # ("None" omits its loader; that stage runs the base model unmodified).
-
-    options = [NO_LORA, "hand_high.safetensors", "hand_low.safetensors"]
-    monkeypatch.setattr(experts, "list_lora_files", lambda fallback, **terms: options)
-
-    wf = Wan21AtiI2vWorkflow()
-    assert wf.lora_keys == ("lora_high", "lora_low")
-    by_key = {pd.key: pd for pd in wf.param_definitions()}
-    for level in ("high", "low"):
-        picker = by_key[f"lora_{level}"]
-        assert picker.type == "combo"
-        assert picker.options == options
-        assert picker.default == NO_LORA
-
-    def lora_nodes(payload):
-        return {nid: n for nid, n in payload.items()
-                if n["class_type"] == "LoraLoaderModelOnly"}
-
-    def stages(payload):
-        samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
-        assert _find_node(payload, "KSampler") is None
-        assert len(samplers) == 2
-        early = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
-        late = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
-        return early, late
-
-    # Both bypassed: two stages, no LoRA loaders, both stages on the base model.
-    params = dict(wf.default_params(), seed=5, steps=20)
-    payload = wf.build_api_payload(params)
-    early, late = stages(payload)
-    assert lora_nodes(payload) == {}
-    assert early["inputs"]["end_at_step"] == 10
-    assert late["inputs"]["start_at_step"] == 10
-    assert early["inputs"]["noise_seed"] == 5
-    # Stage two refines stage one's latent.
-    early_id = next(k for k, v in payload.items() if v is early)
-    assert late["inputs"]["latent_image"] == [early_id, 0]
-
-    # Both set: each stage's model chain runs its own LoRA off the shared UNET.
-    payload = wf.build_api_payload(dict(
-        params, lora_high="hand_high.safetensors", lora_strength_high=0.8,
-        lora_low="hand_low.safetensors", lora_strength_low=0.6,
-    ))
-    early, late = stages(payload)
-    loaders = lora_nodes(payload)
-    assert len(loaders) == 2
-    unet_id = _node_id(payload, "UNETLoader")
-
-    def chain_lora(sampler):
-        shift = payload[sampler["inputs"]["model"][0]]
-        assert shift["class_type"] == "ModelSamplingSD3"
-        loader = payload[shift["inputs"]["model"][0]]
-        assert loader["class_type"] == "LoraLoaderModelOnly"
-        assert loader["inputs"]["model"] == [unet_id, 0]
-        return loader["inputs"]
-
-    assert chain_lora(early)["lora_name"] == "hand_high.safetensors"
-    assert chain_lora(early)["strength_model"] == 0.8
-    assert chain_lora(late)["lora_name"] == "hand_low.safetensors"
-    assert chain_lora(late)["strength_model"] == 0.6
-
-    # One set, one bypassed: exactly one loader; the bypassed stage's shift
-    # reads the UNET directly.
-    payload = wf.build_api_payload(dict(params, lora_high="hand_high.safetensors"))
-    early, late = stages(payload)
-    assert len(lora_nodes(payload)) == 1
-    late_shift = payload[late["inputs"]["model"][0]]
-    assert late_shift["inputs"]["model"] == [unet_id, 0]
-
-
 def _write_image(path, size):
     Image.new("RGB", size, (128, 128, 128)).save(path)
-
-
-def test_wan21_ati_i2v_derives_size_and_rescales_the_motion(tmp_path, monkeypatch):
-    # The output size is measured from the input image app-side (ATI can't derive
-    # it in-graph), matching what ImageScaleToTotalPixels would produce, and the
-    # motion coordinates — authored in the 480×864 reference frame — are rescaled
-    # into that derived space so the track lands in the same relative place
-    # regardless of the image's aspect ratio.
-
-    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
-    _write_image(tmp_path / "square.png", (1024, 1024))
-
-    wf = Wan21AtiI2vWorkflow()
-    params = dict(wf.default_params(), input_image="square.png")
-    payload = wf.build_api_payload(params)
-
-    derived_w, derived_h = scale_to_total_pixels(1024, 1024)
-    assert (derived_w, derived_h) == (640, 640)
-    track_node = _find_node(payload, "WanTrackToVideo")
-    assert track_node["inputs"]["width"] == derived_w
-    assert track_node["inputs"]["height"] == derived_h
-
-    sx, sy = derived_w / REFERENCE_WIDTH, derived_h / REFERENCE_HEIGHT
-    tracks = json.loads(track_node["inputs"]["tracks"])
-    anchor = tracks[3]
-    assert anchor[0] == pytest.approx(
-        {"x": params["anchor_x"] * sx, "y": params["anchor_y"] * sy}
-    )
-    ys = [pt["y"] for pt in tracks[1]]                       # centered motion point
-    # The organic motion starts exactly at the (scaled) top and lands within its
-    # humanized shortfall of the (scaled) floor — never beyond either bound.
-    scaled_depth = (params["motion_floor"] - params["motion_ceiling"]) * sy
-    assert min(ys) == pytest.approx(params["motion_ceiling"] * sy, abs=1)
-    assert params["motion_floor"] * sy - 0.12 * scaled_depth <= max(ys)
-    assert max(ys) <= params["motion_floor"] * sy + 1
-
-
-def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkeypatch):
-    # A missing or unset input image can't be measured, so the size falls back to
-    # the 480×864 reference (scale 1.0 → the motion coordinates pass through
-    # unchanged) rather than crashing payload build.
-
-    wf = Wan21AtiI2vWorkflow()
-    for image in ("", "does_not_exist.png"):
-        params = dict(wf.default_params(), input_image=image)
-        track_node = _find_node(wf.build_api_payload(params), "WanTrackToVideo")
-        assert track_node["inputs"]["width"] == REFERENCE_WIDTH
-        assert track_node["inputs"]["height"] == REFERENCE_HEIGHT
-        anchor = json.loads(track_node["inputs"]["tracks"])[3][0]
-        assert anchor == {"x": float(params["anchor_x"]), "y": float(params["anchor_y"])}
-
-
-def test_wan21_ati_motion_coordinates_are_bounded_by_the_reference_frame():
-    # The motion coordinates are authored in the 480×864 reference frame (then
-    # rescaled into the derived size), so their ranges are that frame's bounds —
-    # X params to the reference width, Y params to the reference height — not the
-    # old catch-all 4096. This keeps the form's meaning honest about the space.
-
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    by_key = {pd.key: pd for pd in wf.param_definitions()}
-    for key in ("motion_x", "anchor_x"):
-        assert by_key[key].max_val == REFERENCE_WIDTH
-    for key in ("motion_ceiling", "motion_floor", "anchor_y"):
-        assert by_key[key].max_val == REFERENCE_HEIGHT
-
-
-def test_wan21_ati_i2v_auto_aims_untouched_motion_params(monkeypatch, tmp_path):
-    # Choosing where in the frame a thing is doesn't scale, so when the motion
-    # coordinates are all still at their defaults, payload build detects the
-    # anchor in the start frame and aims the track at it (converted into the
-    # 480x864 reference frame, then scaled like any manual aim). Any edited
-    # coordinate switches detection off entirely — the user's numbers win.
-    # The funscript is unaffected either way: pos is normalized depth, so the
-    # same seed yields the same actions no matter where the track points.
-
-
-    aim = {"motion_x": 0.5, "motion_ceiling": 0.25, "motion_floor": 0.5,
-           "anchor_x": 0.45, "anchor_y": 0.6}
-    calls = []
-    monkeypatch.setattr(ati, "detect_grip_aim", lambda path: (calls.append(path), aim)[1])
-
-    wf = Wan21AtiI2vWorkflow()
-    params = dict(wf.default_params(), input_image="start.png", seed=9)
-    payload = wf.build_api_payload(params)
-    tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
-    # Missing image file -> reference-size fallback (scale 1.0), so the track
-    # lands exactly at the detected fractions of the reference frame.
-    assert tracks[1][0]["x"] == pytest.approx(round(0.5 * REFERENCE_WIDTH) + 3)  # cluster x-offset
-    assert tracks[1][0]["y"] == pytest.approx(round(0.25 * REFERENCE_HEIGHT))    # at the ceiling
-    assert tracks[3][0] == {"x": float(round(0.45 * REFERENCE_WIDTH)),
-                            "y": float(round(0.6 * REFERENCE_HEIGHT))}
-    assert len(calls) == 1
-
-    # The funscript ignores aim entirely: same seed, same actions, aimed or not.
-    assert wf.authored_actions(params) == wf.authored_actions(
-        dict(params, motion_x=10, motion_ceiling=20, motion_floor=400, anchor_x=5, anchor_y=500)
-    )
-
-    # An edited coordinate is a manual override: no detection, the numbers rule.
-    calls.clear()
-    edited = dict(params, motion_ceiling=300)
-    payload = wf.build_api_payload(edited)
-    tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
-    assert calls == []
-    assert tracks[1][0]["y"] == pytest.approx(300)
-
-
-def test_wan21_ati_i2v_frame_count_avoids_the_resampler_crash():
-    # ComfyUI's track resampler faults at exactly 121 frames (length-1=120 hits
-    # its off-by-one), so the form's range stops at 113 on the same /4 stride
-    # the other video workflows use.
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    fc = next(pd for pd in wf.param_definitions() if pd.key == "frame_count")
-    assert fc.default == 81
-    assert fc.max_val == 113
-    assert fc.min_val == 5
-    assert fc.step == 4
 
 
 # ---- SDXL Pose Transfer (re-skin an image, keeping its pose) ----
@@ -2188,12 +1787,12 @@ def test_a_workflow_with_the_tail_off_saves_only_its_own_render():
 #
 # A re-import reads the graph embedded in an output file and names the workflow
 # from its node classes, overruling what the filename said. The chain that does
-# it names six ComfyUI node classes and five of the eight registered workflows,
-# so what the other three read as is decided by accident. This runs every
-# registered workflow's OWN payload through it and writes the answer down.
+# it names six ComfyUI node classes and five of the registered workflows, so
+# what the rest read as is decided by accident. This runs every registered
+# workflow's OWN payload through it and writes the answer down.
 
 #: workflow name -> what the importer reads its own graph as. Held as an
-#: equality against the registry, so a ninth workflow has to answer this too.
+#: equality against the registry, so a new workflow has to answer this too.
 READS_AS = {
     "sdxl_t2i": "sdxl_t2i",
     "flux_t2i_upscaled": "flux_t2i_upscaled",
@@ -2207,14 +1806,11 @@ READS_AS = {
     # output re-importing as itself).
     "sdxl_pose_transfer": "sdxl_t2i",
     "image_enhance": "sdxl_t2i",
-    # Not recognized at all, which here is the right answer: nothing in the
-    # chain matches, so the filename's guess stands, and it is correct.
-    "wan21_ati_i2v": None,
 }
 
 
 def test_every_registered_workflow_says_what_its_own_graph_reads_as():
-    """An equality against the registry: a ninth workflow cannot be added
+    """An equality against the registry: a new workflow cannot be added
     without someone deciding what a re-import of its output would call it."""
     assert set(READS_AS) == set(WORKFLOW_REGISTRY)
 
@@ -2551,8 +2147,7 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
     for rate in (16.0, 32.0, 128.0):
         payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=rate))
         conditioning = (_find_node(payload, "WanImageToVideo")
-                        or _find_node(payload, "WanFirstLastFrameToVideo")
-                        or _find_node(payload, "WanTrackToVideo"))
+                        or _find_node(payload, "WanFirstLastFrameToVideo"))
         lengths.add(conditioning["inputs"]["length"])
     assert lengths == {wf.default_params()["frame_count"]}
 
@@ -2634,19 +2229,6 @@ def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
         assert shown == min(rate_def.max_val, playback_rate(typed)), typed
         # …and a rate already on the grid is left exactly where it is.
         assert clamped_number(rate_def, shown) == shown
-
-
-def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
-    # The motion was authored over the clip's seconds, and those don't move when
-    # the rate does — so one generation drives the device identically at the
-    # slowest rate and the fastest, matching a video whose motion is unchanged.
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    base = dict(wf.default_params(), frame_count=81, seed=42)
-    slow = wf.authored_actions(dict(base, frame_rate=NATIVE_FPS))
-    fast = wf.authored_actions(dict(base, frame_rate=MAX_PLAYBACK_FPS))
-
-    assert slow == fast
-    assert slow[-1]["at"] <= round(81 / NATIVE_FPS * 1000)
 
 
 # ---- what the form calls a setting ----

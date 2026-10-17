@@ -131,9 +131,8 @@ def _lora_advice(params: dict, judged: set[str]) -> dict[str, Advice]:
         if page.get("steps"):
             _hold(advice, judged, "steps", params.get("steps"), page["steps"],
                   _with(page, "steps", " steps"))
-        shift_key = "shift_high" if "shift_high" in params else "shift"
         if page.get("shift"):
-            _hold(advice, judged, shift_key, params.get(shift_key), page["shift"],
+            _hold(advice, judged, "shift_high", params.get("shift_high"), page["shift"],
                   _with(page, "shift"))
     return advice
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import copy
 import hashlib
 import json
@@ -22,13 +21,7 @@ def _digest(data) -> str:
 
 
 def _rounded(value):
-    if isinstance(value, float):
-        return round(value, 6)
-    if isinstance(value, list):
-        return [_rounded(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _rounded(item) for key, item in value.items()}
-    return value
+    return round(value, 6) if isinstance(value, float) else value
 
 
 def _fingerprint(payload: dict) -> str:
@@ -47,9 +40,6 @@ def _fingerprint(payload: dict) -> str:
         if (isinstance(value, list) and len(value) == 2 and isinstance(value[0], str)
                 and value[0] in payload and isinstance(value[1], int)):
             return {"output": value[1], "of": node(value[0])}
-        if isinstance(value, str) and value.startswith(("[", "{")):
-            with contextlib.suppress(ValueError):
-                return {"document": _rounded(json.loads(value))}
         return _rounded(value)
 
     return _digest(sorted(node(node_id) for node_id in payload))
@@ -93,8 +83,6 @@ def test_float_noise_past_the_sixth_decimal_moves_no_fingerprint():
 
 
 _PINNED = {
-    "anchor_x": 250,
-    "anchor_y": 700,
     "audio_encoder_name": "an_audio_encoder.safetensors",
     "audio_negative_prompt": "hiss",
     "audio_prompt": "waves on shingle",
@@ -134,10 +122,6 @@ _PINNED = {
     "lora_low": "a_low_lora.safetensors",
     "lora_strength_high": 0.9,
     "lora_strength_low": 0.7,
-    "motion_ceiling": 420,
-    "motion_floor": 610,
-    "motion_hz": 1.1,
-    "motion_x": 240,
     "negative_prompt": "blurry",
     "noise_seed": 102,
     "pose_bbox_detector": "a_person_detector.onnx",
@@ -148,7 +132,6 @@ _PINNED = {
     "scene_lines": [""],
     "scheduler": "karras",
     "seed": 101,
-    "shift": 7.0,
     "shift_high": 6.5,
     "shift_low": 5.5,
     "split_step": 10,
@@ -197,7 +180,6 @@ GRAPH_FINGERPRINTS = {
     ("image_enhance", "v003"): "228ccee5269454ec",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
-    ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
     ("wan22_flf2v_loop", "v009"): "3cc07d12a40c7995",
     ("wan22_i2v", "v007"): "ce72e0c5e1342c10",
     ("wan22_t2i", "v002"): "f0794cae55c3e05d",

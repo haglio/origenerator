@@ -50,11 +50,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("Calibration", (
         "steps", "split_step", "cfg", "cfg_high", "cfg_low",
         "guidance", "sampler_name", "scheduler",
-        "shift", "shift_high",
-    ), collapsed=True),
-    Section("Motion", (
-        "motion_hz", "motion_x", "motion_ceiling", "motion_floor",
-        "anchor_x", "anchor_y",
+        "shift_high",
     ), collapsed=True),
     Section("Size", ("width", "height"), collapsed=True),
     Section("Video", ("frame_count", "frame_rate"), collapsed=True),

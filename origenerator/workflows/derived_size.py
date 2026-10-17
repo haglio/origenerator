@@ -4,17 +4,15 @@ Every workflow that takes an ``input_image`` keeps the image's aspect ratio at
 a fixed pixel budget rather than a hardcoded resolution — 0.4 MP for the video
 workflows, the SDXL budget for the pose-transfer still. The WAN 2.2 pair and
 the pose transfer do this in-graph (``ImageScaleToTotalPixels`` on a /16
-stride, then ``GetImageSize``); ATI can't (its ``WanTrackToVideo`` needs the
-integer size *and* a track whose coordinates share that space, both built
-app-side). This module is the app-side twin of that in-graph scaling: it
-replicates ``ImageScaleToTotalPixels`` exactly, so the size it computes for an
-image equals what the in-graph path produces for the same image.
+stride, then ``GetImageSize``). This module is the app-side twin of that
+in-graph scaling: it replicates ``ImageScaleToTotalPixels`` exactly, so the
+size it computes for an image equals what the in-graph path produces for the
+same image, and the Generate form shows every deriving workflow's size in a
+locked Dimensions field (measuring the picked image here rather than waiting
+for ComfyUI to do it in-graph).
 
-It's used two ways: ATI builds its payload size from it, and the Generate form
-shows every deriving workflow's size in a locked Dimensions field (measuring
-the picked image here rather than waiting for ComfyUI to do it in-graph).
-
-Kept free of any workflow/Qt import so both callers share one implementation.
+Kept free of any workflow/Qt import so the form and the workflows share one
+implementation.
 """
 from __future__ import annotations
 
@@ -41,8 +39,8 @@ def scale_to_total_pixels(
 
     Mirrors the node's ``round(dim * sqrt(total / area) / steps) * steps`` (with
     Python's banker's rounding, as ComfyUI uses). The only addition is a floor at
-    one stride, so a degenerate aspect ratio can't round a side to zero and crash
-    the track node — a no-op for any realistic image.
+    one stride, so a degenerate aspect ratio can't round a side to zero — a no-op
+    for any realistic image.
     """
     total = megapixels * 1024 * 1024
     scale = math.sqrt(total / (src_width * src_height))
@@ -107,8 +105,8 @@ def measure_derived_size(
 ) -> tuple[int, int] | None:
     """The output size derived from ``input_image``: its file measured and scaled
     to the ``megapixels`` budget (:func:`scale_to_total_pixels`), or ``None``
-    when the image is missing or unreadable — so a caller can fall back (ATI to
-    its reference frame, the form to showing no size) rather than crash.
+    when the image is missing or unreadable — so the form shows no size rather
+    than crashing.
     """
     path = resolve_input_image_path(input_image)
     if path is None:

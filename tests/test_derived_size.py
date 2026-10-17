@@ -26,8 +26,8 @@ def test_scale_to_total_pixels_matches_comfyui_rounding():
     assert scale_to_total_pixels(864, 1536) == (480, 864)
     assert scale_to_total_pixels(1024, 1024) == (640, 640)
     assert scale_to_total_pixels(768, 1344) == (496, 864)
-    # A degenerate aspect never yields a zero dimension (which would crash the
-    # track node); the side that would round to 0 floors at the /16 stride.
+    # A degenerate aspect never yields a zero dimension; the side that would
+    # round to 0 floors at the /16 stride.
     assert scale_to_total_pixels(10000, 1) == (64768, 16)
 
 

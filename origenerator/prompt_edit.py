@@ -11,8 +11,8 @@ freckles" — and what it means for the prompt pair follows a fixed policy:
   neither.
 
 Each is the smallest change that answers the request, which is why the mirror is
-"stop excluding it" rather than "stop excluding it and also add it": ask twice
-and the second pass, finding it in neither prompt, adds it.
+"take it out of the negative prompt" rather than "take it out and also add it":
+ask twice and the second pass, finding it in neither prompt, adds it.
 
 The policy is deterministic — no model decides what happens to a term. What a
 model *is* needed for is finding the term at all: "no earrings" is about a
@@ -305,13 +305,13 @@ class PromptRevision:
         if self.action == DROPPED:
             return f"dropped {quoted}"
         if self.action == PUSHED:
-            return f"{quoted} pushed further out ({_format_weight(self.weight)})"
+            return f"{quoted} raised to {_format_weight(self.weight)} in the negative prompt"
         if self.action == EXCLUDED:
             return f"{quoted} added to the negative prompt"
         if self.action == RAISED:
             return f"{quoted} raised to {_format_weight(self.weight)}"
         if self.action == ALLOWED:
-            return f"stopped excluding {quoted}"
+            return f"{quoted} taken out of the negative prompt"
         return f"{quoted} added to the prompt"
 
 

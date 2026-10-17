@@ -3132,7 +3132,8 @@ class GalleryView(QWidget):
                     revision.action, job.prompt_id)
         self._db.record_request(
             prompt_id=job.prompt_id, source_prompt_id=row["prompt_id"],
-            heard=spoken.heard, term=revision.term, polarity=revision.polarity,
+            heard=spoken.heard, asked=spoken.text, term=revision.term,
+            polarity=revision.polarity,
             action=revision.action, old_positive=revision.old_positive,
             old_negative=revision.old_negative, new_positive=revision.positive,
             new_negative=revision.negative,

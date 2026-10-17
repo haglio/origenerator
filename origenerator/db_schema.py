@@ -176,7 +176,11 @@ CREATE TABLE IF NOT EXISTS requests (
     old_negative     TEXT,
     new_positive     TEXT,
     new_negative     TEXT,
-    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    -- The request's own words: what was said between "Request" and "over", or
+    -- what was typed into a tab's Request section. NULL on a record from before
+    -- the column, whose words are read back out of `heard`.
+    asked            TEXT
 );
 
 -- A deleted generation the recovery bin is still holding: the whole row the
@@ -238,6 +242,9 @@ ADDED_COLUMNS = {
     },
     "custom_folders": {
         "side": "TEXT",
+    },
+    "requests": {
+        "asked": "TEXT",
     },
 }
 

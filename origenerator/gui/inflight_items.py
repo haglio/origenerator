@@ -20,6 +20,7 @@ from origenerator.generation_state import GenerationStatus
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
+from origenerator.voice.dictation import words_of
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -136,8 +137,8 @@ class InFlightItems:
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,
                 job_kind=kind,
-                requested=bool((records.get(pid) or {}).get("heard")),
-                modified=pid in records and not records[pid].get("heard"),
+                requested=bool(words_of(records.get(pid))),
+                modified=pid in records and not words_of(records[pid]),
                 # Only where the start frame is what the run is *of*: a video
                 # animating a picture, and an enhancement of one. An image
                 # workflow that happens to take an input (the pose transfer's

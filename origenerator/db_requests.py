@@ -26,7 +26,7 @@ class RequestStore(Store):
                        term: str | None = None, polarity: str | None = None,
                        action: str | None = None, old_positive: str = "",
                        old_negative: str = "", new_positive: str = "",
-                       new_negative: str = ""):
+                       new_negative: str = "", asked: str | None = None):
         """Record that ``prompt_id`` was queued by a request about
         ``source_prompt_id`` — spoken, or typed as one picture of a folder-wide
         rewrite, which leaves ``heard`` empty. Replaces any earlier record for
@@ -35,10 +35,10 @@ class RequestStore(Store):
             conn.execute(
                 """INSERT OR REPLACE INTO requests
                        (prompt_id, source_prompt_id, heard, term, polarity, action,
-                        old_positive, old_negative, new_positive, new_negative)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        old_positive, old_negative, new_positive, new_negative, asked)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (prompt_id, source_prompt_id, heard, term, polarity, action,
-                 old_positive, old_negative, new_positive, new_negative),
+                 old_positive, old_negative, new_positive, new_negative, asked),
             )
 
     def list_requests(self) -> list[dict]:

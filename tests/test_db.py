@@ -837,6 +837,14 @@ def test_a_recorded_request_comes_back_whole(tmp_path):
     assert record["new_positive"] == "a woman"
 
 
+def test_a_request_keeps_its_own_words_beside_what_was_heard(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.record_request(prompt_id="gen-1", source_prompt_id="src-1", heard="",
+                      asked="two women")
+
+    assert db.get_request("gen-1")["asked"] == "two women"
+
+
 def test_requests_list_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     _record(db, "gen-1")

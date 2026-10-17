@@ -9786,7 +9786,8 @@ def test_a_job_a_spoken_request_queued_says_so(qtbot):
     # hardest to recognize later in the line.
     db = FakeDB([_image("src", "a kite", 50, 1)])
     db.add(_running_row("asked", prompt="a kite, no string"))
-    db.record_request(prompt_id="asked", source_prompt_id="src", heard="no string")
+    db.record_request(prompt_id="asked", source_prompt_id="src",
+                      heard="Request, no string, over.")
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -14744,6 +14745,15 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
     assert record["heard"] == "Request, no hat, over."
     assert record["old_positive"] == "a woman, a hat, soft light"
     assert record["new_positive"] == "a woman, soft light"
+
+
+def test_a_queued_request_keeps_its_words_without_the_markers(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    assert view._db.get_request(job.prompt_id)["asked"] == "no hat"
 
 
 def test_a_queued_request_is_logged_by_the_pictures_it_joins_never_by_its_words(

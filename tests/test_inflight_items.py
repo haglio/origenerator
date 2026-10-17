@@ -203,6 +203,15 @@ def test_a_run_a_folders_modify_queued_stands_under_the_picture_it_rewrites(buil
     assert card.source_picture == "asked-of.jpg"
 
 
+def test_a_run_a_typed_request_queued_is_marked_as_one(build):
+    rows = [_row("asked-of"), _row("g1")]
+    items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
+                                   "heard": "", "asked": "two women"}])
+
+    card = next(item for item in items if item.key == "g1")
+    assert card.requested and not card.modified
+
+
 def test_a_run_a_request_queued_is_marked_as_one(build):
     rows = [_row("asked-of"), _row("g1")]
     items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",

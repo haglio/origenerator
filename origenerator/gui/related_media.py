@@ -36,6 +36,7 @@ from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.link_heading import link_heading
 from origenerator.gui.source_image_tile import SourceImageTile
 from origenerator.media import MediaType
+from origenerator.voice.dictation import words_of
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,7 @@ class RelatedMedia(QWidget):
                 return frame, None, MediaType.IMAGE
         if request is not None and request.get("source_row"):
             asked_about = request["source_row"]
-            heading = "Requested from" if request.get("heard") else "Modified from"
+            heading = "Requested from" if words_of(request) else "Modified from"
             return asked_about, heading, media_type_of_row(asked_about)
         return None, None, None
 

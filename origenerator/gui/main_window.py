@@ -81,6 +81,7 @@ SESSION_UI_STATE = (
     ("generations_failed_as_it_closed", GalleryView.generations_failed_as_it_closed,
      GalleryView.say_generations_failed_as_it_closed),
     ("how_many", GalleryView.how_many, GalleryView.set_how_many),
+    ("pane_sizes", GalleryView.pane_sizes, GalleryView.set_pane_sizes),
 )
 
 # The two the view does not own. Geometry is the window's own, and the prompt

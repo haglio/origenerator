@@ -32,6 +32,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import desktop_notices, main_window
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
+from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.media import MediaType
@@ -328,6 +329,59 @@ def test_persists_the_max_intensity_on_close(qtbot, tmp_path):
 
     win.close()
     assert state.get("max_intensity") == 35
+
+
+def test_a_border_dragged_between_the_panes_is_where_it_was_left_after_a_restart(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+    panes = first._gallery_view._arrangement.panes
+    panes.moveSplitter(panes.sizes()[0] - 150, 1)
+    dragged = panes.sizes()
+    first.close()
+
+    reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+
+    assert reopened._gallery_view._arrangement.panes.sizes() == dragged
+
+
+@pytest.mark.parametrize("border", [
+    "panes", "folder_panes", "left_column", "left_pane_sections", "browser_and_enhance",
+    "side_sections",
+])
+def test_every_border_dragged_in_the_window_is_where_it_was_left_after_a_restart(
+        qtbot, tmp_path, border):
+    path = tmp_path / "ui.json"
+    first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+    dragged = _drag_the_first_open_handle(first._gallery_view.findChild(PaneSplitter, border))
+    first.close()
+
+    reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+
+    assert reopened._gallery_view.findChild(PaneSplitter, border).sizes() == dragged
+
+
+def test_a_border_never_dragged_is_not_remembered(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path))).close()
+
+    assert AppState(path).get("pane_sizes") == {}
+
+
+def _drag_the_first_open_handle(splitter: PaneSplitter, by: int = 20) -> list[int]:
+    index = next(i for i in range(1, splitter.count())
+                 if splitter.widget(i - 1).isVisible() and splitter.widget(i).isVisible())
+    before = splitter.sizes()
+    splitter.moveSplitter(sum(before[:index]) - by, index)
+    assert splitter.sizes() != before
+    return splitter.sizes()
+
+
+def _shown_at_the_same_size(qtbot, win):
+    win.setGeometry(40, 50, 1600, 1600)
+    win.show()
+    qtbot.waitExposed(win)
+    return win
 
 
 def test_the_motion_reopens_at_the_speed_amp_center_and_shape_it_was_left_at(qtbot, tmp_path):
@@ -1746,6 +1800,50 @@ def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_foun
     win.close()
 
     assert AppState(path).get("slideshows") == kept
+
+
+def test_a_window_a_session_launched_leaves_the_saved_borders_as_it_found_them(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    kept = {"panes": [600, 400]}
+    state = AppState(path)
+    state.set("pane_sizes", kept)
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    win.close()
+
+    assert AppState(path).get("pane_sizes") == kept
+
+
+def test_a_window_a_session_takes_keeps_the_borders_it_was_dragged_to(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win.setGeometry(QApplication.primaryScreen().availableGeometry())
+    win.show()
+    qtbot.waitExposed(win)
+    dragged = _drag_the_first_open_handle(win._gallery_view.findChild(PaneSplitter, "panes"))
+    win.become_hosted(_fun_time_session())
+
+    win.close()
+
+    assert AppState(path).get("pane_sizes")["panes"] == dragged
+
+
+def test_a_window_handed_back_from_a_session_puts_its_dragged_borders_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.setGeometry(QApplication.primaryScreen().availableGeometry())
+    win.show()
+    qtbot.waitExposed(win)
+    panes = win._gallery_view.findChild(PaneSplitter, "panes")
+    dragged = _drag_the_first_open_handle(panes, by=100)
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+    QApplication.sendPostedEvents()
+
+    sizes = panes.sizes()
+    assert sizes[0] / sum(sizes) == pytest.approx(dragged[0] / sum(dragged), abs=0.01)
 
 
 def test_a_window_a_session_launched_leaves_the_saved_motion_as_it_found_it(qtbot, tmp_path):

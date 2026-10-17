@@ -27,10 +27,26 @@ class PaneSplitter(QSplitter):
     """Panes parted by the thick handle that is dragged to resize them, none of
     which can be dragged shut."""
 
-    def __init__(self, orientation: Qt.Orientation):
+    def __init__(self, orientation: Qt.Orientation, remembered_as: str = ""):
         super().__init__(orientation)
+        self.remembered_as = remembered_as
+        self.setObjectName(remembered_as)
         self.setChildrenCollapsible(False)
         self.setHandleWidth(BORDER_WIDTH)
+        self._dragged = False
+        self.splitterMoved.connect(self._on_dragged)
+
+    def _on_dragged(self, _position: int, _index: int) -> None:
+        self._dragged = True
+
+    def dragged_sizes(self) -> list[int] | None:
+        return self.sizes() if self._dragged else None
+
+    def take_dragged_sizes(self, sizes) -> None:
+        if (isinstance(sizes, list) and len(sizes) == self.count()
+                and all(type(size) is int and size >= 0 for size in sizes)):
+            self.setSizes(sizes)
+            self._dragged = True
 
     def hold_still(self, held: bool) -> None:
         for index in range(self.count()):
@@ -46,10 +62,8 @@ class FootSplitter(PaneSplitter):
     """Panes stacked over a foot that opens at the foot's own height and follows
     it as that changes, until its handle is dragged."""
 
-    def __init__(self):
-        super().__init__(Qt.Orientation.Vertical)
-        self._dragged = False
-        self.splitterMoved.connect(self._on_dragged)
+    def __init__(self, remembered_as: str = ""):
+        super().__init__(Qt.Orientation.Vertical, remembered_as)
 
     def event(self, event):
         handled = super().event(event)
@@ -60,9 +74,6 @@ class FootSplitter(PaneSplitter):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._fit_the_foot()
-
-    def _on_dragged(self, _position: int, _index: int) -> None:
-        self._dragged = True
 
     def _fit_the_foot(self) -> None:
         if self._dragged or self.count() < 2:

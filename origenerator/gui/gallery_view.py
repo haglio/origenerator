@@ -484,6 +484,7 @@ class GalleryView(QWidget):
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._folders_left_open: set[str] = set()
+        self._remembered_pane_sizes: dict[str, list[int]] = {}
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
@@ -845,7 +846,7 @@ class GalleryView(QWidget):
             self._motion_pane, hud_column = pane()
             hud_column.addWidget(hud_scroll)
             sections.insert(0, self._motion_pane)
-        toc = PaneSplitter(Qt.Orientation.Vertical)
+        toc = PaneSplitter(Qt.Orientation.Vertical, "left_pane_sections")
         for section in sections:
             toc.addWidget(section)
         toc.setStretchFactor(sections.index(finding), 1)  # the folder list takes the height
@@ -960,7 +961,7 @@ class GalleryView(QWidget):
         # lands in, and this one doesn't.
         enhance, enhance_column = pane()
         enhance_column.addWidget(self._enhance.panel)
-        browsing = FootSplitter()
+        browsing = FootSplitter("browser_and_enhance")
         browsing.addWidget(browser)
         browsing.addWidget(enhance)
         browsing.setStretchFactor(0, 1)
@@ -1044,6 +1045,7 @@ class GalleryView(QWidget):
             self._motion_pane.hide()
         self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
         self._osr2_motion = self._osr2_driver = self._motion_panel = None
+        self._remembered_pane_sizes.update(self._dragged_pane_sizes())
         self.wear_the_room(session)
         hold_the_borders_still(self, True)
 
@@ -1073,7 +1075,33 @@ class GalleryView(QWidget):
             drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic)
         self.wear_the_room(None)
+        self._put_the_borders_back()
         hold_the_borders_still(self, False)
+
+    def pane_sizes(self) -> dict[str, list[int]]:
+        if self._fun_time is None:
+            self._remembered_pane_sizes.update(self._dragged_pane_sizes())
+        return dict(self._remembered_pane_sizes)
+
+    def set_pane_sizes(self, saved) -> None:
+        if isinstance(saved, dict):
+            self._remembered_pane_sizes = {
+                name: sizes for name, sizes in saved.items()
+                if isinstance(name, str) and isinstance(sizes, list)}
+        if self._fun_time is None:
+            self._put_the_borders_back()
+
+    def _dragged_pane_sizes(self) -> dict[str, list[int]]:
+        return {splitter.remembered_as: sizes for splitter in self._remembered_borders()
+                if (sizes := splitter.dragged_sizes()) is not None}
+
+    def _put_the_borders_back(self) -> None:
+        for splitter in self._remembered_borders():
+            splitter.take_dragged_sizes(self._remembered_pane_sizes.get(splitter.remembered_as))
+
+    def _remembered_borders(self) -> list[PaneSplitter]:
+        return [splitter for splitter in self.findChildren(PaneSplitter)
+                if splitter.remembered_as]
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source

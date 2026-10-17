@@ -32,8 +32,8 @@ class PaneArrangement:
         self._info_pane = info_pane
         self._info_tabs = info_tabs
         self._queue = queue
-        self.panes = PaneSplitter(Qt.Orientation.Horizontal)
-        self.folder_panes = PaneSplitter(Qt.Orientation.Horizontal)
+        self.panes = PaneSplitter(Qt.Orientation.Horizontal, "panes")
+        self.folder_panes = PaneSplitter(Qt.Orientation.Horizontal, "folder_panes")
         self.stack: QSplitter | None = None
         self.left_column: QSplitter | None = None
         toc.setMinimumWidth(120)
@@ -42,7 +42,7 @@ class PaneArrangement:
 
     def standalone(self) -> QSplitter:
         """The three panes side by side, as a window of its own opens them."""
-        self.left_column = PaneSplitter(Qt.Orientation.Vertical)
+        self.left_column = PaneSplitter(Qt.Orientation.Vertical, "left_column")
         self.folder_panes.insertWidget(0, self._toc)
         self.left_column.addWidget(self.folder_panes)
         self.left_column.addWidget(self._queue)

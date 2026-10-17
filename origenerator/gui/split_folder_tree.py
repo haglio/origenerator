@@ -131,7 +131,7 @@ class SplitFolderTree(QWidget):
         self._offered = True
         self._active = SEPARATE[0]
 
-        self._splitter = PaneSplitter(Qt.Orientation.Vertical)
+        self._splitter = PaneSplitter(Qt.Orientation.Vertical, "side_sections")
         for side in SIDES:
             self._splitter.addWidget(self._build_section(group_role, side))
             self._splitter.setStretchFactor(len(self._trees) - 1, 1)

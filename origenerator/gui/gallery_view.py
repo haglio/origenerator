@@ -3606,6 +3606,7 @@ class GalleryView(QWidget):
         # selection waits for the variation after this one (see :meth:`_start_reroll`).
         if key == self._selected_reroll_key and not self._auto.is_active(key):
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
+        self._slideshows.note_landed(finished_row)  # before refresh says it left the queue
         self.refresh()
         self._slideshows.note_finished(finished_row)  # a slideshow of its folder gains it
         self._show_reroll_result_in_tab(finished_row, launcher)

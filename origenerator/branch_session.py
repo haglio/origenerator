@@ -1,8 +1,8 @@
 """What a run out of a branch worktree still leaves to the live app.
 
 ``launch_preview_branch.vbs`` in a worktree runs that branch's code as its own
-instance, on the live install's own library (:data:`origenerator.config.
-LIBRARY_STATE_DIR`): the same database, thumbnails and trash, so every instance
+instance, on the live install's own library (the database in :data:`origenerator.config.
+LIBRARY_STATE_DIR`, the thumbnails and trash in the library's app_data folder), so every instance
 shows every generation whichever of them made it. What such a session must not
 do is hand the *shared ComfyUI* work for the coming absence -- background
 experiments and base re-renders (``GalleryView.queue_experiments_for_absence``,

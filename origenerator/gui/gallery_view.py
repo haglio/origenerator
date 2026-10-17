@@ -483,6 +483,7 @@ class GalleryView(QWidget):
         self._drawn_version = 0
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
+        self._folders_left_open: set[str] = set()
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
@@ -1745,7 +1746,7 @@ class GalleryView(QWidget):
     def _rebuild(self, rows, meta, *, new_listing: bool = False):
         self._folder_meta = meta
         self._drawn_version += 1
-        expanded = self._tree_view.expanded_keys()
+        self._folders_left_open = expanded = self._folders_open_on_every_side()
         standing = self._tree_view.selected_folder_key()
         place = self._browser.place()
         if new_listing:
@@ -1912,6 +1913,20 @@ class GalleryView(QWidget):
             show_recents=bool(trees[side]),
             collection_counts=self._browser.collection_counts(side),
         ) for side in self._tree.sides]
+
+    def open_folders(self) -> list[str]:
+        return sorted(self._folders_open_on_every_side())
+
+    def _folders_open_on_every_side(self) -> set[str]:
+        if not self._tree_view.built:
+            return self._folders_left_open
+        drawn = self._tree_view.drawn_sides
+        return ({key for key in self._folders_left_open if _side_of(key) not in drawn}
+                | self._tree_view.expanded_keys())
+
+    def set_open_folders(self, saved) -> None:
+        if isinstance(saved, list):
+            self._folders_left_open = {key for key in saved if isinstance(key, str)}
 
     def folder_list_sides(self) -> list[str]:
         return list(self._tree.chosen_sides)

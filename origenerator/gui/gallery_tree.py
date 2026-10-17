@@ -114,7 +114,7 @@ class GalleryTree:
         # saved session's, a spoken collection name) can still find a row.
         self.keys_by_folder: dict[str, list[str]] = {}
         self._recently_worked: set[str] = set()  # tree keys wearing the mark
-        self._built = False  # whether a first populate has happened (see _open_all)
+        self._drawn_sides: frozenset[str] | None = None
 
     def populate(self, sides, expanded_keys, *, folder_meta=None,
                  recently_worked=()):
@@ -146,7 +146,7 @@ class GalleryTree:
                 item.setExpanded(True)
         self._open_all(expanded_keys)
         self._tree.blockSignals(False)
-        self._built = True
+        self._drawn_sides = frozenset(side.side for side in sides)
 
     def _add_side(self, root, side, folder_meta) -> None:
         """One side's whole table of contents, filling that side's section.
@@ -203,7 +203,7 @@ class GalleryTree:
         build: after that its state is the user's, saved and restored with every
         other folder's, so collapsing it sticks.
         """
-        if self._built or expanded_keys:
+        if self.built or expanded_keys:
             return
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
@@ -281,7 +281,11 @@ class GalleryTree:
 
     @property
     def built(self) -> bool:
-        return self._built
+        return self._drawn_sides is not None
+
+    @property
+    def drawn_sides(self) -> frozenset[str]:
+        return self._drawn_sides or frozenset()
 
     def expanded_keys(self) -> set[str]:
         return {key for key, item in self.item_by_key.items() if item.isExpanded()}

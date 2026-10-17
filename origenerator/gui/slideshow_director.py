@@ -1173,14 +1173,25 @@ class SlideshowDirector:
         if row is None:
             return
         for slideshow, location in list(self._live_slideshows):
-            if not any(r["prompt_id"] == row["prompt_id"]
-                       for r in self.rows_at(location)):
-                continue
-            for item in self.items_of([row]):
-                # With what the slideshow's two switches judge it by: whether it is
-                # favorited, and whether it carries an enhancement.
-                slideshow.note_added(*item, favorite=bool(row.get("starred")),
-                                enhanced=gallery.is_enhanced_row(row))
+            if any(r["prompt_id"] == row["prompt_id"] for r in self.rows_at(location)):
+                self._hand_the_file_to(slideshow, row)
+
+    def note_landed(self, row: dict | None):
+        """A run landed: every slideshow playing its frames plays its file in their
+        place, wherever it opened.  Told before the run leaves the in-flight list,
+        which reads to a slideshow still holding the frames as a run that stopped."""
+        if row is None:
+            return
+        for slideshow, _location in self._slideshows_open_to_runs():
+            if slideshow.holds(row["prompt_id"]):
+                self._hand_the_file_to(slideshow, row)
+
+    def _hand_the_file_to(self, slideshow, row: dict) -> None:
+        for item in self.items_of([row]):
+            # With what the slideshow's two switches judge it by: whether it is
+            # favorited, and whether it carries an enhancement.
+            slideshow.note_added(*item, favorite=bool(row.get("starred")),
+                                 enhanced=gallery.is_enhanced_row(row))
 
     def note_generating(self, prompt_id: str, frame: bytes):
         """A run streamed a frame: every open slideshow playing its folder takes it in

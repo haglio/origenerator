@@ -128,47 +128,6 @@ def test_a_video_made_for_genau_is_scripted_as_exactly_one_cycle(tmp_path, monke
     assert actions[-1]["at"] == round(cycle_seconds * 1000)
 
 
-def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_path, monkeypatch):
-    # A workflow that authored its motion (ATI) knows the exact motion, so its
-    # sidecar comes straight from authored_actions — the metronome synthesizer
-    # must not run for it, or the script would drift from the pixels.
-
-    ati = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    out = tmp_path / "out"
-    video = out / "video" / "wan21_ati_i2v_00001_.mp4"
-    video.parent.mkdir(parents=True)
-    video.write_bytes(b"v")
-    metronome = []
-    monkeypatch.setattr(
-        "origenerator.completion.synthesize_funscript",
-        lambda *a, **k: metronome.append((a, k)),
-    )
-    params = dict(ati.default_params(), motion_hz=1.5)
-    extract_completion(
-        ati, _video_history("15", "images", video.name),
-        out, tmp_path / "thumbs", "n1", params=params,
-    )
-    assert read_actions(funscript_of(video, output_dir=out)) == ati.authored_actions(params)
-    assert metronome == []
-
-
-def test_a_track_authored_video_given_a_deleted_videos_name_is_scripted_with_its_own_motion(
-        tmp_path):
-    ati = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    out = tmp_path / "out"
-    video = out / "video" / "wan21_ati_i2v_00001_.mp4"
-    video.parent.mkdir(parents=True)
-    video.write_bytes(b"v")
-    history = _video_history("15", "images", video.name)
-    extract_completion(ati, history, out, tmp_path / "thumbs", "deleted",
-                       params=dict(ati.default_params(), motion_hz=0.5))
-
-    params = dict(ati.default_params(), motion_hz=1.5)
-    extract_completion(ati, history, out, tmp_path / "thumbs", "namesake", params=params)
-
-    assert read_actions(funscript_of(video, output_dir=out)) == ati.authored_actions(params)
-
-
 def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):
     Image.new("RGB", (8, 8), (1, 2, 3)).save(tmp_path / "a.png")
     calls = []

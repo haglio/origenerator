@@ -743,6 +743,23 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
     assert voice._request_target is None
 
 
+def test_a_fix_asked_for_in_a_request_runs_as_the_fix_on_what_it_was_about(router):
+    slideshow = FakeSlideshow(target="g1")
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
+                                      db=FakeDB([_row("g1")]))
+    begun = []
+    voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
+    voice.on_spoken_request(Spoken("fix hands", listening=True))
+    slideshow.target = "g2"
+
+    voice.on_spoken_request(Spoken("fix hands", heard="Request, fix hands, over."))
+
+    assert [(prompt_id, [part.name for part in parts]) for prompt_id, parts in host.fixed] == [
+        ("g1", ["hands"])]
+    assert begun == []  # not a change to the prompt
+    assert slideshow.runs == [("g1", "🎤 fixing hands…", NOTICE)]
+
+
 def test_a_request_with_no_slideshow_up_is_about_the_picked_generation(router):
     voice, _host, _slideshows = router(FakeHost(selected="g5"))
 

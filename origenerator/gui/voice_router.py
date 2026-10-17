@@ -690,14 +690,18 @@ class VoiceRouter(QObject):
                      else f"a {name_parts(command.command)} fix")
             self._show(f"🎤 {wants} needs a picture on screen", transient=True)
             return
-        target = slideshow.voice_target()
-        if isinstance(command.command, AnimateRequest):
-            prompt_id, message, kind = self._host.animate_it(target, command.command)
-        elif command.command == gallery.ENHANCE_COMMAND:
-            prompt_id, message, kind = self._host.enhance_it(target)
-        else:
-            prompt_id, message, kind = self._host.fix_parts(target, command.command)
+        prompt_id, message, kind = self._run_picture_command(
+            slideshow.voice_target(), command.command)
         slideshow.note_voice_run(prompt_id, message, kind=kind)
+
+    def _run_picture_command(self, target: str | None, command) -> tuple[str | None, str, str]:
+        """Run an order about one picture: what it launched on, and the line
+        to say about it with its kind."""
+        if isinstance(command, AnimateRequest):
+            return self._host.animate_it(target, command)
+        if command == gallery.ENHANCE_COMMAND:
+            return self._host.enhance_it(target)
+        return self._host.fix_parts(target, command)
 
     # --- spoken requests: "Request … over" over whatever is on screen --------
 
@@ -706,7 +710,8 @@ class VoiceRouter(QObject):
         hosting session's channel with the region it was said to.
 
         While it is still being said the slideshow pauses and the corner says so;
-        finished, it queues a revision of the item it was opened over. The
+        finished, it queues a revision of the item it was opened over, or runs
+        the order about a picture its words are ("fix hands"). The
         target is taken at the opening step and kept, because a request is about
         the picture that prompted it, not whatever is up when the words run out.
 
@@ -729,7 +734,16 @@ class VoiceRouter(QObject):
         if spoken.state != COMPLETED:  # given up on — the terminator never came
             self._answer_request(slideshow, "🎤 request dropped — never heard “over”", spoken)
             return
-        self._begin_request(target, spoken, side)
+        command = gallery.match_command(spoken.text)
+        if command is None:
+            self._begin_request(target, spoken, side)
+            return
+        # "Request, fix hands, over" asks for the fix, not for its words in the prompt.
+        prompt_id, message, kind = self._run_picture_command(target, command)
+        if slideshow is not None:
+            slideshow.note_voice_run(prompt_id, message, kind=kind)
+        else:
+            self._show(message, transient=True)
 
     def _target_of(self, slideshow) -> str | None:
         """What a request just opened is about: the slide filling the screen

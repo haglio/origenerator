@@ -25,6 +25,7 @@ from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 from origenerator.slideshow_buttons import answer
 from tests.test_gallery_view import (
     _REROLL_HISTORY,
@@ -688,7 +689,8 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
     played = [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")]
     assert played == [clicked[0], folder[0][0]]
     told = _told(tmp_path, "landscape")
-    assert [verb for verb in told if verb.startswith("SET_PACE")][-1] == "SET_PACE 0"
+    assert [verb for verb in told if verb.startswith("SET_PACE")][-1] == \
+        f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}"
     panel = parse_hud((tmp_path / "origenerator_landscape_hud.json").read_text(encoding="utf-8"))
     assert panel.corner.path == clicked[0]
     assert _told(tmp_path, "portrait") == []
@@ -729,6 +731,14 @@ def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch):
     return client, job
 
 
+def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made(
+        qtbot, tmp_path, monkeypatch):
+    _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
+
+    paces = [verb for verb in _told(tmp_path, "landscape") if verb.startswith("SET_PACE")]
+    assert paces[-1] == "SET_PACE 0"
+
+
 def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_picture(
         qtbot, tmp_path, monkeypatch):
     client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
@@ -739,6 +749,16 @@ def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_picture(
     finished = PlaylistItem(tmp_path / f"{job.prompt_id}.png")
     assert play_file(finished) in _told(tmp_path, "landscape")
     assert read_playlist(tmp_path / "landscape.tsv")[0].path == finished.path
+
+
+def test_a_run_watched_on_a_funestra_lands_at_the_clip_seconds(qtbot, tmp_path, monkeypatch):
+    client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
+    _told(tmp_path, "landscape")
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    paces = [verb for verb in _told(tmp_path, "landscape") if verb.startswith("SET_PACE")]
+    assert paces[-1] == f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}"
 
 
 def test_the_sessions_loop_key_reaches_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):

@@ -1389,8 +1389,8 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     for pd in definitions:
         if pd.key in form._widgets:
             assert form._widgets[pd.key].toolTip() == definition_help(pd), pd.key
-    denoise = next(pd for pd in definitions if pd.key == "denoise")
-    assert _label_beside(form, "denoise").toolTip() == definition_help(denoise)
+    steps = next(pd for pd in definitions if pd.key == "steps")
+    assert _label_beside(form, "steps").toolTip() == definition_help(steps)
 
 
 def test_a_field_with_a_good_range_says_it_in_its_tooltip(qtbot):

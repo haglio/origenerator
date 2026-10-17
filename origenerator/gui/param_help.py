@@ -167,11 +167,6 @@ PARAM_HELP: dict[str, str] = {
         "so more of the run goes to fine detail. It matters less than the Sampler and "
         "goes with it."
     ),
-    "denoise": (
-        "How much of the starting image is redrawn (the denoise strength). 1.0 "
-        "generates from pure noise; lower keeps more of what was there and only "
-        "re-imagines the rest."
-    ),
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
 

@@ -302,7 +302,7 @@ def router(qtbot, monkeypatch):
         buttons = dict(bank or {})
         router.bind_the_bank(
             auto=buttons.get("auto", FakeButton(tip="Auto-generate")),
-            audio=buttons.get("audio", FakeButton(tip="Audio bed")),
+            radio=buttons.get("radio", FakeButton(tip="Origenerator Radio")),
             drive=buttons.get("drive", FakeButton(tip="Drive the OSR2")),
             mic=buttons.get("mic", FakeButton(tip="Listen", checked=mic_on)),
             enhance=buttons.get("enhance",
@@ -339,7 +339,7 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
     voice.sync()
 
     assert voice.listener.commands_on is False
-    voice.bind_the_bank(auto=None, audio=None, drive=None,
+    voice.bind_the_bank(auto=None, radio=None, drive=None,
                         mic=FakeButton(checked=True), enhance=None, actions={})
     voice.sync()
     assert voice.listener.commands_on is True
@@ -393,8 +393,8 @@ def test_a_flashed_line_goes_back_to_the_idle_caption(router):
     voice, _host, _slideshows = router()
     voice.sync()
 
-    voice.say("🎤 audio on")
-    assert voice.status.text() == "🎤 audio on"
+    voice.say("🎤 radio on")
+    assert voice.status.text() == "🎤 radio on"
 
     voice._revert()
     assert voice.status.text() == "🎤 Listening…"
@@ -493,21 +493,21 @@ def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
 def test_a_spoken_switch_flips_the_bank_switch_itself(router):
     # A spoken switch is the same event as a clicked one, so the bank lights the
     # same way and nothing has to be kept in step.
-    audio = FakeButton(tip="Audio bed")
-    voice, _host, slideshows = router(bank={"audio": audio})
+    radio = FakeButton(tip="Origenerator Radio")
+    voice, _host, slideshows = router(bank={"radio": radio})
 
-    voice.on_command(AppCommand.AUDIO_ON)
+    voice.on_command(AppCommand.RADIO_ON)
 
-    assert audio.set_to == [True]
-    assert slideshows.answers == ["🎤 the audio bed on"]
+    assert radio.set_to == [True]
+    assert slideshows.answers == ["🎤 Origenerator Radio on"]
 
 
 def test_a_switch_this_window_does_not_have_says_the_session_owns_it(router):
-    voice, _host, slideshows = router(bank={"audio": None})
+    voice, _host, slideshows = router(bank={"radio": None})
 
-    voice.on_command(AppCommand.AUDIO)
+    voice.on_command(AppCommand.RADIO)
 
-    assert slideshows.answers == ["🎤 the audio bed is the session's here"]
+    assert slideshows.answers == ["🎤 Origenerator Radio is the session's here"]
     assert slideshows.answer_kinds == [WARNING]
 
 
@@ -557,16 +557,16 @@ def test_a_router_taken_into_a_session_leaves_the_motion_to_the_session(router):
 
 def test_a_router_handed_back_from_a_session_holds_the_motion_and_switches_again(router):
     motion = FakeMotion()
-    audio = FakeButton(tip="Audio bed")
-    voice, _host, _slideshows = router(motion=motion, bank={"audio": audio})
+    radio = FakeButton(tip="Origenerator Radio")
+    voice, _host, _slideshows = router(motion=motion, bank={"radio": radio})
     voice.become_hosted()
 
-    voice.become_standalone(motion, audio=audio, drive=FakeButton(), mic=FakeButton(checked=True))
+    voice.become_standalone(motion, radio=radio, drive=FakeButton(), mic=FakeButton(checked=True))
     voice.on_command(AppCommand.SPEED_UP)
-    voice.on_command(AppCommand.AUDIO_ON)
+    voice.on_command(AppCommand.RADIO_ON)
 
     assert motion.speed == 45
-    assert audio.set_to == [True]
+    assert radio.set_to == [True]
 
 
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):

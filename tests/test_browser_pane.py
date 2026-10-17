@@ -102,14 +102,15 @@ class _StubAuto:
         return False
 
 
-def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, jobs=None):
+def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, jobs=None,
+          selected=None):
     if scroll is None:
         scroll = BrowserScrollArea()
         qtbot.addWidget(scroll)
     pane = BrowserPane(
         scroll, _StubDB(rows), jobs or _StubJobQueue(), _StubAuto(),
         TreeNavigation(
-            selected_folder_key=lambda: None,
+            selected_folder_key=lambda: selected,
             folder_context=lambda key: "",
             group_for_key=lambda key: None,
         ),
@@ -268,6 +269,20 @@ def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtb
     _open_recents(pane, finished)
 
     assert list(pane._inflight_cards) == ["j3", "j2", "j1"]
+
+
+def test_latest_redraws_its_cards_when_the_line_changes_order(qtbot):
+    # A drag in the queue, or a run ComfyUI turns out to be making, moves runs
+    # without adding or taking away any.
+    jobs = _StubJobQueue(order=["j1", "j2"])
+    pane, _scroll = _pane(qtbot, [_waiting("j1", 1), _waiting("j2", 2)], jobs=jobs,
+                          selected=RECENTS_KEY)
+    _open_recents(pane, [])
+    jobs.queue_order = ["j2", "j1"]
+
+    pane.refresh_inflight()
+
+    assert list(pane._inflight_cards) == ["j1", "j2"]
 
 
 def test_latest_puts_work_started_long_after_the_newest_picture_in_a_now_section(qtbot):

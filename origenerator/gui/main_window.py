@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QMainWindow, QMessageBox
 from shared_ui.foreground import bring_to_front
 from shared_ui.preview import Preview, window_title
 
-from origenerator import ui_scale
+from origenerator import places_backfill, ui_scale
 from origenerator.app_state import AppState
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.branch_session import is_branch_session
@@ -108,6 +108,11 @@ class OrigeneratorWindow(QMainWindow):
         self._app_state = app_state
         self._fun_time = fun_time
         self._taskbar = taskbar
+
+        def find_places_while_closed() -> int:
+            return places_backfill.queue_finding_for_the_absence(db, client)
+
+        self._find_places_while_closed = find_places_while_closed
         # Before anything below builds a param form: a prompt field reads its
         # height as it is constructed, and the view built a few lines down brings
         # its first one with it.
@@ -168,6 +173,7 @@ class OrigeneratorWindow(QMainWindow):
         # it is drawn — and drop the rest: the GPU is the user's again.
         fold_completed_base_renders(db)
         cancel_base_renders(db, client)
+        places_backfill.fold_found_places(db, client, places_backfill.RECORD)
         # Reconnect to any generation left running by the previous session. A tab's
         # Generate is itself a re-roll, so every in-flight row is the gallery's to
         # re-adopt — the tabs restore their configs only, owning no jobs.
@@ -386,6 +392,7 @@ class OrigeneratorWindow(QMainWindow):
             return
         for chore in (self._gallery_view.queue_experiments_for_absence,
                       self._gallery_view.queue_base_renders_for_absence,
+                      self._find_places_while_closed,
                       self._gallery_view.flush_queue_to_server):
             try:
                 chore()

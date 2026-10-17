@@ -27,7 +27,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from origenerator import provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
-from origenerator.generation_state import GenerationSource, GenerationStatus
+from origenerator.generation_state import GenerationSource
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
 from origenerator.thumbnail import frame_thumbnail
@@ -45,10 +45,14 @@ class JobState(StrEnum):
     CANCELED = "canceled"
 
 
-def display_status(row_status: str) -> JobState:
-    """What a stored row in progress is called in the line: the database says
-    pending for one waiting to be sent, and the line says queued."""
-    return JobState.RUNNING if row_status == GenerationStatus.RUNNING else JobState.QUEUED
+def display_status(status: str) -> JobState:
+    """What the line calls a run in flight, from its job's state, or its row's
+    status where no job holds it: the database says pending for one waiting to
+    be sent, a job says idle or queued for one waiting here or on the server,
+    and the line says queued for all three."""
+    if status in (JobState.SPEAKING, JobState.RUNNING):
+        return JobState(status)
+    return JobState.QUEUED
 
 
 logger = logging.getLogger(__name__)

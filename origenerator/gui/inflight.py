@@ -88,6 +88,8 @@ class InFlightItem:
     # — has not finished. It has no row, no id on the server, and nothing to
     # cancel; it exists so the press has a visible answer.
     starting: bool = False
+    # Sent to ComfyUI, made yet or not: the line can only move what it has not sent.
+    sent: bool = False
 
 
 def queue_lead_text(item: InFlightItem) -> str:
@@ -199,6 +201,12 @@ class RunReading:
         """What the bar and its band show — nothing at all while the run is still
         waiting, which has no progress to report and no time to count down."""
         return (self.progress, self.pass_progress) if self.rendering else (None, None)
+
+
+def first_movable(items) -> int:
+    """Where in a line of runs a move may begin or end: past every run ComfyUI
+    already holds, which nothing can be put in front of."""
+    return next((index for index, item in enumerate(items) if not item.sent), len(items))
 
 
 ALREADY_MAKING_ONE_TIP = "This folder is already making one"

@@ -137,6 +137,24 @@ def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build):
     assert items[0].reading.status == "speaking"
 
 
+def test_a_run_comfyui_holds_but_has_not_started_says_queued(build):
+    # Its row says running from the moment it is sent, and closing the app
+    # sends everything still waiting, so the row cannot tell the run being made
+    # from the ones waiting after it on the server. The job can.
+    job = FakeJob("g1", state="queued")
+    items = build([_row("g1", status="running")],
+                  jobs_by_folder={"video/wan22_i2v/aaa": [job]})
+
+    assert items[0].reading.status == "queued"
+
+
+def test_a_run_counts_as_sent_once_its_row_says_running(build):
+    items = build([_row("g1", status="running"), _row("g2", status="pending")],
+                  order=["g1", "g2"])
+
+    assert [item.sent for item in items] == [True, False]
+
+
 def test_the_queues_own_line_orders_the_cards(build):
     # Nothing a row records says whether an image jumped ahead of a video, or
     # whether a drag moved one.

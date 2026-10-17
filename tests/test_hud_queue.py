@@ -13,6 +13,7 @@ def _item(key="j1", caption="Alpha Workflow › a paper kite", status="queued", 
     reading = {name: kw.pop(name) for name in list(kw)
                if name in ("frame", "progress", "pass_progress", "stage",
                            "started_at", "typical_seconds")}
+    kw.setdefault("sent", status == "running")
     return InFlightItem(key=key, caption=caption,
                         reading=RunReading(status=status, **reading),
                         reveal=kw.pop("reveal", lambda: None), **kw)
@@ -201,6 +202,18 @@ class TestThePointerOnTheBlock:
         """Nothing can be moved in front of what ComfyUI is already rendering,
         itself included."""
         pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),
+                                       _item("j2", typical_seconds=30)])
+        x, y = _middle_of(pointer, f"{OPEN}|j1")
+
+        pointer.press(x, y)
+        pointer.drag(x, y + 40)
+        pointer.release(x, y + 40)
+
+        assert host.relined == []
+
+    def test_a_run_comfyui_holds_cannot_be_picked_up_though_it_has_not_started(self):
+        """The line can only move what it has not sent yet."""
+        pointer, host = _pointer_over([_item("j1", sent=True, typical_seconds=30),
                                        _item("j2", typical_seconds=30)])
         x, y = _middle_of(pointer, f"{OPEN}|j1")
 

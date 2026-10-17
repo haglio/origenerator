@@ -24,8 +24,7 @@ folder being re-rolled. Beside that, a picture — the frame an image-to-video
 animates, the gray clip a dropped-video combine takes its settings from, or a
 four-up of the folder the run will land in — because the one picture a queued
 job cannot show is its own.
-Only the top row is fixed: nothing can be moved in front of what is already
-rendering.
+Only what ComfyUI already holds is fixed: nothing can be moved in front of it.
 With nothing queued at all, the strip says so in dim letters across the middle of
 the whole of itself, rather than sitting blank: the left half has no frame, no
 bar and (barring another app's backlog to report) nothing to say, so it stands
@@ -69,6 +68,7 @@ from origenerator.gui.inflight import (
     TICK_MS,
     discard_run_text,
     discard_run_tooltip,
+    first_movable,
     foreign_queue_text,
     queue_lead_text,
     queue_lead_tooltip,
@@ -650,12 +650,7 @@ class GenerationQueue(QWidget):
             self._rows_column.removeWidget(row)
             row.deleteLater()
         for index, item in enumerate(items):
-            # What ComfyUI is already rendering cannot be moved, and nothing can
-            # be dropped in front of it. Everything else is only waiting, and its
-            # place is the user's to change.
-            self._rows_column.insertWidget(
-                index, QueueRow(item, movable=not item.reading.rendering)
-            )
+            self._rows_column.insertWidget(index, QueueRow(item, movable=not item.sent))
         # The scroll area would otherwise squeeze the whole line into its own
         # height, stacking the rows on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
@@ -672,7 +667,7 @@ class GenerationQueue(QWidget):
         changes nothing asks for nothing.
         """
         order = [item.key for item in self._items]
-        first = self._first_movable()
+        first = first_movable(self._items)
         if not first <= source < len(order) or not first <= target < len(order):
             return
         moved = list(self._items)
@@ -725,14 +720,6 @@ class GenerationQueue(QWidget):
             self._drop_at = index
             self.update()
 
-    def _first_movable(self) -> int:
-        """The first slot a row may be moved to or from — past whatever is already
-        being rendered, which nothing can be put in front of."""
-        for index, item in enumerate(self._items):
-            if not item.reading.rendering:
-                return index
-        return len(self._items)
-
     def _drop_index(self, point) -> int:
         """Which slot a drop at ``point`` (in this widget's coordinates) lands in:
         above the row whose top half it fell on, else at the end of the line. Never
@@ -740,7 +727,7 @@ class GenerationQueue(QWidget):
         for index, row in enumerate(self.rows()):
             middle = row.mapTo(self, row.rect().center())
             if point.y() < middle.y():
-                return max(self._first_movable(), index)
+                return max(first_movable(self._items), index)
         return len(self.rows())
 
     def paintEvent(self, event):

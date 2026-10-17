@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 from origenerator.gui import grid_card, palette
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
+from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import TICK_MS, RunReading, discard_run_text, discard_run_tooltip
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
@@ -101,7 +102,7 @@ class GeneratingTile(QFrame):
 
     def _reading(self) -> RunReading:
         return RunReading(
-            status=self._job.state, frame=self._job.last_preview,
+            status=display_status(self._job.state), frame=self._job.last_preview,
             progress=self._job.last_progress,
             pass_progress=self._job.last_pass_progress,
             stage=self._job.last_stage, started_at=self._job.started_at,

@@ -652,6 +652,15 @@ def test_a_row_waiting_to_be_sent_is_called_queued_on_screen():
     assert display_status(GenerationStatus.RUNNING) == JobState.RUNNING
 
 
+def test_a_job_waiting_here_or_on_the_server_is_called_queued_on_screen():
+    # Only a job ComfyUI has started is being made; one sent but still waiting
+    # there reads the same as one this app has not sent yet.
+    assert display_status(JobState.IDLE) == JobState.QUEUED
+    assert display_status(JobState.QUEUED) == JobState.QUEUED
+    assert display_status(JobState.RUNNING) == JobState.RUNNING
+    assert display_status(JobState.SPEAKING) == JobState.SPEAKING
+
+
 def test_every_state_a_job_walks_through_is_named_once():
     assert {state.value for state in JobState} == {
         "idle", "speaking", "queued", "running", "finished", "failed", "canceled"}

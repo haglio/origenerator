@@ -116,13 +116,13 @@ PARAM_HELP: dict[str, str] = {
     ),
     "lora_strength_high": (
         "How hard the first pass's LoRA (high noise) pulls. 1.0 is its intended "
-        "strength; below 0.5 it barely shows, above 1.2 it tends to take over the "
-        "picture."
+        "strength; much weaker and it barely shows, much stronger and it tends to "
+        "take over the picture."
     ),
     "lora_strength_low": (
         "How hard the second pass's LoRA (low noise) pulls. 1.0 is its intended "
-        "strength; below 0.5 it barely shows, above 1.2 it tends to take over the "
-        "picture."
+        "strength; much weaker and it barely shows, much stronger and it tends to "
+        "take over the picture."
     ),
 
     # --- calibration ---
@@ -153,10 +153,7 @@ PARAM_HELP: dict[str, str] = {
         "the motion comes out weak or the layout wanders, and earlier when the detail "
         "comes out soft or smeared."
     ),
-    "guidance": (
-        "How strictly the model obeys the prompt (Flux's guidance value). It wants "
-        "much smaller numbers than prompt strength does elsewhere."
-    ),
+    "guidance": "How strictly the model obeys the prompt (Flux's guidance value).",
     "sampler_name": (
         "How the picture moves from noise toward the model's guess at each step; "
         "hover each choice for how it works and how long it takes."
@@ -173,8 +170,8 @@ PARAM_HELP: dict[str, str] = {
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (
-        "How much bigger the enhanced version is than the render it came from. Past "
-        "3x the pass has to invent a lot."
+        "How much bigger the enhanced version is than the render it came from. The "
+        "bigger it gets, the more the pass has to invent."
     ),
     "enhance_steps": (
         "How many times the enhancement goes over the enlarged picture. Around 20 is "

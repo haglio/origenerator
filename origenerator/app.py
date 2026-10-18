@@ -670,17 +670,21 @@ def main(argv: list[str] | None = None) -> int:
         # plugin starts, so it has to be set before PyQt6 is imported at all.
         from origenerator.ui_scale import apply_room_scale
         apply_room_scale(in_a_headset=fun_time.in_a_headset)
-    _warm_voice_runtimes()  # must precede the first PyQt6 import below
+    _warm_voice_runtimes()  # must come before anything below imports Qt
     preview = shown_as(CHECKOUT)
     _init_windows_taskbar_identity(fun_time and fun_time.taskbar_identity, preview)
     _name_this_process()
 
-    from PyQt6.QtWidgets import QApplication
+    from origenerator.gui.application import application
 
     # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
     # above, and letting Qt re-read those flags would only invite collisions.
-    app = QApplication.instance() or QApplication(sys.argv[:1])
+    with application(sys.argv[:1]) as app:
+        return _boot_and_run(app, app_args, preview)
 
+
+def _boot_and_run(app, app_args, preview) -> int:
+    fun_time = app_args.fun_time
     # Before config, because config is the first thing a missing key stops from
     # importing, and before the splash, because there is nothing to put one over.
     from origenerator.content import missing_overlay_keys

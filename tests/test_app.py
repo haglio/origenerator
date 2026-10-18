@@ -99,6 +99,27 @@ def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
     assert "an invented error no handler expects" in logged
 
 
+def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
+    """As the QApplication's own wrapper is freed, PyQt deletes every QObject
+    Python still owns while it walks sip's map of wrappers, and a deletion that
+    makes enough new wrappers has sip rebuild that map under the walk, which then
+    reads the memory it let go of: the access violation in sip at 0x10726 that
+    copy after copy hit as it finished closing, from 2026-10-11 on. Whether it
+    faults depends on what the heap did with that memory, so what is held here is
+    what makes it impossible -- nothing left for the walk -- in a real launch and a
+    real close, which only a process of its own can show."""
+    said = tmp_path / "owned when the application went.json"
+    ran = subprocess.run([sys.executable, "-m", "tests.real_close", str(said)],
+                         cwd=REPO_ROOT, timeout=240,
+                         env=os.environ | {"QT_QPA_PLATFORM": "offscreen",
+                                           "ORIGENERATOR_STATE_DIR": str(tmp_path / "state")},
+                         capture_output=True, encoding="utf-8", errors="replace",
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+    assert json.loads(said.read_text(encoding="utf-8")) == {}
+
+
 def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(tmp_path):
     """The launcher keeps the app's stdout and stderr in its log, and Qt's Funestra
     had FFmpeg print a readout of every video it opened there, each of its tags

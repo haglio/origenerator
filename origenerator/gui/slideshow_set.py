@@ -92,6 +92,7 @@ class SlideshowSet:
         # act filter matches it on.  None for a slideshow with no library under it.
         self._acts_of = actions.acts
         self._named: dict[str, str] = {}
+        self._slides_of = actions.slides
         self._on_filters_change = actions.filters_changed
         self.loop: Loop | None = None
         self.filters = SlideshowFilters()
@@ -483,11 +484,16 @@ class SlideshowSet:
                               loop_pool=tuple(slide.prompt_id for slide in loop.pool))
 
     def resume(self, state: SlideshowState) -> bool:
-        if not self.playlist.resume(state.order, state.current):
-            return False
-        if state.loop:
-            self.start_loop(state.loop)
-        return True
+        pool = self._pool_left_looping(state)
+        if pool:
+            self.start_loop(state.loop, pool)
+        return self.playlist.resume(state.order, state.current)
+
+    def _pool_left_looping(self, state: SlideshowState) -> tuple[Slide, ...]:
+        if not state.loop or self._slides_of is None:
+            return ()
+        pool = tuple(self._slides_of(state.loop_pool))
+        return pool if any(slide.prompt_id == state.current for slide in pool) else ()
 
     def configuration_row(self, query: str) -> Slide | None:
         """The slide of the column row *query* names, where that row is a

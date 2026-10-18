@@ -36,7 +36,7 @@ from tests import gestures
 from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, thumbnail_on_screen
-from tests.slideshow_support import ahead
+from tests.slideshow_support import ahead, slides_named
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -2041,16 +2041,21 @@ def test_a_slideshow_opened_on_a_picture_keeps_it_up_under_filters_that_leave_it
     assert view._playlist.current()[2] == "id-b"
 
 
-def test_a_slideshow_closed_looping_a_row_reopens_looping_it(qtbot):
+def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(qtbot):
+    library = SlideshowActions(neighbors=_around, slides=slides_named(
+        Slide("a.png", "image", "id-a"), Slide("c.png", "image", "id-c")))
     browsing = [*_KEYED, ("z.png", "image", "id-z")]
-    closed = _view(qtbot, browsing, actions=SlideshowActions(neighbors=_around))
+    closed = _view(qtbot, browsing, actions=library)
     _press(closed, Qt.Key.Key_E)
+    _press(closed, Qt.Key.Key_E)
+    _press(closed, Qt.Key.Key_Right)
 
-    reopened = _view(qtbot, browsing, actions=SlideshowActions(neighbors=_around))
+    reopened = _view(qtbot, browsing, actions=library)
     reopened.resume(closed.state())
 
-    assert reopened.hud_map().loop == "seed"
-    assert [item[2] for item in reopened._playlist._items] == ["id-a", "id-b"]
+    assert reopened.hud_map() == closed.hud_map()
+    assert reopened.hud_map().loop == "action"
+    assert _media_on_screen(reopened) == "c.png"
 
 
 def test_a_slideshow_of_a_set_without_that_slide_starts_fresh(qtbot):

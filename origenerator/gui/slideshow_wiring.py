@@ -56,7 +56,8 @@ class SlideshowActions:
     :class:`~origenerator.gui.slideshow_map.MapNeighbors`), and what lies just
     beyond the row (the slides "more seeds" adds to it).  ``acts`` takes
     prompt_ids and answers what each one's map row is named for, which is
-    what an act filter matches it on.
+    what an act filter matches it on, and ``slides`` the slides they play as,
+    which a loop picked back up plays whatever set it reopened on.
     """
 
     delete: Callable[[str], None] | None = None
@@ -79,6 +80,7 @@ class SlideshowActions:
     neighbors: Callable[[str], object] | None = None
     widen: Callable[[str], tuple] | None = None
     acts: Callable[[list], dict] | None = None
+    slides: Callable[[tuple], tuple] | None = None
     filters_changed: Callable[[SlideshowFilters], None] | None = None
 
 

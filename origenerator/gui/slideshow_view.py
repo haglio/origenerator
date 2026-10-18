@@ -676,10 +676,10 @@ class SlideshowView(QWidget):
         shuffle, and say whether the place carried.
 
         Closing a slideshow is usually a detour, so coming back is coming back to
-        that picture: the slide it ended on, its lock, and the version it had
-        been stepped to -- which is why this is called after
+        that picture: the slide it ended on, its lock, its loop, and the version
+        it had been stepped to -- which is why this is called after
         :meth:`set_levels`.  It carries only while that slide is among these
-        items.
+        items or the loop it was left in.
         """
         if self._live or not self._set.resume(state):
             return False

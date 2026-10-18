@@ -239,6 +239,7 @@ class FakeDB:
         self._deletions = {}    # prompt_id -> the held-deletion record, newest last
         self._requests = {}     # prompt_id -> its spoken-request record, newest last
         self._seed_uses = []    # newest first
+        self._item_numbers = {}
 
     def list_generations(self):
         return list(self._rows)
@@ -251,6 +252,12 @@ class FakeDB:
 
     def list_seed_uses(self):
         return list(self._seed_uses)
+
+    def list_item_numbers(self):
+        return dict(self._item_numbers)
+
+    def record_item_numbers(self, numbers):
+        self._item_numbers.update(numbers)
 
     def get_generation(self, prompt_id):
         return self._by_id.get(prompt_id)
@@ -652,6 +659,19 @@ def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
     assert _shown(dog) == f"(1) {dog.text(0)}"
     assert _shown(source) == f"(1) {source.text(0)}"
 
+
+def test_a_videos_source_folder_in_the_toc_wears_its_pictures_name(qtbot):
+    picture = _image("i1", "a cat", 50, 1)
+    video = _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5,
+                                     "input_image": "sdxl_t2i_i1.png"},
+                 "wan22_i2v_00001_.mp4")
+    view = GalleryView(FakeDB([video, picture]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    source = _at(_video_workflow(view._tree), 0, 0, 0)
+
+    assert source.text(0) == f"{gallery.folder_id(gallery.settings_folder_key(picture))} 000"
 
 def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # The tree is six levels deep by the time it reaches a settings folder and it
@@ -2231,14 +2251,14 @@ def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
 def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
     # Nothing counts down any more, so the caption has no deadline to carry and
     # says only what the item is.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    held = _image("d1", "a cat", 50, 1)
+    view = GalleryView(_bin_db(held=[("d1", held)]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     caption = view._browser._thumb_widgets["d1"]._text_label.text()
-    assert "seed 1" in caption
-    assert "left" not in caption
+    assert caption == f"{gallery.folder_id(gallery.settings_folder_key(held))} 000"
 
 
 def test_the_trash_collection_states_no_deadline_over_what_it_holds(qtbot):
@@ -3803,6 +3823,34 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
     view._on_thumbnail_clicked("img1")
     assert _source_tile(view).isHidden()
 
+
+def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
+    older, newer = _image("g1", "a cat", 50, 1), _image("g2", "a cat", 50, 2)
+    view = GalleryView(FakeDB([newer, older]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+    for panel in view._info_tabs.config_panels():
+        panel._preview.show_media = MagicMock()
+    _select_first_leaf(view)
+
+    view._on_thumbnail_clicked("g2")
+
+    name = f"{gallery.folder_id(gallery.settings_folder_key(newer))} 001"
+    assert view._browser._thumb_widgets["g2"]._text_label.text() == name
+    assert view._info_tabs.tabText(view._info_tabs.currentIndex()) == name
+
+def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then(qtbot):
+    row = _image("g1", "a cat", 50, 1)
+    view = GalleryView(FakeDB([row]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    for panel in view._info_tabs.config_panels():
+        panel._preview.show_media = MagicMock()
+    view._info_tabs.load_selection(row, [row])
+
+    view.refresh()
+
+    name = f"{gallery.folder_id(gallery.settings_folder_key(row))} 000"
+    assert view._info_tabs.tabText(view._info_tabs.currentIndex()) == name
 
 def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):
     """A move always ends with the item on screen, drawn from its own folder.

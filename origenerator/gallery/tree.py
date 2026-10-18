@@ -31,6 +31,7 @@ dependency so it can be unit-tested directly.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -501,6 +502,7 @@ class _Tier:
     workflow_name: str
     folder_meta: dict
     image_index: dict
+    name_of: Callable[[str], str]
 
 
 def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]:
@@ -597,7 +599,7 @@ def _build_source_image_groups(tier: _Tier, rows: list[dict]) -> list[SourceImag
         signature=lambda r: _source_image_place(tier.workflow_name, r.get("params_json"),
                                                 tier.image_index),
         key_for=lambda sig: source_image_key(tier.media_type, tier.workflow_name, sig),
-        label_for=lambda params: _source_image_label(params, tier.image_index),
+        label_for=lambda params: _source_image_label(params, tier.image_index, tier.name_of),
         children_for=lambda sub: _build_settings_groups(tier, sub),
     )
 
@@ -682,6 +684,7 @@ def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None,
     *, image_index: dict | None = None,
     both_kinds: frozenset[str] | None = None,
+    name_of: Callable[[str], str] | None = None,
 ) -> list[WorkflowGroup]:
     """Nest rows into workflow -> model -> LoRA -> [source image] -> settings
     folders.
@@ -720,13 +723,17 @@ def build_gallery_tree(
         wf_key = f"{media_type}/{wf_name}"
         wf_label, wf_favorite = _workflow_folder_label(media_type, wf_name, folder_meta,
                                                        both_kinds)
-        tier = _Tier(media_type, wf_name, folder_meta, image_index)
+        tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of or _unnamed)
         tree.append(WorkflowGroup(
             wf_key, wf_name, wf_label,
             _build_model_groups(tier, wf_rows),
             wf_favorite,
         ))
     return tree
+
+
+def _unnamed(_prompt_id: str) -> str:
+    return ""
 
 
 # The row over the workflow folders, standing for the library entire. Not part of

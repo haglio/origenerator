@@ -48,7 +48,7 @@ def test_the_caption_is_never_larger_than_the_app_s_own(qtbot):
 
 
 def test_styling_a_caption_gives_it_the_family_font_and_band(qtbot):
-    label = QLabel("seed 1")
+    label = QLabel("3FA9C0D2 000")
     qtbot.addWidget(label)
 
     grid_card.style_caption(label)

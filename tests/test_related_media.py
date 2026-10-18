@@ -57,7 +57,8 @@ def make_related(qtbot):
     """Build a RelatedMedia over a given set of the library's videos, counting
     every time it asks for them."""
     def _make(*videos):
-        widget = RelatedMedia(video_rows=lambda: (asks.append(True), videos)[1])
+        widget = RelatedMedia(video_rows=lambda: (asks.append(True), videos)[1],
+                              name_of={"img1": "3FA9C0D2 004"}.get)
         asks: list = []
         widget.asks = asks
         qtbot.addWidget(widget)
@@ -84,6 +85,12 @@ def test_a_video_points_back_at_the_image_that_seeded_its_start_frame(related):
     assert not related._source_tile.isHidden()
     assert related._source_tile._prompt_id == "img1"
     assert related._animated_strip.isHidden()   # a video is animated into nothing
+
+
+def test_the_start_picture_is_called_by_its_name_not_its_file(related):
+    related.show_row(_video_row(), [_image_row()])
+
+    assert related._source_tile._name.text() == "3FA9C0D2 004"
 
 
 def test_an_image_lists_the_videos_it_was_animated_into(make_related):

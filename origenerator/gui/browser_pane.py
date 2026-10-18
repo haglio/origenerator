@@ -270,6 +270,8 @@ class PaneHost:
     # mirror and the run in front of its line, each None where the folder has
     # none — for the pane to place.
     lead_tiles: Callable[[object], LeadTiles]
+    # What an item is called wherever it is named, by its prompt_id.
+    item_name: Callable[[str], str]
 
 
 @dataclass(frozen=True)
@@ -828,7 +830,7 @@ class BrowserPane(QObject):
         """The last pane's tile for *row*, when it would be built again the same and
         wired the same way, else a new one *wire* connects."""
         prompt_id = row["prompt_id"]
-        thumb_path, caption = row.get("thumbnail_path"), self._thumbnail_caption(row)
+        thumb_path, caption = row.get("thumbnail_path"), self._host.item_name(prompt_id)
         tile = self._kept.take(
             prompt_id, ThumbnailWidget.look_of(prompt_id, thumb_path, caption, **appearance),
             wiring)
@@ -1162,14 +1164,6 @@ class BrowserPane(QObject):
         label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         label.setContentsMargins(16, 24, 16, 16)
         return label
-
-    @staticmethod
-    def _thumbnail_caption(row) -> str:
-        """A thumbnail's caption: its seed, else a snippet of its prompt."""
-        seed = row.get("seed")
-        if seed is not None:
-            return f"seed {seed}"
-        return (row.get("positive_prompt") or "")[:40] or "(no prompt)"
 
     # --- what the open collection gathers (the slideshow plays it) ----------
 

@@ -13,11 +13,11 @@ hover.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
 
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
-from origenerator.gallery.output import row_output_files
 from origenerator.gallery.signatures import (
     _basename,
     _frame_name,
@@ -104,22 +104,6 @@ def config_tab_title(workflow_name: str | None, params: dict) -> str:
     return f"{model} › {headline}" if headline else model
 
 
-def item_label(row: dict | None) -> str:
-    """The name one generation wears where a single item has to be named — a
-    Generate tab's, say. The file it produced, which is what the info block
-    calls it by too, so an item reads the same wherever it is named.
-
-    ``""`` for a row with nothing on disk — a run still in flight, or one whose
-    files are gone — leaving the caller to name it by the folder it sits in
-    instead (:func:`config_folder_name`).
-    """
-    for file in row_output_files(row or {}):
-        name = _basename(file.get("filename") or "")
-        if name:
-            return name
-    return ""
-
-
 def config_folder_key(workflow_name: str, signature: str) -> str:
     """The key of the gallery folder a config would generate into.
 
@@ -171,22 +155,15 @@ def job_kind_label(workflow_name: str | None) -> str:
     return JobKind.VIDEO if output_type == MediaType.VIDEO else JobKind.IMAGE
 
 
-def _source_image_label(params: dict, image_index: dict) -> str:
-    """The name of the source-image folder a video's start frame belongs to.
-
-    The frame's own filename leads, then the code of the image generation's own
-    folder — so a video's source folder names *which* picture it animates, and
-    reads as the same folder that picture sits in over among the images. The
-    filename comes first because the tier is one frame per folder, and two draws
-    of one prompt land in one settings folder, so they would otherwise wear the
-    same code. Falls back to the bare filename when the frame isn't a known
-    generation — there is no folder to borrow a code from — and ``"(no start
-    image)"`` when there is none.
-    """
+def _source_image_label(params: dict, image_index: dict,
+                        name_of: Callable[[str], str]) -> str:
+    """The name of the source-image folder a video's start frame belongs to: the
+    name of the picture it animates, or the frame's bare filename when the frame
+    isn't a known generation, and ``"(no start image)"`` when there is none."""
     input_image = params.get("input_image")
-    name = _frame_name(input_image)
-    if not name:
+    frame = _frame_name(input_image)
+    if not frame:
         return "(no start image)"
-    filename = _basename(_unannotated(input_image))
-    entry = (image_index or {}).get(name)
-    return f"{filename} · {entry.label}" if entry is not None else filename
+    entry = (image_index or {}).get(frame)
+    picture = name_of(entry.prompt_id) if entry is not None else ""
+    return picture or _basename(_unannotated(input_image))

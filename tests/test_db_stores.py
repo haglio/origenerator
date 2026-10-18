@@ -28,6 +28,7 @@ from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
+from origenerator.db_item_numbers import ItemNumberStore
 from origenerator.db_requests import RequestStore
 from origenerator.db_schema import GENERATION_COLUMNS
 from origenerator.db_seed_uses import SeedUseStore
@@ -41,6 +42,7 @@ STORES = {
     "folder_meta": (FolderMetaStore, lambda s: s.folder_meta_full()),
     "custom_folders": (CustomFolderStore, lambda s: s.list_custom_folders()),
     "seed_uses": (SeedUseStore, lambda s: s.list_seed_uses()),
+    "item_numbers": (ItemNumberStore, lambda s: s.list_item_numbers()),
 }
 
 
@@ -62,7 +64,7 @@ def _public_methods(cls) -> set[str]:
 def test_a_store_works_off_the_file_with_no_database_object_in_sight(file, attribute):
     store_class, read = STORES[attribute]
 
-    assert read(store_class(file)) in ([], None)
+    assert not read(store_class(file))
 
 
 @pytest.mark.parametrize("attribute", sorted(STORES))
@@ -115,6 +117,23 @@ class TestDeletionStore:
 
         assert [held["prompt_id"] for held in db.list_deletions()] == ["gen-beta"]
         assert db.deletions.get_deletion("gen-beta") is not None
+
+
+class TestItemNumberStore:
+    def test_what_it_records_it_can_read_back(self, file):
+        numbers = ItemNumberStore(file)
+
+        numbers.record_item_numbers({"gen-alpha": ("image/sdxl_t2i/0123456789ab", 3)})
+
+        assert numbers.list_item_numbers() == {"gen-alpha": ("image/sdxl_t2i/0123456789ab", 3)}
+
+    def test_an_item_recorded_again_keeps_only_its_newest_number(self, file):
+        numbers = ItemNumberStore(file)
+        numbers.record_item_numbers({"gen-alpha": ("image/sdxl_t2i/0123456789ab", 3)})
+
+        numbers.record_item_numbers({"gen-alpha": ("image/sdxl_t2i/ba9876543210", 3)})
+
+        assert numbers.list_item_numbers() == {"gen-alpha": ("image/sdxl_t2i/ba9876543210", 3)}
 
 
 # The writers that interpolate a column name into their statement, and which of

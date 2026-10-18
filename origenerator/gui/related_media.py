@@ -20,6 +20,7 @@ where what the settings made is named before the settings themselves.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
@@ -29,7 +30,6 @@ from origenerator.gallery import (
     animated_preview_path,
     find_source_image_id,
     media_type_of_row,
-    row_output_files,
     videos_from_source_image,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
@@ -49,7 +49,8 @@ class RelatedMedia(QWidget):
     source_activated = pyqtSignal(str)     # the source tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)   # an animation tile was clicked (prompt_id)
 
-    def __init__(self, parent=None, *, video_rows=None):
+    def __init__(self, parent=None, *, video_rows=None,
+                 name_of: Callable[[str], str]):
         """``video_rows`` answers the library's videos, and is asked only for a
         row that could have animations, or is a cycle cut out of one of them —
         which is why it is a call rather than a list. Reading it is a whole-table
@@ -58,6 +59,7 @@ class RelatedMedia(QWidget):
         """
         super().__init__(parent)
         self._video_rows = video_rows or (list)
+        self._name_of = name_of
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
@@ -90,17 +92,16 @@ class RelatedMedia(QWidget):
 
     def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
         """Reveal the source tile for whatever this row was built from, else hide
-        it. The tile shows that item's thumbnail and filename and names it on
+        it. The tile shows that item's thumbnail and name and names it on
         click, for the owner to navigate to.
         """
         source_row, heading, media_type = self._built_from(row, image_rows, request)
         if not source_row:
             self._source_tile.clear()
             return
-        files = row_output_files(source_row)
         self._source_tile.show_source(
             source_row["prompt_id"], source_row.get("thumbnail_path"),
-            files[0]["filename"] if files else "",
+            self._name_of(source_row["prompt_id"]),
             heading=heading, media_type=media_type,
         )
 

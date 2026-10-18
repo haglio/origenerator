@@ -143,6 +143,7 @@ from origenerator.gui.toolbar_bank import (
     ToolbarBank,
 )
 from origenerator.gui.voice_router import VoiceRouter
+from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.orientation import (
     base_of as _base_of,
@@ -437,6 +438,7 @@ class GalleryView(QWidget):
         # still do (see :meth:`row_for`).
         self._held_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
+        self._item_names = ItemNames(db)
         # The browser pane renders the middle column (tiles / thumbnails / collections)
         # and owns the thumbnail multi-selection and in-flight cards. Its signals
         # carry every gesture made on a tile; the handlers here answer them. The
@@ -461,6 +463,7 @@ class GalleryView(QWidget):
                 enhance_settings=lambda: self._enhance.settings,
                 experiments_enabled=lambda: self.experiments_enabled(),
                 lead_tiles=lambda group: self._lead_tiles(group),
+                item_name=self._item_names.of,
             ),
         )
         self._browser.pane_reset.connect(self._forget_generating_tile)
@@ -508,7 +511,8 @@ class GalleryView(QWidget):
         # whose slideshow button starts one.
         self._slideshows = SlideshowDirector(
             self, db=db, browser=self._browser, jobs=self._jobs,
-            pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time)
+            pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
+            names=self._item_names)
         # Combine: a video's recipe run again on a dropped picture, and the
         # spoken "animate as" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
@@ -978,7 +982,7 @@ class GalleryView(QWidget):
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time,
-                                       heights=self._prompt_heights)
+                                       heights=self._prompt_heights, names=self._item_names)
         # One OSR2 driver for the whole view, under the one global switch
         # (self.osr2_control): while that's on it follows whichever video is foreground —
         # an open slideshow, else whatever scripted video is in the front tab —
@@ -1783,6 +1787,7 @@ class GalleryView(QWidget):
         # to (:meth:`media_types`).
         listed = rows
         self._listed_rows = listed
+        self._held_rows = recovery.bin_items(self._bin_records())
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`) — and kept as the
@@ -1790,7 +1795,6 @@ class GalleryView(QWidget):
         start_frames, trees = self._lists_for(rows, meta, self._tree.sides)
         self._image_index = start_frames
         unreviewed = self._review_queue(listed)
-        self._held_rows = recovery.bin_items(self._bin_records())
         held = self._held_rows
         self._live_ids = {row["prompt_id"] for row in rows}
         self._custom_folders_by_side = _custom_folders_by_side(
@@ -1844,6 +1848,7 @@ class GalleryView(QWidget):
         # trashed item) is taken off a tab now.
         self._selected_row = None
         self._info_tabs.reconcile_previews(self._live_ids)
+        self._info_tabs.retitle_tabs()
         # _tree_item_for rather than a bare lookup, so a restore target saved as
         # a folder key — a session from before the tree grew sides — still lands
         # on that folder instead of falling back to the default.
@@ -1885,18 +1890,21 @@ class GalleryView(QWidget):
             panel.refresh_generate_caption()
 
     def _lists_for(self, rows, meta, sides):
-        """The start frames and a table of contents for each of *sides*, kept
-        against the library they were built from; only the drawn sides are built."""
+        """The start frames, every item's name and a table of contents for each
+        of *sides*, kept against the library they were read off; only the drawn
+        sides are built."""
         library = _fingerprint(rows, meta)
         if library != self._lists_built_from:
             self._lists_built_from = library
             self._start_frames = gallery.start_frame_index(rows)
             self._both_kind_workflows = gallery.workflows_of_both_kinds(rows)
+            self._item_names.take(rows, self._held_rows, self._start_frames)
             self._lists_by_side = {}
         for side in sides:
             if side not in self._lists_by_side:
                 self._lists_by_side[side] = _side_list(
-                    rows, meta, self._start_frames, self._both_kind_workflows, side)
+                    rows, meta, self._start_frames, self._both_kind_workflows, side,
+                    self._item_names.of)
         return self._start_frames, {side: self._lists_by_side[side] for side in sides}
 
     def _build_sides(self, trees):
@@ -4490,10 +4498,10 @@ class GalleryView(QWidget):
         self._info_tabs.pin_current_tab()
 
 
-def _side_list(rows, meta, start_frames, both_kinds, side):
+def _side_list(rows, meta, start_frames, both_kinds, side, name_of):
     return gallery.build_gallery_tree(filter_rows(rows, side), meta,
                                       image_index=start_frames,
-                                      both_kinds=both_kinds)
+                                      both_kinds=both_kinds, name_of=name_of)
 
 
 def _custom_folders_by_side(trees, records) -> dict[str, list]:

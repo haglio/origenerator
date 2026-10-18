@@ -194,6 +194,12 @@ CREATE TABLE IF NOT EXISTS deletions (
     deleted_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS item_numbers (
+    prompt_id  TEXT PRIMARY KEY,
+    folder_key TEXT    NOT NULL,
+    number     INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS seed_uses (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     kind           TEXT    NOT NULL,

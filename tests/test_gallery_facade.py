@@ -42,7 +42,7 @@ PUBLISHED = {
     "generation_seed", "group_level",
     "is_enhance_product_row", "is_enhanceable_row",
     "is_enhanced_row", "is_image_conditioned", "is_in_progress",
-    "item_label", "job_kind_label",
+    "job_kind_label",
     "legacy_parentless_folder_key", "legacy_preenhance_settings_folder_keys",
     "legacy_preframe_settings_folder_key",
     "legacy_preversion_settings_folder_key", "legacy_settings_folder_key",

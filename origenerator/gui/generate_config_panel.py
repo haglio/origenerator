@@ -35,7 +35,6 @@ from origenerator.gallery import (
     describe_enhance_params,
     displayed_levels,
     enhance_params_for,
-    item_label,
     level_matching_settings,
     media_type_of_row,
     output_file_path,
@@ -73,6 +72,7 @@ from origenerator.gui.param_form import ParamForm
 from origenerator.gui.picture_state_picker import PictureStatePicker
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
+from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
@@ -172,7 +172,8 @@ class GenerateConfigPanel(QWidget):
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
                  *, fun_time=None, heights=None,
                  inbox: evolver_export.EvolverInbox | None = None,
-                 library: LibraryViews | None = None):
+                 library: LibraryViews | None = None,
+                 names: ItemNames | None = None):
         super().__init__(parent)
         self._heights = heights  # the window's prompt heights, for its forms
         # Where a clip is handed to Evolver. Asked for rather than performed
@@ -183,6 +184,7 @@ class GenerateConfigPanel(QWidget):
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._library = library or LibraryViews(db)
+        self._names = names or ItemNames(db)
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
         self._folder_generating = False
@@ -435,7 +437,7 @@ class GenerateConfigPanel(QWidget):
         between — a stretch grew an elastic gap above them by exactly what folding
         a form section saved.
         """
-        self._related = RelatedMedia(video_rows=self._video_rows)
+        self._related = RelatedMedia(video_rows=self._video_rows, name_of=self._names.of)
         self._related.source_activated.connect(self.source_activated)
         self._related.animated_activated.connect(self.animated_activated)
         body.addWidget(self._related)
@@ -1042,7 +1044,7 @@ class GenerateConfigPanel(QWidget):
         """
         if self._folder_request is not None:
             return self._folder_request.title()
-        name = item_label(self._displayed_row)
+        name = self._names.of((self._displayed_row or {}).get("prompt_id"))
         if not name:
             key = self.workflow_and_signature()
             if key is not None:

@@ -1,7 +1,7 @@
 """The item a generation was built from, shown as a clickable thumbnail tile.
 
 In the info pane of a video generation: the source image's thumbnail with its
-filename centered beneath, styled like the gallery's other thumbnail tiles — a
+name centered beneath, styled like the gallery's other thumbnail tiles — a
 thin border and a media-type badge in the corner. Clicking anywhere emits
 ``activated`` with the source image's prompt_id, so the gallery navigates to it.
 
@@ -17,6 +17,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_SUBTLE
 
+from origenerator.gui import grid_card
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.media import MediaType
 
@@ -28,7 +29,7 @@ _DEFAULT_MEDIA_TYPE = MediaType.IMAGE
 
 
 class SourceImageTile(QWidget):
-    """A clickable thumbnail with its filename centered beneath, for a video's
+    """A clickable thumbnail with its name centered beneath, for a video's
     source image.
 
     ``show_source`` fills and reveals it; ``clear`` hides it and forgets the id so
@@ -60,14 +61,15 @@ class SourceImageTile(QWidget):
         # gallery tiles.
         self._badge = MediaBadge(_DEFAULT_MEDIA_TYPE, self._thumb)
 
-        self._filename = QLabel()
-        self._filename.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
-        self._filename.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        column.addWidget(self._filename, 0, Qt.AlignmentFlag.AlignLeft)
+        self._name = QLabel()
+        self._name.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
+        self._name.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        grid_card.style_caption(self._name)
+        column.addWidget(self._name, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.hide()
 
-    def show_source(self, prompt_id: str, thumbnail_path, filename: str,
+    def show_source(self, prompt_id: str, thumbnail_path, name: str,
                     heading: str | None = None, media_type: str | None = None):
         """Point the tile at an item. ``heading`` names the relation when it
         isn't the usual one — the same slot says "from source image" for a
@@ -79,13 +81,7 @@ class SourceImageTile(QWidget):
         self._prompt_id = prompt_id
         self._heading.setText(heading or _DEFAULT_HEADING)
         self._badge.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
-        # A spaceless filename can't wrap, so middle-elide it to the tile width and
-        # keep the full name in the tooltip.
-        elided = self._filename.fontMetrics().elidedText(
-            filename, Qt.TextElideMode.ElideMiddle, _THUMB
-        )
-        self._filename.setText(elided)
-        self._filename.setToolTip(filename)
+        self._name.setText(name)
         self._thumb.setPixmap(self._scaled_thumb(thumbnail_path))
         self.show()
 

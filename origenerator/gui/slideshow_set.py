@@ -45,7 +45,14 @@ from origenerator.gui.slideshow_map import (
 )
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.media import MediaType
-from origenerator.slideshow import LIVE, Slide, SlideshowFilters, SlideshowPlaylist, in_order
+from origenerator.slideshow import (
+    LIVE,
+    Slide,
+    SlideshowFilters,
+    SlideshowPlaylist,
+    SlideshowState,
+    in_order,
+)
 
 # What the loop key answers: the axis it started looping, that it ended the
 # loop, or — with nothing on either axis to loop — that the press is the lock
@@ -467,6 +474,19 @@ class SlideshowSet:
         if not additions:
             return False
         return self.start_loop(SEED_AXIS, [*self.loop_pool(SEED_AXIS), *additions])
+
+    def state(self, *, locked: bool, level_index: int) -> SlideshowState:
+        return SlideshowState(order=tuple(self.playlist.order_ids()),
+                              current=self.current_prompt_id(), locked=locked,
+                              level_index=level_index,
+                              loop=self.loop.axis if self.loop is not None else "")
+
+    def resume(self, state: SlideshowState) -> bool:
+        if not self.playlist.resume(state.order, state.current):
+            return False
+        if state.loop:
+            self.start_loop(state.loop)
+        return True
 
     def configuration_row(self, query: str) -> Slide | None:
         """The slide of the column row *query* names, where that row is a

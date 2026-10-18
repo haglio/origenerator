@@ -849,21 +849,13 @@ class FunestraSlideshow(QObject):
 
     def state(self) -> SlideshowState:
         """Where this slideshow is, in the terms a later one can be opened at."""
-        return SlideshowState(
-            order=tuple(self._set.playlist.order_ids()),
-            current=self._set.current_prompt_id(),
-            locked=self._locked,
-            level_index=self._levels.index,
-            loop=self._set.loop.axis if self._set.loop is not None else "",
-        )
+        return self._set.state(locked=self._locked, level_index=self._levels.index)
 
     def resume(self, state: SlideshowState) -> bool:
         """Open where a closed slideshow left off rather than at the top of a fresh
         pass.  Returns whether the place carried."""
-        if not self._set.playlist.resume(state.order, state.current):
+        if not self._set.resume(state):
             return False
-        if state.loop:
-            self._set.start_loop(state.loop)
         led = self._set.lead_with_what_is_being_made()
         self._hand_over(land=True)
         if state.level_index and not led:

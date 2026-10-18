@@ -669,13 +669,7 @@ class SlideshowView(QWidget):
 
     def state(self) -> SlideshowState:
         """Where this slideshow is, in the terms a later one can be opened at."""
-        return SlideshowState(
-            order=tuple(self._playlist.order_ids()),
-            current=self._current_prompt_id(),
-            locked=self._playlist.locked,
-            level_index=self._levels.index,
-            loop=self._set.loop.axis if self._set.loop is not None else "",
-        )
+        return self._set.state(locked=self._playlist.locked, level_index=self._levels.index)
 
     def resume(self, state: SlideshowState) -> bool:
         """Open where a closed slideshow left off rather than at the top of a fresh
@@ -687,10 +681,8 @@ class SlideshowView(QWidget):
         :meth:`set_levels`.  It carries only while that slide is among these
         items.
         """
-        if self._live or not self._playlist.resume(state.order, state.current):
+        if self._live or not self._set.resume(state):
             return False
-        if state.loop:
-            self._set.start_loop(state.loop)
         self._playlist.set_locked(state.locked)
         led = self._set.lead_with_what_is_being_made()
         self._show_current()

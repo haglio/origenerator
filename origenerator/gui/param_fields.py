@@ -266,13 +266,6 @@ def _select_combo_value(combo: QComboBox, value: str):
 def grey_out_of_reach(pd: ParamDef, widget: PresetComboBox) -> None:
     """Disable the presets this workflow can't actually produce.
 
-    The Duration dropdown offers the same lengths to every video workflow,
-    and every video model stops well short of the longest of them — 15 s and
-    30 s are out of reach everywhere, and 10 s on the two workflows that
-    render fewer frames. Picked, such a preset just becomes the longest clip
-    the model does render, so the number chosen isn't the number given; the
-    list says which those are instead of quietly substituting.
-
     Out of reach means the value doesn't survive the round trip the field
     itself makes — offered, stored, and read back, it comes out as something
     else. That covers a rate past the writer's ceiling on the same rule.

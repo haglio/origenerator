@@ -312,7 +312,7 @@ class ParamForm(QWidget):
         self._explain(key)
 
     def _explain(self, key: str) -> None:
-        pd = next((p for p in self._param_defs if p.key == key), None)
+        pd = self._defs.get(key)
         explained = (definition_help(pd, self._recommendations.get(key, "")) if pd is not None
                      else param_help(key))
         label = self._labels[key]

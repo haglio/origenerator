@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QWheelEvent
+from PyQt6.QtGui import QPalette, QWheelEvent
 from PyQt6.QtWidgets import QComboBox
 
 from origenerator.gui.no_wheel import (
@@ -91,6 +91,34 @@ def test_a_placeholder_does_not_hold_the_form_open_either(qtbot):
     qtbot.addWidget(w)
 
     assert w.minimumSizeHint().width() == bare.minimumSizeHint().width()
+
+
+def test_a_dropdown_with_nothing_picked_shows_its_placeholder_dimmed(qtbot):
+    w = NoWheelComboBox()
+    w.addItems(_MODELS)
+    w.setPlaceholderText("Select a workflow…")
+    w.setCurrentIndex(-1)
+    qtbot.addWidget(w)
+
+    label = w.label_option(1000)
+
+    assert label.currentText == "Select a workflow…"
+    assert (label.palette.color(QPalette.ColorRole.ButtonText)
+            == w.palette().color(QPalette.ColorRole.PlaceholderText))
+
+
+def test_a_picked_value_is_not_dimmed_like_a_placeholder(qtbot):
+    w = NoWheelComboBox()
+    w.addItems(_MODELS)
+    w.setPlaceholderText("Select a workflow…")
+    w.setCurrentIndex(1)
+    qtbot.addWidget(w)
+
+    label = w.label_option(1000)
+
+    assert label.currentText == _MODELS[1]
+    assert (label.palette.color(QPalette.ColorRole.ButtonText)
+            == w.palette().color(QPalette.ColorRole.ButtonText))
 
 
 def test_a_squeezed_value_elides_rather_than_clips(qtbot):

@@ -573,9 +573,6 @@ class SlideshowSet:
     def being_made(self, slide) -> bool:
         return slide.is_live or self.enhancement_of(slide.prompt_id) == ENHANCEMENT_RUNNING
 
-    def pace_for(self, slide, seconds: float) -> float:
-        return seconds / 2 if self.being_made(slide) else seconds
-
     def lead_with_what_is_being_made(self) -> bool:
         playlist = self.playlist
         index = next((index for index, item in enumerate(playlist.items)

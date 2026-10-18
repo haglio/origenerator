@@ -22,7 +22,6 @@ gallery's own caption instead, where the speaker can still see them.
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -88,15 +87,11 @@ class FunestraSlideshow(QObject):
 
     def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
                  hud=None, pace=None, image_dwell_ms=None, start=None, shuffle=None,
-                 say=None, clock=time.monotonic, parent=None):
+                 say=None, parent=None):
         super().__init__(parent)
         self._side = side
         self.channel = channel
         self._frames = frames
-        self._clock = clock
-        self._last_tick = clock()
-        self._held_s = 0.0
-        self._moves_on_early = False
         self._request_holds_it = False
         self._frame_on_funestra: Path | None = None
         # What a press here asks the gallery to do on its behalf — the half of
@@ -236,21 +231,13 @@ class FunestraSlideshow(QObject):
         """Read the Funestra's status, follow it, and publish the panel."""
         status = self._funestra_status()
         self._locked = status.locked
-        now = self._clock()
         if status.video and status.video != self._showing:
             self._showing = status.video
             self._follow(status.video)
-            self._held_s = 0.0
-            current = self._set.playlist.current()
-            self._moves_on_early = current is not None and self._set.being_made(current)
             self._frame_on_funestra = None
             self._show_what_is_being_made()
-        elif not (status.paused or status.locked or self._request_holds_it):
-            self._held_s += now - self._last_tick
-        self._last_tick = now
         if self._funestra_pace() != self._pace_told:
             self._tell_the_pace()
-        self._move_on_early_from_what_is_being_made()
         self._publish()
 
     def _show_what_is_being_made(self) -> None:
@@ -263,13 +250,6 @@ class FunestraSlideshow(QObject):
             return
         self._frame_on_funestra = path
         self._send(CLEAR_FRAME if path is None else f"{SHOW_FRAME} {path}")
-
-    def _move_on_early_from_what_is_being_made(self) -> None:
-        if not (self._moves_on_early and self._funestra_pace()):
-            return
-        if self._held_s >= self._set.pace_for(self._set.playlist.current(), self._dwell_s):
-            self._moves_on_early = False
-            self._send(NEXT)
 
     def _funestra_status(self):
         return parse_status(_read_fields(self.channel.status_file))

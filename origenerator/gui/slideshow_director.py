@@ -107,9 +107,6 @@ class SlideshowHost(Protocol):
     def group_for_key(self, key: str):
         """The folder ``key`` names, as the side it is looked at from holds it."""
 
-    def media_types(self) -> set[str]:
-        """The kinds the collections are listing — Images, Videos or both."""
-
     def row_for(self, prompt_id: str) -> dict | None:
         """The generation row ``prompt_id`` names, or ``None``."""
 
@@ -625,9 +622,7 @@ class SlideshowDirector:
     def _library_of(self, side: str) -> list[dict]:
         """The generations a slideshow on *side* is mapped against: the whole
         library of that side's shape — what the Satellite Funestras map their
-        clips against too, each over its own sources.  Every generation of
-        that shape, whatever the gallery's two ticks are showing: the ticks
-        narrow what is browsed, and a map is drawn against what exists."""
+        clips against too, each over its own sources."""
         return filter_rows(self._db.list_generations(), side)
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
@@ -1239,13 +1234,17 @@ class SlideshowDirector:
 
     def _recents_would_take(self, row: dict, location) -> bool:
         base, side = _split_collection_key(location)
-        playing_recents = (base == _RECENTS_KEY if location
-                           else self._browser.showing_recents()
-                           and not self._browser.showing_search())
+        latest = folder_collection(base)
+        if location:
+            playing_recents = latest is not None and latest.which == _RECENTS_KEY
+        else:
+            playing_recents = (self._browser.showing_recents()
+                               and not self._browser.showing_search())
         return bool(playing_recents
                     and source_of(row) == GenerationSource.GENERATED
-                    and gallery.media_type_of_row(row) in self._host.media_types()
-                    and filter_rows([row], side))
+                    and filter_rows([row], side)
+                    and (latest is None or latest.folder in gallery.folder_chain(
+                        row, self._host.image_config_index())))
 
     def note_in_flight(self, items):
         """Tell every open slideshow what is still being made, off the same in-flight

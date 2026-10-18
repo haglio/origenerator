@@ -5,8 +5,7 @@ import logging
 import random
 from typing import NamedTuple
 
-from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
@@ -17,7 +16,6 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
-    QRadioButton,
     QScrollArea,
     QTextEdit,
     QVBoxLayout,
@@ -81,7 +79,7 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls, icons, omnipause
+from origenerator.gui import corner_controls, omnipause
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
     REROLL_VIDEO,
@@ -456,7 +454,6 @@ class GalleryView(QWidget):
             # pane's old view reads did — so a per-instance stub (tests fake
             # animated_preview this way) still lands.
             PaneHost(
-                media_types=lambda: self.media_types(),
                 image_rows=lambda: self._image_rows,
                 animated_preview=lambda row: self.animated_preview(row),
                 enhancing_run=lambda row: self._enhance.run_of(row),
@@ -905,37 +902,6 @@ class GalleryView(QWidget):
         self._experiments_bar.hide()  # shown only in the Experiments collection
         self._sync_experiments_bar()
         browser_column.addWidget(self._experiments_bar)
-        # Which kinds a collection lists. Here rather than over the folder list,
-        # because a folder under image/… holds images and one under video/…
-        # holds videos: only a collection gathers both, so only a collection has the
-        # question to answer, and asking it here leaves every folder in the
-        # list reachable whichever kind is chosen.
-        self._images_only = QRadioButton("Images")
-        self._videos_only = QRadioButton("Videos")
-        self._both_kinds = QRadioButton("Both")
-        self._both_kinds.setChecked(True)
-        self._kinds_by_button = {
-            self._images_only: (MediaType.IMAGE,),
-            self._videos_only: (MediaType.VIDEO,),
-            self._both_kinds: (MediaType.IMAGE, MediaType.VIDEO),
-        }
-        self._kinds_bar = QWidget()
-        kinds_row = QHBoxLayout(self._kinds_bar)
-        kinds_row.setContentsMargins(0, 0, 0, 0)
-        marks = (icons.media_type_icon(MediaType.IMAGE),
-                 icons.media_type_icon(MediaType.VIDEO),
-                 QIcon(icons.both_kinds_mark()))
-        word = icons.MARK_BESIDE_A_WORD
-        for kind, mark in zip((self._images_only, self._videos_only, self._both_kinds),
-                              marks):
-            kind.setToolTip("Which kinds this collection lists")
-            kind.setIcon(mark)
-            kind.setIconSize(QSize(word, word))
-            kind.toggled.connect(self._on_media_filter_changed)
-            kinds_row.addWidget(kind)
-        kinds_row.addStretch(1)
-        self._kinds_bar.hide()  # shown in the collections, which are what gather both
-        browser_column.addWidget(self._kinds_bar)
         browser_column.addWidget(self._search.bar)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
@@ -1634,7 +1600,7 @@ class GalleryView(QWidget):
 
     # --- data loading & live update ---------------------------------------
 
-    def refresh(self, *, only_if_moved: bool = False, new_listing: bool = False):
+    def refresh(self, *, only_if_moved: bool = False):
         """Re-read the library and draw everything off it again.
 
         ``only_if_moved`` draws again only when the rows or their folder meta
@@ -1652,7 +1618,7 @@ class GalleryView(QWidget):
         moved = fingerprint != self._fingerprint
         self._fingerprint = fingerprint
         if moved or not only_if_moved:
-            self._rebuild(rows, meta, new_listing=new_listing)
+            self._rebuild(rows, meta)
         # The tree a rebuild makes is what the base state is read from, and
         # the session's open can land before the first one (its launch races
         # this app's boot).  Filling here costs nothing when the regions are
@@ -1753,14 +1719,11 @@ class GalleryView(QWidget):
         if facts.foreign is not None:
             self._foreign_queue = facts.foreign
 
-    def _rebuild(self, rows, meta, *, new_listing: bool = False):
+    def _rebuild(self, rows, meta):
         self._folder_meta = meta
         self._drawn_version += 1
         standing = self._tree_view.selected_folder_key()
         place = self._browser.place()
-        if new_listing:
-            self._browser.restart_recents_listing()
-            place = place.from_the_top()
         # Pending restore targets stand in until the user makes a live choice.
         selected_key = standing or self._pending_key
         # A live multi-selection is a folder the user is composing, so a rebuild
@@ -1780,13 +1743,7 @@ class GalleryView(QWidget):
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._combine.offer_the_acts(rows)
-        # Every kind, in the tree and in the index: which kinds a collection lists is
-        # the collection's own question, answered by the Images / Videos / Both
-        # buttons over the folder's contents, so a folder of the kind those
-        # buttons are not asking for is still a folder you can open and navigate
-        # to (:meth:`media_types`).
-        listed = rows
-        self._listed_rows = listed
+        self._listed_rows = rows
         self._held_rows = recovery.bin_items(self._bin_records())
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
@@ -1794,7 +1751,7 @@ class GalleryView(QWidget):
         # index every folder key is derived against until the next rebuild.
         start_frames, trees = self._lists_for(rows, meta, self._tree.sides)
         self._image_index = start_frames
-        unreviewed = self._review_queue(listed)
+        unreviewed = self._review_queue(rows)
         held = self._held_rows
         self._live_ids = {row["prompt_id"] for row in rows}
         self._custom_folders_by_side = _custom_folders_by_side(
@@ -1816,16 +1773,16 @@ class GalleryView(QWidget):
         # a deleted row is out of ``list_generations`` and lives only in the bin.
         # They are reachable only from that collection: every other scope is a set of
         # ids drawn from the live tree (see :meth:`search_scope`).
-        self._search.index.update(listed + held, gallery.folder_names_by_row(
+        self._search.index.update(rows + held, gallery.folder_names_by_row(
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_folders))
         requests = self._db.list_requests()
-        requested = gallery.requested_generations(requests, listed)  # the Requests collection
-        bumped = gallery.enhancement_recency(listed)
+        requested = gallery.requested_generations(requests, rows)  # the Requests collection
+        bumped = gallery.enhancement_recency(rows)
         self._browser.set_model(
-            gallery.recent_generations(listed, bumped=bumped),
+            gallery.recent_generations(rows, bumped=bumped),
             trees,
-            listed,
+            rows,
             unreviewed,
             held,
             requested,
@@ -1835,7 +1792,7 @@ class GalleryView(QWidget):
             self._build_sides(trees), folder_meta=meta,
             # Where the work has lately been. The tree keeps the order the
             # recipes were tried in, so nothing else in it says so.
-            recently_worked=gallery.recently_worked_folders(trees, listed, bumped=bumped),
+            recently_worked=gallery.recently_worked_folders(trees, rows, bumped=bumped),
         )
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
@@ -2018,7 +1975,6 @@ class GalleryView(QWidget):
         self._folder_path.set_display(f"Search: “{query}” in {scope}")
         self._avg_label.setText("")
         self._experiments_bar.hide()
-        self._offer_the_kinds(False)
 
     def show_search_results(self, tiles, **terms) -> None:
         self._browser.show_search_results(tiles, **terms)
@@ -2157,7 +2113,6 @@ class GalleryView(QWidget):
         collection = folder_collection(base)
         self._experiments_bar.setVisible(collection is not None
                                          and collection.which == _EXPERIMENTS_KEY)
-        self._offer_the_kinds(collection is not None)
         if current is None:
             self._folder_path.set_display("")
             self._avg_label.setText("")
@@ -2294,7 +2249,6 @@ class GalleryView(QWidget):
         the browser pane, and the toolbar offering to save the grouping."""
         group = self._selection_group
         self._experiments_bar.hide()
-        self._offer_the_kinds(False)
         self._folder_path.set_display(group.label)
         self._folder_path.setToolTip("")  # a count of folders, with no one folder under it
         self._update_folder_average(group)
@@ -3693,46 +3647,6 @@ class GalleryView(QWidget):
 
     def visible_prompt_ids(self) -> list[str]:
         return self._browser.visible_prompt_ids()
-
-    def media_types(self) -> set[str]:
-        """The media types the Images / Videos / Both choice lets through — what
-        the TOC, every collection, the in-flight cards and the search
-        index are all built from."""
-        return next(set(kinds) for button, kinds in self._kinds_by_button.items()
-                    if button.isChecked())
-
-    def collection_kinds(self) -> list[str]:
-        return sorted(self.media_types())
-
-    def set_collection_kinds(self, saved) -> None:
-        wanted = set(saved) if isinstance(saved, list) else set()
-        next((button for button, kinds in self._kinds_by_button.items()
-              if set(kinds) == wanted), self._both_kinds).setChecked(True)
-
-    def _on_media_filter_changed(self, checked=True):
-        """Another kind was chosen: list the collection again under it."""
-        if not checked:
-            return
-        with working():
-            self._browser.restart_recents_listing()  # a new choice is a new listing
-            self._recount_the_collections()
-            base, side = _split_collection_key(self.selected_folder_key())
-            collection = folder_collection(base)
-            if collection is not None:
-                self._browser.show_collection(collection.key, side)
-        # A collection the choice empties has no item to select, so the signal that
-        # normally re-syncs the slideshow button never fires — and it went on
-        # offering a slideshow of nothing.
-        self._re_aim()
-
-    def _offer_the_kinds(self, offered: bool) -> None:
-        """Offer the Images / Videos / Both choice, or take it away.
-
-        Away on anything but a collection: a folder holds one kind, so all three
-        buttons there are three ways of asking the same question, and a search
-        and a set of folders shown together are answered by what was asked for
-        rather than by this."""
-        self._kinds_bar.setVisible(offered)
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another

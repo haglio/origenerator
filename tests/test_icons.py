@@ -131,19 +131,6 @@ def test_a_collection_mark_is_drawn_once():
     assert icons.collection_icon(RECENTS_KEY) is icons.collection_icon(RECENTS_KEY)
 
 
-def test_the_both_kinds_mark_draws_a_picture_beside_a_play():
-    """What Both holds IS the other two choices, so its mark is the two the app
-    already draws for an image and for a video, side by side."""
-    mark = icons.both_kinds_mark(48)
-    image = mark.toImage()
-    halves = [any(image.pixelColor(x, y).alpha() > 40
-                  for y in range(image.height()) for x in side)
-              for side in (range(20), range(28, 48))]
-
-    assert halves == [True, True]
-    assert not _ink_at_the_edges(mark)
-
-
 def _ink_at_the_edges(pixmap) -> bool:
     """Whether anything drawn runs into the pixmap's own border."""
     image = pixmap.toImage()

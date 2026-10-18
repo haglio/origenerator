@@ -355,7 +355,6 @@ def media_type_icon(media_type: str) -> QIcon:
 # the family's glyph list because these are not one mark but a set whose whole
 # content is the difference between them, and no other window in the family
 # shows the libraries side by side.
-_KIND_PAIR_SHARE = 0.56  # each mark's share of the canvas, leaving them a gap
 _PROPORTION_LONG = 42.0
 _PROPORTION_SHORT = 28.0
 _PROPORTION_RADIUS = 5.0
@@ -398,18 +397,6 @@ def side_mark(side: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
         _frame_pen(painter)
         for width, height in _SIDE_FRAMES[side]:
             _rounded(painter, (_SIZE - width) / 2, (_SIZE - height) / 2, width, height)
-
-    return _painted(draw, size)
-
-
-@cache
-def both_kinds_mark(size: int = MARK_BESIDE_A_WORD) -> QPixmap:
-    """A picture and a play mark side by side: a list holding both kinds."""
-    def draw(painter: QPainter):
-        each = round(size * _KIND_PAIR_SHARE)
-        top = (size - each) // 2
-        painter.drawPixmap(0, top, glyph_pixmap("photo", each, TEXT_PRIMARY))
-        painter.drawPixmap(size - each, top, glyph_pixmap("play", each, TEXT_PRIMARY))
 
     return _painted(draw, size)
 

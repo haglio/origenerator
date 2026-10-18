@@ -168,14 +168,12 @@ def _thumbnails_of(rows) -> list[str]:
 class _Listing:
     def __init__(self, rows=()):
         self.rows = list(rows)
-        self._dealt: dict[tuple, list[dict]] = {}
+        self._dealt: dict[str | None, list[dict]] = {}
 
-    def on(self, side: str | None, kinds) -> list[dict]:
-        dealt = (side, frozenset(kinds))
-        if dealt not in self._dealt:
-            self._dealt[dealt] = gallery.rows_of_media_types(
-                filter_rows(self.rows, side), kinds)
-        return self._dealt[dealt]
+    def on(self, side: str | None) -> list[dict]:
+        if side not in self._dealt:
+            self._dealt[side] = filter_rows(self.rows, side)
+        return self._dealt[side]
 
 
 class _KeptTiles:
@@ -248,13 +246,11 @@ class PaneHost:
     answers at construction.
 
     Callables rather than pushed values so each is read at the moment a tile is
-    built: the media filter, the enhance settings and the in-flight runs all
-    move between renders, and several tiles are built mid-rebuild, where a
-    value captured earlier would already be the old one.
+    built: the enhance settings and the in-flight runs both move between
+    renders, and several tiles are built mid-rebuild, where a value captured
+    earlier would already be the old one.
     """
 
-    # The media types the gallery's two ticks currently include.
-    media_types: Callable[[], set]
     # Every image row of the current model — what places an untracked run and
     # decides whether an i2v item's start frame can itself be re-drawn.
     image_rows: Callable[[], list]
@@ -425,14 +421,9 @@ class BrowserPane(QObject):
                                                   self._collection_folder)
 
     def _in_folder(self, listing: _Listing, side: str | None, folder: str) -> list[dict]:
-        """What *folder* holds of *listing* on *side*, of the kinds now chosen.
-
-        Every collection's rows come through here, which is why the Images / Videos /
-        Both choice is applied here and nowhere else: a collection gathers both kinds,
-        and nothing else in the gallery does.
-        """
-        return self._placement(side).held_by(
-            folder, listing.on(side, self._host.media_types()))
+        """What *folder* holds of *listing* on *side* -- under Images or Videos,
+        that kind alone."""
+        return self._placement(side).held_by(folder, listing.on(side))
 
     def _placement(self, side: str | None) -> Placement:
         placement = self._placements.get(side)
@@ -491,13 +482,6 @@ class BrowserPane(QObject):
         self._kept = _KeptTiles(self._thumb_widgets, self._wired)
         self._reset_pane_state()
         return container, flow
-
-    def restart_recents_listing(self):
-        """Drop the pages the Recents collection has drawn so its next render starts
-        over at the newest item — what a change of the gallery's media filter
-        deserves, being a new listing rather than a redraw of the old one at the
-        offset the old one was read at."""
-        self._forget_recents_paging()
 
     def _forget_recents_paging(self):
         """Drop the Recents collection's paging state, because the pane it was drawn in
@@ -718,6 +702,8 @@ class BrowserPane(QObject):
         collection = folder_collection(key)
         if collection is None:
             return
+        if (side, collection.folder) != (self._collection_side, self._collection_folder):
+            self._forget_recents_paging()
         self._collection_side = side
         self._collection_folder = collection.folder
         self._collections[collection.which].render()
@@ -731,8 +717,7 @@ class BrowserPane(QObject):
         own folder.
 
         In-flight cards first (the newest work, still in flight), then the
-        finished thumbnails a page at a time; a hint when the media-type filter
-        leaves neither. Both the cards and the thumbnails obey that filter.
+        finished thumbnails a page at a time; a hint when there is neither.
 
         The collection has no end — it lists every generation ever made — so it opens on
         one page and grows as it's scrolled into (:meth:`grow_recents`). A redraw of
@@ -855,7 +840,7 @@ class BrowserPane(QObject):
 
     def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
         """The open Latest's cards: the runs it will list once they land, held to
-        its side, its folder and the kinds chosen exactly as its finished items are."""
+        its side and its folder exactly as its finished items are."""
         if rows is None:
             rows = self._db.list_generations()
         held = {row["prompt_id"] for row in self._in_folder(
@@ -864,11 +849,10 @@ class BrowserPane(QObject):
         return _back_of_the_line_first(self._card_items(rows, requests), held)
 
     def _recents_empty_hint(self) -> str:
-        """The teaching hint for an empty collection, worded for the kinds it is
-        listing."""
-        media_types = self._host.media_types()
-        noun = "generations" if len(media_types) == 2 else (
-            "images" if MediaType.IMAGE in media_types else "videos")
+        """The teaching hint for an empty collection, worded for the kind its
+        folder holds."""
+        noun = next((label.lower() for kind, label in gallery.MEDIA_LABELS.items()
+                     if key_holds(kind, self._collection_folder)), "generations")
         return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
                 "gallery re-roll — collect here, newest first.")
 
@@ -1124,7 +1108,7 @@ class BrowserPane(QObject):
 
     def _favorite_items(self, side: str | None, folder: str) -> list[dict]:
         return self._placement(side).held_by(folder, gallery.favorite_generations(
-            self._listed.on(side, self._host.media_types())))
+            self._listed.on(side)))
 
     def _favorite_folders(self, side: str | None, folder: str) -> list:
         group = self._placement(side).folder(folder)
@@ -1172,7 +1156,7 @@ class BrowserPane(QObject):
         outside the collections, where a folder is what's on screen instead.
 
         The slideshow plays these, so they have to match the tiles: Recents is its
-        listed items (the media-type filter already applied), Favorites is its
+        listed items, Favorites is its
         favorited items plus everything under each bookmarked folder, since a folder
         tile there stands for its whole folder, Experiments is its unreviewed
         queue, Requests is what your spoken requests made, and Trash is what the
@@ -1192,8 +1176,7 @@ class BrowserPane(QObject):
         tallies = {collection: placement.tally(
                        self._collections[collection].rows(side, gallery.ALL_KEY))
                    for collection in (EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
-        tallies[FAVORITES_KEY] = placement.tally_favorites(
-            self._listed.on(side, self._host.media_types()))
+        tallies[FAVORITES_KEY] = placement.tally_favorites(self._listed.on(side))
         return {FolderCollection(collection, folder).key: count
                 for collection, tally in tallies.items() for folder, count in tally.items()}
 

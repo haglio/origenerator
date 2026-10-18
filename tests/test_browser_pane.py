@@ -16,6 +16,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
 from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
@@ -115,7 +116,6 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, job
             group_for_key=lambda key: None,
         ),
         PaneHost(
-            media_types=lambda: {"image", "video"},
             image_rows=list,
             animated_preview=lambda row: None,
             enhancing_run=lambda row: None,
@@ -466,6 +466,17 @@ def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot):
     pane.show_collection(RECENTS_KEY)
 
     assert [r["prompt_id"] for r in pane.rows_for_collection(TRASH_KEY)] == ["d1"]
+
+
+@pytest.mark.parametrize("folder, kind", [
+    (gallery.ALL_KEY, "generations"), ("image", "images"), ("video/wan22_i2v", "videos")])
+def test_an_empty_latest_names_the_kind_its_folder_holds(qtbot, folder, kind):
+    pane, scroll = _pane(qtbot)
+    pane.set_model([], {}, [], [], [])
+
+    pane.show_collection(FolderCollection(RECENTS_KEY, folder).key, LANDSCAPE)
+
+    assert scroll.widget().text().startswith(f"No recent {kind} yet.")
 
 
 def test_the_empty_trash_hint_promises_no_expiry(qtbot):

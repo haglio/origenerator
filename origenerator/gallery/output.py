@@ -96,21 +96,6 @@ def _media_type_of(output_files: str | None, workflow_name: str | None) -> Media
     return workflow_output_type(workflow_name) or MediaType.IMAGE
 
 
-def rows_of_media_types(rows: list[dict], media_types: set[str] | None = None) -> list[dict]:
-    """The rows whose kind is one of ``media_types`` — the gallery's Images/Videos
-    ticks applied to any list of generations.
-
-    ``None`` keeps every type; an empty set keeps none. The two ticks narrow the
-    whole gallery rather than one collection, so every list the browser pane draws
-    (Recents, Favorites, Experiments, Requests, Trash, and the search index under
-    them) passes through here, and the folder tree takes the same set (see
-    :func:`~origenerator.gallery.tree.build_gallery_tree`).
-    """
-    if media_types is None:
-        return list(rows)
-    return [row for row in rows if media_type_of_row(row) in media_types]
-
-
 def output_file_path(file: dict, output_dir: Path) -> Path:
     """Where one recorded output file actually sits on disk.
 

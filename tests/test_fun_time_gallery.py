@@ -1371,7 +1371,7 @@ def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed
     assert [button.isVisibleTo(view) for button in buttons] == [True, True]
 
 
-def test_a_gallery_handed_back_from_a_session_draws_the_folder_list_as_it_was_left(qtbot):
+def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view._tree.together_button.click()

@@ -99,8 +99,7 @@ class FunestraSlideshow(QObject):
         self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
                        shuffle=shuffle, hud=hud)
         self._open = True
-        # What the Funestra last said it was showing, and whether it has locked
-        # it: the Funestra's answer, not this app's — a picture that has moved on
+        # What the Funestra last said it was showing: a picture that has moved on
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._locked = False
@@ -238,7 +237,6 @@ class FunestraSlideshow(QObject):
 
     def _follow_the_funestra(self, fields: dict) -> None:
         status = parse_status(fields)
-        self._locked = status.locked
         if status.video and status.video != self._showing:
             self._showing = status.video
             self._follow(status.video)
@@ -363,8 +361,6 @@ class FunestraSlideshow(QObject):
 
     @property
     def locked(self) -> bool:
-        """Whether the Funestra has locked what is on screen — its own answer,
-        which is what the panel's padlock and its lock ring are drawn from."""
         return self._locked
 
     @property
@@ -407,8 +403,6 @@ class FunestraSlideshow(QObject):
         return True
 
     def _lock(self, on: bool) -> None:
-        # Held here as well as sent, so the panel lights on the press rather
-        # than a tick later; the Funestra's own status settles it either way.
         self._locked = on
         self._send(LOCK_ON if on else LOCK_OFF)
         self._publish()

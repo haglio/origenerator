@@ -98,6 +98,13 @@ def _slideshow_with_the_funestra_on(qtbot, tmp_path, **status) -> FunestraSlides
     return slideshow
 
 
+def _slideshow_locked_on(qtbot, tmp_path, video: str) -> FunestraSlideshow:
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video=video)
+    slideshow.set_locked(True)
+    _sent(slideshow)
+    return slideshow
+
+
 @contextmanager
 def _held_open_for(path: Path, seconds: float):
     reader = path.open(encoding="utf-8")
@@ -135,7 +142,7 @@ def test_no_driver_asks_the_slideshow_what_it_can_do_by_probing_for_it(driver):
 
 
 def test_a_locked_slide_is_not_taken_off_the_screen_for_what_is_being_made(qtbot, tmp_path):
-    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow = _slideshow_locked_on(qtbot, tmp_path, "one.png")
     slideshow.note_enhancing({"id-3": "running"})
 
     slideshow.lead_with_what_is_being_made()
@@ -144,7 +151,7 @@ def test_a_locked_slide_is_not_taken_off_the_screen_for_what_is_being_made(qtbot
 
 
 def test_a_request_and_the_lock_each_let_go_only_of_themselves(qtbot, tmp_path):
-    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow = _slideshow_locked_on(qtbot, tmp_path, "one.png")
 
     slideshow.pause_for_request(True, "🎤 listening…")
     slideshow.pause_for_request(False)
@@ -156,7 +163,7 @@ def test_a_request_and_the_lock_each_let_go_only_of_themselves(qtbot, tmp_path):
 
 
 def test_a_funestra_that_says_nothing_leaves_the_slideshow_as_it_was(qtbot, tmp_path):
-    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow = _slideshow_locked_on(qtbot, tmp_path, "one.png")
     slideshow.channel.status_file.unlink()
 
     slideshow.tick()
@@ -191,7 +198,7 @@ def test_each_file_that_would_not_open_is_stepped_past_once(qtbot, tmp_path):
 def test_a_file_that_would_not_open_is_stepped_past_even_while_locked(qtbot, tmp_path):
     """A lock replays what it holds, so a locked file that cannot play would hold
     the black screen for good; the item stays in the set, the lock comes off."""
-    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow = _slideshow_locked_on(qtbot, tmp_path, "one.png")
 
     _says(slideshow, video="one.png", locked=True, idle=True)
     slideshow.tick()
@@ -275,19 +282,20 @@ def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp
     assert slideshow.hud_map().corner.prompt_id == "id-2"
 
 
-def test_the_slideshows_lock_is_the_funestras_own(qtbot, tmp_path):
-    """A padlock on this panel is the Funestra's repeat-one: it is told, and what
-    it says back is what the panel draws."""
+def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
     slideshow.slideshow_toggle_lock()
-    assert _sent(slideshow) == ["LOCK_ON"]
-    assert slideshow.locked is True
-
-    _says(slideshow, video="one.png", locked=False)   # the Funestra says otherwise
+    told = _sent(slideshow)
+    _says(slideshow, video="one.png", locked=False)
     slideshow.tick()
-    assert slideshow.locked is False
+    still_locked = slideshow.locked
+    slideshow.slideshow_toggle_lock()
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+
+    assert (told, still_locked, slideshow.locked) == (["LOCK_ON"], True, False)
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
@@ -500,18 +508,19 @@ def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_pa
     assert _sent(slideshow) == ["SET_PACE 0", "RELOAD_PLAYLIST"]
 
 
-def test_the_slideshow_names_the_generation_the_funestra_says_it_is_locked_on(qtbot, tmp_path):
+def test_the_slideshow_names_the_generation_it_is_locked_on(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
     assert slideshow.locked_on is None
 
-    _says(slideshow, video="two.png", locked=True)
-    slideshow.tick()
+    slideshow.set_locked(True)
 
     assert slideshow.locked_on == "id-2"
 
 
 def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):
-    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow.set_locked(True)
+    _sent(slideshow)
 
     slideshow.play(_ITEMS, start=1, shuffle=in_order)
 

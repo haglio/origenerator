@@ -135,11 +135,9 @@ class FunestraSlideshow(QObject):
             image_dwell_ms = self._pace.dwell_ms
         self._dwell_s = image_dwell_ms // 1000
         self._following = None
-        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
-                                 start=start, hud=hud, on_pass_change=self._pass_changed,
-                                 neighbors=self._actions.neighbors, widen=self._actions.widen,
-                                 acts=self._actions.acts,
-                                 on_filters_change=self._actions.filters_changed)
+        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, actions=self._actions,
+                                 shuffle=shuffle, start=start, hud=hud,
+                                 on_pass_change=self._pass_changed)
 
     def play(self, items, *, image_dwell_ms=None, start=None, shuffle=None,
              hud=None) -> None:

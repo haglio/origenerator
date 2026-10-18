@@ -251,11 +251,9 @@ class SlideshowView(QWidget):
         # a session's Funestras is showing the slides (see SlideshowSet).  What this
         # view answers for is the slide on screen, so a re-dealt pass comes
         # back here as :meth:`_pass_changed`.
-        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
-                                 start=start, hud=hud, on_pass_change=self._pass_changed,
-                                 neighbors=self._actions.neighbors, widen=self._actions.widen,
-                                 acts=self._actions.acts,
-                                 on_filters_change=self._actions.filters_changed)
+        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, actions=self._actions,
+                                 shuffle=shuffle, start=start, hud=hud,
+                                 on_pass_change=self._pass_changed)
 
     @property
     def _playlist(self):

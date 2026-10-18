@@ -43,7 +43,7 @@ from origenerator.gui.slideshow_map import (
     build_map,
     step_in_ring,
 )
-from origenerator.gui.slideshow_wiring import HudFacts
+from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.media import MediaType
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, SlideshowPlaylist, in_order
 
@@ -65,13 +65,9 @@ class SlideshowSet:
     """Everything a slideshow has been handed, the pass dealt from what the
     switches keep of it, and the map around the slide on screen."""
 
-    def __init__(self, items, *, image_dwell_ms: int, shuffle=None, start=None,
-                 hud: HudFacts | None = None,
-                 on_pass_change: Callable[[bool], None] | None = None,
-                 neighbors: Callable[[str], MapNeighbors] | None = None,
-                 widen: Callable[[str], tuple[Slide, ...]] | None = None,
-                 acts: Callable[[list], dict] | None = None,
-                 on_filters_change: Callable[[SlideshowFilters], None] | None = None) -> None:
+    def __init__(self, items, *, image_dwell_ms: int, actions: SlideshowActions,
+                 shuffle=None, start=None, hud: HudFacts | None = None,
+                 on_pass_change: Callable[[bool], None] | None = None) -> None:
         # Kept so a re-dealt pass is laid out the way this slideshow's was: a
         # double-clicked picture's slideshow reads its folder in order, and a filter
         # applied over one must not quietly shuffle it.  None means the
@@ -82,14 +78,14 @@ class SlideshowSet:
         # column — and what lies beyond the exact row.  None for a slideshow with
         # no library under it (a test's, a lone file's), whose map is the
         # slide alone.
-        self._neighbors_of = neighbors
-        self._widen = widen
+        self._neighbors_of = actions.neighbors
+        self._widen = actions.widen
         self._known: dict[str, MapNeighbors] = {}
         # What each generation's map row is named for, by id -- the acts an
         # act filter matches it on.  None for a slideshow with no library under it.
-        self._acts_of = acts
+        self._acts_of = actions.acts
         self._named: dict[str, str] = {}
-        self._on_filters_change = on_filters_change
+        self._on_filters_change = actions.filters_changed
         self.loop: Loop | None = None
         self.filters = SlideshowFilters()
         self._enhancements_asked: set[str] = set()

@@ -154,6 +154,19 @@ def test_the_one_composition_focus_says_nothing_about_passes():
     assert "pass" not in param_help("shift_high")
 
 
+def test_a_pages_recommendation_stands_in_for_the_forms_own_advice():
+    focus = ParamDef("shift_high", "Composition Focus", ParamType.FLOAT, 8.0, good=(5, 12))
+    page = "With the Example Speed LoRA, its page recommends 5."
+    assert definition_help(focus, page) == f"{PARAM_HELP['shift_high']} {page}"
+
+
+def test_how_to_compare_two_step_spacings_stays_whatever_is_recommended():
+    spacing = next(pd for pd in WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()
+                   if pd.key == "scheduler")
+    tip = definition_help(spacing, "dpmpp_2m works best with karras or exponential.")
+    assert "To compare two, keep the seed and change only this" in tip
+
+
 def test_a_definitions_good_range_is_said_in_its_tooltip():
     pd = ParamDef("mystery_number", "Mystery", ParamType.INT, 30, good=(20, 40))
     assert definition_help(pd) == "Good range: 20–40."

@@ -2936,6 +2936,24 @@ def test_a_number_outside_its_good_range_shows_its_warning_with_no_page_to_judge
     assert mark.toolTip() == "Good range: 25–50. Click to use 50."
 
 
+def test_a_settings_tooltip_says_the_range_its_models_page_holds_it_to(blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+
+    tip = blank_panel._param_form._widgets["cfg"].toolTip()
+
+    assert tip.endswith(" Default Model's page recommends 3–6.")
+
+
+def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+
+    blank_panel._param_form._widgets["checkpoint"].setCurrentText("example_other.safetensors")
+
+    tips = {key: blank_panel._param_form._widgets[key].toolTip() for key in ("steps", "cfg")}
+    assert tips["steps"].endswith(" Other Model's page recommends 30–40 steps.")
+    assert tips["cfg"].endswith(" Other Model's page recommends 3–7.")
+
+
 def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 

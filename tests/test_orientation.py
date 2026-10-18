@@ -507,14 +507,32 @@ def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp
         assert [child.toolTip() for child in heading.findChildren(QLabel)] == ["", ""]
 
 
+def test_together_s_one_list_wears_no_heading_since_the_choice_over_it_names_it(
+        qtbot, tmp_path):
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    view = GalleryView(FakeDB([tall]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.together_button.click()
+
+    (section,) = _sections(view)
+    assert _headings(section) == []
+
+
 def _sections(view):
     """The sections the pane is drawing, in the order it draws them."""
     return [view._tree._sections[side] for side in view._tree.sides]
 
 
+def _headings(section) -> list[QFrame]:
+    return [child for child in section.findChildren(QFrame)
+            if child.objectName() == "treeSectionLabel"]
+
+
 def _heading(section) -> QFrame:
-    return next(child for child in section.findChildren(QFrame)
-                if child.objectName() == "treeSectionLabel")
+    (heading,) = _headings(section)
+    return heading
 
 
 def _heading_mark(section) -> QLabel:

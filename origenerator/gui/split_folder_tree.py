@@ -1,4 +1,4 @@
-"""The folder list's sections: one tree per side, each under a standing label.
+"""The folder list's sections: one tree per side, each shape's under a standing label.
 
 The marks over them are the radio: Portrait and Landscape apart, or one list of
 both shapes (:mod:`origenerator.gallery.sides` says what a side is). Sections
@@ -28,7 +28,6 @@ from shared_ui.spacing import (
 
 from origenerator.gallery.sides import (
     BOTH,
-    ORIENTATIONS,
     SEPARATE,
     SIDE_LABELS,
     SIDES,
@@ -42,15 +41,6 @@ from origenerator.gui.stylesheet import CHOSEN
 
 _MIN_SECTION_HEIGHT = 90
 
-_TIPS = {
-    side: (f"Everything {side}-shaped — its own collections, folders and library. "
-           f"A slideshow started here plays {side} pictures alone.")
-    for side in ORIENTATIONS
-} | {
-    BOTH: ("Everything, both shapes together — its own collections, folders and "
-           "library. A slideshow started here mixes portrait and landscape "
-           "pictures in the one slideshow."),
-}
 _SEPARATE_WORD = "Separate"
 _TOGETHER_WORD = "Together"
 _SEPARATE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
@@ -84,7 +74,8 @@ def _heading(side: str) -> QFrame:
     """One section's standing label: its shape's mark, then its name."""
     heading = QFrame()
     heading.setObjectName("treeSectionLabel")
-    heading.setToolTip(_TIPS[side])
+    heading.setToolTip(f"Everything {side}-shaped — its own collections, folders and "
+                       f"library. A slideshow started here plays {side} pictures alone.")
 
     row = QHBoxLayout(heading)
     row.setContentsMargins(0, 0, 0, 0)  # the stylesheet's padding insets this
@@ -202,7 +193,8 @@ class SplitFolderTree(QWidget):
         column = QVBoxLayout(section)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(2)
-        column.addWidget(_heading(side))
+        if side in SEPARATE:
+            column.addWidget(_heading(side))
 
         tree = FolderTree(group_role)
         tree.setHeaderHidden(True)

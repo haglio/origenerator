@@ -128,7 +128,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("anchor_x", "Still Point Across", ParamType.INT, defaults["anchor_x"], min_val=0, max_val=REFERENCE_WIDTH),
             ParamDef("anchor_y", "Still Point Down", ParamType.INT, defaults["anchor_y"], min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=113, step=4,
-                     options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS, good=(81, 161)),
+                     options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS, good=(81, 113)),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(20, 30)),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1, good=(3, 5)),
             ParamDef("shift", "Composition Focus", ParamType.FLOAT, defaults["shift"], min_val=0.0, max_val=20.0, step=0.5, good=(5, 12)),

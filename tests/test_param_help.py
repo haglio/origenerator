@@ -130,6 +130,14 @@ def test_a_forms_own_defaults_sit_inside_their_good_ranges(workflow_name):
     assert outside == []
 
 
+@pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
+def test_a_good_range_stays_inside_what_its_field_can_be_set_to(workflow_name):
+    past = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
+                  if pd.good is not None
+                  and not pd.min_val <= pd.good[0] <= pd.good[1] <= pd.max_val)
+    assert past == []
+
+
 def test_the_sampler_step_spacing_and_fixes_recommend_what_to_set_them_to():
     assert {"sampler_name", "scheduler", "enhance_detail_fixes"} <= RECOMMENDED.keys()
 

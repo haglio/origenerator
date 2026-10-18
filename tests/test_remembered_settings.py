@@ -76,8 +76,8 @@ NO_SETTING = {
         view._search.field, *_within(view._find_bar), *_within(view._folder_path)],
     "what one picture shows, which the library keeps with the picture": lambda view: [
         widget for panel in _tabs(view) for widget in _within(panel._picture_state)],
-    "Auto-generate, a loop of work that stops when Origenerator closes": lambda view: [
-        view._bank.auto],
+    ("Auto-generate, which a restart leaves off, since a loop that came back on by itself"
+     " could run unnoticed"): lambda view: [view._bank.auto],
 }
 
 CONSOLE_PRESSES_REMEMBERED_AS = {

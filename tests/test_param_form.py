@@ -19,7 +19,7 @@ from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
-from origenerator.gui import icons, param_sections, seed_combo
+from origenerator.gui import icons, param_sections, pictured_dropdown
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.param_form import ParamForm
@@ -627,9 +627,9 @@ def test_a_stretch_too_tall_for_one_row_carries_on_in_the_next(qtbot):
     pitch = view.visualRect(model.index(field.count() - 1, 0)).height()
     stretch_rows = range(field.count() - 1)
     assert {field.itemText(row) for row in stretch_rows} == {"5"}
-    assert sum(len(field.itemData(row, seed_combo._USES_ROLE)) for row in stretch_rows) == 3000
+    assert sum(len(field.itemData(row, pictured_dropdown.PICTURES_ROLE)) for row in stretch_rows) == 3000
     assert all(view.visualRect(model.index(row, 0)).height()
-               == pitch * len(field.itemData(row, seed_combo._USES_ROLE)) for row in stretch_rows)
+               == pitch * len(field.itemData(row, pictured_dropdown.PICTURES_ROLE)) for row in stretch_rows)
     field.hidePopup()
 
 
@@ -650,7 +650,7 @@ def test_a_stretch_taller_than_the_list_scrolls_a_little_at_a_time(qtbot):
 def test_a_long_history_reads_pictures_only_for_the_seeds_on_screen(qtbot, monkeypatch,
                                                                      seed_of):
     read = []
-    monkeypatch.setattr(seed_combo, "fitted_cell", lambda path, side: read.append(path))
+    monkeypatch.setattr(pictured_dropdown, "fitted_cell", lambda path, side: read.append(path))
     history = [SeedUse(seed_of(n), f"thumbs/{n}.jpg") for n in range(3000)]
     form, field = _seed_form(qtbot, history)
     form.show()

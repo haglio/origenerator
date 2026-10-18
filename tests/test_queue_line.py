@@ -169,3 +169,25 @@ def test_a_video_waits_for_nothing_before_any_picture_is_asked_for():
 
 def test_a_videos_start_frame_waits_with_the_videos():
     assert queue_line.wait_before_starting(_video_frame(), seconds_since_a_picture=10) == 50
+
+
+# --- a video waits for the enhancement of its start image -----------------------
+
+def _enhance(image, name=""):
+    return SimpleNamespace(media_type="image", source="generated", prompt_id=name,
+                           run_media_type="image", start_image=image, enhances=image)
+
+
+def _video_from(image, name=""):
+    return SimpleNamespace(media_type="video", source="generated", prompt_id=name,
+                           run_media_type="video", start_image=image, enhances="")
+
+
+def test_videos_waiting_for_one_enhancement_follow_it_in_the_order_they_had():
+    first, second = _video_from("p.png", "first"), _video_from("p.png", "second")
+    enhance = _enhance("p.png", "enhance")
+    line = [first, second, enhance]
+
+    queue_line.behind_the_enhancements_they_wait_for(line)
+
+    assert line == [enhance, first, second]

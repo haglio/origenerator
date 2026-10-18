@@ -27,6 +27,8 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from origenerator import provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, SPEECH_PYTHON, THUMB_DIR
+from origenerator.file_refs import frame_name
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.progress import ProgressTracker, stage_names
@@ -131,8 +133,8 @@ class GenerationJob(QObject):
         # user work it must never cancel.
         self.source = source
         self.prompt_id = prompt_id or str(uuid.uuid4())  # also ComfyUI's id, and the DB row key
-        self.payload = saving_into_its_run_folder(
-            workflow.build_api_payload(self.params), places, self.prompt_id)
+        self._places = places
+        self.payload = self._payload_for(self.params)
         # Which run this job belongs to. Its own prompt normally — but a chained
         # i2v is two prompts that are one run to whoever asked for it, so the
         # second stage is given the first's id (see JobQueue._launch).
@@ -144,7 +146,6 @@ class GenerationJob(QObject):
         # JobQueue._launch and :mod:`origenerator.queue_line`).
         self.run_media_type = self.media_type
         self.shielded = False
-        self._places = places
         self._thumb_dir = thumb_dir
         # idle -> queued -> running -> finished/failed/canceled; and back to idle
         # from queued or running when the job is set aside (see defer()).
@@ -196,6 +197,14 @@ class GenerationJob(QObject):
         reads that one; this is what the prompt itself puts on disk.
         """
         return self.workflow.output_type
+
+    @property
+    def start_image(self) -> str:
+        return frame_name(self.params.get("input_image"))
+
+    @property
+    def enhances(self) -> str:
+        return self.start_image if self.workflow.name == ENHANCE_WORKFLOW else ""
 
     @property
     def last_progress(self) -> tuple[int, int]:
@@ -446,6 +455,16 @@ class GenerationJob(QObject):
         self._state = JobState.IDLE
         self._forget_the_run()
         return True
+
+    def start_from(self, picture: str) -> None:
+        self.params = {**self.params, "input_image": picture}
+        self.payload = self._payload_for(self.params)
+        self._stages = stage_names(self.payload)
+        self._forget_the_run()
+
+    def _payload_for(self, params: dict) -> dict:
+        return saving_into_its_run_folder(
+            self.workflow.build_api_payload(params), self._places, self.prompt_id)
 
     def _stop_on_server(self):
         """Take the prompt out of the server's line if it is waiting there, and

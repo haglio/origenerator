@@ -6,15 +6,35 @@ from __future__ import annotations
 import json
 
 
-def _launcher(db, client):
+def _launcher(db, client, enhance_settings):
     """Queue one video of a sample's own picture with the prompts as edited: the
     same recipe, its seeds re-rolled so it cannot reproduce the sample."""
     from origenerator import gallery
     from origenerator.generation_config import randomize_seeds
+    from origenerator.gui.enhance_controller import launch_enhancements
     from origenerator.gui.job_queue import JobQueue
+    from origenerator.media import MediaType
     from origenerator.workflows import WORKFLOW_REGISTRY
 
     jobs = JobQueue(db, client)
+
+    def image_index():
+        return gallery.build_image_config_index(
+            [row for row in db.list_generations()
+             if gallery.media_type_of_row(row) == MediaType.IMAGE])
+
+    def enhance(picture: dict) -> None:
+        params = gallery.enhance_params_for(picture, enhance_settings)
+        if params is not None:
+            launch_enhancements(jobs, db, [(picture, params)], image_index())
+
+    def fold(_key: str, prompt_id: str, _origin: str) -> None:
+        row = db.get_generation(prompt_id)
+        if row is not None and row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+            gallery.fold_enhancement(db, row)
+
+    jobs.enhance_pictures_with(enhance)
+    jobs.finished.connect(fold)
 
     def submit(sample: dict, positive: str, negative: str) -> str:
         workflow = WORKFLOW_REGISTRY.get(sample.get("workflow_name") or "")
@@ -23,9 +43,7 @@ def _launcher(db, client):
         params = dict(gallery.parse_params(sample.get("params_json")))
         params.update(positive_prompt=positive, negative_prompt=negative)
         params = randomize_seeds(params, workflow.seed_keys())
-        index = gallery.build_image_config_index(
-            [row for row in db.list_generations()
-             if gallery.media_type_of_row(row) == gallery.MediaType.IMAGE])
+        index = image_index()
         key = gallery.settings_folder_key(
             {"workflow_name": workflow.name, "params_json": json.dumps(params),
              "workflow_version": workflow.version}, index)
@@ -41,6 +59,7 @@ def the_animation_window():
     from origenerator import animation_samples, gallery, recipe_match
     from origenerator.animation_check_session import AnimationCheckSession
     from origenerator.animation_recipes import AcceptedRecipes
+    from origenerator.app_state import AppState
     from origenerator.comfyui_client import ComfyUIClient
     from origenerator.config import (
         COMFYUI_FOLDERS,
@@ -49,6 +68,7 @@ def the_animation_window():
         DB_PATH,
         OUTPUT_PLACES,
         THUMB_DIR,
+        UI_STATE_PATH,
     )
     from origenerator.db import Database
     from origenerator.gui.animation_check_window import AnimationCheckWindow
@@ -74,7 +94,8 @@ def the_animation_window():
             AcceptedRecipes(),
             pinned=recipe_match.curated_recipe),
         look,
-        _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS)),
+        _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS),
+                  gallery.EnhanceSettings.parse(AppState(UI_STATE_PATH).get("enhance_settings"))),
     )
 
 

@@ -138,6 +138,17 @@ def test_a_good_range_stays_inside_what_its_field_can_be_set_to(workflow_name):
     assert past == []
 
 
+@pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
+def test_where_a_tooltip_says_a_setting_starts_to_go_wrong_is_its_good_ranges_edge(workflow_name):
+    edge = re.compile(r"\b(below|under|above|over|past) (\d+(?:\.\d+)?)x?\b", re.IGNORECASE)
+    elsewhere = sorted(
+        (pd.key, said) for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
+        if pd.good is not None
+        for side, said in edge.findall(PARAM_HELP.get(pd.key, ""))
+        if float(said) != pd.good[side.lower() not in ("below", "under")])
+    assert elsewhere == []
+
+
 def test_the_sampler_step_spacing_and_fixes_recommend_what_to_set_them_to():
     assert {"sampler_name", "scheduler", "enhance_detail_fixes"} <= RECOMMENDED.keys()
 

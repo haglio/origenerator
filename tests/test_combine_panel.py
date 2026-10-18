@@ -5,7 +5,7 @@ import pytest
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
-from shared_ui.colors import hovered
+from shared_ui.colors import BG_SECONDARY, BLUE, hovered
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 
@@ -190,6 +190,20 @@ def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
 
     panel.video_slot.set_item("vid1")
     assert panel._open_btn.isEnabled()       # both filled: ready to open
+
+
+def test_generate_is_blue_while_it_can_run_and_gray_while_it_cannot(qtbot):
+    panel = _panel(qtbot)
+    panel.setStyleSheet(build_stylesheet())
+    panel.show()
+    qtbot.waitExposed(panel)
+    cannot_run = ground(panel._generate_btn)
+
+    panel.image_slot.set_item("img1")
+    panel.video_slot.set_item("vid1")
+
+    assert ground(panel._generate_btn) == BLUE.name()
+    assert cannot_run == BG_SECONDARY.name()
 
 
 @pytest.mark.parametrize("name", ["_generate_btn", "_open_btn"], ids=["Generate", "Edit"])

@@ -43,6 +43,7 @@ from origenerator import animation_paths
 from origenerator.content import genau_flick_word
 from origenerator.gui.drop_slot import DropSlot, DropZone
 from origenerator.gui.eliding import open_the_list_in_full
+from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.media import MediaType
 from origenerator.recipe_match import GENAU, VIDEO
@@ -176,7 +177,7 @@ class CombinePanel(QWidget):
 
         # Two ways to act on the same chosen recipe: run it now, or open it in the
         # generator to tweak first. Both gate on the same "image + recipe" readiness.
-        self._generate_btn = QPushButton("Generate")
+        self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._emit)
         self._open_btn = QPushButton("Edit individual…")
         self._open_btn.clicked.connect(self._emit_open)

@@ -195,6 +195,9 @@ def build_stylesheet() -> str:
         background-color: {_h(BLUE)};
         font-weight: bold;
     }}
+    QPushButton#generateBtn:hover {{
+        background-color: {_h(hovered(BLUE))};
+    }}
     QFrame#generateWithHowMany {{
         background-color: {_h(BLUE)};
         border: 1px solid {_h(BORDER_SUBTLE)};

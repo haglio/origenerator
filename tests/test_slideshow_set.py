@@ -13,17 +13,19 @@ import pytest
 from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
-from origenerator.gui.slideshow_wiring import HudFacts
+from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import LIVE, SlideshowFilters, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
 
 
-def _set(items=_ITEMS, **fields):
+def _set(items=_ITEMS, *, hud=None, start=None, **asked_of_the_library):
     dealt = []
-    slideshow_set = SlideshowSet(items, image_dwell_ms=4000, shuffle=in_order,
-                                 on_pass_change=dealt.append, **fields)
+    slideshow_set = SlideshowSet(items, image_dwell_ms=4000,
+                                 actions=SlideshowActions(**asked_of_the_library),
+                                 shuffle=in_order, start=start, hud=hud,
+                                 on_pass_change=dealt.append)
     return slideshow_set, dealt
 
 
@@ -51,7 +53,7 @@ def test_narrowing_past_the_slide_on_screen_stands_another_pass_up():
 
 def test_a_filter_pressed_is_told_of_and_one_taken_up_is_not():
     told = []
-    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}), on_filters_change=told.append)
+    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}), filters_changed=told.append)
 
     slideshow_set.take_up(SlideshowFilters(favorites=True))
     slideshow_set.set_filters(SlideshowFilters())

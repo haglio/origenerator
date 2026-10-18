@@ -15,6 +15,16 @@ def _picture_of(row: dict, output_dir):
     return row.get("thumbnail_path")
 
 
+def waiting_pictures(db, output_dir) -> list[dict]:
+    from origenerator.item_names import ItemNames
+    from origenerator.picture_sorting import pictures_to_sort
+
+    names = ItemNames.from_library(db)
+    return [{"prompt_id": row["prompt_id"], "name": names.of(row["prompt_id"]),
+             "picture_path": _picture_of(row, output_dir)}
+            for row in pictures_to_sort(db.list_generations())]
+
+
 def the_sorting_window():
     """The sorting window on every picture nobody has said an action for, or the
     sentence to say instead when there is none left."""
@@ -22,14 +32,11 @@ def the_sorting_window():
     from origenerator.db import Database
     from origenerator.gui.sorting_window import SortingWindow
     from origenerator.picture_marks import mark_for
-    from origenerator.picture_sorting import pictures_to_sort
     from origenerator.picture_states import state_grid
     from origenerator.sorting_session import SortingSession
 
     db = Database(DB_PATH)
-    waiting = [{"prompt_id": row["prompt_id"], "seed": row.get("seed"),
-                "picture_path": _picture_of(row, COMFYUI_OUTPUT_DIR)}
-               for row in pictures_to_sort(db.list_generations())]
+    waiting = waiting_pictures(db, COMFYUI_OUTPUT_DIR)
     if not waiting:
         return "Every picture already says what it shows."
 

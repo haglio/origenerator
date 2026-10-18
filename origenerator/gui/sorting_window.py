@@ -221,7 +221,7 @@ class SortingWindow(QWidget):
             self._picture.clear()
             self._status.setText(self.NOTHING_LEFT)
             return
-        self._status.setText(f"{self._session.remaining} left · seed {picture.get('seed')}")
+        self._status.setText(f"{self._session.remaining} left · {picture.get('name')}")
         path = picture.get("picture_path")
         self._shown = QPixmap(str(path)) if path else QPixmap()
         self._fill_with_the_picture()

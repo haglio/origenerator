@@ -34,6 +34,7 @@ from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.how_many import HOW_MANY
+from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -90,7 +91,7 @@ class InfoPaneTabs(QTabWidget):
     folder_requested = pyqtSignal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
-                 *, fun_time=None, heights=None):
+                 *, fun_time=None, heights=None, names: ItemNames | None = None):
         super().__init__(parent)
         self._heights = heights  # the window's prompt heights, for its panels
         self._client = client
@@ -102,6 +103,7 @@ class InfoPaneTabs(QTabWidget):
         self.currentChanged.connect(self._front_tab_relayout)
         self._db = db
         self._library = LibraryViews(db)
+        self._names = names or ItemNames(db)
         # Install the eliding bar before setTabsClosable: swapping the bar
         # afterwards drops that setting (it doesn't carry to a new bar).
         self.setTabBar(ElidingTabBar())
@@ -178,7 +180,8 @@ class InfoPaneTabs(QTabWidget):
         in either of them reaches the gallery.
         """
         panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time,
-                                    heights=self._heights, library=self._library)
+                                    heights=self._heights, library=self._library,
+                                    names=self._names)
         index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
         # Editing anything in a tab keeps it, the way a double-click on its name
@@ -561,6 +564,10 @@ class InfoPaneTabs(QTabWidget):
         """
         for panel in self.config_panels():
             panel.refresh_displayed(row, image_rows)
+
+    def retitle_tabs(self):
+        for panel in self.config_panels():
+            self.setTabText(self.indexOf(panel), panel.title())
 
     def reconcile_previews(self, live_ids):
         for panel in self.config_panels():

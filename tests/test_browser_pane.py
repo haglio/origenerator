@@ -122,6 +122,7 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, job
             enhance_settings=lambda: gallery.EnhanceSettings(),
             experiments_enabled=lambda: False,
             lead_tiles=lead_tiles,
+            item_name=lambda prompt_id: f"item {prompt_id}",
         ),
     )
     return pane, scroll
@@ -150,6 +151,14 @@ def test_the_pane_stands_alone_on_six_stubs(qtbot):
     pane.show_empty()
     assert scroll.widget() is not None       # the pane filled its own canvas
     assert pane.visible_prompt_ids() == []
+
+
+def test_a_tile_is_captioned_with_the_name_the_gallery_gives_its_item(qtbot):
+    pane, _scroll = _pane(qtbot)
+
+    _open_recents(pane, [_row("g1", 1)])
+
+    assert pane._thumb_widgets["g1"]._text_label.text() == "item g1"
 
 
 def test_the_second_look_for_a_place_goes_with_the_canvas_it_was_for(qtbot):

@@ -23,11 +23,12 @@ def test_starts_hidden(tile):
     assert tile.isHidden()
 
 
-def test_show_source_reveals_the_heading_and_filename(tile):
-    tile.show_source("img1", None, "a_rather_long_source_filename.png")
+def test_show_source_reveals_the_heading_and_the_items_whole_name(tile):
+    widest = "DDDDDDDD 888"
+    tile.show_source("img1", None, widest)
     assert not tile.isHidden()
-    # The caption may middle-elide to fit the tile, but the full name is the tooltip.
-    assert tile._filename.toolTip() == "a_rather_long_source_filename.png"
+    assert tile._name.text() == widest
+    assert tile._name.fontMetrics().horizontalAdvance(widest) <= tile._name.width()
     assert any("source image" in t.lower() for t in _labels(tile))  # the heading
 
 

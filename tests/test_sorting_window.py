@@ -60,7 +60,7 @@ def _picture(made) -> QLabel:
 def window(qtbot):
     def build(*prompt_ids, pictures=None, marks=None):
         store = _Store()
-        listed = pictures or [{"prompt_id": p, "seed": 7, "picture_path": None}
+        listed = pictures or [{"prompt_id": p, "name": "3FA9C0D2 000", "picture_path": None}
                               for p in prompt_ids]
         made = SortingWindow(SortingSession(listed, store), _ROWS, marks or {})
         qtbot.addWidget(made)
@@ -68,6 +68,12 @@ def window(qtbot):
 
     return build
 
+
+def test_the_status_line_calls_the_picture_by_the_name_the_gallery_gives_it(window):
+    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 004",
+                                     "picture_path": None}])
+
+    assert _said(made, STATUS_LINE) == "1 left · 3FA9C0D2 004"
 
 def test_a_tile_is_offered_for_every_state_and_pressing_one_sorts_the_picture(window):
     made, store = window("first", "second")
@@ -184,7 +190,7 @@ def test_a_drawing_that_will_not_load_is_no_worse_than_none(window, tmp_path):
 
 
 def test_the_picture_is_drawn_at_the_size_the_window_gives_it(window, tmp_path):
-    made, _store = window(pictures=[{"prompt_id": "first", "seed": 1,
+    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 001",
                                      "picture_path": _drawn(tmp_path / "p.png",
                                                             size=(400, 600))}])
     made.resize(900, 900)
@@ -199,7 +205,7 @@ def test_the_picture_is_drawn_at_the_size_the_window_gives_it(window, tmp_path):
 
 def test_growing_the_window_re_reads_the_picture_rather_than_stretching_a_copy(
         window, tmp_path):
-    made, _store = window(pictures=[{"prompt_id": "first", "seed": 1,
+    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 001",
                                      "picture_path": _drawn(tmp_path / "p.png",
                                                             size=(400, 600))}])
     _picture(made).resize(50, 75)
@@ -213,7 +219,7 @@ def test_growing_the_window_re_reads_the_picture_rather_than_stretching_a_copy(
 
 
 def test_a_picture_whose_file_has_gone_says_so_rather_than_showing_nothing(window):
-    made, _store = window(pictures=[{"prompt_id": "first", "seed": 1,
+    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 001",
                                      "picture_path": None}])
 
     assert _picture(made).text() == SortingWindow.MISSING

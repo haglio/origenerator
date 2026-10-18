@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import QInputDialog, QMenu, QTabBar
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gallery.keys import folder_id
+from origenerator.gallery.tree import settings_folder_key
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.combination import Combination
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
@@ -324,12 +326,13 @@ def test_tab_text_is_the_folder_a_config_would_land_in(tabs):
 def test_tab_text_and_mark_follow_the_item_a_click_shows(tabs):
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4),
                         "sdxl_g1.png")
+    tabs._names.take([row], [], {})
     tabs.currentWidget()._preview.show_media = MagicMock()
 
     tabs.load_selection(row, [row])
 
     idx = tabs.currentIndex()
-    assert tabs.tabText(idx) == "sdxl_g1.png"    # the item, by its file
+    assert tabs.tabText(idx) == f"{folder_id(settings_folder_key(row))} 000"
     assert not tabs.tabIcon(idx).isNull()        # and wearing its kind's mark
 
 

@@ -25,7 +25,8 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gallery.keys import settings_key
+from origenerator.gallery.keys import folder_id, settings_key
+from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_controls, icons
@@ -1051,24 +1052,32 @@ def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
     assert panel.title() == "Wizards"
 
 
-def test_a_displayed_item_names_the_tab_by_its_file(panel, tmp_path):
+def _named(panel, row) -> str:
+    """Number *row* the way the gallery's rebuild does, and say what it is called."""
+    panel._names.take([row], [], {})
+    return f"{folder_id(settings_folder_key(row))} 000"
+
+
+def test_a_displayed_item_names_the_tab_by_its_name_not_its_file(panel):
     row = _image_row(panel._db, filename="sdxl_img1.png")
+    name = _named(panel, row)
     panel._preview.show_media = MagicMock()
 
     panel.show_saved_generation(row, [row])
 
-    assert panel.title() == "sdxl_img1.png"
+    assert panel.title() == name
 
 
 def test_title_changed_when_the_shown_item_changes(panel):
     row = _image_row(panel._db, filename="sdxl_img1.png")
+    name = _named(panel, row)
     panel._preview.show_media = MagicMock()
     titles = []
     panel.title_changed.connect(titles.append)
 
     panel.show_saved_generation(row, [row])
 
-    assert titles and titles[-1] == "sdxl_img1.png"
+    assert titles and titles[-1] == name
 
 
 def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):
@@ -1679,6 +1688,7 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
+    name = _named(panel, image)
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
@@ -1687,7 +1697,7 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
     assert not _lane_button(panel).isHidden()   # a video with a file → sendable
     assert not panel._related._source_tile.isHidden()   # its start frame is a known generation
     assert panel._related._source_tile._prompt_id == "img1"   # the tile points at that image
-    assert panel._related._source_tile._filename.toolTip() == "sdxl_img1.png"  # names its file (caption may elide)
+    assert panel._related._source_tile._name.text() == name   # called by its name, not its file
     assert panel._related._animated_strip.isHidden()    # a video isn't animated into anything
 
 

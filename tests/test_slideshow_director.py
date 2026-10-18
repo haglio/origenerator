@@ -26,6 +26,7 @@ from origenerator.gallery.collection import FAVORITES_KEY, RECENTS_KEY, FolderCo
 from origenerator.gui import slideshow_director as module
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_director import SlideshowDirector
+from origenerator.item_names import ItemNames
 from origenerator.orientation import oriented_key
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.voice.app_commands import AppCommand
@@ -510,10 +511,11 @@ def slideshows(monkeypatch):
 
     def build(host=None, *, db=None, browser=None, fun_time=None):
         host = host or FakeHost()
+        db = db or FakeDB()
         director = SlideshowDirector(
-            host, db=db or FakeDB(), browser=browser or FakeBrowser(),
+            host, db=db, browser=browser or FakeBrowser(),
             jobs=FakeJobQueue(), pace=FakePace(), motion=None,
-            fun_time=fun_time)
+            fun_time=fun_time, names=ItemNames(db))
         host.slideshows = director
         # The playlist is what a slideshow is of; deriving it from files on disk is
         # resolve_preview's own tested job, not this one's.
@@ -891,9 +893,10 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
 
 
 def _director():
-    return SlideshowDirector(FakeHost(), db=FakeDB(), browser=FakeBrowser(),
+    db = FakeDB()
+    return SlideshowDirector(FakeHost(), db=db, browser=FakeBrowser(),
                              jobs=FakeJobQueue(), pace=FakePace(), motion=None,
-                             fun_time=None)
+                             fun_time=None, names=ItemNames(db))
 
 
 def test_a_video_evolver_upscaled_plays_as_the_upscale(tmp_path, monkeypatch):

@@ -10,14 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.output import frame_names_of, row_output_files
 from origenerator.gallery.signatures import (
     _frame_name,
     parse_params,
     settings_signature,
 )
-from origenerator.media import MediaType
 
 
 @dataclass
@@ -26,7 +24,6 @@ class _ImageConfig:
 
     prompt_id: str  # which picture it is — what the source-image tier groups on
     signature: str  # the image's settings signature — what names it below
-    label: str      # the image folder's own code — names the video's source-image folder
 
 
 def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
@@ -80,21 +77,13 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
     Every file an image row lists points at the same entry, so a picture answers
     as itself under any of its names — which is what keeps a video made from an
     enhanced frame with one made from the frame before it was enhanced.
-
-    The name is the code of the image's own settings folder, so the folder a
-    video's start frames sit in and the folder those frames came from read as the
-    same folder from either side.
     """
     index: dict[str, _ImageConfig] = {}
     for image in image_rows:
         workflow_name = image.get("workflow_name") or "unknown"
         signature = settings_signature(workflow_name, image.get("params_json"),
                                        workflow_version=image.get("workflow_version"))
-        config = _ImageConfig(
-            prompt_id=image.get("prompt_id") or "",
-            signature=signature,
-            label=folder_id(settings_key(MediaType.IMAGE, workflow_name, signature)),
-        )
+        config = _ImageConfig(prompt_id=image.get("prompt_id") or "", signature=signature)
         for name in frame_names_of(image.get("output_files")):
             index.setdefault(name, config)
     return index

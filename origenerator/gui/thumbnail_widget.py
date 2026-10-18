@@ -117,8 +117,6 @@ class ThumbnailWidget(QWidget):
         self._text_label = QLabel(label_text)
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._text_label.setWordWrap(True)
-        # A video's seed is twenty digits, which is what most of these captions
-        # are; the family's font is the size that gets one across a card.
         grid_card.style_caption(self._text_label)
         # Transparent so the tile's fill shows through under the caption.
         self._text_label.setStyleSheet("background-color: transparent;")

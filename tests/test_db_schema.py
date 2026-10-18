@@ -49,6 +49,11 @@ SCHEMA = {
         ("batch_json", "TEXT", 1, None, 0),
         ("deleted_at", "TEXT", 1, "datetime('now')", 0),
     ),
+    "item_numbers": (
+        ("prompt_id", "TEXT", 0, None, 1),
+        ("folder_key", "TEXT", 1, None, 0),
+        ("number", "INTEGER", 1, None, 0),
+    ),
     "folder_meta": (
         ("folder_key", "TEXT", 0, None, 1),
         ("custom_name", "TEXT", 0, None, 0),
@@ -233,6 +238,7 @@ FIRST_SHIPPED = {
     "custom_folders": {"id", "name", "created_at"},
     "deletions": {"prompt_id", "row_json", "batch_json", "deleted_at"},
     "folder_meta": {"folder_key", "custom_name", "starred"},
+    "item_numbers": {"prompt_id", "folder_key", "number"},
     "generations": {
         "id", "prompt_id", "source", "workflow_name", "workflow_version",
         "status", "positive_prompt", "negative_prompt", "seed", "params_json",

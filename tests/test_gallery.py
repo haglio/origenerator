@@ -902,9 +902,9 @@ def _i2v_frame(prompt_id, frame_file, prompt=""):
     )
 
 
-def _i2v_source_folders(rows):
+def _i2v_source_folders(rows, name_of=None):
     """The source-image folders of the sole video/workflow/model/LoRA path."""
-    workflow = build_gallery_tree(rows)[0]
+    workflow = build_gallery_tree(rows, name_of=name_of)[0]
     return workflow.children[0].children[0].children
 
 
@@ -947,30 +947,25 @@ def test_every_video_in_a_source_folder_animates_the_one_picture():
 
 
 def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
-    # Their prompts are identical, so the frame's own filename has to lead the
-    # label — the prompt half is what gets truncated away in the tree.
+    # Their prompts are identical, so their pictures share a folder, and the
+    # number each picture has there is what tells the two apart.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)
     first, second = _i2v_source_folders([
         _i2v_frame("v1", "sdxl_t2i_face1.png"),
         _i2v_frame("v2", "sdxl_t2i_face2.png"),
         face1, face2,
-    ])
-    assert first.label != second.label
-    assert first.label.startswith("sdxl_t2i_face1.png")
+    ], name_of={"face1": "8E1D3C2A 000", "face2": "8E1D3C2A 001"}.get)
+    assert (first.label, second.label) == ("8E1D3C2A 000", "8E1D3C2A 001")
 
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():
-    # A source-image folder names the frame it holds and then carries the code of
-    # the image folder that frame came from, so the two read as the same folder
-    # from either side — and the prompt appears in neither name.
+    # The name that picture's own tile and tab wear, so the two read as one
+    # picture from either side.
     face = _img("face", "a smiling face", 30, 1)
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
-    (source,) = _i2v_source_folders(rows)
-    (images,) = [wf for wf in build_gallery_tree(rows) if wf.key.startswith("image/")]
-    (image_leaf,) = images.children[0].children[0].children
-    assert source.label == f"sdxl_t2i_face.png · {image_leaf.label}"
-    assert "smiling" not in source.label
+    (source,) = _i2v_source_folders(rows, name_of={"face": "3FA9C0D2 004"}.get)
+    assert source.label == "3FA9C0D2 004"
 
 
 def test_i2v_source_folder_labels_a_hand_picked_frame_by_its_filename():

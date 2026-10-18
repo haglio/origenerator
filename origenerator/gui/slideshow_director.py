@@ -57,6 +57,7 @@ from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
+from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.nav_map import (
     act_labels,
@@ -173,9 +174,10 @@ class SlideshowDirector:
     """Every fullscreen slideshow this window has open, and the words about them."""
 
     def __init__(self, host: SlideshowHost, *, db, browser, jobs, pace, motion,
-                 fun_time):
+                 fun_time, names: ItemNames):
         self._host = host
         self._db = db
+        self._names = names
         self._browser = browser
         self._jobs = jobs
         self._pace = pace
@@ -807,32 +809,13 @@ class SlideshowDirector:
         """
         corner, minimized = self.hud_place(side)
         view.wear_the_hud(side, dashboard_cmd_file=self._session_channel,
-                          label_for=self._item_label, corner=corner, minimized=minimized,
+                          label_for=self._names.of, corner=corner, minimized=minimized,
                           collapse=partial(self.collapse_the_hud, side=side),
                           open_in=partial(self.open_the_hud_in, side=side))
 
     @property
     def _session_channel(self):
         return None if self._fun_time is None else self._fun_time.dashboard_cmd_file
-
-    def _item_label(self, prompt_id: str) -> str:
-        """What to call the item on a slideshow's HUD, in this app's vocabulary.
-
-        ``<folder> / seed <n>`` — the folder by the name the tree gives it (the
-        one the user typed, else its short code) and the item by its seed, which
-        is exactly what its tile in the browser is captioned with.  Off the
-        disk's own names on purpose: those read "image / ComfyUI_00123_", a
-        media type and a counter that appear nowhere in this UI.
-
-        Falls back to whichever half it can find, and to nothing at all for a
-        file no row claims — a still being written, say.
-        """
-        row = self._host.row_for(prompt_id) if prompt_id else None
-        if not row:
-            return ""
-        seed = row.get("seed")
-        item = f"seed {seed}" if seed is not None else ""
-        return " / ".join(part for part in (self._folder_name(row), item) if part)
 
     def _folder_name(self, row: dict) -> str:
         """The folder *row* sits in, by the name the tree gives it: the one the

@@ -16,6 +16,7 @@ from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 
+from origenerator import gallery
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY
@@ -1599,24 +1600,35 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_picture(qtbot):
     assert landscape_tab._media_split.orientation() == Qt.Orientation.Vertical
 
 
+def _hud_label_for(view):
+    """What the slideshows' HUD calls each item, as the director hands it over."""
+    worn = {}
+
+    class _Slideshow:
+        def wear_the_hud(self, side, **furnishings):
+            worn.update(furnishings)
+
+    view._slideshows._wear_the_hud(_Slideshow(), "landscape")
+    return worn["label_for"]
+
+
 def test_the_slideshows_hud_names_the_item_the_way_this_app_does(qtbot):
-    """Not the way the disk does.  Off the path it reads "image / ComfyUI_00123_"
-    — a media type and a counter that appear nowhere in this UI — where the tree
-    calls the folder "615F7744" and the browser captions the tile "seed 7"."""
+    """By the name its tile in the browser and its tab both wear, never the
+    disk's "image / ComfyUI_00123_", a media type and a counter that appear
+    nowhere in this UI."""
     row = _image("p1", "a cat", 50, 1)
     view = _fun_time_view(qtbot, rows=[row])
+    view.refresh()
 
-    label = view._slideshows._item_label("p1")
-
-    assert "seed" in label and "/" in label
-    assert "image /" not in label       # never the media type as a folder
-    assert "ComfyUI" not in label       # never the counter off the disk
+    assert _hud_label_for(view)("p1") == (
+        f"{gallery.folder_id(gallery.settings_folder_key(row))} 000")
 
 
 def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
     view = _fun_time_view(qtbot)
-    assert view._slideshows._item_label("nobody") == ""
-    assert view._slideshows._item_label("") == ""
+    view.refresh()
+    assert _hud_label_for(view)("nobody") == ""
+    assert _hud_label_for(view)("") == ""
 
 
 def test_a_hosted_slideshows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp_path, monkeypatch):

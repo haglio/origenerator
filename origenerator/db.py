@@ -18,6 +18,7 @@ as a snapshot, because evolver reads it.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 from origenerator.db_connection import SqliteFile
@@ -25,6 +26,7 @@ from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
+from origenerator.db_item_numbers import ItemNumberStore
 from origenerator.db_requests import RequestStore
 from origenerator.db_salvage import salvage_if_malformed
 from origenerator.db_schema import SCHEMA, create
@@ -48,6 +50,7 @@ class Database:
         self.seed_uses = SeedUseStore(file)
         self.folder_meta = FolderMetaStore(file)
         self.custom_folders = CustomFolderStore(file)
+        self.item_numbers = ItemNumberStore(file)
 
     # --- generations (see origenerator.db_generations) -----------------------
 
@@ -157,6 +160,14 @@ class Database:
 
     def forget_deletion(self, prompt_id: str):
         return self.deletions.forget_deletion(prompt_id)
+
+    # --- item numbers (see origenerator.db_item_numbers) ---------------------
+
+    def list_item_numbers(self) -> dict[str, tuple[str, int]]:
+        return self.item_numbers.list_item_numbers()
+
+    def record_item_numbers(self, numbers: Mapping[str, tuple[str, int]]):
+        return self.item_numbers.record_item_numbers(numbers)
 
     # --- spoken requests (see origenerator.db_requests) ----------------------
 

@@ -536,9 +536,8 @@ class SlideshowView(QWidget):
         return drive is not None and drive.live
 
     def item_label(self) -> str:
-        """The muted line under the status: what is on screen right now, named
-        the way THIS app names it — the folder as the tree shows it and the
-        item by its seed, not "image / ComfyUI_00123_" off the path."""
+        """The muted line under the status: what is on screen right now, by the
+        name its tile and its tab wear, not "image / ComfyUI_00123_" off the path."""
         prompt_id = self.hud_prompt_id
         if not prompt_id or self._label_for is None:
             return ""

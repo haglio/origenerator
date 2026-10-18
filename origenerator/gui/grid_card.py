@@ -6,14 +6,11 @@ beside it. They stand shoulder to shoulder in one flow, so they are one size and
 their captions are set one way. Kept here rather than in any one of them so the
 family cannot drift apart the next time one is touched.
 
-The caption is where the sizing has to be thought about, because what it usually
-carries is a seed, and a video's seed is twenty digits. At the app's own font
-that runs past the width of a card, wraps, and was then cut off by a band one
-line tall — so the number every video tile is identified by was unreadable. Two
-things fix that together: the caption is set a step below the app's font
-(:data:`CAPTION_SCALE`), and the band is two lines of *that* tall, so a caption
-long enough to wrap wraps rather than being clipped. The card's height follows
-from the band, so choosing a bigger caption never quietly costs a line again.
+The caption is set a step below the app's font (:data:`CAPTION_SCALE`), and the
+band is two lines of *that* tall, so a caption long enough to wrap -- a run in
+flight is captioned with its model and its prompt -- wraps rather than being
+clipped. The card's height follows from the band, so choosing a bigger caption
+never quietly costs a line.
 """
 from __future__ import annotations
 
@@ -31,10 +28,8 @@ PICTURE_SIZE = (172, 160)
 CARD_MARGIN = 4
 CARD_SPACING = 2
 
-# How far below the app's own font a caption is set. Small enough that a long
-# seed doesn't take over the tile, large enough to still read as text rather than
-# as fine print — the first pass at this went much further down (far enough to
-# fit a whole seed on one line) and came out too small to read comfortably.
+# How far below the app's own font a caption is set: large enough to still read
+# as text rather than as fine print, which a first pass much further down did not.
 CAPTION_SCALE = 0.8
 # Point sizes are picked on a half-point grid, and never below what is legible.
 _STEP_PT = 0.5

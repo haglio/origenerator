@@ -24,6 +24,7 @@ from shared_ui.spacing import (
     BUTTON_GROUP_GAP,
     BUTTON_MARK,
     BUTTON_ROW_GAP,
+    GAP_MEDIUM,
 )
 
 from origenerator.gallery.sides import (
@@ -40,6 +41,7 @@ from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.stylesheet import CHOSEN
 
 _MIN_SECTION_HEIGHT = 90
+_GAP_UNDER_THE_CHOICES = 2
 
 _SEPARATE_WORD = "Separate"
 _TOGETHER_WORD = "Together"
@@ -139,7 +141,7 @@ class SplitFolderTree(QWidget):
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(2)
+        column.setSpacing(_GAP_UNDER_THE_CHOICES)
         column.addWidget(self._build_radio())
         column.addWidget(self._splitter, 1)
         self._show_sections(SEPARATE)
@@ -202,6 +204,8 @@ class SplitFolderTree(QWidget):
         column.setSpacing(0)
         if side in SEPARATE:
             column.addWidget(_heading(side))
+        else:
+            column.addSpacing(GAP_MEDIUM - _GAP_UNDER_THE_CHOICES)
         column.addWidget(_rule())
         column.addSpacing(2)
 

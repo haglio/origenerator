@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QPoint, QRect, Qt
 from PyQt6.QtWidgets import QApplication, QFrame, QLabel
 from shared_ui.colors import BORDER_SUBTLE
 
@@ -540,6 +540,36 @@ def test_together_s_list_is_ruled_off_above_as_each_of_separate_s_lists_is(qtbot
 
     assert None not in separate and len(set(separate)) == 1
     assert together == separate[:1]
+
+
+def test_together_s_line_sits_as_far_under_its_choices_as_portrait_s_under_its_word(qtbot):
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        pane = _laid_out(qtbot, 300)
+        under_the_word = _clear_rows_over_the_line(
+            pane, PORTRAIT, _heading_name(pane._sections[PORTRAIT]))
+        pane.choose_sides(TOGETHER)
+        app.processEvents()
+        pane.layout().activate()
+        under_the_choices = _clear_rows_over_the_line(pane, BOTH, pane._choices)
+    finally:
+        app.setStyleSheet(prior)
+
+    assert under_the_choices == under_the_word
+
+
+def _clear_rows_over_the_line(pane, side, above) -> int:
+    image = pane.grab().toImage()
+    (rule,) = pane._sections[side].findChildren(QFrame, "treeSectionRule")
+    line = rule.mapTo(pane, QPoint()).y()
+    ground = image.pixelColor(pane.width() - 2, line - 1)
+    box = QRect(above.mapTo(pane, QPoint()), above.size())
+    ink = next(row for row in range(box.bottom(), box.top() - 1, -1)
+               if any(image.pixelColor(x, row) != ground
+                      for x in range(box.left(), box.right() + 1)))
+    return line - ink - 1
 
 
 def _rows_from_the_lighter_line_to_the_list(pane, side) -> int | None:

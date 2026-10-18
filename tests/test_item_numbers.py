@@ -4,7 +4,12 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
-from origenerator.gallery.item_numbers import ItemNumber, item_name, number_items
+from origenerator.gallery.item_numbers import (
+    ItemNumber,
+    item_name,
+    number_items,
+    widest_item_name,
+)
 from origenerator.gallery.keys import folder_id
 
 FOLDER = "image/sdxl_t2i/0123456789ab"
@@ -13,6 +18,12 @@ OTHER_FOLDER = "image/sdxl_t2i/ba9876543210"
 
 def test_an_item_is_named_by_its_folders_code_and_its_number_in_three_digits():
     assert item_name(ItemNumber(FOLDER, 7)) == f"{folder_id(FOLDER)} 007"
+
+
+def test_the_widest_name_an_item_can_wear_is_made_of_the_widest_characters():
+    widths = {"D": 3, "8": 2}
+
+    assert widest_item_name(lambda text: sum(widths.get(c, 1) for c in text)) == "DDDDDDDD 888"
 
 
 def test_a_folders_items_are_numbered_from_000_in_the_order_they_were_made():

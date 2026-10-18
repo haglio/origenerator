@@ -5,6 +5,7 @@ from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QTabBar, QTabWidget, QWidget
 
+from origenerator.gallery.item_numbers import widest_item_name
 from origenerator.gui.eliding_tab_bar import (
     EDGE,
     MARK,
@@ -28,12 +29,17 @@ def _tabs_with(qtbot, n, width=600):
     return tabs
 
 
-def test_long_title_is_capped_at_max_width(qtbot):
+def _widest_name(bar) -> str:
+    return widest_item_name(bar.fontMetrics().horizontalAdvance)
+
+
+def test_a_long_title_gets_only_the_room_the_widest_item_name_needs(qtbot):
     # A very long tab label must not stretch its tab past the cap — it elides.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     bar.addTab("SDXL Text-to-Image › " + "an extremely long prompt " * 8)
-    assert bar.tabSizeHint(0).width() == ElidingTabBar.MAX_TAB_WIDTH
+    bar.addTab(_widest_name(bar))
+    assert bar.tabSizeHint(0).width() == bar.tabSizeHint(1).width()
 
 
 def test_short_title_keeps_its_natural_width(qtbot):
@@ -41,7 +47,23 @@ def test_short_title_keeps_its_natural_width(qtbot):
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     bar.addTab("A")
-    assert bar.tabSizeHint(0).width() < ElidingTabBar.MAX_TAB_WIDTH
+    assert bar.tabSizeHint(0).width() == QTabBar.tabSizeHint(bar, 0).width()
+
+
+@pytest.mark.parametrize("point_size", [9.0, 13.5, 20.0])
+def test_the_widest_name_an_item_can_wear_fits_its_tab_whole(qtbot, point_size):
+    bar = ElidingTabBar()
+    qtbot.addWidget(bar)
+    font = bar.font()
+    font.setPointSizeF(point_size)
+    bar.setFont(font)
+    bar.setTabsClosable(True)
+    bar.setIconSize(MARK_CANVAS)
+    picture = QPixmap(40, 30)
+    picture.fill(Qt.GlobalColor.gray)
+    bar.addTab(tab_mark(QIcon(picture)), _widest_name(bar))
+
+    assert bar.tabSizeHint(0).width() == QTabBar.tabSizeHint(bar, 0).width()
 
 
 def test_labels_elide_with_an_ellipsis(qtbot):

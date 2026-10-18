@@ -4,6 +4,7 @@ from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPalette, QPixmap
 from PyQt6.QtWidgets import QProxyStyle, QStyle, QTabBar, QToolButton
 
+from origenerator.gallery.item_numbers import widest_item_name
 from origenerator.gui.icons import tab_close_icon
 
 # How much wider than its mark a tab's close button sits, so the ✕ isn't flush
@@ -91,8 +92,9 @@ class _PreviewTabStyle(QProxyStyle):
 class ElidingTabBar(QTabBar):
     """A tab bar that keeps every tab on screen at once, and marks the preview one.
 
-    Each tab is capped at ``MAX_TAB_WIDTH`` with its label elided, so a long
-    title takes only its share of the row instead of stretching the tab. When
+    Each tab is capped at the width the widest name an item can wear needs, with
+    a longer label elided, so a long title takes only its share of the row
+    instead of stretching the tab. When
     more tabs open than fit even at that width, they collapse further — down to
     an equal share of the bar — rather than disappearing under scroll buttons.
 
@@ -108,8 +110,6 @@ class ElidingTabBar(QTabBar):
     against its right edge. Ours is the same mark at every position, padded off
     the edge.
     """
-
-    MAX_TAB_WIDTH = 220
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -162,7 +162,10 @@ class ElidingTabBar(QTabBar):
 
     def tabSizeHint(self, index):
         size = super().tabSizeHint(index)
-        size.setWidth(min(size.width(), self.MAX_TAB_WIDTH))
+        metrics = self.fontMetrics()
+        room = (size.width() - metrics.horizontalAdvance(self.tabText(index))
+                + metrics.horizontalAdvance(widest_item_name(metrics.horizontalAdvance)))
+        size.setWidth(min(size.width(), room))
         return size
 
     def minimumTabSizeHint(self, index):

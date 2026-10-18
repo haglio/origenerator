@@ -1,10 +1,13 @@
 """What each item is called: its folder's code and its number in that folder."""
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import string
+from collections.abc import Callable, Mapping, Sequence
 from typing import NamedTuple
 
-from origenerator.gallery.keys import folder_id
+from origenerator.gallery.keys import FOLDER_ID_CHARS, folder_id
+
+_DIGITS_SHOWN = 3
 
 
 class ItemNumber(NamedTuple):
@@ -13,7 +16,19 @@ class ItemNumber(NamedTuple):
 
 
 def item_name(item: ItemNumber) -> str:
-    return f"{folder_id(item.folder_key)} {item.number:03d}"
+    return _named(folder_id(item.folder_key), item.number)
+
+
+def widest_item_name(width_of: Callable[[str], int]) -> str:
+    def widest(characters: str) -> str:
+        return max(characters, key=width_of)
+
+    return _named(widest(string.hexdigits.upper()) * FOLDER_ID_CHARS,
+                  int(widest(string.digits) * _DIGITS_SHOWN))
+
+
+def _named(code: str, number: int) -> str:
+    return f"{code} {number:0{_DIGITS_SHOWN}d}"
 
 
 def number_items(folders: Mapping[str, Sequence[str]],

@@ -221,7 +221,7 @@ class CombineController(QObject):
         lane can no longer answer.
 
         The lane goes in before the act: it decides which acts are answerable,
-        and ``set_category`` refuses one that is greyed out under it.
+        and ``set_category`` refuses one that is grayed out under it.
 
         A list of two is what sessions before this wrote — the slots alone — and
         is still read, so an existing ``ui_state.json`` restores what it has.

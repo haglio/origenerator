@@ -9,7 +9,7 @@ are mutually exclusive. Generate re-runs the chosen recipe on the dropped image;
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
 video (the default), or a Genau flick — one complete cycle, looping. That choice
 picks which recipes the act is answered from, so the dropdown's usable acts change
-with it: an act only the video lane can answer greys out under Genau, and acts that
+with it: an act only the video lane can answer grays out under Genau, and acts that
 are no kind of cycle at all are not offered there.
 
 The panel is pure UI, reporting what was asked for as one :class:`CombineRequest` on
@@ -90,7 +90,7 @@ class CombinePanel(QWidget):
 
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
     animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
-    intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regrey the acts
+    intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the acts
     item_activated = pyqtSignal(str)  # a slot's picture or clip was clicked (prompt_id)
 
     def __init__(
@@ -238,7 +238,7 @@ class CombinePanel(QWidget):
         """Announce the new lane once, on the radio that just went on.
 
         ``buttonToggled`` fires twice for one click — off for the old radio, on for
-        the new — and the view answers by re-greying the whole act list, so only the
+        the new — and the view answers by re-graying the whole act list, so only the
         on edge is passed along.
         """
         if checked:
@@ -265,7 +265,7 @@ class CombinePanel(QWidget):
     def set_category(self, category: str):
         """Select ``category``, or the neutral option for anything else --
         including an act the current lane cannot answer, which
-        :meth:`set_available_categories` has greyed out. A greyed act must not
+        :meth:`set_available_categories` has grayed out. A grayed act must not
         arrive selected for the same reason it must not stay selected: the
         buttons would go live on a pick that can only answer "no recipe yet".
         """
@@ -278,7 +278,7 @@ class CombinePanel(QWidget):
         nothing pinned, so offering it could only ever answer "no recipe yet". A
         disabled item says why on hover, naming the lane, since an act the video
         lane answers happily can still be unanswerable as a loop. The neutral
-        "(custom)" is never greyed."""
+        "(custom)" is never grayed."""
         genau = self.selected_intent() == GENAU
         model = self._category.model()
         for index in range(1, self._category.count()):
@@ -291,7 +291,7 @@ class CombinePanel(QWidget):
             self._category.setItemData(
                 index, "" if usable else reason, Qt.ItemDataRole.ToolTipRole,
             )
-            # A greyed-out act must not stay selected under it — the buttons would be
+            # A grayed-out act must not stay selected under it — the buttons would be
             # live on a pick the lane cannot answer. Dropping to neutral is what the
             # panel already means by "no act chosen".
             if not usable and self._category.currentIndex() == index:

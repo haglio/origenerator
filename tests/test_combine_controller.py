@@ -363,7 +363,7 @@ def test_a_restore_hands_each_lane_back_its_recent_videos_that_still_fit(combine
 
 def test_a_restore_puts_the_lane_in_before_the_act(combine):
     # The lane decides which acts are answerable, and set_category refuses one
-    # that is greyed out under it.
+    # that is grayed out under it.
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
     controller.restore({"image": "img", "video": "clip",
@@ -727,7 +727,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
 # --- which acts are pickable at all -----------------------------------------
 
 
-def test_an_act_with_no_video_under_it_is_greyed_out(combine, monkeypatch):
+def test_an_act_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_image_conditioned",
                         lambda name: name == VIDEO_WORKFLOW)
     monkeypatch.setattr(module.recipe_match, "available_categories",
@@ -922,7 +922,7 @@ def test_the_acts_narrow_to_what_the_dropped_picture_can_start_from(combine,
 
 
 def test_a_picture_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
-    # Greying every act over a picture that says nothing about itself would read
+    # Graying every act over a picture that says nothing about itself would read
     # as the panel being broken.
     _paths(monkeypatch)
     monkeypatch.setattr(module.recipe_match, "available_categories",

@@ -238,7 +238,7 @@ def _enabled(panel, text) -> bool:
     return panel._category.model().item(panel._category.findText(text)).isEnabled()
 
 
-def test_acts_with_no_video_to_mine_are_greyed_out(qtbot):
+def test_acts_with_no_video_to_mine_are_grayed_out(qtbot):
     panel = _panel(qtbot)
 
     panel.set_available_categories({"beta", "epsilon"})
@@ -259,7 +259,7 @@ def test_an_act_becomes_pickable_once_a_video_of_it_exists(qtbot):
     assert _enabled(panel, "dancing")
 
 
-def test_a_greyed_act_explains_itself(qtbot):
+def test_a_grayed_act_explains_itself(qtbot):
     panel = _panel(qtbot)
     panel.set_available_categories({"beta"})
     index = panel._category.findText("gamma")
@@ -544,7 +544,7 @@ def test_generate_carries_the_chosen_lane(qtbot):
 
 def test_switching_the_lane_announces_it_once(qtbot):
     # buttonToggled fires for both radios on one click — the off edge and the on
-    # edge — and the view answers each by re-greying the whole act list.
+    # edge — and the view answers each by re-graying the whole act list.
     panel = _panel(qtbot)
     heard = []
     panel.intent_changed.connect(heard.append)
@@ -556,14 +556,14 @@ def test_switching_the_lane_announces_it_once(qtbot):
     assert heard == [recipe_match.GENAU, recipe_match.VIDEO]
 
 
-def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
+def test_a_grayed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     panel = _panel(qtbot)
     _pick_lane(panel, recipe_match.GENAU)
     panel.set_available_categories({"beta"})
 
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
     # An act the video lane answers happily can still have no loop under it, so
-    # the greyed-out reason has to name which lane it is talking about.
+    # the grayed-out reason has to name which lane it is talking about.
     assert reason == "No past looping “gamma” flick to base a Genau recipe on yet"
 
 

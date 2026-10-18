@@ -476,10 +476,11 @@ class SlideshowSet:
         return self.start_loop(SEED_AXIS, [*self.loop_pool(SEED_AXIS), *additions])
 
     def state(self, *, locked: bool, level_index: int) -> SlideshowState:
+        loop = self.loop or Loop("", ())
         return SlideshowState(order=tuple(self.playlist.order_ids()),
                               current=self.current_prompt_id(), locked=locked,
-                              level_index=level_index,
-                              loop=self.loop.axis if self.loop is not None else "")
+                              level_index=level_index, loop=loop.axis,
+                              loop_pool=tuple(slide.prompt_id for slide in loop.pool))
 
     def resume(self, state: SlideshowState) -> bool:
         if not self.playlist.resume(state.order, state.current):

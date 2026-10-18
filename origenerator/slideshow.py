@@ -110,7 +110,8 @@ class SlideshowState:
 
     ``order`` is the pass it was playing and ``current`` the slide it stood on,
     both as generation ids. The rest is what that slide was doing — locked against
-    the advance, showing which of its versions.
+    the advance, showing which of its versions — and the loop it was in: the axis,
+    and the generations it plays with the one it began on first.
     """
 
     order: tuple = ()
@@ -118,6 +119,7 @@ class SlideshowState:
     locked: bool = False
     level_index: int = 0
     loop: str = ""
+    loop_pool: tuple = ()
 
     def saved(self) -> dict:
         return asdict(self)
@@ -126,16 +128,20 @@ class SlideshowState:
     def restored(cls, saved) -> SlideshowState:
         if not isinstance(saved, dict):
             return cls()
-        order, current = saved.get("order"), saved.get("current")
-        level, loop = saved.get("level_index"), saved.get("loop")
+        current, level, loop = saved.get("current"), saved.get("level_index"), saved.get("loop")
         return cls(
-            order=(tuple(pid for pid in order if isinstance(pid, str))
-                   if isinstance(order, (list, tuple)) else ()),
+            order=_ids_in(saved.get("order")),
             current=current if isinstance(current, str) else None,
             locked=saved.get("locked") is True,
             level_index=level if type(level) is int and level > 0 else 0,
             loop=loop if isinstance(loop, str) else "",
+            loop_pool=_ids_in(saved.get("loop_pool")),
         )
+
+
+def _ids_in(saved) -> tuple:
+    return (tuple(pid for pid in saved if isinstance(pid, str))
+            if isinstance(saved, (list, tuple)) else ())
 
 
 def _without(indices: list, removed: int) -> list:

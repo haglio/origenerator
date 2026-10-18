@@ -567,7 +567,7 @@ def test_dropping_something_that_was_never_here_changes_nothing():
 
 def test_where_a_slideshow_was_left_reads_back_as_it_was_saved():
     state = SlideshowState(order=("id-b", "id-a"), current="id-a", locked=True, level_index=1,
-                           loop="seed")
+                           loop="seed", loop_pool=("id-b", "id-a", "id-far"))
 
     assert SlideshowState.restored(json.loads(json.dumps(state.saved()))) == state
 
@@ -581,7 +581,7 @@ def test_the_filters_read_back_as_they_were_saved():
 
 def test_a_saved_slideshow_that_makes_no_sense_reads_back_as_nowhere():
     nonsense = {"order": "id-a", "current": 3, "locked": "yes", "level_index": -2,
-                "loop": 5}
+                "loop": 5, "loop_pool": "id-a"}
 
     assert SlideshowState.restored(nonsense) == SlideshowState()
     assert SlideshowState.restored(None) == SlideshowState()

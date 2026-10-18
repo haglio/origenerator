@@ -185,6 +185,7 @@ class JobQueue(QObject):
         # the machine from what lands (see _set_aside_for and _pump).
         self._takes_over_on_landing: GenerationJob | None = None
         self._first: frozenset[str] = frozenset()
+        self._enhance = None
 
     @property
     def jobs(self) -> dict:
@@ -378,9 +379,31 @@ class JobQueue(QObject):
             return None
         job.origin = origin or job.prompt_id  # a chained stage keeps the first id
         job.run_media_type = run_media_type or job.media_type
+        start_image = self._enhanced_start_image_of(job)
+        if start_image:
+            job.start_from(start_image)
         self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
         return job
+
+    def enhance_pictures_with(self, enhance) -> None:
+        self._enhance = enhance
+
+    def _enhanced_start_image_of(self, job: GenerationJob) -> str | None:
+        if self._enhance is None or not queue_line.is_video(job) or not job.start_image:
+            return None
+        start_image = job.params.get("input_image")
+        images = [row for row in self._db.list_generations()
+                  if gallery.media_type_of_row(row) == MediaType.IMAGE]
+        picture_id = gallery.source_image_id_for(start_image, images)
+        picture = next((row for row in images if row["prompt_id"] == picture_id), None)
+        if picture is None:
+            return None
+        if gallery.is_enhanced_row(picture):
+            return gallery.enhanced_version_of(start_image, picture)
+        if not queue_line.waits_for_any(job, self.all_jobs):
+            self._enhance(picture)
+        return None
 
     def _admit(self, newcomer: GenerationJob):
         """User work preempts a background experiment here, at the one choke point
@@ -480,6 +503,8 @@ class JobQueue(QObject):
         """
         handed = 0
         for job in list(self._waiting):
+            if queue_line.waits_for_any(job, self.all_jobs):
+                continue
             self._waiting.remove(job)
             if self._hand_over(job, closing=True):
                 handed += 1
@@ -671,6 +696,9 @@ class JobQueue(QObject):
             self._db.delete_generation(row["prompt_id"])
             return
         job.origin = job.prompt_id
+        start_image = self._enhanced_start_image_of(job)
+        if start_image:
+            self._start_from(job, start_image)
         self._register(key, job, self._on_finished)
         self._enqueue(job)
 
@@ -706,6 +734,7 @@ class JobQueue(QObject):
         place = {pid: index for index, pid in enumerate(prompt_ids)}
         self._waiting.sort(key=lambda job: place.get(job.prompt_id, len(place)))
         queue_line.put_first(self._waiting, self._first)
+        queue_line.behind_the_enhancements_they_wait_for(self._waiting)
 
     def cancel(self, key: str):
         """Stop and forget the job leading a folder's queue, dropping its row.
@@ -728,15 +757,15 @@ class JobQueue(QObject):
         folder may hold several jobs, so the one to stop has to be named rather
         than inferred from its folder.
         """
-        for key, jobs in list(self._jobs.items()):
-            for job in list(jobs):
-                if job.prompt_id == prompt_id:
-                    self._drop(key, job)
-                    job.cancel()
-                    record_unfinished_run(self._db, job, SeedUseKind.CANCELED)
-                    self._db.delete_generation(prompt_id)  # drop the abandoned row
-                    self._pump()  # the machine is free: start whatever is next
-                    return
+        job = self.job_for_prompt(prompt_id)
+        if job is None:
+            return
+        for stopped in [job, *self._videos_waiting_for(job)]:
+            self._drop(self._key_of(stopped), stopped)
+            stopped.cancel()
+            record_unfinished_run(self._db, stopped, SeedUseKind.CANCELED)
+            self._db.delete_generation(stopped.prompt_id)  # drop the abandoned row
+        self._pump()  # the machine is free: start whatever is next
 
     def _on_image_finished(self, key, image_job, files, thumb_path, duration,
                            video_workflow, video_params):
@@ -754,18 +783,44 @@ class JobQueue(QObject):
 
     def _on_finished(self, key, job, files, thumb_path, duration):
         self._drop(key, job)
-        self._pump()  # the machine is free: start whatever is next
+        waited_on = self._start_waiting_videos_from(job, files)
+        if not waited_on:
+            self._pump()  # the machine is free: start whatever is next
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
         outcome = _outcome_of(self._db, job, ok=True, seconds=duration)
         self.finished.emit(key, job.prompt_id, job.origin)
         self.run_ended.emit(outcome)
+        if waited_on:
+            self._pump()
+
+    def _start_waiting_videos_from(self, enhance, files) -> bool:
+        enhanced = gallery.output_file_reference(files)
+        if enhanced is None or not enhance.enhances:
+            return False
+        waiting = self._videos_waiting_for(enhance)
+        for job in waiting:
+            self._start_from(job, enhanced)
+        return bool(waiting)
+
+    def _start_from(self, job: GenerationJob, start_image: str):
+        job.start_from(start_image)
+        self._db.set_recipe(job.prompt_id, params_json=json.dumps(job.params),
+                            workflow_json=json.dumps(job.payload))
 
     def _on_failed(self, key, job, message):
-        self._drop(key, job)
+        ended = [(key, job, message)] + [
+            (self._key_of(video), video, f"Its start image could not be enhanced: {message}")
+            for video in self._videos_waiting_for(job)]
+        for ended_key, ended_job, _message in ended:
+            self._drop(ended_key, ended_job)
         self._pump()  # the machine is free: start whatever is next
-        record_unfinished_run(self._db, job, SeedUseKind.FAILED)
-        self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
-                                   error_message=message)
-        logger.warning("Re-roll failed for %s: %s", key, message)
-        self.failed.emit(key, message)
-        self.run_ended.emit(_outcome_of(self._db, job, ok=False))
+        for ended_key, ended_job, why in ended:
+            record_unfinished_run(self._db, ended_job, SeedUseKind.FAILED)
+            self._db.update_generation(ended_job.prompt_id, status=GenerationStatus.ERROR,
+                                       error_message=why)
+            logger.warning("Re-roll failed for %s: %s", ended_key, why)
+            self.failed.emit(ended_key, why)
+            self.run_ended.emit(_outcome_of(self._db, ended_job, ok=False))
+
+    def _videos_waiting_for(self, enhancement) -> list[GenerationJob]:
+        return [job for job in self._waiting if queue_line.waits_for(job, enhancement)]

@@ -144,3 +144,25 @@ def test_work_nobody_asked_for_set_aside_rejoins_at_the_back():
     line = [newcomer, _video()]
     for source in ("experiment", "base_render"):
         assert queue_line.rejoin_index(line, _job("image", source), newcomer) == 2
+
+
+# --- a video waits for the enhancement of its start image -----------------------
+
+def _enhance(image, name=""):
+    return SimpleNamespace(media_type="image", source="generated", prompt_id=name,
+                           run_media_type="image", start_image=image, enhances=image)
+
+
+def _video_from(image, name=""):
+    return SimpleNamespace(media_type="video", source="generated", prompt_id=name,
+                           run_media_type="video", start_image=image, enhances="")
+
+
+def test_videos_waiting_for_one_enhancement_follow_it_in_the_order_they_had():
+    first, second = _video_from("p.png", "first"), _video_from("p.png", "second")
+    enhance = _enhance("p.png", "enhance")
+    line = [first, second, enhance]
+
+    queue_line.behind_the_enhancements_they_wait_for(line)
+
+    assert line == [enhance, first, second]

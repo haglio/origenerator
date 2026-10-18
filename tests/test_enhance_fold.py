@@ -488,3 +488,17 @@ def test_sweep_leaves_an_ordinary_image_alone(tmp_path):
     assert not gallery.is_enhance_product_row(kept)
     assert fold_completed_enhancements(db) == 0
     assert db.get_generation("i1") is not None
+
+
+def test_a_folded_pictures_plain_version_is_superseded_by_its_enhancement(tmp_path):
+    db = Database(tmp_path / "t.db")
+    plain = _add_source(db)
+    fold_enhancement(db, _add_enhance(db, "enh", "image/sdxl_t2i_src.png [output]",
+                                      "image_enhance_00001_.png"))
+    enhanced = db.get_generation("src")
+
+    assert gallery.enhanced_version_of("image/sdxl_t2i_src.png [output]", enhanced) \
+        == "image/image_enhance_00001_.png [output]"
+    assert gallery.enhanced_version_of("image/image_enhance_00001_.png [output]",
+                                       enhanced) is None
+    assert gallery.enhanced_version_of("image/sdxl_t2i_src.png [output]", plain) is None

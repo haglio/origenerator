@@ -183,6 +183,13 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     return []
 
 
+def enhanced_version_of(image_ref: str | None, picture: dict) -> str | None:
+    plain = {_frame_name(f.get("filename")) for f in original_files_of(picture)}
+    if _frame_name(image_ref) not in plain:
+        return None
+    return output_file_reference(row_output_files(picture))
+
+
 def is_enhanced_row(row: dict) -> bool:
     """Whether this generation carries enhanced pixels — what the green
     thumbnail badge marks. A folded-in standalone enhance (``original_files``

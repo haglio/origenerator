@@ -9002,10 +9002,12 @@ def _select_leaf_of(view, prompt_id):
     return item.data(0, _GROUP_ROLE).key
 
 
-def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
+def test_i2v_reroll_regenerates_its_input_image_enhances_it_then_makes_the_video(
+        qtbot, tmp_path):
     # Re-rolling an i2v whose input image is a known, re-buildable generation
-    # first makes a fresh image (its settings, new seed), then runs the video on
-    # that image — both persisted, and the new video links back to the new image.
+    # first makes a fresh image (its settings, new seed), has it enhanced, then
+    # runs the video on the enhancement -- all persisted, and the new video links
+    # back to the new image.
     db = _seeded_i2v_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -9022,10 +9024,17 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)
 
-    # Stage 2: the video now runs on the just-generated image, its own seeds fresh.
+    # Stage 2: the fresh image is enhanced before any video is made of it.
+    (enhance_job,) = [job for job in view._jobs.all_jobs if job.enhances]
+    assert enhance_job.params["input_image"] == "image/sdxl_new.png [output]"
+    enhance_job.finished.emit(
+        [{"filename": "image_enhance_new.png", "subfolder": "image", "type": "output"}],
+        None, 1.0)
+
+    # Stage 3: the video now runs on the enhancement, its own seeds fresh.
     vid_job = view._live_jobs[key]
     assert vid_job.workflow.name == "wan22_i2v"
-    assert vid_job.params["input_image"] == "image/sdxl_new.png [output]"
+    assert vid_job.params["input_image"] == "image/image_enhance_new.png [output]"
     assert vid_job.params["noise_seed"] != 9
 
     client.job_completed.emit(vid_job.prompt_id, _VID_REROLL_HISTORY)
@@ -10206,13 +10215,17 @@ def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
 # --- combine: a video's recipe applied to a dropped image -------------------
 
 
-def _combine_db(tmp_path):
+def _combine_db(tmp_path, *, enhanced=True):
     """A DB with one SDXL image to drop in and one i2v video whose recipe to reuse.
 
     The video's own input image is left at the workflow default (empty), so the
     combined result — keyed to the dropped image — lands in a fresh folder. Rows
     carry the workflows' current versions, as runs made by this app would (the
     settings key folds the version in).
+
+    The image is enhanced already, its base render kept under it, so a combine
+    makes its video straight away; ``enhanced=False`` is an image a video has to
+    wait on while it is enhanced.
     """
     db = Database(tmp_path / "test.db")
     db.insert_generation(
@@ -10221,8 +10234,9 @@ def _combine_db(tmp_path):
         params_json=json.dumps(dict(_SDXL.default_params(), seed=1, positive_prompt="a dog")),
         workflow_json="{}",
     )
-    db.update_generation("img", status="completed",
-                         output_files=json.dumps([{"filename": "sdxl_pick.png", "subfolder": ""}]))
+    base = [{"filename": "sdxl_pick_base.png", "subfolder": "", "role": "original"}]
+    db.update_generation("img", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_pick.png", "subfolder": ""}] + (base if enhanced else [])))
     db.insert_generation(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version=_WAN_I2V.version,
         positive_prompt="dance", seed=42,
@@ -10326,6 +10340,25 @@ def test_combine_submits_the_recipe_on_the_dropped_picture_with_a_fresh_seed(qtb
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
     assert job.params["noise_seed"] != 99
     view._client.submit_job.assert_called_once()
+
+
+def test_a_combine_on_a_picture_never_enhanced_enhances_it_and_makes_the_video_from_that(
+        qtbot, tmp_path):
+    db = _combine_db(tmp_path, enhanced=False)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._combine._generate_combination("img", "vid")
+    (enhance,) = [job for job in view._jobs.all_jobs if job.enhances]
+    enhance.finished.emit([{"filename": "image_enhance_00001_.png", "subfolder": "image"}],
+                          None, 1.0)
+
+    first, then = [call.args for call in view._client.submit_job.call_args_list]
+    assert first[1] == enhance.prompt_id
+    assert "image/image_enhance_00001_.png [output]" in json.dumps(then[0])
+    assert gallery.row_output_files(db.get_generation("img"))[0]["filename"] \
+        == "image_enhance_00001_.png"
 
 
 def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_path):
@@ -15021,7 +15054,8 @@ def _genau_db(tmp_path):
     so this also pins that the Genau lane picks the loop over it. "state two" is
     the one picture state the example overlay lets the Genau lane animate at all,
     and "alpha" the one act it allows from it — so an "animate as go now" over
-    this picture needs no act said.
+    this picture needs no act said. Both pictures are enhanced already, as
+    the combine DB's is.
     """
     db = _combine_db(tmp_path)
     loop = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
@@ -15044,8 +15078,9 @@ def _genau_db(tmp_path):
                                     positive_prompt="a picture by the window")),
         workflow_json="{}",
     )
-    db.update_generation("img_act", status="completed",
-                         output_files=json.dumps([{"filename": "sdxl_act.png", "subfolder": ""}]))
+    db.update_generation("img_act", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_act.png", "subfolder": ""},
+         {"filename": "sdxl_act_base.png", "subfolder": "", "role": "original"}]))
     db.set_picture_state("img_act", "state two")
     return db
 

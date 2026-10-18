@@ -144,6 +144,13 @@ class GenerationStore(Store):
         """
         self._set(prompt_id, "params_json", params_json)
 
+    def set_recipe(self, prompt_id: str, *, params_json: str, workflow_json: str):
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET params_json = ?, workflow_json = ? WHERE prompt_id = ?",
+                (params_json, workflow_json, prompt_id),
+            )
+
     def set_recipe_source(self, prompt_id: str, *, category: str | None = None,
                           video_prompt_id: str | None = None):
         """Record where a combine launch got its recipe: the act picked in the

@@ -27,6 +27,8 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from origenerator import provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
+from origenerator.file_refs import frame_name
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
@@ -192,6 +194,14 @@ class GenerationJob(QObject):
         reads that one; this is what the prompt itself puts on disk.
         """
         return self.workflow.output_type
+
+    @property
+    def start_image(self) -> str:
+        return frame_name(self.params.get("input_image"))
+
+    @property
+    def enhances(self) -> str:
+        return self.start_image if self.workflow.name == ENHANCE_WORKFLOW else ""
 
     @property
     def last_progress(self) -> tuple[int, int]:
@@ -444,6 +454,12 @@ class GenerationJob(QObject):
         self._state = JobState.IDLE
         self._forget_the_run()
         return True
+
+    def start_from(self, picture: str) -> None:
+        self.params = {**self.params, "input_image": picture}
+        self.payload = self.workflow.build_api_payload(self.params)
+        self._stages = stage_names(self.payload)
+        self._forget_the_run()
 
     def _stop_on_server(self):
         """Take the prompt out of the server's line if it is waiting there, and

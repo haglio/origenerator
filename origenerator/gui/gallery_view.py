@@ -524,6 +524,8 @@ class GalleryView(QWidget):
         self._enhance = EnhanceController(
             self, db=db, jobs=self._jobs, browser=self._browser,
             slideshows=self._slideshows, info_tabs_of=lambda: self._info_tabs)
+        self._jobs.enhance_pictures_with(
+            lambda picture: self._enhance.enhance_items([picture["prompt_id"]]))
         # A thumbnail or a preview picked up anywhere lights the slot it fits,
         # so the drop target is obvious from the start of the gesture.
         self._browser.drag_started.connect(self._combine.drag_started)

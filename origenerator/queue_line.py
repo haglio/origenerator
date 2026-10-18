@@ -7,7 +7,7 @@ set down and picked back up. So a queue that means to change its mind has to do
 it before the prompt is sent, which means holding the line on this side of the
 wire.
 
-Three rules, and all three are about what the user is doing while the GPU works:
+Its rules are about what the user is doing while the GPU works:
 
 * **What a slideshow is locked on is made first:** the user is looking at it, so its
   enhancement leads the line and nothing takes the machine from it.
@@ -90,6 +90,24 @@ def insertion_index(line: list, job) -> int:
 
 def put_first(line: list, prompt_ids) -> None:
     line.sort(key=lambda job: job.prompt_id not in prompt_ids)
+
+
+def waits_for(video, enhancement) -> bool:
+    image = getattr(video, "start_image", "")
+    return is_video(video) and bool(image) and getattr(enhancement, "enhances", "") == image
+
+
+def waits_for_any(video, jobs) -> bool:
+    return any(waits_for(video, job) for job in jobs)
+
+
+def behind_the_enhancements_they_wait_for(line: list) -> None:
+    for video in reversed([job for job in line if is_video(job)]):
+        last = max((index for index, job in enumerate(line) if waits_for(video, job)),
+                   default=-1)
+        if last > line.index(video):
+            line.remove(video)
+            line.insert(last, video)
 
 
 def rejoin_index(line: list, job, newcomer) -> int:

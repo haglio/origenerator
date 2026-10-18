@@ -164,19 +164,20 @@ def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp
     assert slideshow.hud_map().corner.prompt_id == "id-2"
 
 
-def test_the_slideshows_lock_is_the_funestras_own(qtbot, tmp_path):
-    """A padlock on this panel is the Funestra's repeat-one: it is told, and what
-    it says back is what the panel draws."""
+def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
     slideshow.slideshow_toggle_lock()
-    assert _sent(slideshow) == ["LOCK_ON"]
-    assert slideshow.locked is True
-
-    _says(slideshow, video="one.png", locked=False)   # the Funestra says otherwise
+    told = _sent(slideshow)
+    _says(slideshow, video="one.png", locked=False)
     slideshow.tick()
-    assert slideshow.locked is False
+    still_locked = slideshow.locked
+    slideshow.slideshow_toggle_lock()
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+
+    assert (told, still_locked, slideshow.locked) == (["LOCK_ON"], True, False)
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
@@ -388,18 +389,19 @@ def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_pa
     assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
 
 
-def test_the_slideshow_names_the_generation_the_funestra_says_it_is_locked_on(qtbot, tmp_path):
+def test_the_slideshow_names_the_generation_it_is_locked_on(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
     assert slideshow.locked_on is None
 
-    _says(slideshow, video="two.png", locked=True)
-    slideshow.tick()
+    slideshow.set_locked(True)
 
     assert slideshow.locked_on == "id-2"
 
 
 def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):
-    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow.set_locked(True)
+    _sent(slideshow)
 
     slideshow.play(_ITEMS, start=1, shuffle=in_order)
 

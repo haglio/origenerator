@@ -86,11 +86,6 @@ def _combo_index(panel, key):
     raise AssertionError(f"workflow {key} not in combo")
 
 
-def _lane_button(panel, name="Evolver"):
-    """The button this panel wears for the named export lane."""
-    return panel._lanes[name].button
-
-
 def _is_descendant(widget, ancestor) -> bool:
     node = widget.parent()
     while node is not None:
@@ -282,8 +277,8 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     The failure this exists for: a row layout squeezed them past their minimum and
     clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
     """
-    buttons = [*(lane.button for lane in panel._lanes.values()),
-               panel._cancel_btn, panel._generate_btn.parentWidget()]
+    panel._lane_button.setText(export_lane_module.EVOLVER.delete_caption)
+    buttons = [panel._lane_button, panel._cancel_btn, panel._generate_btn.parentWidget()]
     for button in buttons:
         button.show()          # the busiest the bank ever is: every button on
     panel.show()
@@ -393,12 +388,10 @@ def test_file_info_above_form_related_media_below(panel):
         < links.indexOf(panel._related._animated_strip)
 
 
-def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
-    # One button bank: Send-to-Evolver isn't a stray footer button — it sits in the
-    # same row as Cancel and Generate.
+def test_the_lane_button_shares_the_button_bank_with_generate_and_cancel(panel):
     bank = _layout_containing(panel._settings_pane.layout(), panel._generate_btn.parentWidget())
     assert bank is not None
-    assert bank.indexOf(_lane_button(panel)) != -1
+    assert bank.indexOf(panel._lane_button) != -1
     assert bank.indexOf(panel._cancel_btn) != -1
 
 
@@ -1207,13 +1200,14 @@ def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
     return db.get_generation(prompt_id)
 
 
-def _video_row(db, prompt_id="vid1", input_image=None, **seeds):
+def _video_row(db, prompt_id="vid1", input_image=None, *, workflow_name="wan22_i2v",
+               **seeds):
     """A completed WAN i2v video, optionally built on a named source image."""
     params = {"positive_prompt": "dance", "seed": 5, **seeds}
     if input_image is not None:
         params["input_image"] = input_image
     db.insert_generation(
-        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v002",
+        prompt_id=prompt_id, workflow_name=workflow_name, workflow_version="v002",
         positive_prompt="dance", seed=5,
         params_json=json.dumps(params), workflow_json="{}",
     )
@@ -1246,7 +1240,7 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     assert panel._versions.isHidden()
     assert panel._related._animated_strip.isHidden()
     assert panel._related._source_tile.isHidden()
-    assert _lane_button(panel).isHidden()
+    assert panel._lane_button.isHidden()
 
 
 def _enhanced_image_row(db, prompt_id="img1"):
@@ -1615,7 +1609,7 @@ def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
     assert panel._metadata_block.isHidden()
     assert panel._versions.isHidden()
     assert panel._related._source_tile.isHidden()
-    assert _lane_button(panel).isHidden()
+    assert panel._lane_button.isHidden()
 
 
 def _wizard_panel(qtbot, tmp_path, monkeypatch):
@@ -1666,7 +1660,7 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
     assert not panel._related._animated_strip.isHidden()
     assert len(panel._related._animated_strip.findChildren(_VideoTile)) == 1
     assert panel._related._source_tile.isHidden()   # an image has no source-image tile
-    assert _lane_button(panel).isHidden()   # Evolver is for videos
+    assert panel._lane_button.isHidden()   # Evolver is for videos
     assert panel._displayed_row is image
 
 
@@ -1694,7 +1688,7 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
 
     panel.show_saved_generation(video, [image])
 
-    assert not _lane_button(panel).isHidden()   # a video with a file → sendable
+    assert not panel._lane_button.isHidden()   # a video with a file → sendable
     assert not panel._related._source_tile.isHidden()   # its start frame is a known generation
     assert panel._related._source_tile._prompt_id == "img1"   # the tile points at that image
     assert panel._related._source_tile._name.text() == name   # called by its name, not its file
@@ -1725,7 +1719,7 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
     panel.show_saved_generation(video, [])
 
     assert panel._related._source_tile.isHidden()
-    assert not _lane_button(panel).isHidden()  # still a sendable video
+    assert not panel._lane_button.isHidden()  # still a sendable video
 
 
 def _script_for(video_path, output_dir=None):
@@ -1881,7 +1875,7 @@ def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved
     panel.show_saved_generation(row, [])
 
     assert panel._param_form.get_values() == before  # form left as-is
-    assert not _lane_button(panel).isHidden()               # footer still applies
+    assert not panel._lane_button.isHidden()               # footer still applies
     assert panel._displayed_row is row
 
 
@@ -1932,31 +1926,6 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
     panel.layout().activate()
 
     assert gap() == before   # the column closed up; the space did not move down
-
-
-# --- the Genau lane: send a clip, or make one from an image -------------------
-
-
-def test_send_to_genau_shares_the_one_button_bank(panel):
-    bank = _layout_containing(panel._settings_pane.layout(), panel._generate_btn.parentWidget())
-    assert bank.indexOf(_lane_button(panel, "Genau")) != -1
-
-
-def test_the_two_lanes_are_sent_independently(saved_panel, monkeypatch):
-    # Sending a video to Evolver must not read as having sent it to Genau: they are
-    # different errands with different destinations.
-    panel, db = saved_panel
-    video = _video_row(db, "vid1")
-    db.mark_evolver_exported("vid1")
-    video = db.get_generation("vid1")
-    monkeypatch.setattr(gcp_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-
-    panel.show_saved_generation(video, [])
-
-    assert _lane_button(panel).text() == "Delete from Evolver"
-    assert _lane_button(panel, "Genau").text() == "Send to Genau"
-    assert _lane_button(panel, "Genau").isEnabled()
 
 
 # --- the modified notice: the preview no longer answers the form -------------
@@ -2527,50 +2496,114 @@ def _lanes():
     return list(export_lane_module.EXPORT_LANES)
 
 
-@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_a_fresh_tab_offers_no_lane_at_all(saved_panel, lane):
+_LOOP = "wan22_flf2v_loop"
+
+
+def _lane_video(db, lane, prompt_id="vid1"):
+    """A video of the kind *lane* carries."""
+    return _video_row(db, prompt_id,
+                      workflow_name=_LOOP if lane.carries_loops else "wan22_i2v")
+
+
+def _lane_offers(panel):
+    """The caption of every button on show that names an app a video can go to."""
+    names = tuple(f" {lane.name}" for lane in _lanes())
+    return [button.text() for button in panel.findChildren(QPushButton)
+            if not button.isHidden() and button.text().endswith(names)]
+
+
+@pytest.mark.parametrize(("workflow", "offer"), [(_LOOP, "Send to Genau"),
+                                                 ("wan22_i2v", "Send to Evolver"),
+                                                 ("unknown", "Send to Evolver")])
+def test_a_loop_is_offered_to_genau_and_any_other_video_to_evolver_alone(
+        saved_panel, monkeypatch, workflow, offer):
+    panel, db = saved_panel
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(_video_row(db, "vid1", workflow_name=workflow), [])
+
+    assert _lane_offers(panel) == [offer]
+
+
+def _press(panel, caption):
+    (button,) = [button for button in panel.findChildren(QPushButton)
+                 if not button.isHidden() and button.text() == caption]
+    button.click()
+
+
+def test_a_loop_already_in_evolver_offers_that_copy_back_before_genau(saved_panel,
+                                                                       monkeypatch):
+    panel, db = saved_panel
+    _video_row(db, "vid1", workflow_name=_LOOP)
+    db.mark_evolver_exported("vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+    assert _lane_offers(panel) == ["Delete from Evolver"]
+
+    _press(panel, "Delete from Evolver")
+
+    assert _lane_offers(panel) == ["Send to Genau"]
+
+
+def test_a_loop_in_both_apps_offers_its_evolver_copy_back_and_then_its_genau_one(
+        saved_panel, monkeypatch):
+    panel, db = saved_panel
+    _video_row(db, "vid1", workflow_name=_LOOP)
+    db.mark_evolver_exported("vid1")
+    db.mark_genau_exported("vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+    assert _lane_offers(panel) == ["Delete from Evolver"]
+
+    _press(panel, "Delete from Evolver")
+
+    assert _lane_offers(panel) == ["Delete from Genau"]
+
+
+def test_a_fresh_tab_offers_no_lane_at_all(saved_panel):
     panel, _db = saved_panel
-    assert panel._lanes[lane.name].button.isHidden()
+    assert _lane_offers(panel) == []
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_offers_itself_for_a_video_and_not_for_an_image(saved_panel,
                                                                monkeypatch, lane):
     panel, db = saved_panel
-    button = panel._lanes[lane.name].button
 
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-    assert not button.isHidden()
+    panel.show_saved_generation(_lane_video(db, lane), [])
+    assert _lane_offers(panel) == [lane.send_caption]
 
     image = _image_row(db, "img1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/img1.png"), "image"))
     panel.show_saved_generation(image, [image])
-    assert button.isHidden()
+    assert _lane_offers(panel) == []
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
         saved_panel, monkeypatch, lane):
     panel, db = saved_panel
-    button = panel._lanes[lane.name].button
     video_path = Path("C:/out/vid1.mp4")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (video_path, "video"))
     export = MagicMock(return_value=EVOLVER_INBOX_DIR / lane.source / "vid1.mp4")
     monkeypatch.setattr(evolver_export, "export_video", export)
 
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-    panel._on_send(panel._lanes[lane.name])
+    panel.show_saved_generation(_lane_video(db, lane), [])
+    _press(panel, lane.send_caption)
 
     # The same inbox Evolver watches, under the name that says where the result
     # belongs — the destination is the whole of what makes a lane a lane.
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
                                    funscript=None)
     assert panel._displayed_row[lane.flag]
-    assert button.text() == f"Delete from {lane.name}"
+    assert _lane_offers(panel) == [f"Delete from {lane.name}"]
 
 
 @pytest.mark.parametrize(("lane", "brings_its_funscript"),
@@ -2589,8 +2622,8 @@ def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alo
     export = MagicMock(return_value=EVOLVER_INBOX_DIR / lane.source / "vid1.mp4")
     monkeypatch.setattr(evolver_export, "export_video", export)
 
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-    panel._on_send(panel._lanes[lane.name])
+    panel.show_saved_generation(_lane_video(db, lane), [])
+    _press(panel, lane.send_caption)
 
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
                                    funscript=funscript if brings_its_funscript else None)
@@ -2612,8 +2645,8 @@ def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
     clip.write_bytes(b"pixels")
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
 
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-    panel._on_send(panel._lanes[lane.name])
+    panel.show_saved_generation(_lane_video(db, lane), [])
+    _press(panel, lane.send_caption)
 
     assert (inbox / lane.source / "vid1.mp4").read_bytes() == b"pixels"
 
@@ -2635,7 +2668,7 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
     panel._preview.show_media = MagicMock()
 
     panel.show_saved_generation(_video_row(db, "vid1"), [])
-    panel._on_send(panel._lanes[export_lane_module.EVOLVER.name])
+    _press(panel, export_lane_module.EVOLVER.send_caption)
 
     lane = inbox / export_lane_module.EVOLVER.source
     assert sorted(path.name for path in lane.iterdir()) == ["vid1.funscript", "vid1.mp4"]
@@ -2646,7 +2679,7 @@ def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane
     # Re-checked against the persisted flag rather than the button's disabled
     # state, so a stale press cannot repeat the handoff.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     lane.mark(db, "vid1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
@@ -2654,8 +2687,8 @@ def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane
     monkeypatch.setattr(evolver_export, "export_video", export)
 
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert panel._lanes[lane.name].button.text() == f"Delete from {lane.name}"
-    panel._on_send(panel._lanes[lane.name])
+    assert _lane_offers(panel) == [f"Delete from {lane.name}"]
+    panel._on_send(lane)
 
     export.assert_not_called()
 
@@ -2668,17 +2701,17 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
     # is what survives a restart. Where the two disagree the column wins, or a
     # stale press repeats a handoff another app has already been given.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     export = MagicMock()
     monkeypatch.setattr(evolver_export, "export_video", export)
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert panel._lanes[lane.name].button.isEnabled()   # drawn before the send
+    assert _lane_offers(panel) == [lane.send_caption]   # drawn before the send
 
     lane.mark(db, "vid1")
     panel._displayed_row = db.get_generation("vid1")    # …and the row moved under it
-    panel._on_send(panel._lanes[lane.name])
+    panel._on_send(lane)
 
     export.assert_not_called()
 
@@ -2695,8 +2728,8 @@ def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lan
     warn = MagicMock()
     monkeypatch.setattr(gcp_module.QMessageBox, "warning", warn)
 
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-    panel._on_send(panel._lanes[lane.name])  # must not raise
+    panel.show_saved_generation(_lane_video(db, lane), [])
+    _press(panel, lane.send_caption)  # must not raise
 
     warn.assert_called_once()
     assert warn.call_args.args[1] == f"Send to {lane.name} failed"
@@ -2709,16 +2742,15 @@ def test_a_lane_offers_to_delete_the_copy_it_handed_over(saved_panel,
     # A send is a file copy into another app's folders, so the only way back is a
     # delete there -- and it has to stay offered, however long ago the send was.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     lane.mark(db, "vid1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
     panel.show_saved_generation(db.get_generation("vid1"), [])
 
-    button = panel._lanes[lane.name].button
-    assert button.text() == f"Delete from {lane.name}"
-    assert button.isEnabled()
+    assert _lane_offers(panel) == [f"Delete from {lane.name}"]
+    assert panel._lane_button.isEnabled()
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -2728,17 +2760,17 @@ def test_pressing_delete_takes_the_send_back_and_offers_it_again(saved_panel,
     # re-filed since, and only the app holding it can still find it. The stamp
     # is the whole of the ask, and the button returns to offering the send.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     lane.mark(db, "vid1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(db.get_generation("vid1"), [])
 
-    panel._lanes[lane.name].button.click()
+    _press(panel, lane.delete_caption)
 
     row = db.get_generation("vid1")
     assert row[lane.unsent_flag] and not row[lane.flag]
-    assert panel._lanes[lane.name].button.text() == f"Send to {lane.name}"
+    assert _lane_offers(panel) == [lane.send_caption]
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -2748,7 +2780,7 @@ def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
     # nothing else on the tab mentions the other app at all -- so the one place
     # left to say the deletion was taken down is the words under the cursor.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     lane.mark(db, "vid1")
     lane.unmark(db, "vid1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
@@ -2756,9 +2788,8 @@ def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
 
     panel.show_saved_generation(db.get_generation("vid1"), [])
 
-    button = panel._lanes[lane.name].button
-    assert button.text() == f"Send to {lane.name}"
-    assert button.toolTip() == lane.withdrawn_tooltip
+    assert _lane_offers(panel) == [lane.send_caption]
+    assert panel._lane_button.toolTip() == lane.withdrawn_tooltip
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -2768,15 +2799,15 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
     # after a withdrawal has to retract it -- otherwise the clip just handed over
     # is the one deleted.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     lane.mark(db, "vid1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     monkeypatch.setattr(evolver_export, "export_video", MagicMock())
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    panel._lanes[lane.name].button.click()   # take it back
+    _press(panel, lane.delete_caption)   # take it back
 
-    panel._lanes[lane.name].button.click()   # and send it again
+    _press(panel, lane.send_caption)     # and send it again
 
     row = db.get_generation("vid1")
     assert row[lane.flag] and not row[lane.unsent_flag]
@@ -2789,12 +2820,12 @@ def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
     # fresh as the last time the footer was drawn. Condemning a clip that was
     # never handed over would leave the row asking for a delete of nothing.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(db.get_generation("vid1"), [])
 
-    panel._on_unsend(panel._lanes[lane.name])
+    panel._on_unsend(lane)
 
     assert db.get_generation("vid1")[lane.unsent_flag] is None
 
@@ -2806,7 +2837,7 @@ def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
     # landing on this very clip. The press must do nothing at all: taking the
     # send back is the opposite of what the words under the cursor promised.
     panel, db = saved_panel
-    _video_row(db, "vid1")
+    _lane_video(db, lane)
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     export = MagicMock()
@@ -2815,7 +2846,7 @@ def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
     lane.mark(db, "vid1")
     panel._displayed_row = db.get_generation("vid1")
 
-    panel._lanes[lane.name].button.click()
+    _press(panel, lane.send_caption)
 
     export.assert_not_called()
     assert db.get_generation("vid1")[lane.unsent_flag] is None
@@ -2823,7 +2854,7 @@ def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
 
 def test_every_lane_is_told_apart_by_its_folder_its_column_and_its_stamp():
     # Held as an equality per field: two lanes sharing any of these four would
-    # be one lane wearing two buttons, and each is a name outside this repo —
+    # be one lane under two names, and each is a name outside this repo —
     # Evolver keys on the folder, and it reads all four columns off this app's
     # database.
     lanes = _lanes()

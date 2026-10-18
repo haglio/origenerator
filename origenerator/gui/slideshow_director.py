@@ -155,7 +155,6 @@ class SlideshowHost(Protocol):
 @dataclass(frozen=True)
 class HeldSlideshow:
     items: tuple
-    location: str | None
     side: str | None
     order_label: str
     image_dwell_ms: int
@@ -291,8 +290,8 @@ class SlideshowDirector:
     def start(self, *, side: str | None = None):
         """Open what's on screen — a folder, or the Latest/Favorites collection —
         as a fullscreen slideshow, shuffled and running at the app-wide pace,
-        and standing where the last slideshow was closed when that slide is in
-        here."""
+        and standing where the last slideshow was left when this comes back to
+        it."""
         location = self._host.slideshow_location()
         base, located_on = _split_collection_key(location)
         collection = folder_collection(base)
@@ -318,7 +317,7 @@ class SlideshowDirector:
         # the newest is what it is opened for.
         latest = collection is not None and collection.which == _RECENTS_KEY
         self.open(items, rows=rows, location=location, side=side,
-                  resume=None if latest else self._slideshow_state,
+                  resume=None if latest else self._place_coming_back_to(location, items),
                   filters=replace(self._filters, favorites=True) if favorites else None,
                   **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
@@ -845,7 +844,7 @@ class SlideshowDirector:
         # Where it had got to, so the next one opens back on that slide: the
         # look at the folder under a picture doesn't cost the place among them.
         if slideshow is not None:
-            self._slideshow_state = slideshow.state()
+            self._slideshow_state = self._where_it_stands(slideshow)
         self._live_slideshows = [entry for entry in self._live_slideshows
                             if entry[0] is not slideshow]
         side = self._side_of(slideshow) if slideshow is not None else None
@@ -860,9 +859,25 @@ class SlideshowDirector:
             self._region_slideshows[side] = None
             self._refill_region(side)
 
-    def remembered(self) -> dict:
+    def _where_it_stands(self, slideshow) -> SlideshowState:
+        return replace(slideshow.state(),
+                       location=next((where for live, where in self._live_slideshows
+                                      if live is slideshow), None))
+
+    def _place_left(self) -> SlideshowState:
         up = _still_up(self._slideshow)
-        state = up.state() if up is not None and not up.is_live() else self._slideshow_state
+        if up is not None and not up.is_live():
+            return self._where_it_stands(up)
+        return self._slideshow_state
+
+    def _place_coming_back_to(self, location, items) -> SlideshowState | None:
+        place = self._place_left()
+        if place.location == location or any(item[2] == place.current for item in items):
+            return place
+        return None
+
+    def remembered(self) -> dict:
+        state = self._place_left()
         panels = {}
         for side in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
             corner, minimized = self.hud_place(side)
@@ -896,17 +911,15 @@ class SlideshowDirector:
         if slideshow is None:
             return None
         return HeldSlideshow(items=tuple(slideshow.whole_set()),
-                        location=next((where for live, where in self._live_slideshows
-                                       if live is slideshow), None),
                         side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
-                        image_dwell_ms=slideshow.dwell_s * 1000, state=slideshow.state(),
-                        filters=slideshow.filters)
+                        image_dwell_ms=slideshow.dwell_s * 1000,
+                        state=self._where_it_stands(slideshow), filters=slideshow.filters)
 
     def put_back(self, held: HeldSlideshow):
         ids = (item.prompt_id for item in held.items if item.prompt_id is not None)
         return self.open(list(held.items),
                          rows=[row for row in map(self._host.row_for, ids) if row is not None],
-                         location=held.location, side=held.side, resume=held.state,
+                         location=held.state.location, side=held.side, resume=held.state,
                          filters=held.filters,
                          image_dwell_ms=held.image_dwell_ms,
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,

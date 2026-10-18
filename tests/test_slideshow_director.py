@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -111,7 +112,7 @@ class FakeSlideshow:
         self.hud_panel = None
         self.released = []
         self.pause_raises = False
-        self.state_at_close = "where-it-got-to"
+        self.state_at_close = SlideshowState()
         self.played = []
         self.leads = 0
         self.follows = 0
@@ -641,7 +642,7 @@ def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_a
 
     carried = director.region_slideshow(PORTRAIT)
     assert [slide[2] for slide in carried.items] == ["g1", "g2"]
-    assert carried.resumed == watched.state_at_close
+    assert carried.resumed == replace(watched.state_at_close, location="collection/a")
     assert carried.taken_up == (SlideshowFilters(favorites=True), False)
     assert carried.opened_with["image_dwell_ms"] == 6000
     assert [slide[2] for slide in director.region_slideshow(LANDSCAPE).items] == ["g5"]
@@ -1505,11 +1506,12 @@ def test_what_is_on_screen_opens_where_the_last_slideshow_left_off(slideshows):
     host = FakeHost(location="workflow/a", rows=[_row("g1")])
     director, _host, made = slideshows(host)
     director.open([("a.png", "image", "g1", None)])
+    made[0].state_at_close = SlideshowState(order=("g1",), current="g1")
     made[0].close()
 
     director.start()
 
-    assert made[1].resumed == "where-it-got-to"
+    assert made[1].resumed == SlideshowState(order=("g1",), current="g1")
 
 
 def test_nothing_to_play_opens_no_slideshow_at_all(slideshows):
@@ -1906,7 +1908,7 @@ def test_the_next_launch_picks_up_the_slideshow_the_last_one_left(slideshows):
     relaunched.remember(json.loads(json.dumps(director.remembered())))
     relaunched.start()
 
-    assert made[-1].resumed == left
+    assert made[-1].resumed == replace(left, location="workflow/a")
     assert made[-1].taken_up == (SlideshowFilters(enhanced=True), False)
 
 

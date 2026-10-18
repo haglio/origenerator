@@ -1,7 +1,7 @@
 """The lanes a finished clip is handed down to a sibling app.
 
-One :class:`ExportLane` per lane, and :data:`EXPORT_LANES` is all of them, in
-the order their buttons sit in the config tab's bank.
+One :class:`ExportLane` per lane, :data:`EXPORT_LANES` is all of them, and
+:func:`lane_for` is the one lane the config tab offers a video.
 """
 
 from __future__ import annotations
@@ -10,12 +10,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from PyQt6.QtWidgets import QPushButton
-
 from origenerator.config import EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.funscript import funscript_of
 from origenerator.gallery_contract import LANES
+from origenerator.recipe_match import loops
 
 
 @dataclass(frozen=True)
@@ -54,10 +53,7 @@ class ExportLane:
     delete_tooltip: str
     withdrawn_tooltip: str
     hands_over_funscript: bool
-    # The button this lane wears, filled in per panel when the bank is built
-    # (see :meth:`GenerateConfigPanel._build_ui`). ``None`` on the table's own
-    # rows, which describe the lanes rather than any one panel's buttons.
-    button: QPushButton | None = None
+    carries_loops: bool
 
     @property
     def flag(self) -> str:
@@ -108,6 +104,7 @@ EVOLVER = ExportLane(
     withdrawn_tooltip="An earlier copy of this video is down for deletion in "
                       "Evolver. Sending puts a fresh one in its inbox.",
     hands_over_funscript=True,
+    carries_loops=False,
 )
 
 GENAU = ExportLane(
@@ -122,8 +119,14 @@ GENAU = ExportLane(
     withdrawn_tooltip="An earlier copy of this clip is down for deletion in "
                       "Genau's folder. Sending starts a fresh one down the lane.",
     hands_over_funscript=False,
+    carries_loops=True,
 )
 
-# In the order they sit in the button bank. Named above as well, because a
-# spoken animation hands its clip down this lane with no button to read it off.
 EXPORT_LANES = (EVOLVER, GENAU)
+
+
+def lane_for(row: dict) -> ExportLane:
+    own = next(lane for lane in EXPORT_LANES if lane.carries_loops == loops(row))
+    holding_a_stray_copy = (lane for lane in EXPORT_LANES
+                            if lane is not own and row.get(lane.flag))
+    return next(holding_a_stray_copy, own)

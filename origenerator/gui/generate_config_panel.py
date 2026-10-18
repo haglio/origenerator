@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import contextmanager
-from dataclasses import replace
 from pathlib import Path
 
 from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
@@ -55,7 +54,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
-from origenerator.gui.export_lane import EXPORT_LANES
+from origenerator.gui.export_lane import lane_for
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
@@ -480,7 +479,7 @@ class GenerateConfigPanel(QWidget):
     def _build_button_bank(self) -> FlowLayout:
         """One bank, fixed over the scroll so Generate is always reachable.
 
-        An export lane's button shows only for a video on display, and the discard
+        The lane button shows only for a video on display, and the discard
         button only while a run this tab launched is in flight — "Cancel", or "Next
         seed" while that folder is auto-generating. A flow rather than a row: it
         wraps onto a second line when the pane is too narrow, instead of squeezing
@@ -488,16 +487,11 @@ class GenerateConfigPanel(QWidget):
         """
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
-        # One button per lane, in the order EXPORT_LANES lists them: a third lane
-        # is a row of that table and appears here without another line of this.
-        self._lanes = {lane.name: replace(lane, button=QPushButton(lane.send_caption))
-                       for lane in EXPORT_LANES}
-        for lane in self._lanes.values():
-            lane.button.setToolTip(lane.tooltip)
-            lane.button.clicked.connect(
-                lambda _checked=False, lane=lane: self._on_lane_pressed(lane))
-            lane.button.hide()  # shown only for a video the tab is displaying
-            btn_row.addWidget(lane.button)
+        self._lane_button = QPushButton()
+        self._lane_button.clicked.connect(self._on_lane_pressed)
+        self._lane_button.hide()
+        btn_row.addWidget(self._lane_button)
+        self._offered_lane = None
         self._cancel_btn = QPushButton(discard_run_text(False))
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
@@ -1485,14 +1479,14 @@ class GenerateConfigPanel(QWidget):
         self._related.clear()
         self._versions.hide()
         self._pending_enhancement = None  # nothing on display to be enhancing
-        for lane in self._lanes.values():
-            lane.button.hide()
+        self._lane_button.hide()
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
         """Reveal the info and actions for the generation on display: the
-        read-only metadata block for every selection, the source tile + Evolver for
-        a video, and the animations strip for an image. ``preview`` is the resolved
-        ``(path, media_type)`` (or ``None``), so Evolver keys off the same lookup.
+        read-only metadata block for every selection, the source tile + the lane
+        button for a video, and the animations strip for an image. ``preview`` is the
+        resolved ``(path, media_type)`` (or ``None``), so the lane button keys off the
+        same lookup.
 
         ``request`` is the spoken request that made this row, when one did.
         """
@@ -1506,8 +1500,7 @@ class GenerateConfigPanel(QWidget):
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()
         self._show_request_diff(request)
-        for lane in self._lanes.values():
-            self._update_export_button(lane, preview)
+        self._update_lane_button(preview)
 
     def displayed_row(self) -> dict | None:
         """The saved generation this tab is showing, or ``None``.
@@ -1706,8 +1699,8 @@ class GenerateConfigPanel(QWidget):
 
     # --- the export lanes: hand a displayed clip to a sibling app -----------
 
-    def _update_export_button(self, lane, preview):
-        """Reflect the displayed generation on *lane*'s button.
+    def _update_lane_button(self, preview):
+        """Offer the displayed generation to the one app :func:`lane_for` picks.
 
         Shown only for a video with a file on disk — every lane carries clips,
         and Evolver is a video pipeline — so an image or a missing file hides it.
@@ -1716,13 +1709,14 @@ class GenerateConfigPanel(QWidget):
         ``preview`` is the resolved ``(path, media_type)``, or ``None``.
         """
         is_video = preview is not None and preview[1] == MediaType.VIDEO
-        lane.button.setVisible(is_video)
+        self._lane_button.setVisible(is_video)
         if not is_video:
             return
         row = self._displayed_row or {}
+        lane = self._offered_lane = lane_for(row)
         already_sent = bool(row.get(lane.flag))
-        lane.button.setText(lane.delete_caption if already_sent else lane.send_caption)
-        lane.button.setToolTip(self._lane_tooltip(lane, row))
+        self._lane_button.setText(lane.delete_caption if already_sent else lane.send_caption)
+        self._lane_button.setToolTip(self._lane_tooltip(lane, row))
 
     @staticmethod
     def _lane_tooltip(lane, row: dict) -> str:
@@ -1736,8 +1730,8 @@ class GenerateConfigPanel(QWidget):
             return lane.delete_tooltip
         return lane.withdrawn_tooltip if row.get(lane.unsent_flag) else lane.tooltip
 
-    def _on_lane_pressed(self, lane):
-        """Do what *lane*'s button says: send the clip, or delete it over there.
+    def _on_lane_pressed(self):
+        """Do what the lane button says: send the clip, or delete it over there.
 
         Which of the two is read off the caption under the cursor rather than off
         the row, so a press does what it promised. Where the row has moved on
@@ -1745,7 +1739,8 @@ class GenerateConfigPanel(QWidget):
         half re-checks and does nothing, rather than the opposite of what the
         words said.
         """
-        if lane.button.text() == lane.delete_caption:
+        lane = self._offered_lane
+        if self._lane_button.text() == lane.delete_caption:
             self._on_unsend(lane)
         else:
             self._on_send(lane)
@@ -1771,7 +1766,7 @@ class GenerateConfigPanel(QWidget):
             QMessageBox.warning(self._preview, lane.failure_title,
                                 lane.failure_body(e))
             return
-        self._redraw_lane(lane)
+        self._redraw_lane_button()
 
     def _on_unsend(self, lane):
         """Take the send back: the app it went to deletes every copy it holds.
@@ -1785,18 +1780,18 @@ class GenerateConfigPanel(QWidget):
         if not self._displayed_row or not self._displayed_row.get(lane.flag):
             return
         lane.unmark(self._db, self._displayed_row["prompt_id"])
-        self._redraw_lane(lane)
+        self._redraw_lane_button()
 
-    def _redraw_lane(self, lane):
+    def _redraw_lane_button(self):
         prompt_id = self._displayed_row["prompt_id"]
         self._set_displayed_row(self._db.get_generation(prompt_id) or self._displayed_row)
         path = self._displayed_video_path()
-        self._update_export_button(lane, None if path is None else (path, MediaType.VIDEO))
+        self._update_lane_button(None if path is None else (path, MediaType.VIDEO))
 
     def _displayed_video_path(self) -> Path | None:
         """The on-disk video file backing the displayed generation, or ``None``
         when it isn't a video (or its file is missing). Resolved fresh, so a file
-        deleted since selection is caught. Shared by Send-to-Evolver and OSR2 drive.
+        deleted since selection is caught. Shared by the lane button and OSR2 drive.
 
         ``_displayed_row`` is whatever the preview is showing — a browsed selection
         or this tab's idle autoshow — so a scripted video on screen arms the drive

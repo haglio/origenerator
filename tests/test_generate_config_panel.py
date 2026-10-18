@@ -1474,18 +1474,15 @@ def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkey
     panel._preview.show_media.assert_called_once_with(upscale, "video", "vid1")
 
 
-def test_an_upscaled_videos_trash_cans_are_grayed_saying_why(saved_panel, monkeypatch,
-                                                            tmp_path):
+def test_an_upscaled_videos_versions_have_no_trash_can(saved_panel, monkeypatch, tmp_path):
     panel, db = saved_panel
     video, _upscale = _evolver_upscaled_video(db, monkeypatch, tmp_path)
 
     panel.show_saved_generation(video, [])
 
-    trash_cans = [row.findChild(QPushButton, "deleteButton") for row in _level_rows(panel)]
-    assert len(trash_cans) == 2
-    assert not any(trash.isEnabled() for trash in trash_cans)
-    assert {trash.toolTip() for trash in trash_cans} == {
-        "Delete (a video's versions can't be deleted here)"}
+    rows = _level_rows(panel)
+    assert len(rows) == 2
+    assert [row.findChild(QPushButton, "deleteButton") for row in rows] == [None, None]
 
 
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
@@ -1816,7 +1813,7 @@ def test_a_picture_the_tab_puts_up_itself_carries_its_own_file_row(
     (row,) = _level_rows(panel)
     assert "image/sdxl_g1.png" in _row_texts(row)
     names = [b.objectName() for b in row.findChildren(QPushButton)]
-    assert names == ["copyButton", "deleteButton", "revealButton"]
+    assert names == ["copyButton", "revealButton"]
 
 
 def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, monkeypatch):

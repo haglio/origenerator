@@ -1169,26 +1169,39 @@ def test_a_versions_trash_can_is_the_button_banks_red_can_at_the_copys_size(qtbo
     assert trash.iconSize() == copy.iconSize()
 
 
-def test_a_versions_trash_can_grays_out_on_the_images_only_version(qtbot):
+def test_a_version_without_a_trash_can_keeps_the_gap_after_its_copy_button(qtbot):
+    gaps = []
+    for levels in (_levels(1), _levels(1)[:1]):
+        versions = EnhanceVersions()
+        qtbot.addWidget(versions)
+        versions.show_levels(_items(levels))
+        versions.resize(600, 400)
+        versions.show()
+        qtbot.waitExposed(versions)
+        row = _rows(versions)[0]
+        copy = row.findChild(QPushButton, "copyButton").geometry()
+        following = _trash(row) or row.findChild(QPushButton, "revealButton")
+        gaps.append(following.geometry().left() - copy.right())
+
+    assert gaps[0] == gaps[1]
+
+
+def test_an_images_only_version_has_no_trash_can(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items([
         EnhanceLevel(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
     ]))
-    trash = _trash(_rows(versions)[0])
 
-    assert not trash.isEnabled()
-    assert trash.toolTip() == "Delete (this is the image's only version)"
+    assert _trash(_rows(versions)[0]) is None
 
 
-def test_a_videos_trash_cans_gray_out_saying_why(qtbot):
+def test_a_videos_versions_have_no_trash_can(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), deletable=False)
 
-    for row in _rows(versions):
-        assert not _trash(row).isEnabled()
-        assert _trash(row).toolTip() == "Delete (a video's versions can't be deleted here)"
+    assert [_trash(row) for row in _rows(versions)] == [None, None]
 
 
 def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):

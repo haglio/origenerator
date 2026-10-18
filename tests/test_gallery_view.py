@@ -8128,12 +8128,13 @@ def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, picture):
     return view, slideshow
 
 
-def _looping_actions_on_a_video(qtbot, monkeypatch):
+def _looping_actions_on_a_video(qtbot, monkeypatch, *, elsewhere=()):
     """A folder of two pictures, the first animated twice, looping that picture's
     actions from the panel's loop button and standing on the first video."""
     view, slideshow = _slideshow_of_the_folder_of(
         qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
-                             _animated_from("v1", "p1", 1), _animated_from("v2", "p1", 2)],
+                             _animated_from("v1", "p1", 1), _animated_from("v2", "p1", 2),
+                             *elsewhere],
         "p1")
     slideshow.press(f"{slideshow.hud_side}_action_loop")
     slideshow.press(f"{slideshow.hud_side}_next")
@@ -8153,21 +8154,32 @@ def _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch):
     return view, slideshow
 
 
-def _with_the_slideshow_button(view):
+def _closed_then_the_slideshow_button(view, slideshow):
+    _press_escape(view)
     view._bank.slideshow.click()
 
 
-def _with_esc_again(view):
+def _closed_then_esc_again(view, slideshow):
+    _press_escape(view)
     _press_escape(view)
 
 
-_REOPENINGS = pytest.mark.parametrize(
-    "reopen", [_with_the_slideshow_button, _with_esc_again], ids=["slideshow_button", "esc_again"])
+def _minimized_then_the_slideshow_button(view, slideshow):
+    slideshow.press(f"{slideshow.hud_side}_minimize")
+    view._bank.slideshow.click()
 
 
-@_REOPENINGS
-def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
-        qtbot, monkeypatch, reopen):
+_LEFT_AND_COME_BACK_TO = pytest.mark.parametrize(
+    "come_back",
+    [_closed_then_the_slideshow_button, _closed_then_esc_again,
+     _minimized_then_the_slideshow_button],
+    ids=["closed_then_slideshow_button", "closed_then_esc_again",
+         "minimized_then_slideshow_button"])
+
+
+@_LEFT_AND_COME_BACK_TO
+def test_a_slideshow_left_looping_actions_comes_back_looping_them_where_it_stood(
+        qtbot, monkeypatch, come_back):
     # The Nav Map is part of where a slideshow was left: closed looping a picture's
     # actions, the next one loops them again, standing where the last stood --
     # which in an action loop is one of the picture's videos as often as not.
@@ -8175,8 +8187,7 @@ def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
     looping, standing_on = slideshow.hud_map(), slideshow._playlist.current()
     assert (looping.loop, standing_on.prompt_id) == ("action", "v1")
 
-    _press_escape(view)
-    reopen(view)
+    come_back(view, slideshow)
 
     reopened = view._slideshows.showing
     qtbot.addWidget(reopened)
@@ -8185,20 +8196,36 @@ def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
     reopened.close()
 
 
-@_REOPENINGS
-def test_a_row_more_seeds_widened_reopens_widened_where_it_stood(qtbot, monkeypatch, reopen):
+@_LEFT_AND_COME_BACK_TO
+def test_a_row_more_seeds_widened_comes_back_widened_where_it_stood(
+        qtbot, monkeypatch, come_back):
     view, slideshow = _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch)
     widened, standing_on = slideshow.hud_map(), slideshow._playlist.current()
     assert ([seed.prompt_id for seed in widened.seeds], standing_on.prompt_id) == (
         ["p2", "p3"], "p3")
 
-    _press_escape(view)
-    reopen(view)
+    come_back(view, slideshow)
 
     reopened = view._slideshows.showing
     qtbot.addWidget(reopened)
     assert reopened.hud_map() == widened
     assert reopened._playlist.current() == standing_on
+    reopened.close()
+
+
+def test_the_slideshow_button_on_another_folder_plays_that_folder_not_the_loop_left(
+        qtbot, monkeypatch):
+    view, slideshow = _looping_actions_on_a_video(
+        qtbot, monkeypatch, elsewhere=[_image("q1", "a dog", 50, 3)])
+
+    _press_escape(view)
+    view._tree.setCurrentItem(view._leaf_by_id["q1"])
+    view._bank.slideshow.click()
+
+    reopened = view._slideshows.showing
+    qtbot.addWidget(reopened)
+    assert reopened._playlist.current().prompt_id == "q1"
+    assert reopened.hud_map().loop == ""
     reopened.close()
 
 

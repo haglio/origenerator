@@ -251,14 +251,17 @@ class FakeVoiceSteering(QObject):
         return self._dictation.push(text) if self._dictation is not None else None
 
 
+def keep_the_microphone_shut(setattr) -> None:
+    """Point every voice router's steering at the inert stand-in above."""
+    setattr(voice_router, "VoiceSteering", FakeVoiceSteering)
+
+
 @pytest.fixture(autouse=True)
 def _no_real_mic(monkeypatch):
-    """Point every voice router's steering at the inert stand-in above."""
-    monkeypatch.setattr(voice_router, "VoiceSteering", FakeVoiceSteering)
+    keep_the_microphone_shut(monkeypatch.setattr)
 
 
-@pytest.fixture(autouse=True, scope="session")
-def _never_reach_the_comfyui_on_this_machine():
+def refuse_the_comfyui_on_this_machine(setattr) -> None:
     """Refuse every call to the real ComfyUI address, as a machine without one would.
 
     Whatever reaches the ComfyUI running here is rendered into the folder the
@@ -274,13 +277,17 @@ def _never_reach_the_comfyui_on_this_machine():
                 errno.ECONNREFUSED, "the suite never reaches the ComfyUI on this machine"))
         return real_urlopen(url, *args, **kwargs)
 
+    setattr(urllib.request, "urlopen", urlopen)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _never_reach_the_comfyui_on_this_machine():
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(urllib.request, "urlopen", urlopen)
+        refuse_the_comfyui_on_this_machine(patch.setattr)
         yield
 
 
-@pytest.fixture(autouse=True)
-def _never_take_the_real_device(monkeypatch):
+def keep_off_the_device(setattr) -> None:
     """Keep the suite off the OSR2.
 
     A test that builds a gallery gets real drive controllers, and the one OSR2
@@ -301,23 +308,26 @@ def _never_take_the_real_device(monkeypatch):
         def start(self): pass
         def stop(self): pass
 
-    monkeypatch.setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
-    monkeypatch.setattr(osr2_motion_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
-    monkeypatch.setattr(osr2_motion_driver, "_TickThread", _NoTicker)
+    setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
+    setattr(osr2_motion_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
+    setattr(osr2_motion_driver, "_TickThread", _NoTicker)
     # And off the broker's serial stamps, which the console reads to say whether
     # the device is answering: those are live files whose freshness depends on
     # whether the OSR2 happens to be switched on right now, so a suite reading
     # them would pass or fail with the hardware. The stand-in says it is there —
     # the console's own state before it could tell — and the tests about the
     # device being off inject their own.
-    monkeypatch.setattr(motion_panel.osr2, "device_mode",
-                        lambda **_kw: motion_panel.osr2.osr2_device.Osr2Mode.CONTROLLED)
+    setattr(motion_panel.osr2, "device_mode",
+            lambda **_kw: motion_panel.osr2.osr2_device.Osr2Mode.CONTROLLED)
 
 
 @pytest.fixture(autouse=True)
-def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
-    """Keep the suite out of the registry, out of the real AppData, and off the
-    user's screen.
+def _never_take_the_real_device(monkeypatch):
+    keep_off_the_device(monkeypatch.setattr)
+
+
+def keep_out_of_windows(setattr) -> None:
+    """Keep the suite out of the registry and off the user's screen.
 
     Every window this suite builds builds the desktop notices with it, and those
     name the app to Windows: two values under HKEY_CURRENT_USER — what to call
@@ -325,29 +335,35 @@ def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
     written beside them, all of which belong to a real launch rather than to a
     test's fiftieth throwaway window. And a notice raised here would be a
     notification on the user's desktop and a line in their notification center,
-    from a run that never happened. All three are replaced and the marks are
-    pointed at a directory of the run's own; the test that covers any of them
-    supplies its own stand-in over these.
+    from a run that never happened. All three are replaced; the test that
+    covers any of them supplies its own stand-in over these.
     """
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
-    monkeypatch.setattr(windows_api, "dress_window", lambda *_a, **_kw: None)
-    monkeypatch.setattr(desktop_notices, "register_notification_identity",
-                        lambda *_a, **_kw: None)
-    monkeypatch.setattr(desktop_notices, "register_link_handler",
-                        lambda *_a, **_kw: None)
-    monkeypatch.setattr(notice_toast, "show", lambda *_a, **_kw: None)
-    monkeypatch.setattr(notice_toast, "take_back", lambda *_a, **_kw: None)
+    setattr(windows_api, "dress_window", lambda *_a, **_kw: None)
+    setattr(desktop_notices, "register_notification_identity", lambda *_a, **_kw: None)
+    setattr(desktop_notices, "register_link_handler", lambda *_a, **_kw: None)
+    setattr(notice_toast, "show", lambda *_a, **_kw: None)
+    setattr(notice_toast, "take_back", lambda *_a, **_kw: None)
 
 
 @pytest.fixture(autouse=True)
-def alert_sounds(monkeypatch):
+def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
+    """keep_out_of_windows, with the notices' marks in an AppData of the run's own."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
+    keep_out_of_windows(monkeypatch.setattr)
+
+
+def keep_silent(setattr) -> list:
     sounded = []
-    monkeypatch.setattr(winsound, "MessageBeep", sounded.append)
+    setattr(winsound, "MessageBeep", sounded.append)
     return sounded
 
 
 @pytest.fixture(autouse=True)
-def _no_dialog_nobody_can_answer(monkeypatch):
+def alert_sounds(monkeypatch):
+    return keep_silent(monkeypatch.setattr)
+
+
+def refuse_the_dialogs_nobody_can_answer(setattr) -> None:
     """Fail on a modal the test never arranged to answer, rather than hang on it.
 
     A message dialog or input dialog raised in an offscreen run has nobody to click
@@ -368,9 +384,14 @@ def _no_dialog_nobody_can_answer(monkeypatch):
         return staticmethod(blocked)
 
     for name in ("question", "warning", "information", "critical", "about"):
-        monkeypatch.setattr(QMessageBox, name, refuse(f"QMessageBox.{name}"))
+        setattr(QMessageBox, name, refuse(f"QMessageBox.{name}"))
     for name in ("getText", "getInt", "getDouble", "getItem", "getMultiLineText"):
-        monkeypatch.setattr(QInputDialog, name, refuse(f"QInputDialog.{name}"))
+        setattr(QInputDialog, name, refuse(f"QInputDialog.{name}"))
+
+
+@pytest.fixture(autouse=True)
+def _no_dialog_nobody_can_answer(monkeypatch):
+    refuse_the_dialogs_nobody_can_answer(monkeypatch.setattr)
 
 
 def pytest_collection_finish(session):

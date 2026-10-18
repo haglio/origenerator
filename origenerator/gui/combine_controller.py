@@ -199,16 +199,18 @@ class CombineController(QObject):
 
     def selection(self) -> dict:
         """Everything the combine panel is holding, for session save: the
-        picture, the video each lane last had dropped, the lane and the act.
+        picture, the videos each lane last had, the lane and the act.
 
         All four, because all four are choices the user made and none is
         recoverable from the others — an act says nothing about which lane
         answers it, and a restart that put the picture back and forgot it was for
         a Genau flick would answer the next Generate out of the wrong recipes.
         """
+        recent = self.panel.recent_videos()
         return {
             "image": self.panel.image_slot.current_id(),
-            "videos": self.panel.dropped_videos(),
+            "videos": {lane: videos[0] for lane, videos in recent.items() if videos},
+            "recent_videos": recent,
             "intent": self.panel.selected_intent(),
             "category": self.panel.selected_category(),
         }
@@ -235,9 +237,18 @@ class CombineController(QObject):
         videos = saved.get("videos")
         if not isinstance(videos, dict):
             videos = {self.panel.selected_intent(): saved.get("video")}
-        self.panel.set_dropped_videos({lane: video for lane, video in videos.items()
-                                       if video and self._accepts_video(video)})
+        recent = saved.get("recent_videos")
+        if not isinstance(recent, dict):
+            recent = {}
+        newest_first = {lane: [videos.get(lane), *recent.get(lane, ())]
+                        for lane in {*videos, *recent}}
+        fitting = {lane: self._fitting_videos(held) for lane, held in newest_first.items()}
+        self.panel.set_recent_videos({lane: held for lane, held in fitting.items() if held})
         self.panel.set_category(saved.get("category") or "")
+
+    def _fitting_videos(self, videos) -> list[str]:
+        return [video for video in dict.fromkeys(videos)
+                if video and self._accepts_video(video)]
 
     def drag_started(self, prompt_id: str) -> None:
         """A generation began dragging — from a browser thumbnail or a generate tab's

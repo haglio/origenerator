@@ -12322,6 +12322,7 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": "img", "videos": {recipe_match.VIDEO: "vid"},
+        "recent_videos": {recipe_match.VIDEO: ["vid"]},
         "intent": recipe_match.VIDEO, "category": "",
     }
 
@@ -12335,7 +12336,7 @@ def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
     _pick_act(view._combine.panel, "beta")
 
     assert view.combine_selection() == {
-        "image": "img", "videos": {},
+        "image": "img", "videos": {}, "recent_videos": {},
         "intent": recipe_match.GENAU, "category": "beta",
     }
 
@@ -12428,7 +12429,7 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
     view.restore_combine_selection(["only-one"])  # malformed
 
     assert view.combine_selection() == {
-        "image": None, "videos": {},
+        "image": None, "videos": {}, "recent_videos": {},
         "intent": recipe_match.VIDEO, "category": "",
     }
 

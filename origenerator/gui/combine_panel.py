@@ -42,6 +42,7 @@ from origenerator.content import genau_flick_word
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.picture_state_picker import ACTION_LABEL
+from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.media import MediaType
 from origenerator.recipe_match import GENAU, VIDEO
 
@@ -51,6 +52,7 @@ _DROP_PLACEHOLDER = "Drop a video"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
 _NEEDS_RECIPE = "Pick an act or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
+_RECENT_VIDEOS = 12
 
 
 def _text_inset(combo: QComboBox) -> int:
@@ -62,6 +64,12 @@ def _text_inset(combo: QComboBox) -> int:
         QStyle.ComplexControl.CC_ComboBox, opt,
         QStyle.SubControl.SC_ComboBoxEditField, combo)
     return field.x() + 1  # the style insets the text a pixel before drawing it
+
+
+def _keep_its_room_when_hidden(widget: QWidget) -> None:
+    room = widget.sizePolicy()
+    room.setRetainSizeWhenHidden(True)
+    widget.setSizePolicy(room)
 
 
 @dataclass(frozen=True)
@@ -93,20 +101,22 @@ class CombinePanel(QWidget):
         parent=None,
     ):
         super().__init__(parent)
+        self._preview = preview
         self.image_slot = DropSlot(MediaType.IMAGE, image_accepts, preview, "Drop an image")
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
         # the image, which is the one thing it is not.
         self.video_slot = DropSlot(MediaType.VIDEO, video_accepts, preview, _DROP_PLACEHOLDER,
                                    grayscale=True)
-        room = self.video_slot.sizePolicy()
-        room.setRetainSizeWhenHidden(True)
-        self.video_slot.setSizePolicy(room)
+        _keep_its_room_when_hidden(self.video_slot)
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._on_video_changed)
         self.image_slot.activated.connect(self.item_activated)
         self.video_slot.activated.connect(self.item_activated)
-        self._dropped: dict[str, str] = {}
+        self._recent: dict[str, list[str]] = {}
+        self._recent_videos = RecentVideos(self._recent_rows)
+        self._recent_videos.picked.connect(self.video_slot.set_item)
+        _keep_its_room_when_hidden(self._recent_videos)
 
         # The video part's fast path: pick an act and the view finds a fitting past
         # video for you. A neutral "(custom)" leads the list (index 0, the default) so
@@ -140,7 +150,13 @@ class CombinePanel(QWidget):
         video_row.setContentsMargins(0, 0, 0, 0)
         video_row.setSpacing(BUTTON_GAP)  # the family's gap inside a group
         video_row.addWidget(self._action_part, 1)  # each takes half the part's width
-        video_row.addWidget(self.video_slot, 1)
+        slot_part = QWidget()
+        slot_column = QVBoxLayout(slot_part)
+        slot_column.setContentsMargins(0, 0, 0, 0)
+        slot_column.setSpacing(BUTTON_GAP)
+        slot_column.addWidget(self.video_slot)
+        slot_column.addWidget(self._recent_videos)
+        video_row.addWidget(slot_part, 1)
 
         # What the result is for. Kino is the default because it is the long-
         # standing behavior of this panel and by far the more common ask; Genau is
@@ -228,7 +244,8 @@ class CombinePanel(QWidget):
         if checked:
             self._list_the_acts(self.selected_intent())
             if not self.selected_category():
-                self._show_dropped()
+                self._show_the_lanes_last_video()
+            self._recent_videos.refresh()
             self.intent_changed.emit(self.selected_intent())
 
     # --- category ---------------------------------------------------------
@@ -299,35 +316,47 @@ class CombinePanel(QWidget):
         lane last had dropped in it."""
         custom = not self.selected_category()
         if custom:
-            self._show_dropped()
+            self._show_the_lanes_last_video()
         else:
             self.video_slot.clear()
         self.video_slot.setVisible(custom)
+        self._recent_videos.setVisible(custom)
         self._sync()
 
     def _on_video_changed(self):
         """A dropped video supersedes a picked act: wipe the dropdown back to "(custom)"."""
-        if self.video_slot.current_id():
-            self._dropped[self.selected_intent()] = self.video_slot.current_id()
+        video = self.video_slot.current_id()
+        if video:
+            lane = self.selected_intent()
+            self._recent[lane] = [video, *(held for held in self._recent.get(lane, ())
+                                           if held != video)][:_RECENT_VIDEOS]
+            self._recent_videos.refresh()
             self._category.setCurrentIndex(0)
         self._sync()
 
-    def _show_dropped(self):
-        lane = self.selected_intent()
-        video = self._dropped.get(lane)
-        if video and self.video_slot.accepts(video):
-            self.video_slot.set_item(video)
+    def _fitting_recent_videos(self) -> list[str]:
+        return [video for video in self._recent.get(self.selected_intent(), ())
+                if self.video_slot.accepts(video)]
+
+    def _recent_rows(self) -> list[RecentVideo]:
+        return [RecentVideo(video, self._preview(video)[0])
+                for video in self._fitting_recent_videos()]
+
+    def _show_the_lanes_last_video(self):
+        fitting = self._fitting_recent_videos()
+        if fitting:
+            self.video_slot.set_item(fitting[0])
         else:
-            self._dropped.pop(lane, None)
             self.video_slot.clear()
 
-    def dropped_videos(self) -> dict[str, str]:
-        return dict(self._dropped)
+    def recent_videos(self) -> dict[str, list[str]]:
+        return {lane: list(videos) for lane, videos in self._recent.items()}
 
-    def set_dropped_videos(self, videos: dict[str, str]):
-        self._dropped = dict(videos)
+    def set_recent_videos(self, videos: dict[str, list[str]]):
+        self._recent = {lane: list(held)[:_RECENT_VIDEOS] for lane, held in videos.items()}
         if not self.selected_category():
-            self._show_dropped()
+            self._show_the_lanes_last_video()
+        self._recent_videos.refresh()
 
     def _sync(self):
         has_image = bool(self.image_slot.current_id())

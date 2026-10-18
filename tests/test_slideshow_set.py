@@ -706,6 +706,19 @@ def test_a_generation_landing_in_a_row_that_is_looping_joins_the_loop():
     assert (shown.loop, shown.playing) == ("seed", ("seed", 1))
 
 
+# --- picking a closed slideshow back up -------------------------------------
+
+def test_a_loop_is_left_naming_what_it_plays_with_the_slide_it_began_on_first():
+    slideshow_set, _dealt = _mapped()
+    slideshow_set.start_loop("seed")
+    slideshow_set.playlist.advance()
+
+    left = slideshow_set.state(locked=False, level_index=0)
+
+    assert (left.loop, left.loop_pool) == ("seed", ("id-1", "id-1b", "id-1c"))
+    assert left.current == "id-1b"
+
+
 # --- the act filter: the map's row buttons, and the session's spoken acts ------
 
 _NAMED_FOR = {"id-1": "Source image, alpha", "id-2": "beta", "id-3": "alpha"}

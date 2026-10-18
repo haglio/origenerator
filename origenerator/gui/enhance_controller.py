@@ -53,6 +53,24 @@ def _folder_of(workflow, params: dict, image_index: dict) -> str:
     )
 
 
+def launch_enhancements(jobs, db, asks, image_index) -> list[tuple[dict, dict, str, str | None]]:
+    workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
+    by_folder: dict[str, list[tuple[dict, dict]]] = {}
+    for row, params in asks:
+        by_folder.setdefault(_folder_of(workflow, params, image_index), []).append((row, params))
+    launched = []
+    for key, entries in by_folder.items():
+        batch = [randomize_seeds(params, workflow.seed_keys()) for _row, params in entries]
+        for (row, params), prompt_id in zip(entries, jobs.start_batch(key, workflow, batch)):
+            if prompt_id:
+                # Which image the run is of, by id: the params name only the file
+                # it reads, and a file name can belong to more than one row.
+                # Stamped on the row for the fold and for a restart.
+                db.set_enhance_target(prompt_id, row.get("prompt_id"))
+            launched.append((row, params, key, prompt_id))
+    return launched
+
+
 class Offer(NamedTuple):
     """What the Enhance button would do right now, and what it says it would do.
 
@@ -290,28 +308,22 @@ class EnhanceController:
         controller took only one job per folder; it takes them all now, so the
         buffer had nothing left to do but hide the work.)
         """
-        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
-        index = self._host.image_config_index()
-        asks: dict[str, list[tuple[dict, dict]]] = {}
+        asks = []
         for row in rows:
             params = gallery.enhance_params_for(row, self._settings)
             if params is None:
                 logger.warning("Enhance skipped for %s: no output file to enhance",
                                row.get("prompt_id"))
                 continue
-            asks.setdefault(_folder_of(workflow, params, index), []).append((row, params))
-        for key, entries in asks.items():
-            batch = [randomize_seeds(params, workflow.seed_keys()) for _row, params in entries]
-            for (row, params), prompt_id in zip(entries,
-                                                self._jobs.start_batch(key, workflow, batch)):
-                self._note_launch(row, params, key, prompt_id)
+            asks.append((row, params))
+        for launched in launch_enhancements(self._jobs, self._db, asks,
+                                            self._host.image_config_index()):
+            self._note_launch(*launched)
 
     def _launch(self, row: dict, params: dict) -> bool:
-        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
-        key = _folder_of(workflow, params, self._host.image_config_index())
-        prompt_id = self._jobs.start_prepared(
-            key, workflow, randomize_seeds(params, workflow.seed_keys()))
-        return self._note_launch(row, params, key, prompt_id)
+        (launched,) = launch_enhancements(self._jobs, self._db, [(row, params)],
+                                          self._host.image_config_index())
+        return self._note_launch(*launched)
 
     def _note_launch(self, row: dict, params: dict, key: str, prompt_id: str | None) -> bool:
         """Unlaunchable (no client, or the submit was refused) is logged rather
@@ -319,12 +331,8 @@ class EnhanceController:
         the one failure they cannot diagnose from the screen.
         """
         if prompt_id:
-            # Which image the run is of, by id: the params name only the file it
-            # reads, and a file name can belong to more than one row. Stamped on
-            # the row for the fold and for a restart, and remembered here for
-            # the tile, the version list and the slideshow while it runs — after the
-            # launch's own reconcile, which read the row before the stamp.
-            self._db.set_enhance_target(prompt_id, row.get("prompt_id"))
+            # Kept for the tile, the version list and the slideshow while it runs:
+            # the launch's own reconcile read the row before the stamp.
             self._targets[prompt_id] = row.get("prompt_id")
             self.put_what_is_locked_first()
             self.reconcile()

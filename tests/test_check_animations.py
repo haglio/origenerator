@@ -1,0 +1,55 @@
+"""The trial videos the animation window asks for, made the way every video is.
+
+Fixture values are fabricated throughout (see CLAUDE.md).
+"""
+from __future__ import annotations
+
+import json
+from unittest.mock import MagicMock
+
+from origenerator import check_animations, gallery
+from origenerator.comfyui_client import ComfyUIClient
+from origenerator.db import Database
+from origenerator.workflows import WORKFLOW_REGISTRY
+
+_I2V = WORKFLOW_REGISTRY["wan22_i2v"]
+_PICTURE = "image/picture_00001_.png [output]"
+_ENHANCED = {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}
+
+
+def _client():
+    client = ComfyUIClient()
+    client.submit_job = MagicMock(return_value="comfy-X")
+    client.fetch_history = MagicMock(return_value={})
+    client.forget_history = MagicMock()
+    return client
+
+
+def _library(tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(prompt_id="picture", workflow_name="sdxl_t2i", workflow_version="v",
+                         params_json="{}", workflow_json="{}")
+    db.update_generation("picture", status="completed", output_files=json.dumps(
+        [{"filename": "picture_00001_.png", "subfolder": "image", "type": "output"}]))
+    db.insert_generation(prompt_id="sample", workflow_name=_I2V.name,
+                         workflow_version=_I2V.version, workflow_json="{}",
+                         params_json=json.dumps({**_I2V.default_params(),
+                                                 "input_image": _PICTURE}))
+    db.update_generation("sample", status="completed",
+                         output_files=json.dumps([{"filename": "sample.mp4"}]))
+    return db
+
+
+def test_a_trial_from_a_picture_never_enhanced_is_made_from_its_enhancement(qtbot, tmp_path):
+    db = _library(tmp_path)
+    client = _client()
+    trial = check_animations._launcher(db, client, gallery.EnhanceSettings())
+
+    trial(db.get_generation("sample"), "alpha", "beta")
+    (enhance,) = [row for row in db.list_generations() if row["enhance_of"] == "picture"]
+    client.job_completed.emit(enhance["prompt_id"],
+                              {"outputs": {"12": {"images": [_ENHANCED]}}})
+
+    assert gallery.row_output_files(db.get_generation("picture"))[0] == _ENHANCED
+    payload, _prompt_id = client.submit_job.call_args_list[-1].args
+    assert "image/image_enhance_00001_.png [output]" in json.dumps(payload)

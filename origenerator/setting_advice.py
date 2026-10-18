@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import NamedTuple
 
 from origenerator.content import load_content
@@ -58,16 +59,38 @@ def _model_page(params: dict) -> dict:
     return model_recommendations().get(params.get("checkpoint") or "") or {}
 
 
+class _Range(NamedTuple):
+    said: str
+    span: tuple
+    shown: Callable[[object], str] = lambda fix: ""
+
+    def advice(self, value) -> Advice | None:
+        if not _outside(value, self.span):
+            return None
+        fix = _nearest(value, self.span)
+        return Advice(self.said, fix, self.shown(fix))
+
+
+class _Choices(NamedTuple):
+    said: str
+    good: tuple[str, ...]
+    order: list[str]
+
+    def advice(self, value) -> Advice | None:
+        if value in self.good:
+            return None
+        return Advice(self.said, _nearest_choice(value, self.good, self.order))
+
+
 def setting_advice(params: dict, definitions=()) -> dict[str, Advice]:
-    advice, judged = _model_advice(params)
-    for key, found in _lora_advice(params, judged).items():
-        advice.setdefault(key, found)
-    for pd in definitions:
-        if pd.key in judged or pd.key not in params:
-            continue
-        _hold(advice, judged, pd.key, params[pd.key], pd.good, good_range_text(pd),
-              shown=lambda fix: _in_seconds(fix, pd))
-    return advice
+    rules = {**_good_ranges(params, definitions), **_recommended(params)}
+    found = {key: rule.advice(params.get(key)) for key, rule in rules.items()}
+    return {key: advice for key, advice in found.items() if advice is not None}
+
+
+def _good_ranges(params: dict, definitions) -> dict[str, _Range]:
+    return {pd.key: _Range(good_range_text(pd), pd.good, lambda fix, pd=pd: _in_seconds(fix, pd))
+            for pd in definitions if pd.good and pd.key in params}
 
 
 def _in_seconds(frames, pd: ParamDef) -> str:
@@ -76,66 +99,57 @@ def _in_seconds(frames, pd: ParamDef) -> str:
     return f"{_shown(seconds_for_frames(frames, pd.rate, pd))} {pd.unit}"
 
 
-def _hold(advice: dict, judged: set, key: str, value, span, said: str,
-          shown=lambda fix: "") -> None:
-    if not span:
-        return
-    judged.add(key)
-    if _outside(value, span):
-        fix = _nearest(value, span)
-        advice[key] = Advice(said, fix, shown(fix))
+def _recommended(params: dict) -> dict:
+    rules = _model_recommends(params)
+    for key, rule in _loras_recommend(params).items():
+        rules.setdefault(key, rule)
+    return rules
 
 
-def _model_advice(params: dict) -> tuple[dict[str, Advice], set[str]]:
-    advice: dict[str, Advice] = {}
-    judged: set[str] = set()
-    sampler, spacing = params.get("sampler_name"), params.get("scheduler")
+def _model_recommends(params: dict) -> dict:
+    sampler = params.get("sampler_name")
     page = _model_page(params)
     name, choices = page.get("name"), recommended_choices(params)
-    if choices["sampler_name"] and sampler not in choices["sampler_name"]:
-        advice["sampler_name"] = Advice(
+    rules: dict = {}
+    if choices["sampler_name"]:
+        rules["sampler_name"] = _Choices(
             f"{name}'s page recommends {_either(choices['sampler_name'])}.",
-            _nearest_choice(sampler, choices["sampler_name"], SAMPLER_OPTIONS))
-    if choices["scheduler"] and spacing not in choices["scheduler"]:
+            choices["sampler_name"], SAMPLER_OPTIONS)
+    if choices["scheduler"]:
         paired_by_page = bool((page.get("samplers") or {}).get(sampler))
         pairs = f"{name}'s page pairs {sampler}" if paired_by_page else f"{sampler} works best"
-        advice["scheduler"] = Advice(f"{pairs} with {_either(choices['scheduler'])}.",
-                                     _nearest_choice(spacing, choices["scheduler"],
-                                                     SCHEDULER_OPTIONS))
+        rules["scheduler"] = _Choices(f"{pairs} with {_either(choices['scheduler'])}.",
+                                     choices["scheduler"], SCHEDULER_OPTIONS)
     for key, unit in (("steps", " steps"), ("cfg", "")):
         if page.get(key):
-            _hold(advice, judged, key, params.get(key), page[key],
-                  f"{name}'s page recommends {_span(page[key])}{unit}.")
-    return advice, judged
+            rules[key] = _Range(f"{name}'s page recommends {_span(page[key])}{unit}.", page[key])
+    return rules
 
 
-def _lora_advice(params: dict, judged: set[str]) -> dict[str, Advice]:
+def _loras_recommend(params: dict) -> dict:
     loras = lora_recommendations()
     pages = {side: loras.get(params.get(f"lora_{side}") or "") for side in _PASSES
              if f"lora_{side}" in params}
-    advice: dict[str, Advice] = {}
+    rules: dict = {}
     for side, page in pages.items():
         if page is None:
             continue
-        strength_key = f"lora_strength_{side}"
         if page.get("strength"):
-            _hold(advice, judged, strength_key, params.get(strength_key), page["strength"],
-                  f"{page['name']}'s page recommends a strength of {_span(page['strength'])}.")
-        cfg_key = f"cfg_{side}" if f"cfg_{side}" in params else "cfg"
-        if page.get("cfg") and cfg_key not in advice:
-            _hold(advice, judged, cfg_key, params.get(cfg_key), page["cfg"],
-                  _with(page, "cfg"))
+            rules[f"lora_strength_{side}"] = _Range(
+                f"{page['name']}'s page recommends a strength of {_span(page['strength'])}.",
+                page["strength"])
+        if page.get("cfg"):
+            rules.setdefault(f"cfg_{side}" if f"cfg_{side}" in params else "cfg",
+                             _Range(_with(page, "cfg"), page["cfg"]))
     shared = list(pages.values())
     if shared and all(page is not None for page in shared):
         page = shared[0]
         if page.get("steps"):
-            _hold(advice, judged, "steps", params.get("steps"), page["steps"],
-                  _with(page, "steps", " steps"))
-        shift_key = "shift_high" if "shift_high" in params else "shift"
+            rules["steps"] = _Range(_with(page, "steps", " steps"), page["steps"])
         if page.get("shift"):
-            _hold(advice, judged, shift_key, params.get(shift_key), page["shift"],
-                  _with(page, "shift"))
-    return advice
+            rules["shift_high" if "shift_high" in params else "shift"] = _Range(
+                _with(page, "shift"), page["shift"])
+    return rules
 
 
 def _with(page: dict, recommended: str, unit: str = "") -> str:

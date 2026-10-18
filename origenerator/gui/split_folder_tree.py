@@ -93,6 +93,13 @@ def _heading(side: str) -> QFrame:
     return heading
 
 
+def _rule() -> QFrame:
+    rule = QFrame()
+    rule.setObjectName("treeSectionRule")
+    rule.setFixedHeight(1)
+    return rule
+
+
 class SplitFolderTree(QWidget):
     """A folder tree per side, under the radio that says which sides there are.
 
@@ -192,9 +199,11 @@ class SplitFolderTree(QWidget):
         section = QWidget()
         column = QVBoxLayout(section)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(2)
+        column.setSpacing(0)
         if side in SEPARATE:
             column.addWidget(_heading(side))
+        column.addWidget(_rule())
+        column.addSpacing(2)
 
         tree = FolderTree(group_role)
         tree.setHeaderHidden(True)

@@ -16,7 +16,8 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtWidgets import QFrame, QLabel
+from PyQt6.QtWidgets import QApplication, QFrame, QLabel
+from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator import gallery
 from origenerator import orientation as orientation_module
@@ -34,6 +35,7 @@ from origenerator.gallery.sides import (
     PORTRAIT,
     SIDE_LABELS,
     SIDES,
+    TOGETHER,
     orientation_of_size,
     side_covers,
     side_holds,
@@ -41,7 +43,7 @@ from origenerator.gallery.sides import (
 from origenerator.gui.gallery_tree import GROUP_ROLE
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.gui.stylesheet import CHOSEN
+from origenerator.gui.stylesheet import CHOSEN, build_stylesheet
 from origenerator.orientation import (
     base_of,
     filter_rows,
@@ -518,6 +520,35 @@ def test_together_s_one_list_wears_no_heading_since_the_choice_over_it_names_it(
 
     (section,) = _sections(view)
     assert _headings(section) == []
+
+
+def test_together_s_list_is_ruled_off_above_as_each_of_separate_s_lists_is(qtbot):
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        pane = _laid_out(qtbot, 300)
+        separate = [_rows_from_the_lighter_line_to_the_list(pane, side)
+                    for side in pane.sides]
+        pane.choose_sides(TOGETHER)
+        app.processEvents()
+        pane.layout().activate()
+        together = [_rows_from_the_lighter_line_to_the_list(pane, side)
+                    for side in pane.sides]
+    finally:
+        app.setStyleSheet(prior)
+
+    assert None not in separate and len(set(separate)) == 1
+    assert together == separate[:1]
+
+
+def _rows_from_the_lighter_line_to_the_list(pane, side) -> int | None:
+    section, tree = pane._sections[side], pane._trees[side]
+    image = section.grab().toImage()
+    top = tree.mapTo(section, QPoint()).y()
+    across = section.width() // 2
+    return next((top - row for row in range(top - 1, -1, -1)
+                 if image.pixelColor(across, row) == BORDER_SUBTLE), None)
 
 
 def _sections(view):

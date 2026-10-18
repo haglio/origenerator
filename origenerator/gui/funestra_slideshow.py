@@ -92,7 +92,6 @@ class FunestraSlideshow(QObject):
         self._side = side
         self.channel = channel
         self._frames = frames
-        self._request_holds_it = False
         self._frame_on_funestra: Path | None = None
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
@@ -110,6 +109,7 @@ class FunestraSlideshow(QObject):
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._locked = False
+        self._keep_told: bool | None = None
         self._published = ""
         self._levels = LevelStepper()
         opened_on_a_slide = start is not None
@@ -156,18 +156,21 @@ class FunestraSlideshow(QObject):
             self._send(play_file(self._funestra_item(current)))
         self._send(RELOAD_PLAYLIST)
         self._tell_the_pace()
+        self._tell_the_keep()
 
     def _tell_the_pace(self) -> None:
-        self._pace_told = self._funestra_pace()
-        self._send(f"{SET_PACE} {self._pace_told}")
+        self._send(f"{SET_PACE} {self._dwell_s}")
 
-    def _funestra_pace(self) -> int:
-        """The slideshow's pace, or nought while something holds the slide on
-        screen still: a spoken request, or the run it was opened over."""
+    def _tell_the_keep(self) -> None:
+        keeps = self._locked or self._set.playlist.paused or self._on_the_run()
+        if keeps != self._keep_told:
+            self._keep_told = keeps
+            self._send(LOCK_ON if keeps else LOCK_OFF)
+
+    def _on_the_run(self) -> bool:
         current = self._set.playlist.current()
-        on_the_run = (current is not None and current.is_live
-                      and current.prompt_id == self._following)
-        return 0 if self._request_holds_it or on_the_run else self._dwell_s
+        return (current is not None and current.is_live
+                and current.prompt_id == self._following)
 
     def _file_of(self, slide) -> str:
         if slide.is_live:
@@ -234,8 +237,7 @@ class FunestraSlideshow(QObject):
             self._follow(status.video)
             self._frame_on_funestra = None
             self._show_what_is_being_made()
-        if self._funestra_pace() != self._pace_told:
-            self._tell_the_pace()
+        self._tell_the_keep()
         self._publish()
 
     def _show_what_is_being_made(self) -> None:
@@ -368,7 +370,7 @@ class FunestraSlideshow(QObject):
 
     def _lock(self, on: bool) -> None:
         self._locked = on
-        self._send(LOCK_ON if on else LOCK_OFF)
+        self._tell_the_keep()
         self._publish()
 
     def _unlock(self) -> None:
@@ -782,14 +784,11 @@ class FunestraSlideshow(QObject):
         holds the picture, and nothing advances until it is let go."""
 
     def pause_for_request(self, paused: bool, note: str = "") -> None:
-        """Stop the advance while a request is being spoken: the pace goes to
-        nought, which is how anything is kept still on a Funestra, and back after.
-
-        A request is about what is on screen, and a set that pages on every few
-        seconds would hand the words to whatever came up next.
-        """
-        self._request_holds_it = paused
-        self._tell_the_pace()
+        """Keep the slide on screen while a request is being spoken: a request
+        is about what is on screen, and a set that pages on every few seconds
+        would hand the words to whatever came up next."""
+        self._set.playlist.set_paused(paused)
+        self._tell_the_keep()
         if note:
             self._note(note)
 

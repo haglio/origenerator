@@ -780,12 +780,16 @@ def test_a_run_alone_in_its_folder_double_clicked_goes_to_the_funestra_of_its_sh
     assert shown.is_file() and shown.read_bytes() == _png_bytes()
 
 
-def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made(
+def _pace_and_lock(told: list[str]) -> list[str]:
+    return [verb for verb in told if verb.startswith(("SET_PACE", "LOCK"))]
+
+
+def test_a_run_watched_on_a_funestra_is_kept_there_still_moving_while_it_is_made(
         qtbot, tmp_path, monkeypatch):
     _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
 
-    paces = [verb for verb in _told(tmp_path, "landscape") if verb.startswith("SET_PACE")]
-    assert paces[-1] == "SET_PACE 0"
+    assert _pace_and_lock(_told(tmp_path, "landscape"))[-2:] == [
+        f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}", "LOCK_ON"]
 
 
 def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_picture(
@@ -800,14 +804,15 @@ def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_picture(
     assert read_playlist(tmp_path / "landscape.tsv")[0].path == finished.path
 
 
-def test_a_run_watched_on_a_funestra_lands_at_the_clip_seconds(qtbot, tmp_path, monkeypatch):
+def test_a_run_watched_on_a_funestra_that_lands_is_let_go_at_the_clip_seconds(
+        qtbot, tmp_path, monkeypatch):
     client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
     _told(tmp_path, "landscape")
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    paces = [verb for verb in _told(tmp_path, "landscape") if verb.startswith("SET_PACE")]
-    assert paces[-1] == f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}"
+    assert _pace_and_lock(_told(tmp_path, "landscape"))[-2:] == [
+        f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}", "LOCK_OFF"]
 
 
 def test_the_sessions_loop_key_reaches_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):

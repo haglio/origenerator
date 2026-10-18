@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import AMBER, BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_PRIMARY
+from shared_ui.icons import CANVAS
 from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -35,7 +36,7 @@ from origenerator.gallery import (
     EnhanceSettings,
     default_enhance_params,
 )
-from origenerator.gui import drag_thumbnail
+from origenerator.gui import drag_thumbnail, icons
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.drags import under_way
@@ -756,9 +757,9 @@ def test_clicking_anywhere_on_a_row_picks_it(qtbot):
 
 
 def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
-    # The pass-through must stop at the copy and Show-in-Explorer buttons: Qt's
-    # hit test skips a container marked transparent along with everything inside
-    # it, so these are laid into the row's grid rather than into one.
+    # The pass-through must stop at the copy, trash and Show-in-Explorer buttons:
+    # Qt's hit test skips a container marked transparent along with everything
+    # inside it, so these are laid into the row's grid rather than into one.
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -766,7 +767,8 @@ def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
     row = _rows(versions)[0]
 
     buttons = row.findChildren(QPushButton)
-    assert {b.objectName() for b in buttons} == {"copyButton", "revealButton"}
+    assert {b.objectName() for b in buttons} == {"copyButton", "deleteButton",
+                                                 "revealButton"}
     for button in buttons:
         assert row.childAt(button.mapTo(row, QPoint(3, 3))) is button
 
@@ -1105,6 +1107,98 @@ def test_the_menu_says_a_videos_versions_are_not_deleted_from_here(qtbot, monkey
 
     assert seen == {"text": "Delete (a video's versions can't be deleted here)",
                     "enabled": False}
+
+
+def _trash(row):
+    return row.findChild(QPushButton, "deleteButton")
+
+
+def test_pressing_a_versions_trash_can_deletes_that_version(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)))
+    versions.show()
+    qtbot.waitExposed(versions)
+    asked = []
+    versions.delete_requested.connect(asked.append)
+
+    qtbot.mouseClick(_trash(_rows(versions)[1]), Qt.MouseButton.LeftButton)
+
+    assert asked == [[1]]
+
+
+def test_a_versions_trash_can_deletes_only_its_own_version_whatever_is_picked(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)))
+    asked = []
+    versions.delete_requested.connect(asked.append)
+    _click(qtbot, _rows(versions)[0])
+    _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ControlModifier)
+
+    _trash(_rows(versions)[1]).click()
+
+    assert asked == [[1]]
+
+
+def test_a_versions_trash_can_sits_beside_its_copy_button(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)))
+    versions.resize(600, 400)
+    versions.show()
+    qtbot.waitExposed(versions)
+    row = _rows(versions)[0]
+    copy, reveal = (row.findChild(QPushButton, name).geometry()
+                    for name in ("copyButton", "revealButton"))
+    trash = _trash(row).geometry()
+
+    assert trash.top() == copy.top()
+    assert copy.right() < trash.left() < reveal.left()
+
+
+def test_a_versions_trash_can_is_the_button_banks_red_can_at_the_copys_size(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)))
+    row = _rows(versions)[0]
+    trash, copy = _trash(row), row.findChild(QPushButton, "copyButton")
+    side = QSize(int(CANVAS), int(CANVAS))
+
+    assert trash.icon().pixmap(side).toImage() == icons.delete_icon().pixmap(side).toImage()
+    assert trash.iconSize() == copy.iconSize()
+
+
+def test_a_versions_trash_can_grays_out_on_the_images_only_version(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items([
+        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
+    ]))
+    trash = _trash(_rows(versions)[0])
+
+    assert not trash.isEnabled()
+    assert trash.toolTip() == "Delete (this is the image's only version)"
+
+
+def test_a_videos_trash_cans_gray_out_saying_why(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), deletable=False)
+
+    for row in _rows(versions):
+        assert not _trash(row).isEnabled()
+        assert _trash(row).toolTip() == "Delete (a video's versions can't be deleted here)"
+
+
+def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)))
+
+    for row in _rows(versions):
+        assert _trash(row).isEnabled()
+        assert _trash(row).toolTip() == "Delete this version"
 
 
 # --- dragging a level onto the panel to reuse its settings -----------------

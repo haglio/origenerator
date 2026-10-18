@@ -18,11 +18,12 @@ A row can also be dragged onto the Enhance subpanel, which absorbs the settings
 it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
-Levels can be deleted from here: pick rows and press Delete or Backspace, or
-right-click for the menu. A binned version is a file, not a generation — the
-image keeps its folder, its star and its other versions — and the delete is
-undoable like every other. What is refused is emptying the row: an image with no
-file left is a deleted generation, and that is the gallery's own delete.
+Levels can be deleted from here: press the trash can beside a version's copy
+button, or pick rows and press Delete or Backspace, or right-click for the
+menu. A binned version is a file, not a generation — the image keeps its
+folder, its star and its other versions — and the delete is undoable like every
+other. What is refused is emptying the row: an image with no file left is a
+deleted generation, and that is the gallery's own delete.
 
 An enhancement still in flight takes the ``+ Enhance`` row's own slot at the head
 of the list, mirroring the run's streamed frames the way the in-flight cards do
@@ -57,8 +58,9 @@ from shared_ui.icons import glyph_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
-from origenerator.gui import palette
+from origenerator.gui import icons, palette
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_block import label_column_width, meta_cells
@@ -133,7 +135,6 @@ def _pass_mouse_through(widget) -> None:
     """
     widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
     widget.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
-
 
 
 class RunningEnhancement(NamedTuple):
@@ -256,7 +257,8 @@ class _Row(QWidget):
         self._wrapped = wrapped
         self.updateGeometry()   # the row is a different height in each shape
 
-    def _show_facts(self, items: list[MetaItem]) -> None:
+    def _show_facts(self, items: list[MetaItem],
+                    beside_copy: QWidget | None = None) -> None:
         """Lay this row's facts out as the same ``label: value`` cells a metadata
         block builds — so the enhancement that made a version, the file it wrote
         and when it was written all read alike, and the file line keeps its copy
@@ -269,7 +271,10 @@ class _Row(QWidget):
         self._resting_ink = {}
         key_width = label_column_width([MetaItem(key, "") for key in _FACT_KEYS])
         for line, item in enumerate(items, start=1):
-            for column, widget in enumerate(meta_cells(item, key_width)):
+            label, value, copy, reveal = meta_cells(item, key_width)
+            cells = (label, value, copy,
+                     beside_copy if copy is not None else None, reveal)
+            for column, widget in enumerate(cells):
                 if widget is None:
                     continue
                 if isinstance(widget, QLabel):
@@ -299,6 +304,7 @@ class _LevelRow(_Row):
 
     clicked = pyqtSignal(int, Qt.KeyboardModifier)
     context_requested = pyqtSignal(int, QPoint)
+    delete_pressed = pyqtSignal(int)
 
     def __init__(self, level, position: int, image_path, created_fallback: str = "",
                  held_days: int | None = None, parent=None):
@@ -324,7 +330,11 @@ class _LevelRow(_Row):
             items.append(MetaItem("Enhancement", level.settings))
         items.append(file_item(level.file, held_days=held_days))
         items.append(created_item(level.file, created_fallback))
-        self._show_facts(items)
+        self._delete = IconButton(icons.delete_icon(), "Delete this version",
+                                  "deleteButton")
+        self._delete.clicked.connect(
+            lambda _checked=False: self.delete_pressed.emit(self._position))
+        self._show_facts(items, beside_copy=self._delete)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # so Delete reaches the list
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -339,6 +349,10 @@ class _LevelRow(_Row):
 
     def position(self) -> int:
         return self._position
+
+    def refuse_delete(self, reason: str) -> None:
+        self._delete.setEnabled(False)
+        self._delete.setToolTip(reason)
 
     def set_highlighted(self, on: bool) -> None:
         """Light this level's picture — what the ``+ Enhance`` row points at
@@ -463,7 +477,8 @@ class EnhanceVersions(QWidget):
     an enhancement still running on this image. Clicking a level's row emits
     ``level_selected`` with its position in that list, for the panel to put in
     the preview; picking rows and pressing Delete (or the right-click menu's
-    Delete) emits ``delete_requested`` with those positions.
+    Delete) emits ``delete_requested`` with those positions, and a row's trash
+    can emits it with that row's alone.
     """
 
     level_selected = pyqtSignal(int)
@@ -506,9 +521,10 @@ class EnhanceVersions(QWidget):
         newest first. ``duplicate_of`` names the level those settings would
         duplicate, or ``None`` when they would make something new.
 
-        ``pending`` is the :class:`RunningEnhancement` of one still running, and it takes that same leading slot — the row *becomes* the
-        thing it asked for rather than sitting beside it, which is what the press
-        looks like from the other side.
+        ``pending`` is the :class:`RunningEnhancement` of one still running, and
+        it takes that same leading slot — the row *becomes* the thing it asked
+        for rather than sitting beside it, which is what the press looks like
+        from the other side.
 
         ``created_fallback`` stands in on a level whose file is no longer on disk
         to be asked when it was written — the row's own timestamp, which is the
@@ -552,8 +568,12 @@ class EnhanceVersions(QWidget):
             row = _LevelRow(level, position, image_path, created_fallback, held_days)
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
+            row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))
             self._rows.append(row)
             column.addWidget(row)
+        for row in self._rows:
+            if not self._may_delete([row.position()]):
+                row.refuse_delete(self._refusal())
         form.addRow(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
 
@@ -618,10 +638,13 @@ class EnhanceVersions(QWidget):
             # Grayed with the reason on it rather than absent: the answer to
             # "why can't I delete this" is the only thing the menu can offer.
             action.setEnabled(False)
-            action.setText("Delete (this is the image's only version)" if self._deletable
-                           else "Delete (a video's versions can't be deleted here)")
+            action.setText(self._refusal())
         if menu.exec(global_pos) is action and self._may_delete(picked):
             self.delete_requested.emit(picked)
+
+    def _refusal(self) -> str:
+        return ("Delete (this is the image's only version)" if self._deletable
+                else "Delete (a video's versions can't be deleted here)")
 
     def _may_delete(self, positions: list[int]) -> bool:
         """Whether these versions are this list's to bin, and binning

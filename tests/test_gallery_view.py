@@ -13030,6 +13030,28 @@ def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp
     assert not view._bank.undo.isHidden()
 
 
+def test_pressing_a_versions_trash_can_bins_that_level_and_grays_the_last_ones(qtbot,
+                                                                              tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    row = _enhanced_in_place(db)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    panel.show_saved_generation(row, view._image_rows)
+    enhancement = panel._versions._host.findChildren(_LevelRow)[0]
+
+    enhancement.findChild(QPushButton, "deleteButton").click()
+
+    updated = db.get_generation("g0")
+    assert json.loads(updated["output_files"]) == [
+        {"filename": "sdxl_t2i_g0.png", "subfolder": "image"}
+    ]
+    assert view._actions.can_undo()
+    (original,) = panel._versions._host.findChildren(_LevelRow)
+    assert not original.findChild(QPushButton, "deleteButton").isEnabled()
+
+
 def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
     # The enhance folds back onto the row it came from, and that row arrives
     # here again as "finished". Already-enhanced, it must not queue another —

@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 
 import origenerator.setting_advice as advice_module
-from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
+from origenerator.setting_advice import (
+    fresh_settings,
+    recommendations,
+    recommended_choices,
+    setting_advice,
+)
 from origenerator.workflows.base import ParamDef, ParamType
 
 MODELS = {
@@ -169,6 +174,36 @@ def test_a_number_a_speed_loras_page_judges_is_not_held_to_its_definitions_range
              "lora_strength_low": 1.0, "steps": 6, "cfg_high": 1.0, "cfg_low": 1.0,
              "shift_high": 5.0}
     assert setting_advice(video, [steps]) == {}
+
+
+def test_a_models_page_is_quoted_for_every_setting_it_speaks_for_even_when_followed():
+    assert recommendations(_picture(sampler_name="dpmpp_2m", scheduler="karras")) == {
+        "sampler_name": "Example Model's page recommends euler_ancestral or dpmpp_2m.",
+        "scheduler": "Example Model's page pairs dpmpp_2m with karras.",
+        "steps": "Example Model's page recommends 20–40 steps.",
+        "cfg": "Example Model's page recommends 3–6.",
+    }
+
+
+def test_a_speed_loras_page_is_quoted_for_every_setting_it_speaks_for():
+    video = {"lora_high": "example_speed_high.safetensors",
+             "lora_low": "example_speed_low.safetensors", "lora_strength_high": 1.0,
+             "lora_strength_low": 1.0, "steps": 6, "cfg_high": 1.0, "cfg_low": 1.0,
+             "shift_high": 5.0}
+    assert recommendations(video) == {
+        "lora_strength_high": "Example Speed's page recommends a strength of 1.",
+        "lora_strength_low": "Example Speed's page recommends a strength of 1.",
+        "cfg_high": "With the Example Speed LoRA, its page recommends 1.",
+        "cfg_low": "With the Example Speed LoRA, its page recommends 1.",
+        "steps": "With the Example Speed LoRA, its page recommends 4–8 steps.",
+        "shift_high": "With the Example Speed LoRA, its page recommends 5.",
+    }
+
+
+def test_with_no_page_only_the_step_spacing_its_sampler_wants_is_quoted():
+    unknown = _picture(checkpoint="another_model.safetensors", sampler_name="dpmpp_2m")
+    assert recommendations(unknown) == {
+        "scheduler": "dpmpp_2m works best with karras or exponential."}
 
 
 def test_a_durations_fix_is_shown_in_seconds():

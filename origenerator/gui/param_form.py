@@ -167,6 +167,8 @@ class ParamForm(QWidget):
         self._copy_buttons: dict[str, CopyButton] = {}
         self._warning_marks: dict[str, WarningMark] = {}
         self._advice: dict[str, Advice] = {}
+        self._labels: dict[str, ElidingLabel] = {}
+        self._recommendations: dict[str, str] = {}
         # A single swap-width-and-height button, built only when the workflow has
         # both dimension params (t2i does; i2v derives its size in-graph). None
         # when absent, so callers can tell whether the control exists. It floats as
@@ -304,14 +306,23 @@ class ParamForm(QWidget):
         form.insertRow(index, self._label_cell(key, label_widget, self._label_columns[title]),
                        self._field_cell(field, extras))
         keys.insert(index, key)
-        # A label cut short is one you most want spelled out, so the tip says the
-        # whole thing when the param has nothing more useful to explain.
+        self._labels[key] = label_widget
+        self._explain(key)
+
+    def _explain(self, key: str) -> None:
         pd = next((p for p in self._param_defs if p.key == key), None)
-        explained = definition_help(pd) if pd is not None else param_help(key)
-        label_widget.setToolTip(explained or label)
+        explained = (definition_help(pd, self._recommendations.get(key, "")) if pd is not None
+                     else param_help(key))
+        label = self._labels[key]
+        label.setToolTip(explained or label.text())
         widget = self._widgets.get(key)
         if widget is not None and explained:
             widget.setToolTip(explained)
+
+    def explain(self, recommendations: dict[str, str]) -> None:
+        self._recommendations = dict(recommendations)
+        for key in self._labels:
+            self._explain(key)
 
     @staticmethod
     def _insert_index(present: list[str], key: str) -> int:

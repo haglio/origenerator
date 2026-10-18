@@ -88,6 +88,10 @@ def setting_advice(params: dict, definitions=()) -> dict[str, Advice]:
     return {key: advice for key, advice in found.items() if advice is not None}
 
 
+def recommendations(params: dict) -> dict[str, str]:
+    return {key: rule.said for key, rule in _recommended(params).items()}
+
+
 def _good_ranges(params: dict, definitions) -> dict[str, _Range]:
     return {pd.key: _Range(good_range_text(pd), pd.good, lambda fix, pd=pd: _in_seconds(fix, pd))
             for pd in definitions if pd.good and pd.key in params}

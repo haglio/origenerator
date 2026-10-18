@@ -78,7 +78,12 @@ from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.picture_states import state_names
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
-from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
+from origenerator.setting_advice import (
+    fresh_settings,
+    recommendations,
+    recommended_choices,
+    setting_advice,
+)
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -641,6 +646,7 @@ class GenerateConfigPanel(QWidget):
             values = self._param_form.get_values()
             self._param_form.set_warnings(setting_advice(values, self._param_form.definitions()))
             self._param_form.mark_recommended(recommended_choices(values))
+            self._param_form.explain(recommendations(values))
 
     def _detach_form(self):
         """Take the installed form off the panel, if there is one.

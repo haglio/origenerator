@@ -1401,6 +1401,28 @@ def test_a_field_with_a_good_range_says_it_in_its_tooltip(qtbot):
     assert "Good range: 20–40." in _label_beside(form, "steps").toolTip()
 
 
+def test_a_label_with_no_help_spells_out_its_whole_name_on_hover(qtbot):
+    mystery = ParamDef("mystery_number", "A Mystery Setting Too Long To Show", ParamType.INT, 1)
+    form = ParamForm([mystery])
+    qtbot.addWidget(form)
+    assert _label_beside(form, "mystery_number").toolTip() == "A Mystery Setting Too Long To Show"
+
+
+def test_a_pages_recommendation_takes_the_good_ranges_place_until_it_goes(qtbot):
+    steps = ParamDef("steps", "Steps", ParamType.INT, 30, min_val=1, max_val=100, good=(20, 40))
+    form = ParamForm([steps])
+    qtbot.addWidget(form)
+
+    form.explain({"steps": "Example Model's page recommends 25–35 steps."})
+    recommended = (form._widgets["steps"].toolTip(), _label_beside(form, "steps").toolTip())
+    form.explain({})
+    left_alone = (form._widgets["steps"].toolTip(), _label_beside(form, "steps").toolTip())
+
+    assert all(tip.endswith(" Example Model's page recommends 25–35 steps.")
+               and "Good range" not in tip for tip in recommended)
+    assert all(tip.endswith(" Good range: 20–40.") for tip in left_alone)
+
+
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     # Loading an old enhanced run into a tab must not arm its enhancement for
     # the next Generate: enhancement is the Enhance subpanel's, applied

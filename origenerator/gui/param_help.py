@@ -165,7 +165,8 @@ PARAM_HELP: dict[str, str] = {
         "How the noise removed is spread across the steps: normal spreads it evenly, "
         "while karras and exponential take big steps first and small ones at the end, "
         "so more of the run goes to fine detail. It matters less than the Sampler and "
-        "goes with it."
+        "goes with it. To compare two, keep the seed and change only this, on two or "
+        "three different prompts."
     ),
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
@@ -272,8 +273,7 @@ RECOMMENDED: dict[str, str] = {
     ),
     "scheduler": (
         "Good choices: normal or simple with euler and euler_ancestral, karras with "
-        "the dpmpp ones (DPM++ 2M Karras on model pages). To compare two, keep the "
-        "seed and change only this, on two or three different prompts."
+        "the dpmpp ones (DPM++ 2M Karras on model pages)."
     ),
     "shift": (
         "8 is the usual start, 5 for a looping clip."
@@ -432,9 +432,10 @@ def param_help(key: str) -> str:
     return " ".join(filter(None, (PARAM_HELP.get(key, ""), RECOMMENDED.get(key, ""))))
 
 
-def definition_help(pd: ParamDef) -> str:
-    return " ".join(filter(None, (PARAM_HELP.get(pd.key, ""), good_range_text(pd),
-                                  RECOMMENDED.get(pd.key, ""))))
+def definition_help(pd: ParamDef, recommendation: str = "") -> str:
+    advice = recommendation or " ".join(filter(None, (good_range_text(pd),
+                                                      RECOMMENDED.get(pd.key, ""))))
+    return " ".join(filter(None, (PARAM_HELP.get(pd.key, ""), advice)))
 
 
 def option_help(key: str, option: str) -> str:

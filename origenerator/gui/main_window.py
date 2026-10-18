@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 # before the generation, each later one needing what the earlier ones put up.
 SESSION_UI_STATE = (
     ("generate_tabs", GalleryView.capture_config_tabs, GalleryView.restore_config_tabs),
-    ("folder_list_sides", GalleryView.folder_list_sides, GalleryView.set_folder_list_sides),
+    ("toc_sides", GalleryView.toc_sides, GalleryView.set_toc_sides),
     ("collection_kinds", GalleryView.collection_kinds, GalleryView.set_collection_kinds),
     ("open_folders", GalleryView.open_folders, GalleryView.set_open_folders),
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),

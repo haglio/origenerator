@@ -1211,7 +1211,7 @@ def test_a_tabs_border_under_its_picture_is_where_it_was_left_after_a_restart(qt
     assert reopened._gallery_view._info_tabs.currentWidget()._media_split.sizes() == dragged
 
 
-def test_the_folder_list_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
+def test_the_toc_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view._tree.together_button.click()
@@ -1268,7 +1268,7 @@ def test_a_collection_left_listing_videos_is_open_on_its_videos_after_a_restart(
     assert reopened._gallery_view.visible_prompt_ids() == ["vid"]
 
 
-def test_a_folder_left_open_in_the_folder_list_is_open_after_a_restart(qtbot, tmp_path):
+def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
@@ -1909,14 +1909,14 @@ def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_n
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
     state = AppState(path)
-    state.set("folder_list_sides", [BOTH])
+    state.set("toc_sides", [BOTH])
     state.save()
 
     win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
     assert win._gallery_view._tree.sides == SEPARATE
     win.close()
 
-    assert AppState(path).get("folder_list_sides") == [BOTH]
+    assert AppState(path).get("toc_sides") == [BOTH]
 
 
 def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtbot, tmp_path):
@@ -1924,7 +1924,7 @@ def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtb
     path = tmp_path / "ui.json"
     folder = oriented_key("image/sdxl_t2i", BOTH)
     state = AppState(path)
-    state.set("folder_list_sides", [BOTH])
+    state.set("toc_sides", [BOTH])
     state.set("open_folders", [folder])
     state.save()
 

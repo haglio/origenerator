@@ -1926,10 +1926,10 @@ class GalleryView(QWidget):
         if isinstance(saved, list):
             self._tree_view.leave_folders_open(key for key in saved if isinstance(key, str))
 
-    def folder_list_sides(self) -> list[str]:
+    def toc_sides(self) -> list[str]:
         return list(self._tree.chosen_sides)
 
-    def set_folder_list_sides(self, saved) -> None:
+    def set_toc_sides(self, saved) -> None:
         self._tree.choose_sides(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
 
     def _on_sides_changed(self):
@@ -2095,7 +2095,7 @@ class GalleryView(QWidget):
                                 {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
-            # Nothing selected, or the caret resting on a side's header row: the
+            # Nothing selected, or a side's header row selected: the
             # whole gallery, since neither names a folder to narrow to. The
             # trash's held rows share the index but belong to their collection alone.
             return _SearchScope(gallery.ALL_LABEL, self._live_ids)
@@ -3687,7 +3687,7 @@ class GalleryView(QWidget):
 
     def media_types(self) -> set[str]:
         """The media types the Images / Videos / Both choice lets through — what
-        the folder tree, every collection, the in-flight cards and the search
+        the TOC, every collection, the in-flight cards and the search
         index are all built from."""
         return next(set(kinds) for button, kinds in self._kinds_by_button.items()
                     if button.isChecked())

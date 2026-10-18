@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from PyQt6.QtCore import QCoreApplication, QEvent, QPoint, QRect, Qt
 from PyQt6.QtWidgets import QWidget
@@ -16,9 +16,6 @@ class PanePlace:
     offset: int
     picture: str | None = None
     picture_at: int = 0
-
-    def from_the_top(self) -> PanePlace:
-        return replace(self, offset=0, picture=None, picture_at=0)
 
 
 def place_of(scroll, selection: ThumbnailSelection, tiles: dict) -> PanePlace:

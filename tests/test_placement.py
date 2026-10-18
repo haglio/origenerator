@@ -8,6 +8,7 @@ from origenerator.gallery import (
     build_gallery_tree,
     build_image_config_index,
     child_groups,
+    recent_generations,
 )
 from origenerator.gallery.placement import Placement
 
@@ -21,6 +22,17 @@ def _image(prompt_id, checkpoint, *, steps=30, seed=1, starred=0):
         "params_json": json.dumps({"positive_prompt": "a lamp", "checkpoint": checkpoint,
                                    "steps": steps, "seed": seed}),
         "output_files": json.dumps([{"filename": f"sdxl_t2i_{prompt_id}.png"}]),
+    }
+
+
+def _video(prompt_id, *, seed=1):
+    return {
+        "prompt_id": prompt_id,
+        "workflow_name": "wan22_i2v",
+        "status": "completed",
+        "starred": 0,
+        "params_json": json.dumps({"positive_prompt": "a lamp", "seed": seed}),
+        "output_files": json.dumps([{"filename": f"wan22_i2v_{prompt_id}.mp4"}]),
     }
 
 
@@ -48,6 +60,24 @@ def test_all_and_every_folder_above_a_row_hold_it():
     assert placement.held_by(ALL_KEY, rows) == rows
     assert placement.held_by(alpha.key, rows) == [rows[0]]
     assert placement.holds(alpha.key, "p1") and not placement.holds(alpha.key, "p2")
+
+
+def test_each_kind_holds_its_own_rows_in_their_order_and_all_holds_both():
+    rows = [_video("v2", seed=2), _image("i1", "alpha.safetensors"), _video("v1")]
+    placement = _placement(_library(rows))
+
+    assert [row["prompt_id"] for row in placement.held_by("video", rows)] == ["v2", "v1"]
+    assert [row["prompt_id"] for row in placement.held_by("image", rows)] == ["i1"]
+    assert placement.held_by(ALL_KEY, rows) == rows
+
+
+def test_the_videos_latest_reaches_a_lone_old_video():
+    # Nothing trims the list, so the one video under five images still surfaces.
+    rows = [_image(f"i{n}", "alpha.safetensors", seed=n) for n in range(5)] + [_video("v1")]
+    placement = _placement(_library(rows))
+
+    assert [row["prompt_id"]
+            for row in placement.held_by("video", recent_generations(rows))] == ["v1"]
 
 
 def test_a_deleted_row_is_held_by_the_folders_it_was_deleted_from():

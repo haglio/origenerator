@@ -389,7 +389,6 @@ class FakeHost:
         self.cleared_queue = 0
         self.queue = ([], 0)
         self.visible = [row["prompt_id"] for row in self.rows]
-        self.types = {"image", "video"}
 
     def slideshow_location(self):
         return self.location
@@ -405,9 +404,6 @@ class FakeHost:
 
     def group_for_key(self, key):
         return self.groups.get(key)
-
-    def media_types(self):
-        return self.types
 
     def row_for(self, prompt_id):
         return next((r for r in self.rows if r["prompt_id"] == prompt_id), None)
@@ -2059,6 +2055,20 @@ def test_a_latest_slideshow_takes_a_new_run_after_the_browser_has_moved_on(slide
     director.note_generating("g-run", b"frame")
 
     assert made[0].generating == [("g-run", b"frame")]
+
+
+def test_a_slideshow_of_one_kinds_latest_takes_a_new_run_of_that_kind_alone(slideshows):
+    videos_latest = oriented_key(FolderCollection(RECENTS_KEY, "video").key, LANDSCAPE)
+    clip_run = _row("v-run", workflow_name="wan22_i2v", files=("v-run.mp4",))
+    browser = FakeBrowser(collections={videos_latest: [_row("v1", files=("v1.mp4",))]})
+    director, _host, made = slideshows(browser=browser, db=FakeDB([clip_run, _row("i-run")]),
+                                       fun_time=FakeSession())
+    director.open([("v1.mp4", "video", "v1", None)], location=videos_latest, side=LANDSCAPE)
+
+    director.note_generating("i-run", b"frame")
+    director.note_generating("v-run", b"frame")
+
+    assert made[0].generating == [("v-run", b"frame")]
 
 
 def test_a_latest_slideshow_turns_down_a_run_asked_for_in_the_other_shape(slideshows):

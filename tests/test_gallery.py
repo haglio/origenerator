@@ -47,7 +47,6 @@ from origenerator.gallery import (
     resolve_preview,
     row_output_files,
     rows_awaiting_enhancement,
-    rows_of_media_types,
     rows_under,
     settings_folder_key,
     settings_signature,
@@ -1603,20 +1602,6 @@ def test_recent_generations_is_uncapped():
     assert len(recent_generations(rows)) == 200
 
 
-def test_rows_of_media_types_keeps_only_the_checked_kinds():
-    # The gallery's two ticks narrow every list it draws: with only "video"
-    # checked the images drop out, and with only "image" the videos do.
-    rows = [_i2v("v2", "styleA", seed=2), _img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
-    assert [r["prompt_id"] for r in rows_of_media_types(rows, {"video"})] == ["v2", "v1"]
-    assert [r["prompt_id"] for r in rows_of_media_types(rows, {"image"})] == ["i1"]
-
-
-def test_rows_of_media_types_defaults_to_every_media_type():
-    # No filter argument keeps both — what an unfiltered list means.
-    rows = [_i2v("v1", "styleA", seed=1), _img("i1", "a cat", 50, 1)]
-    assert [r["prompt_id"] for r in rows_of_media_types(rows)] == ["v1", "i1"]
-
-
 def test_favorite_generations_collects_favorite_items_newest_first():
     rows = [_img("i3", "c", 50, 3, starred=1), _img("i2", "b", 50, 2),
             _img("i1", "a", 50, 1, starred=1)]
@@ -1635,20 +1620,6 @@ def test_favorite_generations_excludes_rows_with_no_output():
     # A favorited row that produced nothing (in-flight/failed) has nothing to show.
     favorite_wip = _row(prompt_id="wip", starred=1, output_files=None)
     assert favorite_generations([favorite_wip]) == []
-
-
-def test_recent_generations_reaches_a_lone_old_match_of_the_selected_type():
-    # A type the user has barely made is still listed however far back it sits:
-    # nothing trims the list, so the one video under five images still surfaces.
-    rows = [_img(f"i{n}", "a cat", 50, n) for n in range(5)] + [_i2v("v1", "styleA", seed=9)]
-    listed = recent_generations(rows_of_media_types(rows, {"video"}))
-    assert [r["prompt_id"] for r in listed] == ["v1"]
-
-
-def test_rows_of_media_types_with_nothing_checked_is_empty():
-    # Unchecking both ticks selects nothing, so every list the gallery draws clears.
-    rows = [_img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
-    assert rows_of_media_types(rows, set()) == []
 
 
 def _collection(*ids_and_seeds):

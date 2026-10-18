@@ -26,7 +26,7 @@ from origenerator.db import Database
 from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.collection import RECENTS_KEY, FolderCollection
 from origenerator.gallery.sides import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import desktop_notices, main_window
@@ -1238,27 +1238,14 @@ def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp
     assert reopened._gallery_view.selected_folder_key() == folder
 
 
-def test_the_collections_reopen_listing_the_kinds_they_were_closed_on(qtbot, tmp_path):
-    path = tmp_path / "ui.json"
-    first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._videos_only.setChecked(True)  # as a click does
-    first.close()
-
-    reopened = _window(qtbot, tmp_path, AppState(path))
-
-    assert reopened._gallery_view.media_types() == {MediaType.VIDEO}
-
-
-def test_a_collection_left_listing_videos_is_open_on_its_videos_after_a_restart(
-        qtbot, tmp_path):
+def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot, tmp_path):
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     view = first._gallery_view
     view.refresh()
-    latest = oriented_key(RECENTS_KEY, SEPARATE[1])
+    latest = oriented_key(FolderCollection(RECENTS_KEY, MediaType.VIDEO).key, SEPARATE[1])
     view._tree.setCurrentItem(view._tree_item_for(latest))
-    view._videos_only.setChecked(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))

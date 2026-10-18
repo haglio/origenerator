@@ -59,7 +59,6 @@ REMEMBERED = {
     ] + [view._info_tabs.tabBar()],
     "how_many": lambda view: [panel._how_many for panel in _tabs(view)],
     "toc_sides": lambda view: [view._tree.separate_button, view._tree.together_button],
-    "collection_kinds": lambda view: [view._images_only, view._videos_only, view._both_kinds],
     "open_folders": lambda view: view._tree.findChildren(QTreeView),
     "pane_sizes": lambda view: [splitter for splitter in view.findChildren(PaneSplitter)
                                 if splitter.remembered_as],

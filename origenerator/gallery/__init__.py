@@ -95,6 +95,7 @@ from origenerator.gallery.groups import (
 )
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.labels import (
+    MEDIA_LABELS,
     JobKind,
     config_folder_key,
     config_folder_name,
@@ -114,7 +115,6 @@ from origenerator.gallery.output import (
     produced_output,
     resolve_preview,
     row_output_files,
-    rows_of_media_types,
 )
 from origenerator.gallery.signatures import (
     GENERATION_SEED_KEYS,
@@ -143,6 +143,7 @@ from origenerator.gallery.tree import (
     build_gallery_tree,
     favorite_folders,
     favorite_generations,
+    folder_chain,
     folder_key_at_level,
     folder_names_by_row,
     legacy_parentless_folder_key,
@@ -179,6 +180,7 @@ __all__ = [
     "ENHANCE_WORKFLOW",
     "GENERATION_SEED_KEYS",
     "MATCH_SOURCE_MODEL",
+    "MEDIA_LABELS",
     "SELECTION_KEY",
     "AllGroup",
     "CustomGroup",
@@ -223,6 +225,7 @@ __all__ = [
     "fix_params_for",
     "fold_completed_enhancements",
     "fold_enhancement",
+    "folder_chain",
     "folder_id",
     "folder_key_at_level",
     "folder_level",
@@ -267,7 +270,6 @@ __all__ = [
     "row_output_files",
     "rows_awaiting_enhancement",
     "rows_in_settings",
-    "rows_of_media_types",
     "rows_under",
     "section_headings",
     "selection_group",

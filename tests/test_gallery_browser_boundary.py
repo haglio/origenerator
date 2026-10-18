@@ -214,8 +214,13 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     each border was dragged is the window's own, kept beside its geometry, and
     which folders are open is the TOC's. And the pane 87 -> 86: a tile is
     captioned with its item's name, which the gallery's one set of names
-    answers, so the pane's own caption-maker went.)"""
+    answers, so the pane's own caption-maker went. 285 -> 280: Images and
+    Videos are folders in the list again, each with its own five collections,
+    so the five methods that offered the Images / Videos / Both choice,
+    answered it, said what it held and saved and restored it went. And the
+    pane 86 -> 85: another Latest opens on its first page by itself, so the
+    step that choice asked for went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 285
+               for x in _class_def(VIEW, "GalleryView").body) == 280
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 86
+               for x in _class_def(PANE, "BrowserPane").body) == 85

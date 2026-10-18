@@ -3180,8 +3180,8 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
 
 
 def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
-    # The choice narrows the collection, not the folder list, so a tab showing a
-    # picture of the kind the collection is not listing still has somewhere to go.
+    # Standing in the videos' Latest leaves the folder list whole, so a tab
+    # showing a picture still has somewhere to go.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -3190,7 +3190,7 @@ def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
     view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)
     assert _folder_buttons(view)
 
-    view._videos_only.setChecked(True)
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "Latest"))
 
     (button,) = _folder_buttons(view)
     button.click()
@@ -3351,153 +3351,52 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
     assert view.visible_prompt_ids()[0] == "fresh"    # ...led by the new arrival
 
 
-def test_the_kinds_are_chosen_over_the_folders_contents_not_over_the_list(qtbot):
-    # The choice narrows what a collection lists, so it belongs to the pane the collection
-    # is drawn in — not over the folder list, which keeps every folder whichever
-    # kind is chosen.
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+def test_alls_latest_lists_both_kinds(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._both_kinds.parentWidget() is view._kinds_bar
-    assert view._images_only.parentWidget() is view._kinds_bar
-    assert view._videos_only.parentWidget() is view._kinds_bar
-    assert view._kinds_bar not in _descendants(view._tree.parentWidget())
-
-
-def _descendants(widget):
-    return widget.findChildren(QWidget) if widget is not None else []
-
-
-def test_each_kind_wears_a_mark_beside_its_word(qtbot):
-    # Three bare words; each now carries the mark for what it lists.
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    marks = [kind.icon() for kind in
-             (view._images_only, view._videos_only, view._both_kinds)]
-
-    assert [mark.isNull() for mark in marks] == [False, False, False]
-    assert len({mark.cacheKey() for mark in marks}) == 3
-
-
-def test_the_kinds_open_on_both_and_are_offered_on_a_collection_alone(qtbot):
-    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    # Both to start, so the gallery opens listing every kind.
-    assert view._both_kinds.isChecked()
-
-    # A folder holds one kind by construction, so there is nothing to choose
-    # there; a collection gathers both, which is where the question belongs.
-    view._tree.setCurrentItem(_image_workflow(view._tree))
-    assert view._kinds_bar.isHidden()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert not view._kinds_bar.isHidden()
+
+    assert set(view.visible_prompt_ids()) == {"i1", "v1"}
 
 
-def test_both_radios_wear_the_waiting_cursor_while_they_redraw(qtbot, monkeypatch):
+def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monkeypatch):
     # A redraw holds the window thread, so without this the window reads as dead
     # for as long as it takes rather than as working.
-    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     while_drawing = []
-    for owner, name in ((view, "_recount_the_collections"), (view, "refresh")):
-        real = getattr(owner, name)
-        monkeypatch.setattr(owner, name, lambda *a, _real=real: (
-            while_drawing.append(QApplication.overrideCursor()), _real(*a))[1])
+    real = view.refresh
+    monkeypatch.setattr(view, "refresh", lambda *a: (
+        while_drawing.append(QApplication.overrideCursor()), real(*a))[1])
 
-    view._videos_only.setChecked(True)
     view._tree.together_button.click()
 
-    assert [cursor and cursor.shape() for cursor in while_drawing] == [
-        Qt.CursorShape.WaitCursor, Qt.CursorShape.WaitCursor]
+    assert [cursor and cursor.shape() for cursor in while_drawing] == [Qt.CursorShape.WaitCursor]
     assert QApplication.overrideCursor() is None
 
 
-def test_choosing_one_kind_lists_the_collection_again_and_leaves_the_list_alone(
-        qtbot, monkeypatch):
-    # Every choice used to re-read the library and build the whole table of
-    # contents again -- twice over, since the button going off reports as well
-    # as the one coming on -- which took seconds on a full library and could
-    # not change a single folder (test_choosing_one_kind_leaves_every_folder_
-    # in_the_list says why).
-    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
+def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot, monkeypatch):
+    # Opening a collection cannot change a single folder, so the table of
+    # contents is not built again for it -- a build takes seconds on a full library.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     built = []
     monkeypatch.setattr(gallery, "build_gallery_tree",
                         lambda *a, **k: built.append(1) or [])
 
-    view._videos_only.setChecked(True)
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "Latest"))
 
     assert view.visible_prompt_ids() == ["v1"]
     assert built == []
 
 
-def test_choosing_one_kind_lists_only_that_kind_on_a_collection(qtbot):
-    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert set(view.visible_prompt_ids()) == {"i1", "v1"}  # Both, to start
-
-    view._images_only.setChecked(True)
-    assert view.visible_prompt_ids() == ["i1"]
-
-    view._videos_only.setChecked(True)
-    assert view.visible_prompt_ids() == ["v1"]
-
-    view._both_kinds.setChecked(True)
-    assert set(view.visible_prompt_ids()) == {"i1", "v1"}
-
-
-def test_choosing_one_kind_leaves_every_folder_in_the_list(qtbot):
-    # What the move fixes: clicking an image in a video's "from source image"
-    # section can navigate to that image's folder even while the collections are
-    # listing videos, because the list still holds every folder.
-    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-    both = list(_workflow_rows(view._tree))
-    assert len(both) == 2
-
-    view._videos_only.setChecked(True)
-    assert list(_workflow_rows(view._tree)) == both
-
-    view._images_only.setChecked(True)
-    assert list(_workflow_rows(view._tree)) == both
-
-
-def test_choosing_one_kind_leaves_every_sides_folders_standing(qtbot):
-    # One picture of each shape, so both sides have a folder to lose.
-    rows = [_row("i1", "sdxl_t2i", {"positive_prompt": "a cat", "steps": 50, "seed": 5,
-                                    "width": 100, "height": 200}, "sdxl_t2i_i1.png"),
-            _row("i2", "sdxl_t2i", {"positive_prompt": "a cat", "steps": 50, "seed": 6,
-                                    "width": 200, "height": 100}, "sdxl_t2i_i2.png")]
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-    assert all(_subs(_top_level(view._tree, side)["All"]) for side in (PORTRAIT, LANDSCAPE))
-
-    view._videos_only.setChecked(True)
-
-    assert all(_subs(_top_level(view._tree, side)["All"]) for side in (PORTRAIT, LANDSCAPE))
-
-
-def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
-    # A filter change is a new listing, not a redraw of the old one, so the collection
-    # starts over at its newest item instead of holding the pages already scrolled.
+def test_another_latest_opens_on_its_first_page(qtbot):
+    # Another Latest is a new listing, not a redraw of the one on screen, so it
+    # starts at its newest item instead of holding the pages already scrolled.
     view = GalleryView(FakeDB(_many_recents(120)))
     qtbot.addWidget(view)
     view.refresh()
@@ -3507,24 +3406,23 @@ def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
     bar.setValue(bar.maximum())
     assert len(view.visible_prompt_ids()) == 100
 
-    view._images_only.setChecked(True)  # images only — still all 120 of them
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
 
     assert len(view.visible_prompt_ids()) == 50
     assert view.visible_prompt_ids()[0] == "i119"
 
 
-def test_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
-    # The filter narrows the whole collection, so an in-flight card of a hidden type
-    # drops out alongside the finished thumbnails.
+def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("rr1", workflow="wan22_i2v"))  # a running video
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert "rr1" in view._browser._inflight_cards               # shown by default
+    assert "rr1" in view._browser._inflight_cards
 
-    view._images_only.setChecked(True)         # videos left out of the collection
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
+
     assert "rr1" not in view._browser._inflight_cards
 
 
@@ -3934,18 +3832,16 @@ def test_entering_an_empty_path_goes_nowhere_and_says_nothing(qtbot, monkeypatch
     assert told == []
 
 
-def test_a_folder_of_each_kind_keeps_its_name_whichever_kind_is_chosen(qtbot):
+def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
     still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
     clip = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
     view = GalleryView(FakeDB([still, clip]))
     qtbot.addWidget(view)
     view.refresh()
     looping = workflow_label("wan22_flf2v_loop")
-    assert {f"{looping} images", f"{looping} videos"} <= set(_workflow_rows(view._tree))
 
-    view._videos_only.setChecked(True)
-
-    assert {f"{looping} images", f"{looping} videos"} <= set(_workflow_rows(view._tree))
+    assert list(_workflow_rows(view._tree, "image")) == [f"{looping} images"]
+    assert list(_workflow_rows(view._tree, "video")) == [f"{looping} videos"]
 
 
 def test_with_several_folders_picked_the_path_opens_empty(qtbot):
@@ -7688,18 +7584,16 @@ def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
     view._slideshows.showing.close()
 
 
-def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
+def test_a_slideshow_of_one_kinds_latest_plays_that_kind_alone(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
-    view._images_only.setChecked(True)  # the collection now lists images only
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
 
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing)
-    # It plays what the collection shows, not everything recent.
     assert [item[2] for item in view._slideshows.showing._playlist._items] == ["i1"]
     view._slideshows.showing.close()
 
@@ -13862,28 +13756,6 @@ def test_a_folder_of_your_own_is_drawn_only_on_the_side_it_was_made_on(qtbot):
 
     assert "Keepers" in _top_level(view._tree, PORTRAIT)
     assert "Keepers" not in _top_level(view._tree, LANDSCAPE)
-
-
-def test_a_folder_saved_before_folders_had_a_side_stays_put_when_the_ticks_hide_what_it_holds(
-        qtbot):
-    tall_video = _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5,
-                                          "width": 100, "height": 200}, "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([tall_video]))
-    qtbot.addWidget(view)
-    folder_id = view._db.create_custom_folder("Keepers")
-    view._db.add_custom_folder_items(
-        folder_id, [(gallery.settings_folder_key(tall_video), None, None)])
-    view.refresh()
-
-    def sides_showing_it():
-        return [side for side in (PORTRAIT, LANDSCAPE)
-                if "Keepers" in _top_level(view._tree, side)]
-
-    before = sides_showing_it()
-
-    view._images_only.setChecked(True)
-
-    assert sides_showing_it() == before
 
 
 def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):

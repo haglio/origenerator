@@ -256,9 +256,8 @@ class _Row(QWidget):
         key_width = label_column_width([MetaItem(key, "") for key in _FACT_KEYS])
         for line, item in enumerate(items, start=1):
             label, value, copy, reveal = meta_cells(item, key_width)
-            cells = (label, value, copy,
-                     beside_copy if copy is not None else None, reveal)
-            for column, widget in enumerate(cells):
+            beside = (beside_copy,) if beside_copy is not None and copy is not None else ()
+            for column, widget in enumerate((label, value, copy, *beside, reveal)):
                 if widget is None:
                     continue
                 if isinstance(widget, QLabel):
@@ -295,7 +294,7 @@ class _LevelRow(_Row):
     delete_pressed = pyqtSignal(int)
 
     def __init__(self, level, position: int, image_path, created_fallback: str = "",
-                 held_days: int | None = None, parent=None):
+                 held_days: int | None = None, deletable: bool = False, parent=None):
         super().__init__(level.label, parent)
         self._position = position
         self._params = dict(level.params)
@@ -319,11 +318,12 @@ class _LevelRow(_Row):
             items.append(MetaItem("Enhancement", level.settings))
         items.append(file_item(level.file, held_days=held_days))
         items.append(created_item(level.file, created_fallback))
-        self._delete = IconButton(icons.delete_icon(), "Delete this version",
-                                  "deleteButton")
-        self._delete.clicked.connect(
-            lambda _checked=False: self.delete_pressed.emit(self._position))
-        self._show_facts(items, beside_copy=self._delete)
+        trash = None
+        if deletable:
+            trash = IconButton(icons.delete_icon(), "Delete this version", "deleteButton")
+            trash.clicked.connect(
+                lambda _checked=False: self.delete_pressed.emit(self._position))
+        self._show_facts(items, beside_copy=trash)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # so Delete reaches the list
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -338,10 +338,6 @@ class _LevelRow(_Row):
 
     def position(self) -> int:
         return self._position
-
-    def refuse_delete(self, reason: str) -> None:
-        self._delete.setEnabled(False)
-        self._delete.setToolTip(reason)
 
     def is_selected(self) -> bool:
         return self._selected
@@ -497,6 +493,7 @@ class EnhanceVersions(QWidget):
         self._pending: _PendingRow | None = None
         self._rows: list[_LevelRow] = []
         self._deletable = True
+        self._versions_listed = 0
         self.hide()
 
     def is_collapsed(self) -> bool:
@@ -544,6 +541,7 @@ class EnhanceVersions(QWidget):
         self._pending = None
         self._rows = []
         self._deletable = deletable
+        self._versions_listed = len(items)
         # One leading slot, held by whichever of the two applies: the run in
         # flight if there is one, else the row that would start it.
         if pending is not None:
@@ -557,15 +555,13 @@ class EnhanceVersions(QWidget):
                 lambda on, at=add.duplicate_of: self._highlight_level(at, on))
             column.addWidget(card)
         for position, (level, image_path) in enumerate(items):
-            row = _LevelRow(level, position, image_path, created_fallback, held_days)
+            row = _LevelRow(level, position, image_path, created_fallback, held_days,
+                            deletable=self._may_delete([position]))
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
             row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))
             self._rows.append(row)
             column.addWidget(row)
-        for row in self._rows:
-            if not self._may_delete([row.position()]):
-                row.refuse_delete(self._refusal())
         form.addRow(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
 
@@ -609,13 +605,10 @@ class EnhanceVersions(QWidget):
             # Grayed with the reason on it rather than absent: the answer to
             # "why can't I delete this" is the only thing the menu can offer.
             action.setEnabled(False)
-            action.setText(self._refusal())
+            action.setText("Delete (this is the image's only version)" if self._deletable
+                           else "Delete (a video's versions can't be deleted here)")
         if menu.exec(global_pos) is action and self._may_delete(picked):
             self.delete_requested.emit(picked)
-
-    def _refusal(self) -> str:
-        return ("Delete (this is the image's only version)" if self._deletable
-                else "Delete (a video's versions can't be deleted here)")
 
     def _may_delete(self, positions: list[int]) -> bool:
         """Whether these versions are this list's to bin, and binning
@@ -625,7 +618,8 @@ class EnhanceVersions(QWidget):
         generation is the gallery's own action, reached from its thumbnail — a
         version list quietly doing it would be a much bigger delete than the one
         that was asked for."""
-        return self._deletable and bool(positions) and len(positions) < len(self._rows)
+        return (self._deletable and bool(positions)
+                and len(positions) < self._versions_listed)
 
     def keyPressEvent(self, event):
         """Delete or Backspace bins the picked levels — the keys that delete a

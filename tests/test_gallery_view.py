@@ -12206,8 +12206,8 @@ def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp
     assert not view._bank.undo.isHidden()
 
 
-def test_pressing_a_versions_trash_can_bins_that_level_and_grays_the_last_ones(qtbot,
-                                                                              tmp_path):
+def test_pressing_a_versions_trash_can_bins_that_level_and_the_last_one_has_none(qtbot,
+                                                                                tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -12225,7 +12225,7 @@ def test_pressing_a_versions_trash_can_bins_that_level_and_grays_the_last_ones(q
     ]
     assert view._actions.can_undo()
     (original,) = panel._versions._host.findChildren(_LevelRow)
-    assert not original.findChild(QPushButton, "deleteButton").isEnabled()
+    assert original.findChild(QPushButton, "deleteButton") is None
 
 
 def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):

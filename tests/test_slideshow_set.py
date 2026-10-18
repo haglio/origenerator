@@ -15,6 +15,7 @@ from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import LIVE, SlideshowFilters, in_order
+from tests.slideshow_support import slides_named
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -717,6 +718,20 @@ def test_a_loop_is_left_naming_what_it_plays_with_the_slide_it_began_on_first():
 
     assert (left.loop, left.loop_pool) == ("seed", ("id-1", "id-1b", "id-1c"))
     assert left.current == "id-1b"
+
+
+def test_a_loop_picked_back_up_plays_its_own_slides_from_the_one_it_was_left_on():
+    beyond = (Slide("far.png", "image", "id-far"),)
+    closed, _dealt = _mapped(widen=lambda pid: beyond if pid == "id-1" else ())
+    closed.more_seeds()
+    for _ in range(3):
+        closed.playlist.advance()
+
+    reopened, _dealt = _mapped(slides=slides_named(*closed.playlist.items))
+    assert reopened.resume(closed.state(locked=False, level_index=0)) is True
+
+    assert reopened.current_prompt_id() == "id-far"
+    assert reopened.map() == closed.map()
 
 
 # --- the act filter: the map's row buttons, and the session's spoken acts ------

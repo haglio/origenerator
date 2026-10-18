@@ -489,6 +489,7 @@ class SlideshowDirector:
             neighbors=partial(self.neighbors_of, side=side),
             widen=partial(self.beyond_the_row_of, side=side),
             acts=partial(self.acts_of, side=side),
+            slides=self.slides_for,
             move_hud=partial(self.move_the_hud, side=side),
             filters_changed=self._note_filters,
         )
@@ -676,6 +677,10 @@ class SlideshowDirector:
                                image_index=self._host.image_config_index())
         return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
                 if prompt_id in named_for}
+
+    def slides_for(self, prompt_ids) -> tuple[Slide, ...]:
+        return self._slides_of(row for row in map(self._db.get_generation, prompt_ids)
+                               if row is not None)
 
     def rows_at(self, location) -> list[dict]:
         """What a slideshow opened at *location* would play if it opened now.

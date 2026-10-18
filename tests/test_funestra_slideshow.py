@@ -26,6 +26,7 @@ from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
+from tests.slideshow_support import slides_named
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -704,18 +705,22 @@ def test_a_loop_hands_the_funestra_the_row_to_play_and_its_ending_hands_back_the
     assert said[-1] == "Loop off"
 
 
-def test_a_slideshow_closed_looping_a_row_reopens_looping_it(qtbot, tmp_path):
-    closed = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
-    closed.slideshow_loop("seed")
+def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(qtbot, tmp_path):
+    library = SlideshowActions(neighbors=_around, slides=slides_named(
+        Slide("one.png", "image", "id-1"), Slide("one-x.png", "image", "id-1x")))
+    closed = _slideshow(qtbot, tmp_path, actions=library)
+    closed.slideshow_loop("action")
+    closed.show_item("one-x.png")
 
     elsewhere = tmp_path / "reopened"
     elsewhere.mkdir()
-    reopened = _slideshow(qtbot, elsewhere, actions=SlideshowActions(neighbors=_around))
+    reopened = _slideshow(qtbot, elsewhere, actions=library)
     reopened.resume(closed.state())
 
     played = [str(item.path) for item in read_playlist(reopened.channel.playlist)]
-    assert played == ["one.png", "one-b.png"]
-    assert parse_hud(reopened.channel.hud_file.read_text(encoding="utf-8")).active_loop == "seed"
+    assert played == ["one-x.png", "one.png"]
+    assert parse_hud(reopened.channel.hud_file.read_text(encoding="utf-8")).active_loop == "action"
+    assert reopened.hud_map() == closed.hud_map()
 
 
 def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):

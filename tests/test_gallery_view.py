@@ -8095,6 +8095,113 @@ def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeyp
     view._slideshows.showing.close()
 
 
+def _resolve_each_to_its_own_kind(monkeypatch):
+    """Resolve a picture's preview to an image and a video's to a video, the way
+    a slideshow of a picture and the videos animated from it plays them."""
+    monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: (
+        (f"{row['prompt_id']}.mp4", "video") if row["workflow_name"] == "wan22_i2v"
+        else (f"{row['prompt_id']}.png", "image")))
+
+
+def _animated_from(prompt_id, picture, seed):
+    """A video animated from *picture*: a row down that picture's column on the
+    Nav Map."""
+    return _row(prompt_id, "wan22_i2v",
+                {"positive_prompt": "dance", "input_image": f"sdxl_t2i_{picture}.png",
+                 "seed": seed},
+                f"wan22_i2v_{prompt_id}.mp4")
+
+
+def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, picture):
+    """The Slideshow button pressed on the landscape folder holding *picture*,
+    the slideshow then stood on that picture by its cell on the Nav Map."""
+    _resolve_each_to_its_own_kind(monkeypatch)
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    _keys_are_the_gallerys(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id[picture])
+    view._bank.slideshow.click()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    slideshow.press(f"{slideshow.hud_side}_play_video|{picture}.png")
+    return view, slideshow
+
+
+def _looping_actions_on_a_video(qtbot, monkeypatch):
+    """A folder of two pictures, the first animated twice, looping that picture's
+    actions from the panel's loop button and standing on the first video."""
+    view, slideshow = _slideshow_of_the_folder_of(
+        qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
+                             _animated_from("v1", "p1", 1), _animated_from("v2", "p1", 2)],
+        "p1")
+    slideshow.press(f"{slideshow.hud_side}_action_loop")
+    slideshow.press(f"{slideshow.hud_side}_next")
+    return view, slideshow
+
+
+def _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch):
+    """A folder of two seeds of one picture, its row widened by "more seeds" to a
+    picture of the next folder over, and standing on that one."""
+    view, slideshow = _slideshow_of_the_folder_of(
+        qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
+                             _image("p3", "a cat sitting", 50, 3)],
+        "p1")
+    slideshow.press(f"{slideshow.hud_side}_more_seeds")
+    slideshow.press(f"{slideshow.hud_side}_next")
+    slideshow.press(f"{slideshow.hud_side}_next")
+    return view, slideshow
+
+
+def _with_the_slideshow_button(view):
+    view._bank.slideshow.click()
+
+
+def _with_esc_again(view):
+    _press_escape(view)
+
+
+_REOPENINGS = pytest.mark.parametrize(
+    "reopen", [_with_the_slideshow_button, _with_esc_again], ids=["slideshow_button", "esc_again"])
+
+
+@_REOPENINGS
+def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
+        qtbot, monkeypatch, reopen):
+    # The Nav Map is part of where a slideshow was left: closed looping a picture's
+    # actions, the next one loops them again, standing where the last stood --
+    # which in an action loop is one of the picture's videos as often as not.
+    view, slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
+    looping, standing_on = slideshow.hud_map(), slideshow._playlist.current()
+    assert (looping.loop, standing_on.prompt_id) == ("action", "v1")
+
+    _press_escape(view)
+    reopen(view)
+
+    reopened = view._slideshows.showing
+    qtbot.addWidget(reopened)
+    assert reopened.hud_map() == looping
+    assert reopened._playlist.current() == standing_on
+    reopened.close()
+
+
+@_REOPENINGS
+def test_a_row_more_seeds_widened_reopens_widened_where_it_stood(qtbot, monkeypatch, reopen):
+    view, slideshow = _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch)
+    widened, standing_on = slideshow.hud_map(), slideshow._playlist.current()
+    assert ([seed.prompt_id for seed in widened.seeds], standing_on.prompt_id) == (
+        ["p2", "p3"], "p3")
+
+    _press_escape(view)
+    reopen(view)
+
+    reopened = view._slideshows.showing
+    qtbot.addWidget(reopened)
+    assert reopened.hud_map() == widened
+    assert reopened._playlist.current() == standing_on
+    reopened.close()
+
+
 def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
     # The neighbor stills either side of the shown item are drawn from these —
     # a video has no other still to show small.

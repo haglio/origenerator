@@ -1769,6 +1769,7 @@ def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows
     assert [slide.prompt_id for slide in actions.neighbors("g1").seeds] == ["g2"]
     assert actions.widen("g1") == ()
     assert actions.acts(["g1"]) == {"g1": ""}
+    assert [slide.prompt_id for slide in actions.slides(("g2", "nobody", "g1"))] == ["g2", "g1"]
     actions.favorite("g1")
     actions.unfavorite("g1")
     assert host.favorited == []

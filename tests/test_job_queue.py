@@ -1631,3 +1631,236 @@ def test_taking_the_shield_off_with_only_videos_waiting_leaves_the_run_going(qtb
 
     client.interrupt.assert_not_called()
     assert queue.queue_order == [video.prompt_id, later.prompt_id]
+
+
+# --- a video waits for the enhancement of the picture it starts from ----------
+
+_ENHANCE = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
+_PICTURE = "image/picture_00001_.png [output]"
+_ENHANCED = {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}
+_ENHANCED_REF = "image/image_enhance_00001_.png [output]"
+
+
+def _launch_enhance(queue, key, picture=_PICTURE):
+    queue.start_prepared(key, _ENHANCE, {**_ENHANCE.default_params(), "input_image": picture})
+    return queue.newest_job_for(key)
+
+
+def _a_minute_later(queue, now):
+    """The minute a video waits after the last picture asked for, here an
+    enhancement, gone by, and the timer's call delivered."""
+    now[0] += 60
+    queue._videos_wait.timeout.emit()
+
+
+def test_a_video_asked_for_while_its_picture_is_enhanced_is_made_from_the_enhancement(
+        qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    now = [1000.0]
+    queue = JobQueue(db, client, clock=lambda: now[0])
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+
+    enhance.finished.emit([_ENHANCED], None, 1.0)
+    _a_minute_later(queue, now)
+
+    payload, prompt_id = client.submit_job.call_args_list[-1].args
+    assert prompt_id == video.prompt_id
+    assert _ENHANCED_REF in json.dumps(payload)
+    row = db.get_generation(video.prompt_id)
+    assert json.loads(row["params_json"])["input_image"] == _ENHANCED_REF
+    assert json.loads(row["workflow_json"]) == payload
+
+
+def test_the_video_waiting_on_an_enhancement_is_sent_after_the_enhancement_is_announced(
+        qtbot, tmp_path):
+    client = _client()
+    now = [1000.0]
+    queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+    now[0] += 120  # the enhancement asked for long ago: no minute left to wait
+    sent_by_the_announcement = []
+    queue.finished.connect(
+        lambda *_: sent_by_the_announcement.append(client.submit_job.call_count))
+
+    enhance.finished.emit([_ENHANCED], None, 1.0)
+
+    assert sent_by_the_announcement == [1]
+    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
+
+
+def test_a_video_dragged_ahead_of_its_pictures_enhancement_stays_behind_it(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    locked = _launch_image(queue, "i", seed=1)
+    queue.put_first({locked.prompt_id})
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+
+    queue.reorder([video.prompt_id, enhance.prompt_id])
+
+    assert queue.queue_order == [locked.prompt_id, enhance.prompt_id, video.prompt_id]
+
+
+def test_closing_keeps_back_a_video_waiting_for_its_pictures_enhancement(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+    other = _launch_video(queue, "w", input_image="image/another_00002_.png [output]")
+
+    queue.flush_to_server()
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [
+        enhance.prompt_id, other.prompt_id]
+    assert db.get_generation(video.prompt_id)["status"] == "pending"
+
+
+_PLAIN = {"filename": "picture_00001_.png", "subfolder": "image", "type": "output"}
+
+
+def _picture(db, *, enhanced=False):
+    """The image a video starts from, enhanced or still plain."""
+    db.insert_generation(prompt_id="picture", workflow_name=_IMAGE_WF, workflow_version="v",
+                         params_json="{}", workflow_json="{}")
+    db.update_generation(
+        "picture", status="completed",
+        output_files=json.dumps([_ENHANCED, _PLAIN] if enhanced else [_PLAIN]),
+        original_files=json.dumps([_PLAIN]) if enhanced else None)
+
+
+def _enhanced_into(queue, enhanced):
+    queue.enhance_pictures_with(lambda picture: enhanced.append(picture["prompt_id"]))
+    return queue
+
+
+def test_a_video_from_a_picture_never_enhanced_has_the_picture_enhanced_first(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    _picture(db)
+    enhanced = []
+    queue = _enhanced_into(JobQueue(db, _client()), enhanced)
+
+    _launch_video(queue, "v", input_image=_PICTURE)
+
+    assert enhanced == ["picture"]
+
+
+def test_a_picture_already_being_enhanced_is_not_enhanced_again_for_a_video(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    _picture(db)
+    enhanced = []
+    queue = _enhanced_into(JobQueue(db, _client()), enhanced)
+    _launch_enhance(queue, "e")
+
+    _launch_video(queue, "v", input_image=_PICTURE)
+
+    assert enhanced == []
+
+
+def test_a_video_from_the_plain_version_of_an_enhanced_picture_is_made_from_the_enhancement(
+        qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    _picture(db, enhanced=True)
+    enhanced = []
+    queue = _enhanced_into(JobQueue(db, client), enhanced)
+
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+
+    payload, prompt_id = client.submit_job.call_args_list[-1].args
+    assert prompt_id == video.prompt_id
+    assert _ENHANCED_REF in json.dumps(payload)
+    row = db.get_generation(video.prompt_id)
+    assert json.loads(row["params_json"])["input_image"] == _ENHANCED_REF
+    assert json.loads(row["workflow_json"]) == payload
+    assert enhanced == []
+
+
+def test_a_video_asked_for_on_an_enhancement_is_made_from_it_as_asked(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    _picture(db, enhanced=True)
+    enhanced = []
+    queue = _enhanced_into(JobQueue(db, _client()), enhanced)
+
+    video = _launch_video(queue, "v", input_image=_ENHANCED_REF)
+
+    assert video.params["input_image"] == _ENHANCED_REF
+    assert enhanced == []
+
+
+def test_a_start_image_no_gallery_picture_holds_is_made_from_as_it_is(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    _picture(db)
+    enhanced = []
+    queue = _enhanced_into(JobQueue(db, _client()), enhanced)
+
+    video = _launch_video(queue, "v", input_image="from_elsewhere.png")
+
+    assert video.params["input_image"] == "from_elsewhere.png"
+    assert enhanced == []
+
+
+def test_a_video_whose_start_image_is_sent_for_enhancement_waits_and_is_made_from_it(
+        qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    _picture(db)
+    now = [1000.0]
+    queue = JobQueue(db, client, clock=lambda: now[0])
+    queue.enhance_pictures_with(lambda picture: _launch_enhance(queue, "e"))
+
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+    enhance = queue.newest_job_for("e")
+    enhance.finished.emit([_ENHANCED], None, 1.0)
+    _a_minute_later(queue, now)
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [
+        enhance.prompt_id, video.prompt_id]
+    assert _ENHANCED_REF in json.dumps(client.submit_job.call_args_list[-1].args[0])
+
+
+def test_a_video_held_over_a_restart_starts_from_the_enhancement_its_picture_gained(
+        qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    _pending_row(db, "video", params=_params(input_image=_PICTURE))
+    _picture(db, enhanced=True)
+    queue = _enhanced_into(JobQueue(db, client), [])
+
+    queue.reconnect_running()
+
+    assert _ENHANCED_REF in json.dumps(client.submit_job.call_args_list[-1].args[0])
+    assert json.loads(db.get_generation("video")["params_json"])["input_image"] == _ENHANCED_REF
+
+
+def test_a_video_waiting_on_an_enhancement_that_fails_fails_with_it(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    failed = []
+    queue.failed.connect(lambda key, message: failed.append(key))
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+
+    enhance.failed.emit("the sampler ran out of memory")
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [enhance.prompt_id]
+    assert db.get_generation(video.prompt_id)["status"] == "error"
+    assert failed == ["e", "v"]
+
+
+def test_cancelling_the_enhancement_a_video_waits_on_cancels_the_video_too(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_PICTURE)
+
+    queue.cancel_job(enhance.prompt_id)
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [enhance.prompt_id]
+    assert db.get_generation(video.prompt_id) is None
+    assert queue.all_jobs == []

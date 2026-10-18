@@ -561,6 +561,8 @@ class GalleryView(QWidget):
         self._enhance = EnhanceController(
             self, db=db, jobs=self._jobs, browser=self._browser,
             slideshows=self._slideshows, info_tabs_of=lambda: self._info_tabs)
+        self._jobs.enhance_pictures_with(
+            lambda picture: self._enhance.enhance_items([picture["prompt_id"]]))
         # Everything spoken: the microphone, the caption that says what it heard,
         # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
         # caption is placed by _build_ui, and the bank it presses is bound to it

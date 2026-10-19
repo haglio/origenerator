@@ -1,9 +1,9 @@
 """What else in the library a shown generation is tied to.
 
-The links under a config tab's settings form: the item this row was built from
-with, beside it, the video whose settings Combine ran on it, and the videos an
-image was animated into. A video has the first two and no animations, an image
-the other way round.
+The links under a config tab's settings form: a section headed Source holding
+the item this row was built from and, beside it, the video whose settings
+Combine ran on it, then the videos an image was animated into. A video has a
+Source and no animations, an image the other way round.
 
 "Built from" is one slot answering three relations, because they are one
 question: a video's start frame, the item a spoken request revised, and — for the
@@ -33,6 +33,7 @@ from origenerator.gallery import (
     videos_from_source_image,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
+from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
 
@@ -66,18 +67,27 @@ class RelatedMedia(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)
         self._source_tile = SourceTile()
-        self._source_tile.activated.connect(self.source_activated)
         self._source_video_tile = SourceTile()
-        self._source_video_tile.activated.connect(self.source_activated)
-        built_from = QHBoxLayout()
-        built_from.setSpacing(GAP_MEDIUM)
-        built_from.addWidget(self._source_tile)
-        built_from.addWidget(self._source_video_tile)
-        built_from.addStretch(1)
-        layout.addLayout(built_from)
+        self._source_section = self._section_holding(self._source_tile,
+                                                     self._source_video_tile)
+        layout.addWidget(self._source_section)
         self._animated_strip = AnimatedVideoStrip()
         self._animated_strip.video_activated.connect(self.animated_activated)
         layout.addWidget(self._animated_strip)
+
+    def _section_holding(self, *tiles: SourceTile) -> CollapsibleSection:
+        side_by_side = QWidget()
+        row = QHBoxLayout(side_by_side)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(GAP_MEDIUM)
+        for tile in tiles:
+            tile.activated.connect(self.source_activated)
+            row.addWidget(tile)
+        row.addStretch(1)
+        section = CollapsibleSection("Source")
+        section.content_form().addRow(side_by_side)
+        section.hide()
+        return section
 
     def show_row(self, row: dict, image_rows: list[dict], request=None) -> None:
         """Point at what ``row`` is tied to, and at nothing the last one was.
@@ -88,13 +98,22 @@ class RelatedMedia(QWidget):
         """
         self._show_source_tile(row, image_rows, request)
         self._show_source_video_tile(row)
+        self._source_section.setVisible(
+            not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         # Hides itself when empty, which for anything but an animated image it is.
         self._animated_strip.show_videos(self._animated_items(row))
+
+    def is_source_folded(self) -> bool:
+        return self._source_section.is_collapsed()
+
+    def set_source_folded(self, folded: bool) -> None:
+        self._source_section.set_collapsed(folded)
 
     def clear(self) -> None:
         """Put every link down — the tab has no generation on display."""
         self._source_tile.clear()
         self._source_video_tile.clear()
+        self._source_section.hide()
         self._animated_strip.hide()
 
     def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):

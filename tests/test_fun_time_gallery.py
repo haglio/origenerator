@@ -1469,6 +1469,26 @@ def test_a_gallery_taken_into_a_session_opens_its_next_slideshow_on_a_region(qtb
     assert slideshow.windowTitle() == "Origenerator Portrait"
 
 
+def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_shapes_side(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=2)
+    watched = view._slideshows.showing
+    qtbot.addWidget(watched)
+    assert view.slideshow_showing_on() == "portrait"
+
+    view.become_hosted(_session())
+    monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
+    open_both_sides(view._slideshows)
+
+    carried = view.region_slideshow("portrait")
+    assert carried is not None
+    qtbot.addWidget(carried)
+    assert [slide.prompt_id for slide in carried.whole_set()] == ["id-tall-0", "id-tall-1"]
+    assert view.region_slideshow("landscape") is None
+
+
 def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_session(qtbot):
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), osr2_motion=motion)

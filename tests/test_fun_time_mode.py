@@ -222,6 +222,13 @@ def test_region_for_items_takes_the_majority_orientation(tmp_path):
     assert region_for_items(items) == "portrait"
 
 
+def test_a_tie_between_the_shapes_goes_to_landscape_the_roomier_region(tmp_path):
+    tall = _png(tmp_path / "tall.png", 100, 200)
+    wide = _png(tmp_path / "wide.png", 200, 100)
+    items = [(str(tall), "image", "a", str(tall)), (str(wide), "image", "b", str(wide))]
+    assert region_for_items(items) == "landscape"
+
+
 def test_region_for_items_routes_a_running_slideshows_own_slides(tmp_path):
     # A slideshow already playing asks again when its region has to be re-decided,
     # and what it holds are slides rather than the tuples the browser built.

@@ -330,8 +330,7 @@ class SlideshowView(QWidget):
     def _tell_the_engine_what_keeps_the_slide(self) -> None:
         playback = self._pane.playback
         if playback is not None:
-            playback.set_locked(self._playlist.locked_or_paused() or self._live
-                                or not self._dwell_s)
+            playback.set_locked(self._playlist.locked_or_paused() or self._live)
 
     def _the_funestra_opened(self) -> None:
         self._settle()
@@ -905,7 +904,7 @@ class SlideshowView(QWidget):
 
     @property
     def dwell_s(self) -> int:
-        """The seconds this slideshow leaves an unlocked slide up; nought holds it."""
+        """The seconds this slideshow leaves an unlocked slide up."""
         return self._dwell_s
 
     @property
@@ -1146,13 +1145,8 @@ class SlideshowView(QWidget):
         self.cull()
 
     def set_dwell_s(self, seconds: int) -> None:
-        """Take a new pace, and hand it on: the number is app-wide, so a slideshow
-        opened at nought that is turned up sets the pace for the next one too.
-
-        Applied here as well as posted to the pace, rather than only waiting for
-        the signal back — a slideshow sitting at nought while the app-wide pace already
-        reads one gets no signal from a step up to one, and would stay frozen.
-        """
+        """Take a new pace, and hand it on: the number is app-wide, so the next
+        slideshow opens at it too."""
         self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
         self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
 
@@ -1278,9 +1272,8 @@ class SlideshowView(QWidget):
     def _on_media_unplayable(self):
         """A file the Funestra will not open: step past it, whatever holds it.
 
-        Unlike a clip that ended, this one never will, so the replay a lock or
-        a pace of nought asks for would hold a black screen for the rest of the
-        session.  The item stays in the set — the fault is the backend's, not
+        Unlike a clip that ended, this one never will, so the replay a lock
+        asks for would hold a black screen for the rest of the session.  The item stays in the set — the fault is the backend's, not
         the file's — but the slideshow moves on.
 
         A pause is the one stop this yields to: the slideshow is frozen, and a slideshow

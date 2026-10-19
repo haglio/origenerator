@@ -125,19 +125,6 @@ def test_a_locked_or_empty_playlist_has_no_dwell():
     assert SlideshowPlaylist([]).dwell_ms() is None
 
 
-def test_a_pace_of_nought_means_never_move_on():
-    # What a double-clicked picture opens at: the slide holds the screen until an
-    # arrow moves it, rather than advancing the instant the timer is armed with 0.
-    playlist = _playlist(image_dwell_ms=0)
-    assert playlist.dwell_ms() is None
-
-
-def test_turning_the_pace_up_off_nought_starts_it_moving():
-    playlist = _playlist(image_dwell_ms=0)
-    playlist.image_dwell_ms = 3000
-    assert playlist.dwell_ms() == 3000
-
-
 # --- opening on a chosen item -----------------------------------------------
 
 def test_a_pass_can_start_on_a_named_item():

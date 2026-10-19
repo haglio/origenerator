@@ -13,9 +13,6 @@ Videos aren't dwell-timed: they play once and the view advances when they end,
 so ``dwell_ms`` returns ``None`` for them. Keeping this a plain, Qt-free object
 lets the policy be unit-tested without a window or a clock.
 
-A dwell of zero means never: the slideshow holds whatever is on screen until an arrow
-moves it.
-
 A third stop — :attr:`SlideshowPlaylist.paused` — is the slideshow's own rather than
 the user's: speaking a request keeps the slide for as long as the sentence takes,
 and "pause slideshow" until "start slideshow", each released without disturbing

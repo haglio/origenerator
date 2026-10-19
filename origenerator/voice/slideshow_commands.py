@@ -22,9 +22,9 @@ from origenerator.voice.text import words
 class SlideshowCommand(Enum):
     """What a spoken utterance asked of the slideshow."""
 
-    START = "start"   # open one if none is up, and set the pace to the standard
-    PAUSE = "pause"   # stop on what is on screen: the pace goes to nought
-    STOP = "stop"     # close it
+    START = "start"
+    PAUSE = "pause"
+    STOP = "stop"
 
 
 # The verbs, as said. Each maps to the one thing it asks for; anything else

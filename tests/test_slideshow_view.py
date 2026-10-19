@@ -1,9 +1,9 @@
 """SlideshowView — the one fullscreen Funestra: show, advance, lock, neighbors, keys.
 
 Also everything the retired second full-screen viewer used to do on its own, which
-this view now covers because a double-clicked picture opens it at a pace of
-nought: paging a folder in order, stepping an image's versions, following a
-generation that is still being made, and driving the OSR2 off the clip on screen.
+this view now covers: paging a folder in order, stepping an image's versions,
+following a generation that is still being made, and driving the OSR2 off the
+clip on screen.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ from tests import gestures
 from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, thumbnail_on_screen
-from tests.slideshow_support import ahead
+from tests.slideshow_support import ahead, will_move_on
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -91,18 +91,6 @@ def _time_passes(view, seconds: float):
     view._clock.now += seconds
     view._pane.tick()
     view._pane.tick()
-
-
-def _will_move_on(view) -> bool:
-    """Whether the slideshow pages on by itself when the item on screen runs out.
-
-    The engine holds a picture for the pace and ends it the way it ends a
-    finished clip, so there is no clock of the view's own to ask any more:
-    what decides is the same three things that decided whether one was armed
-    — the room is not frozen, the slide is not locked, and the pace is not
-    nought."""
-    return (not view._paused and not view._playlist.locked_or_paused()
-            and bool(view._dwell_s))
 
 
 def _wired(kw: dict) -> dict:
@@ -387,7 +375,7 @@ def test_culling_releases_the_lock(qtbot):
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Up)             # the locked slide is the one condemned
     assert not view._playlist.locked
-    assert _will_move_on(view)   # so the rest keeps rotating
+    assert will_move_on(view)   # so the rest keeps rotating
 
 
 def test_space_drives_the_shared_motion_not_the_lock(qtbot):
@@ -1267,64 +1255,26 @@ def test_closing_announces_itself(qtbot):
     assert closes == [True]
 
 
-# --- a pace of nought: the slide held until an arrow moves it ---------------
+# --- the Clip seconds: one number, app-wide ---------------------------------
 
-def test_a_pace_of_nought_holds_the_slide_with_no_timer(qtbot):
-    view = _view(qtbot, image_dwell_ms=0)
-    assert view.dwell_s == 0
-    assert not _will_move_on(view)
-    assert view._playlist.dwell_ms() is None
-
-
-def test_the_arrows_still_move_a_slideshow_held_at_nought(qtbot):
-    view = _view(qtbot, image_dwell_ms=0)
-    _press(view, Qt.Key.Key_Right)
-    assert view._playlist.current() == Slide("b.mp4", "video")
-
-
-def test_a_clip_replays_rather_than_advancing_at_nought(qtbot):
-    # Nothing moves on its own at nought — a finished clip included, which is how
-    # the retired viewer's looping video behaved.
-    view = _view(qtbot, image_dwell_ms=0)
-    _press(view, Qt.Key.Key_Right)          # -> the video
-    _runs_out(view)
-    assert view._playlist.current() == Slide("b.mp4", "video")
-
-
-def test_turning_the_console_pace_up_sets_a_held_slideshow_going(qtbot):
-    # The console's clip-seconds pair is what starts a held slideshow moving, and
-    # the number it sets is the app-wide one.
+def test_the_consoles_clip_seconds_are_the_app_wide_ones(qtbot):
     pace = SlideshowPace(parent=None)
-    view = _view(qtbot, image_dwell_ms=0, pace=pace)
+    view = _view(qtbot, pace=pace)
 
     view.set_dwell_s(2)
 
-    assert view.dwell_s == 2
-    assert pace.seconds == 2
-    assert _will_move_on(view)
-
-
-def test_turning_up_to_the_pace_the_app_already_held_still_starts_it(qtbot):
-    # The app-wide pace never moves here, so no signal comes back — the slideshow has
-    # to take the number itself or it stays frozen at nought forever.
-    pace = SlideshowPace(seconds=1, parent=None)
-    view = _view(qtbot, image_dwell_ms=0, pace=pace)
-
-    view.set_dwell_s(1)
-
-    assert view.dwell_s == 1
-    assert _will_move_on(view)
-
-
-def test_the_pace_can_be_wound_back_down_to_nought(qtbot):
-    view = _view(qtbot, image_dwell_ms=4000)
-    view.set_dwell_s(0)
-    assert view.dwell_s == 0
-    assert not _will_move_on(view)
+    assert (view.dwell_s, pace.seconds) == (2, 2)
 
 
 def test_the_pace_starts_at_the_slideshows_own_default():
     assert SlideshowPace().seconds == DEFAULT_IMAGE_DWELL_MS // 1000
+
+
+def test_the_clip_seconds_go_no_lower_than_one():
+    pace = SlideshowPace(seconds=0)
+    opened_at = pace.seconds
+    pace.step(-5)
+    assert (opened_at, pace.seconds) == (1, 1)
 
 
 def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
@@ -1355,16 +1305,6 @@ def test_a_still_slide_is_handed_the_dwell_it_keeps_the_screen_for(qtbot):
     assert _engine(view).pace_s == 4
 
 
-def test_a_pace_of_nought_is_handed_over_as_nought(qtbot):
-    # Nought holds one picture until an arrow moves it, which is what the
-    # engine does with a dwell of nought.
-    view = _view(qtbot, _KEYED, image_dwell_ms=0)
-
-    _press(view, Qt.Key.Key_Right)
-
-    assert _engine(view).pace_s == 0
-
-
 def test_locking_a_slide_leaves_it_where_it_is(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     opened = list(_engine(view).opened)
@@ -1372,7 +1312,7 @@ def test_locking_a_slide_leaves_it_where_it_is(qtbot):
     _press(view, Qt.Key.Key_Down)           # lock it
 
     assert _engine(view).opened == opened   # not opened again under the lock
-    assert not _will_move_on(view)
+    assert not will_move_on(view)
 
 
 def test_a_new_pace_reaches_a_locked_slide_without_opening_it_again(qtbot):
@@ -1396,7 +1336,7 @@ def test_a_slideshow_reopened_on_a_locked_slide_opens_it_locked(qtbot):
     reopened.resume(closed.state())
 
     assert _engine(reopened).pace_s == 4
-    assert not _will_move_on(reopened)
+    assert not will_move_on(reopened)
 
 
 def test_a_request_keeps_the_picture_on_screen_still_moving_and_its_release_lets_it_go(qtbot):
@@ -1441,7 +1381,7 @@ def test_a_locked_slide_stays_locked_through_a_request_and_is_stilled_by_the_roo
     view.set_paused(False)
 
     assert (after_the_request, frozen, _engine(view).paused) == ((True, False), True, False)
-    assert not _will_move_on(view)
+    assert not will_move_on(view)
 
 
 def test_a_request_released_under_the_rooms_freeze_leaves_it_frozen(qtbot):
@@ -1474,11 +1414,11 @@ def test_a_click_pauses_a_slideshow_with_no_room_to_ask_at_once_and_a_second_pla
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
     _click(view)
-    assert not _will_move_on(view)
+    assert not will_move_on(view)
     assert _engine(view).paused is True
 
     _click(view)
-    assert _will_move_on(view)
+    assert will_move_on(view)
     assert _engine(view).paused is False
 
 
@@ -1490,7 +1430,7 @@ def test_a_click_asks_the_room_to_pause_rather_than_pausing_the_slideshow_alone(
     _click(view)
 
     assert asked == [True]
-    assert _will_move_on(view)
+    assert will_move_on(view)
 
 
 def test_each_slide_is_opened_in_its_own_right(qtbot):
@@ -1539,9 +1479,9 @@ def test_a_re_seeded_set_wraps_at_either_end(qtbot):
 
 
 def test_a_re_seeded_set_keeps_the_pace_the_slideshow_opened_at(qtbot):
-    view = _view(qtbot, [("a.png", "image", "id-a")], image_dwell_ms=0)
+    view = _view(qtbot, [("a.png", "image", "id-a")], image_dwell_ms=7000)
     view.set_playlist([("a.png", "image", "id-a"), ("b.png", "image", "id-b")], 0)
-    assert view._playlist.dwell_ms() is None  # still at nought, not back at the default
+    assert view._playlist.dwell_ms() == 7000
 
 
 # --- Shift+Left/Right: the versions of the image on screen -------------------
@@ -1866,11 +1806,11 @@ def test_stepping_a_paused_slideshow_still_re_aims_the_device(qtbot):
 
 def test_a_request_pauses_the_advance_and_says_so(qtbot):
     view = _view(qtbot, _KEYED)
-    assert _will_move_on(view)  # an image, dwelling
+    assert will_move_on(view)  # an image, dwelling
 
     view.pause_for_request(True, "🎤 Request: no hat…")
 
-    assert not _will_move_on(view)
+    assert not will_move_on(view)
     assert view._playlist.paused
     assert "Request" in view._note.text()
 
@@ -1881,7 +1821,7 @@ def test_releasing_the_pause_resumes_the_dwell(qtbot):
 
     view.pause_for_request(False)
 
-    assert _will_move_on(view)
+    assert will_move_on(view)
     assert not view._playlist.paused
     assert view._note.isHidden()
 
@@ -1905,7 +1845,7 @@ def test_releasing_the_pause_leaves_a_locked_slide_locked(qtbot):
     view.pause_for_request(False)
 
     assert view._playlist.locked
-    assert not _will_move_on(view)  # still stopped — by the lock, now
+    assert not will_move_on(view)  # still stopped — by the lock, now
 
 
 def test_a_request_targets_the_slide_on_screen(qtbot):
@@ -1942,10 +1882,9 @@ def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_p
 
 
 def test_an_unopenable_clip_is_stepped_past_even_while_locked(qtbot, tmp_path):
-    """A lock replays the clip it holds, and a pace of nought never moves on —
-    both of which would hold a clip that cannot play forever.  So this one step
-    happens regardless: the item stays in the set, but the screen does not stay
-    black."""
+    """A lock replays the clip it holds, which would hold a clip that cannot
+    play forever.  So this one step happens regardless: the item stays in the
+    set, but the screen does not stay black."""
 
     still = tmp_path / "a.png"
     Image.new("RGB", (40, 30)).save(still)
@@ -2012,7 +1951,7 @@ def test_a_slide_closed_under_a_lock_reopens_locked(qtbot):
     reopened.resume(state)
 
     assert reopened._playlist.locked
-    assert not _will_move_on(reopened)  # locked, so nothing moves it on
+    assert not will_move_on(reopened)  # locked, so nothing moves it on
 
 
 def test_a_slideshow_takes_up_each_filter_that_leaves_it_something(qtbot):
@@ -2352,17 +2291,6 @@ def test_a_picture_still_being_generated_holds_the_screen_until_its_pace_runs_ou
 
     assert held == "id-run"
     assert view._playlist.current()[2] == "id-b"
-
-
-def test_a_picture_still_being_generated_under_a_pace_of_nought_is_held(qtbot):
-    view = _view(qtbot, _THREE, image_dwell_ms=0)
-    view.note_generating("id-run", _png_bytes())
-
-    view.step(1)
-    _runs_out(view)
-    _time_passes(view, 10)
-
-    assert view._playlist.current()[2] == "id-run"
 
 
 def test_a_slideshow_picked_back_up_opens_on_what_is_being_made_then_where_it_left_off(qtbot):

@@ -374,17 +374,17 @@ def test_a_slideshow_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, t
 def test_a_new_set_lands_the_funestra_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+    slideshow.play(_ITEMS, start=2, shuffle=in_order)
 
-    assert _sent(slideshow) == ["PLAY_FILE three.png", "RELOAD_PLAYLIST", "SET_PACE 0"]
+    assert _sent(slideshow) == ["PLAY_FILE three.png", "RELOAD_PLAYLIST", "SET_PACE 4"]
 
 
 def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="three.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+    slideshow.play(_ITEMS, start=2, shuffle=in_order)
 
-    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
+    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 4"]
 
 
 def test_the_slideshow_names_the_generation_it_is_locked_on(qtbot, tmp_path):
@@ -1120,7 +1120,7 @@ def _pace_and_lock(sent: list[str]) -> list[str]:
 def test_a_run_the_slideshow_follows_is_kept_on_the_funestra_still_moving(qtbot, tmp_path):
     _slideshow, sent = _slideshow_following_a_run(qtbot, tmp_path)
 
-    assert (_pace_and_lock(sent)[-2:], "SET_PACE 0" in sent) == (["SET_PACE 4", "LOCK_ON"], False)
+    assert _pace_and_lock(sent)[-2:] == ["SET_PACE 4", "LOCK_ON"]
 
 
 def test_a_run_the_slideshow_follows_that_stops_lets_go_of_the_funestra(qtbot, tmp_path):

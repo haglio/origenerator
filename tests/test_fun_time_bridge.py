@@ -30,6 +30,7 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 from origenerator.slideshow_buttons import answer
 from tests.slideshow_hud_support import open_both_sides
+from tests.slideshow_support import will_move_on
 from tests.test_gallery_view import (
     _REROLL_HISTORY,
     FakeDB,
@@ -43,17 +44,6 @@ from tests.test_gallery_view import (
     _running_reroll,
     _seeded_db,
 )
-
-
-def _will_move_on(view) -> bool:
-    """Whether the slideshow pages on by itself when the item on screen runs out.
-
-    The engine holds a picture for the pace and ends it the way it ends a
-    finished clip, so there is no clock of the view's own to ask: what decides
-    is the same three things that decided whether one was armed -- the room is
-    not frozen, the slide is not locked, and the pace is not nought."""
-    return (not view._paused and not view._playlist.locked_or_paused()
-            and bool(view._dwell_s))
 
 
 def _session(tmp_path):
@@ -381,15 +371,15 @@ def test_filter_enhanced_with_no_slideshow_up_is_dropped(qtbot, tmp_path):
 def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    assert _will_move_on(slideshow)  # an image slide dwells on its timer
+    assert will_move_on(slideshow)  # an image slide dwells on its timer
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
-    assert not _will_move_on(slideshow)
+    assert not will_move_on(slideshow)
 
     (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
     bridge._tick()
-    assert _will_move_on(slideshow)
+    assert will_move_on(slideshow)
 
 
 def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path):
@@ -446,7 +436,7 @@ def test_a_slideshow_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch)
 
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    assert not _will_move_on(slideshow)  # no dwell armed: it opened frozen
+    assert not will_move_on(slideshow)  # no dwell armed: it opened frozen
 
 
 def test_a_step_while_paused_lands_on_a_slide_that_stays_frozen(qtbot, tmp_path, monkeypatch):
@@ -463,7 +453,7 @@ def test_a_step_while_paused_lands_on_a_slide_that_stays_frozen(qtbot, tmp_path,
     bridge._tick()
 
     assert slideshow._playlist.index == (before + 1) % 3  # the step still lands
-    assert not _will_move_on(slideshow)                # but the slide stays frozen
+    assert not will_move_on(slideshow)                # but the slide stays frozen
 
 
 def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, monkeypatch):

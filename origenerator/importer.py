@@ -318,8 +318,8 @@ def backfill_import_workflows(db: Database) -> int:
                                    or _could_have_made(filed, kind)):
             continue
         files = row_output_files(row)
-        guess = infer_workflow_name(files[0].get("filename", "")) if files else None
-        name = guess if _could_have_made(guess, kind) else "unknown"
+        name = _workflow_that_made(files[0].get("filename", "") if files else "",
+                                   recipe_of(row), kind)
         if name != filed:
             db.set_workflow_name(row["prompt_id"], name)
             updated += 1
@@ -627,6 +627,12 @@ def _could_have_made(workflow_name: str | None, kind: MediaType | None) -> bool:
         kind == MediaType.VIDEO and workflow_output_type(workflow_name) == MediaType.IMAGE)
 
 
+def _workflow_that_made(filename: str, graph: dict, kind: MediaType | None) -> str:
+    guess = infer_workflow_name(filename)
+    filed = guess if _could_have_made(guess, kind) else "unknown"
+    return _reconciled(filed, _workflow_from_nodes(graph), kind) if graph else filed
+
+
 def _reconciled(filename_guess: str, graph_read: str | None, kind: MediaType | None) -> str:
     """The workflow name the two witnesses agree on.
 
@@ -653,9 +659,10 @@ def _extract_metadata(fpath: Path, suffix: str, kind: MediaType | None = None) -
     one, the picture itself does (:func:`_size_from_its_own_file`).
     """
     kind = kind or media_type_from_filename(fpath.name)
-    filename_guess = infer_workflow_name(fpath.name)
+    graph = graph_in_file(fpath, suffix)
+    workflow_name = _workflow_that_made(fpath.name, graph, kind)
     result: dict = {
-        "workflow_name": filename_guess if _could_have_made(filename_guess, kind) else "unknown",
+        "workflow_name": workflow_name,
         "workflow_version": "imported",
         "positive_prompt": None,
         "negative_prompt": None,
@@ -664,12 +671,10 @@ def _extract_metadata(fpath: Path, suffix: str, kind: MediaType | None = None) -
         "prompt_data": {},
     }
 
-    graph = graph_in_file(fpath, suffix)
     if not graph:
-        result["params"] = _size_from_its_own_file(fpath, result["workflow_name"])
+        result["params"] = _size_from_its_own_file(fpath, workflow_name)
         return result
 
-    workflow_name = _reconciled(result["workflow_name"], _workflow_from_nodes(graph), kind)
     params = _graph_params(graph)
     if "width" not in params:
         params = {**_size_from_its_own_file(fpath, workflow_name), **params}
@@ -679,7 +684,6 @@ def _extract_metadata(fpath: Path, suffix: str, kind: MediaType | None = None) -
         negative_prompt=params.get("negative_prompt"),
         seed=params.get("seed"),
         params=params,
-        workflow_name=workflow_name,
     )
     return result
 

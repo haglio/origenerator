@@ -18,13 +18,11 @@ A row can also be dragged onto the Enhance subpanel, which absorbs the settings
 it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
-Levels can be deleted from here: press the trash can beside a version's copy
-button, or pick rows and press Delete or Backspace, or right-click for the
-menu. A binned version is a file, not a generation — the image keeps its
-folder, its star and its other versions — and the delete is undoable like every
-other. Never deleted from here: the original, which offers no trash can and no
-menu, and the last version, since an image with no file left is a deleted
-generation, and that is the gallery's own delete.
+Levels are deleted here by a version's trash can, by Delete or Backspace over
+picked rows, or by the right-click menu. A binned version is a file, not a
+generation — the image keeps its folder, its star and its other versions — and
+the delete is undoable. Never deleted here: the original, and the last version,
+since an image with no file left is a deleted generation, the gallery's own.
 
 An enhancement still in flight takes the ``+ Enhance`` row's own slot at the head
 of the list, mirroring the run's streamed frames the way the in-flight cards do
@@ -521,9 +519,8 @@ class EnhanceVersions(QWidget):
         duplicate, or ``None`` when they would make something new.
 
         ``pending`` is the :class:`RunningEnhancement` of one still running, and
-        it takes that same leading slot — the row *becomes* the thing it asked
-        for rather than sitting beside it, which is what the press looks like
-        from the other side.
+        it takes that same leading slot: the row becomes the thing it asked for
+        rather than sitting beside it.
 
         ``created_fallback`` stands in on a level whose file is no longer on disk
         to be asked when it was written — the row's own timestamp, which is the
@@ -621,8 +618,7 @@ class EnhanceVersions(QWidget):
             self._pick_and_show(position)
 
     def _on_row_menu(self, position: int, global_pos: QPoint):
-        """The right-click menu: Delete, over whatever is picked — and no menu at
-        all over the original, which is never deleted.
+        """The right-click menu: Delete, over whatever is picked.
 
         A right-click on an unpicked row picks it first, so the menu always acts
         on what it appeared over — the same rule the thumbnail menu follows."""

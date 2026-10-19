@@ -1,6 +1,5 @@
 """A small copy-to-clipboard icon button, shared wherever a value is worth
-lifting to the clipboard in one click — a metadata filename, a prompt, a seed —
-and the shape it lends a button set beside it, so the two read as a pair.
+lifting to the clipboard in one click — a metadata filename, a prompt, a seed.
 
 The value can be fixed (a string) or live (a zero-arg callable read at click
 time), so the same button serves a read-only label and an editable form field.
@@ -16,7 +15,6 @@ from shared_ui.spacing import BUTTON_MARK_INSET, BUTTON_PAD_H_TIGHT
 
 
 class IconButton(QPushButton):
-    """A small button wearing only its mark: the copy button's shape."""
 
     def __init__(self, icon: QIcon, tooltip: str, name: str, parent=None):
         super().__init__(parent)
@@ -44,10 +42,4 @@ class CopyButton(IconButton):
 
 
 def _copy_icon() -> QIcon:
-    """The familiar two-overlapping-sheets copy glyph.
-
-    The family's drawing, out of :mod:`shared_ui.icons` -- Fun Time's log-panel
-    copy button wears the same one.  Each app drew its own before, at its own
-    proportions, and the two apps sit on screen together.
-    """
     return QIcon(glyph_pixmap("copy", int(CANVAS), TEXT_SECONDARY))

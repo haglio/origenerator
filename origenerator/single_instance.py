@@ -31,8 +31,12 @@ class LibraryClaim:
 
     def let_go(self) -> None:
         while self._handles:
-            ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(self._handles.pop(0)))
+            let_go_of(self._handles.pop(0))
         logger.info("Let go of the library")
+
+
+def let_go_of(held: int) -> None:
+    ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(held))
 
 
 class Copies:

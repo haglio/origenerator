@@ -20,6 +20,11 @@ import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from app_support.loading_screen import TAKING_OVER_WITHIN_S
+from app_support.win32 import mutex_name, try_acquire_mutex
+
+from origenerator.single_instance import let_go_of
+
 SCHEME = "origenerator"
 _GO_TO = "go-to"
 _GENERATION = "generation"
@@ -39,6 +44,10 @@ CHECKOUT = Path(__file__).resolve().parents[1]
 
 _PIPE = r"\\.\pipe"
 _BUSY_PATIENCE_S = 2.0
+_NO_SUCH_PIPE = 2
+
+_STARTING = "Global\\Origenerator.starting-for-a-click"
+_LOOK_EVERY_S = 0.1
 
 
 def link_to(generation: str) -> str:
@@ -58,6 +67,10 @@ def generation_in(link: str) -> str | None:
 def a_generation(asked: str) -> str | None:
     """*asked* if it could name a generation of this app's, else ``None``."""
     return asked if _AN_ID.fullmatch(asked or "") else None
+
+
+def made_for_a_click() -> bool:
+    return CARRIED_IN in os.environ
 
 
 def channel_for(checkout: Path) -> str:
@@ -91,12 +104,27 @@ def follow(argv, *, checkout: Path = CHECKOUT) -> int:
     generation = generation_in(link)
     if generation is None:
         return 2
-    if hand_over(generation, channel=channel_for(checkout)):
+    channel = channel_for(checkout)
+    if hand_over(generation, channel=channel):
         _note(checkout, f"handed {generation} to the running app")
         return 0
-    _note(checkout, f"starting the app on {generation}")
-    start_the_app(checkout, launcher, generation)
+    starting = try_acquire_mutex(mutex_name(_STARTING, channel))
+    if starting is None:
+        _note(checkout, f"left {generation} to the copy another click is starting")
+        return 0
+    try:
+        _note(checkout, f"starting the app on {generation}")
+        start_the_app(checkout, launcher, generation)
+        wait_until_it_listens(channel)
+    finally:
+        let_go_of(starting)
     return 0
+
+
+def wait_until_it_listens(channel: str) -> None:
+    giving_up_at = time.monotonic() + TAKING_OVER_WITHIN_S
+    while not listening(channel) and time.monotonic() < giving_up_at:
+        time.sleep(_LOOK_EVERY_S)
 
 
 def hand_over(generation: str, *, channel: str) -> bool:
@@ -122,6 +150,14 @@ def hand_over(generation: str, *, channel: str) -> bool:
         finally:
             os.close(pipe)
         return True
+
+
+def listening(channel: str) -> bool:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.WaitNamedPipeW.argtypes = [ctypes.wintypes.LPCWSTR, ctypes.wintypes.DWORD]
+    if kernel32.WaitNamedPipeW(rf"{_PIPE}\{channel}", 1):
+        return True
+    return ctypes.get_last_error() != _NO_SUCH_PIPE
 
 
 def let_it_take_the_foreground(pipe: int) -> None:

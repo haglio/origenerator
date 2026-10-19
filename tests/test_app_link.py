@@ -7,6 +7,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -84,8 +86,20 @@ def _started(monkeypatch):
     return runs
 
 
+def _carried(runs):
+    return [named["env"][app_link.CARRIED_IN] for _command, named in runs]
+
+
+def _until(condition, *, within_s=5.0):
+    give_up_at = time.monotonic() + within_s
+    while not condition():
+        assert time.monotonic() < give_up_at, "waited in vain"
+        time.sleep(0.01)
+
+
 def test_with_nothing_listening_the_app_is_started_carrying_the_generation(monkeypatch, tmp_path):
     monkeypatch.setattr(app_link, "hand_over", lambda *a, **k: False)
+    monkeypatch.setattr(app_link, "listening", lambda channel: True)
     runs = _started(monkeypatch)
 
     assert app_link.follow(["launch_origenerator.vbs",
@@ -146,6 +160,42 @@ def test_an_app_too_busy_to_take_a_click_is_not_started_a_second_time(monkeypatc
                            checkout=tmp_path) == 0
 
     assert runs == []
+
+
+def test_a_click_while_another_click_is_starting_the_app_starts_nothing(monkeypatch, tmp_path):
+    # Notices clicked one after another faster than the app comes up: the copy
+    # the first click started is still on its loading screen, nobody is
+    # listening yet, and a second copy started over it could only say that
+    # another copy is running.
+    monkeypatch.setattr(app_link, "hand_over", lambda *a, **k: False)
+    app_is_up = threading.Event()
+    monkeypatch.setattr(app_link, "listening", lambda channel: app_is_up.is_set())
+    runs = _started(monkeypatch)
+    first = threading.Thread(target=app_link.follow,
+                             args=([app_link.LIVE_LAUNCHER, app_link.link_to("alpha-1")],),
+                             kwargs={"checkout": tmp_path})
+    first.start()
+    _until(lambda: len(runs) == 1)
+
+    assert app_link.follow([app_link.LIVE_LAUNCHER, app_link.link_to("beta-2")],
+                           checkout=tmp_path) == 0
+
+    app_is_up.set()
+    first.join(timeout=5)
+    assert _carried(runs) == ["alpha-1"]
+
+
+def test_a_click_whose_app_never_comes_up_leaves_the_next_click_free_to_start_it(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(app_link, "hand_over", lambda *a, **k: False)
+    monkeypatch.setattr(app_link, "listening", lambda channel: False)
+    monkeypatch.setattr(app_link, "TAKING_OVER_WITHIN_S", 0.05)
+    runs = _started(monkeypatch)
+
+    app_link.follow([app_link.LIVE_LAUNCHER, app_link.link_to("alpha-1")], checkout=tmp_path)
+    app_link.follow([app_link.LIVE_LAUNCHER, app_link.link_to("beta-2")], checkout=tmp_path)
+
+    assert _carried(runs) == ["alpha-1", "beta-2"]
 
 
 def test_a_click_leaves_a_line_in_the_log_the_launcher_writes(monkeypatch, tmp_path):

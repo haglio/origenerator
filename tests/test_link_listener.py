@@ -64,6 +64,18 @@ def test_a_launch_a_click_started_opens_on_what_it_carried(qtbot, tmp_path):
     assert environment == {}
 
 
+def test_asking_whether_the_app_is_listening_hands_it_no_click(qtbot, tmp_path):
+    asked = []
+    assert not app_link.listening(app_link.channel_for(tmp_path))
+    listener = LinkListener(checkout=tmp_path, environ={})
+    listener.answer_with(asked.append)
+
+    assert app_link.listening(app_link.channel_for(tmp_path))
+    qtbot.wait(300)
+
+    assert asked == []
+
+
 def test_a_channel_carrying_anything_but_a_generation_is_ignored(qtbot, tmp_path):
     asked = []
     listener = LinkListener(checkout=tmp_path, environ={})

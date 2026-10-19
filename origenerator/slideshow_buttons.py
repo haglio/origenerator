@@ -8,11 +8,10 @@ session routes ``portrait_next`` back to whatever holds that side; standalone,
 the slideshow answers the same verb itself.
 
 Only what a slideshow answers is declared, which depends on what is drawing the
-panel: minimize parks a window of this app's, so it is offered only where the
-slideshow has one, and the session's mode pair is drawn by a slideshow covering a
-region — but not by one handed to a Funestra, whose panel the session puts its
-own row on.  A button drawn for sameness whose press is swallowed says a
-feature is there when it is not.
+panel: the session's mode pair is drawn by a slideshow covering a region — but
+not by one handed to a Funestra, whose panel the session puts its own row on.  A
+button drawn for sameness whose press is swallowed says a feature is there when
+it is not.
 """
 from __future__ import annotations
 
@@ -20,7 +19,7 @@ from collections.abc import Callable
 from typing import Any
 
 from funestra.hud_button import FIT_THE_WORD, Button
-from funestra.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
+from funestra.hud_marks import FMODE_ICON, shared_mark
 from funestra.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.console_commands import FILTER, spelled_for
@@ -33,7 +32,6 @@ CONTROL_GROUPS = (
     ("enhanced", "reset"),
     ("shuffle", "latest"),
     ("cycle_version",),
-    ("minimize",),
 )
 _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name in group}
 
@@ -63,7 +61,7 @@ CONTROL_FACES = {
     "trash": shared_mark("trash"), "fmode": FMODE_ICON,
     "enhanced": shared_mark("enhance_filter"), "reset": shared_mark("reset"),
     "shuffle": shared_mark("shuffle"), "latest": shared_mark("latest"),
-    "cycle_version": shared_mark("versions"), "minimize": MINIMIZE_ICON,
+    "cycle_version": shared_mark("versions"),
 }
 
 # Said after the versions tooltip on an item filed once, so a faded button says
@@ -84,7 +82,6 @@ CONTROL_TOOLTIPS = {
     "latest": f"{LATEST_LABEL} — every picture and video of this shape, newest first",
     "cycle_version": "Other versions of this one — an enhancement, the picture it was "
                 "made from, the upscale Evolver made of a video",
-    "minimize": "Minimize this slideshow — bring it back from the taskbar",
 }
 # Reset means what the side goes back TO, which is not the same in both places:
 # hosted it is the region's base state — that side's whole library, the way a
@@ -102,16 +99,13 @@ def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = 
                    has_other_versions: bool = False) -> tuple[tuple[Button, ...], ...]:
     """The rows a slideshow's HUD draws, for the surface it is drawn on.
 
-    *own_window* is whether this slideshow has a window of this app's — which is
-    what minimize parks, and so what decides whether it is offered at all.
-    Handed to one of a session's Funestras there is none, and the mode pair is
-    the session's own to put on its panel; in a window over a session's region
-    the slideshow draws that pair itself.
+    *own_window* is whether this slideshow has a window of this app's.  Handed to
+    one of a session's Funestras there is none, and the mode pair is the
+    session's own to put on its panel; in a window over a session's region the
+    slideshow draws that pair itself.
     """
     mode_row = hosted and own_window
-    minimize = own_window and not hosted
-    names = [name for group in CONTROL_GROUPS for name in group
-             if minimize or name != "minimize"]
+    names = [name for group in CONTROL_GROUPS for name in group]
     lit = {"lock": locked, "fmode": favorites_filter, "enhanced": enhanced,
            "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
     band = tuple(

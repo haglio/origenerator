@@ -11,7 +11,7 @@ import logging
 
 import pytest
 from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtGui import QColor, QMouseEvent, QPixmap
 
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.related_media import RelatedMedia
@@ -52,15 +52,24 @@ def _trim_row(prompt_id="cut1", trimmed_from="vid1", input_image="sdxl_t2i_img1.
     }
 
 
+def _combined_row(prompt_id="made1", recipe_video_id="vid0"):
+    return {**_video_row(prompt_id), "recipe_video_id": recipe_video_id}
+
+
 @pytest.fixture
 def make_related(qtbot):
     """Build a RelatedMedia over a given set of the library's videos, counting
     every time it asks for them."""
     def _make(*videos):
+        by_id = {video["prompt_id"]: video for video in videos}
         widget = RelatedMedia(video_rows=lambda: (asks.append(True), videos)[1],
-                              name_of={"img1": "3FA9C0D2 004"}.get)
+                              row_of=lambda prompt_id: (looked_up.append(prompt_id),
+                                                        by_id.get(prompt_id))[1],
+                              name_of={"img1": "3FA9C0D2 004", "vid0": "77B2E1A0 012"}.get)
         asks: list = []
+        looked_up: list = []
         widget.asks = asks
+        widget.looked_up = looked_up
         qtbot.addWidget(widget)
         return widget
 
@@ -91,6 +100,19 @@ def test_the_start_picture_is_called_by_its_name_not_its_file(related):
     related.show_row(_video_row(), [_image_row()])
 
     assert related._source_tile._name.text() == "3FA9C0D2 004"
+
+
+def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(make_related):
+    related = make_related(_video_row("vid0"))
+
+    related.show_row(_combined_row(), [_image_row()])
+
+    assert related._source_tile._prompt_id == "img1"
+    assert not related._source_video_tile.isHidden()
+    assert related._source_video_tile._prompt_id == "vid0"
+    assert related._source_video_tile._heading.text() == "From source video"
+    assert related._source_video_tile._badge.media_type == "video"
+    assert related._source_video_tile._name.text() == "77B2E1A0 012"
 
 
 def test_an_image_lists_the_videos_it_was_animated_into(make_related):
@@ -179,6 +201,40 @@ def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
     assert named == ["img1"]
 
 
+def test_the_source_video_sits_beside_the_source_image(make_related, qtbot):
+    related = make_related(_video_row("vid0"))
+    related.show_row(_combined_row(), [_image_row()])
+    related.show()
+    qtbot.waitExposed(related)
+
+    image, video = related._source_tile.geometry(), related._source_video_tile.geometry()
+    assert video.top() == image.top()
+    assert video.left() > image.right()
+
+
+def test_the_source_video_is_drained_of_color_being_only_the_settings(make_related, tmp_path):
+    red = QPixmap(16, 16)
+    red.fill(QColor("red"))
+    red.save(str(tmp_path / "vid0_thumb.png"))
+    related = make_related({**_video_row("vid0"), "thumbnail_path": str(tmp_path / "vid0_thumb.png")})
+
+    related.show_row(_combined_row(), [_image_row()])
+
+    shown = related._source_video_tile._thumb.pixmap().toImage().pixelColor(8, 8)
+    assert shown.red() == shown.green() == shown.blue()
+
+
+def test_a_click_on_the_source_video_names_that_video(make_related):
+    related = make_related(_video_row("vid0"))
+    related.show_row(_combined_row(), [_image_row()])
+    named = []
+    related.source_activated.connect(named.append)
+
+    related._source_video_tile.activated.emit("vid0")
+
+    assert named == ["vid0"]
+
+
 def test_showing_the_next_row_takes_the_last_one_s_answers_away(related):
     image = _image_row()
     related.show_row(_video_row(), [image])
@@ -198,6 +254,31 @@ def test_clearing_puts_both_links_down(make_related):
 
     assert related._source_tile.isHidden()
     assert related._animated_strip.isHidden()
+
+
+def test_clearing_puts_the_source_video_down_too(make_related):
+    related = make_related(_video_row("vid0"))
+    related.show_row(_combined_row(), [_image_row()])
+
+    related.clear()
+
+    assert related._source_video_tile.isHidden()
+
+
+def test_the_next_row_with_no_source_video_takes_that_link_away(make_related):
+    related = make_related(_video_row("vid0"))
+    related.show_row(_combined_row(), [_image_row()])
+
+    related.show_row(_video_row(), [_image_row()])
+
+    assert related._source_video_tile.isHidden()
+
+
+def test_a_source_video_since_deleted_leaves_no_link_to_it(related):
+    related.show_row(_combined_row(recipe_video_id="deleted"), [_image_row()])
+
+    assert related._source_video_tile.isHidden()
+    assert related._source_tile._prompt_id == "img1"
 
 
 def test_a_long_list_of_animations_is_capped_and_says_so(make_related, caplog):
@@ -223,6 +304,12 @@ def test_a_video_costs_no_read_of_the_library_s_videos(related):
     related.show_row(_video_row(), [_image_row()])
 
     assert related.asks == []
+
+
+def test_a_row_with_no_source_video_looks_none_up(related):
+    related.show_row(_video_row(), [_image_row()])
+
+    assert related.looked_up == []
 
 
 def test_an_image_asks_for_them_once(make_related):

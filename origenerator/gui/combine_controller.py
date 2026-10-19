@@ -455,7 +455,8 @@ class CombineController(QObject):
     def _open_prepared(self, workflow, params, image_row, video_row,
                        category: str, video_id: str | None) -> None:
         """Hand a built combination to a generate tab: its settings on the form, its
-        two halves in the preview, and the mark saying where they came from.
+        two halves in the preview, and the mark saying where they came from,
+        which the links under the form show.
 
         The preview is the point of the pair being visible at all — nothing has
         been generated from it yet, so the pane would otherwise sit on the line a

@@ -13,6 +13,7 @@ from origenerator.workflows import (
     base,
     detail_parts,
     model_files,
+    video_writer,
     wan22_i2v,
 )
 
@@ -121,7 +122,6 @@ _PINNED = {
     "controlnet": "a_controlnet.safetensors",
     "controlnet_end": 0.9,
     "controlnet_strength": 0.75,
-    "crf": 21,
     "denoise": 1.0,
     "depth_model": "a_depth_model.safetensors",
     "enhance": False,
@@ -206,9 +206,9 @@ GRAPH_FINGERPRINTS = {
     ("image_enhance", "v003"): "228ccee5269454ec",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
-    ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
+    ("wan21_ati_i2v", "v007"): "8ff892322a8f4b48",
     ("wan22_flf2v_loop", "v009"): "ad7bd431c5c33f40",
-    ("wan22_i2v", "v007"): "ce72e0c5e1342c10",
+    ("wan22_i2v", "v007"): "d145583f999e536b",
     ("wan22_t2i", "v002"): "f0794cae55c3e05d",
 }
 
@@ -290,14 +290,16 @@ def test_a_change_to_a_part_the_pinned_recipe_leaves_out_still_moves_the_fingerp
     assert _workflow_fingerprint(workflow) != before
 
 
-def test_how_finely_a_video_is_compressed_is_no_part_of_its_recipe():
-    payload = _payload(WORKFLOW_REGISTRY["wan22_flf2v_loop"], {})
-    recompressed = copy.deepcopy(payload)
-    (writer,) = [node for node in recompressed.values()
-                 if node["class_type"] == "VHS_VideoCombine"]
-    writer["inputs"]["crf"] += 7
+@pytest.mark.parametrize("name", sorted(name for name, workflow in WORKFLOW_REGISTRY.items()
+                                        if workflow.output_type == "video"))
+def test_how_finely_a_video_is_compressed_is_no_part_of_its_recipe(name, monkeypatch):
+    workflow = WORKFLOW_REGISTRY[name]
+    before = _workflow_fingerprint(workflow)
 
-    assert _fingerprint(recompressed) == _fingerprint(payload)
+    monkeypatch.setattr(video_writer, "CRF", video_writer.CRF + 7)
+
+    assert _payload(workflow, {})[workflow.output_node_id]["inputs"]["crf"] == video_writer.CRF
+    assert _workflow_fingerprint(workflow) == before
 
 
 def test_the_gates_tables_hold_nothing_the_registry_has_dropped():

@@ -258,8 +258,8 @@ class OrigeneratorWindow(QMainWindow):
         """A Fun Time session running beside this window has the OSR2, or not."""
         self._gallery_view.osr2_control.the_session_has_it(held)
 
-    def shows_a_slideshow(self) -> bool:
-        return self._gallery_view.shows_a_slideshow()
+    def slideshow_showing_on(self) -> str | None:
+        return self._gallery_view.slideshow_showing_on()
 
     def become_hosted(self, session: FunTimeSession) -> None:
         logger.info("Taken into a Fun Time session; the OSR2 and the appliance "

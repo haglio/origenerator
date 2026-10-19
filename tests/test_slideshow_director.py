@@ -20,10 +20,11 @@ import pytest
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from PIL import Image
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QRect, Qt
 
 from origenerator import gallery
 from origenerator.gallery.collection import FAVORITES_KEY, RECENTS_KEY, FolderCollection
+from origenerator.gallery.sides import BOTH
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
@@ -44,6 +45,12 @@ ALL_PORTRAIT = oriented_key(gallery.ALL_KEY, PORTRAIT)
 ALL_LANDSCAPE = oriented_key(gallery.ALL_KEY, LANDSCAPE)
 LATEST_PORTRAIT = oriented_key(RECENTS_KEY, PORTRAIT)
 LATEST_LANDSCAPE = oriented_key(RECENTS_KEY, LANDSCAPE)
+PORTRAIT_MONITOR = QRect(2560, 0, 1440, 2560)
+LANDSCAPE_MONITOR = QRect(0, 0, 2560, 1440)
+HIS_TWO_MONITORS = [SimpleNamespace(geometry=lambda: LANDSCAPE_MONITOR),
+                    SimpleNamespace(geometry=lambda: PORTRAIT_MONITOR)]
+TALL = {"width": 832, "height": 1216}
+WIDE = {"width": 1216, "height": 832}
 
 
 class FakeSignal:
@@ -258,7 +265,9 @@ class FakeWindow:
         self.activated = 0
         self.shows = 0
         self.fullscreen = 0
+        self.full_screen = False
         self.minimized = False
+        self.monitor = LANDSCAPE_MONITOR
 
     def set_queue(self, items, foreign_total):
         self.queue_set = (list(items), foreign_total)
@@ -269,6 +278,13 @@ class FakeWindow:
     def showFullScreen(self):
         self.fullscreen += 1
         self.minimized = False
+        self.full_screen = True
+
+    def showNormal(self):
+        self.full_screen = False
+
+    def isFullScreen(self):
+        return self.full_screen
 
     def isMinimized(self):
         return self.minimized
@@ -287,9 +303,13 @@ class FakeWindow:
 
     def setGeometry(self, x, y, width, height):
         self.geometry = (x, y, width, height)
+        self.monitor = QRect(x, y, width, height)
 
     def winId(self):
         return 4242
+
+    def screen(self):
+        return SimpleNamespace(geometry=lambda: self.monitor)
 
     def raise_(self):
         self.raised += 1
@@ -529,6 +549,7 @@ def slideshows(monkeypatch):
     monkeypatch.setattr(module.SlideshowDirector, "_wear_the_hud", lambda self, view, side: None)
     monkeypatch.setattr(module, "place_window_in_device_pixels",
                         lambda *args: None)
+    monkeypatch.setattr(module, "_screens", list)
 
     def build(host=None, *, db=None, browser=None, fun_time=None):
         host = host or FakeHost()
@@ -643,14 +664,20 @@ def test_a_director_taken_into_a_session_closes_its_fullscreen_slideshow_for_the
     assert made[1].shown.fullscreen == 0
 
 
-def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(slideshows):
+def _shaped(prompt_id, params):
+    return {**_row(prompt_id), "params_json": json.dumps(params)}
+
+
+def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
+        slideshows, *, side=PORTRAIT, shapes=(TALL, TALL), monitor=PORTRAIT_MONITOR):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
-    director, _host, made = slideshows(FakeHost(rows=[_row("g1"), _row("g2")]),
-                                       browser=browser)
-    director.open([("g1.png", "image", "g1", None), ("g2.png", "image", "g2", None)],
-                  side=PORTRAIT, location="collection/a")
+    rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes, start=1)]
+    director, _host, made = slideshows(FakeHost(rows=rows), browser=browser)
+    director.open([(f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
+                   for row in rows], rows=rows, side=side, location="collection/a")
     watched = made[0]
+    watched.shown.monitor = monitor
     watched.state_at_close = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
     watched.filters = SlideshowFilters(favorites=True)
     director.become_hosted(FakeSession())
@@ -667,6 +694,85 @@ def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_a
     assert carried.resumed == replace(watched.state_at_close, location="collection/a")
     assert carried.taken_up == (SlideshowFilters(favorites=True), False)
     assert [slide[2] for slide in director.region_slideshow(LANDSCAPE).items] == ["g5"]
+
+
+@pytest.mark.parametrize(("side", "shapes", "monitor", "carried_to", "the_other", "its_library"), [
+    (LANDSCAPE, (WIDE, WIDE), PORTRAIT_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
+    (PORTRAIT, (TALL, TALL), LANDSCAPE_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
+    (BOTH, (TALL, WIDE, TALL), LANDSCAPE_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
+    (BOTH, (WIDE, TALL, WIDE), PORTRAIT_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
+])
+def test_a_slideshow_taken_over_opens_on_the_funestra_of_its_shape_whatever_monitor_it_was_on(
+        slideshows, side, shapes, monitor, carried_to, the_other, its_library):
+    director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
+        slideshows, side=side, shapes=shapes, monitor=monitor)
+
+    open_both_sides(director)
+
+    assert ([slide[2] for slide in director.region_slideshow(carried_to).items]
+            == [f"g{n}" for n in range(1, len(shapes) + 1)])
+    assert [slide[2] for slide in director.region_slideshow(the_other).items] == its_library
+
+
+@pytest.mark.parametrize(("side", "monitor"), [(PORTRAIT, PORTRAIT_MONITOR),
+                                                (LANDSCAPE, LANDSCAPE_MONITOR)])
+def test_a_slideshow_on_its_own_opens_full_screen_on_the_monitor_of_its_shape(
+        slideshows, monkeypatch, side, monitor):
+    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+
+    director.open([("a.png", "image", "g1", None)], side=side)
+
+    (slideshow,) = made
+    assert (slideshow.shown.geometry, slideshow.shown.fullscreen) == (monitor.getRect(), 1)
+
+
+@pytest.mark.parametrize(("shapes", "monitor"), [((TALL, WIDE, TALL), PORTRAIT_MONITOR),
+                                                  ((WIDE, TALL, WIDE), LANDSCAPE_MONITOR),
+                                                  ((TALL, WIDE), LANDSCAPE_MONITOR)])
+def test_a_slideshow_of_both_shapes_opens_on_the_monitor_most_of_its_items_fit(
+        slideshows, monkeypatch, shapes, monitor):
+    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+    rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes)]
+
+    director.open([(f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
+                   for row in rows], rows=rows, side=BOTH)
+
+    assert made[0].shown.geometry == monitor.getRect()
+
+
+def test_a_slideshow_of_the_other_shape_asked_for_while_one_is_up_moves_to_its_monitor(
+        slideshows, monkeypatch):
+    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    (slideshow,) = made
+    assert (slideshow.shown.geometry, slideshow.shown.isFullScreen()) == (
+        PORTRAIT_MONITOR.getRect(), True)
+
+
+def test_a_slideshow_asked_for_again_on_the_monitor_it_is_on_stays_put(slideshows, monkeypatch):
+    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    assert made[0].shown.fullscreen == 1
+
+
+def test_a_slideshow_with_no_monitor_of_its_shape_opens_full_screen_where_it_always_did(
+        slideshows, monkeypatch):
+    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS[:1])
+    director, _host, made = slideshows()
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert (made[0].shown.geometry, made[0].shown.fullscreen) == (None, 1)
 
 
 def test_the_slideshow_a_session_took_over_is_put_back_on_the_first_opening_only(slideshows):
@@ -689,15 +795,15 @@ def test_a_window_handed_back_before_its_regions_opened_lets_go_of_the_slideshow
     assert [slide[2] for slide in director.region_slideshow(PORTRAIT).items] == ["g4"]
 
 
-def test_a_director_shows_a_slideshow_while_one_it_could_hand_a_session_is_up(slideshows):
+def test_a_director_names_the_shape_of_a_slideshow_it_could_hand_a_session(slideshows):
     director, _host, made = slideshows()
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
-    director.open([("a.png", "image", "g1", None)])
-    assert director.shows_a_slideshow()
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+    assert director.slideshow_showing_on() == PORTRAIT
 
     made[0].close()
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
 
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slideshows):

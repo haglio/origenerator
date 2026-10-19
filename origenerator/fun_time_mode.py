@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -421,21 +422,22 @@ def region_for_items(items) -> str:
     nothing measures at all, goes to landscape, the roomier region.
     """
     slides = [Slide.of(item) for item in items]
-    votes = {"portrait": 0, "landscape": 0}
-    for slide in slides:
-        size = _measured_size(slide)
-        if size is not None:
-            votes[region_for_size(*size)] += 1
-    if not votes["portrait"] and not votes["landscape"]:
+    shapes = [region_for_size(*size) for size in map(_measured_size, slides)
+              if size is not None]
+    if not shapes:
         probed = _probed_video_size(slides)
-        if probed is not None:
-            votes[region_for_size(*probed)] += 1
-    side = "portrait" if votes["portrait"] > votes["landscape"] else "landscape"
+        shapes = [region_for_size(*probed)] if probed is not None else []
+    side = majority_shape(shapes)
     logger.info(
         "Slideshow routed to %s (portrait=%d landscape=%d of %d items)",
-        side, votes["portrait"], votes["landscape"], len(slides),
+        side, shapes.count("portrait"), shapes.count("landscape"), len(slides),
     )
     return side
+
+
+def majority_shape(shapes) -> str:
+    votes = Counter(shapes)
+    return "portrait" if votes["portrait"] > votes["landscape"] else "landscape"
 
 
 def _funestra(args: argparse.Namespace, side: str) -> FunestraChannel | None:
@@ -504,7 +506,9 @@ def handoff(pid: int, created_at: int) -> dict:
     return {
         "offer": {"file": OFFER_NAME, "writes": [offer_of(pid, created_at),
                                                  offer_of(pid, created_at, starting=True)]},
-        "showing": {"file": SHOWING_NAME, "writes": [slideshow_mark(pid, created_at)]},
+        "showing": {"file": SHOWING_NAME,
+                    "writes": [slideshow_mark(pid, created_at, shape)
+                               for shape in ("portrait", "landscape")]},
         "session": {"file": SESSION_NAME, "reads": {"pattern": SESSION_CLAIM.pattern}},
         "takeover": {"file": TAKEOVER_NAME,
                      "reads": {"keys": sorted((TAKEOVER_PID, TAKEOVER_ARGS))}},
@@ -516,16 +520,16 @@ def offer_of(pid: int, created_at: int, *, starting: bool = False) -> str:
     return f"{offer} {OFFER_STILL_STARTING}" if starting else offer
 
 
-def slideshow_mark(pid: int, created_at: int) -> str:
-    return offer_of(pid, created_at)
+def slideshow_mark(pid: int, created_at: int, shape: str) -> str:
+    return f"{offer_of(pid, created_at)} {shape}"
 
 
 def offer_of_this_process(*, starting: bool = False) -> str:
     return offer_of(os.getpid(), this_process_creation_time(), starting=starting)
 
 
-def slideshow_mark_of_this_process() -> str:
-    return slideshow_mark(os.getpid(), this_process_creation_time())
+def slideshow_mark_of_this_process(shape: str) -> str:
+    return slideshow_mark(os.getpid(), this_process_creation_time(), shape)
 
 
 def offer_the_window_while_it_is_built(*state_dirs: Path) -> None:

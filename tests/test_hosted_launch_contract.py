@@ -167,7 +167,10 @@ def test_every_offer_and_slideshow_mark_the_document_says_this_app_writes_is_one
             if "writes" in entry} == {
         "offer": [contract.offer_of(pid, created_at),
                   contract.offer_of(pid, created_at, starting=True)],
-        "showing": [contract.slideshow_mark(pid, created_at)]}
+        "showing": [contract.slideshow_mark(pid, created_at, shape)
+                    for shape in ("portrait", "landscape")]}
+
+
 def test_the_document_names_every_fix_a_session_should_hear_for_the_built_in_parts():
     # The session owns the room's microphone and can only hear a phrase it was
     # told to listen for, so a part added here without being published is one

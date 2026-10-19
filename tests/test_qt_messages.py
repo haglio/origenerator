@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import logging
+import tomllib
+from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 from PyQt6.QtCore import qCritical, qInstallMessageHandler, qWarning
 
 from origenerator.qt_messages import (
     RepeatCollapser,
     install_qt_message_logging,
 )
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _probe(_kind, _context, _message):
@@ -60,6 +65,19 @@ def test_a_new_install_never_reports_a_run_an_earlier_one_was_counting(caplog):
 
     assert [r.getMessage() for r in caplog.records if r.name == "qt"] == [
         "scene one is not a QObject"]
+
+
+def test_the_qt_this_app_asks_for_says_a_wildcard_disconnect_after_letting_go_of_its_lock():
+    # "QObject::disconnect: wildcard call disconnects from destroyed signal" comes in
+    # no category, so no filter rule keeps it from the handler above, and Qt 6.11.1
+    # says it holding the sender's pooled signal/slot lock: the handler then waits
+    # for Python with that lock held (QTBUG-145216). 6.11.2 says it after letting go.
+    project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    qt = [Requirement(line) for line in project["dependencies"]
+          if Requirement(line).name == "PyQt6-Qt6"]
+
+    assert [(r.specifier.contains("6.11.1"), r.specifier.contains("6.11.2")) for r in qt] == [
+        (False, True)]
 
 
 def _collapser():

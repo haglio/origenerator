@@ -503,6 +503,10 @@ class SlideshowDirector:
         elif self._session_channel is not None:
             ask_for_omnipause(self._session_channel)
 
+    def _ask_for_the_room(self, *, paused: bool) -> None:
+        if paused != self._room_paused:
+            self.pause_or_play_the_room()
+
     def _ask_the_room_to_pause(self):
         if self._fun_time is None:
             return self._pause_or_play_the_room_while_a_slideshow_is_up
@@ -1320,12 +1324,9 @@ class SlideshowDirector:
             self._host.say(message)
 
     def run_slideshow_command(self, command: SlideshowCommand, side: str | None):
-        """Get the slideshow going, pause it, or close it — on *side*'s region when
-        the utterance named one, else on the slideshow that is up.
-
-        Pausing is a pace of nought and starting is that pace back at the
-        standard number, because a slideshow that never moves on is exactly what a
-        stopped picture is here — there is no separate paused state to keep.
+        """Get the slideshow going, pause the room, or close the slideshow — on
+        *side*'s region when the utterance named one, else on the slideshow that
+        is up.
 
         The pace is set through the slideshow when there is one, not only posted to
         the app-wide number: a slideshow sitting at nought while that number already
@@ -1340,21 +1341,23 @@ class SlideshowDirector:
             slideshow.close()
             self._host.say("🎤 slideshow closed")
             return
-        seconds = 0 if command is SlideshowCommand.PAUSE else DEFAULT_IMAGE_DWELL_MS // 1000
+        if command is SlideshowCommand.PAUSE:
+            self._ask_for_the_room(paused=True)
+            if slideshow is None:
+                self._host.say("🎤 paused")
+            else:
+                slideshow.note_voice_command("🎤 slideshow paused")
+            return
+        self._ask_for_the_room(paused=False)
+        seconds = DEFAULT_IMAGE_DWELL_MS // 1000
         if slideshow is None:
             self._pace.set_seconds(seconds)  # what the next slideshow opens at
-            if command is SlideshowCommand.PAUSE:
-                self._host.say("🎤 no slideshow to pause")
-                return
             self.start(side=side)
             if self._slideshow is None:
                 self._host.say("🎤 nothing here to play")
             return
         slideshow.set_dwell_s(seconds)
-        slideshow.note_voice_command(
-            "🎤 slideshow paused" if command is SlideshowCommand.PAUSE
-            else f"🎤 slideshow at {seconds}s"
-        )
+        slideshow.note_voice_command(f"🎤 slideshow at {seconds}s")
 
     def play_collection(self, command) -> None:
         """A spoken collection name, on the named side.

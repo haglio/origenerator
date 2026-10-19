@@ -1693,7 +1693,7 @@ class GalleryView(QWidget):
         # ids drawn from the live tree (see :meth:`search_scope`).
         self._search.index.update(rows + held, gallery.folder_names_by_row(
             [folder for tree in trees.values() for folder in tree], meta,
-            self._custom_folders))
+            self._custom_folders), item_name=self._item_names.of)
         requests = self._db.list_requests()
         requested = gallery.requested_generations(requests, rows)  # the Requests collection
         bumped = gallery.enhancement_recency(rows)

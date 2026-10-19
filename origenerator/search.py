@@ -25,11 +25,10 @@ emptied it instead of leaving the user to guess which one to drop.
 
 Precision is the hard half, and every guard here was put in by a measurement
 rather than a hunch — the comments name what each one cost on a real library.
-Only the positive prompt, the recipe's names and the names the user gave the
-folders a row sits in are searched, decimals stay whole, and bare numbers are
-dropped from the recipe: a search is for what a generation is OF, and everything
-else in a row is either markup or bookkeeping that happens to be spelled like a
-word.
+The negative prompt is not searched, decimals stay whole, bare numbers are
+dropped from the recipe, and an item's name or seed matches only whole: a search
+is for what a generation is OF, and everything else in a row is either markup or
+bookkeeping that happens to be spelled like a word.
 
 The table below is plain, publishable English, and it is deliberately
 incomplete: the words describing the library itself — its own vocabulary for
@@ -50,6 +49,7 @@ from functools import lru_cache
 
 from origenerator import gallery
 from origenerator.content import load_content
+from origenerator.gallery.item_numbers import names_in, without_names
 from origenerator.gallery.signatures import READINGS_KEPT
 from origenerator.generation_state import in_sight
 
@@ -244,8 +244,8 @@ class QueryTerm:
 
     text: str                    # the word as typed, for the "nothing matched X" note
     stem: str
-    synonyms: frozenset[str]
-    related: frozenset[str]
+    synonyms: frozenset[str] = frozenset()
+    related: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -282,13 +282,14 @@ class _Entry:
     # re-index rather than carried over with the cached stems — a folder made a
     # moment ago has to be findable by its name now.
     folders: frozenset[str] = frozenset()
+    name_keys: frozenset[str] = frozenset()
 
 
 def query_words(query: str) -> tuple[str, ...]:
     """The words a query actually searches on: its non-stop words, in order,
     each counted once. A query of nothing but stop words keeps them — better to
     search for "the" than to answer a typed query with everything."""
-    words = _words(query)
+    words = _words(without_names(query))
     kept = [word for word in words if word not in _STOP_WORDS] or words
     seen: set[str] = set()
     ordered = []
@@ -307,7 +308,7 @@ def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm
     deterministic search that runs while the user types.
     """
     synonyms = _SYNONYMS if synonyms is None else synonyms
-    terms = []
+    terms = [QueryTerm(text=name, stem=name.lower()) for name in dict.fromkeys(names_in(query))]
     for word in query_words(query):
         stem = _stem(word)
         table = set(synonyms.get(stem, ())) - {stem}
@@ -333,13 +334,8 @@ def _field_score(term: QueryTerm, stems: frozenset[str]) -> float:
 
 
 def _term_score(term: QueryTerm, entry: _Entry) -> float:
-    """The best any part of ``entry`` satisfies ``term``, field weighting applied.
-
-    A seed is an identity, not a word: it matches exactly or not at all, and a
-    hit is worth as much as a prompt word, so typing a seed lands on that one
-    generation rather than ranking it among rows that merely share a digit.
-    """
-    if term.stem in entry.seeds:
+    """The best any part of ``entry`` satisfies ``term``, field weighting applied."""
+    if term.stem in entry.seeds or term.stem in entry.name_keys:
         return _EXACT
     return max(
         _field_score(term, entry.positive) * _POSITIVE_WEIGHT,
@@ -383,6 +379,11 @@ def _folder_stems(names) -> frozenset[str]:
     return frozenset().union(*(_stems(name) for name in names))
 
 
+def _name_keys(name: str) -> frozenset[str]:
+    whole = name.lower()
+    return frozenset({whole, whole.partition(" ")[0]} - {""})
+
+
 def _positive_stems(row: dict, params: dict) -> frozenset[str]:
     return _stems(_prompt_text(row, params, "positive_prompt"))
 
@@ -422,7 +423,7 @@ class GallerySearch:
         self._order: list[str] = []       # prompt_ids, newest first, as given
         self._synonyms = _SYNONYMS if synonyms is None else synonyms
 
-    def update(self, rows, folder_names=None) -> None:
+    def update(self, rows, folder_names=None, item_name=None) -> None:
         """Re-index ``rows`` (newest first), keeping the stems already computed
         for a generation that was here last time and only swapping in its fresh
         row dict — a poll rewrites every row object, but not the words in it.
@@ -447,10 +448,11 @@ class GallerySearch:
                     or not gallery.produced_output(row) or not in_sight(row):
                 continue
             folders = _folder_stems(folder_names.get(prompt_id, ()))
+            name_keys = _name_keys(item_name(prompt_id) if item_name else "")
             known = self._entries.get(prompt_id)
             entries[prompt_id] = replace(
                 known if known is not None else _build_entry(row),
-                row=row, folders=folders,
+                row=row, folders=folders, name_keys=name_keys,
             )
             order.append(prompt_id)
         self._entries = entries

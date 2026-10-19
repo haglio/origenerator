@@ -180,6 +180,28 @@ def test_a_seed_lands_on_the_one_generation_carrying_it():
     assert _hits(_index(rows), "778899") == ["g1"]
 
 
+def test_the_code_leading_a_name_finds_every_item_of_its_folder():
+    rows = [_row("g1", "a quiet street"), _row("g2", "a quiet street"),
+            _row("g3", "a quiet street")]
+    names = {"g1": "3FA9C0D2 004", "g2": "3FA9C0D2 005", "g3": "77B1E0AA 004"}
+    index = search.GallerySearch()
+    index.update(rows, item_name=names.get)
+
+    assert _hits(index, "3fa9c0d2") == ["g1", "g2"]
+
+
+def test_a_whole_name_lands_on_its_item_alone():
+    rows = [_row("picture", "a quiet street"), _row("made from it", "a quiet street"),
+            _row("numbered alike", "a quiet street")]
+    names = {"picture": "3FA9C0D2 004", "made from it": "77B1E0AA 000",
+             "numbered alike": "77B1E0AA 004"}
+    folders = {"made from it": ["3FA9C0D2 004"], "numbered alike": ["3FA9C0D2 001"]}
+    index = search.GallerySearch()
+    index.update(rows, folders, item_name=names.get)
+
+    assert _hits(index, "3FA9C0D2 004") == ["picture"]
+
+
 def test_a_search_can_be_held_to_a_set_of_generations():
     # The gallery's tree selection is the scope: standing in a folder asks the
     # question there, and a hit outside it is not an answer.
@@ -408,10 +430,25 @@ def test_a_widening_that_will_not_parse_leaves_the_table_tier_standing(monkeypat
     ) == {}
 
 
-def test_a_query_with_no_words_asks_the_model_nothing(monkeypatch):
-    def explode(*_args, **_kwargs):
-        raise AssertionError("should not have called out")
+def _calls_to_the_model(monkeypatch):
+    calls = []
+    monkeypatch.setattr(search.urllib.request, "urlopen",
+                        lambda *args, **kwargs: calls.append(args))
+    return calls
 
-    monkeypatch.setattr(search.urllib.request, "urlopen", explode)
+
+def test_a_query_with_no_words_asks_the_model_nothing(monkeypatch):
+    calls = _calls_to_the_model(monkeypatch)
+
     assert search.expand_query(
         "   ", base_url="http://localhost:1", model="m", system_prompt="R") == {}
+    assert calls == []
+
+
+def test_an_items_name_is_never_sent_to_the_model_to_widen(monkeypatch):
+    calls = _calls_to_the_model(monkeypatch)
+
+    search.expand_query(
+        "3FA9C0D2 004", base_url="http://localhost:1", model="m", system_prompt="R")
+
+    assert calls == []

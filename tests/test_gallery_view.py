@@ -1481,6 +1481,17 @@ def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
     assert view.visible_prompt_ids() == ["i2"]
 
 
+def test_an_item_is_found_by_the_name_it_wears(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+
+    _search_for(view, view._item_names.of("i2"))
+
+    assert view.visible_prompt_ids() == ["i2"]
+
+
 def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
     # Naming a folder by a code took every prompt word out of the tree, so the
     # search has to reach the rows themselves — matching on a word that appears

@@ -1,17 +1,11 @@
 """Spoken control of the fullscreen slideshow: get it going, pause it, close it.
 
-Three things to say, because three are what a slideshow has: **start** it (or resume
-one sitting at nought), **pause** it, **stop** it. Each is a verb plus the word
+Three things to say, because three are what a slideshow has: **start** it, **pause**
+it, **stop** it. Each is a verb plus the word
 "slideshow", which is what keeps them clear of prompt steering — the same mic is
 often rewriting a prompt, and an utterance this doesn't claim falls through to
 become a prompt edit. "start slideshow" is not a sentence anyone types at an
 image generator, so the pairing is safe to match on.
-
-Pausing is a pace of nought, not a fourth state: a slideshow that never moves on is a
-picture on the screen, which is the whole reason there is no separate full-screen
-viewer any more. So "pause slideshow" turns the clip-seconds pace to nought and
-"start slideshow" turns it back to the standard number — the same pair Genau's
-console steps by hand, spoken.
 
 Whisper's own renderings are what these are matched against, so "slide show"
 arrives as two words about as often as one, and punctuation and case are its to
@@ -28,9 +22,9 @@ from origenerator.voice.text import words
 class SlideshowCommand(Enum):
     """What a spoken utterance asked of the slideshow."""
 
-    START = "start"   # open one if none is up, and set the pace to the standard
-    PAUSE = "pause"   # stop on what is on screen: the pace goes to nought
-    STOP = "stop"     # close it
+    START = "start"
+    PAUSE = "pause"
+    STOP = "stop"
 
 
 # The verbs, as said. Each maps to the one thing it asks for; anything else

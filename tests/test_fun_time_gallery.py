@@ -32,6 +32,7 @@ from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
 from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names, open_both_sides
+from tests.slideshow_support import will_move_on
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
@@ -43,17 +44,6 @@ from tests.test_gallery_view import (  # the in-memory Database stand-in, and a 
     _row,
     _SignalMotion,
 )
-
-
-def _will_move_on(view) -> bool:
-    """Whether the slideshow pages on by itself when the item on screen runs out.
-
-    The engine holds a picture for the pace and ends it the way it ends a
-    finished clip, so there is no clock of the view's own to ask: what decides
-    is the same three things that decided whether one was armed -- the room is
-    not frozen, the slide is not locked, and the pace is not nought."""
-    return (not view._paused and not view._playlist.locked_or_paused()
-            and bool(view._dwell_s))
 
 
 def _session(tmp_path=None):
@@ -1147,7 +1137,7 @@ def test_omnipause_reaches_a_slideshow_the_region_map_does_not_answer_for(
     view.set_room_paused(True)
 
     assert slideshow._paused is True
-    assert not _will_move_on(slideshow)
+    assert not will_move_on(slideshow)
 
 
 def test_a_frozen_slideshow_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, monkeypatch):

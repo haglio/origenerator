@@ -22,7 +22,6 @@ gallery's own caption instead, where the speaker can still see them.
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -62,7 +61,13 @@ from origenerator.gui.slideshow_set import (
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.media import MediaType
-from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
+from origenerator.slideshow import (
+    PAUSED_BY_VOICE,
+    PAUSED_FOR_A_REQUEST,
+    Slide,
+    SlideshowFilters,
+    SlideshowState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,17 +92,12 @@ class FunestraSlideshow(QObject):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
-                 hud=None, pace=None, image_dwell_ms=None, start=None, shuffle=None,
-                 say=None, clock=time.monotonic, parent=None):
+                 hud=None, pace=None, start=None, shuffle=None,
+                 say=None, parent=None):
         super().__init__(parent)
         self._side = side
         self.channel = channel
         self._frames = frames
-        self._clock = clock
-        self._last_tick = clock()
-        self._held_s = 0.0
-        self._moves_on_early = False
-        self._request_holds_it = False
         self._frame_on_funestra: Path | None = None
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
@@ -108,14 +108,13 @@ class FunestraSlideshow(QObject):
         self._say = say
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
-        self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
-                       shuffle=shuffle, hud=hud)
+        self._take_set(items, start=start, shuffle=shuffle, hud=hud)
         self._open = True
-        # What the Funestra last said it was showing, and whether it has locked
-        # it: the Funestra's answer, not this app's — a picture that has moved on
+        # What the Funestra last said it was showing: a picture that has moved on
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._locked = False
+        self._keep_told: bool | None = None
         self._published = ""
         self._levels = LevelStepper()
         opened_on_a_slide = start is not None
@@ -130,21 +129,16 @@ class FunestraSlideshow(QObject):
 
     # --- handing the Funestra what to play ------------------------------------
 
-    def _take_set(self, items, *, image_dwell_ms, start, shuffle, hud) -> None:
-        if image_dwell_ms is None:
-            image_dwell_ms = self._pace.dwell_ms
-        self._dwell_s = image_dwell_ms // 1000
+    def _take_set(self, items, *, start, shuffle, hud) -> None:
         self._following = None
-        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
+        self._set = SlideshowSet(items, shuffle=shuffle,
                                  start=start, hud=hud, on_pass_change=self._pass_changed,
                                  neighbors=self._actions.neighbors, widen=self._actions.widen,
                                  acts=self._actions.acts,
                                  on_filters_change=self._actions.filters_changed)
 
-    def play(self, items, *, image_dwell_ms=None, start=None, shuffle=None,
-             hud=None) -> None:
-        self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
-                       shuffle=shuffle, hud=hud)
+    def play(self, items, *, start=None, shuffle=None, hud=None) -> None:
+        self._take_set(items, start=start, shuffle=shuffle, hud=hud)
         self._unlock()
         self._hand_over(land=True)
         self._publish()
@@ -162,18 +156,21 @@ class FunestraSlideshow(QObject):
             self._send(play_file(self._funestra_item(current)))
         self._send(RELOAD_PLAYLIST)
         self._tell_the_pace()
+        self._tell_the_keep()
 
     def _tell_the_pace(self) -> None:
-        self._pace_told = self._funestra_pace()
-        self._send(f"{SET_PACE} {self._pace_told}")
+        self._send(f"{SET_PACE} {self._pace.seconds}")
 
-    def _funestra_pace(self) -> int:
-        """The slideshow's pace, or nought while something holds the slide on
-        screen still: a spoken request, or the run it was opened over."""
+    def _tell_the_keep(self) -> None:
+        keeps = self._locked or self._set.playlist.paused or self._on_the_run()
+        if keeps != self._keep_told:
+            self._keep_told = keeps
+            self._send(LOCK_ON if keeps else LOCK_OFF)
+
+    def _on_the_run(self) -> bool:
         current = self._set.playlist.current()
-        on_the_run = (current is not None and current.is_live
-                      and current.prompt_id == self._following)
-        return 0 if self._request_holds_it or on_the_run else self._dwell_s
+        return (current is not None and current.is_live
+                and current.prompt_id == self._following)
 
     def _file_of(self, slide) -> str:
         if slide.is_live:
@@ -195,28 +192,14 @@ class FunestraSlideshow(QObject):
     @property
     def dwell_s(self) -> int:
         """The seconds an unlocked picture holds the Funestra's screen."""
-        return self._dwell_s
+        return self._pace.seconds
 
     def set_dwell_s(self, seconds: int) -> None:
         """Take a new pace, and hand it on: the number is app-wide, so a pace
         set over this slideshow is what the next one opens at."""
-        self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
-        self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
+        self._pace.set_seconds(seconds)
 
-    def _on_pace_changed(self, seconds: int) -> None:
-        self._apply_dwell(seconds)
-
-    def _apply_dwell(self, seconds: int) -> None:
-        """Tell the Funestra how long to hold a picture, when the number moved.
-
-        The pace is the Funestra's to keep from there: it holds the frame that
-        long and then ends the file, which is how a picture moves on at all.
-        """
-        seconds = max(0, int(seconds))
-        if seconds == self._dwell_s:
-            return
-        self._dwell_s = seconds
-        self._set.playlist.image_dwell_ms = seconds * 1000
+    def _on_pace_changed(self, _seconds: int) -> None:
         self._tell_the_pace()
 
     def _pass_changed(self, kept: bool) -> None:
@@ -235,22 +218,12 @@ class FunestraSlideshow(QObject):
     def tick(self) -> None:
         """Read the Funestra's status, follow it, and publish the panel."""
         status = self._funestra_status()
-        self._locked = status.locked
-        now = self._clock()
         if status.video and status.video != self._showing:
             self._showing = status.video
             self._follow(status.video)
-            self._held_s = 0.0
-            current = self._set.playlist.current()
-            self._moves_on_early = current is not None and self._set.being_made(current)
             self._frame_on_funestra = None
             self._show_what_is_being_made()
-        elif not (status.paused or status.locked or self._request_holds_it):
-            self._held_s += now - self._last_tick
-        self._last_tick = now
-        if self._funestra_pace() != self._pace_told:
-            self._tell_the_pace()
-        self._move_on_early_from_what_is_being_made()
+        self._tell_the_keep()
         self._publish()
 
     def _show_what_is_being_made(self) -> None:
@@ -263,13 +236,6 @@ class FunestraSlideshow(QObject):
             return
         self._frame_on_funestra = path
         self._send(CLEAR_FRAME if path is None else f"{SHOW_FRAME} {path}")
-
-    def _move_on_early_from_what_is_being_made(self) -> None:
-        if not (self._moves_on_early and self._funestra_pace()):
-            return
-        if self._held_s >= self._set.pace_for(self._set.playlist.current(), self._dwell_s):
-            self._moves_on_early = False
-            self._send(NEXT)
 
     def _funestra_status(self):
         return parse_status(_read_fields(self.channel.status_file))
@@ -342,8 +308,6 @@ class FunestraSlideshow(QObject):
 
     @property
     def locked(self) -> bool:
-        """Whether the Funestra has locked what is on screen — its own answer,
-        which is what the panel's padlock and its lock ring are drawn from."""
         return self._locked
 
     @property
@@ -391,10 +355,8 @@ class FunestraSlideshow(QObject):
         return True
 
     def _lock(self, on: bool) -> None:
-        # Held here as well as sent, so the panel lights on the press rather
-        # than a tick later; the Funestra's own status settles it either way.
         self._locked = on
-        self._send(LOCK_ON if on else LOCK_OFF)
+        self._tell_the_keep()
         self._publish()
 
     def _unlock(self) -> None:
@@ -807,15 +769,16 @@ class FunestraSlideshow(QObject):
         their paused flag, so there is nothing to do here — a frozen Funestra
         holds the picture, and nothing advances until it is let go."""
 
-    def pause_for_request(self, paused: bool, note: str = "") -> None:
-        """Stop the advance while a request is being spoken: the pace goes to
-        nought, which is how anything is kept still on a Funestra, and back after.
+    def set_spoken_pause(self, paused: bool) -> None:
+        self._set.playlist.set_paused(paused, PAUSED_BY_VOICE)
+        self._tell_the_keep()
 
-        A request is about what is on screen, and a set that pages on every few
-        seconds would hand the words to whatever came up next.
-        """
-        self._request_holds_it = paused
-        self._tell_the_pace()
+    def pause_for_request(self, paused: bool, note: str = "") -> None:
+        """Keep the slide on screen while a request is being spoken: a request
+        is about what is on screen, and a set that pages on every few seconds
+        would hand the words to whatever came up next."""
+        self._set.playlist.set_paused(paused, PAUSED_FOR_A_REQUEST)
+        self._tell_the_keep()
         if note:
             self._note(note)
 

@@ -37,7 +37,7 @@ class SlideshowHost(Protocol):
 
     @property
     def dwell_s(self) -> int:
-        """The seconds an unlocked slide holds the screen; nought means never."""
+        """The seconds an unlocked slide holds the screen."""
         ...
 
     def set_dwell_s(self, seconds: int) -> None:

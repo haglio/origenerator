@@ -8,3 +8,7 @@ def ahead(playlist, steps: int):
     None when the pass is empty."""
     turned = rotated_onto(playlist.in_play_order(), playlist.current())
     return turned[steps % len(turned)] if turned else None
+
+
+def will_move_on(view) -> bool:
+    return not view._paused and not view._playlist.locked_or_paused()

@@ -23,6 +23,7 @@ from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
+from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
@@ -142,13 +143,11 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
     assert slideshow.video_on_screen() is None
 
 
-def test_the_funestra_is_told_to_read_the_list_and_how_long_a_picture_holds(qtbot, tmp_path):
-    """Two verbs make the hand-over: read this list, and hold each picture for
-    the pace this app's console sets — the Funestra owning the advance from
-    there, as it does for its own clips."""
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=6000)
+def test_the_funestra_is_told_to_read_the_list_how_long_a_picture_holds_and_its_lock(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, pace=SlideshowPace(seconds=6))
 
-    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 6"]
+    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 6", "LOCK_OFF"]
 
 
 def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
@@ -164,19 +163,20 @@ def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp
     assert slideshow.hud_map().corner.prompt_id == "id-2"
 
 
-def test_the_slideshows_lock_is_the_funestras_own(qtbot, tmp_path):
-    """A padlock on this panel is the Funestra's repeat-one: it is told, and what
-    it says back is what the panel draws."""
+def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
     slideshow.slideshow_toggle_lock()
-    assert _sent(slideshow) == ["LOCK_ON"]
-    assert slideshow.locked is True
-
-    _says(slideshow, video="one.png", locked=False)   # the Funestra says otherwise
+    told = _sent(slideshow)
+    _says(slideshow, video="one.png", locked=False)
     slideshow.tick()
-    assert slideshow.locked is False
+    still_locked = slideshow.locked
+    slideshow.slideshow_toggle_lock()
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+
+    assert (told, still_locked, slideshow.locked) == (["LOCK_ON"], True, False)
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
@@ -234,7 +234,7 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
     slideshow.slideshow_cull()
 
     assert deleted == ["id-1"]
-    assert queued_at_delete[:2] == ["LOCK_OFF", "TRASH"]
+    assert queued_at_delete[:1] == ["TRASH"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["two.png", "three.png"]  # and it is off the list
 
@@ -375,31 +375,32 @@ def test_a_slideshow_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, t
 def test_a_new_set_lands_the_funestra_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+    slideshow.play(_ITEMS, start=2, shuffle=in_order)
 
-    assert _sent(slideshow) == ["PLAY_FILE three.png", "RELOAD_PLAYLIST", "SET_PACE 0"]
+    assert _sent(slideshow) == ["PLAY_FILE three.png", "RELOAD_PLAYLIST", "SET_PACE 4"]
 
 
 def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="three.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+    slideshow.play(_ITEMS, start=2, shuffle=in_order)
 
-    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
+    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 4"]
 
 
-def test_the_slideshow_names_the_generation_the_funestra_says_it_is_locked_on(qtbot, tmp_path):
+def test_the_slideshow_names_the_generation_it_is_locked_on(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
     assert slideshow.locked_on is None
 
-    _says(slideshow, video="two.png", locked=True)
-    slideshow.tick()
+    slideshow.set_locked(True)
 
     assert slideshow.locked_on == "id-2"
 
 
 def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):
-    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow.set_locked(True)
+    _sent(slideshow)
 
     slideshow.play(_ITEMS, start=1, shuffle=in_order)
 
@@ -762,7 +763,7 @@ def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qt
 
     slideshow.show_item("one-x.png")
 
-    assert _sent(slideshow) == ["PLAY_FILE one-x.png", "LOCK_OFF"]
+    assert _sent(slideshow) == ["PLAY_FILE one-x.png"]
     assert slideshow.hud_prompt_id == "id-1x"
 
 
@@ -976,7 +977,7 @@ def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     slideshow.slideshow_cull()
 
     assert (unfavorited, deleted) == (["id-1"], [])
-    assert _sent(slideshow) == ["LOCK_OFF", "NEXT"]
+    assert _sent(slideshow) == ["NEXT"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["one.png", "two.png", "three.png"]   # still in the list
 
@@ -1073,128 +1074,73 @@ def test_a_slideshow_picked_back_up_plays_what_is_being_made_before_where_it_lef
     assert "PLAY_FILE three.png" in _sent(slideshow)
 
 
-def _clocked_slideshow(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> FunestraSlideshow:
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
-                           **fields)
-    _says(slideshow, video="one.png")
-    slideshow.tick()
-    _sent(slideshow)
-    return slideshow
-
-
-def test_an_item_being_enhanced_is_moved_on_after_half_the_pace(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
-
-    now[0] = 1.9
-    slideshow.tick()
-    assert _sent(slideshow) == []
-    now[0] = 2.1
-    slideshow.tick()
-    assert _sent(slideshow) == ["NEXT"]
-
-
-def test_the_time_a_frozen_funestra_holds_an_item_being_made_does_not_count(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
-
-    _says(slideshow, video="one.png", paused=True)
-    now[0] = 5.0
-    slideshow.tick()
-    _says(slideshow, video="one.png")
-    now[0] = 6.0
-    slideshow.tick()
-
-    assert _sent(slideshow) == []
-
-
-def test_an_item_being_made_that_the_funestra_holds_is_not_moved_on(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
-
-    _says(slideshow, video="one.png", locked=True)
-    now[0] = 5.0
-    slideshow.tick()
-
-    assert _sent(slideshow) == []
-
-
-def test_an_item_being_made_under_a_pace_of_nought_is_held_like_any_other(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=0, clock=lambda: now[0],
-                           hud=HudFacts(enhancing={"id-1": "running"}))
-    _sent(slideshow)
-
-    _says(slideshow, video="one.png")
-    slideshow.tick()
-    now[0] = 5.0
-    slideshow.tick()
-
-    assert _sent(slideshow) == []
-
-
-def test_an_item_being_made_is_not_moved_on_while_a_request_is_spoken_over_it(
-        qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+def test_a_request_spoken_over_a_picture_keeps_it_on_the_funestra_still_moving(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     slideshow.pause_for_request(True)
-    now[0] = 5.0
-    slideshow.tick()
+    while_said = _sent(slideshow)
+    slideshow.pause_for_request(False)
 
-    assert "NEXT" not in _sent(slideshow)
+    assert (while_said, _sent(slideshow), slideshow.locked) == (["LOCK_ON"], ["LOCK_OFF"], False)
+
+
+def test_pause_slideshow_keeps_the_picture_on_the_funestra_still_moving_until_start_slideshow(
+        qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+
+    slideshow.set_spoken_pause(True)
+    while_paused = _sent(slideshow)
+    slideshow.set_spoken_pause(False)
+
+    assert (while_paused, _sent(slideshow), slideshow.locked) == (["LOCK_ON"], ["LOCK_OFF"], False)
 
 
 def test_a_slide_a_request_is_spoken_over_stays_held_through_a_new_list(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.pause_for_request(True)
+    _sent(slideshow)
 
     slideshow.note_added("four.png", "image", "id-4")
 
-    assert _paces(_sent(slideshow))[-1] == "SET_PACE 0"
+    assert "LOCK_OFF" not in _sent(slideshow)
 
 
-def _slideshow_following_a_run(qtbot, tmp_path, now) -> FunestraSlideshow:
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now)
+def _slideshow_following_a_run(qtbot, tmp_path) -> tuple[FunestraSlideshow, list[str]]:
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.note_generating("id-run", FRAME)
     slideshow.follow_what_is_being_made()
     _says(slideshow, video=str(read_playlist(slideshow.channel.playlist)[0].path))
     slideshow.tick()
-    _sent(slideshow)
-    return slideshow
+    return slideshow, _sent(slideshow)
 
 
-def test_a_run_the_slideshow_follows_is_held_on_the_funestra_while_it_is_made(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _slideshow_following_a_run(qtbot, tmp_path, now)
-
-    now[0] = 30.0
-    slideshow.tick()
-
-    assert "NEXT" not in _sent(slideshow)
+def _pace_and_lock(sent: list[str]) -> list[str]:
+    return [verb for verb in sent if verb.startswith(("SET_PACE", "LOCK"))]
 
 
-def _paces(sent: list[str]) -> list[str]:
-    return [verb for verb in sent if verb.startswith("SET_PACE")]
+def test_a_run_the_slideshow_follows_is_kept_on_the_funestra_still_moving(qtbot, tmp_path):
+    _slideshow, sent = _slideshow_following_a_run(qtbot, tmp_path)
+
+    assert _pace_and_lock(sent)[-2:] == ["SET_PACE 4", "LOCK_ON"]
 
 
-def test_a_run_the_slideshow_follows_that_stops_leaves_it_paging_at_its_pace(qtbot, tmp_path):
-    slideshow = _slideshow_following_a_run(qtbot, tmp_path, [0.0])
+def test_a_run_the_slideshow_follows_that_stops_lets_go_of_the_funestra(qtbot, tmp_path):
+    slideshow, _following = _slideshow_following_a_run(qtbot, tmp_path)
 
     slideshow.note_in_flight(set())
 
-    assert _paces(_sent(slideshow))[-1] == f"SET_PACE {slideshow.dwell_s}"
+    assert _pace_and_lock(_sent(slideshow)) == ["SET_PACE 4", "LOCK_OFF"]
 
 
 def test_a_run_the_slideshow_follows_lets_go_once_the_funestra_is_stepped_off_it(
         qtbot, tmp_path):
-    slideshow = _slideshow_following_a_run(qtbot, tmp_path, [0.0])
+    slideshow, _following = _slideshow_following_a_run(qtbot, tmp_path)
 
     slideshow.slideshow_step(1)
     _says(slideshow, video="one.png")
     slideshow.tick()
 
-    assert _paces(_sent(slideshow)) == [f"SET_PACE {slideshow.dwell_s}"]
+    assert _sent(slideshow) == ["NEXT", "LOCK_OFF"]
 
 
 def test_a_slideshow_told_to_lead_with_what_is_being_made_sends_the_funestra_there(qtbot, tmp_path):
@@ -1205,17 +1151,6 @@ def test_a_slideshow_told_to_lead_with_what_is_being_made_sends_the_funestra_the
     slideshow.lead_with_what_is_being_made()
 
     assert "PLAY_FILE three.png" in _sent(slideshow)
-
-
-def test_an_item_whose_enhancement_starts_while_it_is_up_keeps_its_whole_time(qtbot, tmp_path):
-    now = [0.0]
-    slideshow = _clocked_slideshow(qtbot, tmp_path, now)
-
-    slideshow.note_enhancing({"id-1": "running"})
-    now[0] = 2.5
-    slideshow.tick()
-
-    assert "NEXT" not in _sent(slideshow)
 
 
 def test_a_picture_enhanced_during_the_slideshow_steps_its_versions_on_the_funestra(qtbot, tmp_path):

@@ -109,12 +109,13 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, key_holds, oriented_key
 from origenerator.prompt_edit import apply_request
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
+from origenerator.slideshow import LIVE
 from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
@@ -125,7 +126,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import gestures
 from tests.slideshow_hud_support import button_on_screen, engine_of, hud_button_names, panel_targets
-from tests.slideshow_support import ahead
+from tests.slideshow_support import ahead, will_move_on
 from tests.test_folder_tree import _shown
 from tests.test_osr2_driver import ACTIONS, FakeBroker, FakePlayer
 
@@ -141,17 +142,6 @@ _VID_REROLL_HISTORY = {"outputs": {"19": {"images": [
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
 _SHIFT = Qt.KeyboardModifier.ShiftModifier
-
-
-def _will_move_on(view) -> bool:
-    """Whether the slideshow pages on by itself when the item on screen runs out.
-
-    The engine holds a picture for the pace and ends it the way it ends a
-    finished clip, so there is no clock of the view's own to ask: what decides
-    is the same three things that decided whether one was armed -- the room is
-    not frozen, the slide is not locked, and the pace is not nought."""
-    return (not view._paused and not view._playlist.locked_or_paused()
-            and bool(view._dwell_s))
 
 
 class FakeActions:
@@ -14618,8 +14608,8 @@ def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeyp
 
     assert view._slideshows.showing is not None
     qtbot.addWidget(view._slideshows.showing)
-    assert view._slideshows.showing.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert _will_move_on(view._slideshows.showing)
+    assert view._slideshows.showing.dwell_s == DEFAULT_S
+    assert will_move_on(view._slideshows.showing)
     view._slideshows.showing.close()
 
 
@@ -14641,37 +14631,36 @@ def test_a_double_clicked_pictures_slideshow_opens_at_the_clip_seconds_set(
     slideshow = _double_click_slideshow(view, qtbot)
 
     assert slideshow.dwell_s == 7
-    assert _will_move_on(slideshow)
+    assert will_move_on(slideshow)
     slideshow.close()
 
 
-def test_start_slideshow_sets_a_held_slideshow_going(qtbot, tmp_path, monkeypatch):
-    # A slideshow held at nought is set going by this, and there is no separate
-    # resume to learn.
+def test_start_slideshow_sets_a_paused_slideshow_going_in_the_same_window(
+        qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
-    view._pace.set_seconds(0)
     slideshow = _double_click_slideshow(view, qtbot)
-    assert slideshow.dwell_s == 0
+    view._voice.listener.speak_command("pause slideshow")
 
     view._voice.listener.speak_command("start slideshow")
 
-    assert view._slideshows.showing is slideshow          # the open one, not a second window
-    assert slideshow.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert _will_move_on(slideshow)
+    assert view._slideshows.showing is slideshow
+    assert will_move_on(slideshow)
     slideshow.close()
 
 
-def test_pause_slideshow_turns_the_pace_to_nought(qtbot, tmp_path, monkeypatch):
+def test_pause_slideshow_holds_the_slide_and_leaves_the_clip_seconds_alone(
+        qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
+    view._pace.set_seconds(7)
     view._voice.listener.speak_command("start slideshow")
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
 
     view._voice.listener.speak_command("pause slideshow")
 
-    assert slideshow.dwell_s == 0
-    assert not _will_move_on(slideshow)
-    assert view._slideshows.showing is slideshow  # paused, not closed
+    assert view._slideshows.showing is slideshow
+    assert not will_move_on(slideshow)
+    assert slideshow.dwell_s == 7
     slideshow.close()
 
 

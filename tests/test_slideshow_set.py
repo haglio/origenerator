@@ -22,7 +22,7 @@ _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
 
 def _set(items=_ITEMS, **fields):
     dealt = []
-    slideshow_set = SlideshowSet(items, image_dwell_ms=4000, shuffle=in_order,
+    slideshow_set = SlideshowSet(items, shuffle=in_order,
                                  on_pass_change=dealt.append, **fields)
     return slideshow_set, dealt
 
@@ -210,15 +210,6 @@ def test_a_locked_slide_is_not_taken_off_the_screen_for_what_is_being_made():
 
     assert slideshow_set.lead_with_what_is_being_made() is False
     assert slideshow_set.current_prompt_id() == "id-1"
-
-
-def test_a_picture_being_made_holds_the_screen_half_as_long_as_the_pace():
-    slideshow_set, _dealt = _set(hud=HudFacts(enhancing={"id-2": "queued", "id-3": "running"}))
-    plain, waiting, being_made = (Slide.of(item) for item in _ITEMS)
-
-    assert slideshow_set.pace_for(being_made, 5) == 2.5
-    assert slideshow_set.pace_for(waiting, 5) == 5
-    assert slideshow_set.pace_for(plain, 5) == 5
 
 
 _TWO_VERSIONS = [("one_enhanced.png", "image", "Enhance 1"), ("one.png", "image", "Original")]

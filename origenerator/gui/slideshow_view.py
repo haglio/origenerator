@@ -76,7 +76,14 @@ from origenerator.gui.slideshow_set import (
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
-from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
+from origenerator.slideshow import (
+    PAUSED_BY_VOICE,
+    PAUSED_FOR_A_REQUEST,
+    Slide,
+    SlideshowFilters,
+    SlideshowState,
+    in_order,
+)
 from origenerator.slideshow_buttons import answer
 
 logger = logging.getLogger(__name__)
@@ -120,7 +127,7 @@ class SlideshowView(QWidget):
     # A different item (or version) is on screen — re-aim the OSR2 drive.
     media_changed = pyqtSignal()
 
-    def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
+    def __init__(self, items, *, frame=None, start=None,
                  shuffle=None, actions=None, hud=None, engine=None, motion=None,
                  pace=None, frames=None, clock=time.monotonic, parent=None):
         super().__init__(parent)
@@ -129,16 +136,9 @@ class SlideshowView(QWidget):
         # None of it, for a slideshow standing on its own (see SlideshowActions).
         self._actions = actions if actions is not None else SlideshowActions()
         self._motion = motion  # the gallery's app-global motion driver, or None
-        # How long a slide holds the screen is app-wide, because the console
-        # that sets it is: turned up here or in the main window, it is the
-        # same number. An explicit dwell (a test's) wins until the console
-        # next moves the pace.
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
         self._clock = clock
-        self._last_tick = clock()
-        self._held_s = 0.0
-        self._moves_on_early = False
         self._frames = frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")
         # The file the Funestra was last stood on, and what it is of: a slide,
         # one of its versions, or nothing while a run's frames are up.
@@ -165,8 +165,7 @@ class SlideshowView(QWidget):
         self._queue_items: list = []
         self._foreign_queued = 0
         self._queue_pointer = QueuePointer(self)
-        self._take_set(items, frame=frame, start=start,
-                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
+        self._take_set(items, frame=frame, start=start, shuffle=shuffle, hud=hud)
         self.setWindowTitle("Slideshow")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround under the media
@@ -213,7 +212,7 @@ class SlideshowView(QWidget):
 
     # --- the set, and the pass dealt from it --------------------------------
 
-    def play(self, items, *, frame=None, start=None, image_dwell_ms=None,
+    def play(self, items, *, frame=None, start=None,
              shuffle=None, hud=None, actions=None) -> None:
         """Take a new set into this window and start it on that set.
 
@@ -226,11 +225,10 @@ class SlideshowView(QWidget):
         """
         if actions is not None:
             self._actions = actions
-        self._take_set(items, frame=frame, start=start,
-                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
+        self._take_set(items, frame=frame, start=start, shuffle=shuffle, hud=hud)
         self._show_current()
 
-    def _take_set(self, items, *, frame, start, image_dwell_ms, shuffle, hud) -> None:
+    def _take_set(self, items, *, frame, start, shuffle, hud) -> None:
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
@@ -243,15 +241,12 @@ class SlideshowView(QWidget):
         # The versions of each item that has any, and the place within the one
         # being stepped: Shift+Left/Right moves there rather than along the set.
         self._levels = LevelStepper()
-        if image_dwell_ms is None:
-            image_dwell_ms = self._pace.dwell_ms
-        self._dwell_s = image_dwell_ms // 1000
         # The set this slideshow plays, the pass dealt from it, and what its two
         # switches keep of it — all of it the same whether a window or one of
         # a session's Funestras is showing the slides (see SlideshowSet).  What this
         # view answers for is the slide on screen, so a re-dealt pass comes
         # back here as :meth:`_pass_changed`.
-        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
+        self._set = SlideshowSet(items, shuffle=shuffle,
                                  start=start, hud=hud, on_pass_change=self._pass_changed,
                                  neighbors=self._actions.neighbors, widen=self._actions.widen,
                                  acts=self._actions.acts,
@@ -293,7 +288,6 @@ class SlideshowView(QWidget):
         self._levels.restart()  # a new item, so its own versions from the top
         self._hand_over(land=True)
         self._show_what_is_being_made()
-        self._move_on_early_from(slide)
         self._refresh_note()  # the note belongs to whatever is on screen now
         self._apply_freeze()  # a slide arrived at under a freeze arrives frozen
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
@@ -319,16 +313,15 @@ class SlideshowView(QWidget):
         playback = self._pane.playback
         if playback is None:
             return
-        playback.set_pace(self._dwell_s)
-        # A lock is repeat-one, as it is on a Fun Time satellite; a slideshow
-        # following a run holds its frames the same way, and so does a pace
-        # of nought, since nought means nothing moves on its own -- a finished
-        # clip included.
-        playback.set_locked(self._playlist.locked or self._live or not self._dwell_s)
+        playback.set_pace(self._pace.seconds)
+        self._tell_the_engine_what_keeps_the_slide()
         self._loads_seen = playback.loads
         self._refusal_checked = False
-        self._held_s = 0.0
-        self._last_tick = self._clock()
+
+    def _tell_the_engine_what_keeps_the_slide(self) -> None:
+        playback = self._pane.playback
+        if playback is not None:
+            playback.set_locked(self._playlist.locked_or_paused() or self._live)
 
     def _the_funestra_opened(self) -> None:
         self._settle()
@@ -351,27 +344,20 @@ class SlideshowView(QWidget):
     def follow_the_funestra(self) -> None:
         """The pass of this slideshow's own the Funestra gives it each frame: stand
         the set on whatever the Funestra moved onto by itself -- a picture's
-        pace ran out, a clip ended -- step past an item it would not open,
-        and move a picture being enhanced on early."""
+        pace ran out, a clip ended -- and step past an item it would not open."""
         playback = self._pane.playback
         if playback is None:
             return
-        now = self._clock()
         if playback.loads != self._loads_seen:
             self._loads_seen = playback.loads
             self._refusal_checked = False
-            self._held_s = 0.0
             video = playback.current_video
             if video != self._showing:
                 self._showing = video
                 self._follow(video)
-        elif not (self._paused or self._playlist.locked_or_paused()):
-            self._held_s += now - self._last_tick
-        self._last_tick = now
         if not self._refusal_checked and playback.idle:
             self._refusal_checked = True
             self._on_media_unplayable()
-        self._move_on_early()
 
     def _follow(self, video: Path) -> None:
         """Stand the pass on the item the Funestra just moved to: how the map,
@@ -384,7 +370,6 @@ class SlideshowView(QWidget):
                 self._frame_on_funestra = None
                 self._showing_media = None if item.is_live else (item.path, item.media_type)
                 self._show_what_is_being_made()
-                self._move_on_early_from(item)
                 self._refresh_note()
                 self._apply_freeze()
                 self.media_changed.emit()
@@ -395,37 +380,10 @@ class SlideshowView(QWidget):
         opens a file, and a released lock's dwell starts counting again."""
         self._show_current()
 
-    def _move_on_early_from(self, slide) -> None:
-        held_for = self._set.pace_for(slide, self._dwell_s)
-        self._moves_on_early = held_for < self._dwell_s and not self._playlist.locked
-        self._held_s = 0.0
-
-    def _move_on_early(self) -> None:
-        if not (self._moves_on_early and self._dwell_s):
-            return
-        current = self._playlist.current()
-        if current is None or self._held_s < self._set.pace_for(current, self._dwell_s):
-            return
-        self._moves_on_early = False
-        playback = self._pane.playback
-        if playback is not None and not self._playlist.locked_or_paused():
-            playback.step(1)
-
     def _apply_freeze(self) -> None:
-        """Hand the Funestra whatever is holding the slideshow still.
-
-        The room's freeze stops everything.  A spoken request stops the slideshow
-        moving on rather than stopping the clip: it is about what is on screen,
-        and a clip that stopped mid-sentence would be answering a question
-        nobody asked.  A picture under one holds where its move had got to,
-        since the alternative is its dwell running out and starting over under
-        the speaker.
-        """
-        request_stills_a_picture = self._playlist.paused and not self._showing_a_video()
-        held = self._paused or request_stills_a_picture
         playback = self._pane.playback
         if playback is not None:
-            playback.set_paused(held)
+            playback.set_paused(self._paused)
 
     def _showing_a_video(self) -> bool:
         return (self._showing_media is not None and not self._frames_on_screen
@@ -937,8 +895,8 @@ class SlideshowView(QWidget):
 
     @property
     def dwell_s(self) -> int:
-        """The seconds this slideshow leaves an unlocked slide up; nought holds it."""
-        return self._dwell_s
+        """The seconds this slideshow leaves an unlocked slide up."""
+        return self._pace.seconds
 
     @property
     def locked(self) -> bool:
@@ -1178,15 +1136,9 @@ class SlideshowView(QWidget):
         self.cull()
 
     def set_dwell_s(self, seconds: int) -> None:
-        """Take a new pace, and hand it on: the number is app-wide, so a slideshow
-        opened at nought that is turned up sets the pace for the next one too.
-
-        Applied here as well as posted to the pace, rather than only waiting for
-        the signal back — a slideshow sitting at nought while the app-wide pace already
-        reads one gets no signal from a step up to one, and would stay frozen.
-        """
-        self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
-        self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
+        """Take a new pace, and hand it on: the number is app-wide, so the next
+        slideshow opens at it too."""
+        self._pace.set_seconds(seconds)
 
     def is_showing(self) -> bool:
         """Whether this slideshow is on screen — what says a region is occupied."""
@@ -1288,20 +1240,12 @@ class SlideshowView(QWidget):
     def _on_pace_changed(self, seconds: int) -> None:
         """The pace moved — here or in another window — so the slide on screen
         takes the new one rather than waiting out the old."""
-        self._apply_dwell(seconds)
-
-    def _apply_dwell(self, seconds: int) -> None:
-        seconds = max(0, int(seconds))
-        if seconds == self._dwell_s:
-            return
-        self._dwell_s = seconds
-        self._playlist.image_dwell_ms = seconds * 1000
         if self._live:
             return
         playback = self._pane.playback
         if playback is None:
             return
-        playback.set_pace(self._dwell_s)
+        playback.set_pace(seconds)
         if not self._playlist.locked:
             # The engine reads the pace when it opens the file, so the picture
             # on screen takes the new pace by being opened again.
@@ -1310,9 +1254,8 @@ class SlideshowView(QWidget):
     def _on_media_unplayable(self):
         """A file the Funestra will not open: step past it, whatever holds it.
 
-        Unlike a clip that ended, this one never will, so the replay a lock or
-        a pace of nought asks for would hold a black screen for the rest of the
-        session.  The item stays in the set — the fault is the backend's, not
+        Unlike a clip that ended, this one never will, so the replay a lock
+        asks for would hold a black screen for the rest of the session.  The item stays in the set — the fault is the backend's, not
         the file's — but the slideshow moves on.
 
         A pause is the one stop this yields to: the slideshow is frozen, and a slideshow
@@ -1328,22 +1271,24 @@ class SlideshowView(QWidget):
 
     # --- the pause a spoken request puts on the slideshow ------------------
 
-    def pause_for_request(self, paused: bool, note: str = "") -> None:
-        """Stop (or release) the advance while a request is being spoken.
+    def set_spoken_pause(self, paused: bool) -> None:
+        self._playlist.set_paused(paused, PAUSED_BY_VOICE)
+        self._tell_the_engine_what_keeps_the_slide()
 
-        Not the user's lock: a slide they had locked is still locked when the
-        request ends, and one they hadn't goes back to its dwell. ``note`` is
-        what the corner should say while the slideshow waits — the only sign, in a view
+    def pause_for_request(self, paused: bool, note: str = "") -> None:
+        """Keep the slide on screen while a request is being spoken, its clip
+        playing and its picture moving: a request is about what is on screen.
+        ``note`` is what the corner says meanwhile — the only sign, in a view
         with no panels, that the mic is taking a sentence.
         """
-        self._playlist.set_paused(paused)
+        self._playlist.set_paused(paused, PAUSED_FOR_A_REQUEST)
         if paused:
             self._note_timer.stop()  # it holds, rather than fading after a beat
             self._request_note = note
         else:
             self._request_note = ""
         self._refresh_note()
-        self._apply_freeze()
+        self._tell_the_engine_what_keeps_the_slide()
 
     def note_request(self, message: str, request=None, *,
                      working: bool = False, kind: str = NOTICE) -> None:
@@ -1417,7 +1362,6 @@ class SlideshowView(QWidget):
                 self._levels.restart()
                 self._frames_on_screen = False
                 self._swap_in(path, media_type)
-                self._move_on_early_from(self._playlist.current())
             self._hand_over(land=False)
         elif upgraded is not None and self._set.passes(upgraded) and self._playlist.add(upgraded):
             # Kept out of an enhanced-only pass until now, being unenhanced; the
@@ -1459,7 +1403,6 @@ class SlideshowView(QWidget):
             self._frame_on_funestra = None
             self._frames.forget(current.prompt_id)
             playback.clear_frame()
-            self._move_on_early_from(current)
 
     def lead_with_what_is_being_made(self) -> None:
         if self._set.lead_with_what_is_being_made():
@@ -1531,7 +1474,6 @@ class SlideshowView(QWidget):
         it twice in two ways.
         """
         if self._playlist.toggle_lock():
-            self._moves_on_early = False
             self.favorite()
             self._settle()
             self.refresh_panel()

@@ -162,7 +162,17 @@ class AmbientAudio(QObject):
         collected early leaves a player that runs silently.
         """
         player = QMediaPlayer(self)
-        output = QAudioOutput(player)
-        player.setAudioOutput(output)
+        player.setAudioOutput(_sound_output_qt_never_waits_on_python(player))
         player.setLoops(QMediaPlayer.Loops.Once)  # one clip, then the next
         return player
+
+
+def _sound_output_qt_never_waits_on_python(player: QMediaPlayer) -> QAudioOutput:
+    output = QAudioOutput(player)
+    output.volumeChanged.connect(_nothing)  # sip asks Python whether a virtual is overridden
+    output.volumeChanged.disconnect(_nothing)  # at its first call: here, not on a Qt thread
+    return output
+
+
+def _nothing(*_) -> None:
+    pass

@@ -1,6 +1,11 @@
 """The audio bed — which clip each voice takes, and the players that run them."""
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+import textwrap
+import wave
 from pathlib import Path
 
 import pytest
@@ -9,6 +14,8 @@ from PyQt6.QtMultimedia import QMediaPlayer
 from origenerator.ambient_audio import AmbientRotation, find_clips
 from origenerator.ambient_audio_players import AmbientAudio
 from origenerator.config import ambient_audio_dir
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _clips(*names):
@@ -362,3 +369,78 @@ def test_a_bed_switched_on_in_a_frozen_room_waits_for_it_to_play(qtbot, tmp_path
 
     bed.set_frozen(False)
     assert [p.play_count for p in players] == [1, 1, 1]
+
+
+# --- a voice's own player ----------------------------------------------------
+
+_STOP_A_VOICE_WHILE_PYTHON_IS_BUSY = textwrap.dedent("""
+    import ctypes, os, sys, time
+    from PyQt6.QtCore import QEventLoop, QTimer, QUrl
+    from PyQt6.QtMultimedia import QMediaPlayer
+    from PyQt6.QtWidgets import QApplication
+
+    app = QApplication(sys.argv[:1])
+    from origenerator.ambient_audio_players import AmbientAudio
+
+    api = ctypes.pythonapi
+    api.PyInterpreterState_Get.restype = ctypes.c_void_p
+    api.PyInterpreterState_ThreadHead.restype = ctypes.c_void_p
+    api.PyInterpreterState_ThreadHead.argtypes = [ctypes.c_void_p]
+    api.PyThreadState_Next.restype = ctypes.c_void_p
+    api.PyThreadState_Next.argtypes = [ctypes.c_void_p]
+
+    def threads_waiting_to_enter_python():
+        count, state = 0, api.PyInterpreterState_ThreadHead(api.PyInterpreterState_Get())
+        while state:
+            count += 1
+            state = api.PyThreadState_Next(state)
+        return count - len(sys._current_frames())
+
+    def pump(ms):
+        loop = QEventLoop()
+        QTimer.singleShot(ms, loop.quit)
+        loop.exec()
+
+    bed = AmbientAudio(voices=1)
+    player = bed._real_player()
+    player.audioOutput().setMuted(True)
+    player.setSource(QUrl.fromLocalFile(sys.argv[1]))
+    player.play()
+    deadline = time.monotonic() + 10
+    while player.mediaStatus() != QMediaPlayer.MediaStatus.BufferedMedia and time.monotonic() < deadline:
+        pump(50)
+    pump(300)
+    print("sound track:", player.hasAudio(), flush=True)
+    sys.setswitchinterval(100)
+    player.stop()
+    held_until = time.perf_counter() + 1.5
+    while time.perf_counter() < held_until:
+        pass
+    print("waiting to enter Python:", threads_waiting_to_enter_python(), flush=True)
+    os._exit(0)
+""")
+
+
+def _silent_wav(path: Path, seconds: float = 3.0, rate: int = 8000) -> Path:
+    with wave.open(str(path), "wb") as sound:
+        sound.setnchannels(1)
+        sound.setsampwidth(2)
+        sound.setframerate(rate)
+        sound.writeframes(bytes(2 * int(seconds * rate)))
+    return path
+
+
+def test_a_voice_stopped_while_python_is_busy_leaves_no_qt_thread_waiting_to_enter_it(tmp_path):
+    # Qt retires a stopped voice's audio renderer on the renderer's own thread,
+    # holding one of its pooled signal/slot locks; a thread that waits there for
+    # Python waits for good once Python is waiting for that lock -- the freeze of
+    # 2026-10-15 and 2026-10-17. Muted, and a silent clip: nothing is heard.
+    clip = _silent_wav(tmp_path / "quiet.wav")
+
+    ran = subprocess.run(
+        [sys.executable, "-c", _STOP_A_VOICE_WHILE_PYTHON_IS_BUSY, str(clip)], cwd=REPO_ROOT,
+        timeout=120, env=os.environ | {"QT_QPA_PLATFORM": "offscreen"}, capture_output=True,
+        encoding="utf-8", errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    assert ran.stdout.splitlines() == [
+        "sound track: True", "waiting to enter Python: 0"], ran.stdout + ran.stderr

@@ -1,6 +1,7 @@
 """What each item is called: its folder's code and its number in that folder."""
 from __future__ import annotations
 
+import re
 import string
 from collections.abc import Callable, Mapping, Sequence
 from typing import NamedTuple
@@ -9,6 +10,8 @@ from origenerator.gallery.keys import FOLDER_ID_CHARS, folder_id
 
 _DIGITS_SHOWN = 3
 _HIGHEST_SHOWN = 10 ** _DIGITS_SHOWN - 1
+_WRITTEN_NAME = re.compile(
+    rf"\b([0-9a-f]{{{FOLDER_ID_CHARS}}})\s+([0-9]{{{_DIGITS_SHOWN}}})\b", re.IGNORECASE)
 
 
 class ItemNumber(NamedTuple):
@@ -26,6 +29,14 @@ def widest_item_name(width_of: Callable[[str], int]) -> str:
 
     return _named(widest(string.hexdigits.upper()) * FOLDER_ID_CHARS,
                   int(widest(string.digits) * _DIGITS_SHOWN))
+
+
+def names_in(text: str) -> list[str]:
+    return [_named(code.upper(), int(number)) for code, number in _WRITTEN_NAME.findall(text)]
+
+
+def without_names(text: str) -> str:
+    return _WRITTEN_NAME.sub(" ", text)
 
 
 def _named(code: str, number: int) -> str:

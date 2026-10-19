@@ -34,14 +34,14 @@ _POLL_MS = 250
 class FunTimeWatch(QObject):
     def __init__(self, state_dir: Path, *, take_over: Callable[[FunTimeSession], None],
                  device_claimed: Callable[[bool], None] | None = None,
-                 showing: Callable[[], bool] | None = None,
+                 showing_on: Callable[[], str | None] | None = None,
                  library_state_dir: Path | None = None,
                  parent: QObject | None = None):
         super().__init__(parent)
         self._state_dirs = tuple(dict.fromkeys((state_dir, library_state_dir or state_dir)))
         self._take_over = take_over
         self._device_claimed = device_claimed or (lambda held: None)
-        self._showing = showing or (lambda: False)
+        self._showing_on = showing_on or (lambda: None)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self._answer_the_session)
@@ -75,7 +75,8 @@ class FunTimeWatch(QObject):
         offer.write_text(mine, encoding="utf-8")
 
     def _mark_the_slideshow(self) -> None:
-        mark = slideshow_mark_of_this_process() if self._showing() else None
+        shape = self._showing_on()
+        mark = None if shape is None else slideshow_mark_of_this_process(shape)
         for state_dir in self._state_dirs:
             _stand(state_dir / SHOWING_NAME, mark)
 

@@ -29,7 +29,8 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.modes import read_mode
 from funestra.volume import VolumeHud
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QApplication, QWidget
+from shared_ui.orientation import orientation_of_size
 
 from origenerator import gallery, points_of_interest
 from origenerator.config import (
@@ -40,7 +41,7 @@ from origenerator.config import (
 )
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
-from origenerator.fun_time_mode import region_for_items
+from origenerator.fun_time_mode import majority_shape, region_for_items
 from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
@@ -51,6 +52,7 @@ from origenerator.gallery.collection import folder_collection
 from origenerator.gallery.sides import (
     ORIENTATIONS as _ORIENTATIONS,
 )
+from origenerator.gallery.sides import the_one_shape_on
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
@@ -183,6 +185,24 @@ def _place_of(prompt_id: str, items) -> int | None:
     return next((index for index, item in enumerate(items) if item[2] == prompt_id), None)
 
 
+def _screens():
+    return QApplication.screens()
+
+
+def _monitor_shaped(shape: str):
+    return next((screen for screen in _screens()
+                 if orientation_of_size(screen.geometry().width(),
+                                        screen.geometry().height()) == shape), None)
+
+
+def _shape_of_the_set(side: str, rows, items) -> str:
+    if (shape := the_one_shape_on(side)) is not None:
+        return shape
+    if rows:
+        return majority_shape(map(row_orientation, rows))
+    return region_for_items(items)
+
+
 class SlideshowDirector:
     """Every fullscreen slideshow this window has open, and the words about them."""
 
@@ -205,6 +225,7 @@ class SlideshowDirector:
         # it is one view.
         self._slideshow = None
         self._standalone_side: str | None = None
+        self._standalone_shape: str | None = None
         self._hud_corners: dict[str, HudCorner] = {}
         self._hud_minimized: dict[str, bool] = {}
         # Every slideshow currently up, each with the collection/folder key it opened
@@ -240,7 +261,7 @@ class SlideshowDirector:
         self._giving_them_back = False
 
     def become_hosted(self, session) -> None:
-        self._taken_into_the_session = self.held_slideshow()
+        self._taken_into_the_session = self._held_for_the_session()
         if self._slideshow is not None:
             self._slideshow.close()
         self._fun_time = session
@@ -460,8 +481,10 @@ class SlideshowDirector:
             slideshow = self._hand_to_the_funestra(items, where, channel, actions=actions,
                                             hud=hud, levels=levels, **kwargs)
         else:
-            slideshow = self._open_a_window(items, where, actions=actions, hud=hud,
-                                            levels=levels, **kwargs)
+            shape = (_shape_of_the_set(where, rows, items)
+                     if self._fun_time is None else where)
+            slideshow = self._open_a_window(items, where, shape=shape, actions=actions,
+                                            hud=hud, levels=levels, **kwargs)
         self._slideshow = slideshow
         self._picked_as_the_slideshow_up_opened = tuple(self._host.selected_prompt_ids())
         already_live = any(live is slideshow for live, _where in self._live_slideshows)
@@ -581,7 +604,8 @@ class SlideshowDirector:
             slideshow.set_paused(True)
         return slideshow
 
-    def _open_a_window(self, items, side: str, *, actions, hud, levels, **kwargs):
+    def _open_a_window(self, items, side: str, *, shape: str, actions, hud, levels,
+                       **kwargs):
         """A slideshow in a window of this app's: over the whole monitor standalone,
         or over one of the session's regions.
 
@@ -595,6 +619,7 @@ class SlideshowDirector:
         view = up.shown if up is not None else None
         if self._fun_time is None:
             self._standalone_side = side
+            self._standalone_shape = shape
         built = view is None
         if built:
             view = SlideshowView(items, side=side, actions=actions,
@@ -608,9 +633,20 @@ class SlideshowDirector:
         if built:
             self._present_surface(view, side)
             view.set_queue(*self._host.queue_now())
-        elif view.isMinimized():
-            view.showFullScreen()
+        else:
+            self._show_on_its_monitor(view, built=False)
         return view.slideshow
+
+    def _show_on_its_monitor(self, view, *, built: bool) -> None:
+        monitor = _monitor_shaped(self._standalone_shape)
+        if monitor is not None and (built or view.screen().geometry() != monitor.geometry()):
+            if view.isFullScreen():
+                view.showNormal()
+            area = monitor.geometry()
+            view.setGeometry(area.x(), area.y(), area.width(), area.height())
+            view.showFullScreen()
+        elif built or view.isMinimized():
+            view.showFullScreen()
 
     def items_of(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
@@ -763,7 +799,7 @@ class SlideshowDirector:
         the panel is about the slideshow, and a slideshow is a slideshow wherever it is.
         """
         if self._fun_time is None:
-            view.showFullScreen()
+            self._show_on_its_monitor(view, built=True)
             self._wear_the_hud(view, side)
             return
         occupant = self._region_slideshows.get(side)
@@ -940,8 +976,8 @@ class SlideshowDirector:
                                                     HudCorner.UPPER_LEFT)
                 self._hud_minimized[side] = place.get("minimized") is True
 
-    def shows_a_slideshow(self) -> bool:
-        return self._slideshow is not None
+    def slideshow_showing_on(self) -> str | None:
+        return None if self._slideshow is None else self._standalone_shape
 
     def held_slideshow(self) -> HeldSlideshow | None:
         slideshow = self._slideshow
@@ -950,6 +986,12 @@ class SlideshowDirector:
         return HeldSlideshow(items=tuple(slideshow.whole_set()),
                         side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
                         state=self._where_it_stands(slideshow), filters=slideshow.filters)
+
+    def _held_for_the_session(self) -> HeldSlideshow | None:
+        held = self.held_slideshow()
+        if held is None:
+            return None
+        return replace(held, side=self._standalone_shape)
 
     def put_back(self, held: HeldSlideshow):
         ids = (item.prompt_id for item in held.items if item.prompt_id is not None)
@@ -1034,13 +1076,10 @@ class SlideshowDirector:
 
     def _put_back_what_was_taken_over(self, side: str) -> bool:
         taken = self._taken_into_the_session
-        if taken is None:
-            return False
-        where = taken.side or region_for_items(taken.items)
-        if where != side:
+        if taken is None or taken.side != side:
             return False
         self._taken_into_the_session = None
-        if self.put_back(replace(taken, side=where)) is None:
+        if self.put_back(taken) is None:
             return False
         logger.info("The %s region takes up the slideshow that was up when the "
                     "session took this window over: %d items", side, len(taken.items))

@@ -38,6 +38,11 @@ def side_covers(side: str | None, other: str | None) -> bool:
     return _SHAPES_ON[other] <= _SHAPES_ON[side]
 
 
+def the_one_shape_on(side: str | None) -> str | None:
+    shapes = _SHAPES_ON[side]
+    return next(iter(shapes)) if len(shapes) == 1 else None
+
+
 def side_holding(orientation: str | None, sides: Iterable[str]) -> str | None:
     return next((side for side in sides if side_holds(side, orientation)), None)
 

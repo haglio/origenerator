@@ -1386,9 +1386,11 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     rows = _level_rows(panel)
     assert "image/image_enhance_00001_.png" in _row_texts(rows[0])
     assert "image/sdxl_img1.png" in _row_texts(rows[1])
+    assert [[b.objectName() for b in row.findChildren(QPushButton)] for row in rows] == [
+        ["copyButton", "deleteButton", "revealButton"],   # the enhancement
+        ["copyButton", "revealButton"],                   # the original stays
+    ]
     for row in rows:
-        names = [b.objectName() for b in row.findChildren(QPushButton)]
-        assert names == ["copyButton", "deleteButton", "revealButton"]
         assert "Created" in _row_texts(row)
     # ...and the block at the top has no file of its own to repeat.
     assert "File" not in _metadata_texts(panel)

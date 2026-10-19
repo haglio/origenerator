@@ -615,12 +615,8 @@ class SlideshowView(QWidget):
 
         Standalone there is no command file to take the round trip a hosted
         press takes, so the press lands on the slideshow through the same answers
-        that round trip would have ended at.  Minimize is the one button only a
-        slideshow on its own has, the slideshow being the window here.
+        that round trip would have ended at.
         """
-        if action == "minimize":
-            self.window().showMinimized()
-            return True  # nothing on the panel changed, and it is off screen anyway
         if answer(self, action):
             self.refresh_panel()  # the readout answers the press without waiting for the beat
             return True

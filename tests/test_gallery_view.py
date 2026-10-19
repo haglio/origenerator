@@ -7383,17 +7383,16 @@ def test_a_standalone_slideshow_wears_the_funestras_own_hud(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
+def test_a_standalone_hud_draws_no_mode_row_and_no_minimize(qtbot, monkeypatch):
     # The mode pair hands a region back to the Funestra under it.  There is no
     # Funestra under a standalone slideshow and no session to tell, so the row is not
-    # drawn rather than drawn dead.  The window IS this slideshow's, though, so the
-    # minimize a hosted one leaves off is on it.
+    # drawn rather than drawn dead.
 
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
 
     names = hud_button_names(slideshow)
     assert MODE_VERBS.isdisjoint(names)
-    assert "minimize" in names
+    assert "minimize" not in names
     slideshow.close()
 
 
@@ -7418,7 +7417,7 @@ def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_
         qtbot, monkeypatch):
     view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch)
     _on_screen(qtbot, view, 1200, 800)
-    gestures.click(slideshow._pane._window, button_on_screen(slideshow, f"{slideshow.hud_side}_minimize"))
+    slideshow.showMinimized()   # from the taskbar, which still minimizes any window
     assert slideshow.isMinimized()
 
     gestures.click(view._bank.slideshow, view._bank.slideshow.rect().center())
@@ -8165,7 +8164,7 @@ def _closed_then_esc_again(view, slideshow):
 
 
 def _minimized_then_the_slideshow_button(view, slideshow):
-    slideshow.press(f"{slideshow.hud_side}_minimize")
+    slideshow.showMinimized()
     view._bank.slideshow.click()
 
 

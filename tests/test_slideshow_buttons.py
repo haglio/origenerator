@@ -18,7 +18,7 @@ def _names(buttons) -> list[str]:
 def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
     assert _names(_band()) == [
         "prev", "next", "lock", "trash", "fmode", "enhanced", "reset",
-        "shuffle", "latest", "cycle_version", "minimize"]
+        "shuffle", "latest", "cycle_version"]
 
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
@@ -36,7 +36,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
     """A run of evenly spaced squares reads as one undifferentiated strip; the
     wider gap opens at the seams the Funestras' own band opens them at."""
     assert [name for name, button in zip(_names(_band()), _band()) if button.group_break] == [
-        "lock", "enhanced", "shuffle", "cycle_version", "minimize"]
+        "lock", "enhanced", "shuffle", "cycle_version"]
 
 
 def test_the_switches_light_and_the_things_done_never_do():
@@ -50,7 +50,7 @@ def test_the_switches_light_and_the_things_done_never_do():
     assert band["fmode"].lit and band["fmode"].favorite
     assert band["enhanced"].lit and band["enhanced"].enhanced
     assert band["trash"].danger
-    assert not any(band[name].lit for name in ("prev", "next", "trash", "reset", "minimize"))
+    assert not any(band[name].lit for name in ("prev", "next", "trash", "reset"))
     at_rest = dict(zip(_names(_band()), _band()))
     assert not any(at_rest[name].lit for name in ("lock", "fmode", "enhanced"))
 
@@ -75,13 +75,13 @@ def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize(
     assert "minimize" not in _names(rows[-1])
 
 
-def test_a_slideshow_on_its_own_has_a_window_to_park_and_no_session_to_switch():
+def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
     """Standalone there is no Funestra under it and no mode to leave, so the pair
     is not drawn — a lit button nothing answers would be a picture of one."""
     rows = slideshow_rows("portrait")
 
     assert len(rows) == 1
-    assert "minimize" in _names(rows[-1])
+    assert "minimize" not in _names(rows[-1])
 
 
 def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_it():

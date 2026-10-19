@@ -127,7 +127,7 @@ class SlideshowView(QWidget):
     # A different item (or version) is on screen — re-aim the OSR2 drive.
     media_changed = pyqtSignal()
 
-    def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
+    def __init__(self, items, *, frame=None, start=None,
                  shuffle=None, actions=None, hud=None, engine=None, motion=None,
                  pace=None, frames=None, clock=time.monotonic, parent=None):
         super().__init__(parent)
@@ -136,10 +136,6 @@ class SlideshowView(QWidget):
         # None of it, for a slideshow standing on its own (see SlideshowActions).
         self._actions = actions if actions is not None else SlideshowActions()
         self._motion = motion  # the gallery's app-global motion driver, or None
-        # How long a slide holds the screen is app-wide, because the console
-        # that sets it is: turned up here or in the main window, it is the
-        # same number. An explicit dwell (a test's) wins until the console
-        # next moves the pace.
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
         self._clock = clock
@@ -169,8 +165,7 @@ class SlideshowView(QWidget):
         self._queue_items: list = []
         self._foreign_queued = 0
         self._queue_pointer = QueuePointer(self)
-        self._take_set(items, frame=frame, start=start,
-                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
+        self._take_set(items, frame=frame, start=start, shuffle=shuffle, hud=hud)
         self.setWindowTitle("Slideshow")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround under the media
@@ -217,7 +212,7 @@ class SlideshowView(QWidget):
 
     # --- the set, and the pass dealt from it --------------------------------
 
-    def play(self, items, *, frame=None, start=None, image_dwell_ms=None,
+    def play(self, items, *, frame=None, start=None,
              shuffle=None, hud=None, actions=None) -> None:
         """Take a new set into this window and start it on that set.
 
@@ -230,11 +225,10 @@ class SlideshowView(QWidget):
         """
         if actions is not None:
             self._actions = actions
-        self._take_set(items, frame=frame, start=start,
-                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
+        self._take_set(items, frame=frame, start=start, shuffle=shuffle, hud=hud)
         self._show_current()
 
-    def _take_set(self, items, *, frame, start, image_dwell_ms, shuffle, hud) -> None:
+    def _take_set(self, items, *, frame, start, shuffle, hud) -> None:
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
@@ -247,15 +241,12 @@ class SlideshowView(QWidget):
         # The versions of each item that has any, and the place within the one
         # being stepped: Shift+Left/Right moves there rather than along the set.
         self._levels = LevelStepper()
-        if image_dwell_ms is None:
-            image_dwell_ms = self._pace.dwell_ms
-        self._dwell_s = image_dwell_ms // 1000
         # The set this slideshow plays, the pass dealt from it, and what its two
         # switches keep of it — all of it the same whether a window or one of
         # a session's Funestras is showing the slides (see SlideshowSet).  What this
         # view answers for is the slide on screen, so a re-dealt pass comes
         # back here as :meth:`_pass_changed`.
-        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
+        self._set = SlideshowSet(items, shuffle=shuffle,
                                  start=start, hud=hud, on_pass_change=self._pass_changed,
                                  neighbors=self._actions.neighbors, widen=self._actions.widen,
                                  acts=self._actions.acts,
@@ -322,7 +313,7 @@ class SlideshowView(QWidget):
         playback = self._pane.playback
         if playback is None:
             return
-        playback.set_pace(self._dwell_s)
+        playback.set_pace(self._pace.seconds)
         self._tell_the_engine_what_keeps_the_slide()
         self._loads_seen = playback.loads
         self._refusal_checked = False
@@ -905,7 +896,7 @@ class SlideshowView(QWidget):
     @property
     def dwell_s(self) -> int:
         """The seconds this slideshow leaves an unlocked slide up."""
-        return self._dwell_s
+        return self._pace.seconds
 
     @property
     def locked(self) -> bool:
@@ -1147,8 +1138,7 @@ class SlideshowView(QWidget):
     def set_dwell_s(self, seconds: int) -> None:
         """Take a new pace, and hand it on: the number is app-wide, so the next
         slideshow opens at it too."""
-        self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
-        self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
+        self._pace.set_seconds(seconds)
 
     def is_showing(self) -> bool:
         """Whether this slideshow is on screen — what says a region is occupied."""
@@ -1250,20 +1240,12 @@ class SlideshowView(QWidget):
     def _on_pace_changed(self, seconds: int) -> None:
         """The pace moved — here or in another window — so the slide on screen
         takes the new one rather than waiting out the old."""
-        self._apply_dwell(seconds)
-
-    def _apply_dwell(self, seconds: int) -> None:
-        seconds = max(0, int(seconds))
-        if seconds == self._dwell_s:
-            return
-        self._dwell_s = seconds
-        self._playlist.image_dwell_ms = seconds * 1000
         if self._live:
             return
         playback = self._pane.playback
         if playback is None:
             return
-        playback.set_pace(self._dwell_s)
+        playback.set_pace(seconds)
         if not self._playlist.locked:
             # The engine reads the pace when it opens the file, so the picture
             # on screen takes the new pace by being opened again.

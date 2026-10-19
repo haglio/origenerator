@@ -157,7 +157,6 @@ class HeldSlideshow:
     location: str | None
     side: str | None
     order_label: str
-    image_dwell_ms: int
     state: SlideshowState
     filters: SlideshowFilters
 
@@ -897,8 +896,7 @@ class SlideshowDirector:
                         location=next((where for live, where in self._live_slideshows
                                        if live is slideshow), None),
                         side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
-                        image_dwell_ms=slideshow.dwell_s * 1000, state=slideshow.state(),
-                        filters=slideshow.filters)
+                        state=slideshow.state(), filters=slideshow.filters)
 
     def put_back(self, held: HeldSlideshow):
         ids = (item.prompt_id for item in held.items if item.prompt_id is not None)
@@ -906,7 +904,6 @@ class SlideshowDirector:
                          rows=[row for row in map(self._host.row_for, ids) if row is not None],
                          location=held.location, side=held.side, resume=held.state,
                          filters=held.filters,
-                         image_dwell_ms=held.image_dwell_ms,
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,
                          hud=HudFacts(order_label=held.order_label,
                                       favorite_ids=self._favorite_prompt_ids()))

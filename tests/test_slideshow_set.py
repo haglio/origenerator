@@ -22,7 +22,7 @@ _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
 
 def _set(items=_ITEMS, **fields):
     dealt = []
-    slideshow_set = SlideshowSet(items, image_dwell_ms=4000, shuffle=in_order,
+    slideshow_set = SlideshowSet(items, shuffle=in_order,
                                  on_pass_change=dealt.append, **fields)
     return slideshow_set, dealt
 

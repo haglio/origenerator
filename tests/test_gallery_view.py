@@ -109,12 +109,13 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, key_holds, oriented_key
 from origenerator.prompt_edit import apply_request
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
+from origenerator.slideshow import LIVE
 from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
@@ -14607,7 +14608,7 @@ def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeyp
 
     assert view._slideshows.showing is not None
     qtbot.addWidget(view._slideshows.showing)
-    assert view._slideshows.showing.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
+    assert view._slideshows.showing.dwell_s == DEFAULT_S
     assert will_move_on(view._slideshows.showing)
     view._slideshows.showing.close()
 

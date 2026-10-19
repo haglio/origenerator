@@ -65,7 +65,7 @@ class SlideshowSet:
     """Everything a slideshow has been handed, the pass dealt from what the
     switches keep of it, and the map around the slide on screen."""
 
-    def __init__(self, items, *, image_dwell_ms: int, shuffle=None, start=None,
+    def __init__(self, items, *, shuffle=None, start=None,
                  hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None,
                  neighbors: Callable[[str], MapNeighbors] | None = None,
@@ -99,16 +99,15 @@ class SlideshowSet:
         # it; the pass is dealt from what survives them (:meth:`set_filters`).
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
-        self.playlist = self._deal(items, image_dwell_ms=image_dwell_ms, start=start)
+        self.playlist = self._deal(items, start=start)
         if start is None:
             self.lead_with_what_is_being_made()
         self._a_row_played_whole_is_its_loop()
 
     # --- the pass ----------------------------------------------------------
 
-    def _deal(self, items, *, image_dwell_ms: int, start=None,
-              shuffle=None) -> SlideshowPlaylist:
-        kwargs = {"image_dwell_ms": image_dwell_ms, "start": start}
+    def _deal(self, items, *, start=None, shuffle=None) -> SlideshowPlaylist:
+        kwargs = {"start": start}
         shuffle = self._shuffle if shuffle is None else shuffle
         if shuffle is not None:  # else the playlist uses its own random shuffle
             kwargs["shuffle"] = shuffle
@@ -124,8 +123,7 @@ class SlideshowSet:
         self.all_items = [Slide.of(item) for item in items]
         self.loop = None
         self._library_moved()
-        self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
-                                   start=start, shuffle=shuffle)
+        self.playlist = self._deal(items, start=start, shuffle=shuffle)
         self._a_row_played_whole_is_its_loop()
 
     def _a_row_played_whole_is_its_loop(self) -> None:
@@ -161,8 +159,7 @@ class SlideshowSet:
         start = next((index for index, item in enumerate(items)
                       if keep_id is not None and item.prompt_id == keep_id), None)
         pauses = self.playlist.pauses
-        self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
-                                   start=start, shuffle=shuffle)
+        self.playlist = self._deal(items, start=start, shuffle=shuffle)
         self.playlist.pauses = pauses
         if new_set:
             self.lead_with_what_is_being_made()

@@ -92,7 +92,7 @@ class FunestraSlideshow(QObject):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
-                 hud=None, pace=None, image_dwell_ms=None, start=None, shuffle=None,
+                 hud=None, pace=None, start=None, shuffle=None,
                  say=None, parent=None):
         super().__init__(parent)
         self._side = side
@@ -108,8 +108,7 @@ class FunestraSlideshow(QObject):
         self._say = say
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
-        self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
-                       shuffle=shuffle, hud=hud)
+        self._take_set(items, start=start, shuffle=shuffle, hud=hud)
         self._open = True
         # What the Funestra last said it was showing: a picture that has moved on
         # by itself is news that arrives this way and no other.
@@ -130,21 +129,16 @@ class FunestraSlideshow(QObject):
 
     # --- handing the Funestra what to play ------------------------------------
 
-    def _take_set(self, items, *, image_dwell_ms, start, shuffle, hud) -> None:
-        if image_dwell_ms is None:
-            image_dwell_ms = self._pace.dwell_ms
-        self._dwell_s = image_dwell_ms // 1000
+    def _take_set(self, items, *, start, shuffle, hud) -> None:
         self._following = None
-        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
+        self._set = SlideshowSet(items, shuffle=shuffle,
                                  start=start, hud=hud, on_pass_change=self._pass_changed,
                                  neighbors=self._actions.neighbors, widen=self._actions.widen,
                                  acts=self._actions.acts,
                                  on_filters_change=self._actions.filters_changed)
 
-    def play(self, items, *, image_dwell_ms=None, start=None, shuffle=None,
-             hud=None) -> None:
-        self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
-                       shuffle=shuffle, hud=hud)
+    def play(self, items, *, start=None, shuffle=None, hud=None) -> None:
+        self._take_set(items, start=start, shuffle=shuffle, hud=hud)
         self._unlock()
         self._hand_over(land=True)
         self._publish()
@@ -165,7 +159,7 @@ class FunestraSlideshow(QObject):
         self._tell_the_keep()
 
     def _tell_the_pace(self) -> None:
-        self._send(f"{SET_PACE} {self._dwell_s}")
+        self._send(f"{SET_PACE} {self._pace.seconds}")
 
     def _tell_the_keep(self) -> None:
         keeps = self._locked or self._set.playlist.paused or self._on_the_run()
@@ -198,28 +192,14 @@ class FunestraSlideshow(QObject):
     @property
     def dwell_s(self) -> int:
         """The seconds an unlocked picture holds the Funestra's screen."""
-        return self._dwell_s
+        return self._pace.seconds
 
     def set_dwell_s(self, seconds: int) -> None:
         """Take a new pace, and hand it on: the number is app-wide, so a pace
         set over this slideshow is what the next one opens at."""
-        self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
-        self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
+        self._pace.set_seconds(seconds)
 
-    def _on_pace_changed(self, seconds: int) -> None:
-        self._apply_dwell(seconds)
-
-    def _apply_dwell(self, seconds: int) -> None:
-        """Tell the Funestra how long to hold a picture, when the number moved.
-
-        The pace is the Funestra's to keep from there: it holds the frame that
-        long and then ends the file, which is how a picture moves on at all.
-        """
-        seconds = max(0, int(seconds))
-        if seconds == self._dwell_s:
-            return
-        self._dwell_s = seconds
-        self._set.playlist.image_dwell_ms = seconds * 1000
+    def _on_pace_changed(self, _seconds: int) -> None:
         self._tell_the_pace()
 
     def _pass_changed(self, kept: bool) -> None:

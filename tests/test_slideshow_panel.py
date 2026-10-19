@@ -196,7 +196,7 @@ class TestTheOnePanelASlideshowWears:
         assert "shape" in slideshow._motion.calls
 
     def test_a_press_on_the_clip_seconds_pair_paces_the_slideshow(self, qtbot):
-        slideshow = self._slideshow(qtbot, image_dwell_ms=4000)
+        slideshow = self._slideshow(qtbot)
         slideshow.wear_the_hud("portrait")
 
         slideshow.press("genau_clip_seconds_up")

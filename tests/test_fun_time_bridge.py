@@ -27,7 +27,7 @@ from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
+from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import answer
 from tests.slideshow_hud_support import open_both_sides
 from tests.slideshow_support import will_move_on
@@ -711,7 +711,7 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
     assert played == [clicked[0], folder[0][0]]
     told = _told(tmp_path, "landscape")
     assert [verb for verb in told if verb.startswith("SET_PACE")][-1] == \
-        f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}"
+        f"SET_PACE {DEFAULT_S}"
     panel = parse_hud((tmp_path / "origenerator_landscape_hud.json").read_text(encoding="utf-8"))
     assert panel.corner.path == clicked[0]
     assert _told(tmp_path, "portrait") == []
@@ -779,7 +779,7 @@ def test_a_run_watched_on_a_funestra_is_kept_there_still_moving_while_it_is_made
     _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
 
     assert _pace_and_lock(_told(tmp_path, "landscape"))[-2:] == [
-        f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}", "LOCK_ON"]
+        f"SET_PACE {DEFAULT_S}", "LOCK_ON"]
 
 
 def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_picture(
@@ -802,7 +802,7 @@ def test_a_run_watched_on_a_funestra_that_lands_is_let_go_at_the_clip_seconds(
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     assert _pace_and_lock(_told(tmp_path, "landscape"))[-2:] == [
-        f"SET_PACE {DEFAULT_IMAGE_DWELL_MS // 1000}", "LOCK_OFF"]
+        f"SET_PACE {DEFAULT_S}", "LOCK_OFF"]
 
 
 def test_the_sessions_loop_key_reaches_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):

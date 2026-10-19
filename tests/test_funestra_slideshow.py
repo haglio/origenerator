@@ -23,6 +23,7 @@ from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
+from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
@@ -144,7 +145,7 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
 
 def test_the_funestra_is_told_to_read_the_list_how_long_a_picture_holds_and_its_lock(
         qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=6000)
+    slideshow = _slideshow(qtbot, tmp_path, pace=SlideshowPace(seconds=6))
 
     assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 6", "LOCK_OFF"]
 

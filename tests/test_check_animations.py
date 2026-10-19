@@ -45,11 +45,12 @@ def test_a_trial_from_a_picture_never_enhanced_is_made_from_its_enhancement(qtbo
     client = _client()
     trial = check_animations._launcher(db, client, gallery.EnhanceSettings())
 
-    trial(db.get_generation("sample"), "alpha", "beta")
+    said = trial(db.get_generation("sample"), "alpha", "beta")
     (enhance,) = [row for row in db.list_generations() if row["enhance_of"] == "picture"]
     client.job_completed.emit(enhance["prompt_id"],
                               {"outputs": {"12": {"images": [_ENHANCED]}}})
 
+    assert said == "Queued. Come back to this one once it has finished."
     assert gallery.row_output_files(db.get_generation("picture"))[0] == _ENHANCED
     (trial_video,) = [row for row in db.list_generations()
                       if row["workflow_name"] == _I2V.name and row["prompt_id"] != "sample"]

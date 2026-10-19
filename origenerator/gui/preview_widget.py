@@ -2,8 +2,8 @@
 
 The gallery hands it a resolved ``(path, media_type)`` and it does the rest:
 static images are scaled to fit (and rescaled on resize), animated images
-(animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop, muted, so
-selecting one gives an immediate moving preview without stealing audio.
+(animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop with no sound
+output, so selecting one gives an immediate moving preview without stealing audio.
 
 A pane the owner has armed (:meth:`PreviewWidget.set_actions`) also carries the
 three controls a gallery thumbnail of the same generation wears in its corners,
@@ -28,7 +28,7 @@ from PyQt6.QtCore import (
     pyqtSignal,
 )
 from PyQt6.QtGui import QImageReader, QMovie, QPixmap
-from PyQt6.QtMultimedia import QAudioOutput, QMediaMetaData, QMediaPlayer
+from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -110,8 +110,6 @@ class PreviewWidget(QWidget):
         # The player is injectable so unit tests can drive playback intent
         # without spinning up the real (WMF) backend, which deadlocks at exit.
         self._player = player if player is not None else QMediaPlayer(self)
-        self._audio = QAudioOutput(self)
-        self._audio.setMuted(True)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -143,7 +141,6 @@ class PreviewWidget(QWidget):
 
         self._video = VideoSurface()
         self._video.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._player.setAudioOutput(self._audio)
         self._player.setVideoOutput(self._video.video_sink())
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
@@ -633,7 +630,6 @@ class PreviewWidget(QWidget):
         backend deadlocks)."""
         self._stop_playback()
         self._player.setVideoOutput(None)
-        self._player.setAudioOutput(None)
 
     def _set_movie(self, movie: QMovie | None, native_size=None) -> None:
         """Attach (or clear) an animated movie, retiring any previous one.

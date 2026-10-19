@@ -220,9 +220,13 @@ def test_release_media_reaches_a_fullscreen_view_of_the_file(make_preview, tmp_p
     w._fullscreen.release_media.assert_called_once_with([clip])
 
 
-def test_video_preview_is_muted(make_preview):
+def test_a_video_plays_with_no_sound_output_at_all(make_preview, tmp_path):
     w = make_preview()
-    assert w._audio.isMuted() is True
+
+    w.show_video(tmp_path / "clip.mp4")
+    w.release_player()
+
+    assert [c for c in w._player.method_calls if c[0] == "setAudioOutput"] == []
 
 
 
@@ -1367,9 +1371,8 @@ def test_releasing_the_player_detaches_it_from_the_pane(make_preview):
 
     w.release_player()
 
-    assert p.method_calls[-4:] == [
+    assert p.method_calls[-3:] == [
         call.stop(),
         call.setSource(QUrl()),
         call.setVideoOutput(None),
-        call.setAudioOutput(None),
     ]

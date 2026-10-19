@@ -731,6 +731,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
 
+    from origenerator.app_link import made_for_a_click
     from origenerator.single_instance import Copies, say_another_copy_is_running
     copies = Copies(LIBRARY_STATE_DIR)
     claim = copies.claim_the_library()
@@ -740,6 +741,9 @@ def _boot_and_run(app, app_args, preview) -> int:
         loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
         loading.say(WAITING_FOR_THE_OTHER_COPY)
         claim = copies.claim_the_library_once_the_closing_one_lets_go()
+    elif claim is None and fun_time is None and made_for_a_click():
+        logger.info("Another copy of Origenerator is already running; the click is left to it")
+        return 0
     if claim is None and fun_time is None:
         if loading is not None:
             loading.done()

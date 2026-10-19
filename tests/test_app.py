@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 
-from origenerator import config, content, gallery
+from origenerator import app_link, config, content, gallery
 from origenerator.app import (
     MAINTENANCE,
     Library,
@@ -1583,6 +1583,24 @@ class TestASecondCopy:
         comfyui.assert_not_called()
         window.assert_not_called()
 
+    def test_one_started_by_a_click_on_a_notice_leaves_it_to_that_copy_without_a_word(
+            self, qapp, monkeypatch):
+        # The click only had to see that some copy opens to show what it is
+        # about, and the copy already open or on its loading screen has done it.
+        monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
+        told = MagicMock()
+        window = MagicMock()
+
+        with _a_faked_boot([], **{
+            "PyQt6.QtWidgets.QMessageBox.information": told,
+            "origenerator.gui.main_window.OrigeneratorWindow": window,
+        }):
+            code = main([])
+
+        assert code == 0
+        told.assert_not_called()
+        window.assert_not_called()
+
     def test_the_copy_fun_time_starts_opens_even_while_another_boots(self, qapp):
         told = MagicMock()
         window = MagicMock()
@@ -1666,6 +1684,21 @@ def test_a_launch_that_waited_in_vain_takes_its_loading_screen_down_before_sayin
         assert main([]) == 1
 
     assert seen == ["screen down"]
+
+
+def test_a_click_that_waited_in_vain_for_a_closing_copy_is_told_why_nothing_opened(
+        qapp, monkeypatch):
+    # The copy it waited a minute for is stuck closing, not open, so nothing
+    # will show what the notice was about.
+    monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
+    copies = _the_copies(monkeypatch, None, closing=True)
+    copies.claim_the_library_once_the_closing_one_lets_go.return_value = None
+    told = MagicMock()
+
+    with _a_faked_boot([], **{"PyQt6.QtWidgets.QMessageBox.information": told}):
+        assert main([]) == 1
+
+    told.assert_called_once()
 
 
 def test_the_claim_is_on_the_library_a_preview_shares_with_the_production_copy(

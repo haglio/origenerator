@@ -46,7 +46,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     model_keys = ("unet_high", "unet_low")
     lora_keys = ("lora_high", "lora_low")
     output_node_id = "16"
-    output_key = "gifs"
 
     def default_params(self) -> dict:
         return {

@@ -53,6 +53,25 @@ from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.prompt_edit import apply_request
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import (
+    AUDIO_SWITCH as _AUDIO,
+)
+from origenerator.voice.app_commands import (
+    AUTO_SWITCH as _AUTO,
+)
+from origenerator.voice.app_commands import (
+    DRIVE_SWITCH as _DRIVE,
+)
+from origenerator.voice.app_commands import (
+    MIC_SWITCH as _MIC,
+)
+from origenerator.voice.app_commands import (
+    MOTION_MOVES as _MOTION,
+)
+from origenerator.voice.app_commands import (
+    SWITCHES as _SWITCHES,
+)
+from origenerator.voice.app_commands import (
+    SWITCHES_A_HOST_HOLDS,
     AppCommand,
     BarSetting,
     phrases_heard_only_outright,
@@ -92,26 +111,6 @@ _COLLECTIONS = {
     AppCommand.TRASH: _TRASH_KEY,
 }
 
-# The move each spoken motion word makes, as (the driver's method, its argument
-# or ``None`` for a method that takes none) — the very moves the keys make (see
-# :mod:`origenerator.gui.motion_hud`), said out loud instead of pressed. Bound
-# against the driver at construction, so a method renamed there is an error at
-# launch rather than a spoken word that quietly does nothing.
-_MOTION = {
-    AppCommand.SPEED_UP: ("adjust_speed", 5),
-    AppCommand.SPEED_DOWN: ("adjust_speed", -5),
-    AppCommand.AMP_UP: ("adjust_amplitude", 10),
-    AppCommand.AMP_DOWN: ("adjust_amplitude", -10),
-    AppCommand.CENTER_UP: ("adjust_center", 5),
-    AppCommand.CENTER_DOWN: ("adjust_center", -5),
-    AppCommand.NEXT_SHAPE: ("cycle_shape", 1),
-    AppCommand.PREVIOUS_SHAPE: ("cycle_shape", -1),
-    AppCommand.LEARNED: ("toggle_learned", None),
-    AppCommand.LEARNED_ON: ("set_learned", True),
-    AppCommand.LEARNED_OFF: ("set_learned", False),
-    AppCommand.OFFSET: ("quarter_offset", None),
-}
-
 # The driver's setter for each bar the numeric grid names
 # (:class:`~origenerator.voice.app_commands.BarSetting`), so "amp fifty" puts
 # the bar at fifty rather than walking it there ten at a time.
@@ -119,26 +118,6 @@ _BARS = {
     "speed": "set_speed",
     "amp": "set_amplitude",
     "center": "set_center",
-}
-
-# The app-wide switch each spoken word flips, as (which of the four switches, the
-# state asked for — ``None`` flips whichever way it is standing — and what the
-# answer calls it). Set through the button rather than around it, so a spoken
-# switch and a clicked one are the same event and the bank shows both. The
-# buttons themselves arrive in :meth:`VoiceRouter.bind_the_bank`, by keyword, so
-# a rename is a TypeError at launch rather than a word that quietly does nothing.
-_AUTO, _AUDIO, _DRIVE, _MIC = "auto", "audio", "drive", "mic"
-_SWITCHES = {
-    AppCommand.AUTO: (_AUTO, None, "auto-generate"),
-    AppCommand.AUTO_ON: (_AUTO, True, "auto-generate"),
-    AppCommand.AUTO_OFF: (_AUTO, False, "auto-generate"),
-    AppCommand.AUDIO: (_AUDIO, None, "the audio bed"),
-    AppCommand.AUDIO_ON: (_AUDIO, True, "the audio bed"),
-    AppCommand.AUDIO_OFF: (_AUDIO, False, "the audio bed"),
-    AppCommand.DRIVE: (_DRIVE, None, "OSR2"),
-    AppCommand.DRIVE_ON: (_DRIVE, True, "OSR2"),
-    AppCommand.DRIVE_OFF: (_DRIVE, False, "OSR2"),
-    AppCommand.MIC_OFF: (_MIC, False, "the mic"),
 }
 
 # The refusal each bank word carries when its button cannot run — ``None`` to use
@@ -304,7 +283,7 @@ class VoiceRouter(QObject):
 
     def become_hosted(self) -> None:
         self._hold_the_motion(None)
-        self._switches.update(dict.fromkeys((_AUDIO, _DRIVE, _MIC)))
+        self._switches.update(dict.fromkeys(SWITCHES_A_HOST_HOLDS))
 
     def become_standalone(self, motion, *, audio, drive, mic) -> None:
         self._hold_the_motion(motion)

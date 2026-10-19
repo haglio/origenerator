@@ -52,7 +52,7 @@ ABANDONED = RequestState.ABANDONED
 # What opens a request, as whisper renders it. "Request" is distinctive enough
 # that one substitution is safe (the same tolerance the fix matcher allows its
 # lead word), and the trailing forms are what a hurried "request:" comes back as.
-_LEAD_WORDS = ("request", "requests", "requested")
+LEAD_WORDS = ("request", "requests", "requested")
 # What closes one. Radio's own word, chosen because nothing in a prompt ends on
 # it by accident — and matched only as an utterance's LAST word, so "the blanket
 # over her legs" carries on rather than cutting the request short there.
@@ -136,7 +136,7 @@ class RequestDictation:
 
     def _maybe_open(self, text: str):
         heard = words(text, keep_apostrophes=True)
-        if not heard or not sounds_like(heard[0], _LEAD_WORDS):
+        if not heard or not sounds_like(heard[0], LEAD_WORDS):
             return None  # not a request — the caller's other uses may have it
         self._open = True
         self._heard = [text]

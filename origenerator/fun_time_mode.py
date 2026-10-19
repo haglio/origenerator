@@ -110,6 +110,8 @@ TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
 #: launch works (see :func:`build_parser`).
 CHECK_LAUNCH_FLAG = "--check-launch"
 
+SPOKEN_PHRASES_MODULE = "origenerator.voice.hosted"
+
 #: The caption the main window wears, which a host resolves it by (together
 #: with the pid).  The splash deliberately wears another ("Origenerator
 #: Loading"), so a caption match cannot reach it.
@@ -201,6 +203,7 @@ def declaration() -> dict:
         "module": MODULE,
         "window_title": WINDOW_TITLE,
         "check_launch_flag": CHECK_LAUNCH_FLAG,
+        "spoken_phrases_module": SPOKEN_PHRASES_MODULE,
         "required_flags": list(required_flags()),
         "region_flags": {side: list(region_flags(side)) for side in SIDES},
         "player_flags": {side: list(funestra_flags(side)) for side in SIDES},

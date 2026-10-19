@@ -16,7 +16,7 @@ import origenerator.workflows.sdxl_t2i as t2i
 import origenerator.workflows.wan21_ati_i2v as ati
 import origenerator.workflows.wan_experts as experts
 from origenerator import config
-from origenerator.comfy_graph import dual_sampler_model_files
+from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params
 from origenerator.gui.param_fields import clamped_number
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
 from origenerator.workflows import WORKFLOW_REGISTRY, base
@@ -79,6 +79,7 @@ def test_workflows_declare_the_params_that_identify_their_lora():
     # LoRA (SDXL, WAN t2i) declare none, and so grow no LoRA folder level.
     assert Wan22I2vWorkflow().lora_keys == ("lora_high", "lora_low")
     assert Wan22Flf2vLoopWorkflow().lora_keys == ("lora_high", "lora_low")
+    assert FluxT2iUpscaledWorkflow().lora_keys == ("lora",)
     assert SdxlT2iWorkflow().lora_keys == ()
     assert Wan22T2iWorkflow().lora_keys == ()
 
@@ -453,6 +454,46 @@ def test_flux_enhance_resamples_on_the_guided_conditioning():
     assert sampler["inputs"]["positive"] == base["inputs"]["positive"]
     assert sampler["inputs"]["cfg"] == 1.0
     assert payload[encode_id]["inputs"]["vae"] == _find_node(payload, "VAEDecode")["inputs"]["vae"]
+
+
+def test_flux_runs_its_lora_on_the_model_and_both_prompts_at_one_strength():
+    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
+    payload = wf.build_api_payload(dict(wf.default_params(), lora="example_style.safetensors",
+                                        lora_strength=0.2, enhance=True))
+
+    lora_id = _node_id(payload, "LoraLoader")
+    lora = payload[lora_id]["inputs"]
+    assert (lora["lora_name"], lora["strength_model"], lora["strength_clip"]) == (
+        "example_style.safetensors", 0.2, 0.2)
+    assert lora["model"] == [_node_id(payload, "UnetLoaderGGUF"), 0]
+    assert lora["clip"] == [_node_id(payload, "DualCLIPLoader"), 0]
+    assert {tuple(n["inputs"]["model"]) for n in payload.values()
+            if n["class_type"] == "KSampler"} == {(lora_id, 0)}
+    assert {tuple(n["inputs"]["clip"]) for n in payload.values()
+            if n["class_type"] == "CLIPTextEncode"} == {(lora_id, 1)}
+    assert graph_model_params(payload)["lora_strength"] == 0.2
+
+
+def test_flux_offers_a_lora_and_its_strength_just_under_its_model(monkeypatch):
+    options = [NO_LORA, "x_flux.safetensors"]
+    monkeypatch.setattr(lora_choice_module, "list_lora_files", lambda fallback, **terms: options)
+    fields = FluxT2iUpscaledWorkflow().param_definitions()
+    keys = [pd.key for pd in fields]
+    by_key = {pd.key: pd for pd in fields}
+
+    assert keys[keys.index("unet") + 1:keys.index("unet") + 3] == ["lora", "lora_strength"]
+    assert (by_key["lora"].label, by_key["lora"].options) == ("LoRA", options)
+    assert (by_key["lora_strength"].label, by_key["lora_strength"].good) == (
+        "LoRA Strength", (0.6, 1.2))
+
+
+def test_flux_with_no_lora_builds_the_graph_it_always_has():
+    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
+    payload = wf.build_api_payload(dict(wf.default_params(), lora=NO_LORA))
+
+    assert _node_id(payload, "LoraLoader") is None
+    assert _find_node(payload, "KSampler")["inputs"]["model"] == [
+        _node_id(payload, "UnetLoaderGGUF"), 0]
 
 
 # ---- Image Enhance (the standalone form of the tail) ----

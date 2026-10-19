@@ -1189,7 +1189,7 @@ def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_
     _rendering(client, video)
     image = _launch_image(queue, "i")
     client.fetch_history = MagicMock(return_value={"outputs": {
-        _I2V.output_node_id: {_I2V.output_key: [{"filename": "out.mp4", "subfolder": ""}]},
+        _I2V.output_node_id: {"gifs": [{"filename": "out.mp4", "subfolder": ""}]},
     }})
     client.forget_history = MagicMock()
 

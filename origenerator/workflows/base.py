@@ -233,11 +233,7 @@ class WorkflowTemplate(ABC):
     # Flux does not — there the same param also drives the plain 4x upscale that
     # is that workflow's namesake output, so it stays part of the recipe.
     extra_enhance_keys: tuple[str, ...] = ()
-    # The output node whose /history entry lists the saved files, and the key it
-    # lists them under: "images" for SaveImage / native SaveVideo, "gifs" for
-    # VHS_VideoCombine.
     output_node_id: str
-    output_key: str = "images"
     # The node that saves the pre-enhance render, present in the payload only
     # when the inline enhance tail ran (see :meth:`base_save_node`). Its files
     # are appended after the primary ones and tagged as the original, so a row
@@ -886,10 +882,8 @@ class WorkflowTemplate(ABC):
     def extract_output_info(self, history_data: dict) -> list[dict]:
         """Find this workflow's saved files in a ComfyUI /history response.
 
-        The output node lists them under ``output_key`` — ``images`` for
-        SaveImage and native SaveVideo, ``gifs`` for VHS_VideoCombine, which
-        names only the ``-audio`` file it muxed and leaves the soundless one
-        it wrote first beside it unlisted.
+        VHS_VideoCombine names only the ``-audio`` file it muxed and leaves the
+        soundless one it wrote first beside it unlisted.
 
         When the run also saved its pre-enhance render (:meth:`base_save_node`),
         those files follow, each tagged ``role: "original"``. The order is the
@@ -898,11 +892,11 @@ class WorkflowTemplate(ABC):
         way a standalone enhance folded into a row does.
         """
         outputs = history_data.get("outputs", {})
-        files = list(outputs.get(self.output_node_id, {}).get(self.output_key, []))
+        files = _listed_files(outputs.get(self.output_node_id, {}))
         files += soundless_copies_of(files)
         if self.base_output_node_id is None:
             return files
-        base = outputs.get(self.base_output_node_id, {}).get(self.output_key, [])
+        base = _listed_files(outputs.get(self.base_output_node_id, {}))
         return files + [{**f, "role": "original"} for f in base]
 
     def base_save_node(self, node_id: str, image_ref, params: dict) -> dict:
@@ -926,6 +920,10 @@ class WorkflowTemplate(ABC):
                 },
             },
         }
+
+
+def _listed_files(saved_by_node: dict) -> list[dict]:
+    return [*saved_by_node.get("images", []), *saved_by_node.get("gifs", [])]
 
 
 def soundless_copies_of(saved: list[dict]) -> list[dict]:

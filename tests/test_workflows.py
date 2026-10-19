@@ -1287,22 +1287,13 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
     assert create["inputs"]["audio"] == [sampler_id, 0]
 
 
-def test_wan22_i2v_extract_output_info_uses_images_key():
+@pytest.mark.parametrize("listed_under", ["images", "gifs"])
+def test_a_runs_file_is_found_whichever_key_its_save_node_listed_it_under(listed_under):
     wf = Wan22I2vWorkflow()
-    # ComfyUI's native SaveVideo reports outputs under "images", not "gifs"
-    history = {
-        "outputs": {
-            "19": {
-                "images": [
-                    {"filename": "wan22_i2v_00001_.mp4", "subfolder": "video", "type": "output"}
-                ],
-                "animated": [True],
-            }
-        }
-    }
-    files = wf.extract_output_info(history)
-    assert len(files) == 1
-    assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
+    saved = {"filename": "wan22_i2v_00001_.mp4", "subfolder": "video", "type": "output"}
+    history = {"outputs": {wf.output_node_id: {listed_under: [saved], "animated": [True]}}}
+
+    assert wf.extract_output_info(history) == [saved]
 
 
 # ---- WAN 2.1 ATI (motion-tracked image-to-video) ----
@@ -2164,8 +2155,8 @@ def test_every_enhance_capable_workflow_keeps_its_base_render():
         # And the run's history reads that file back as the row's original, which
         # is what makes it a level rather than a second picture.
         history = {"outputs": {
-            wf.output_node_id: {wf.output_key: [{"filename": "enhanced.png"}]},
-            wf.base_output_node_id: {wf.output_key: [{"filename": "base.png"}]},
+            wf.output_node_id: {"images": [{"filename": "enhanced.png"}]},
+            wf.base_output_node_id: {"images": [{"filename": "base.png"}]},
         }}
         assert [(f["filename"], f.get("role")) for f in wf.extract_output_info(history)] \
             == [("enhanced.png", None), ("base.png", "original")], wf.name

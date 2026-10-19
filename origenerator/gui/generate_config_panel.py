@@ -1144,6 +1144,7 @@ class GenerateConfigPanel(QWidget):
         return {"folds": self._param_form.folds() if self._param_form else {},
                 "enhancement_levels_folded": self._versions.is_collapsed(),
                 "details_folded": self._metadata_block.is_folded(),
+                "source_folded": self._related.is_source_folded(),
                 "picture_border": self._picture_border}
 
     def restore_layout(self, saved) -> None:
@@ -1156,6 +1157,8 @@ class GenerateConfigPanel(QWidget):
             self._versions.set_collapsed(saved["enhancement_levels_folded"])
         if isinstance(saved.get("details_folded"), bool):
             self._metadata_block.set_folded(saved["details_folded"])
+        if isinstance(saved.get("source_folded"), bool):
+            self._related.set_source_folded(saved["source_folded"])
         self._picture_border = saved.get("picture_border")
         if self._fun_time is None:
             self._media_split.take_dragged_sizes(self._picture_border)

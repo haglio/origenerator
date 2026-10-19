@@ -49,7 +49,7 @@ class SourceTile(QWidget):
         column.setSpacing(4)
         self._heading = QLabel(_DEFAULT_HEADING)
         self._heading.setStyleSheet("font-weight: 600;")
-        column.addWidget(self._heading)
+        column.addWidget(self._heading, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self._thumb = QLabel()
         self._thumb.setFixedSize(_THUMB, _THUMB)
@@ -57,7 +57,7 @@ class SourceTile(QWidget):
         self._thumb.setStyleSheet(
             f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: 3px;"
         )
-        column.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignLeft)
+        column.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignHCenter)
         # A photo (or play) badge in the thumbnail's top-left corner, like the
         # gallery tiles.
         self._badge = MediaBadge(_DEFAULT_MEDIA_TYPE, self._thumb)
@@ -66,7 +66,7 @@ class SourceTile(QWidget):
         self._name.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
         self._name.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         grid_card.style_caption(self._name)
-        column.addWidget(self._name, 0, Qt.AlignmentFlag.AlignLeft)
+        column.addWidget(self._name, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.hide()
 

@@ -82,6 +82,7 @@ def related(make_related):
 
 
 def test_a_row_tied_to_nothing_shows_no_links(related):
+    assert related._source_section.isHidden()
     assert related._source_tile.isHidden()
     assert related._animated_strip.isHidden()
 
@@ -199,6 +200,36 @@ def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
     related._source_tile.activated.emit("img1")
 
     assert named == ["img1"]
+
+
+def test_the_source_links_sit_in_a_section_headed_source(make_related):
+    related = make_related(_video_row("vid0"))
+
+    related.show_row(_combined_row(), [_image_row()])
+
+    section = related._source_section
+    assert section._title == "Source"
+    assert not section.isHidden()
+    assert section.isAncestorOf(related._source_tile)
+    assert section.isAncestorOf(related._source_video_tile)
+
+
+def test_a_row_built_from_nothing_shows_no_source_section(make_related):
+    related = make_related(_video_row("vid0"))
+    related.show_row(_combined_row(), [_image_row()])
+
+    related.show_row(_image_row(), [_image_row()])
+
+    assert related._source_section.isHidden()
+
+
+def test_clearing_takes_the_source_section_down(make_related):
+    related = make_related(_video_row("vid0"))
+    related.show_row(_combined_row(), [_image_row()])
+
+    related.clear()
+
+    assert related._source_section.isHidden()
 
 
 def test_the_source_video_sits_beside_the_source_image(make_related, qtbot):

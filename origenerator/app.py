@@ -700,6 +700,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         COMFYUI_PORT,
         DB_PATH,
         LIBRARY_STATE_DIR,
+        PRODUCTION_CHECKOUT,
         STATE_DIR,
         THUMB_DIR,
         TRASH_DIR,
@@ -762,7 +763,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     # notice clicked during one is a click that would otherwise find nobody
     # listening and start a second copy of the app (origenerator.app_link).
     from origenerator.gui.link_listener import LinkListener
-    clicked_notices = LinkListener(parent=app)
+    clicked_notices = LinkListener(checkout=PRODUCTION_CHECKOUT, parent=app)
 
     if loading is None:
         loading = _open_the_loading(fun_time, app, logger, preview, taskbar)

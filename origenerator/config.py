@@ -90,7 +90,8 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
 # library itself, beside the copy of its records. Only what is about this
 # window alone (UI_STATE_PATH, the logs) stays in the checkout that runs it.
 RECORDS_DIR = LIBRARY_ROOT / "app_data" / "origenerator"
-LIBRARY_STATE_DIR = project_dir("origenerator") / "state" if _BRANCH_SESSION else STATE_DIR
+PRODUCTION_CHECKOUT = project_dir("origenerator") if _BRANCH_SESSION else PROJECT_DIR
+LIBRARY_STATE_DIR = PRODUCTION_CHECKOUT / "state" if _BRANCH_SESSION else STATE_DIR
 DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
 _LIBRARY_FILES_DIR = STATE_DIR if _TOLD_WHERE_STATE_IS else RECORDS_DIR
 THUMB_DIR = _LIBRARY_FILES_DIR / "thumbnails"

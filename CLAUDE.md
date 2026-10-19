@@ -288,12 +288,14 @@ is the two hooks that call the guard, below.
   `GenerationJob.start` runs it before a job with lines is submitted.
 - `tools/open_from_notification.py` — what Windows runs when a notification of
   this app's is clicked, registered as the command for the `origenerator:` link
-  every notice carries. It hands the generation to the running app if there is
-  one and starts the app on it if there is not; `origenerator.app_link` is all
-  of the deciding, and the registering is `DesktopNotices`. Run by path and
-  from its own checkout on purpose: a branch preview's notices have to be
-  answered by the preview's code, which is the only copy a change is in before
-  it lands.
+  every notice carries. It hands the generation to the copy that has the
+  library if one is open, a preview included, and starts production
+  Origenerator on it if none is; `origenerator.app_link` is all of the
+  deciding, and the registering is `DesktopNotices`. Every copy registers the
+  production checkout's, his decision (2026-10-18): a toast opened the preview
+  that had raised it, and he wants toasts to open production. So a change to
+  what this handler decides reaches a click only once it ships, and a preview
+  shows only what an open copy does with the item it is handed.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of

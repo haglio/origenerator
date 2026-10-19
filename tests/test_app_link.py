@@ -40,9 +40,9 @@ def test_a_link_that_asks_for_anything_else_names_nothing(link):
     assert app_link.generation_in(link) is None
 
 
-def test_each_checkout_is_answered_on_a_channel_of_its_own():
-    # A branch preview runs beside the live app on the same library, and a click
-    # on its notice belongs to the copy that raised it.
+def test_each_checkout_names_a_channel_of_its_own():
+    # A suite's copy listens on its own checkout's, never on the one production's
+    # clicks arrive on.
     live = app_link.channel_for(Path(r"C:\workspace\origenerator"))
     preview = app_link.channel_for(Path(r"C:\workspace\origenerator\.claude\worktrees\x"))
 
@@ -55,14 +55,10 @@ def test_the_checkout_it_answers_for_is_the_one_it_was_imported_from():
     assert app_link.CHECKOUT == config.PROJECT_DIR
 
 
-def test_what_windows_runs_on_a_click_names_this_checkouts_own_handler():
-    # Registered per checkout rather than per install: a preview's notices have
-    # to reach the preview's code, which is the only copy that has the change in
-    # it yet.
+def test_what_windows_runs_on_a_click_names_the_checkouts_handler_and_its_launcher():
     command = app_link.handler_command(
         checkout=Path(r"C:\workspace\origenerator"),
-        interpreter=Path(r"C:\workspace\origenerator\.venv\Scripts\pythonw.exe"),
-        launcher="launch_origenerator.vbs")
+        interpreter=Path(r"C:\workspace\origenerator\.venv\Scripts\pythonw.exe"))
 
     assert command == (
         r'"C:\workspace\origenerator\.venv\Scripts\pythonw.exe" '
@@ -74,9 +70,8 @@ def test_a_handler_run_by_windows_is_the_script_the_command_names():
     assert (app_link.CHECKOUT / app_link.HANDLER).is_file()
 
 
-def test_both_launchers_it_may_start_are_launchers_this_checkout_has():
-    for launcher in (app_link.LIVE_LAUNCHER, app_link.PREVIEW_LAUNCHER):
-        assert (app_link.CHECKOUT / launcher).is_file()
+def test_the_launcher_a_click_starts_is_one_this_checkout_has():
+    assert (app_link.CHECKOUT / app_link.LIVE_LAUNCHER).is_file()
 
 
 def _started(monkeypatch):
@@ -222,7 +217,7 @@ def test_a_log_that_cannot_be_written_costs_the_click_nothing(monkeypatch, tmp_p
 def test_the_handler_windows_runs_answers_out_of_its_own_checkout(tmp_path):
     # Run by path from wherever Windows happens to be standing, so what decides
     # what a click does has to be this checkout's copy rather than whichever one
-    # the venv has installed -- a preview's notices are answered by the preview.
+    # the venv has installed.
     handler = subprocess.run(
         [sys.executable, str(app_link.CHECKOUT / app_link.HANDLER),
          app_link.LIVE_LAUNCHER, "https://example.test/"],

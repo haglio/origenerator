@@ -1,8 +1,9 @@
 """What Windows runs when one of this app's notifications is clicked.
 
-Registered as the command for the ``origenerator:`` link a notice carries, and
-run by path with its own checkout in front of everything else, because the copy
-that must answer a preview's notice is the preview's own.
+Registered as the command for the ``origenerator:`` link a notice carries, the
+production checkout's whichever copy raised the notice, and run by path with
+that checkout in front of everything else, so the code that answers is its own
+whatever the venv has installed.
 """
 
 from __future__ import annotations

@@ -2,9 +2,9 @@
 
 A notification outlives the app that raised it, so Windows answers one by
 following the link the toast carries (``activationType="protocol"``) and running
-whatever is registered for its scheme: this checkout's own handler
-(:data:`HANDLER`), per checkout because a click belongs to the copy that raised
-it. Qt-free, because this is what runs on a click.
+whatever is registered for its scheme: the production checkout's handler
+(:data:`HANDLER`), whichever copy raised the notice. Qt-free, because this is
+what runs on a click.
 """
 from __future__ import annotations
 
@@ -38,7 +38,6 @@ CARRIED_IN = "ORIGENERATOR_GO_TO"
 HANDLER = Path("tools") / "open_from_notification.py"
 
 LIVE_LAUNCHER = "launch_origenerator.vbs"
-PREVIEW_LAUNCHER = "launch_preview_branch.vbs"
 
 CHECKOUT = Path(__file__).resolve().parents[1]
 
@@ -87,9 +86,8 @@ def windowless_interpreter() -> Path:
     return silent if silent.exists() else Path(sys.executable)
 
 
-def handler_command(*, checkout: Path, interpreter: Path, launcher: str) -> str:
-    """The command line Windows runs when a notice of this checkout's is clicked."""
-    return f'"{interpreter}" "{checkout / HANDLER}" "{launcher}" "%1"'
+def handler_command(*, checkout: Path, interpreter: Path) -> str:
+    return f'"{interpreter}" "{checkout / HANDLER}" "{LIVE_LAUNCHER}" "%1"'
 
 
 def follow(argv, *, checkout: Path = CHECKOUT) -> int:

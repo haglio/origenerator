@@ -55,6 +55,7 @@ class FakePanel:
         self.visible = None
         self.lit_for = []
         self.cleared = 0
+        self.folder_generating = None
         self.combine_requested = _Signal()
         self.animation_settings_requested = _Signal()
         self.intent_changed = _Signal()
@@ -92,6 +93,9 @@ class FakePanel:
     def clear_drop_candidates(self):
         self.cleared += 1
 
+    def note_folder_generating(self, generating):
+        self.folder_generating = generating
+
 
 class _Signal:
     def __init__(self):
@@ -126,17 +130,17 @@ class FakeJob:
 
 
 class FakeReroll:
-    def __init__(self, launches="new-run", busy=False):
+    def __init__(self, launches="new-run", making=()):
         self.prepared = []
         self.launches = launches
-        self.busy = busy
+        self.making = set(making)
 
     def start_prepared(self, key, workflow, params):
         self.prepared.append((key, workflow.name, dict(params)))
         return self.launches
 
     def job_for(self, key):
-        return FakeJob("the-run-already-going") if self.busy else None
+        return FakeJob("the-run-already-going") if key in self.making else None
 
 
 class FakeDB:
@@ -323,6 +327,37 @@ def test_a_video_made_from_a_picture_the_gallery_lacks_lends_the_image_slot_noth
     controller, _host = combine(db=FakeDB([_video("clip", source_image="elsewhere.png")]))
 
     assert controller._picture_lent_by("clip") is None
+
+
+def _a_dropped_pair(combine, *, making=()):
+    picture = _image("img", files=("frame.png",))
+    controller, _host = combine(FakeHost(rows=[picture]),
+                                db=FakeDB([picture, _video("clip")]),
+                                jobs=FakeReroll(making=making))
+    controller.panel.image_slot.set_item("img")
+    controller.panel.video_slot.set_item("clip")
+    return controller
+
+
+def test_generate_grays_while_the_folder_a_dropped_pair_lands_in_is_making_one(combine):
+    controller = _a_dropped_pair(combine, making={"folder-of-clip"})
+
+    assert controller.panel.folder_generating is True
+
+
+def test_a_pair_whose_folder_is_making_nothing_leaves_generate_alone(combine):
+    controller = _a_dropped_pair(combine, making={"folder-of-another"})
+
+    assert controller.panel.folder_generating is False
+
+
+def test_generate_comes_back_when_the_run_in_that_folder_ends(combine):
+    controller = _a_dropped_pair(combine, making={"folder-of-clip"})
+
+    controller._jobs.making.clear()
+    controller.reconcile_generating()
+
+    assert controller.panel.folder_generating is False
 
 
 def test_the_video_slot_takes_only_a_recipe_this_app_can_rebuild(combine):
@@ -788,7 +823,7 @@ def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine,
     monkeypatch.setattr(module.gallery, "curated_params", lambda s, r, wf: {"seed": 3})
     slideshows = FakeSlideshows(showing="img")
     db = FakeDB([_image("img")])
-    jobs = FakeReroll(launches=None, busy=True)
+    jobs = FakeReroll(launches=None, making={f"folder-for-{VIDEO_WORKFLOW}-3"})
     controller, _host = combine(db=db, slideshows=slideshows, jobs=jobs)
 
     controller.generate_category("img", "waving", send=True)

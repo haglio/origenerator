@@ -48,6 +48,7 @@ from origenerator.gui.generate_button import (
     RANDOM_SEED_CAPTION,
     GenerateButton,
 )
+from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.media import MediaType
 from origenerator.recipe_match import GENAU, VIDEO
@@ -116,6 +117,7 @@ class CombinePanel(QWidget):
         self.image_slot.activated.connect(self.item_activated)
         self.video_slot.activated.connect(self.item_activated)
         self._dropped: dict[str, str] = {}
+        self._folder_generating = False
 
         # The video part's fast path: pick an act and the view finds a fitting past
         # video for you. A neutral "(custom)" leads the list (index 0, the default) so
@@ -331,6 +333,10 @@ class CombinePanel(QWidget):
             self._dropped.pop(lane, None)
             self.video_slot.clear()
 
+    def note_folder_generating(self, generating: bool) -> None:
+        self._folder_generating = generating
+        self._sync()
+
     def dropped_videos(self) -> dict[str, str]:
         return dict(self._dropped)
 
@@ -343,13 +349,15 @@ class CombinePanel(QWidget):
         image_id = self.image_slot.current_id()
         video_id = self.video_slot.current_id()
         ready = bool(image_id) and bool(self.selected_category() or video_id)
+        can_run = ready and not self._folder_generating
         remakes_its_own = bool(video_id) and self.image_slot.lent_by(video_id) == image_id
-        self._generate_btn.setEnabled(ready)
+        self._generate_btn.setEnabled(can_run)
         self._generate_btn.set_caption(
-            RANDOM_SEED_CAPTION if ready and remakes_its_own else DEFAULT_CAPTION)
+            RANDOM_SEED_CAPTION if can_run and remakes_its_own else DEFAULT_CAPTION)
         self._open_btn.setEnabled(ready)
         missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_RECIPE
-        self._generate_btn.setToolTip(missing)
+        self._generate_btn.setToolTip(
+            missing or (ALREADY_MAKING_ONE_TIP if self._folder_generating else ""))
         self._open_btn.setToolTip(missing or _EDIT_TIP)
 
     def _emit(self):

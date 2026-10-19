@@ -152,6 +152,7 @@ class CombineController(QObject):
         # A picture dropped in narrows the acts too, so the list is re-asked
         # for the moment one lands rather than only when the lane changes.
         self.panel.image_slot.changed.connect(self.picture_dropped)
+        self.panel.video_slot.changed.connect(self.reconcile_generating)
         self.panel.setVisible(client is not None)
 
     def _on_animation_settings(self) -> None:
@@ -288,10 +289,20 @@ class CombineController(QObject):
     def picture_dropped(self) -> None:
         """The picture in the slot changed: re-ask which acts it can start from."""
         self.offer_the_acts(self._db.list_generations())
+        self.reconcile_generating()
 
     def _on_intent_changed(self, _intent: str) -> None:
         """Re-gray the act list for the lane just chosen."""
         self.offer_the_acts(self._db.list_generations())
+        self.reconcile_generating()
+
+    def reconcile_generating(self) -> None:
+        image_id = self.panel.image_slot.current_id()
+        video_id = self.panel.video_slot.current_id()
+        built = (self._combined_params(image_id, video_id, self.panel.selected_intent())
+                 if image_id and video_id else None)
+        self.panel.note_folder_generating(
+            built is not None and self._jobs.job_for(self._folder_of(built)) is not None)
 
     # --- the line's answer to the press, before there is a job ---------------
 
@@ -483,8 +494,8 @@ class CombineController(QObject):
         built = self._combined_params(image_id, video_id, intent, category)
         if built is None:
             return
-        workflow, params, video_row, _image_row = built
-        key = self._host.folder_key_of(_the_row_this_run_will_make(video_row, params, workflow))
+        workflow, params, _video_row, _image_row = built
+        key = self._folder_of(built)
         if self._already_making_one(key, send):
             return
         prompt_id = self._jobs.start_prepared(key, workflow, params)
@@ -493,6 +504,10 @@ class CombineController(QObject):
                                        video_prompt_id=video_id)
             self._mark_for_sending(prompt_id, send)
             self._host.reveal_launch(key)
+
+    def _folder_of(self, built) -> str:
+        workflow, params, video_row, _image_row = built
+        return self._host.folder_key_of(_the_row_this_run_will_make(video_row, params, workflow))
 
     def _already_making_one(self, key: str, send: bool) -> bool:
         going = self._jobs.job_for(key)

@@ -28,12 +28,18 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP, BUTT
 
 from origenerator import ui_scale
 from origenerator.config import AMBIENT_AUDIO_VOICES
-from origenerator.gui import icons
+from origenerator.gui import icons, omnipause
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.link_tip import LinkTip, link
 
+
+def _lit(color: str) -> str:
+    return f"QToolButton:checked {{ background-color: {color}; border-radius: 4px; }}"
+
+
 # A lit background while a switch is on.
-_LIT = "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+_LIT = _lit("#2d6cdf")
+_LIT_WHILE_THE_ROOM_IS_PAUSED = _lit("#a68600")
 
 # What the Auto switch's clickable tip says while the loop it would stop is
 # running in some other folder. Naming that folder is no use when a name is a
@@ -106,8 +112,14 @@ def _landing_at_the_huds_scale(length: int, *, hosted: bool) -> int:
     return length if hosted else round(length * ui_scale.HOSTED_SCALE)
 
 
-def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
-    btn = QToolButton()
+class _SoundSwitch(QToolButton):
+    def set_frozen(self, frozen: bool) -> None:
+        self.setStyleSheet(_LIT_WHILE_THE_ROOM_IS_PAUSED if frozen else _LIT)
+
+
+def _tool_button(icon, tooltip: str, handler, *, checkable=False,
+                 kind=QToolButton) -> QToolButton:
+    btn = kind()
     btn.setIcon(icon)
     btn.setToolTip(tooltip)
     btn.setCheckable(checkable)
@@ -194,9 +206,9 @@ class ToolbarBank(QWidget):
                 icons.audio_icon(),
                 f"Play {AMBIENT_AUDIO_VOICES} library clips at once, sound only, "
                 "shuffling endlessly",
-                acts.toggle_audio, checkable=True,
+                acts.toggle_audio, checkable=True, kind=_SoundSwitch,
             )
-            self.audio.setStyleSheet(_LIT)
+            omnipause.holds(self.audio)
             # The microphone stands apart from the switches above: those are what
             # the app is doing, and the mic is what it hears with. On is listening,
             # off is not.

@@ -124,6 +124,7 @@ from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import gestures
+from tests.lit_switches import lit_in
 from tests.slideshow_hud_support import button_on_screen, engine_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
 from tests.test_folder_tree import _shown
@@ -13415,6 +13416,19 @@ def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
 
     _press_escape_at_the_gallery(view)
     assert not omnipause.frozen() and not bed.frozen
+
+
+def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_again(
+        qtbot, tmp_path, monkeypatch):
+    view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
+    del view._other_window_owns_keys
+    view._bank.audio.setChecked(True)
+
+    _press_escape_at_the_gallery(view)
+    assert lit_in(view._bank.audio) == "yellow"
+
+    _press_escape_at_the_gallery(view)
+    assert lit_in(view._bank.audio) == "blue"
 
 
 def _startable_view(qtbot, tmp_path, monkeypatch):

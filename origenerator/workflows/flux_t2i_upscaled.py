@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
+from origenerator.workflows.lora_choice import lora_choice
 from origenerator.workflows.model_arch import FLUX
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_files import NO_LORA, list_model_files
 
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
@@ -34,6 +35,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     display_name = "Flux Text-to-Image (Upscaled)"
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
+    lora_keys = ("lora",)
     output_node_id = "12"
     base_output_node_id = "17"  # the plain 4x upscale, saved when the tail runs
 
@@ -52,6 +54,8 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             "scheduler": "simple",
             "denoise": 1.0,
             "unet": "ultrarealFineTune_v4_fp16.gguf",
+            "lora": NO_LORA,
+            "lora_strength": 1.0,
             "clip_name1": "clip_l.safetensors",
             "clip_name2": "t5xxl_fp16.safetensors",
             "vae": "ae.safetensors",
@@ -71,6 +75,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
+            *lora_choice(defaults, "lora", "lora_strength", accepts=(FLUX,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=16),
@@ -86,12 +91,14 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
+        lora, model_ref, clip_ref = self.lora_model_and_clip_input(
+            "13", ["1", 0], ["2", 0], params["lora"], params["lora_strength"])
         if params.get("enhance"):
             # The tail's own upscale is this workflow's namesake 4x, so the
             # plain output stays reachable either way — it is what the base save
             # keeps when the tail runs.
             enhanced = self.enhance_image_nodes(
-                image_ref=["9", 0], model_ref=["1", 0],
+                image_ref=["9", 0], model_ref=model_ref,
                 positive_ref=["5", 0], negative_ref=["6", 0], vae_ref=["3", 0],
                 params=params,
             )
@@ -126,9 +133,10 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},
             },
+            **lora,
             "4": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["2", 0], "text": params["positive_prompt"]},
+                "inputs": {"clip": clip_ref, "text": params["positive_prompt"]},
             },
             "5": {
                 "class_type": "FluxGuidance",
@@ -136,7 +144,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             },
             "6": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["2", 0], "text": params["negative_prompt"]},
+                "inputs": {"clip": clip_ref, "text": params["negative_prompt"]},
             },
             "7": {
                 "class_type": "EmptyLatentImage",
@@ -149,7 +157,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             "8": {
                 "class_type": "KSampler",
                 "inputs": {
-                    "model": ["1", 0],
+                    "model": model_ref,
                     "positive": ["5", 0],
                     "negative": ["6", 0],
                     "latent_image": ["7", 0],

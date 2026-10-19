@@ -106,6 +106,14 @@ PARAM_HELP: dict[str, str] = {
     ),
 
     # --- LoRAs ---
+    "lora": (
+        "A LoRA trained for a specific look or subject, applied to the model and "
+        "to the prompts. \"None\" leaves the model unmodified."
+    ),
+    "lora_strength": (
+        "How hard the LoRA pulls. 1.0 is its intended strength; much weaker and "
+        "it barely shows, much stronger and it tends to take over the picture."
+    ),
     "lora_high": (
         "A LoRA trained for a specific look or subject, applied to the first "
         "pass (high noise). \"None\" leaves the model unmodified."

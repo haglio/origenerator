@@ -139,8 +139,10 @@ _PINNED = {
     "height": 768,
     "input_image": "",
     "length": 5,
+    "lora": "None",
     "lora_high": "a_high_lora.safetensors",
     "lora_low": "a_low_lora.safetensors",
+    "lora_strength": 0.8,
     "lora_strength_high": 0.9,
     "lora_strength_low": 0.7,
     "motion_ceiling": 420,
@@ -190,6 +192,7 @@ _VARIATIONS = {
         "frame_rate": 48.0,
     },
     "with both LoRAs bypassed": {"lora_high": "None", "lora_low": "None"},
+    "with a picture's LoRA": {"lora": "a_lora.safetensors"},
     "sized by hand": {"width": 832, "height": 480},
     "posed from a skeleton, through a union ControlNet": {
         "control_mode": "pose",
@@ -202,7 +205,7 @@ _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 # Changing the recipes above, or what _fingerprint reads, moves these without any
 # graph changing: re-record every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
-    ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
+    ("flux_t2i_upscaled", "v002"): "25f811aa4de86d7b",
     ("image_enhance", "v003"): "228ccee5269454ec",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",

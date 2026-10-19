@@ -361,6 +361,24 @@ class WorkflowTemplate(ABC):
         return node, [node_id, 0]
 
     @staticmethod
+    def lora_model_and_clip_input(node_id: str, model_ref, clip_ref, lora_name, strength):
+        if is_no_lora(lora_name):
+            return {}, model_ref, clip_ref
+        node = {
+            node_id: {
+                "class_type": "LoraLoader",
+                "inputs": {
+                    "model": model_ref,
+                    "clip": clip_ref,
+                    "lora_name": lora_name,
+                    "strength_model": strength,
+                    "strength_clip": strength,
+                },
+            }
+        }
+        return node, [node_id, 0], [node_id, 1]
+
+    @staticmethod
     def scene_prompt_nodes(index: int, scene: int, scenes: list[str], clip_ref, first_ref,
                            role: str = "prompt"):
         """The text conditioning segment ``index`` of scene ``scene`` reads --

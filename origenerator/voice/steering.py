@@ -126,9 +126,7 @@ class VoiceSteering(QObject):
         """Shut the mic and drop any half-said request with it — one nobody can
         finish saying must not be waiting the next time it opens."""
         self._listener.stop()
-        if self._dictation is not None:
-            with self._lock:
-                self._dictation.reset()
+        self.drop_the_request()
 
     def bare_command(self, text: str):
         """The whole-utterance command *text* is, or ``None`` — asked of a
@@ -159,6 +157,16 @@ class VoiceSteering(QObject):
         """
         with self._lock:
             return self._dictation.push(text) if self._dictation is not None else None
+
+    @property
+    def taking_a_request(self) -> bool:
+        with self._lock:
+            return self._dictation is not None and self._dictation.listening
+
+    def drop_the_request(self) -> None:
+        if self._dictation is not None:
+            with self._lock:
+                self._dictation.reset()
 
     def _on_said(self, text: str) -> None:
         if self._get_prompts is None and self._execute_command is None:

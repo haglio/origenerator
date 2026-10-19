@@ -715,6 +715,10 @@ class VoiceRouter(QObject):
             return
         self._begin_request(target, spoken, side)
 
+    def drop_the_request(self) -> None:
+        self.listener.drop_the_request()
+        self._request_target = None
+
     def _target_of(self, slideshow) -> str | None:
         """What a request just opened is about: the slide filling the screen
         when a slideshow is up, else the generation picked in the gallery."""

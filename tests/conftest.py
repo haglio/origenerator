@@ -250,6 +250,14 @@ class FakeVoiceSteering(QObject):
         while this app is hosted and its own mic is shut."""
         return self._dictation.push(text) if self._dictation is not None else None
 
+    @property
+    def taking_a_request(self):
+        return self._dictation is not None and self._dictation.listening
+
+    def drop_the_request(self):
+        if self._dictation is not None:
+            self._dictation.reset()
+
 
 def keep_the_microphone_shut(setattr) -> None:
     """Point every voice router's steering at the inert stand-in above."""

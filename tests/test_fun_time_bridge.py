@@ -511,6 +511,65 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
     assert played == []
 
 
+def _the_room_was_told(tmp_path) -> list[str]:
+    return consume_command_file(tmp_path / "dashboard_cmd.txt", uppercase=False)
+
+
+def _said_to_this_app(bridge, tmp_path, *lines: str) -> None:
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        "".join(f"{line}\n" for line in lines), encoding="utf-8")
+    bridge._tick()
+
+
+def test_the_room_is_told_a_request_has_opened_on_the_side_it_was_said_to(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request")
+
+    assert _the_room_was_told(tmp_path) == ["portrait_request_open"]
+
+
+def test_the_room_is_told_the_request_is_over_once_over_is_said(qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request", "PORTRAIT_SAY:no feet")
+
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:over")
+
+    told = _the_room_was_told(tmp_path)
+    assert told == ["portrait_request_open", "portrait_request_closed"]
+    assert set(told) <= set(contract.declaration()["request_lines"])
+
+
+def test_a_request_said_in_one_breath_leaves_the_room_nothing_to_hear(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
+
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request no feet over")
+
+    assert _the_room_was_told(tmp_path) == []
+
+
+def test_closing_the_slideshow_a_request_was_said_to_drops_the_request(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    played = []
+    monkeypatch.setattr(view._slideshows, "play_collection", played.append)
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request")
+
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_CLOSE_SLIDESHOW")
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:favorites")
+
+    assert _the_room_was_told(tmp_path) == ["portrait_request_open", "portrait_request_closed"]
+    assert len(played) == 1
+
+
 def _press(bridge, tmp_path, line: str) -> None:
     """A press the session routed back here, as a Funestra's panel posted it."""
     (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")

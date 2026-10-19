@@ -216,6 +216,12 @@
     "(?i)filter_landscape_.+",
     "(?i)landscape_say:.+"
   ],
+  "request_lines": [
+    "portrait_request_open",
+    "portrait_request_closed",
+    "landscape_request_open",
+    "landscape_request_closed"
+  ],
   "handoff": {
     "offer": {
       "file": "fun_time_offer.txt",

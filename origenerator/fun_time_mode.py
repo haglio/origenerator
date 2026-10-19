@@ -102,6 +102,8 @@ CLOSE_SLIDESHOW = "close_slideshow"
 SIDE_VERBS = (OPEN_SLIDESHOW, CLOSE_SLIDESHOW)
 GO_TO = "GO_TO"
 SAY = "say"
+REQUEST_OPEN = "request_open"
+REQUEST_CLOSED = "request_closed"
 
 #: Whose taskbar button this window joins.
 TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
@@ -212,6 +214,8 @@ def declaration() -> dict:
         "command_case_blind": True,
         "command_lines": list(command_lines()),
         "command_patterns": list(command_patterns()),
+        "request_lines": [spelled_for(side, line) for side in SIDES
+                          for line in (REQUEST_OPEN, REQUEST_CLOSED)],
         "handoff": handoff(*_A_WINDOW),
     }
 

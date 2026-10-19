@@ -221,8 +221,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     pane 86 -> 85: another Latest opens on its first page by itself, so the
     step that choice asked for went.
     280 -> 279: the session opens each side on its own, so the open of both
-    at once, which nothing sends now, went.)"""
+    at once, which nothing sends now, went. 279 -> 281: the session hears the
+    rest of a spoken request it posted here, so whether one is being taken, and
+    dropping one whose slideshow closed, are two forwarders to the voice.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 279
+               for x in _class_def(VIEW, "GalleryView").body) == 281
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

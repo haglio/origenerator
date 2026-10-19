@@ -9,6 +9,7 @@ from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -54,7 +55,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
-from origenerator.gui.export_lane import lane_for
+from origenerator.gui.export_lane import UNSEND_CAPTION, lane_for
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
@@ -488,10 +489,13 @@ class GenerateConfigPanel(QWidget):
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
         self._lane_button = QPushButton()
-        self._lane_button.clicked.connect(self._on_lane_pressed)
-        self._lane_button.hide()
+        self._lane_button.clicked.connect(
+            lambda _checked=False: self._on_send(self._offered_lane))
         btn_row.addWidget(self._lane_button)
+        self._sent_row = self._build_sent_row()
+        btn_row.addWidget(self._sent_row)
         self._offered_lane = None
+        self._update_lane_button(None)
         self._cancel_btn = QPushButton(discard_run_text(False))
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
@@ -504,6 +508,19 @@ class GenerateConfigPanel(QWidget):
         self._generate_pair = GenerateWithHowMany(self._generate_btn, self._how_many)
         btn_row.addWidget(self._generate_pair)
         return btn_row
+
+    def _build_sent_row(self) -> QWidget:
+        row = QWidget()
+        line = QHBoxLayout(row)
+        line.setContentsMargins(0, 0, 0, 0)
+        line.setSpacing(BUTTON_GAP)
+        self._sent_note = QLabel()
+        self._unsend_button = QPushButton(UNSEND_CAPTION)
+        self._unsend_button.clicked.connect(
+            lambda _checked=False: self._on_unsend(self._offered_lane))
+        line.addWidget(self._sent_note)
+        line.addWidget(self._unsend_button)
+        return row
 
     def minimumSizeHint(self):
         """Never narrower than the settings can be squeezed into.
@@ -1479,7 +1496,7 @@ class GenerateConfigPanel(QWidget):
         self._related.clear()
         self._versions.hide()
         self._pending_enhancement = None  # nothing on display to be enhancing
-        self._lane_button.hide()
+        self._update_lane_button(None)
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
         """Reveal the info and actions for the generation on display: the
@@ -1704,46 +1721,23 @@ class GenerateConfigPanel(QWidget):
 
         Shown only for a video with a file on disk — every lane carries clips,
         and Evolver is a video pipeline — so an image or a missing file hides it.
-        One already sent offers its deletion instead, read from the row rather
+        One already sent says so beside Unsend instead, read from the row rather
         than from the button's own state so it survives a restart.
         ``preview`` is the resolved ``(path, media_type)``, or ``None``.
         """
         is_video = preview is not None and preview[1] == MediaType.VIDEO
-        self._lane_button.setVisible(is_video)
+        row = self._displayed_row or {}
+        lane = self._offered_lane = lane_for(row) if is_video else None
+        sent = is_video and bool(row.get(lane.flag))
+        self._lane_button.setVisible(is_video and not sent)
+        self._sent_row.setVisible(sent)
         if not is_video:
             return
-        row = self._displayed_row or {}
-        lane = self._offered_lane = lane_for(row)
-        already_sent = bool(row.get(lane.flag))
-        self._lane_button.setText(lane.delete_caption if already_sent else lane.send_caption)
-        self._lane_button.setToolTip(self._lane_tooltip(lane, row))
-
-    @staticmethod
-    def _lane_tooltip(lane, row: dict) -> str:
-        """What *lane*'s button says about *row* when the cursor rests on it.
-
-        Withdrawn, the button reads exactly as it does for a clip never sent, and
-        nothing else on the tab mentions the other app at all — so this is the
-        one place left to say the earlier copy is down for deletion.
-        """
-        if row.get(lane.flag):
-            return lane.delete_tooltip
-        return lane.withdrawn_tooltip if row.get(lane.unsent_flag) else lane.tooltip
-
-    def _on_lane_pressed(self):
-        """Do what the lane button says: send the clip, or delete it over there.
-
-        Which of the two is read off the caption under the cursor rather than off
-        the row, so a press does what it promised. Where the row has moved on
-        since it was drawn — a spoken animation landing on this very clip — each
-        half re-checks and does nothing, rather than the opposite of what the
-        words said.
-        """
-        lane = self._offered_lane
-        if self._lane_button.text() == lane.delete_caption:
-            self._on_unsend(lane)
-        else:
-            self._on_send(lane)
+        self._lane_button.setText(lane.send_caption)
+        self._lane_button.setToolTip(
+            lane.withdrawn_tooltip if row.get(lane.unsent_flag) else lane.tooltip)
+        self._sent_note.setText(lane.sent_caption)
+        self._unsend_button.setToolTip(lane.unsend_tooltip)
 
     def _on_send(self, lane):
         """Copy the displayed video into *lane*'s inbox folder and remember it.

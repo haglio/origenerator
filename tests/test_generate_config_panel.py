@@ -277,8 +277,8 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     The failure this exists for: a row layout squeezed them past their minimum and
     clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
     """
-    panel._lane_button.setText(export_lane_module.EVOLVER.delete_caption)
-    buttons = [panel._lane_button, panel._cancel_btn, panel._generate_btn.parentWidget()]
+    panel._sent_note.setText(export_lane_module.EVOLVER.sent_caption)
+    buttons = [panel._sent_row, panel._cancel_btn, panel._generate_btn.parentWidget()]
     for button in buttons:
         button.show()          # the busiest the bank ever is: every button on
     panel.show()
@@ -2506,15 +2506,15 @@ def _lane_video(db, lane, prompt_id="vid1"):
 
 
 def _lane_offers(panel):
-    """The caption of every button on show that names an app a video can go to."""
+    """The words of every button and line on show that name an app a video can go to."""
     names = tuple(f" {lane.name}" for lane in _lanes())
-    return [button.text() for button in panel.findChildren(QPushButton)
-            if not button.isHidden() and button.text().endswith(names)]
+    return [widget.text() for widget in panel.findChildren((QPushButton, QLabel))
+            if widget.isVisibleTo(panel) and widget.text().endswith(names)]
 
 
-@pytest.mark.parametrize(("workflow", "offer"), [(_LOOP, "Send to Genau"),
-                                                 ("wan22_i2v", "Send to Evolver"),
-                                                 ("unknown", "Send to Evolver")])
+@pytest.mark.parametrize(("workflow", "offer"), [(_LOOP, "→ Send to Genau"),
+                                                 ("wan22_i2v", "→ Send to Evolver"),
+                                                 ("unknown", "→ Send to Evolver")])
 def test_a_loop_is_offered_to_genau_and_any_other_video_to_evolver_alone(
         saved_panel, monkeypatch, workflow, offer):
     panel, db = saved_panel
@@ -2528,7 +2528,7 @@ def test_a_loop_is_offered_to_genau_and_any_other_video_to_evolver_alone(
 
 def _press(panel, caption):
     (button,) = [button for button in panel.findChildren(QPushButton)
-                 if not button.isHidden() and button.text() == caption]
+                 if button.isVisibleTo(panel) and button.text() == caption]
     button.click()
 
 
@@ -2540,11 +2540,11 @@ def test_a_loop_already_in_evolver_offers_that_copy_back_before_genau(saved_pane
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert _lane_offers(panel) == ["Delete from Evolver"]
+    assert _lane_offers(panel) == ["✓ Sent to Evolver"]
 
-    _press(panel, "Delete from Evolver")
+    _press(panel, "✕ Unsend")
 
-    assert _lane_offers(panel) == ["Send to Genau"]
+    assert _lane_offers(panel) == ["→ Send to Genau"]
 
 
 def test_a_loop_in_both_apps_offers_its_evolver_copy_back_and_then_its_genau_one(
@@ -2556,11 +2556,11 @@ def test_a_loop_in_both_apps_offers_its_evolver_copy_back_and_then_its_genau_one
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert _lane_offers(panel) == ["Delete from Evolver"]
+    assert _lane_offers(panel) == ["✓ Sent to Evolver"]
 
-    _press(panel, "Delete from Evolver")
+    _press(panel, "✕ Unsend")
 
-    assert _lane_offers(panel) == ["Delete from Genau"]
+    assert _lane_offers(panel) == ["✓ Sent to Genau"]
 
 
 def test_a_fresh_tab_offers_no_lane_at_all(saved_panel):
@@ -2603,7 +2603,7 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
                                    funscript=None)
     assert panel._displayed_row[lane.flag]
-    assert _lane_offers(panel) == [f"Delete from {lane.name}"]
+    assert _lane_offers(panel) == [lane.sent_caption]
 
 
 @pytest.mark.parametrize(("lane", "brings_its_funscript"),
@@ -2687,7 +2687,7 @@ def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane
     monkeypatch.setattr(evolver_export, "export_video", export)
 
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert _lane_offers(panel) == [f"Delete from {lane.name}"]
+    assert _lane_offers(panel) == [lane.sent_caption]
     panel._on_send(lane)
 
     export.assert_not_called()
@@ -2737,8 +2737,7 @@ def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lan
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_a_lane_offers_to_delete_the_copy_it_handed_over(saved_panel,
-                                                         monkeypatch, lane):
+def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, lane):
     # A send is a file copy into another app's folders, so the only way back is a
     # delete there -- and it has to stay offered, however long ago the send was.
     panel, db = saved_panel
@@ -2749,12 +2748,13 @@ def test_a_lane_offers_to_delete_the_copy_it_handed_over(saved_panel,
 
     panel.show_saved_generation(db.get_generation("vid1"), [])
 
-    assert _lane_offers(panel) == [f"Delete from {lane.name}"]
-    assert panel._lane_button.isEnabled()
+    assert _lane_offers(panel) == [f"✓ Sent to {lane.name}"]
+    assert [button.text() for button in panel.findChildren(QPushButton)
+            if button.isVisibleTo(panel) and "Unsend" in button.text()] == ["✕ Unsend"]
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_pressing_delete_takes_the_send_back_and_offers_it_again(saved_panel,
+def test_pressing_unsend_takes_the_send_back_and_offers_it_again(saved_panel,
                                                                  monkeypatch, lane):
     # Nothing is deleted from here: the copy has been sorted, upscaled and
     # re-filed since, and only the app holding it can still find it. The stamp
@@ -2766,7 +2766,7 @@ def test_pressing_delete_takes_the_send_back_and_offers_it_again(saved_panel,
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(db.get_generation("vid1"), [])
 
-    _press(panel, lane.delete_caption)
+    _press(panel, export_lane_module.UNSEND_CAPTION)
 
     row = db.get_generation("vid1")
     assert row[lane.unsent_flag] and not row[lane.flag]
@@ -2805,7 +2805,7 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     monkeypatch.setattr(evolver_export, "export_video", MagicMock())
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    _press(panel, lane.delete_caption)   # take it back
+    _press(panel, export_lane_module.UNSEND_CAPTION)   # take it back
 
     _press(panel, lane.send_caption)     # and send it again
 

@@ -7,7 +7,16 @@ settings a graph was run with.
 """
 from __future__ import annotations
 
+from typing import NamedTuple
+
 _COND_NODES = ("WanImageToVideo", "WanFirstLastFrameToVideo")
+_LORA_LOADERS = ("LoraLoaderModelOnly", "LoraLoader")
+
+
+class ModelChain(NamedTuple):
+    unet: str | None
+    lora: str | None
+    lora_strength: float | None
 
 
 def follow(graph: dict, ref) -> dict | None:
@@ -37,31 +46,43 @@ def empty_latent(graph: dict) -> dict | None:
     return None
 
 
-def _model_source_files(graph: dict, model_ref) -> tuple[str | None, str | None]:
-    """Walk a ``model`` link back to its UNET and LoRA source filenames.
+def _model_chain(graph: dict, model_ref) -> ModelChain:
+    """Walk a ``model`` link back to its UNET and LoRA source files.
 
     Follows each node's ``model`` input until it reaches a ``UNETLoader``,
-    capturing the first ``LoraLoaderModelOnly``'s ``lora_name`` passed on the
-    way. Returns ``(unet_name, lora_name)``, either ``None`` if unresolved.
+    capturing the first LoRA loader's name and model strength on the way.
     """
-    unet = lora = None
+    unet = lora = strength = None
     node = follow(graph, model_ref)
     seen: set[int] = set()
     while node is not None and id(node) not in seen:
         seen.add(id(node))
         inputs = node.get("inputs", {})
         class_type = node.get("class_type", "")
-        if class_type == "LoraLoaderModelOnly" and lora is None:
+        if class_type in _LORA_LOADERS and lora is None:
             name = inputs.get("lora_name")
             if isinstance(name, str):
                 lora = name
+                strength = _number(inputs.get("strength_model"))
         if class_type == "UNETLoader":
             name = inputs.get("unet_name")
             if isinstance(name, str):
                 unet = name
             break
         node = follow(graph, inputs.get("model"))
-    return unet, lora
+    return ModelChain(unet, lora, strength)
+
+
+def _number(value) -> float | None:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _base_sampler_lora(graph: dict) -> dict:
+    sampler = next((n for n in graph.values() if n.get("class_type") == "KSampler"), {})
+    chain = _model_chain(graph, sampler.get("inputs", {}).get("model"))
+    return {key: value for key, value in (("lora", chain.lora),
+                                          ("lora_strength", chain.lora_strength))
+            if value is not None}
 
 
 def dual_sampler_model_files(graph: dict) -> dict:
@@ -71,8 +92,8 @@ def dual_sampler_model_files(graph: dict) -> dict:
     (``add_noise`` enabled) then a low-noise one (disabled). Walking each
     sampler's ``model`` input back to its UNET — and any LoRA in between — pairs
     the files with the stage that used them by graph structure, not node-id
-    order. Returns whichever of ``unet_high``/``unet_low``/``lora_high``/
-    ``lora_low`` it resolves; empty for a graph with no such samplers.
+    order. Returns whichever ``unet_``, ``lora_`` and ``lora_strength_`` keys, high
+    and low, it resolves; empty for a graph with no such samplers.
     """
     result: dict = {}
     for suffix, add_noise in (("high", "enable"), ("low", "disable")):
@@ -84,11 +105,13 @@ def dual_sampler_model_files(graph: dict) -> dict:
         )
         if sampler is None:
             continue
-        unet, lora = _model_source_files(graph, sampler.get("inputs", {}).get("model"))
-        if unet:
-            result[f"unet_{suffix}"] = unet
-        if lora:
-            result[f"lora_{suffix}"] = lora
+        chain = _model_chain(graph, sampler.get("inputs", {}).get("model"))
+        if chain.unet:
+            result[f"unet_{suffix}"] = chain.unet
+        if chain.lora:
+            result[f"lora_{suffix}"] = chain.lora
+        if chain.lora_strength is not None:
+            result[f"lora_strength_{suffix}"] = chain.lora_strength
     return result
 
 
@@ -99,7 +122,8 @@ def graph_model_params(graph: dict) -> dict:
     every workflow's model nests into the gallery's folders the same way:
 
     * ``checkpoint`` — SDXL's ``CheckpointLoaderSimple``.
-    * ``unet`` — Flux's ``UnetLoaderGGUF`` (the quantized diffusion model).
+    * ``unet`` — Flux's ``UnetLoaderGGUF`` (the quantized diffusion model), and
+      ``lora``/``lora_strength`` from any LoRA on its sampler's model.
     * ``unet_high``/``unet_low`` (and any ``lora_high``/``lora_low``) — WAN's
       dual-noise samplers, paired to their stage by :func:`dual_sampler_model_files`.
 
@@ -113,8 +137,16 @@ def graph_model_params(graph: dict) -> dict:
             params["checkpoint"] = inputs["ckpt_name"]
         elif class_type == "UnetLoaderGGUF" and isinstance(inputs.get("unet_name"), str):
             params["unet"] = inputs["unet_name"]
+    params.update(_base_sampler_lora(graph))
     params.update(dual_sampler_model_files(graph))
     return params
+
+
+def guidance_params(graph: dict) -> dict:
+    found = [strength for node in graph.values()
+             if node.get("class_type") == "FluxGuidance"
+             and (strength := _number(node.get("inputs", {}).get("guidance"))) is not None]
+    return {"guidance": found[-1]} if found else {}
 
 
 _SOUND_INPUTS = {

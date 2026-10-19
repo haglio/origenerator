@@ -427,6 +427,7 @@ class FakeHost:
 
     def reveal(self, prompt_id):
         self.revealed.append(prompt_id)
+        return prompt_id in self.visible
 
     def trash_generation(self, prompt_id):
         self.trashed.append(prompt_id)
@@ -1425,7 +1426,7 @@ def test_a_favorite_that_lands_says_so_in_the_favorites_green(slideshows):
 def test_leaving_a_slideshow_picks_its_slide_where_the_slideshow_was_playing(slideshows):
     # Not the folder the picture was generated in: the pictures you were watching
     # are where you want to be put back, with that one picked among them.
-    director, host, made = slideshows()
+    director, host, made = slideshows(FakeHost(rows=[_row("g1")]))
     director.open([("a.png", "image", "g1", None)])
 
     made[0].open_requested.emit("g1")
@@ -1433,6 +1434,15 @@ def test_leaving_a_slideshow_picks_its_slide_where_the_slideshow_was_playing(sli
     assert host.revealed == ["g1"]
     assert host.followed == []
     assert director.showing is None
+
+
+def test_leaving_a_slideshow_on_a_slide_the_pane_does_not_hold_goes_to_it(slideshows):
+    director, host, made = slideshows(FakeHost(rows=[_row("g1")]))
+    director.open([("a.png", "image", "g1", None)])
+
+    made[0].open_requested.emit("g2")
+
+    assert host.followed == ["g2"]
 
 
 def test_a_region_slideshow_is_placed_muted_frameless_and_on_top(slideshows):

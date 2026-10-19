@@ -8228,6 +8228,31 @@ def test_the_slideshow_button_on_another_folder_plays_that_folder_not_the_loop_l
     reopened.close()
 
 
+def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on_it(
+        qtbot, monkeypatch):
+    # The Slideshow button plays the folder on screen, so leaving on one of the
+    # picture's videos has to put that video's own folder on screen, picked --
+    # not the folder of the picture the slideshow was started from.
+    view, _slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
+    folder_of_the_video = oriented_key(gallery.settings_folder_key(
+        view._db.get_generation("v1"), view.image_config_index()), LANDSCAPE)
+
+    _press_escape(view)
+
+    assert view.selected_folder_key() == folder_of_the_video
+    assert view._browser.selected_ids == {"v1"}
+
+
+def test_giving_the_slideshows_back_as_the_window_closes_moves_the_gallery_nowhere(
+        qtbot, monkeypatch):
+    view, _slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
+    folder_it_was_started_from = view.selected_folder_key()
+
+    view.close_the_slideshows()
+
+    assert view.selected_folder_key() == folder_it_was_started_from
+
+
 def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
     # The neighbor stills either side of the shown item are drawn from these —
     # a video has no other still to show small.

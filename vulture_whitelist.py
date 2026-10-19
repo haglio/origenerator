@@ -43,6 +43,9 @@ _.set_learned  # noqa  # origenerator/osr2_motion_driver.py:269
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231
 
+# --- sqlite3 hands this back on rows nothing writes any more, which the listing keeps for every source the enum names ---
+_.STROKE_TRIM  # noqa  # origenerator/generation_state.py:25, the source on a Genau-lane cut, read through _KNOWN_SOURCES in origenerator/db_generations.py
+
 # --- style-option fields written for Qt's painter to read, never read back here ---
 _.textVisible  # noqa  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
 _.features  # noqa  # origenerator/gui/seed_combo.py:32, the QStyleOptionViewItem the item delegate paints from

@@ -31,6 +31,9 @@ LIFECYCLE_COLUMNS = frozenset({
 #: again when the send is taken back).
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
+_KNOWN_SOURCES = tuple(GenerationSource)
+_OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
+
 
 class GenerationStore(Store):
     """The queries over the `generations` table."""
@@ -279,12 +282,13 @@ class GenerationStore(Store):
         """
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT * FROM generations
+                f"""SELECT * FROM generations
                    WHERE status = ?
                      AND duration_seconds IS NULL
                      AND completed_at IS NOT NULL
+                     AND {_OF_A_KNOWN_SOURCE}
                    ORDER BY id""",
-                (GenerationStatus.COMPLETED,),
+                (GenerationStatus.COMPLETED, *_KNOWN_SOURCES),
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -330,8 +334,8 @@ class GenerationStore(Store):
     def get_generation(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM generations WHERE prompt_id = ?",
-                (prompt_id,),
+                f"SELECT * FROM generations WHERE prompt_id = ? AND {_OF_A_KNOWN_SOURCE}",
+                (prompt_id, *_KNOWN_SOURCES),
             ).fetchone()
             return dict(row) if row else None
 
@@ -344,7 +348,8 @@ class GenerationStore(Store):
             if self._listed is None or self._listed[0] != version:
                 with self._connect() as conn:
                     rows = conn.execute(
-                        "SELECT * FROM generations ORDER BY id DESC"
+                        f"SELECT * FROM generations WHERE {_OF_A_KNOWN_SOURCE} ORDER BY id DESC",
+                        _KNOWN_SOURCES,
                     ).fetchall()
                 self._listed = (version, [dict(r) for r in rows])
             return [dict(r) for r in self._listed[1]]

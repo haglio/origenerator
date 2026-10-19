@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 
 from origenerator.db_connection import Store
+from origenerator.generation_state import GenerationSource, source_of
 
 
 class DeletionStore(Store):
@@ -46,7 +47,7 @@ class DeletionStore(Store):
                 "SELECT prompt_id, row_json, batch_json, deleted_at FROM deletions"
                 " ORDER BY deleted_at DESC, rowid DESC"
             ).fetchall()
-            return [_deletion(r) for r in rows]
+            return [deletion for r in rows if _of_a_known_source(deletion := _deletion(r))]
 
     def get_deletion(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:
@@ -55,12 +56,17 @@ class DeletionStore(Store):
                 " WHERE prompt_id = ?",
                 (prompt_id,),
             ).fetchone()
-            return _deletion(record) if record else None
+            deletion = _deletion(record) if record else None
+            return deletion if deletion is not None and _of_a_known_source(deletion) else None
 
     def forget_deletion(self, prompt_id: str):
         """Drop a held deletion — the item was restored or purged."""
         with self._connect() as conn:
             conn.execute("DELETE FROM deletions WHERE prompt_id = ?", (prompt_id,))
+
+
+def _of_a_known_source(deletion: dict) -> bool:
+    return source_of(deletion["row"]) in GenerationSource
 
 
 def _deletion(record) -> dict:

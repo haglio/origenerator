@@ -22,6 +22,7 @@ class GenerationSource(StrEnum):
     IMPORTED = "imported"
     EXPERIMENT = "experiment"
     BASE_RENDER = "base_render"
+    STROKE_TRIM = "stroke_trim"
 
 
 def source_of(row: dict) -> str:

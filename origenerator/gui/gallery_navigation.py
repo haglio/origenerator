@@ -43,7 +43,7 @@ class NavigationHost(Protocol):
         """Open whatever holds this generation and land on it — the fallback
         when a stop's own folder is gone."""
 
-    def reveal(self, prompt_id: str) -> None:
+    def reveal(self, prompt_id: str) -> bool:
         """Pick and scroll to a tile the pane is already showing."""
 
     def clear_selection(self) -> None:

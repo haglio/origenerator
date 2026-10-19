@@ -128,6 +128,8 @@ class SlideshowHost(Protocol):
     def follow_link(self, prompt_id: str) -> None:
         """Land on this generation: its folder, its tile, its config tab."""
 
+    def reveal(self, prompt_id: str) -> bool: ...
+
     def trash_generation(self, prompt_id: str) -> None:
         """Condemn it, as a slideshow's Up key does."""
 
@@ -218,6 +220,7 @@ class SlideshowDirector:
         self._held_at_stamp = None
         self._held_at: dict[str, frozenset[str]] = {}
         self._taken_into_the_session: HeldSlideshow | None = None
+        self._giving_them_back = False
 
     def become_hosted(self, session) -> None:
         self._taken_into_the_session = self.held_slideshow()
@@ -943,8 +946,12 @@ class SlideshowDirector:
         """
         self._regions_wanted.clear()
         self._asked_for.clear()
-        for slideshow, _location in list(self._live_slideshows):
-            slideshow.close()
+        self._giving_them_back = True
+        try:
+            for slideshow, _location in list(self._live_slideshows):
+                slideshow.close()
+        finally:
+            self._giving_them_back = False
 
     def close_the_slideshow(self, side: str) -> None:
         self._regions_wanted.discard(side)
@@ -955,9 +962,11 @@ class SlideshowDirector:
 
     def _pick_where_it_played(self, prompt_id: str):
         """A slideshow handed its slide over on the way out: pick that picture where
-        the slideshow was playing, and put it in a tab the way a click on it would."""
+        the slideshow was playing, or open its own folder on it when what is on
+        screen does not hold it, and put it in a tab the way a click on it would."""
         self._slideshow = None
-        self._host.reveal(prompt_id)
+        if not self._giving_them_back and not self._host.reveal(prompt_id):
+            self._host.follow_link(prompt_id)
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
         """A lock on a hosted slideshow: go to the locked item, in the browser and in

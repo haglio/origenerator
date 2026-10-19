@@ -1866,16 +1866,16 @@ class GalleryView(QWidget):
             self._tree.setCurrentItem(row)  # whose signal draws it
         return True
 
-    def reveal(self, prompt_id: str) -> None:
+    def reveal(self, prompt_id: str) -> bool:
         """Pick and scroll to the picture where the pane stands, and put the item
-        back in the info pane; a pane of folders marks the square holding it."""
+        back in the info pane; a pane of folders marks the square holding it.
+        Whether anything the pane shows held it."""
         if self._browser.reveal_tile(prompt_id):
             self._on_thumbnail_clicked(prompt_id)
-            return
+            return True
         row = self._db.get_generation(prompt_id)
-        if row is not None:
-            self._browser.reveal_folder(
-                gallery.settings_folder_key(row, self.image_config_index()))
+        return row is not None and self._browser.reveal_folder(
+            gallery.settings_folder_key(row, self.image_config_index()))
 
     def clear_selection(self) -> None:
         self._clear_metadata()

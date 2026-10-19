@@ -125,7 +125,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import gestures
 from tests.lit_switches import lit_in
-from tests.slideshow_hud_support import button_on_screen, engine_of, hud_button_names, panel_targets
+from tests.slideshow_hud_support import engine_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
 from tests.test_folder_tree import _shown
 from tests.test_osr2_driver import ACTIONS, FakeBroker, FakePlayer

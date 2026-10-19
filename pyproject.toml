@@ -26,6 +26,10 @@ dependencies = [
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.210",
     "voice-core @ git+https://github.com/haglio/voice_core@v0.1.52",
     "PyQt6>=6,<7",
+    # Qt itself, which PyQt6 takes at any 6.11. 6.11.1 handed its wildcard-disconnect
+    # warning to the Python message handler holding a signal/slot lock (QTBUG-145216);
+    # 6.11.2 lets go of the lock first.
+    "PyQt6-Qt6>=6.11.2,<7",
     "pillow>=12,<13",
     "opencv-python>=4.8,<6",
     "websockets>=17,<18",

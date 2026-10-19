@@ -48,9 +48,9 @@ def test_a_status_goes_to_the_database_as_its_plain_string(tmp_path):
     assert db.get_generation("a-generation")["status"] == GenerationStatus.COMPLETED
 
 
-def test_the_sources_are_the_four_strings_rows_have_always_carried():
+def test_the_sources_are_the_strings_rows_have_always_carried():
     assert {source.value for source in GenerationSource} == {
-        "generated", "imported", "experiment", "base_render"}
+        "generated", "imported", "experiment", "base_render", "stroke_trim"}
 
 
 def test_a_row_inserted_without_a_source_is_the_users_own_work(tmp_path):
@@ -73,4 +73,39 @@ def test_a_row_that_names_no_source_counts_as_the_users_own_work():
 
 
 def test_an_old_rows_source_comes_back_as_stored_even_with_no_name_for_it():
-    assert source_of({"source": "stroke_trim"}) == "stroke_trim"
+    assert source_of({"source": "a-kind-from-a-newer-build"}) == "a-kind-from-a-newer-build"
+
+
+def test_a_row_of_a_kind_this_build_has_no_name_for_is_left_out_of_the_library(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _insert(db, prompt_id="ours")
+    _insert(db, prompt_id="a-newer-builds", source="a-kind-from-a-newer-build")
+
+    assert [row["prompt_id"] for row in db.list_generations()] == ["ours"]
+    assert db.get_generation("a-newer-builds") is None
+
+
+def test_a_row_of_a_kind_this_build_has_no_name_for_gets_no_generation_time(tmp_path):
+    db = Database(tmp_path / "test.db")
+    for prompt_id, source in (("ours", "generated"), ("a-newer-builds", "a-kind-from-a-newer-build")):
+        _insert(db, prompt_id=prompt_id, source=source)
+        db.update_generation(prompt_id, status="completed", completed_at="2026-01-02T03:04:05")
+
+    assert [row["prompt_id"] for row in db.completed_without_duration()] == ["ours"]
+
+
+def test_a_row_of_a_kind_this_build_has_no_name_for_is_left_out_of_the_trash(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.record_deletion("ours", {"prompt_id": "ours", "source": "generated"}, {})
+    db.record_deletion("a-newer-builds",
+                       {"prompt_id": "a-newer-builds", "source": "a-kind-from-a-newer-build"}, {})
+
+    assert [record["prompt_id"] for record in db.list_deletions()] == ["ours"]
+    assert db.get_deletion("a-newer-builds") is None
+
+
+def test_a_cut_made_for_the_genau_lane_is_still_in_the_library(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _insert(db, source="stroke_trim")
+
+    assert db.get_generation("a-generation")["source"] == "stroke_trim"

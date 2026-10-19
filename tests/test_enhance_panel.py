@@ -1013,15 +1013,45 @@ def test_deleting_the_only_version_is_refused(qtbot):
     # gallery's own delete, reached from the thumbnail.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)))
+    versions.show_levels(_items([
+        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
+    ]))
     asked = []
     versions.delete_requested.connect(asked.append)
 
-    for row in _rows(versions):
-        row.set_selected(True)
+    _rows(versions)[0].set_selected(True)
     qtbot.keyClick(versions, Qt.Key.Key_Delete)
 
     assert asked == []
+
+
+def test_delete_with_only_the_original_picked_bins_nothing(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)))
+    asked = []
+    versions.delete_requested.connect(asked.append)
+    original = _rows(versions)[2]
+    _click(qtbot, original)
+
+    qtbot.keyClick(original, Qt.Key.Key_Delete)
+
+    assert asked == []
+
+
+def test_delete_with_the_original_picked_bins_only_the_other_picked_versions(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)))
+    asked = []
+    versions.delete_requested.connect(asked.append)
+    newest, _, original = _rows(versions)
+    _click(qtbot, newest)
+    _click(qtbot, original, Qt.KeyboardModifier.ControlModifier)
+
+    qtbot.keyClick(newest, Qt.Key.Key_Delete)
+
+    assert asked == [[0]]
 
 
 def test_a_list_shown_as_not_deletable_ignores_the_delete_key(qtbot):
@@ -1064,10 +1094,48 @@ def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
     assert asked == [[1]]
 
 
+def test_the_menu_over_picks_that_include_the_original_deletes_the_others(qtbot, monkeypatch):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)))
+    asked = []
+    versions.delete_requested.connect(asked.append)
+    chosen = {}
+
+    def _exec(self, _pos):
+        action = self.actions()[0]
+        chosen["text"] = action.text()
+        return action
+
+    monkeypatch.setattr(QMenu, "exec", _exec)
+    newest, _, original = _rows(versions)
+    _click(qtbot, newest)
+    _click(qtbot, original, Qt.KeyboardModifier.ControlModifier)
+
+    versions._on_row_menu(0, QPoint(0, 0))
+
+    assert chosen["text"] == "Delete 1 version"
+    assert asked == [[0]]
+
+
+def test_right_clicking_the_original_opens_no_menu(qtbot, monkeypatch):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)))
+    opened = []
+    monkeypatch.setattr(QMenu, "exec", lambda self, _pos: opened.append(self))
+
+    versions._on_row_menu(2, QPoint(0, 0))
+
+    assert opened == []
+
+
 def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeypatch):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)))
+    versions.show_levels(_items([
+        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
+    ]))
     asked = []
     versions.delete_requested.connect(asked.append)
     seen = {}
@@ -1080,8 +1148,6 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
 
     monkeypatch.setattr(QMenu, "exec", _exec)
 
-    for row in _rows(versions):
-        row.set_selected(True)
     versions._on_row_menu(0, QPoint(0, 0))
 
     assert seen["enabled"] is False
@@ -1204,14 +1270,22 @@ def test_a_videos_versions_have_no_trash_can(qtbot):
     assert [_trash(row) for row in _rows(versions)] == [None, None]
 
 
+def test_the_original_has_no_trash_can_beside_its_enhancements(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)))
+
+    assert [_trash(row) is not None for row in _rows(versions)] == [True, True, False]
+
+
 def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)))
 
-    for row in _rows(versions):
-        assert _trash(row).isEnabled()
-        assert _trash(row).toolTip() == "Delete this version"
+    trash = _trash(_rows(versions)[0])
+    assert trash.isEnabled()
+    assert trash.toolTip() == "Delete this version"
 
 
 # --- dragging a level onto the panel to reuse its settings -----------------

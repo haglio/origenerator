@@ -22,8 +22,9 @@ Levels can be deleted from here: press the trash can beside a version's copy
 button, or pick rows and press Delete or Backspace, or right-click for the
 menu. A binned version is a file, not a generation — the image keeps its
 folder, its star and its other versions — and the delete is undoable like every
-other. What is refused is emptying the row: an image with no file left is a
-deleted generation, and that is the gallery's own delete.
+other. Never deleted from here: the original, which offers no trash can and no
+menu, and the last version, since an image with no file left is a deleted
+generation, and that is the gallery's own delete.
 
 An enhancement still in flight takes the ``+ Enhance`` row's own slot at the head
 of the list, mirroring the run's streamed frames the way the in-flight cards do
@@ -473,8 +474,8 @@ class EnhanceVersions(QWidget):
     an enhancement still running on this image. Clicking a level's row emits
     ``level_selected`` with its position in that list, for the panel to put in
     the preview; picking rows and pressing Delete (or the right-click menu's
-    Delete) emits ``delete_requested`` with those positions, and a row's trash
-    can emits it with that row's alone.
+    Delete) emits ``delete_requested`` with those positions but the original's,
+    and a row's trash can emits it with that row's alone.
     """
 
     level_selected = pyqtSignal(int)
@@ -500,6 +501,7 @@ class EnhanceVersions(QWidget):
         self._arrows_from: int | None = None
         self._deletable = True
         self._versions_listed = 0
+        self._originals: set[int] = set()
         self.hide()
 
     def is_collapsed(self) -> bool:
@@ -550,6 +552,8 @@ class EnhanceVersions(QWidget):
         self._arrows_from = None
         self._deletable = deletable
         self._versions_listed = len(items)
+        self._originals = {position for position, (level, _path) in enumerate(items)
+                           if level.is_original}
         # One leading slot, held by whichever of the two applies: the run in
         # flight if there is one, else the row that would start it.
         if pending is not None:
@@ -564,7 +568,7 @@ class EnhanceVersions(QWidget):
             column.addWidget(self._enhance_row)
         for position, (level, image_path) in enumerate(items):
             row = _LevelRow(level, position, image_path, created_fallback, held_days,
-                            deletable=self._may_delete([position]))
+                            deletable=bool(self._deleted_by([position])))
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
             row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))
@@ -617,38 +621,41 @@ class EnhanceVersions(QWidget):
             self._pick_and_show(position)
 
     def _on_row_menu(self, position: int, global_pos: QPoint):
-        """The right-click menu: Delete, over whatever is picked.
+        """The right-click menu: Delete, over whatever is picked — and no menu at
+        all over the original, which is never deleted.
 
         A right-click on an unpicked row picks it first, so the menu always acts
         on what it appeared over — the same rule the thumbnail menu follows."""
+        if position in self._originals:
+            return
         if position not in self.selected_positions():
             self._pick_only(position)
-        picked = self.selected_positions()
-        if not picked:
-            return
+        doomed = self._deleted_by(self.selected_positions())
         menu = QMenu(self)
         action = menu.addAction(
-            f"Delete {len(picked)} version{'s' if len(picked) != 1 else ''}"
+            f"Delete {len(doomed)} version{'s' if len(doomed) != 1 else ''}"
         )
-        if not self._may_delete(picked):
+        if not doomed:
             # Grayed with the reason on it rather than absent: the answer to
             # "why can't I delete this" is the only thing the menu can offer.
             action.setEnabled(False)
             action.setText("Delete (this is the image's only version)" if self._deletable
                            else "Delete (a video's versions can't be deleted here)")
-        if menu.exec(global_pos) is action and self._may_delete(picked):
-            self.delete_requested.emit(picked)
+        if menu.exec(global_pos) is action and doomed:
+            self.delete_requested.emit(doomed)
 
-    def _may_delete(self, positions: list[int]) -> bool:
-        """Whether these versions are this list's to bin, and binning
-        ``positions`` would leave the image a version.
+    def _deleted_by(self, positions: list[int]) -> list[int]:
+        """The versions a delete of ``positions`` bins: all but the original, or
+        none when they are not this list's to bin or would leave the image none.
 
         An image with no file left is a deleted generation, and deleting a
         generation is the gallery's own action, reached from its thumbnail — a
         version list quietly doing it would be a much bigger delete than the one
         that was asked for."""
-        return (self._deletable and bool(positions)
-                and len(positions) < self._versions_listed)
+        doomed = [position for position in positions if position not in self._originals]
+        if not self._deletable or not doomed or len(doomed) >= self._versions_listed:
+            return []
+        return doomed
 
     def keyPressEvent(self, event):
         """Delete or Backspace bins the picked levels — the keys that delete a
@@ -664,9 +671,9 @@ class EnhanceVersions(QWidget):
             self._enhance_row.press()
             return
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-            picked = self.selected_positions()
-            if self._may_delete(picked):
-                self.delete_requested.emit(picked)
+            doomed = self._deleted_by(self.selected_positions())
+            if doomed:
+                self.delete_requested.emit(doomed)
                 return
         super().keyPressEvent(event)
 

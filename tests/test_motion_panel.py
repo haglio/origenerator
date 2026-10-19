@@ -17,7 +17,7 @@ from funestra.console import (
     OSR2_DRIVING,
     OSR2_PARKED,
 )
-from funestra.console_hud import ConsolePainter
+from funestra.console_hud import ConsolePainter, hud_xy
 from funestra.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.modes import Osr2State
@@ -128,6 +128,22 @@ def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot)
     motion.parked_by_the_pause = True
 
     assert console_hud(motion, control=OSR2_DRIVING).console.paused
+
+
+def test_the_readouts_speed_amp_and_center_buttons_take_presses_while_the_room_is_paused(qtbot):
+    motion = FakeMotion()
+    motion.active = True
+    motion.state.state.amplitude = 60
+    motion.parked_by_the_pause = True
+    painter = ConsolePainter()
+    painter.rgba(console_hud(motion, control=OSR2_DRIVING))
+    left, top = hud_xy()
+
+    taken = [button.command for (x, y, w, h), button in painter.buttons
+             if button.command.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))
+             and painter.press_at(left + x + w // 2, top + y + h // 2) == button.command]
+
+    assert len(taken) == 6
 
 
 def test_every_button_the_console_declares_does_something_here(qtbot):

@@ -87,11 +87,10 @@ def test_a_notice_carries_the_way_back_to_what_it_is_about(qapp, monkeypatch):
         "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
 
 
-def test_the_copy_that_raises_a_notice_is_the_copy_a_click_on_it_reaches(
-        qapp, monkeypatch):
-    # A branch preview runs beside the live app, and its notices are the only
-    # ones that can show what the branch does: the click has to land in the
-    # preview's own code, which is the only copy that has the change in it.
+def test_a_click_on_a_notice_runs_production_origenerators_handler_whichever_copy_raised_it(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setenv("ORIGENERATOR_BRANCH_SESSION", "1")
+    monkeypatch.setattr(desktop_notices, "PRODUCTION_CHECKOUT", tmp_path / "production")
     registered = []
     monkeypatch.setattr(desktop_notices, "register_link_handler",
                         lambda scheme, **named: registered.append((scheme, named)))
@@ -102,19 +101,20 @@ def test_the_copy_that_raises_a_notice_is_the_copy_a_click_on_it_reaches(
 
     scheme, named = registered[-1]
     assert scheme == app_link.SCHEME
-    assert str(app_link.CHECKOUT / app_link.HANDLER) in named["command"]
+    assert str(tmp_path / "production" / app_link.HANDLER) in named["command"]
     assert named["command"].endswith('"%1"')
 
 
-def test_a_preview_answers_its_click_by_starting_the_preview(qapp, monkeypatch):
+def test_a_click_with_no_copy_open_starts_production_origenerator_even_from_a_preview(
+        qapp, monkeypatch):
+    monkeypatch.setenv("ORIGENERATOR_BRANCH_SESSION", "1")
     registered = []
     monkeypatch.setattr(desktop_notices, "register_link_handler",
                         lambda scheme, **named: registered.append(named))
-    monkeypatch.setattr(desktop_notices, "is_branch_session", lambda: True)
 
     DesktopNotices(QIcon())
 
-    assert app_link.PREVIEW_LAUNCHER in registered[0]["command"]
+    assert f'"{app_link.LIVE_LAUNCHER}"' in registered[0]["command"]
 
 
 def test_the_handler_windows_runs_is_one_that_opens_no_console(qapp, monkeypatch):

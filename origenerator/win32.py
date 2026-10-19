@@ -71,9 +71,7 @@ def register_link_handler(scheme: str, *, name: str, command: str,
 
     A notification carries a link rather than a way back to the process that
     raised it, because it outlives that process (:mod:`origenerator.app_link` is
-    what Windows runs and why). Written on every launch and again with every
-    notice raised, so the copy that raised the notice answers the click, and
-    never fatal.
+    what Windows runs and why). Written on every launch, and never fatal.
     """
     try:
         write(rf"Software\Classes\{scheme}", {"": f"URL:{name}", "URL Protocol": ""})

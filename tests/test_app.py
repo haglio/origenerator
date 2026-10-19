@@ -1713,6 +1713,17 @@ def test_the_claim_is_on_the_library_a_preview_shares_with_the_production_copy(
     copies.assert_called_once_with(tmp_path / "production" / "state")
 
 
+def test_a_copy_hears_clicks_where_production_origenerators_handler_hands_them(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "PRODUCTION_CHECKOUT", tmp_path / "production")
+    listener = MagicMock()
+
+    with _a_faked_boot([], **{"origenerator.gui.link_listener.LinkListener": listener}):
+        assert main([]) == 0
+
+    assert listener.call_args.kwargs["checkout"] == tmp_path / "production"
+
+
 def test_the_claim_says_the_copy_is_closing_ahead_of_every_quit_step_the_window_adds(
         qapp, monkeypatch):
     events = []

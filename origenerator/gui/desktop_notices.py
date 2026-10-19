@@ -8,8 +8,8 @@ with this app closed, so it is raised through Windows' own notification platform
 (:mod:`origenerator.windows_toast`), which carries a link Windows follows
 whenever it is answered (:mod:`origenerator.app_link`). The heading over it and
 the mark beside it are read off the id the process claims, so this names the app
-there too, and registers what a click runs beside it, because the copy that
-raised a notice is the copy that should answer it.
+there too, and registers what a click runs beside it: production Origenerator,
+whichever copy raised the notice.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from shared_ui.preview import Preview, taskbar_identity, window_title
 from shared_ui.preview_icon_pil import in_preview_ink
 
 from origenerator import app_link
-from origenerator.branch_session import is_branch_session
+from origenerator.config import PRODUCTION_CHECKOUT
 from origenerator.icon_design import render_icon
 from origenerator.notice_toast import raise_notice, take_back_notice
 from origenerator.run_notice import RunOutcome, notice_for
@@ -119,7 +119,7 @@ class DesktopNotices(QObject):
             self._tray.show()
         self._marks = _the_marks_beside_a_notice()
         self._name_this_app_to_windows(shown_as)
-        self._answer_clicks_here()
+        self._answer_clicks_with_production()
         self._video_in_front = video_in_front
         self._watched: set[str] = set()
         self._looks = QTimer(self)
@@ -131,10 +131,6 @@ class DesktopNotices(QObject):
         notice = notice_for(outcome)
         if notice is None:
             return
-        # Again per notice, not once per launch: a preview and the live app run
-        # beside each other, and whichever raised THIS one is the one a click on
-        # it should reach.
-        self._answer_clicks_here()
         self._watched.discard(notice.generation)
         raise_notice(self._identity, notice, mark=self._marks.get(notice.ok))
 
@@ -157,13 +153,9 @@ class DesktopNotices(QObject):
             # worth a launch, and an unwritable mark fails in more ways than one.
             logger.warning("Notification identity unavailable: %s", e)
 
-    def _answer_clicks_here(self) -> None:
-        """Have a click on this app's notices run this copy of the app's handler,
-        and start this copy where nothing is running."""
+    def _answer_clicks_with_production(self) -> None:
         register_link_handler(
             app_link.SCHEME, name=APP_NAME,
             command=app_link.handler_command(
-                checkout=app_link.CHECKOUT,
-                interpreter=app_link.windowless_interpreter(),
-                launcher=(app_link.PREVIEW_LAUNCHER if is_branch_session()
-                          else app_link.LIVE_LAUNCHER)))
+                checkout=PRODUCTION_CHECKOUT,
+                interpreter=app_link.windowless_interpreter()))

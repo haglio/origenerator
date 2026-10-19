@@ -1,6 +1,6 @@
 """Where a click on one of this app's notifications reaches the running app.
 
-Windows answers a click by running this checkout's handler
+Windows answers a click by running the production checkout's handler
 (:mod:`origenerator.app_link`), which hands the generation over here or starts
 the app carrying it; both arrive at :meth:`LinkListener.answer_with`. Standing
 from the moment there is an event loop rather than from the moment there is a
@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 class LinkListener(QObject):
-    """The channel this checkout's clicks arrive on, and what is waiting on it."""
+    """The channel a checkout's clicks arrive on, and what is waiting on it."""
 
-    def __init__(self, *, checkout: Path = app_link.CHECKOUT, environ=None,
+    def __init__(self, *, checkout: Path, environ=None,
                  parent: QObject | None = None):
         super().__init__(parent)
         self._answer: Callable[[str], None] | None = None

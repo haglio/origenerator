@@ -215,8 +215,7 @@ for _osr2 in ("osr 2", "o s r 2", "osr two", "o s r two"):
 # very phrase the satellites answer, so one gesture has one wording in both
 # rooms. "Upscales" is what the enhanced pictures are called at the desk, so it
 # is heard too; inside a Fun Time session the room's recognizer has no such
-# word (see fun_time's ORIGENERATOR_PHRASES), and "enhanced only" is the one
-# that carries there.
+# word, and "enhanced only" is the one that carries there.
 _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
      "filter enhanced only", "enhanced only",
      "upscales", "upscales only", "filter upscales", "upscaled only")
@@ -236,6 +235,36 @@ _say(AppCommand.LEARNED, "human inspired")
 _say(AppCommand.LEARNED_ON, "human inspired on")
 _say(AppCommand.LEARNED_OFF, "human inspired off")
 _say(AppCommand.OFFSET, "offset")
+
+MOTION_MOVES: dict[AppCommand, tuple[str, int | bool | None]] = {
+    AppCommand.SPEED_UP: ("adjust_speed", 5),
+    AppCommand.SPEED_DOWN: ("adjust_speed", -5),
+    AppCommand.AMP_UP: ("adjust_amplitude", 10),
+    AppCommand.AMP_DOWN: ("adjust_amplitude", -10),
+    AppCommand.CENTER_UP: ("adjust_center", 5),
+    AppCommand.CENTER_DOWN: ("adjust_center", -5),
+    AppCommand.NEXT_SHAPE: ("cycle_shape", 1),
+    AppCommand.PREVIOUS_SHAPE: ("cycle_shape", -1),
+    AppCommand.LEARNED: ("toggle_learned", None),
+    AppCommand.LEARNED_ON: ("set_learned", True),
+    AppCommand.LEARNED_OFF: ("set_learned", False),
+    AppCommand.OFFSET: ("quarter_offset", None),
+}
+
+AUTO_SWITCH, AUDIO_SWITCH, DRIVE_SWITCH, MIC_SWITCH = "auto", "audio", "drive", "mic"
+SWITCHES: dict[AppCommand, tuple[str, bool | None, str]] = {
+    AppCommand.AUTO: (AUTO_SWITCH, None, "auto-generate"),
+    AppCommand.AUTO_ON: (AUTO_SWITCH, True, "auto-generate"),
+    AppCommand.AUTO_OFF: (AUTO_SWITCH, False, "auto-generate"),
+    AppCommand.AUDIO: (AUDIO_SWITCH, None, "the audio bed"),
+    AppCommand.AUDIO_ON: (AUDIO_SWITCH, True, "the audio bed"),
+    AppCommand.AUDIO_OFF: (AUDIO_SWITCH, False, "the audio bed"),
+    AppCommand.DRIVE: (DRIVE_SWITCH, None, "OSR2"),
+    AppCommand.DRIVE_ON: (DRIVE_SWITCH, True, "OSR2"),
+    AppCommand.DRIVE_OFF: (DRIVE_SWITCH, False, "OSR2"),
+    AppCommand.MIC_OFF: (MIC_SWITCH, False, "the mic"),
+}
+SWITCHES_A_HOST_HOLDS = (AUDIO_SWITCH, DRIVE_SWITCH, MIC_SWITCH)
 
 # --- the bars said outright: "amp fifty", "max speed" ----------------------
 #
@@ -274,6 +303,17 @@ def spoken_phrases() -> frozenset[str]:
     listens for words: the spellings with digits in them are whisper's."""
     return frozenset(phrase for phrase in _PHRASES
                      if not any(character.isdigit() for character in phrase))
+
+
+def _answered_when_hosted(command: AppCommand | BarSetting) -> bool:
+    if isinstance(command, BarSetting) or command in MOTION_MOVES:
+        return False
+    return command not in SWITCHES or SWITCHES[command][0] not in SWITCHES_A_HOST_HOLDS
+
+
+def phrases_answered_when_hosted() -> frozenset[str]:
+    return frozenset(phrase for phrase in spoken_phrases()
+                     if _answered_when_hosted(_PHRASES[phrase]))
 
 
 def match_app_command(text: str) -> AppCommand | BarSetting | None:

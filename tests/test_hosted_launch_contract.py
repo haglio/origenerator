@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -99,6 +101,13 @@ def test_no_other_window_here_wears_that_caption():
     ]
 
     assert elsewhere == []
+
+
+def test_the_module_the_document_names_tells_a_session_what_to_hear_said_to_a_side():
+    done = subprocess.run([sys.executable, "-m", _document()["spoken_phrases_module"]],
+                          cwd=REPO_ROOT, capture_output=True, text=True, timeout=60, check=True)
+
+    assert "request" in json.loads(done.stdout)["phrases"]
 
 
 def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):

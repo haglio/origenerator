@@ -344,7 +344,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 17882 when the window a headset room has stayed off the monitors.
 # 17855 when the OSR2's switch came in and its holds went to the broker.
 # 17841 when the old words Fun Time said for slideshows were taken out.
-MAX_PROSE_LINES = 17841
+# 17693 when the motion and the switches a session holds moved beside their words,
+# taken down to what the tree measured.
+MAX_PROSE_LINES = 17693
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

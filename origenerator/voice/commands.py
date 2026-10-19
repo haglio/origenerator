@@ -41,8 +41,9 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery.voice_commands import command_phrases, match_command
-from origenerator.voice.app_commands import match_app_command
+from origenerator.voice.app_commands import match_app_command, phrases_answered_when_hosted
 from origenerator.voice.app_commands import spoken_phrases as app_command_phrases
+from origenerator.voice.dictation import LEAD_WORDS
 from origenerator.voice.slideshow_commands import (
     SlideshowCommand,
     match_slideshow_command,
@@ -179,5 +180,12 @@ def spoken_phrases() -> frozenset[str]:
     Unsided: a side is for a hosting session's two slideshows, and that session hears for
     itself. One said here still works, by the slower road every sentence takes.
     """
-    return (app_command_phrases() | command_phrases() | slideshow_command_phrases()
-            | frozenset(COLLECTION_KEYS))
+    return app_command_phrases() | _what_is_said_to_a_surface()
+
+
+def hosted_phrases() -> frozenset[str]:
+    return phrases_answered_when_hosted() | _what_is_said_to_a_surface() | {LEAD_WORDS[0]}
+
+
+def _what_is_said_to_a_surface() -> frozenset[str]:
+    return command_phrases() | slideshow_command_phrases() | frozenset(COLLECTION_KEYS)

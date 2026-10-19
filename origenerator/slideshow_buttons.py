@@ -156,10 +156,12 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "cycle_version": lambda host: host.slideshow_step_version(1),
     "cycle_version_back": lambda host: host.slideshow_step_version(-1),
 }
-# The map's thumbnails, whose presses carry the item they were made on.
+# The presses that carry the item they are about: the map's thumbnails, and an aimed lock.
 _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
     "play_video": lambda host, path: host.show_item(path, lock=False),
     "lock_video": lambda host, path: host.show_item(path, lock=True),
+    "lock": lambda host, path: host.slideshow_toggle_lock(aimed_at=path),
+    "lock_on": lambda host, path: host.set_locked(True, aimed_at=path),
 }
 PANEL_CORNER = "hud_corner"
 PANEL_MINIMIZED = "hud_minimized"
@@ -180,10 +182,10 @@ def answer(host, action: str, argument: str = "") -> bool:
     for minimize, which is a window's rather than a slideshow's, and for the
     Funestras' chrome about acts, which a slideshow has no counterpart for.
     """
-    if action in _PRESSES:
-        _PRESSES[action](host)
-    elif action in _PRESSES_ABOUT_A_FILE:
+    if argument and action in _PRESSES_ABOUT_A_FILE:
         _PRESSES_ABOUT_A_FILE[action](host, argument)
+    elif action in _PRESSES:
+        _PRESSES[action](host)
     elif action == FILTER:
         host.slideshow_filter(argument)
     else:

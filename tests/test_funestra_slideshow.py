@@ -171,12 +171,37 @@ def test_the_slideshows_lock_is_the_funestras_own(qtbot, tmp_path):
     _sent(slideshow)
 
     slideshow.slideshow_toggle_lock()
-    assert _sent(slideshow) == ["LOCK_ON"]
+    assert _sent(slideshow) == ["LOCK_ON one.png"]
     assert slideshow.locked is True
 
     _says(slideshow, video="one.png", locked=False)   # the Funestra says otherwise
     slideshow.tick()
     assert slideshow.locked is False
+
+
+def test_a_lock_aimed_at_the_picture_the_funestra_moved_on_from_is_that_pictures(qtbot, tmp_path):
+    asked = []
+    actions = SlideshowActions(favorite=lambda pid: asked.append(("star", pid)),
+                               enhance=lambda pid: asked.append(("enhance", pid)) or True,
+                               lock=lambda pid: asked.append(("lock", pid)))
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow._actions = actions
+    _says(slideshow, video="two.png")
+    slideshow.tick()
+
+    slideshow.slideshow_toggle_lock(aimed_at="one.png")
+
+    assert _sent(slideshow) == ["LOCK_ON one.png"]
+    assert asked == [("star", "id-1"), ("enhance", "id-1"), ("lock", "id-1")]
+    assert slideshow.hud_prompt_id == "id-1"
+
+
+def test_a_lock_while_another_version_of_the_picture_is_up_holds_that_version(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one-enhanced.png")
+
+    slideshow.slideshow_toggle_lock()
+
+    assert _sent(slideshow) == ["LOCK_ON one-enhanced.png"]
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
@@ -896,7 +921,7 @@ def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot, tmp_path
 
     slideshow.slideshow_loop("seed")
 
-    assert (_sent(slideshow), said) == (["LOCK_ON"], ["Locked"])
+    assert (_sent(slideshow), said) == (["LOCK_ON one.png"], ["Locked"])
     assert slideshow.locked is True
 
 
@@ -908,7 +933,8 @@ def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path
     slideshow.slideshow_loop_cycle()
     slideshow.slideshow_loop_cycle()
 
-    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == ["LOCK_ON", "LOCK_OFF"]
+    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == [
+        "LOCK_ON one.png", "LOCK_OFF"]
     assert said == ["Locked", "Unlocked"]
 
 

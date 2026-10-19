@@ -371,6 +371,19 @@ def test_an_import_filed_as_an_enhancement_that_a_flux_recipe_made_is_filed_unde
     assert db.get_generation("enhancement")["workflow_name"] == "image_enhance"
 
 
+def test_backfill_files_an_import_whose_name_says_nothing_under_the_recipe_its_graph_names(
+        tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="flux-picture", workflow_name="unknown",
+                         workflow_version="imported", params_json="{}",
+                         workflow_json=json.dumps(_A_FLUX_PICTURES_RECIPE), source="imported")
+    db.update_generation("flux-picture", output_files=json.dumps(
+        [{"filename": "my_flux_00001_.png", "subfolder": "image", "type": "output"}]))
+
+    assert backfill_import_workflows(db) == 1
+    assert db.get_generation("flux-picture")["workflow_name"] == "flux_t2i_upscaled"
+
+
 def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monkeypatch):
     # No _meta titles: prompts must be found structurally via the Wan node's links.
     graph = {

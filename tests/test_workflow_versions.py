@@ -31,6 +31,12 @@ def _rounded(value):
     return value
 
 
+def _recipe_inputs(built: dict) -> dict:
+    if built["class_type"] == "VHS_VideoCombine":
+        return {name: value for name, value in built["inputs"].items() if name != "crf"}
+    return built["inputs"]
+
+
 def _fingerprint(payload: dict) -> str:
     nodes: dict[str, str] = {}
 
@@ -39,7 +45,7 @@ def _fingerprint(payload: dict) -> str:
             built = payload[node_id]
             nodes[node_id] = _digest([
                 built["class_type"],
-                {name: wired(value) for name, value in built["inputs"].items()},
+                {name: wired(value) for name, value in _recipe_inputs(built).items()},
             ])
         return nodes[node_id]
 
@@ -193,23 +199,27 @@ _VARIATIONS = {
 
 _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 
-# Changing the recipes above moves these without any graph changing: re-record
-# every fingerprint that moves, and bump no version for it.
+# Changing the recipes above, or what _fingerprint reads, moves these without any
+# graph changing: re-record every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "f02c9827d96c9fc1",
     ("image_enhance", "v003"): "228ccee5269454ec",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
     ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
-    ("wan22_flf2v_loop", "v009"): "3cc07d12a40c7995",
+    ("wan22_flf2v_loop", "v009"): "ad7bd431c5c33f40",
     ("wan22_i2v", "v007"): "ce72e0c5e1342c10",
     ("wan22_t2i", "v002"): "f0794cae55c3e05d",
 }
 
 
-def _variation_fingerprint(workflow, variation: dict) -> str:
+def _payload(workflow, variation: dict) -> dict:
     pinned = {key: _PINNED[key] for key in workflow.default_params()}
-    return _fingerprint(workflow.build_api_payload(copy.deepcopy({**pinned, **variation})))
+    return workflow.build_api_payload(copy.deepcopy({**pinned, **variation}))
+
+
+def _variation_fingerprint(workflow, variation: dict) -> str:
+    return _fingerprint(_payload(workflow, variation))
 
 
 def _workflow_fingerprint(workflow) -> str:
@@ -278,6 +288,16 @@ def test_a_change_to_a_part_the_pinned_recipe_leaves_out_still_moves_the_fingerp
 
     assert _variation_fingerprint(workflow, {}) == pinned_graph
     assert _workflow_fingerprint(workflow) != before
+
+
+def test_how_finely_a_video_is_compressed_is_no_part_of_its_recipe():
+    payload = _payload(WORKFLOW_REGISTRY["wan22_flf2v_loop"], {})
+    recompressed = copy.deepcopy(payload)
+    (writer,) = [node for node in recompressed.values()
+                 if node["class_type"] == "VHS_VideoCombine"]
+    writer["inputs"]["crf"] += 7
+
+    assert _fingerprint(recompressed) == _fingerprint(payload)
 
 
 def test_the_gates_tables_hold_nothing_the_registry_has_dropped():

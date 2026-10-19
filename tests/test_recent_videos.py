@@ -57,19 +57,10 @@ def test_picking_a_video_names_it_and_the_field_reads_recent_again(qtbot):
     assert dropdown.display_text(1000) == "Recent"
 
 
-def test_with_no_video_to_list_the_dropdown_is_grayed_until_there_is_one(qtbot):
-    videos = []
-    dropdown = _dropdown(qtbot, videos)
-    assert not dropdown.isEnabled()
+def test_with_no_video_to_list_the_dropdown_is_live_and_empty(qtbot):
+    dropdown = _dropdown(qtbot, [])
 
-    videos.append(RecentVideo("vid1", None))
     dropdown.refresh()
 
     assert dropdown.isEnabled()
-
-
-def test_the_dropdown_says_what_it_lists_and_what_picking_does(qtbot):
-    dropdown = _dropdown(qtbot, [])
-
-    assert dropdown.toolTip() == (
-        "The videos you've had here before, newest first: pick one to put it back")
+    assert dropdown.count() == 0

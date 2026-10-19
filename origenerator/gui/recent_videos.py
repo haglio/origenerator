@@ -22,13 +22,10 @@ class RecentVideos(PicturedDropdown):
         super().__init__(parent, gray=True)
         self._recent = recent
         self.setPlaceholderText("Recent")
-        self.setToolTip("The videos you've had here before, newest first: pick one to put it back")
         self.activated.connect(self._on_activated)
-        self.setEnabled(False)
 
     def refresh(self) -> None:
         self._list_rows(("", (video,)) for video in self._recent())
-        self.setEnabled(bool(self.count()))
 
     def _on_activated(self, row: int) -> None:
         video = self.itemData(row, PICTURES_ROLE)[0]

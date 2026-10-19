@@ -192,6 +192,36 @@ def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
     assert panel._open_btn.isEnabled()       # both filled: ready to open
 
 
+def test_generate_says_it_draws_a_random_seed_for_a_video_on_its_own_start_picture(qtbot):
+    # The press gives the video's settings fresh seeds, so it makes a new
+    # variation rather than the same video again, and the button says so.
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel.image_slot.set_item("img1")
+
+    panel.video_slot.set_item("vid1")
+
+    assert panel._generate_btn.text() == "Generate with Random seed"
+
+
+def test_generate_stays_plain_for_a_video_on_another_picture(qtbot):
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel.image_slot.set_item("img2")
+
+    panel.video_slot.set_item("vid1")
+
+    assert panel._generate_btn.text() == "Generate"
+
+
+def test_generate_goes_back_to_plain_once_the_picture_changes(qtbot):
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel.image_slot.set_item("img1")
+    panel.video_slot.set_item("vid1")
+
+    panel.image_slot.set_item("img2")
+
+    assert panel._generate_btn.text() == "Generate"
+
+
 def test_generate_is_blue_while_it_can_run_and_gray_while_it_cannot(qtbot):
     panel = _panel(qtbot)
     panel.setStyleSheet(build_stylesheet())

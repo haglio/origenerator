@@ -17,7 +17,8 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QPushButton
 
 _GUARD_MS = 2500  # how long a blocked-Generate guard message lingers on the button
-DEFAULT_CAPTION = "Generate"  # the plain face; the panel sets the other (set_caption)
+DEFAULT_CAPTION = "Generate"
+RANDOM_SEED_CAPTION = "Generate with Random seed"
 
 
 class GenerateButton(QPushButton):

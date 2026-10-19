@@ -43,7 +43,11 @@ from origenerator import animation_paths
 from origenerator.content import genau_flick_word
 from origenerator.gui.drop_slot import DropSlot, DropZone
 from origenerator.gui.eliding import open_the_list_in_full
-from origenerator.gui.generate_button import GenerateButton
+from origenerator.gui.generate_button import (
+    DEFAULT_CAPTION,
+    RANDOM_SEED_CAPTION,
+    GenerateButton,
+)
 from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.media import MediaType
 from origenerator.recipe_match import GENAU, VIDEO
@@ -336,12 +340,15 @@ class CombinePanel(QWidget):
             self._show_dropped()
 
     def _sync(self):
-        has_image = bool(self.image_slot.current_id())
-        has_recipe = bool(self.selected_category() or self.video_slot.current_id())
-        ready = has_image and has_recipe
+        image_id = self.image_slot.current_id()
+        video_id = self.video_slot.current_id()
+        ready = bool(image_id) and bool(self.selected_category() or video_id)
+        remakes_its_own = bool(video_id) and self.image_slot.lent_by(video_id) == image_id
         self._generate_btn.setEnabled(ready)
+        self._generate_btn.set_caption(
+            RANDOM_SEED_CAPTION if ready and remakes_its_own else DEFAULT_CAPTION)
         self._open_btn.setEnabled(ready)
-        missing = "" if ready else _NEEDS_RECIPE if has_image else _NEEDS_IMAGE
+        missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_RECIPE
         self._generate_btn.setToolTip(missing)
         self._open_btn.setToolTip(missing or _EDIT_TIP)
 

@@ -1,24 +1,30 @@
 """The document this repo publishes about its gallery database, held against the code.
 
 Evolver mounts ``state/origenerator.db`` read-only and selects columns off
-``generations`` by name -- the prompts and the model a clip was made with, for
+``generations`` by name -- the prompts and the model a video was made with, for
 the sidecar it files; the two withdrawal stamps, for the sends it has to take
 back.  It cannot import this package, so this document is the whole agreement,
 and a rename here that the document does not carry is exactly the silent break
 it exists to end: a column gone, every row reading as never sent, every suite
 green through it.
 
-These hold the document to the schema this app actually writes.
+These hold the document to the schema this app actually writes, and to the rate
+its videos are generated at.
 """
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
+
+from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 from origenerator import db_schema
 from origenerator import gallery_contract as contract
 from origenerator.gui.export_lane import EXPORT_LANES
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.frame_rate import NATIVE_FPS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -61,3 +67,15 @@ def test_a_videos_soundless_copy_is_listed_under_the_role_the_document_promises(
         "gifs": [{"filename": "clip_00001-audio.mp4", "subfolder": "video", "type": "output"}]}}})
 
     assert finished[1]["role"] == _document()["silent_copy_role"]
+
+
+def test_the_document_promises_the_rate_every_video_is_generated_at():
+    assert _document()["generated_fps"] == NATIVE_FPS
+
+
+def test_the_contract_imports_first_though_the_workflows_it_reads_the_rate_from_import_it():
+    imported = subprocess.run([sys.executable, "-c", "import origenerator.gallery_contract"],
+                              cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+                              timeout=120, **hidden_subprocess_kwargs())
+
+    assert imported.returncode == 0, imported.stderr

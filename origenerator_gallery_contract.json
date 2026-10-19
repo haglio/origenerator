@@ -36,5 +36,6 @@
       "unsent": "genau_unsent_at"
     }
   },
-  "silent_copy_role": "silent"
+  "silent_copy_role": "silent",
+  "generated_fps": 16.0
 }

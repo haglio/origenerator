@@ -356,7 +356,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # set the pace to nought: what the words do is
 # test_the_spoken_pause_pauses_the_room_and_leaves_the_slideshow_up_at_its_pace and
 # test_the_spoken_play_plays_a_paused_room_again_and_sets_the_slideshow_going.
-MAX_PROSE_LINES = 17584
+# 17581 when the gallery's published document came to carry the rate its videos
+# are generated at, and left why it is published to tests/test_gallery_contract.py.
+MAX_PROSE_LINES = 17581
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -20,6 +20,7 @@ from origenerator.comfy_graph import (
     empty_latent,
     follow,
     graph_model_params,
+    guidance_params,
     input_image_name,
     sound_params,
 )
@@ -713,6 +714,7 @@ def _graph_params(graph: dict) -> dict:
         **_size_params(graph),
         **_input_image_params(graph),
         **sampler_params,
+        **guidance_params(graph),
         **graph_model_params(graph),
         **sound_params(graph),
         **{key: value for key, value in stated if value is not None},

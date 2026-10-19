@@ -1031,6 +1031,65 @@ def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
     assert backfill_import_params(db, tmp_path) == 0         # idempotent
 
 
+def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
+        params_json="{}", workflow_json=json.dumps(_A_FLUX_PICTURES_RECIPE), source="imported",
+    )
+
+    assert backfill_import_params(db, tmp_path) == 1
+    assert json.loads(db.get_generation("flux-old")["params_json"])["guidance"] == 3.5
+
+
+def test_backfill_fills_the_lora_a_flux_imports_graph_loaded_at_the_strength_it_ran(tmp_path):
+    graph = {
+        **_A_FLUX_PICTURES_RECIPE,
+        "11": {"class_type": "LoraLoader",
+               "inputs": {"model": ["1", 0], "clip": ["2", 0],
+                          "lora_name": "example_style.safetensors",
+                          "strength_model": 0.5, "strength_clip": 0.5}},
+        "8": {"class_type": "KSampler", "inputs": {"model": ["11", 0], "seed": 1}},
+    }
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
+        params_json="{}", workflow_json=json.dumps(graph), source="imported",
+    )
+
+    backfill_import_params(db, tmp_path)
+
+    params = json.loads(db.get_generation("flux-old")["params_json"])
+    assert (params["lora"], params["lora_strength"]) == ("example_style.safetensors", 0.5)
+
+
+def test_backfill_fills_the_strength_each_wan_stage_ran_its_lora_at(tmp_path):
+    graph = {
+        "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_high.safetensors"}},
+        "5": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_low.safetensors"}},
+        "6": {"class_type": "LoraLoaderModelOnly",
+              "inputs": {"model": ["4", 0], "lora_name": "styleB_high.safetensors",
+                         "strength_model": 0.8}},
+        "7": {"class_type": "LoraLoaderModelOnly",
+              "inputs": {"model": ["5", 0], "lora_name": "styleB_low.safetensors",
+                         "strength_model": 0.6}},
+        "15": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["6", 0], "add_noise": "enable"}},
+        "16": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["7", 0], "add_noise": "disable"}},
+    }
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="old", workflow_name="wan22_i2v", workflow_version="imported",
+        params_json="{}", workflow_json=json.dumps(graph), source="imported",
+    )
+
+    backfill_import_params(db, tmp_path)
+
+    params = json.loads(db.get_generation("old")["params_json"])
+    assert (params["lora_strength_high"], params["lora_strength_low"]) == (0.8, 0.6)
+
+
 def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
     # WAN 2.2 text-to-image embeds no Wan conditioning node and no checkpoint, so
     # its EmptyHunyuanLatentVideo + ImageFromBatch + SaveImage signature is what

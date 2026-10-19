@@ -198,19 +198,10 @@ class CombineController(QObject):
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
     def selection(self) -> dict:
-        """Everything the combine panel is holding, for session save: the
-        picture, the videos each lane last had, the lane and the act.
-
-        All four, because all four are choices the user made and none is
-        recoverable from the others — an act says nothing about which lane
-        answers it, and a restart that put the picture back and forgot it was for
-        a Genau flick would answer the next Generate out of the wrong recipes.
-        """
-        recent = self.panel.recent_videos()
         return {
             "image": self.panel.image_slot.current_id(),
-            "videos": {lane: videos[0] for lane, videos in recent.items() if videos},
-            "recent_videos": recent,
+            "videos": self.panel.dropped_videos(),
+            "recent_videos": self.panel.recent_videos(),
             "intent": self.panel.selected_intent(),
             "category": self.panel.selected_category(),
         }
@@ -237,6 +228,8 @@ class CombineController(QObject):
         videos = saved.get("videos")
         if not isinstance(videos, dict):
             videos = {self.panel.selected_intent(): saved.get("video")}
+        self.panel.set_dropped_videos({lane: video for lane, video in videos.items()
+                                       if video and self._accepts_video(video)})
         recent = saved.get("recent_videos")
         if not isinstance(recent, dict):
             recent = {}

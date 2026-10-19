@@ -52,7 +52,6 @@ _DROP_PLACEHOLDER = "Drop a video"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
 _NEEDS_RECIPE = "Pick an act or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
-_RECENT_VIDEOS = 12
 
 
 def _text_inset(combo: QComboBox) -> int:
@@ -113,6 +112,7 @@ class CombinePanel(QWidget):
         self.video_slot.changed.connect(self._on_video_changed)
         self.image_slot.activated.connect(self.item_activated)
         self.video_slot.activated.connect(self.item_activated)
+        self._dropped: dict[str, str] = {}
         self._recent: dict[str, list[str]] = {}
         self._recent_videos = RecentVideos(self._recent_rows)
         self._recent_videos.picked.connect(self.video_slot.set_item)
@@ -140,6 +140,8 @@ class CombinePanel(QWidget):
         named = QLabel(ACTION_LABEL)
         named.setIndent(_text_inset(self._category))
         action_column.addWidget(named)
+        action_column.addSpacing(BUTTON_GAP)
+        action_column.addWidget(self._recent_videos)
         # Or the row's spare height goes to the word, which then floats in it.
         action_column.addStretch(1)
 
@@ -150,13 +152,7 @@ class CombinePanel(QWidget):
         video_row.setContentsMargins(0, 0, 0, 0)
         video_row.setSpacing(BUTTON_GAP)  # the family's gap inside a group
         video_row.addWidget(self._action_part, 1)  # each takes half the part's width
-        slot_part = QWidget()
-        slot_column = QVBoxLayout(slot_part)
-        slot_column.setContentsMargins(0, 0, 0, 0)
-        slot_column.setSpacing(BUTTON_GAP)
-        slot_column.addWidget(self.video_slot)
-        slot_column.addWidget(self._recent_videos)
-        video_row.addWidget(slot_part, 1)
+        video_row.addWidget(self.video_slot, 1)
 
         # What the result is for. Kino is the default because it is the long-
         # standing behavior of this panel and by far the more common ask; Genau is
@@ -244,7 +240,7 @@ class CombinePanel(QWidget):
         if checked:
             self._list_the_acts(self.selected_intent())
             if not self.selected_category():
-                self._show_the_lanes_last_video()
+                self._show_dropped()
             self._recent_videos.refresh()
             self.intent_changed.emit(self.selected_intent())
 
@@ -316,7 +312,7 @@ class CombinePanel(QWidget):
         lane last had dropped in it."""
         custom = not self.selected_category()
         if custom:
-            self._show_the_lanes_last_video()
+            self._show_dropped()
         else:
             self.video_slot.clear()
         self.video_slot.setVisible(custom)
@@ -328,34 +324,40 @@ class CombinePanel(QWidget):
         video = self.video_slot.current_id()
         if video:
             lane = self.selected_intent()
+            self._dropped[lane] = video
             self._recent[lane] = [video, *(held for held in self._recent.get(lane, ())
-                                           if held != video)][:_RECENT_VIDEOS]
+                                           if held != video)]
             self._recent_videos.refresh()
             self._category.setCurrentIndex(0)
         self._sync()
 
-    def _fitting_recent_videos(self) -> list[str]:
-        return [video for video in self._recent.get(self.selected_intent(), ())
-                if self.video_slot.accepts(video)]
-
     def _recent_rows(self) -> list[RecentVideo]:
         return [RecentVideo(video, self._preview(video)[0])
-                for video in self._fitting_recent_videos()]
+                for video in self._recent.get(self.selected_intent(), ())
+                if self.video_slot.accepts(video)]
 
-    def _show_the_lanes_last_video(self):
-        fitting = self._fitting_recent_videos()
-        if fitting:
-            self.video_slot.set_item(fitting[0])
+    def _show_dropped(self):
+        lane = self.selected_intent()
+        video = self._dropped.get(lane)
+        if video and self.video_slot.accepts(video):
+            self.video_slot.set_item(video)
         else:
+            self._dropped.pop(lane, None)
             self.video_slot.clear()
+
+    def dropped_videos(self) -> dict[str, str]:
+        return dict(self._dropped)
+
+    def set_dropped_videos(self, videos: dict[str, str]):
+        self._dropped = dict(videos)
+        if not self.selected_category():
+            self._show_dropped()
 
     def recent_videos(self) -> dict[str, list[str]]:
         return {lane: list(videos) for lane, videos in self._recent.items()}
 
     def set_recent_videos(self, videos: dict[str, list[str]]):
-        self._recent = {lane: list(held)[:_RECENT_VIDEOS] for lane, held in videos.items()}
-        if not self.selected_category():
-            self._show_the_lanes_last_video()
+        self._recent = {lane: list(held) for lane, held in videos.items()}
         self._recent_videos.refresh()
 
     def _sync(self):

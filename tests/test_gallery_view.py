@@ -12448,6 +12448,18 @@ def test_a_video_dragged_from_a_picture_the_gallery_holds_lights_the_image_slot_
     assert view._combine.panel.video_slot._label.property("dragActive") is True
 
 
+def test_combines_generate_grays_while_the_pair_dropped_in_it_is_being_made(qtbot, tmp_path):
+    view = _combine_view(qtbot, tmp_path)
+    panel = view._combine.panel
+    panel.image_slot.set_item("img")
+    panel.video_slot.set_item("vid")
+    assert panel._generate_btn.isEnabled()
+
+    view._combine._generate_combination("img", "vid")
+
+    assert not panel._generate_btn.isEnabled()
+
+
 def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
     # The front generate tab's preview drags onto combine like a browser thumbnail.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())

@@ -1282,6 +1282,7 @@ class GalleryView(QWidget):
             panel.set_generating(job is not None,
                                  auto_generating=self._auto_generating(job))
             panel.note_folder_generating(self._panel_reroll_key(panel) in making_one)
+        self._combine.reconcile_generating()
 
     def _auto_generating(self, job) -> bool:
         """Whether ``job``'s own folder is auto-looping — so the button that throws

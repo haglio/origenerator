@@ -222,6 +222,30 @@ def test_generate_goes_back_to_plain_once_the_picture_changes(qtbot):
     assert panel._generate_btn.text() == "Generate"
 
 
+def test_generate_grays_while_the_pair_dropped_in_is_already_being_made(qtbot):
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+    panel.video_slot.set_item("vid1")
+
+    panel.note_folder_generating(True)
+
+    assert not panel._generate_btn.isEnabled()
+    assert panel._generate_btn.toolTip() == "This folder is already making one"
+    assert panel._open_btn.isEnabled()  # there is still a tab to open it in
+
+
+def test_generate_comes_back_once_that_one_is_made(qtbot):
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+    panel.video_slot.set_item("vid1")
+    panel.note_folder_generating(True)
+
+    panel.note_folder_generating(False)
+
+    assert panel._generate_btn.isEnabled()
+    assert panel._generate_btn.toolTip() == ""
+
+
 def test_generate_is_blue_while_it_can_run_and_gray_while_it_cannot(qtbot):
     panel = _panel(qtbot)
     panel.setStyleSheet(build_stylesheet())

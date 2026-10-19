@@ -2922,6 +2922,12 @@ class GalleryView(QWidget):
         whether it was one. The session's bridge posts them here."""
         return self._voice.run_spoken_command(text)
 
+    def taking_a_request(self) -> bool:
+        return self._voice.listener.taking_a_request
+
+    def drop_the_request(self) -> None:
+        self._voice.drop_the_request()
+
     def _go_to_looping_folder(self, _href: str):
         """Follow the tip's link to whichever folder is looping right now.
 

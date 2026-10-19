@@ -37,7 +37,7 @@ from funestra.file_channel import (
 )
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from origenerator.console_commands import side_press, side_spoken_to
+from origenerator.console_commands import side_press, side_spoken_to, spelled_for
 from origenerator.fun_time_mode import (
     CLOSE_SLIDESHOW,
     CLOSE_SLIDESHOWS,
@@ -46,6 +46,8 @@ from origenerator.fun_time_mode import (
     HAND_OVER,
     OPEN_SLIDESHOW,
     RELEASE,
+    REQUEST_CLOSED,
+    REQUEST_OPEN,
     SAY,
     SIDES,
     TAKE_BACK,
@@ -109,18 +111,16 @@ class FunTimeBridge(QObject):
         self._published = False
         # The verbs about the session's slideshows as a whole, rather than one side's.
         self._session_verbs = {
-            # Through the gallery, not slideshow by slideshow: it has to stop WANTING the
-            # regions first, or each close it makes here is answered by the
-            # base state opening again underneath it.
-            CLOSE_SLIDESHOWS: lambda: self._gallery.close_the_slideshows(),
+            CLOSE_SLIDESHOWS: self._close_the_slideshows,
             FILTER_ENHANCED: self._filter_enhanced,
             RELEASE: self._release,
             TAKE_BACK: self.take_back_asked.emit,
         }
         self._side_verbs = {
             OPEN_SLIDESHOW: lambda side: self._gallery.fill_the_region(side),
-            CLOSE_SLIDESHOW: lambda side: self._gallery.close_the_slideshow(side),
+            CLOSE_SLIDESHOW: self._close_the_slideshow,
         }
+        self._request_side: str | None = None
         self._released = False
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
@@ -182,11 +182,44 @@ class FunTimeBridge(QObject):
             # command about one of these regions is heard THERE and sent here
             # as the words themselves — matched by this app's own vocabulary,
             # which is the only place that knows its collections and its parts.
-            self._gallery.run_spoken_command(f"{side} {argument}")
+            self._run_what_was_said(side, argument)
             return
         self._apply_side(side, action, argument, line)
 
+    def _run_what_was_said(self, side: str, words: str) -> None:
+        was_taking_a_request = self._gallery.taking_a_request()
+        self._gallery.run_spoken_command(f"{side} {words}")
+        taking_a_request = self._gallery.taking_a_request()
+        if taking_a_request == was_taking_a_request:
+            return
+        self._request_side = side if taking_a_request else None
+        self._tell_the_room(spelled_for(side, REQUEST_OPEN if taking_a_request
+                                        else REQUEST_CLOSED))
+
+    def _close_the_slideshow(self, side: str) -> None:
+        self._drop_the_request_said_to(side)
+        self._gallery.close_the_slideshow(side)
+
+    def _close_the_slideshows(self) -> None:
+        # Through the gallery, not slideshow by slideshow: it has to stop WANTING the
+        # regions first, or each close it makes here is answered by the
+        # base state opening again underneath it.
+        self._drop_the_request_said_to(self._request_side)
+        self._gallery.close_the_slideshows()
+
+    def _drop_the_request_said_to(self, side: str | None) -> None:
+        if side is None or side != self._request_side:
+            return
+        self._gallery.drop_the_request()
+        self._request_side = None
+        self._tell_the_room(spelled_for(side, REQUEST_CLOSED))
+
+    def _tell_the_room(self, line: str) -> None:
+        if self._session.dashboard_cmd_file is not None:
+            append_command(self._session.dashboard_cmd_file, line)
+
     def _release(self) -> None:
+        self._drop_the_request_said_to(self._request_side)
         self._released = True
         self._timer.stop()
         self.released.emit()

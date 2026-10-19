@@ -368,3 +368,13 @@ def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):
     listener.failed.emit("No module named 'sounddevice'")
 
     assert errors == ["mic unavailable — No module named 'sounddevice'"]
+
+
+def test_it_says_a_request_is_being_taken_from_its_opening_word_until_over(qtbot):
+    steering, _listener = _bare_steering("unused")
+
+    steering.push_dictation("request")
+    taking_one = steering.taking_a_request
+    steering.push_dictation("a red scarf over")
+
+    assert (taking_one, steering.taking_a_request) == (True, False)

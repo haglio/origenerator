@@ -495,7 +495,8 @@ def test_a_slideshow_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_p
         "two.png", "three.png"]
 
 
-def test_what_esc_keeps_is_the_whole_set_standing_where_the_funestra_is(qtbot, tmp_path):
+def test_what_a_slideshow_hands_over_is_the_whole_set_standing_where_the_funestra_is(
+        qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
 
     assert [str(item.path) for item in slideshow.whole_set()] == ["one.png", "two.png", "three.png"]

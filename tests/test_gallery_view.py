@@ -4436,8 +4436,8 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[1] == (view._bank.undo, view._bank.redo)
     assert groups[3] == (view._bank.favorite, view._bank.enhance, view._bank.delete)
     assert view._bank.auto in groups[4] and view._bank.audio in groups[4]
-    # The mic has a space of its own: the group beside it is what Esc turns off,
-    # and the mic is the one switch it leaves listening.
+    # The mic has a space of its own: the group beside it is what the app is
+    # doing, and the mic is what it hears with.
     assert groups[5] == (view._bank.mic,) and view._bank.mic not in groups[4]
 
 
@@ -13432,8 +13432,7 @@ def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_aga
 
 
 def _startable_view(qtbot, tmp_path, monkeypatch):
-    """A gallery on a loopable folder with nothing running — the app as it opens,
-    and what Esc has to be able to start from."""
+    """A gallery on a loopable folder with nothing running — the app as it opens."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: ("g0.png", "image"))
     bed = _FakeAmbientAudio()
@@ -14480,17 +14479,20 @@ def test_start_slideshow_sets_a_held_slideshow_going(qtbot, tmp_path, monkeypatc
     slideshow.close()
 
 
-def test_pause_slideshow_turns_the_pace_to_nought(qtbot, tmp_path, monkeypatch):
+def test_pause_slideshow_pauses_the_whole_room_as_esc_does_and_play_slideshow_plays_it(
+        qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak_command("start slideshow")
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
 
     view._voice.listener.speak_command("pause slideshow")
-
-    assert slideshow.dwell_s == 0
-    assert not _will_move_on(slideshow)
+    assert omnipause.frozen() and slideshow._paused
     assert view._slideshows.showing is slideshow  # paused, not closed
+    assert slideshow.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
+
+    view._voice.listener.speak_command("play slideshow")
+    assert not omnipause.frozen() and not slideshow._paused
     slideshow.close()
 
 

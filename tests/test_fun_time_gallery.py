@@ -415,6 +415,22 @@ def test_a_click_on_a_hosted_slideshow_asks_the_room_for_omnipause(qtbot, tmp_pa
     assert slideshow._paused is False
 
 
+def test_a_spoken_pause_slideshow_asks_the_room_for_omnipause_and_play_slideshow_asks_it_back(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    qtbot.addWidget(view.region_slideshow("portrait"))
+    channel = tmp_path / "dashboard_cmd.txt"
+
+    assert view.run_spoken_command("portrait pause slideshow")
+    assert channel.read_text(encoding="utf-8").split() == ["omnipause_toggle"]
+
+    view.set_room_paused(True)
+    assert view.run_spoken_command("portrait play slideshow")
+    assert channel.read_text(encoding="utf-8").split() == ["omnipause_toggle", "omnipause_toggle"]
+
+
 def _session_with_dashboard(tmp_path):
     return FunTimeSession(
         main_rect=Rect(0, 206, 853, 1234),

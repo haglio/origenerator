@@ -28,7 +28,7 @@ from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.item_names import ItemNames
 from origenerator.orientation import oriented_key
-from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, Slide, SlideshowFilters, SlideshowState
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from tests.slideshow_hud_support import open_both_sides
@@ -568,7 +568,7 @@ def test_a_double_clicked_picture_plays_its_folder_newest_first_and_says_latest(
     assert slideshow.hud.order_label == LATEST_LABEL
 
 
-def test_a_slideshow_esc_put_back_goes_on_taking_in_what_lands_where_it_plays(slideshows):
+def test_a_slideshow_put_back_goes_on_taking_in_what_lands_where_it_plays(slideshows):
     landed = _row("g2")
     director, _host, made = slideshows(browser=FakeBrowser(collections={"collection/a": [_row("g1"), landed]}))
     director.open([("g1.png", "image", "g1", None)], location="collection/a")
@@ -1257,14 +1257,67 @@ def test_the_spoken_close_with_no_slideshow_up_says_so(slideshows):
     assert made == []
 
 
-def test_the_spoken_pause_with_no_slideshow_sets_what_the_next_one_opens_at(slideshows):
-    # A slideshow that never moves on is exactly what a stopped picture is here.
+def test_the_spoken_pause_with_no_slideshow_up_pauses_the_room_as_esc_does(slideshows):
     director, host, _made = slideshows()
 
     director.run_slideshow_command(SlideshowCommand.PAUSE, None)
 
-    assert director._pace.seconds == 0
-    assert host.said == ["🎤 no slideshow to pause"]
+    assert host.room_paused == [True]
+    assert director._pace.seconds is None
+    assert host.said == ["🎤 paused"]
+
+
+def test_the_spoken_pause_pauses_the_room_and_leaves_the_slideshow_up_at_its_pace(slideshows):
+    director, host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+    made[0].dwell_s = 4
+
+    director.run_slideshow_command(SlideshowCommand.PAUSE, None)
+
+    assert host.room_paused == [True]
+    assert (made[0].paused, made[0].dwell_s, made[0].closes) == (True, 4, 0)
+    assert made[0].said == ["🎤 slideshow paused"]
+
+
+def test_the_spoken_pause_leaves_a_room_already_paused_as_it_is(slideshows):
+    director, host, _made = slideshows()
+    director.set_room_paused(True)
+
+    director.run_slideshow_command(SlideshowCommand.PAUSE, None)
+
+    assert host.room_paused == []
+
+
+def test_the_spoken_play_plays_a_paused_room_again_and_sets_the_slideshow_going(slideshows):
+    director, host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+    made[0].actions.omnipause()
+
+    director.run_slideshow_command(SlideshowCommand.START, None)
+
+    assert host.room_paused == [True, False]
+    assert (made[0].paused, made[0].dwell_s) == (False, DEFAULT_IMAGE_DWELL_MS // 1000)
+
+
+@pytest.mark.parametrize(("command", "paused", "asked"), [
+    (SlideshowCommand.PAUSE, False, ["omnipause_toggle"]),
+    (SlideshowCommand.PAUSE, True, []),
+    (SlideshowCommand.START, True, ["omnipause_toggle"]),
+    (SlideshowCommand.START, False, []),
+], ids=["pause a playing room", "pause a paused room", "play a paused room",
+        "play a playing room"])
+def test_a_spoken_pause_or_play_asks_a_hosting_session_for_omnipause_only_to_change_the_room(
+        slideshows, tmp_path, command, paused, asked):
+    session = FakeSession()
+    session.dashboard_cmd_file = tmp_path / "dashboard_cmd.txt"
+    director, _host, _made = slideshows(fun_time=session)
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+    director.set_room_paused(paused)
+
+    director.run_slideshow_command(command, PORTRAIT)
+
+    sent = session.dashboard_cmd_file
+    assert (sent.read_text(encoding="utf-8").split() if sent.exists() else []) == asked
 
 
 def test_a_spoken_word_is_answered_in_the_slideshows_own_corner(slideshows):

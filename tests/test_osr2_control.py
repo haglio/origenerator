@@ -104,7 +104,7 @@ def test_driving_to_parked_still_says_so():
 
 def test_the_switch_announces_a_move_and_not_a_re_statement():
     """A switch put where the app already is must not re-run what a click does:
-    Esc puts the device back on, and a resumed session sets it again."""
+    a resumed session sets it again."""
     control = _control()
     heard = []
     control.changed.connect(lambda: heard.append(control.isChecked()))

@@ -352,7 +352,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again,
 # test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up and
 # test_esc_in_a_text_field_is_the_fields_own_even_with_the_osr2_moving.
-MAX_PROSE_LINES = 17592
+# 17584 when "pause slideshow" came to pause the room as Esc does rather than
+# set the pace to nought: what the words do is
+# test_the_spoken_pause_pauses_the_room_and_leaves_the_slideshow_up_at_its_pace and
+# test_the_spoken_play_plays_a_paused_room_again_and_sets_the_slideshow_going.
+MAX_PROSE_LINES = 17584
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

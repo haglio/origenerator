@@ -481,6 +481,20 @@ def test_each_lanes_recent_videos_handed_back_are_listed(qtbot):
     assert panel.recent_videos() == recent
 
 
+def test_recent_reads_its_videos_only_when_it_opens(qtbot):
+    asked = []
+    panel = CombinePanel(image_accepts=lambda pid: True,
+                         video_accepts=lambda pid: pid.startswith("vid"),
+                         preview=lambda pid: asked.append(pid) or (None, None))
+    qtbot.addWidget(panel)
+
+    for n in range(5):
+        panel.video_slot.set_item(f"vid{n}")
+    _pick_lane(panel, recipe_match.GENAU)
+
+    assert asked == [f"vid{n}" for n in range(5)]
+
+
 def test_a_lane_that_has_had_no_video_lists_none_under_recent(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")

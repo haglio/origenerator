@@ -241,7 +241,6 @@ class CombinePanel(QWidget):
             self._list_the_acts(self.selected_intent())
             if not self.selected_category():
                 self._show_dropped()
-            self._recent_videos.refresh()
             self.intent_changed.emit(self.selected_intent())
 
     # --- category ---------------------------------------------------------
@@ -327,7 +326,6 @@ class CombinePanel(QWidget):
             self._dropped[lane] = video
             self._recent[lane] = [video, *(held for held in self._recent.get(lane, ())
                                            if held != video)]
-            self._recent_videos.refresh()
             self._category.setCurrentIndex(0)
         self._sync()
 
@@ -358,7 +356,6 @@ class CombinePanel(QWidget):
 
     def set_recent_videos(self, videos: dict[str, list[str]]):
         self._recent = {lane: list(held) for lane, held in videos.items()}
-        self._recent_videos.refresh()
 
     def _sync(self):
         has_image = bool(self.image_slot.current_id())

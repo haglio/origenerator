@@ -351,7 +351,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # down to what the tree measured: what the key does is
 # test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again,
 # test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up and
-# test_esc_pauses_a_moving_osr2_even_from_a_text_field.
+# test_esc_in_a_text_field_is_the_fields_own_even_with_the_osr2_moving.
 MAX_PROSE_LINES = 17592
 
 

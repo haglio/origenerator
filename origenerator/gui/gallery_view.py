@@ -574,14 +574,10 @@ class GalleryView(QWidget):
     def _handle_escape(self) -> bool:
         if self._other_window_owns_keys():
             return False
-        if self._escape_cancels_something() and not self._the_device_moves():
+        if self._escape_cancels_something():
             return False
         self._slideshows.pause_or_play_the_room()
         return True
-
-    def _the_device_moves(self) -> bool:
-        return not omnipause.frozen() and (self.osr2_control.isChecked() or (
-            self._osr2_motion is not None and self._osr2_motion.active))
 
     def _escape_cancels_something(self) -> bool:
         if self._find_bar.isVisible():

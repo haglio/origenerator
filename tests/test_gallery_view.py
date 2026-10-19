@@ -13105,15 +13105,27 @@ def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_pictures_wit
     slideshow.close()
 
 
-def test_closing_a_paused_slideshow_plays_the_room_again(qtbot, monkeypatch):
+def _double_click_the_picture(slideshow):
+    window = slideshow._pane._window
+    gestures.double_click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
+
+
+def _press_enter(slideshow):
+    gestures.press_key(slideshow, Qt.Key.Key_Return)
+
+
+@pytest.mark.parametrize("leave", [_double_click_the_picture, _press_enter],
+                         ids=["a double-click on the picture", "Enter"])
+def test_leaving_a_paused_slideshow_leaves_the_room_paused(qtbot, monkeypatch, leave):
     bed, motion = _FakeAmbientAudio(), _SignalMotion()
     _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
                                                         osr2_motion=motion)
     _click_the_picture(slideshow)
 
-    slideshow.close()
+    leave(slideshow)
+    qtbot.waitUntil(lambda: not slideshow.isVisible())
 
-    assert (motion.frozen, bed.frozen, omnipause.frozen()) == (False, False, False)
+    assert (motion.frozen, bed.frozen, omnipause.frozen()) == (True, True, True)
 
 
 def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
@@ -13280,23 +13292,6 @@ def _typing_in_a_text_field(qtbot, monkeypatch):
     monkeypatch.setattr(QApplication, "focusWidget", staticmethod(lambda: field))
 
 
-def test_esc_pauses_a_moving_osr2_even_from_a_text_field(qtbot, monkeypatch):
-    view = _driving_the_device(qtbot)
-    _typing_in_a_text_field(qtbot, monkeypatch)
-
-    assert _press_escape(view) is True
-    assert omnipause.frozen()
-
-
-def test_esc_from_a_text_field_never_plays_a_paused_room_again(qtbot, monkeypatch):
-    view = _driving_the_device(qtbot)
-    view.set_room_paused(True)
-    _typing_in_a_text_field(qtbot, monkeypatch)
-
-    assert _press_escape(view) is False
-    assert omnipause.frozen()
-
-
 def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     positive, _negative = _tab_with_prompts(view).prompt_fields()
@@ -13308,14 +13303,16 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     assert not omnipause.frozen()
 
 
-def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize("paused", [False, True], ids=["a playing room", "a paused room"])
+def test_esc_in_a_text_field_is_the_fields_own_even_with_the_osr2_moving(
+        qtbot, monkeypatch, paused):
     # Renaming a folder, writing a prompt: Esc there is how you take it back.
-    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    view = _driving_the_device(qtbot)
+    view.set_room_paused(paused)
     _typing_in_a_text_field(qtbot, monkeypatch)
 
-    assert view._handle_escape() is False
-    assert not omnipause.frozen()
+    assert _press_escape(view) is False
+    assert omnipause.frozen() is paused
 
 
 def test_the_console_hints_that_esc_pauses_the_room(qtbot):

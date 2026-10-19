@@ -1217,19 +1217,17 @@ def test_a_second_click_on_it_plays_the_room_again(slideshows):
     assert made[0].paused is False
 
 
-def test_closing_a_slideshow_standing_on_its_own_lets_the_room_it_paused_play_again(slideshows):
+def test_closing_a_paused_slideshow_standing_on_its_own_leaves_the_room_paused(slideshows):
     director, host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
     made[0].actions.omnipause()
 
     made[0].close()
 
-    assert host.room_paused == [True, False]
+    assert host.room_paused == [True]
 
 
-def test_the_second_press_of_a_double_click_does_not_pause_the_room_behind_the_slideshow(slideshows):
-    """The double-click closes the slideshow between its two presses, so the
-    second lands on a slideshow that is gone."""
+def test_a_press_that_reaches_a_slideshow_already_gone_leaves_the_room_as_it_is(slideshows):
     director, host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
     made[0].actions.omnipause()
@@ -1237,7 +1235,7 @@ def test_the_second_press_of_a_double_click_does_not_pause_the_room_behind_the_s
 
     made[0].actions.omnipause()
 
-    assert host.room_paused == [True, False]
+    assert host.room_paused == [True]
 
 
 def test_a_hosted_slideshow_closing_leaves_the_sessions_pause_to_the_session(slideshows):

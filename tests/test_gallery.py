@@ -460,6 +460,20 @@ def test_settings_signature_ignores_the_enhancement():
                               workflow_version="v004") != plain
 
 
+def test_settings_signature_ignores_how_finely_a_video_was_compressed():
+    # How finely a file was compressed is how it was saved, not what was
+    # rendered: a loop that stored the quality it was saved at shares a folder
+    # with one saved at any other.
+    wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
+
+    def loop(**stored):
+        return json.dumps(dict(wf.default_params(), **stored))
+
+    signatures = {settings_signature(wf.name, loop(**stored), {}, workflow_version=wf.version)
+                  for stored in ({}, {"crf": 19}, {"crf": 23})}
+    assert len(signatures) == 1
+
+
 def test_flux_still_groups_by_its_namesake_upscale_model():
     # Flux reads upscale_model on BOTH paths: with the toggle off it drives the
     # plain 4x upscale the workflow is named for, so there it is a genuine

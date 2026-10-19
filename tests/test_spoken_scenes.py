@@ -22,7 +22,7 @@ def _nodes(payload, class_type):
 
 
 def _writer_audio(payload):
-    (writer,) = _nodes(payload, "CreateVideo")
+    (writer,) = _nodes(payload, "VHS_VideoCombine")
     return payload[writer["inputs"]["audio"][0]]
 
 

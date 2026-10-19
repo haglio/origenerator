@@ -10,11 +10,8 @@ from origenerator.workflows.base import (
     WorkflowTemplate,
     scene_prompts,
 )
-from origenerator.workflows.frame_rate import (
-    MAX_PLAYBACK_FPS,
-    NATIVE_FPS,
-    playback_rate,
-)
+from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
+from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import (
     wan_expert_lora_params,
     wan_expert_model_params,
@@ -66,7 +63,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "lora_strength_high": 1.0,
             "lora_strength_low": 1.0,
             "frame_rate": NATIVE_FPS,
-            "crf": 19,
             "filename_prefix": "video/flf2v_loop",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "vae_name": "wan_2.1_vae.safetensors",
@@ -264,21 +260,5 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
             },
-            "16": {
-                "class_type": "VHS_VideoCombine",
-                "inputs": {
-                    "images": frames_ref,
-                    "audio": audio_ref,
-                    "frame_rate": playback_rate(params["frame_rate"]),
-                    "loop_count": 0,
-                    "filename_prefix": params["filename_prefix"],
-                    "format": "video/h264-mp4",
-                    "pix_fmt": "yuv420p",
-                    "crf": params["crf"],
-                    "save_metadata": True,
-                    "trim_to_audio": False,
-                    "pingpong": False,
-                    "save_output": True,
-                },
-            },
+            self.output_node_id: video_writer(frames_ref, audio_ref, params),
         }

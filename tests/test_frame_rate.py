@@ -27,14 +27,10 @@ def test_a_rate_between_two_multiples_is_written_at_the_nearer_one():
     assert (rate_multiplier(30), playback_rate(30)) == (2, 32.0)
 
 
-def test_no_rate_is_faster_than_the_video_writer_will_accept():
-    # ComfyUI's CreateVideo refuses an fps over 120 at validation time, before
-    # anything runs — the user sees a Generate button that does nothing. So a
-    # rate past the ceiling comes back as the ceiling, not as a dead submit.
-    assert MAX_PLAYBACK_FPS <= 120.0
+def test_a_rate_past_the_fastest_is_written_at_the_fastest():
+    assert MAX_PLAYBACK_FPS == 7 * NATIVE_FPS
     for asked in (113, 120, 128, 240, 10_000):
         assert playback_rate(asked) == MAX_PLAYBACK_FPS
-        assert playback_rate(asked) % NATIVE_FPS == 0
 
 
 def test_a_rate_under_the_native_one_still_plays_at_true_speed():

@@ -13,13 +13,10 @@ from origenerator.workflows.base import (
     WorkflowTemplate,
     scene_prompts,
 )
-from origenerator.workflows.frame_rate import (
-    MAX_PLAYBACK_FPS,
-    NATIVE_FPS,
-    playback_rate,
-)
+from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.model_arch import WAN_S2V
 from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import (
     wan_expert_lora_params,
     wan_expert_model_params,
@@ -47,16 +44,16 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     input image is encoded with CLIP-Vision and fed to ``WanImageToVideo``, then
     denoised by two ``KSamplerAdvanced`` passes (high-noise model first, low-noise
     model after), interpolated up to the chosen playback rate
-    (:meth:`~WorkflowTemplate.interpolation_nodes`) and written with the native
-    ``CreateVideo`` + ``SaveVideo`` nodes. The stages hand off at ``split_step``
+    (:meth:`~WorkflowTemplate.interpolation_nodes`) and written by the one video
+    writer every video workflow saves with. The stages hand off at ``split_step``
     (0 = half the steps), and each runs at its own ``cfg_high``/``cfg_low`` —
     LoRA authors tune these per stage (motion lives in the high pass, texture in
     the low), so a recipe can follow their numbers exactly. The output resolution is
     derived in-graph from the input image (see :meth:`build_api_payload`): it
     keeps the image's aspect ratio at a fixed pixel budget rather than a
     hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
-    (:meth:`~WorkflowTemplate.foley_audio_nodes`), whose synced audio
-    ``CreateVideo`` muxes into the file.
+    (:meth:`~WorkflowTemplate.foley_audio_nodes`), whose synced audio the
+    writer muxes into the file.
 
     A story's scene with a line (``scene_lines``) is spoken instead: that
     scene's segments render on WAN 2.2's speech-to-video model, hearing the
@@ -372,7 +369,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 audio_ref)
             speech.update(track)
         # The decode's frames are the clip's motion; the writer's are that motion
-        # shown more often. Foley above watches the former, CreateVideo below
+        # shown more often. Foley above watches the former, the writer below
         # encodes the latter, and at the native rate they are the same frames.
         interpolate, frames_ref = self.interpolation_nodes("25", decoded_ref, params)
         return {
@@ -427,21 +424,5 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
             },
-            "18": {
-                "class_type": "CreateVideo",
-                "inputs": {
-                    "images": frames_ref,
-                    "fps": playback_rate(params["frame_rate"]),
-                    "audio": audio_ref,
-                },
-            },
-            "19": {
-                "class_type": "SaveVideo",
-                "inputs": {
-                    "video": ["18", 0],
-                    "filename_prefix": params["filename_prefix"],
-                    "format": "auto",
-                    "codec": "auto",
-                },
-            },
+            self.output_node_id: video_writer(frames_ref, audio_ref, params),
         }

@@ -13,11 +13,7 @@ from origenerator.workflows.derived_size import (
     override_size,
     resolve_input_image_path,
 )
-from origenerator.workflows.frame_rate import (
-    MAX_PLAYBACK_FPS,
-    NATIVE_FPS,
-    playback_rate,
-)
+from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import NO_LORA, list_model_files
 from origenerator.workflows.motion_aim import detect_grip_aim
@@ -28,6 +24,7 @@ from origenerator.workflows.motion_track import (
     motion_tracks,
     scaled_motion_params,
 )
+from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import wan_expert_lora_params
 
 
@@ -39,7 +36,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     conditions the ATI-finetuned WAN 2.1 checkpoint on it, and the video obeys.
     The same track then becomes the funscript (:meth:`authored_actions`) — one
     source, exact by construction, no pixel measurement. The decoded frames
-    still get the HunyuanVideo-Foley scoring pass, muxed by ``CreateVideo``, and
+    still get the HunyuanVideo-Foley scoring pass, muxed in by the writer, and
     are interpolated up to the chosen playback rate on their way to it
     (:meth:`~WorkflowTemplate.interpolation_nodes`) — the track, the funscript
     and the audio all stay on the clip's real seconds, which the rate no longer
@@ -201,7 +198,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         width, height = self._output_size(params)
         motion_params = scaled_motion_params(params, width, height)
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)
-        # Foley scores the decoded frames; CreateVideo encodes the interpolated
+        # Foley scores the decoded frames; the writer encodes the interpolated
         # ones. At the native rate they are the same frames.
         interpolate, frames_ref = self.interpolation_nodes("23", ["13", 0], params)
         # High/low-noise LoRA pair, emulated on the single 2.1 base: the
@@ -325,21 +322,5 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
                 "class_type": "VAEDecode",
                 "inputs": {"samples": ["12", 0], "vae": ["2", 0]},
             },
-            "14": {
-                "class_type": "CreateVideo",
-                "inputs": {
-                    "images": frames_ref,
-                    "fps": playback_rate(params["frame_rate"]),
-                    "audio": audio_ref,
-                },
-            },
-            "15": {
-                "class_type": "SaveVideo",
-                "inputs": {
-                    "video": ["14", 0],
-                    "filename_prefix": params["filename_prefix"],
-                    "format": "auto",
-                    "codec": "auto",
-                },
-            },
+            self.output_node_id: video_writer(frames_ref, audio_ref, params),
         }

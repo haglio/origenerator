@@ -201,9 +201,7 @@ _STAGE_NAMES = {
     "ImageUpscaleWithModel": "Upscaling",
     "VAEDecode": "Decoding frames",
     "RIFE VFI": "Smoothing the motion",
-    "CreateVideo": "Writing the video",
     "VHS_VideoCombine": "Writing the video",
-    "SaveVideo": "Writing the video",
     "SaveImage": "Saving the image",
 }
 

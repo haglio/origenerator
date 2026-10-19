@@ -59,6 +59,11 @@ def _node_id(payload: dict, class_type: str) -> str | None:
     return None
 
 
+_VIDEO_WORKFLOWS = [
+    n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
+]
+
+
 def test_workflows_declare_the_params_that_identify_their_model():
     # The gallery groups a workflow's generations by these param values, so each
     # workflow names the param(s) that pick its model.
@@ -1120,15 +1125,17 @@ def test_wan22_extract_output_info():
     assert files[0]["filename"] == "flf2v_loop_00001.mp4"
 
 
-def test_wan22_extract_output_info_lists_the_soundless_copy_beside_the_sounded_file():
-    wf = Wan22Flf2vLoopWorkflow()
-    history = {"outputs": {"16": {"gifs": [
-        {"filename": "flf2v_loop_00001-audio.mp4", "subfolder": "video", "type": "output",
-         "workflow": "flf2v_loop_00001.png"},
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_a_videos_file_with_sound_is_listed_beside_its_soundless_copy(name):
+    wf = WORKFLOW_REGISTRY[name]
+    stem = wf.default_params()["filename_prefix"].rpartition("/")[2] + "_00001"
+    history = {"outputs": {wf.output_node_id: {"gifs": [
+        {"filename": f"{stem}-audio.mp4", "subfolder": "video", "type": "output",
+         "workflow": f"{stem}.png"},
     ]}}}
     files = wf.extract_output_info(history)
-    assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
-    assert files[1] == {"filename": "flf2v_loop_00001.mp4", "subfolder": "video",
+    assert [f["filename"] for f in files] == [f"{stem}-audio.mp4", f"{stem}.mp4"]
+    assert files[1] == {"filename": f"{stem}.mp4", "subfolder": "video",
                         "type": "output", "role": "silent"}
 
 
@@ -1208,11 +1215,6 @@ def test_wan22_i2v_build_api_payload_structure():
         for n in payload.values()
     )
 
-    # Native video output nodes (CreateVideo + SaveVideo), not VHS
-    assert _find_node(payload, "CreateVideo") is not None
-    assert _find_node(payload, "SaveVideo") is not None
-    assert _find_node(payload, "VHS_VideoCombine") is None
-
 
 def test_wan22_i2v_zero_split_still_hands_off_at_half_the_steps():
     wf = Wan22I2vWorkflow()
@@ -1249,7 +1251,7 @@ def test_a_recipe_stored_with_one_shared_strength_still_renders_at_that_strength
 def test_wan22_i2v_payload_generates_synced_foley_audio():
     # Every i2v render carries a HunyuanVideo-Foley pass: the decoded frames
     # drive the foley sampler (so the audio follows the on-screen motion), and
-    # its output is muxed into the file by CreateVideo's audio input. The
+    # its output is muxed into the file by the writer's audio input. The
     # sampler's duration must equal the video's, derived from the same
     # frame_count/frame_rate the video nodes use, or the tracks drift.
     wf = Wan22I2vWorkflow()
@@ -1281,10 +1283,9 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
     assert payload[deps_id]["inputs"]["vae_name"] == params["foley_vae"]
     assert payload[deps_id]["inputs"]["synchformer_name"] == params["foley_synchformer"]
 
-    # Slot 0 is audio_first — the single generated track — and CreateVideo
-    # muxes it, so the SaveVideo output is a video WITH sound.
-    create = _find_node(payload, "CreateVideo")
-    assert create["inputs"]["audio"] == [sampler_id, 0]
+    # Slot 0 is audio_first — the single generated track — and the writer
+    # muxes it, so the saved file is a video WITH sound.
+    assert payload[wf.output_node_id]["inputs"]["audio"] == [sampler_id, 0]
 
 
 @pytest.mark.parametrize("listed_under", ["images", "gifs"])
@@ -1356,13 +1357,13 @@ def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
     unet = _find_node(payload, "UNETLoader")
     assert unet["inputs"]["unet_name"] == params["unet"]
 
-    # The foley pass rides the decoded frames and CreateVideo muxes it, exactly
+    # The foley pass rides the decoded frames and the writer muxes it, exactly
     # like the other video workflows.
     sampler_id = _node_id(payload, "HunyuanFoleySampler")
     decode_id = _node_id(payload, "VAEDecode")
     assert payload[sampler_id]["inputs"]["image"] == [decode_id, 0]
     assert payload[sampler_id]["inputs"]["seed"] == 8
-    assert _find_node(payload, "CreateVideo")["inputs"]["audio"] == [sampler_id, 0]
+    assert payload[wf.output_node_id]["inputs"]["audio"] == [sampler_id, 0]
 
 
 def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
@@ -2003,7 +2004,6 @@ def test_wan22_t2i_build_api_payload_structure():
     assert _find_node(payload, "ImageFromBatch") is not None
     save = _find_node(payload, "SaveImage")
     assert save["inputs"]["filename_prefix"] == params["filename_prefix"]
-    assert _find_node(payload, "SaveVideo") is None
     assert _find_node(payload, "VHS_VideoCombine") is None
 
     # The positive prompt is encoded and feeds both samplers.
@@ -2227,10 +2227,6 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 
 # ---- video length and rate, as the form offers them ----
 
-_VIDEO_WORKFLOWS = [
-    n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
-]
-
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates(name):
@@ -2244,8 +2240,7 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates
     assert (frames.min_val, frames.step) == (5, 4)     # the models' 4k+1 frames
     # Every rate offered is a whole multiple of the native one, because those are
     # the only rates the interpolator can actually produce the frames for — and
-    # none is past what the video writer accepts, which is what a rate that
-    # can't be submitted looks like from the form.
+    # none is past the fastest a video is written at.
     assert rate.options == [16, 32, 48, 64, 80, 96, 112]
     assert all(playback_rate(r) == r for r in rate.options)
     assert rate.unit == "fps"
@@ -2344,7 +2339,8 @@ def test_a_chained_clip_hands_the_writer_every_frame_once_in_order():
     # with each seam one shared frame long.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
-    joined = payload[_find_node(payload, "CreateVideo")["inputs"]["images"][0]]
+    written = payload[wf.output_node_id]["inputs"]["images"]
+    joined = payload[written[0]]
     pieces = []
     while joined["class_type"] == "ImageBatch":
         new = payload[joined["inputs"]["image2"][0]]
@@ -2355,7 +2351,7 @@ def test_a_chained_clip_hands_the_writer_every_frame_once_in_order():
     first = payload[payload[payload[joined["inputs"]["samples"][0]]["inputs"]["latent_image"][0]]["inputs"]["latent_image"][0]]
     assert [first["inputs"]["length"]] + pieces == [161, 160, 160]
     # Foley scores the same joined frames the writer encodes
-    assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["image"] == _find_node(payload, "CreateVideo")["inputs"]["images"]
+    assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["image"] == written
 
 
 def test_each_chained_segment_draws_its_own_noise():
@@ -2486,17 +2482,22 @@ def test_the_audio_is_scored_for_the_scenes_as_they_add_up():
     assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["duration"] == pytest.approx(241 / 16)
 
 
+# ---- the file every video is saved as ----
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_every_video_is_saved_as_h264_at_one_high_quality(name):
+    wf = WORKFLOW_REGISTRY[name]
+    params = wf.default_params()
+    writer = wf.build_api_payload(params)[wf.output_node_id]
+
+    assert writer["class_type"] == "VHS_VideoCombine"
+    inputs = writer["inputs"]
+    assert (inputs["format"], inputs["pix_fmt"], inputs["crf"]) == ("video/h264-mp4", "yuv420p", 13)
+    assert inputs["filename_prefix"] == params["filename_prefix"]
+
+
 # ---- the frames between the frames ----
-
-
-def _video_writer(payload: dict) -> tuple[dict, str]:
-    """The node that encodes the file, and the name of its playback-rate input.
-
-    The native writer (CreateVideo) calls it ``fps``; VHS_VideoCombine calls it
-    ``frame_rate``. Every video workflow writes with one of the two.
-    """
-    node = _find_node(payload, "CreateVideo") or _find_node(payload, "VHS_VideoCombine")
-    return node, "fps" if node["class_type"] == "CreateVideo" else "frame_rate"
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
@@ -2508,9 +2509,9 @@ def test_a_clip_played_at_the_native_rate_carries_no_interpolation_at_all(name):
     payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=NATIVE_FPS))
 
     assert _find_node(payload, "RIFE VFI") is None
-    writer, rate_input = _video_writer(payload)
-    assert writer["inputs"]["images"] == [_node_id(payload, "VAEDecode"), 0]
-    assert writer["inputs"][rate_input] == 16.0
+    writer = payload[wf.output_node_id]["inputs"]
+    assert writer["images"] == [_node_id(payload, "VAEDecode"), 0]
+    assert writer["frame_rate"] == 16.0
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
@@ -2527,9 +2528,9 @@ def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(n
     assert rife["multiplier"] == 3
     assert rife["ckpt_name"] == RIFE_CHECKPOINT
 
-    writer, rate_input = _video_writer(payload)
-    assert writer["inputs"]["images"] == [rife_id, 0]
-    assert writer["inputs"][rate_input] == 48.0
+    writer = payload[wf.output_node_id]["inputs"]
+    assert writer["images"] == [rife_id, 0]
+    assert writer["frame_rate"] == 48.0
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
@@ -2558,21 +2559,17 @@ def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
     payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=60.0))
 
     assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 4
-    writer, rate_input = _video_writer(payload)
-    assert writer["inputs"][rate_input] == 64.0
+    assert payload[wf.output_node_id]["inputs"]["frame_rate"] == 64.0
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
-def test_no_payload_asks_the_writer_for_a_rate_it_would_refuse(name):
-    # CreateVideo validates fps <= 120 and rejects the whole graph above it, so
-    # a stored recipe carrying a rate from before this ceiling — or a number
-    # typed past the field's own range — still has to submit. It lands on the
-    # ceiling instead of on a Generate button that does nothing.
+def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
+    # A stored recipe carrying a rate from before this ceiling, or a number
+    # typed past the field's own range, is written at the ceiling.
     wf = WORKFLOW_REGISTRY[name]
     for asked in (128.0, 240.0, 10_000.0):
         payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=asked))
-        writer, rate_input = _video_writer(payload)
-        assert writer["inputs"][rate_input] == MAX_PLAYBACK_FPS
+        assert payload[wf.output_node_id]["inputs"]["frame_rate"] == MAX_PLAYBACK_FPS
         assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 7
 
 

@@ -1253,14 +1253,14 @@ class SlideshowView(QWidget):
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same
-        jump a satellite's map makes; *lock* keeps it there (the double-click),
-        exactly as it locks a Funestra's clip."""
+        jump a satellite's map makes; *lock* (the double-click) then takes
+        Down's whole lock there."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
         self._jump_to(slide)
-        if lock and not self._playlist.locked:
-            self._flip_lock()
+        if lock:
+            self._lock_current()
 
     def _jump_to(self, slide) -> None:
         """Stand the slideshow on *slide*, wherever the map found it: the lock

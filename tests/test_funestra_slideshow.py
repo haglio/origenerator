@@ -341,14 +341,19 @@ def test_the_panel_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_locks_it(qtbot, tmp_path):
-    """The same jump a click makes on a Funestra's own map, and the same lock its
-    double-click takes."""
-    slideshow = _slideshow(qtbot, tmp_path)
+    """The same jump a click makes on a Funestra's own map, and the whole of the
+    lock its Lock button takes."""
+    asked = []
+    actions = SlideshowActions(favorite=lambda pid: asked.append(("star", pid)),
+                               enhance=lambda pid: asked.append(("enhance", pid)) or True,
+                               lock=lambda pid: asked.append(("lock", pid)))
+    slideshow = _slideshow(qtbot, tmp_path, actions=actions)
     _sent(slideshow)
 
     slideshow.show_item("three.png", lock=True)
 
-    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON"]
+    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON three.png"]
+    assert asked == [("star", "id-3"), ("enhance", "id-3"), ("lock", "id-3")]
 
 
 def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):

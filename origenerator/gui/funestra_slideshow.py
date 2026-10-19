@@ -386,13 +386,16 @@ class FunestraSlideshow(QObject):
         held = aimed_at or self._what_is_up()
         if held != self._what_is_up():
             self._follow(held)
+        self._full_lock(held)
+        return True
+
+    def _full_lock(self, held: str) -> None:
         self._lock(True, held)
         self.favorite()
         self._enhance_current()
         prompt_id = self._set.current_prompt_id()
         if self._actions.lock is not None and prompt_id is not None:
             self._actions.lock(prompt_id)
-        return True
 
     def _what_is_up(self) -> str:
         current = self._set.playlist.current()
@@ -515,12 +518,12 @@ class FunestraSlideshow(QObject):
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump
-        it makes on a Funestra's own map; *lock* keeps it there."""
+        it makes on a Funestra's own map; *lock* gives it the full lock."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
         self._jump_to(slide)
-        self._lock(lock)
+        self._full_lock(self._file_of(slide)) if lock else self._lock(False)
 
     def _jump_to(self, slide) -> None:
         """Stand the pass on *slide* and send the Funestra there.

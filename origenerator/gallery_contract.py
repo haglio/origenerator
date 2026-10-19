@@ -1,21 +1,18 @@
-"""What a reader of this app's gallery database must know, published for it.
+"""What another app must know to read this app's gallery and the videos it sends.
 
 Evolver mounts the gallery read-only and reads two things out of it: the row
-that made a clip, which becomes that clip's metadata sidecar, and the stamp
+that made a video, which becomes that video's metadata sidecar, and the stamp
 that says a send has been taken back, which tells it to delete the copies it is
-holding.  It cannot import this package -- no app here reaches into another's
-repo -- so it worked from names spelled on its own side: a table, nine columns,
-two withdrawal stamps and the param keys a model is named under.
+holding.  Upscaling a video, it gives Topaz only the frames its model generated:
+smoothing the motion puts a whole number of frames between each two of those and
+keeps them all, so at M times the generated rate they are every M-th frame from the first.
 
-Spelled over there, those names were a copy of these, and nothing compared the
-two: a column renamed here left every row reading as never sent, with both
-suites green.  Spelled here they are the promise this app makes, and
-``origenerator_gallery_contract.json`` at the checkout root is how they travel.
-Run ``python -c "from origenerator.gallery_contract import publish; publish()"``
-to rewrite it; the suite fails on a copy that no longer matches, and on a
-promise the table cannot keep.
+It cannot import this package -- no app here reaches into another's repo -- so
+this module is the promise, and ``origenerator_gallery_contract.json`` at the
+checkout root is how it travels: ``publish()`` rewrites it, and the suite fails
+on a copy that no longer matches and on a promise the table cannot keep.
 
-What is NOT here is the inbox folder each lane's clips arrive under.  That name
+What is NOT here is the inbox folder each lane's videos arrive under.  That name
 is library vocabulary, which the sanitize blocklist keeps out of a tracked file;
 both apps read it from their own content overlay and the two must agree.
 """
@@ -83,6 +80,8 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 def declaration() -> dict:
     """The published document, as a reader reads it."""
+    from origenerator.workflows.frame_rate import NATIVE_FPS  # noqa: PLC0415
+
     return {
         "database_path": DATABASE_PATH,
         "table": TABLE,
@@ -92,6 +91,7 @@ def declaration() -> dict:
         "params_input_image_key": PARAMS_INPUT_IMAGE_KEY,
         "lanes": {lane: dict(stamps) for lane, stamps in LANES.items()},
         "silent_copy_role": SILENT_COPY_ROLE,
+        "generated_fps": NATIVE_FPS,
     }
 
 

@@ -11117,6 +11117,63 @@ def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_p
     assert preview._stack.currentWidget() is preview._combination
 
 
+def test_open_in_generator_links_to_the_picture_and_the_video_before_generating(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._combine._open_combination("img", "vid")
+
+    related = _front_panel(view)._related
+    assert not related._source_tile.isHidden()
+    assert related._source_tile._prompt_id == "img"
+    assert not related._source_video_tile.isHidden()
+    assert related._source_video_tile._prompt_id == "vid"
+
+
+def test_the_video_an_opened_combination_makes_keeps_both_links(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_combine_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._combine._open_combination("img", "vid")
+    panel = _front_panel(view)
+    panel._on_generate()
+    job = next(iter(view._live_jobs.values()))
+
+    client.job_completed.emit(job.prompt_id, _VID_REROLL_HISTORY)
+
+    assert panel.displayed_row()["prompt_id"] == job.prompt_id
+    assert panel._related._source_tile._prompt_id == "img"
+    assert panel._related._source_video_tile._prompt_id == "vid"
+    assert not panel._related._source_video_tile.isHidden()
+
+
+def test_an_act_opened_links_to_the_past_video_its_settings_came_from(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+
+    view._combine._open_category("img", "dancing")
+
+    related = _front_panel(view)._related
+    assert related._source_tile._prompt_id == "img"
+    assert related._source_video_tile._prompt_id == "vid"
+
+
+def test_an_act_whose_settings_came_from_no_video_links_to_the_picture_alone(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._combine._open_category("img", "gamma")
+
+    related = _front_panel(view)._related
+    assert related._source_tile._prompt_id == "img"
+    assert related._source_video_tile.isHidden()
+
+
 def _combine_view_with_a_looping_recipe(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

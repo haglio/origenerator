@@ -1,10 +1,9 @@
 """What else in the library a shown generation is tied to.
 
-Two links, stacked under a config tab's settings form: the item this row was
-built from, and the videos an image was animated into. They are mutually
-exclusive in practice — a video has a start frame and no animations, an image is
-the other way round — and both are hidden whenever the tab has no generation on
-display.
+The links under a config tab's settings form: the item this row was built from
+with, beside it, the video whose settings Combine ran on it, and the videos an
+image was animated into. A video has the first two and no animations, an image
+the other way round.
 
 "Built from" is one slot answering three relations, because they are one
 question: a video's start frame, the item a spoken request revised, and — for the
@@ -23,7 +22,8 @@ import logging
 from collections.abc import Callable
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.gallery import (
@@ -33,7 +33,7 @@ from origenerator.gallery import (
     videos_from_source_image,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
-from origenerator.gui.source_image_tile import SourceImageTile
+from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
@@ -46,10 +46,11 @@ ANIMATED_STRIP_LIMIT = 8
 class RelatedMedia(QWidget):
     """The links under a tab's form, about the row on display."""
 
-    source_activated = pyqtSignal(str)     # the source tile was clicked (prompt_id)
+    source_activated = pyqtSignal(str)     # a source tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)   # an animation tile was clicked (prompt_id)
 
     def __init__(self, parent=None, *, video_rows=None,
+                 row_of: Callable[[str], dict | None],
                  name_of: Callable[[str], str]):
         """``video_rows`` answers the library's videos, and is asked only for a
         row that could have animations, or is a cycle cut out of one of them —
@@ -59,17 +60,21 @@ class RelatedMedia(QWidget):
         """
         super().__init__(parent)
         self._video_rows = video_rows or (list)
+        self._row_of = row_of
         self._name_of = name_of
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        # One tile, one place: the start frame for a video, and for something a
-        # spoken request made, the item it was asked about — the same kind of
-        # link (this came from that) in the same spot, rather than a second tile
-        # teaching the reader a second place to look.
-        self._source_tile = SourceImageTile()
+        layout.setSpacing(GAP_MEDIUM)
+        self._source_tile = SourceTile()
         self._source_tile.activated.connect(self.source_activated)
-        layout.addWidget(self._source_tile)
+        self._source_video_tile = SourceTile()
+        self._source_video_tile.activated.connect(self.source_activated)
+        built_from = QHBoxLayout()
+        built_from.setSpacing(GAP_MEDIUM)
+        built_from.addWidget(self._source_tile)
+        built_from.addWidget(self._source_video_tile)
+        built_from.addStretch(1)
+        layout.addLayout(built_from)
         self._animated_strip = AnimatedVideoStrip()
         self._animated_strip.video_activated.connect(self.animated_activated)
         layout.addWidget(self._animated_strip)
@@ -82,12 +87,14 @@ class RelatedMedia(QWidget):
         the spoken request that made this row, when one did.
         """
         self._show_source_tile(row, image_rows, request)
+        self._show_source_video_tile(row)
         # Hides itself when empty, which for anything but an animated image it is.
         self._animated_strip.show_videos(self._animated_items(row))
 
     def clear(self) -> None:
-        """Put both links down — the tab has no generation on display."""
+        """Put every link down — the tab has no generation on display."""
         self._source_tile.clear()
+        self._source_video_tile.clear()
         self._animated_strip.hide()
 
     def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
@@ -103,6 +110,18 @@ class RelatedMedia(QWidget):
             source_row["prompt_id"], source_row.get("thumbnail_path"),
             self._name_of(source_row["prompt_id"]),
             heading=heading, media_type=media_type,
+        )
+
+    def _show_source_video_tile(self, row: dict) -> None:
+        video_id = row.get("recipe_video_id")
+        video = self._row_of(video_id) if video_id else None
+        if video is None:
+            self._source_video_tile.clear()
+            return
+        self._source_video_tile.show_source(
+            video["prompt_id"], video.get("thumbnail_path"),
+            self._name_of(video["prompt_id"]),
+            heading="From source video", media_type=MediaType.VIDEO, gray=True,
         )
 
     def _built_from(self, row: dict, image_rows: list[dict], request):

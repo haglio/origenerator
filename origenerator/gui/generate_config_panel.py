@@ -442,12 +442,14 @@ class GenerateConfigPanel(QWidget):
         """What the generation on display is tied to, below the form: what it
         was built from and what it was animated into
         (:class:`~origenerator.gui.related_media.RelatedMedia`), and every version
-        an enhanced image holds. All of it hidden when the tab isn't showing a
-        saved generation, and stacked straight under the form with no stretch
-        between — a stretch grew an elastic gap above them by exactly what folding
-        a form section saved.
+        an enhanced image holds. All of it hidden while the tab shows no saved
+        generation, unless Combine opened it, and stacked straight under the form
+        with no stretch between — a stretch grew an elastic gap above them by
+        exactly what folding a form section saved.
         """
-        self._related = RelatedMedia(video_rows=self._video_rows, name_of=self._names.of)
+        self._related = RelatedMedia(video_rows=self._video_rows,
+                                     row_of=self._db.get_generation,
+                                     name_of=self._names.of)
         self._related.source_activated.connect(self.source_activated)
         self._related.animated_activated.connect(self.animated_activated)
         body.addWidget(self._related)
@@ -799,7 +801,8 @@ class GenerateConfigPanel(QWidget):
 
     def set_recipe_source(self, category: str, video_prompt_id: str | None) -> None:
         """Remember that these settings came out of Combine — the act off its
-        dropdown, and the video whose recipe they are.
+        dropdown, and the video whose recipe they are — and link to that video
+        and the picture under the form, as the generation they make will.
 
         Set after the settings are in (:meth:`prefill` re-picks the workflow,
         which clears this), so what the tab launches carries the mark whether it
@@ -807,6 +810,12 @@ class GenerateConfigPanel(QWidget):
         """
         self._recipe_source = (category or "", video_prompt_id or None)
         self._recipe_row = self._db.get_generation(video_prompt_id) if video_prompt_id else None
+        self._related.show_row(self._the_row_generate_would_make(), self._image_rows())
+
+    def _the_row_generate_would_make(self) -> dict:
+        return {"workflow_name": self._workflow_combo.currentData(),
+                "params_json": json.dumps(self._param_form.get_values()),
+                "recipe_video_id": self._recipe_source[1]}
 
     def recipe_source(self) -> tuple[str, str | None]:
         """``(category, video_prompt_id)`` for a tab Combine opened, else

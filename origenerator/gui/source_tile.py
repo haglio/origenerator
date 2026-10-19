@@ -1,14 +1,14 @@
 """The item a generation was built from, shown as a clickable thumbnail tile.
 
-In the info pane of a video generation: the source image's thumbnail with its
-name centered beneath, styled like the gallery's other thumbnail tiles — a
-thin border and a media-type badge in the corner. Clicking anywhere emits
-``activated`` with the source image's prompt_id, so the gallery navigates to it.
+Under a config tab's form: the item's thumbnail with its name centered beneath,
+styled like the gallery's other thumbnail tiles — a thin border and a media-type
+badge in the corner. Clicking anywhere emits ``activated`` with the item's
+prompt_id, so the gallery navigates to it.
 
-Something a spoken request made borrows the same tile for the item it was
-revised from, which is why the heading and the badge's media type are settable:
-what a request came from may itself be a video, and it is "requested from"
-rather than a start frame.
+A video's start frame is what it shows most often. The other relations borrow
+it — the item a spoken request revised, the clip a cycle was cut out of, the
+video whose settings Combine ran — which is why its heading, its badge and
+whether its picture is drained of color are set with each showing.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator.gui import grid_card
+from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.media import MediaType
 
@@ -28,9 +29,9 @@ _DEFAULT_HEADING = "From source image"
 _DEFAULT_MEDIA_TYPE = MediaType.IMAGE
 
 
-class SourceImageTile(QWidget):
-    """A clickable thumbnail with its name centered beneath, for a video's
-    source image.
+class SourceTile(QWidget):
+    """A clickable thumbnail with its name centered beneath, for what a
+    generation was built from.
 
     ``show_source`` fills and reveals it; ``clear`` hides it and forgets the id so
     a stale click can't navigate. A left click emits ``activated(prompt_id)``.
@@ -70,19 +71,22 @@ class SourceImageTile(QWidget):
         self.hide()
 
     def show_source(self, prompt_id: str, thumbnail_path, name: str,
-                    heading: str | None = None, media_type: str | None = None):
+                    heading: str | None = None, media_type: str | None = None,
+                    gray: bool = False):
         """Point the tile at an item. ``heading`` names the relation when it
-        isn't the usual one — the same slot says "from source image" for a
-        video's start frame, "requested from" for what a request revised, and
-        "trimmed from" for the clip a single cycle was cut out of. That last one
-        is a video, so ``media_type`` moves the badge with it; both settings are
-        per-showing, because the next row put in this slot may be a different
-        relation to a different kind of thing."""
+        isn't the usual one — "requested from" for what a request revised,
+        "trimmed from" for the clip a single cycle was cut out of, "from source
+        video" for the video whose settings Combine ran. The last two are
+        videos, so ``media_type`` moves the badge with them, and ``gray`` drains
+        the one shown only for its settings. All three are per-showing, because
+        the next row put in this tile may be a different relation to a
+        different kind of thing."""
         self._prompt_id = prompt_id
         self._heading.setText(heading or _DEFAULT_HEADING)
         self._badge.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
         self._name.setText(name)
-        self._thumb.setPixmap(self._scaled_thumb(thumbnail_path))
+        thumb = self._scaled_thumb(thumbnail_path)
+        self._thumb.setPixmap(grayscale_pixmap(thumb) if gray else thumb)
         self.show()
 
     def clear(self):

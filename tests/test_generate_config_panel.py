@@ -1124,6 +1124,9 @@ class SpyDB:
     def list_generations(self):
         return []
 
+    def get_generation(self, prompt_id):
+        return None
+
     def library_version(self):
         return 0
 

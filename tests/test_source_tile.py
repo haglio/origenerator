@@ -5,12 +5,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel
 
-from origenerator.gui.source_image_tile import SourceImageTile
+from origenerator.gui.source_tile import SourceTile
 
 
 @pytest.fixture
 def tile(qtbot):
-    t = SourceImageTile()
+    t = SourceTile()
     qtbot.addWidget(t)
     return t
 

@@ -843,8 +843,6 @@ class SlideshowDirector:
         if slideshow is None or self._slideshow is slideshow:
             self._slideshow = next((s for s, _loc in reversed(self._live_slideshows)), None)
         self._host.reconcile_osr2()
-        if self._fun_time is None and self._room_paused:
-            self._host.set_room_paused(False)
         if side is not None:
             # Whatever ended it -- the loop button pressed off, a set culled
             # empty -- the region goes back to browsing its library.  The

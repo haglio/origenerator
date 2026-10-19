@@ -226,8 +226,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     dropping one whose slideshow closed, are two forwarders to the voice.
     281 -> 278: Esc pauses the room rather than stopping everything and
     putting it back, so the four methods that read, stopped and restarted
-    what was running went, and one asks whether the OSR2 is moving.)"""
+    what was running went, and one asks whether the OSR2 is moving. 278 -> 277:
+    Esc in a text field is the field's even while the OSR2 moves, so that
+    question went too.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 278
+               for x in _class_def(VIEW, "GalleryView").body) == 277
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

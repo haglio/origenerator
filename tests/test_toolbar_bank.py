@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import QToolButton
 from shared_ui.spacing import BUTTON_MARK_INSET, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
+from origenerator.gui import omnipause
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
@@ -24,6 +25,7 @@ from origenerator.gui.toolbar_bank import (
     Button,
     ToolbarBank,
 )
+from tests.lit_switches import lit_in
 
 
 def _acts(**overrides) -> BankActs:
@@ -91,6 +93,24 @@ def test_a_bank_handed_back_from_a_session_has_its_room_switches_again(bank):
 
     assert all(switch is not None and not switch.isHidden()
                for switch in (taken.audio, taken.mic))
+
+
+def test_the_sound_switch_turned_on_in_a_paused_room_is_lit_yellow_at_once(bank):
+    switch = bank().audio
+    omnipause.freeze(True)
+
+    switch.setChecked(True)
+
+    assert lit_in(switch) == "yellow"
+
+
+def test_the_sound_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_one(bank):
+    switch = bank().audio
+    playing = switch.grab().toImage()
+
+    omnipause.freeze(True)
+
+    assert switch.grab().toImage() == playing
 
 
 def test_the_bank_opens_with_its_optional_buttons_away(bank):

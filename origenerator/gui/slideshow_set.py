@@ -160,10 +160,10 @@ class SlideshowSet:
         keep_id = current.prompt_id if keep_slide and current is not None else None
         start = next((index for index, item in enumerate(items)
                       if keep_id is not None and item.prompt_id == keep_id), None)
-        paused = self.playlist.paused
+        pauses = self.playlist.pauses
         self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
                                    start=start, shuffle=shuffle)
-        self.playlist.set_paused(paused)
+        self.playlist.pauses = pauses
         if new_set:
             self.lead_with_what_is_being_made()
             self._a_row_played_whole_is_its_loop()

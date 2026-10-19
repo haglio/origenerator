@@ -61,7 +61,13 @@ from origenerator.gui.slideshow_set import (
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.media import MediaType
-from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
+from origenerator.slideshow import (
+    PAUSED_BY_VOICE,
+    PAUSED_FOR_A_REQUEST,
+    Slide,
+    SlideshowFilters,
+    SlideshowState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -783,11 +789,15 @@ class FunestraSlideshow(QObject):
         their paused flag, so there is nothing to do here — a frozen Funestra
         holds the picture, and nothing advances until it is let go."""
 
+    def set_spoken_pause(self, paused: bool) -> None:
+        self._set.playlist.set_paused(paused, PAUSED_BY_VOICE)
+        self._tell_the_keep()
+
     def pause_for_request(self, paused: bool, note: str = "") -> None:
         """Keep the slide on screen while a request is being spoken: a request
         is about what is on screen, and a set that pages on every few seconds
         would hand the words to whatever came up next."""
-        self._set.playlist.set_paused(paused)
+        self._set.playlist.set_paused(paused, PAUSED_FOR_A_REQUEST)
         self._tell_the_keep()
         if note:
             self._note(note)

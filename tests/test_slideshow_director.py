@@ -86,6 +86,7 @@ class FakeSlideshow:
         self.reordered = None
         self.kept_the_slide = None
         self.dwell_s = 0
+        self.spoken_pause = False
         self.paused = None
         self.audio_muted = None
         self.window_title = None
@@ -200,6 +201,9 @@ class FakeSlideshow:
 
     def set_dwell_s(self, seconds):
         self.dwell_s = seconds
+
+    def set_spoken_pause(self, paused):
+        self.spoken_pause = paused
 
     def set_paused(self, paused):
         if self.pause_raises:
@@ -1259,14 +1263,25 @@ def test_the_spoken_close_with_no_slideshow_up_says_so(slideshows):
     assert made == []
 
 
-def test_the_spoken_pause_with_no_slideshow_sets_what_the_next_one_opens_at(slideshows):
-    # A slideshow that never moves on is exactly what a stopped picture is here.
+def test_the_spoken_pause_holds_the_slideshow_and_leaves_the_clip_seconds_alone(slideshows):
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+    director._pace.set_seconds(7)
+
+    director.run_slideshow_command(SlideshowCommand.PAUSE, None)
+    paused = (made[0].spoken_pause, director._pace.seconds)
+    director.run_slideshow_command(SlideshowCommand.START, None)
+
+    assert (paused, made[0].spoken_pause, director._pace.seconds) == ((True, 7), False, 7)
+
+
+def test_the_spoken_pause_with_no_slideshow_says_so_and_leaves_the_clip_seconds_alone(slideshows):
     director, host, _made = slideshows()
+    director._pace.set_seconds(7)
 
     director.run_slideshow_command(SlideshowCommand.PAUSE, None)
 
-    assert director._pace.seconds == 0
-    assert host.said == ["🎤 no slideshow to pause"]
+    assert (director._pace.seconds, host.said) == (7, ["🎤 no slideshow to pause"])
 
 
 def test_a_spoken_word_is_answered_in_the_slideshows_own_corner(slideshows):

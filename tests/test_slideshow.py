@@ -7,6 +7,8 @@ from dataclasses import asdict
 
 from origenerator.slideshow import (
     LIVE,
+    PAUSED_BY_VOICE,
+    PAUSED_FOR_A_REQUEST,
     Slide,
     SlideshowFilters,
     SlideshowPlaylist,
@@ -178,11 +180,11 @@ def test_in_order_leaves_the_set_exactly_as_handed_over():
 def test_a_paused_playlist_has_no_dwell_either():
     # What a spoken request puts on the slideshow while the sentence is being said.
     playlist = _playlist()
-    playlist.set_paused(True)
+    playlist.set_paused(True, PAUSED_FOR_A_REQUEST)
     assert playlist.dwell_ms() is None
     assert playlist.locked_or_paused()
 
-    playlist.set_paused(False)
+    playlist.set_paused(False, PAUSED_FOR_A_REQUEST)
     assert playlist.dwell_ms() == playlist.image_dwell_ms
 
 
@@ -192,14 +194,27 @@ def test_the_pause_and_the_lock_are_independent():
     # quietly resume a slideshow that is still listening.
     playlist = _playlist()
     playlist.toggle_lock()
-    playlist.set_paused(True)
+    playlist.set_paused(True, PAUSED_FOR_A_REQUEST)
 
-    playlist.set_paused(False)
+    playlist.set_paused(False, PAUSED_FOR_A_REQUEST)
     assert playlist.locked and playlist.locked_or_paused()
 
-    playlist.set_paused(True)
+    playlist.set_paused(True, PAUSED_FOR_A_REQUEST)
     playlist.unlock()
     assert playlist.paused and playlist.locked_or_paused()
+
+
+def test_a_request_ending_leaves_pause_slideshow_in_place_and_start_slideshow_leaves_a_request():
+    playlist = _playlist()
+    playlist.set_paused(True, PAUSED_BY_VOICE)
+    playlist.set_paused(True, PAUSED_FOR_A_REQUEST)
+    playlist.set_paused(False, PAUSED_FOR_A_REQUEST)
+    after_the_request = playlist.paused
+
+    playlist.set_paused(True, PAUSED_FOR_A_REQUEST)
+    playlist.set_paused(False, PAUSED_BY_VOICE)
+
+    assert (after_the_request, playlist.paused) == (True, True)
 
 
 def test_remove_current_drops_the_item_and_advances():

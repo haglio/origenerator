@@ -76,7 +76,14 @@ from origenerator.gui.slideshow_set import (
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
-from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
+from origenerator.slideshow import (
+    PAUSED_BY_VOICE,
+    PAUSED_FOR_A_REQUEST,
+    Slide,
+    SlideshowFilters,
+    SlideshowState,
+    in_order,
+)
 from origenerator.slideshow_buttons import answer
 
 logger = logging.getLogger(__name__)
@@ -1289,13 +1296,17 @@ class SlideshowView(QWidget):
 
     # --- the pause a spoken request puts on the slideshow ------------------
 
+    def set_spoken_pause(self, paused: bool) -> None:
+        self._playlist.set_paused(paused, PAUSED_BY_VOICE)
+        self._tell_the_engine_what_keeps_the_slide()
+
     def pause_for_request(self, paused: bool, note: str = "") -> None:
         """Keep the slide on screen while a request is being spoken, its clip
         playing and its picture moving: a request is about what is on screen.
         ``note`` is what the corner says meanwhile — the only sign, in a view
         with no panels, that the mic is taking a sentence.
         """
-        self._playlist.set_paused(paused)
+        self._playlist.set_paused(paused, PAUSED_FOR_A_REQUEST)
         if paused:
             self._note_timer.stop()  # it holds, rather than fading after a beat
             self._request_note = note

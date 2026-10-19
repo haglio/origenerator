@@ -17,8 +17,9 @@ A dwell of zero means never: the slideshow holds whatever is on screen until an 
 moves it.
 
 A third stop — :attr:`SlideshowPlaylist.paused` — is the slideshow's own rather than
-the user's or the pace's: speaking a request stops the advance for as long as
-the sentence takes, and releases it without disturbing either of the others.
+the user's: speaking a request keeps the slide for as long as the sentence takes,
+and "pause slideshow" until "start slideshow", each released without disturbing
+the other or the lock.
 
 Closing a slideshow is rarely being done with it, so where one was is kept:
 :class:`SlideshowState` says it and :meth:`SlideshowPlaylist.resume` lays a fresh
@@ -45,6 +46,9 @@ DEFAULT_IMAGE_DWELL_MS = 4000
 # a black screen reading "Generating…" is nothing to watch, but the first
 # iterations coming in are the most exciting thing in a folder that is filling.
 LIVE = "live"
+
+PAUSED_FOR_A_REQUEST = "request"
+PAUSED_BY_VOICE = "pause slideshow"
 
 
 class Slide(NamedTuple):
@@ -164,7 +168,7 @@ class SlideshowPlaylist:
         self._pos = (self._order.index(start)
                      if start is not None and 0 <= start < len(self._items) else 0)
         self._locked = False
-        self._paused = False
+        self._pauses: set[str] = set()
         self._image_dwell_ms = image_dwell_ms
         self._waiting: list[int] = []
 
@@ -447,23 +451,25 @@ class SlideshowPlaylist:
 
     @property
     def paused(self) -> bool:
-        """Whether something other than the user's lock is stopping the slide.
+        return bool(self._pauses)
 
-        Speaking a request pauses the slideshow: the request is *about* what is on
-        screen, and a set that pages on every few seconds would hand the words
-        to whatever came up next. Kept apart from the lock so releasing one
-        never releases the other — a paused slide the user had locked stays
-        locked when the request ends, and stepping off a slide (which drops its
-        lock) doesn't quietly resume a slideshow that is still listening.
-        """
-        return self._paused
+    def set_paused(self, paused: bool, reason: str) -> None:
+        if paused:
+            self._pauses.add(reason)
+        else:
+            self._pauses.discard(reason)
 
-    def set_paused(self, paused: bool) -> None:
-        self._paused = bool(paused)
+    @property
+    def pauses(self) -> frozenset[str]:
+        return frozenset(self._pauses)
+
+    @pauses.setter
+    def pauses(self, reasons) -> None:
+        self._pauses = set(reasons)
 
     def locked_or_paused(self) -> bool:
         """Whether anything at all is stopping this slide — locked or paused."""
-        return self._locked or self._paused
+        return self._locked or self.paused
 
     def current_is_video(self) -> bool:
         slide = self.current()

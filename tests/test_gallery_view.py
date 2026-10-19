@@ -14645,33 +14645,32 @@ def test_a_double_clicked_pictures_slideshow_opens_at_the_clip_seconds_set(
     slideshow.close()
 
 
-def test_start_slideshow_sets_a_held_slideshow_going(qtbot, tmp_path, monkeypatch):
-    # A slideshow held at nought is set going by this, and there is no separate
-    # resume to learn.
+def test_start_slideshow_sets_a_paused_slideshow_going_in_the_same_window(
+        qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
-    view._pace.set_seconds(0)
     slideshow = _double_click_slideshow(view, qtbot)
-    assert slideshow.dwell_s == 0
+    view._voice.listener.speak_command("pause slideshow")
 
     view._voice.listener.speak_command("start slideshow")
 
-    assert view._slideshows.showing is slideshow          # the open one, not a second window
-    assert slideshow.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
+    assert view._slideshows.showing is slideshow
     assert _will_move_on(slideshow)
     slideshow.close()
 
 
-def test_pause_slideshow_turns_the_pace_to_nought(qtbot, tmp_path, monkeypatch):
+def test_pause_slideshow_holds_the_slide_and_leaves_the_clip_seconds_alone(
+        qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
+    view._pace.set_seconds(7)
     view._voice.listener.speak_command("start slideshow")
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
 
     view._voice.listener.speak_command("pause slideshow")
 
-    assert slideshow.dwell_s == 0
+    assert view._slideshows.showing is slideshow
     assert not _will_move_on(slideshow)
-    assert view._slideshows.showing is slideshow  # paused, not closed
+    assert slideshow.dwell_s == 7
     slideshow.close()
 
 

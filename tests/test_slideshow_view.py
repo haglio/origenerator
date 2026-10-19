@@ -1409,6 +1409,16 @@ def test_a_request_keeps_the_picture_on_screen_still_moving_and_its_release_lets
     assert (while_said, _engine(view).loop_file) == ((True, False), False)
 
 
+def test_pause_slideshow_keeps_the_picture_on_screen_still_moving_until_start_slideshow(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+
+    view.set_spoken_pause(True)
+    while_paused = (_engine(view).loop_file, _engine(view).paused)
+    view.set_spoken_pause(False)
+
+    assert (while_paused, _engine(view).loop_file) == ((True, False), False)
+
+
 def test_the_rooms_freeze_holds_it_and_its_resume_lets_it_go(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 

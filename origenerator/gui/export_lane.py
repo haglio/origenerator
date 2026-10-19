@@ -50,7 +50,7 @@ class ExportLane:
     unmark: Callable[[Database, str], None]
     noun: str
     tooltip: str
-    delete_tooltip: str
+    unsend_tooltip: str
     withdrawn_tooltip: str
     hands_over_funscript: bool
     carries_loops: bool
@@ -67,17 +67,11 @@ class ExportLane:
 
     @property
     def send_caption(self) -> str:
-        return f"Send to {self.name}"
+        return f"→ Send to {self.name}"
 
     @property
-    def delete_caption(self) -> str:
-        """What the button offers once the clip is over there.
-
-        The send left a file in another app's folders, so the only thing left to
-        offer is its deletion — a tick reading "Sent ✓" was all the button could
-        say while there was no way to take one back, and it said it disabled.
-        """
-        return f"Delete from {self.name}"
+    def sent_caption(self) -> str:
+        return f"✓ Sent to {self.name}"
 
     @property
     def failure_title(self) -> str:
@@ -99,7 +93,7 @@ EVOLVER = ExportLane(
     unmark=lambda db, prompt_id: db.mark_evolver_unsent(prompt_id),
     noun="video",
     tooltip="Copy this video into Evolver's inbox for sorting and upscaling.",
-    delete_tooltip="Delete the copy Evolver holds, wherever it has filed it by "
+    unsend_tooltip="Delete the copy Evolver holds, wherever it has filed it by "
                    "now. It goes on Evolver's next run.",
     withdrawn_tooltip="An earlier copy of this video is down for deletion in "
                       "Evolver. Sending puts a fresh one in its inbox.",
@@ -114,7 +108,7 @@ GENAU = ExportLane(
     noun="clip",
     tooltip="Send this clip down the Genau lane: Evolver upscales it on its "
             "usual schedule, then delivers it to the folder Genau plays from.",
-    delete_tooltip="Delete this clip from the folder Genau plays from. Evolver "
+    unsend_tooltip="Delete this clip from the folder Genau plays from. Evolver "
                    "does it on its next run.",
     withdrawn_tooltip="An earlier copy of this clip is down for deletion in "
                       "Genau's folder. Sending starts a fresh one down the lane.",
@@ -123,6 +117,8 @@ GENAU = ExportLane(
 )
 
 EXPORT_LANES = (EVOLVER, GENAU)
+
+UNSEND_CAPTION = "✕ Unsend"
 
 
 def lane_for(row: dict) -> ExportLane:

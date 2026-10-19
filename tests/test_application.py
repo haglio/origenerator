@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import logging
 import weakref
 
@@ -82,3 +83,9 @@ def test_the_log_says_how_many_it_deleted(qapp, caplog):
         delete_what_python_still_owns(qapp, candidates=lambda: windows)
 
     assert "Deleted 2 object(s) Python still owned" in caplog.text
+
+
+def test_this_copy_goes_once_the_pinned_shared_ui_carries_the_familys():
+    assert importlib.util.find_spec("shared_ui.application") is None, (
+        "shared_ui now carries application(): make main take it from there, and "
+        "delete origenerator/gui/application.py and this file")

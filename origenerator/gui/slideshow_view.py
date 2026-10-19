@@ -316,13 +316,15 @@ class SlideshowView(QWidget):
         if playback is None:
             return
         playback.set_pace(self._dwell_s)
-        # A lock is repeat-one, as it is on a Fun Time satellite; a slideshow
-        # following a run holds its frames the same way, and so does a pace
-        # of nought, since nought means nothing moves on its own -- a finished
-        # clip included.
-        playback.set_locked(self._playlist.locked or self._live or not self._dwell_s)
+        self._tell_the_engine_what_keeps_the_slide()
         self._loads_seen = playback.loads
         self._refusal_checked = False
+
+    def _tell_the_engine_what_keeps_the_slide(self) -> None:
+        playback = self._pane.playback
+        if playback is not None:
+            playback.set_locked(self._playlist.locked_or_paused() or self._live
+                                or not self._dwell_s)
 
     def _the_funestra_opened(self) -> None:
         self._settle()
@@ -382,20 +384,9 @@ class SlideshowView(QWidget):
         self._show_current()
 
     def _apply_freeze(self) -> None:
-        """Hand the Funestra whatever is holding the slideshow still.
-
-        The room's freeze stops everything.  A spoken request stops the slideshow
-        moving on rather than stopping the clip: it is about what is on screen,
-        and a clip that stopped mid-sentence would be answering a question
-        nobody asked.  A picture under one holds where its move had got to,
-        since the alternative is its dwell running out and starting over under
-        the speaker.
-        """
-        request_stills_a_picture = self._playlist.paused and not self._showing_a_video()
-        held = self._paused or request_stills_a_picture
         playback = self._pane.playback
         if playback is not None:
-            playback.set_paused(held)
+            playback.set_paused(self._paused)
 
     def _showing_a_video(self) -> bool:
         return (self._showing_media is not None and not self._frames_on_screen
@@ -1299,11 +1290,9 @@ class SlideshowView(QWidget):
     # --- the pause a spoken request puts on the slideshow ------------------
 
     def pause_for_request(self, paused: bool, note: str = "") -> None:
-        """Stop (or release) the advance while a request is being spoken.
-
-        Not the user's lock: a slide they had locked is still locked when the
-        request ends, and one they hadn't goes back to its dwell. ``note`` is
-        what the corner should say while the slideshow waits — the only sign, in a view
+        """Keep the slide on screen while a request is being spoken, its clip
+        playing and its picture moving: a request is about what is on screen.
+        ``note`` is what the corner says meanwhile — the only sign, in a view
         with no panels, that the mic is taking a sentence.
         """
         self._playlist.set_paused(paused)
@@ -1313,7 +1302,7 @@ class SlideshowView(QWidget):
         else:
             self._request_note = ""
         self._refresh_note()
-        self._apply_freeze()
+        self._tell_the_engine_what_keeps_the_slide()
 
     def note_request(self, message: str, request=None, *,
                      working: bool = False, kind: str = NOTICE) -> None:

@@ -1399,14 +1399,14 @@ def test_a_slideshow_reopened_on_a_locked_slide_opens_it_locked(qtbot):
     assert not _will_move_on(reopened)
 
 
-def test_a_request_pauses_the_picture_and_its_release_lets_it_go(qtbot):
+def test_a_request_keeps_the_picture_on_screen_still_moving_and_its_release_lets_it_go(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
     view.pause_for_request(True, "🎤 listening…")
-    assert _engine(view).paused is True
-
+    while_said = (_engine(view).loop_file, _engine(view).paused)
     view.pause_for_request(False)
-    assert _engine(view).paused is False
+
+    assert (while_said, _engine(view).loop_file) == ((True, False), False)
 
 
 def test_the_rooms_freeze_holds_it_and_its_resume_lets_it_go(qtbot):
@@ -1419,19 +1419,18 @@ def test_the_rooms_freeze_holds_it_and_its_resume_lets_it_go(qtbot):
     assert _engine(view).paused is False
 
 
-def test_a_locked_slide_is_stilled_again_by_a_request_and_by_the_rooms_freeze(qtbot):
+def test_a_locked_slide_stays_locked_through_a_request_and_is_stilled_by_the_rooms_freeze(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Down)
 
     view.pause_for_request(True, "🎤 listening…")
-    assert _engine(view).paused is True
     view.pause_for_request(False)
-    assert _engine(view).paused is False
-
+    after_the_request = (_engine(view).loop_file, _engine(view).paused)
     view.set_paused(True)
-    assert _engine(view).paused is True
+    frozen = _engine(view).paused
     view.set_paused(False)
-    assert _engine(view).paused is False
+
+    assert (after_the_request, frozen, _engine(view).paused) == ((True, False), True, False)
     assert not _will_move_on(view)
 
 

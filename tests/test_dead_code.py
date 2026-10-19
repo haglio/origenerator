@@ -346,7 +346,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 17841 when the old words Fun Time said for slideshows were taken out.
 # 17693 when the motion and the switches a session holds moved beside their words,
 # taken down to what the tree measured.
-MAX_PROSE_LINES = 17692
+MAX_PROSE_LINES = 17670
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

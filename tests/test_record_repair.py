@@ -7,6 +7,7 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from origenerator.db import Database
+from origenerator.gallery.enhance import displayed_levels
 from origenerator.record_repair import repair_records
 
 GRAPH = {"3": {"class_type": "KSampler", "inputs": {"seed": 7}}}
@@ -259,3 +260,95 @@ def test_a_record_that_also_holds_a_picture_of_its_own_keeps_it_and_stays(tmp_pa
     assert _ids(db) == {"made-the-enhanced-one", "its-name-was-reused"}
     kept = json.loads(db.get_generation("its-name-was-reused")["output_files"])
     assert [entry["filename"] for entry in kept] == ["sdxl_t2i_00016_.png"]
+
+
+def test_a_record_left_with_only_enhancements_of_the_picture_hands_them_to_the_one_that_stays(
+        tmp_path):
+    output_dir = tmp_path / "output"
+    _picture(output_dir, "sdxl_t2i_00020_.png")
+    _picture(output_dir, "image_enhance_00021_.png", graph=OTHER_GRAPH)
+    db = Database(tmp_path / "test.db")
+    _row(db, "made-it", filename="sdxl_t2i_00020_.png")
+    _row(db, "second-record-enhanced", filename="sdxl_t2i_00020_.png", graph=OTHER_GRAPH)
+    db.update_generation(
+        "second-record-enhanced",
+        output_files=json.dumps([{"filename": "image_enhance_00021_.png", "subfolder": "image"},
+                                 {"filename": "sdxl_t2i_00020_.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "sdxl_t2i_00020_.png", "subfolder": "image"}]),
+        enhance_history=json.dumps([{"filename": "image_enhance_00021_.png",
+                                     "params": {"enhance_scale": 2.0}}]))
+
+    repair_records(db, output_dir)
+
+    assert _ids(db) == {"made-it"}
+    kept = db.get_generation("made-it")
+    assert [level.label for level in displayed_levels(kept)] == ["Enhance 1", "Original"]
+    assert [level.file["filename"] for level in displayed_levels(kept)] == [
+        "image_enhance_00021_.png", "sdxl_t2i_00020_.png"]
+
+
+def test_a_record_that_loses_its_enhanced_picture_lists_what_is_left_as_its_original(tmp_path):
+    output_dir = tmp_path / "output"
+    _picture(output_dir, "sdxl_t2i_00022_.png")
+    _picture(output_dir, "image_enhance_00022_.png")
+    db = Database(tmp_path / "test.db")
+    _row(db, "made-the-enhanced-one", filename="image_enhance_00022_.png")
+    _row(db, "its-enhancement-name-was-reused", filename="image_enhance_00022_.png",
+         graph=OTHER_GRAPH)
+    db.update_generation(
+        "its-enhancement-name-was-reused",
+        output_files=json.dumps([{"filename": "image_enhance_00022_.png", "subfolder": "image"},
+                                 {"filename": "sdxl_t2i_00022_.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "sdxl_t2i_00022_.png", "subfolder": "image"}]),
+        enhance_history=json.dumps([{"filename": "image_enhance_00022_.png"}]))
+
+    repair_records(db, output_dir)
+
+    kept = db.get_generation("its-enhancement-name-was-reused")
+    assert [level.label for level in displayed_levels(kept)] == ["Original"]
+
+
+def _second_record_enhanced_from(db, filename: str, enhanced: str) -> None:
+    _row(db, "second-record-enhanced", filename=filename, graph=OTHER_GRAPH)
+    db.update_generation(
+        "second-record-enhanced",
+        output_files=json.dumps([{"filename": enhanced, "subfolder": "image"},
+                                 {"filename": filename, "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": filename, "subfolder": "image"}]),
+        enhance_history=json.dumps([{"filename": enhanced}]),
+        thumbnail_path=f"thumbs/{enhanced}.jpg")
+
+
+def test_handed_over_enhancements_go_above_the_ones_the_record_that_stays_has(tmp_path):
+    output_dir = tmp_path / "output"
+    _picture(output_dir, "sdxl_t2i_00023_.png")
+    db = Database(tmp_path / "test.db")
+    _row(db, "made-it", filename="sdxl_t2i_00023_.png")
+    db.update_generation(
+        "made-it",
+        output_files=json.dumps([{"filename": "image_enhance_00023_.png", "subfolder": "image"},
+                                 {"filename": "sdxl_t2i_00023_.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "sdxl_t2i_00023_.png", "subfolder": "image"}]),
+        enhance_history=json.dumps([{"filename": "image_enhance_00023_.png"}]))
+    _second_record_enhanced_from(db, "sdxl_t2i_00023_.png", "image_enhance_00024_.png")
+
+    repair_records(db, output_dir)
+
+    levels = displayed_levels(db.get_generation("made-it"))
+    assert [(level.label, level.file["filename"]) for level in levels] == [
+        ("Enhance 2", "image_enhance_00024_.png"),
+        ("Enhance 1", "image_enhance_00023_.png"),
+        ("Original", "sdxl_t2i_00023_.png"),
+    ]
+
+
+def test_the_record_that_stays_wears_the_picture_of_the_enhancement_it_was_handed(tmp_path):
+    output_dir = tmp_path / "output"
+    _picture(output_dir, "sdxl_t2i_00025_.png")
+    db = Database(tmp_path / "test.db")
+    _row(db, "made-it", filename="sdxl_t2i_00025_.png", thumbnail_path="thumbs/made-it.jpg")
+    _second_record_enhanced_from(db, "sdxl_t2i_00025_.png", "image_enhance_00026_.png")
+
+    repair_records(db, output_dir)
+
+    assert db.get_generation("made-it")["thumbnail_path"] == "thumbs/image_enhance_00026_.png.jpg"

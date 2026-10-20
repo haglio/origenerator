@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from origenerator.gallery.enhance import original_files_of, remove_enhance_levels
 from origenerator.gallery.output import parse_file_list
 from origenerator.generation_state import GenerationStatus
 from origenerator.importer import graph_in_file, recipe_of
@@ -41,21 +42,46 @@ def _leave_one_record_per_picture(db, rows, output_dir: Path) -> int:
         for row in claimants:
             if row["prompt_id"] == keeper["prompt_id"]:
                 continue
+            was_its_original = (subfolder, filename) in {
+                file_key(entry) for entry in original_files_of(row)}
             _stop_claiming(db, row, (subfolder, filename))
+            if was_its_original:
+                _hand_its_versions_to(db, row, keeper["prompt_id"], (subfolder, filename))
             if parse_file_list(row.get("output_files")):
                 folded += 1
                 continue
-            fold_record_into(db, rows, row, keeper)
+            fold_record_into(db, rows, row, db.get_generation(keeper["prompt_id"]))
             _drop_the_record_only(db, row)
             folded += 1
     return folded
 
 
-def _stop_claiming(db, row: dict, picture: tuple[str, str]) -> None:
-    left = [entry for entry in parse_file_list(row.get("output_files"))
-            if file_key(entry) != picture]
-    row["output_files"] = json.dumps(left)
+def _hand_its_versions_to(db, row: dict, keeper_id: str, original: tuple[str, str]) -> None:
+    versions = parse_file_list(row.get("output_files"))
+    if not versions:
+        return
+    keeper = db.get_generation(keeper_id)
+    files = parse_file_list(keeper.get("output_files"))
+    updates = {
+        "output_files": json.dumps(versions + files),
+        "enhance_history": json.dumps(parse_file_list(row.get("enhance_history"))
+                                      + parse_file_list(keeper.get("enhance_history"))),
+        "original_files": keeper.get("original_files") or json.dumps(
+            [entry for entry in files if file_key(entry) == original]),
+    }
+    if row.get("thumbnail_path"):
+        updates["thumbnail_path"] = row["thumbnail_path"]
+    db.update_generation(keeper_id, **updates)
+    row["output_files"] = json.dumps([])
     db.update_generation(row["prompt_id"], output_files=row["output_files"])
+
+
+def _stop_claiming(db, row: dict, picture: tuple[str, str]) -> None:
+    updates = remove_enhance_levels(row, [picture[1]]) or {"output_files": json.dumps(
+        [entry for entry in parse_file_list(row.get("output_files"))
+         if file_key(entry) != picture])}
+    row.update(updates)
+    db.update_generation(row["prompt_id"], **updates)
 
 
 def _drop_records_of_no_picture(db, rows, output_dir: Path) -> int:

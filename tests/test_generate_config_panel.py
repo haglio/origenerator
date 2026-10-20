@@ -1349,6 +1349,17 @@ def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkey
     panel._preview.show_media.assert_called_once_with(upscale, "video", "vid1")
 
 
+def test_an_upscaled_videos_versions_have_no_trash_can(saved_panel, monkeypatch, tmp_path):
+    panel, db = saved_panel
+    video, _upscale = _evolver_upscaled_video(db, monkeypatch, tmp_path)
+
+    panel.show_saved_generation(video, [])
+
+    rows = _level_rows(panel)
+    assert len(rows) == 2
+    assert [row.findChild(QPushButton, "deleteButton") for row in rows] == [None, None]
+
+
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     panel, db = saved_panel
     image = _enhanced_image_row(db)
@@ -1365,7 +1376,8 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
 def test_each_level_carries_its_own_file_row(saved_panel):
     # The file information is per enhancement, so it sits with the level that
     # made it — the same File row a metadata block renders, copy button and all,
-    # rather than a pooled block at the top labeled with a level's name.
+    # with the version's trash can beside it, rather than a pooled block at the
+    # top labeled with a level's name.
 
     panel, db = saved_panel
     image = _enhanced_image_row(db)
@@ -1374,9 +1386,11 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     rows = _level_rows(panel)
     assert "image/image_enhance_00001_.png" in _row_texts(rows[0])
     assert "image/sdxl_img1.png" in _row_texts(rows[1])
+    assert [[b.objectName() for b in row.findChildren(QPushButton)] for row in rows] == [
+        ["copyButton", "deleteButton", "revealButton"],   # the enhancement
+        ["copyButton", "revealButton"],                   # the original stays
+    ]
     for row in rows:
-        names = [b.objectName() for b in row.findChildren(QPushButton)]
-        assert names == ["copyButton", "revealButton"]
         assert "Created" in _row_texts(row)
     # ...and the block at the top has no file of its own to repeat.
     assert "File" not in _metadata_texts(panel)

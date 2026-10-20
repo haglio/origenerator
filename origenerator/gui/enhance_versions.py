@@ -18,11 +18,11 @@ A row can also be dragged onto the Enhance subpanel, which absorbs the settings
 it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
-Levels can be deleted from here: pick rows and press Delete or Backspace, or
-right-click for the menu. A binned version is a file, not a generation — the
-image keeps its folder, its star and its other versions — and the delete is
-undoable like every other. What is refused is emptying the row: an image with no
-file left is a deleted generation, and that is the gallery's own delete.
+Levels are deleted here by a version's trash can, by Delete or Backspace over
+picked rows, or by the right-click menu. A binned version is a file, not a
+generation — the image keeps its folder, its star and its other versions — and
+the delete is undoable. Never deleted here: the original, and the last version,
+since an image with no file left is a deleted generation, the gallery's own.
 
 An enhancement still in flight takes the ``+ Enhance`` row's own slot at the head
 of the list, mirroring the run's streamed frames the way the in-flight cards do
@@ -56,8 +56,9 @@ from shared_ui.colors import AMBER, BG_PRIMARY, TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
-from origenerator.gui import palette
+from origenerator.gui import icons, palette
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_block import label_column_width, meta_cells
@@ -129,7 +130,6 @@ def _pass_mouse_through(widget) -> None:
     """
     widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
     widget.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
-
 
 
 class RunningEnhancement(NamedTuple):
@@ -240,7 +240,8 @@ class _Row(QWidget):
         self._wrapped = wrapped
         self.updateGeometry()   # the row is a different height in each shape
 
-    def _show_facts(self, items: list[MetaItem]) -> None:
+    def _show_facts(self, items: list[MetaItem],
+                    beside_copy: QWidget | None = None) -> None:
         """Lay this row's facts out as the same ``label: value`` cells a metadata
         block builds — so the enhancement that made a version, the file it wrote
         and when it was written all read alike, and the file line keeps its copy
@@ -253,7 +254,9 @@ class _Row(QWidget):
         self._resting_ink = {}
         key_width = label_column_width([MetaItem(key, "") for key in _FACT_KEYS])
         for line, item in enumerate(items, start=1):
-            for column, widget in enumerate(meta_cells(item, key_width)):
+            label, value, copy, reveal = meta_cells(item, key_width)
+            beside = (beside_copy,) if beside_copy is not None and copy is not None else ()
+            for column, widget in enumerate((label, value, copy, *beside, reveal)):
                 if widget is None:
                     continue
                 if isinstance(widget, QLabel):
@@ -287,9 +290,10 @@ class _LevelRow(_Row):
 
     clicked = pyqtSignal(int, Qt.KeyboardModifier)
     context_requested = pyqtSignal(int, QPoint)
+    delete_pressed = pyqtSignal(int)
 
     def __init__(self, level, position: int, image_path, created_fallback: str = "",
-                 held_days: int | None = None, parent=None):
+                 held_days: int | None = None, deletable: bool = False, parent=None):
         super().__init__(level.label, parent)
         self._position = position
         self._params = dict(level.params)
@@ -313,7 +317,12 @@ class _LevelRow(_Row):
             items.append(MetaItem("Enhancement", level.settings))
         items.append(file_item(level.file, held_days=held_days))
         items.append(created_item(level.file, created_fallback))
-        self._show_facts(items)
+        trash = None
+        if deletable:
+            trash = IconButton(icons.delete_icon(), "Delete this version", "deleteButton")
+            trash.clicked.connect(
+                lambda _checked=False: self.delete_pressed.emit(self._position))
+        self._show_facts(items, beside_copy=trash)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # so Delete reaches the list
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -459,7 +468,8 @@ class EnhanceVersions(QWidget):
     an enhancement still running on this image. Clicking a level's row emits
     ``level_selected`` with its position in that list, for the panel to put in
     the preview; picking rows and pressing Delete (or the right-click menu's
-    Delete) emits ``delete_requested`` with those positions.
+    Delete) emits ``delete_requested`` with those positions but the original's,
+    and a row's trash can emits it with that row's alone.
     """
 
     level_selected = pyqtSignal(int)
@@ -482,6 +492,8 @@ class EnhanceVersions(QWidget):
         self._pending: _PendingRow | None = None
         self._rows: list[_LevelRow] = []
         self._deletable = True
+        self._versions_listed = 0
+        self._originals: set[int] = set()
         self.hide()
 
     def is_collapsed(self) -> bool:
@@ -500,9 +512,9 @@ class EnhanceVersions(QWidget):
         newest first. ``duplicate_of`` names the level those settings would
         duplicate, or ``None`` when they would make something new.
 
-        ``pending`` is the :class:`RunningEnhancement` of one still running, and it takes that same leading slot — the row *becomes* the
-        thing it asked for rather than sitting beside it, which is what the press
-        looks like from the other side.
+        ``pending`` is the :class:`RunningEnhancement` of one still running, and
+        it takes that same leading slot: the row becomes the thing it asked for
+        rather than sitting beside it.
 
         ``created_fallback`` stands in on a level whose file is no longer on disk
         to be asked when it was written — the row's own timestamp, which is the
@@ -528,6 +540,9 @@ class EnhanceVersions(QWidget):
         self._pending = None
         self._rows = []
         self._deletable = deletable
+        self._versions_listed = len(items)
+        self._originals = {position for position, (level, _path) in enumerate(items)
+                           if level.is_original}
         # One leading slot, held by whichever of the two applies: the run in
         # flight if there is one, else the row that would start it.
         if pending is not None:
@@ -541,9 +556,11 @@ class EnhanceVersions(QWidget):
                 lambda on, at=add.duplicate_of: self._highlight_level(at, on))
             column.addWidget(card)
         for position, (level, image_path) in enumerate(items):
-            row = _LevelRow(level, position, image_path, created_fallback, held_days)
+            row = _LevelRow(level, position, image_path, created_fallback, held_days,
+                            deletable=bool(self._deleted_by([position])))
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
+            row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))
             self._rows.append(row)
             column.addWidget(row)
         form.addRow(self._host)
@@ -575,42 +592,45 @@ class EnhanceVersions(QWidget):
 
         A right-click on an unpicked row picks it first, so the menu always acts
         on what it appeared over — the same rule the thumbnail menu follows."""
+        if position in self._originals:
+            return
         if position not in self.selected_positions():
             for row in self._rows:
                 row.set_selected(row.position() == position)
-        picked = self.selected_positions()
-        if not picked:
-            return
+        doomed = self._deleted_by(self.selected_positions())
         menu = QMenu(self)
         action = menu.addAction(
-            f"Delete {len(picked)} version{'s' if len(picked) != 1 else ''}"
+            f"Delete {len(doomed)} version{'s' if len(doomed) != 1 else ''}"
         )
-        if not self._may_delete(picked):
+        if not doomed:
             # Grayed with the reason on it rather than absent: the answer to
             # "why can't I delete this" is the only thing the menu can offer.
             action.setEnabled(False)
             action.setText("Delete (this is the image's only version)" if self._deletable
                            else "Delete (a video's versions can't be deleted here)")
-        if menu.exec(global_pos) is action and self._may_delete(picked):
-            self.delete_requested.emit(picked)
+        if menu.exec(global_pos) is action and doomed:
+            self.delete_requested.emit(doomed)
 
-    def _may_delete(self, positions: list[int]) -> bool:
-        """Whether these versions are this list's to bin, and binning
-        ``positions`` would leave the image a version.
+    def _deleted_by(self, positions: list[int]) -> list[int]:
+        """The versions a delete of ``positions`` bins: all but the original, or
+        none when they are not this list's to bin or would leave the image none.
 
         An image with no file left is a deleted generation, and deleting a
         generation is the gallery's own action, reached from its thumbnail — a
         version list quietly doing it would be a much bigger delete than the one
         that was asked for."""
-        return self._deletable and bool(positions) and len(positions) < len(self._rows)
+        doomed = [position for position in positions if position not in self._originals]
+        if not self._deletable or not doomed or len(doomed) >= self._versions_listed:
+            return []
+        return doomed
 
     def keyPressEvent(self, event):
         """Delete or Backspace bins the picked levels — the keys that delete a
         picked thumbnail, over the picked versions instead."""
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-            picked = self.selected_positions()
-            if self._may_delete(picked):
-                self.delete_requested.emit(picked)
+            doomed = self._deleted_by(self.selected_positions())
+            if doomed:
+                self.delete_requested.emit(doomed)
                 return
         super().keyPressEvent(event)
 

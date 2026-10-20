@@ -12,6 +12,7 @@ import pytest
 
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import (
+    DetailFixPass,
     detail_fix_passes,
     detail_fixes_of,
     detector_for_part,
@@ -38,7 +39,8 @@ def _named(text):
     ("fix hand", "hands"),
     ("Fixed the eyes.", "eyes"),   # what an imperative "fix" is often heard as
     ("Fix face", "faces"),
-    ("Fix her mouth", "teeth"),
+    ("Fix her mouth", "mouth"),
+    ("fix the tongue", "mouth"),
     ("six-teeth.", "teeth"),       # whisper, quiet mic: "fix teeth" verbatim
     ("Mix her hands.", "hands"),   # one letter off "fix" still reads as it
 ])
@@ -47,7 +49,7 @@ def test_a_short_fix_utterance_names_its_part(text, part):
 
 
 @pytest.mark.parametrize("text, parts", [
-    ("fix hands and mouth", ["hands", "teeth"]),
+    ("fix hands and mouth", ["hands", "mouth"]),
     ("Fix her eyes and teeth.", ["teeth", "eyes"]),
     ("fix face, hands and eyes", ["faces", "hands", "eyes"]),
 ])
@@ -116,6 +118,12 @@ def test_a_part_resolves_to_the_installed_detector_that_finds_it(monkeypatch):
     assert detector_for_part(_part("teeth")) == "Teeth_v1.pt"
     assert detector_for_part(_part("faces")) == "face_yolov8m.pt"
     assert detector_for_part(_part("hands")) == "hand_yolov8s.pt"
+
+
+def test_a_mouth_is_found_by_the_lips_detector_around_it(monkeypatch):
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["face_yolov8m.pt", "lips_v1.pt"])
+    assert detector_for_part(_part("mouth")) == "lips_v1.pt"
 
 
 def test_a_part_with_no_installed_detector_resolves_to_nothing(monkeypatch):
@@ -271,7 +279,8 @@ def test_an_old_pass_that_named_no_detector_ran_the_generic_pair():
 def test_the_passes_are_the_installed_detector_for_each_part_asked_for(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["Teeth_v1.pt", "face_yolov8m.pt"])
-    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}})         == [("face_yolov8m.pt", 0.4), ("Teeth_v1.pt", 0.5)]
+    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}})         == [DetailFixPass(_part("faces"), "face_yolov8m.pt", 0.4),
+            DetailFixPass(_part("teeth"), "Teeth_v1.pt", 0.5)]
 
 
 def test_the_passes_come_in_the_tables_order_however_they_were_asked_for(monkeypatch):
@@ -290,7 +299,7 @@ def test_a_part_with_no_installed_detector_is_dropped_rather_than_submitted(monk
     # outlive the file they named, so this is an ordinary state, not an error.
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["face_yolov8m.pt"])
-    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}})         == [("face_yolov8m.pt", 0.4)]
+    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}})         == [DetailFixPass(_part("faces"), "face_yolov8m.pt", 0.4)]
 
 
 def test_a_part_the_vocabulary_no_longer_lists_is_dropped(monkeypatch):
@@ -299,3 +308,75 @@ def test_a_part_the_vocabulary_no_longer_lists_is_dropped(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["omega_yolov8n.pt"])
     assert detail_fix_passes({"enhance_detail_fixes": {"omega": 0.5}}) == []
+
+
+# --- the parts redrawn inside their outlines -----------------------------------
+
+
+def test_skin_and_hair_are_redrawn_inside_their_outlines_toward_their_own_prompts():
+    # Neither is box-shaped: a box around the hair takes the face with it, and a
+    # box around the skin is most of the picture. And a redraw that only reuses
+    # the picture's prompt gives back the same smooth skin it started from.
+    skin, hair = _part("skin"), _part("hair")
+    assert skin.outline and hair.outline
+    assert "pores" in skin.prompt and "strands" in hair.prompt
+    assert skin.avoid and hair.avoid
+    assert not _part("faces").outline
+
+
+def test_every_part_this_app_names_is_redrawn_toward_prompts_of_its_own():
+    assert all(part.prompt and part.avoid for part in detail_parts.part_table({}))
+
+
+def test_an_overlay_part_can_be_an_outline_with_its_own_prompts(monkeypatch):
+    _with_overlay(monkeypatch, [{"name": "zeta", "outline": True,
+                                 "prompt": "fine zeta texture", "avoid": "smooth zeta"}])
+    (part,) = match_fix_command("fix zeta")
+    assert part.outline is True
+    assert part.prompt == "fine zeta texture"
+    assert part.avoid == "smooth zeta"
+
+
+def test_an_overlay_part_that_says_nothing_of_the_sort_is_a_box_on_the_pictures_prompt(monkeypatch):
+    _with_overlay(monkeypatch, [{"name": "zeta", "outline": "yes please", "prompt": 7}])
+    (part,) = match_fix_command("fix zeta")
+    assert part.outline is False
+    assert part.prompt == "" and part.avoid == ""
+
+
+def test_a_part_redrawn_inside_its_outline_is_found_among_the_outline_detectors(monkeypatch):
+    # ComfyUI hands out a part's outline only for a model in its segm folder; the
+    # same file in the bbox folder gives boxes alone.
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["skin_finder.pt"])
+    assert detector_for_part(_part("skin")) is None
+    monkeypatch.setattr(detail_parts, "list_outline_detector_files", lambda: ["skin_finder.pt"])
+    assert detector_for_part(_part("skin")) == "skin_finder.pt"
+    assert detail_parts.detector_folder(_part("skin")) == "models/ultralytics/segm"
+    assert detail_parts.detector_folder(_part("hands")) == "models/ultralytics/bbox"
+
+
+def test_a_fix_redraws_toward_the_prompts_its_settings_give_it_or_else_its_own():
+    hands = _part("hands")
+    asked = {"enhance_detail_fixes": {"hands": 0.4, "teeth": 0.5}}
+    assert detail_parts.fix_prompts(asked)["hands"] == {
+        "prompt": hands.prompt, "avoid": hands.avoid, "lora": "", "strength": 1.0}
+
+    given = dict(asked, enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}})
+    assert detail_parts.fix_prompts(given)["hands"] == {
+        "prompt": "open palms", "avoid": "fists", "lora": "", "strength": 1.0}
+    assert detail_parts.fix_prompts(given)["teeth"]["prompt"] == _part("teeth").prompt
+
+
+def test_a_fix_redraws_through_the_lora_its_settings_give_it_at_their_strength():
+    asked = {"enhance_detail_fixes": {"hands": 0.4, "teeth": 0.5},
+             "enhance_fix_prompts": {"hands": {"lora": "my_hands.safetensors", "strength": 0.7},
+                                     "teeth": {"lora": "None"}}}
+
+    prompts = detail_parts.fix_prompts(asked)
+
+    assert (prompts["hands"]["lora"], prompts["hands"]["strength"]) == ("my_hands.safetensors", 0.7)
+    assert prompts["teeth"]["lora"] == ""
+
+
+def test_prompts_for_a_part_the_enhancement_does_not_fix_are_never_run():
+    assert detail_parts.fix_prompts({"enhance_fix_prompts": {"hands": {"prompt": "x"}}}) == {}

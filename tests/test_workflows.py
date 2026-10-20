@@ -576,7 +576,7 @@ def _nodes_of(payload: dict, class_type: str) -> list[dict]:
     return [n for n in payload.values() if n.get("class_type") == class_type]
 
 
-def _enhance_payload(installed=_FOUND_DETECTORS, **params):
+def _enhance_payload(installed=_FOUND_DETECTORS, outlined=(), **params):
     """An enhance payload built against a stated set of installed detectors.
 
     Stated rather than read off this machine's ComfyUI: the pass drops any part
@@ -585,8 +585,37 @@ def _enhance_payload(installed=_FOUND_DETECTORS, **params):
     wf = WORKFLOW_REGISTRY["image_enhance"]
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(detail_module, "list_detector_files", lambda: list(installed))
+        mp.setattr(detail_module, "list_outline_detector_files", lambda: list(outlined))
         return wf.build_api_payload(dict(wf.default_params(), input_image="pick.png",
                                          **params))
+
+
+def test_a_mouth_fix_redraws_a_wider_area_than_the_lips_it_is_found_by():
+    payload = _enhance_payload(installed=["hand_yolov8s.pt", "lips_v1.pt"],
+                               enhance_detail_fixes={"hands": 0.4, "mouth": 0.4})
+
+    detector_of = {node_id: node["inputs"]["model_name"] for node_id, node in payload.items()
+                   if node.get("class_type") == "UltralyticsDetectorProvider"}
+    grown = {detector_of[node["inputs"]["bbox_detector"][0]]: node["inputs"]["dilation"]
+             for node in _nodes_of(payload, "BboxDetectorSEGS")}
+    assert grown["bbox/lips_v1.pt"] > grown["bbox/hand_yolov8s.pt"]
+
+
+def test_a_fix_given_a_lora_redraws_through_it_and_no_other_fix_does():
+    payload = _enhance_payload(
+        installed=["hand_yolov8s.pt", "face_yolov8m.pt"],
+        enhance_detail_fixes={"faces": 0.3, "hands": 0.4},
+        enhance_fix_prompts={"hands": {"lora": "my_hands.safetensors", "strength": 0.7}})
+
+    ((lora_id, lora),) = [(node_id, node) for node_id, node in payload.items()
+                          if node.get("class_type") == "LoraLoader"]
+    assert lora["inputs"]["lora_name"] == "my_hands.safetensors"
+    assert lora["inputs"]["strength_model"] == lora["inputs"]["strength_clip"] == 0.7
+    fixes = {node["_meta"]["title"]: node for node in _nodes_of(payload, "DetailerForEach")}
+    hands, faces = fixes["Hands fix"]["inputs"], fixes["Faces fix"]["inputs"]
+    assert (hands["model"], hands["clip"]) == ([lora_id, 0], [lora_id, 1])
+    assert payload[hands["positive"][0]]["inputs"]["clip"] == [lora_id, 1]
+    assert lora_id not in (faces["model"][0], faces["clip"][0])
 
 
 def test_every_part_is_at_zero_by_default_and_adds_nothing():
@@ -652,7 +681,7 @@ def test_a_third_part_is_a_third_pass_on_the_chain():
     assert len(_nodes_of(payload, "UltralyticsDetectorProvider")) == 3
 
 
-def test_the_detail_pass_borrows_the_enhances_model_prompts_and_vae():
+def test_the_detail_pass_borrows_the_enhances_model_settings_and_vae():
     # It is the same enhancement, spent where it matters: the checkpoint
     # refining the picture refines its faces too, steered by the same prompts,
     # so a redrawn mouth stays in the picture's own style rather than the
@@ -666,8 +695,6 @@ def test_the_detail_pass_borrows_the_enhances_model_prompts_and_vae():
     ckpt_id = _node_id(payload, "CheckpointLoaderSimple")
     assert detailer["model"] == sampler["model"] == [ckpt_id, 0]
     assert detailer["clip"] == [ckpt_id, 1]
-    assert detailer["positive"] == sampler["positive"]
-    assert detailer["negative"] == sampler["negative"]
     assert detailer["vae"] == _find_node(payload, "VAEEncode")["inputs"]["vae"]
     assert detailer["steps"] == sampler["steps"]
     assert detailer["cfg"] == sampler["cfg"]
@@ -2756,3 +2783,62 @@ def test_a_wan_2_2_form_offers_no_seed_for_the_pass_that_draws_no_new_noise(name
 
     assert second_passes and all(p["sampler_name"] == "euler" for p in second_passes)
     assert "seed" not in {pd.key for pd in wf.param_definitions()}
+
+
+def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around_it():
+    # A box around the hair takes the face with it, and a box around the skin is
+    # most of the picture; their detectors draw the part's outline, and the
+    # redraw stays inside it.
+    payload = _enhance_payload(outlined=["skin_finder.pt"], enhance_detail_fixes={"skin": 0.4})
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    segs = payload[detailer["inputs"]["segs"][0]]
+    assert segs["class_type"] == "SegmDetectorSEGS"
+    provider_id, output = segs["inputs"]["segm_detector"]
+    assert payload[provider_id]["class_type"] == "UltralyticsDetectorProvider"
+    assert output == 1
+    assert payload[provider_id]["inputs"]["model_name"] == "segm/skin_finder.pt"
+    assert "bbox_detector" not in segs["inputs"]
+    assert segs["inputs"]["image"] == detailer["inputs"]["image"]
+
+
+def test_a_part_with_its_own_prompts_is_redrawn_toward_them_ahead_of_the_pictures_prompt():
+    skin = next(part for part in detail_module.part_table() if part.name == "skin")
+    payload = _enhance_payload(
+        outlined=["skin_finder.pt"], positive_prompt="a lantern on a jetty",
+        negative_prompt="blurry", enhance_detail_fixes={"skin": 0.4},
+    )
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    positive = payload[detailer["inputs"]["positive"][0]]
+    negative = payload[detailer["inputs"]["negative"][0]]
+    assert positive["class_type"] == negative["class_type"] == "CLIPTextEncode"
+    assert positive["inputs"]["text"] == f"{skin.prompt}, a lantern on a jetty"
+    assert negative["inputs"]["text"] == f"{skin.avoid}, blurry"
+    assert positive["inputs"]["clip"] == negative["inputs"]["clip"] == detailer["inputs"]["clip"]
+    # The whole-frame pass still reads the prompt as typed.
+    sampler = _find_node(payload, "KSampler")["inputs"]
+    assert payload[sampler["positive"][0]]["inputs"]["text"] == "a lantern on a jetty"
+    assert payload[sampler["negative"][0]]["inputs"]["text"] == "blurry"
+
+
+def test_a_picture_with_no_prompt_leaves_a_part_its_own_prompts_alone():
+    skin = next(part for part in detail_module.part_table() if part.name == "skin")
+    payload = _enhance_payload(outlined=["skin_finder.pt"], positive_prompt="",
+                               negative_prompt="", enhance_detail_fixes={"skin": 0.4})
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    assert payload[detailer["inputs"]["positive"][0]]["inputs"]["text"] == skin.prompt
+    assert payload[detailer["inputs"]["negative"][0]]["inputs"]["text"] == skin.avoid
+
+
+def test_a_fix_is_redrawn_toward_the_prompts_its_settings_give_it():
+    payload = _enhance_payload(
+        positive_prompt="a lantern on a jetty", negative_prompt="blurry",
+        enhance_detail_fixes={"hands": 0.45},
+        enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}},
+    )
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    assert payload[detailer["inputs"]["positive"][0]]["inputs"]["text"] == "open palms, a lantern on a jetty"
+    assert payload[detailer["inputs"]["negative"][0]]["inputs"]["text"] == "fists, blurry"

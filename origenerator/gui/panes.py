@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtWidgets import QFrame, QSplitter, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QFrame, QLayout, QSplitter, QVBoxLayout, QWidget
 from shared_ui.spacing import MARGIN_STANDARD
 
 BORDER_WIDTH = 6
 BORDER_NAME = "paneBorder"
+BORDERED_SET = "borderedSet"
 
 
 def pane() -> tuple[QWidget, QVBoxLayout]:
@@ -14,6 +15,11 @@ def pane() -> tuple[QWidget, QVBoxLayout]:
     column.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
                               MARGIN_STANDARD, MARGIN_STANDARD)
     return widget, column
+
+
+def border_as_a_set(frame: QFrame, layout: QLayout) -> None:
+    frame.setObjectName(BORDERED_SET)
+    layout.setContentsMargins(6, 4, 6, 6)
 
 
 def pane_border() -> QFrame:

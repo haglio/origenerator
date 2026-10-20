@@ -32,6 +32,7 @@ _MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt", ".gguf")
 # directory the Impact Subpack's ``UltralyticsDetectorProvider`` scans, so a
 # model dropped in for ComfyUI is the same one this app offers.
 _DETECTOR_CATEGORY = "ultralytics/bbox"
+_OUTLINE_DETECTOR_CATEGORY = "ultralytics/segm"
 
 # The picker option that means "no LoRA": choosing it builds the graph with no
 # LoraLoader for that slot (see the workflows' ``build_api_payload``), so the
@@ -157,6 +158,10 @@ def list_detector_files() -> list[str]:
     image they scan.
     """
     return list_model_files(_DETECTOR_CATEGORY, [], accepts=ANY)
+
+
+def list_outline_detector_files() -> list[str]:
+    return list_model_files(_OUTLINE_DETECTOR_CATEGORY, [], accepts=ANY)
 
 
 def is_no_lora(value) -> bool:

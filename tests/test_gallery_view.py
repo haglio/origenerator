@@ -14380,7 +14380,7 @@ def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
     view = _fix_slideshow(qtbot, tmp_path, monkeypatch,
                           "teeth_yolov8n.pt", "hand_yolov8s.pt")
 
-    view._voice.listener.speak_command("fix hands and mouth")
+    view._voice.listener.speak_command("fix hands and teeth")
 
     (job,) = view._live_jobs.values()
     assert job.params["enhance_detail_fixes"] == {

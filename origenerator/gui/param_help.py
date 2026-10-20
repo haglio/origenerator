@@ -198,6 +198,11 @@ PARAM_HELP: dict[str, str] = {
         "actually re-forms a bad hand, while below 0.3 it only tidies the one it was "
         "given."
     ),
+    "enhance_fix_prompts": (
+        "The prompts a fix redraws its part toward and away from, put ahead of the "
+        "picture's own, and the LoRA it redraws through. A fix run with different "
+        "ones makes a different enhancement level."
+    ),
 
     # --- structure transfer ---
     "control_mode": (

@@ -100,7 +100,8 @@ def _detail_fixes(graph: dict) -> dict:
     fixes = {}
     for _order, inputs in passes:
         segs = _linked_inputs(graph, inputs.get("segs"))
-        model = _linked_inputs(graph, segs.get("bbox_detector")).get("model_name")
+        finder = segs.get("segm_detector") or segs.get("bbox_detector")
+        model = _linked_inputs(graph, finder).get("model_name")
         denoise = inputs.get("denoise")
         if isinstance(model, str) and isinstance(denoise, (int, float)):
             fixes[detector_part_label(model.rsplit("/", 1)[-1])] = denoise

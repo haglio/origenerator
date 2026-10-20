@@ -558,6 +558,13 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
         **{part.name: configured.get(part.name, DEFAULT_FIX_DENOISE)
            for part in wanted},
     )
+    asked = {part.name for part in wanted}
+    carried = (newest.params.get("enhance_fix_prompts") if newest is not None else None) or {}
+    given = (settings.params.get("enhance_fix_prompts") if settings else None) or {}
+    params["enhance_fix_prompts"] = {
+        **{name: prompts for name, prompts in carried.items() if name not in asked},
+        **{name: prompts for name, prompts in given.items() if name in asked},
+    }
     return params
 
 

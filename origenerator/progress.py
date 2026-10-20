@@ -206,7 +206,7 @@ _STAGE_NAMES = {
 }
 
 
-def _sampler_stage(class_type: str, inputs: dict) -> str:
+def _sampler_stage(class_type: str, inputs: dict, title: str = "") -> str:
     """What to call this sampler's pass on the bar that reports it.
 
     Read off what the node is set to do rather than declared per workflow,
@@ -220,7 +220,7 @@ def _sampler_stage(class_type: str, inputs: dict) -> str:
     if class_type == "HunyuanFoleySampler":
         return "Sound"
     if class_type == "DetailerForEach":
-        return "Detail fix"
+        return title or "Detail fix"
     if class_type == "KSamplerAdvanced":
         return "First pass" if inputs.get("add_noise") == "enable" else "Second pass"
     return "Enhance" if _literal(inputs.get("denoise"), 1.0) < 1.0 else "Render"
@@ -242,7 +242,8 @@ def stage_names(payload: dict) -> dict[str, str]:
     for node_id, node in payload.items():
         class_type = node.get("class_type")
         if class_type in _SAMPLER_STEPS:
-            names[str(node_id)] = _sampler_stage(class_type, node.get("inputs", {}))
+            names[str(node_id)] = _sampler_stage(class_type, node.get("inputs", {}),
+                                                 node.get("_meta", {}).get("title", ""))
         elif class_type in _STAGE_NAMES:
             names[str(node_id)] = _STAGE_NAMES[class_type]
     return names

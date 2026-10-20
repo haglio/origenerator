@@ -137,9 +137,7 @@ button (`nav_map.act_of`).
 It used to be worked out from the prompt, by matching each act's keywords in
 `recipe_categories` against the stored text. That answer named every map row and
 narrowed the show's act filter, and it was wrong often enough to be worse than
-nothing: one keyword — the act in one sense, a measurement of a face in the other
-— sat in the quality boilerplate of 853 of this library's 3,884 pictures and
-named 472 rows for an act none of them shows, which the user found off the map
+nothing: it named rows for an act none of them shows, which the user found off the map
 (2026-09-21). He called the mechanism garbage and had it removed, with the spoken
 "genau it" that animated a picture as whatever its prompt read as (2026-09-22).
 `recipe_categories` is now a plain list of the act names.
@@ -286,6 +284,12 @@ is the two hooks that call the guard, below.
   is why it lives here rather than in it: the dependency gate installs exactly
   what pyproject declares, and the voice's torch is not the app's to declare.
   `GenerationJob.start` runs it before a job with lines is submitted.
+- `tools/fix_lora_trainer.py` — trains a fix's LoRA: crops each photo in that
+  fix's folder under `app_data\origenerator\fix photos` down to the part with
+  the fix's own detector, then runs kohya's sd-scripts on the crops into
+  ComfyUI's `loras\fixes`. Run by path under the `lora_training_python` the
+  overlay names, for the same reason as the voice: sd-scripts' pins are not
+  this app's to declare. The Train button in a fix's prompts window starts it.
 - `tools/open_from_notification.py` — what Windows runs when a notification of
   this app's is clicked, registered as the command for the `origenerator:` link
   every notice carries. It hands the generation to the copy that has the

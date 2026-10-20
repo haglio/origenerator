@@ -64,12 +64,20 @@ def speech_python(content: dict[str, Any] | None = None) -> Path | None:
     recipe with lines fails at submit saying so, rather than the app guessing
     at an environment that may not exist.
     """
+    return _overlay_path("speech_python", content)
+
+
+def _overlay_path(key: str, content: dict[str, Any] | None = None) -> Path | None:
     content = _CONTENT if content is None else content
-    raw = content.get("speech_python")
+    raw = content.get(key)
     return Path(raw) if raw else None
 
 
 SPEECH_PYTHON = speech_python()
+# kohya's sd-scripts, which trains a fix's LoRA (see :mod:`origenerator.fix_training`),
+# and the Python of the environment it lives in: its pins are not this app's either.
+LORA_TRAINING_PYTHON = _overlay_path("lora_training_python")
+LORA_TRAINING_SCRIPTS = _overlay_path("lora_training_scripts")
 # How many clips the audio bed plays at once. Each voice walks its own shuffled
 # pass of the folder, so they drift apart the moment two clip lengths differ.
 AMBIENT_AUDIO_VOICES = 3
@@ -96,6 +104,8 @@ DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
 _LIBRARY_FILES_DIR = STATE_DIR if _TOLD_WHERE_STATE_IS else RECORDS_DIR
 THUMB_DIR = _LIBRARY_FILES_DIR / "thumbnails"
 TRASH_DIR = _LIBRARY_FILES_DIR / "trash"
+FIX_PHOTOS_DIR = _LIBRARY_FILES_DIR / "fix photos"
+FIX_TRAINING_DIR = _LIBRARY_FILES_DIR / "fix training"
 LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 
 

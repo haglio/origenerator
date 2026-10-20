@@ -358,7 +358,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_spoken_play_plays_a_paused_room_again_and_sets_the_slideshow_going.
 # 17581 when the gallery's published document came to carry the rate its videos
 # are generated at, and left why it is published to tests/test_gallery_contract.py.
-MAX_PROSE_LINES = 17581
+# 17485 when the fixes took prompts, a LoRA and a Train button, taken down to
+# what the tree measured.
+MAX_PROSE_LINES = 17485
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

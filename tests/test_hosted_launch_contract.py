@@ -22,6 +22,7 @@ from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
 from origenerator.win32 import this_process_creation_time
+from origenerator.workflows import detail_parts
 from tests.test_main_window import _fun_time_session, _window
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -169,3 +170,10 @@ def test_every_offer_and_slideshow_mark_the_document_says_this_app_writes_is_one
         "offer": [contract.offer_of(pid, created_at),
                   contract.offer_of(pid, created_at, starting=True)],
         "showing": [contract.slideshow_mark(pid, created_at)]}
+def test_the_document_names_every_fix_a_session_should_hear_for_the_built_in_parts():
+    # The session owns the room's microphone and can only hear a phrase it was
+    # told to listen for, so a part added here without being published is one
+    # nobody can fix by voice from the headset.
+    phrases = contract.declaration()["fix_phrases"]
+    assert {"fix teeth", "fix skin", "fix hair"} <= set(phrases)
+    assert [phrase for phrase in phrases if not detail_parts.match_fix_command(phrase)] == []

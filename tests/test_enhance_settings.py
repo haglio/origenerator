@@ -29,6 +29,7 @@ from origenerator.gallery.enhance_settings import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    level_settings,
 )
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
@@ -499,14 +500,14 @@ def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_ticks(
 def test_a_spoken_fix_can_ask_for_several_parts_at_once(monkeypatch):
     _install_detectors(monkeypatch, "hand_yolov8s.pt", "teeth_yolov8n.pt")
 
-    params = fix_params_for(_source_row(), _spoken("fix hands and mouth"))
+    params = fix_params_for(_source_row(), _spoken("fix hands and teeth"))
 
     assert params["enhance_detail_fixes"] == {
         "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
 
 
 def test_a_part_with_nothing_to_find_it_is_dropped_from_a_combination(monkeypatch):
-    # The hands still get fixed; a missing teeth detector would otherwise have
+    # The hands still get fixed; a missing mouth detector would otherwise have
     # ComfyUI reject the whole prompt.
     _install_detectors(monkeypatch, "hand_yolov8s.pt")
 
@@ -580,3 +581,35 @@ def test_a_repeated_spoken_fix_reads_as_the_duplicate_it_is(tmp_path, monkeypatc
     # different enhancement and runs.
     assert level_matching_params(row, fix_params_for(row, _spoken("fix teeth"))) == 0
     assert level_matching_params(row, fix_params_for(row, _spoken("fix eyes"))) is None
+
+
+def test_the_prompts_a_fix_ran_with_are_part_of_what_its_level_is():
+    hands = next(part for part in detail_parts.part_table() if part.name == "hands")
+    ran = {"enhance_detail_fixes": {"hands": 0.45}, "enhance_fix_prompts": {}}
+    edited = dict(ran, enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}})
+
+    assert level_settings(ran)["enhance_fix_prompts"] == {
+        "hands": {"prompt": hands.prompt, "avoid": hands.avoid, "lora": "", "strength": 1.0}}
+    assert level_settings(ran) != level_settings(edited)
+
+
+def test_a_level_made_before_fixes_had_prompts_of_their_own_records_none():
+    assert "enhance_fix_prompts" not in level_settings({"enhance_detail_fixes": {"hands": 0.45}})
+
+
+def test_a_folders_prompts_for_a_fix_are_kept_with_its_settings():
+    prompts = {"hands": {"prompt": "open palms", "avoid": "fists"}}
+    stored = EnhanceSettings(params={"enhance_fix_prompts": prompts}).to_json()
+
+    assert EnhanceSettings.parse(stored).params["enhance_fix_prompts"] == prompts
+
+
+def test_a_spoken_fix_redraws_toward_the_prompts_the_panel_gives_that_part(monkeypatch):
+    _install_detectors(monkeypatch, "hand_yolov8s.pt", "teeth_yolov8n.pt")
+    panel = EnhanceSettings(params={"enhance_fix_prompts": {
+        "hands": {"prompt": "open palms", "avoid": "fists"},
+        "teeth": {"prompt": "even teeth", "avoid": "gaps"}}})
+
+    params = fix_params_for(_source_row(), _spoken("fix hands"), panel)
+
+    assert params["enhance_fix_prompts"] == {"hands": {"prompt": "open palms", "avoid": "fists"}}

@@ -19,7 +19,7 @@ from shared_ui.preview_icon import app_icon
 from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.config import PROJECT_DIR
-from origenerator.gui.panes import BORDER_NAME
+from origenerator.gui.panes import BORDER_NAME, BORDERED_SET
 from origenerator.gui.tooltip_shape import shape_long_tooltips
 from origenerator.spin_arrows import arrow_paths
 
@@ -91,9 +91,10 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_PRIMARY)};
         font-weight: 600;
     }}
-    /* A scene card: a scene's texts and its length together. Bordered, so three
-       scenes of three fields each read as three things rather than nine. */
-    QFrame#sceneCard {{
+    /* Fields that belong together -- a scene's texts and its length, a fix's
+       edit button, checkbox, name and value -- bordered, so each set reads as
+       one thing rather than as loose fields. */
+    QFrame#{BORDERED_SET} {{
         border: 1px solid {_h(BORDER_SUBTLE)};
         border-radius: 3px;
     }}

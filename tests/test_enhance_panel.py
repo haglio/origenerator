@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QMimeData, QPoint, QRect, Qt
+from PyQt6.QtCore import QMimeData, QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QDropEvent, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -19,9 +19,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import AMBER, BG_PRIMARY, BLUE, TEXT_PRIMARY
+from shared_ui.colors import AMBER, BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_PRIMARY
+from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.toggle_switch import ToggleSwitch
 
+import origenerator.gui.enhance_panel as enhance_panel_module
 import origenerator.workflows.detail_parts as parts
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
@@ -56,6 +58,7 @@ def _panel(qtbot, detectors=_FOUND_DETECTORS):
     edits = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parts, "list_detector_files", lambda: list(detectors))
+        mp.setattr(parts, "list_outline_detector_files", list)
         panel = EnhancePanel(edits.append)
     qtbot.addWidget(panel)
     return panel, edits
@@ -373,6 +376,7 @@ def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
     # this part needs is called.
     tooltip = panel._fix_checks["hands"].toolTip()
     assert "models/ultralytics/bbox" in tooltip
+    assert "models/ultralytics/segm" in panel._fix_checks["skin"].toolTip()
     assert "Impact Subpack" in tooltip
     assert "hand" in tooltip
     assert panel._label_for(panel._fixes["hands"]).toolTip() == tooltip
@@ -1168,3 +1172,156 @@ def test_a_number_on_the_panel_says_its_good_range(qtbot):
     panel, _edits = _panel(qtbot)
     assert "Good range: 0.1–0.2." in panel._denoise.toolTip()
     assert "Good range: 1.5–2." in panel._scale.toolTip()
+
+
+def test_each_fixs_button_opens_its_prompts_over_the_enhance_panel_alone_leaving_the_window_usable(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel.show()
+    hands = next(part for part in part_table() if part.name == "hands")
+
+    panel._fix_prompt_buttons["hands"].click()
+
+    window = panel._fix_prompt_windows["hands"]
+    assert window.isVisible()
+    assert window.windowModality() == Qt.WindowModality.NonModal
+    assert window.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert window.geometry() == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size())
+    assert "Hands fix prompts" in [label.text() for label in window.findChildren(QLabel)]
+    assert (window.prompts()["prompt"], window.prompts()["avoid"]) == (hands.prompt, hands.avoid)
+
+
+def test_a_fixs_prompts_stay_over_the_enhance_panel_as_the_window_moves_and_its_border_is_dragged(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    column = QVBoxLayout(host)
+    panel, _edits = _panel(qtbot)
+    column.addWidget(QWidget(), 1)
+    column.addWidget(panel)
+    host.resize(900, 900)
+    host.show()
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+
+    host.move(host.pos() + QPoint(40, 30))
+    panel.setFixedHeight(panel.height() + 50)
+
+    qtbot.waitUntil(lambda: window.geometry()
+                    == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size()))
+
+
+def test_a_fixs_prompts_fit_an_enhance_panel_dragged_as_short_as_it_goes(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel.setStyleSheet(build_stylesheet() + panel.styleSheet())
+    panel.resize(700, panel.minimumSizeHint().height())
+    panel.show()
+
+    panel._fix_prompt_buttons["hands"].click()
+
+    window = panel._fix_prompt_windows["hands"]
+    assert window.geometry() == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size())
+    for field in (window.positive, window.negative):
+        assert field.height() >= 2 * field.fontMetrics().lineSpacing()
+
+
+def test_each_fixs_edit_button_is_the_square_the_buttons_above_the_gallery_are(qtbot):
+    panel, _edits = _panel(qtbot)
+
+    for button in panel._fix_prompt_buttons.values():
+        assert button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)
+
+
+def test_each_fixs_edit_button_checkbox_name_and_value_sit_inside_one_thin_gray_border(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel.setStyleSheet(build_stylesheet() + panel.styleSheet())
+    panel.resize(700, panel.sizeHint().height())
+    panel.show()
+    drawn = panel.grab().toImage()
+
+    frames = set()
+    for name, button in panel._fix_prompt_buttons.items():
+        frame = button.parentWidget()
+        assert frame.isAncestorOf(panel._fix_checks[name])
+        assert frame.isAncestorOf(panel._fixes[name])
+        top_edge = frame.mapTo(panel, QPoint(frame.width() // 2, 0))
+        assert drawn.pixelColor(top_edge).name() == BORDER_SUBTLE.name()
+        frames.add(frame)
+    assert len(frames) == len(panel._fix_prompt_buttons)
+
+
+def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, monkeypatch):
+    monkeypatch.setattr(enhance_panel_module, "list_lora_files",
+                        lambda fallback, accepts: ["None", "my_hands.safetensors"])
+    panel, edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+
+    assert [window.lora.itemText(i) for i in range(window.lora.count())] == [
+        "None", "my_hands.safetensors"]
+    window.lora.setCurrentText("my_hands.safetensors")
+    window.strength.setValue(0.7)
+    window.accept()
+
+    kept = edits[-1].params["enhance_fix_prompts"]["hands"]
+    assert (kept["lora"], kept["strength"]) == ("my_hands.safetensors", 0.7)
+
+
+def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+
+    with qtbot.waitSignal(panel.fix_training_requested) as asked:
+        window.train.click()
+
+    assert asked.args == ["hands"]
+
+
+def test_a_fixs_train_button_says_how_its_training_is_going_until_it_ends(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel.show_fix_training("hands", "Training 40%")
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    assert (window.train.text(), window.train.isEnabled()) == ("Training 40%", False)
+
+    panel.show_fix_training("hands", None)
+
+    assert (window.train.text(), window.train.isEnabled()) == ("Train", True)
+
+
+def test_a_trained_lora_is_put_on_its_fix(qtbot):
+    panel, edits = _panel(qtbot)
+
+    panel.use_fix_lora("hands", "fixes\\hands 2026-10-19 0130.safetensors")
+
+    assert edits[-1].params["enhance_fix_prompts"]["hands"]["lora"] == (
+        "fixes\\hands 2026-10-19 0130.safetensors")
+
+
+def test_ok_on_a_fixs_prompts_keeps_them_and_cancel_keeps_nothing(qtbot):
+    panel, edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    window.positive.setPlainText("open palms")
+    window.negative.setPlainText("fists")
+
+    window.accept()
+
+    assert edits[-1].params["enhance_fix_prompts"] == {
+        "hands": {"prompt": "open palms", "avoid": "fists", "lora": "", "strength": 1.0}}
+    kept = len(edits)
+    panel._fix_prompt_buttons["hands"].click()
+    again = panel._fix_prompt_windows["hands"]
+    assert (again.prompts()["prompt"], again.prompts()["avoid"]) == ("open palms", "fists")
+    again.positive.setPlainText("something else")
+    again.reject()
+    assert len(edits) == kept
+
+
+def test_a_fixs_prompts_already_open_are_brought_forward_rather_than_opened_twice(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    first = panel._fix_prompt_windows["hands"]
+
+    panel._fix_prompt_buttons["hands"].click()
+
+    assert panel._fix_prompt_windows["hands"] is first

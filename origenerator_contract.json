@@ -251,5 +251,19 @@
         ]
       }
     }
-  }
+  },
+  "fix_phrases": [
+    "fix face",
+    "fix faces",
+    "fix hand",
+    "fix hands",
+    "fix teeth",
+    "fix tooth",
+    "fix eye",
+    "fix eyes",
+    "fix skin",
+    "fix hair",
+    "fix mouth",
+    "fix tongue"
+  ]
 }

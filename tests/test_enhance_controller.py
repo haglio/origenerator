@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from origenerator import gallery
+from origenerator import config, gallery
 from origenerator.gui import enhance_controller as module
 from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
@@ -21,6 +21,8 @@ from origenerator.gui.enhance_controller import (
     Offer,
 )
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.workflows import detail_parts
+from origenerator.workflows.detail_parts import DetailPart
 
 ENHANCE = gallery.ENHANCE_WORKFLOW
 
@@ -32,9 +34,9 @@ class FakeSignal:
     def connect(self, slot):
         self._slots.append(slot)
 
-    def emit(self):
+    def emit(self, *args):
         for slot in self._slots:
-            slot()
+            slot(*args)
 
 
 class FakePanel:
@@ -43,6 +45,9 @@ class FakePanel:
     def __init__(self, on_changed):
         self.on_changed = on_changed
         self.enhance_requested = FakeSignal()
+        self.fix_training_requested = FakeSignal()
+        self.training: dict = {}
+        self.used: list = []
         self.shown = None
         self.applicable = None
         self.offer = None
@@ -55,6 +60,12 @@ class FakePanel:
 
     def show_offer(self, available, tip):
         self.offer = (available, tip)
+
+    def show_fix_training(self, name, text):
+        self.training[name] = text
+
+    def use_fix_lora(self, name, lora):
+        self.used.append((name, lora))
 
 
 class FakeWorkflow:
@@ -655,20 +666,20 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
     assert kind == NOTICE
 
 
-def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch):
-    class Part:
-        name = "teeth"
-
+@pytest.mark.parametrize("part, folder", [
+    (DetailPart("teeth", ("teeth",), ("teeth",)), "bbox"),
+    (DetailPart("skin", ("skin",), ("skin",), outline=True), "segm"),
+])
+def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch, part, folder):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "fix_params_for",
                         lambda row, parts, settings: None)
-    monkeypatch.setattr(module, "name_parts", lambda parts: "teeth")
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    _prompt_id, message, kind = controller.fix_parts("i1", [Part()])
+    _prompt_id, message, kind = controller.fix_parts("i1", [part])
 
-    assert message == ("🎤 no teeth detector installed "
-                       "(ComfyUI models/ultralytics/bbox)")
+    assert message == (f"🎤 no {part.name} detector installed "
+                       f"(ComfyUI models/ultralytics/{folder})")
     assert kind == WARNING
 
 
@@ -741,3 +752,74 @@ def test_an_enhancement_launched_for_what_a_slideshow_is_locked_on_is_put_first(
     controller.enhance_items(["i1"])
 
     assert jobs.first == {"run-1"}
+
+
+# --- training a fix's LoRA -----------------------------------------------------
+
+
+_training_runs: list = []
+
+
+class FakeTrainingRun:
+    def __init__(self, job, queue, parent=None):
+        self.job, self.queue = job, queue
+        self.progress, self.finished, self.failed = FakeSignal(), FakeSignal(), FakeSignal()
+        self.began = False
+        _training_runs.append(self)
+
+    def begin(self):
+        self.began = True
+
+
+@pytest.fixture
+def photos(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+    monkeypatch.setattr(config, "LORA_TRAINING_PYTHON", tmp_path / "python.exe")
+    monkeypatch.setattr(config, "LORA_TRAINING_SCRIPTS", tmp_path / "sd-scripts")
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
+    monkeypatch.setattr(module, "FixTrainingRun", FakeTrainingRun)
+    _training_runs.clear()
+    return tmp_path
+
+
+def test_train_with_no_photos_makes_the_fixs_folder_and_says_to_put_them_there(
+        enhance, photos, monkeypatch):
+    told = []
+    monkeypatch.setattr(module.QMessageBox, "information",
+                        lambda parent, title, text: told.append(text))
+    controller, _host = enhance()
+
+    controller.panel.fix_training_requested.emit("hands")
+
+    assert (photos / "Hands").is_dir()
+    assert str(photos / "Hands") in told[0]
+    assert _training_runs == []
+
+
+def test_train_with_photos_trains_that_fix_for_the_enhancements_model(enhance, photos):
+    (photos / "Hands").mkdir()
+    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    controller, _host = enhance()
+    controller.restore_settings(json.dumps({"params": {"checkpoint": "sample_xl.safetensors"}}))
+
+    controller.panel.fix_training_requested.emit("hands")
+
+    (run,) = _training_runs
+    assert run.began
+    assert run.job["part"] == "hands"
+    assert run.job["base_model"].endswith("sample_xl.safetensors")
+
+
+def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
+    (photos / "Hands").mkdir()
+    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    controller, _host = enhance()
+    controller.panel.fix_training_requested.emit("hands")
+    (run,) = _training_runs
+
+    run.progress.emit("Training 40%")
+    assert controller.panel.training["hands"] == "Training 40%"
+    run.finished.emit("fixes\\hands 2026-10-19 0130.safetensors")
+
+    assert controller.panel.used == [("hands", "fixes\\hands 2026-10-19 0130.safetensors")]
+    assert controller.panel.training["hands"] is None

@@ -21,18 +21,23 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import NamedTuple, Protocol
 
-from origenerator import gallery
+from PyQt6.QtWidgets import QMessageBox
+
+from origenerator import config, fix_training, gallery
+from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
+from origenerator.gui.fix_training_run import FixTrainingRun
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.detail_parts import name_parts
+from origenerator.workflows.detail_parts import detector_folder, name_parts, part_table
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +123,48 @@ class EnhanceController:
         self._signature: tuple = ()
         self.panel = EnhancePanel(self._on_settings_changed)
         self.panel.enhance_requested.connect(self.enhance_the_selection)
+        self.panel.fix_training_requested.connect(self._train_fix)
         self.panel.show_settings(self._settings)
+        self._training: FixTrainingRun | None = None
+
+    # --- training a fix's LoRA --------------------------------------------------
+
+    def _train_fix(self, name: str) -> None:
+        if self._training is not None:
+            return
+        part = next(part for part in part_table() if part.name == name)
+        folder = fix_training.photos_folder(part)
+        folder.mkdir(parents=True, exist_ok=True)
+        if not fix_training.photo_files(folder):
+            QMessageBox.information(self.panel, "Train",
+                                    f"Put photos of {name} in {folder}, then press Train again.")
+            return
+        if config.LORA_TRAINING_PYTHON is None or config.LORA_TRAINING_SCRIPTS is None:
+            QMessageBox.information(
+                self.panel, "Train", "No training program is set up: content.local.json "
+                "names no lora_training_python and lora_training_scripts.")
+            return
+        job = fix_training.training_job(part, self._model_to_train_for(),
+                                        datetime.now().astimezone())
+        self._training = FixTrainingRun(job, self._jobs)
+        self._training.progress.connect(lambda text: self.panel.show_fix_training(name, text))
+        self._training.finished.connect(lambda lora: self._training_ended(name, lora))
+        self._training.failed.connect(lambda why: self._training_ended(name, None, why))
+        self._training.begin()
+
+    def _model_to_train_for(self) -> str:
+        chosen = self._settings.params.get("checkpoint")
+        if not chosen or chosen == MATCH_SOURCE_MODEL:
+            return WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW].default_params()["checkpoint"]
+        return chosen
+
+    def _training_ended(self, name: str, lora: str | None, why: str = "") -> None:
+        self._training = None
+        self.panel.show_fix_training(name, None)
+        if lora:
+            self.panel.use_fix_lora(name, lora)
+        else:
+            QMessageBox.warning(self.panel, "Train", why)
 
     # --- what it runs at ------------------------------------------------------
 
@@ -395,8 +441,8 @@ class EnhanceController:
             return None, f"🎤 only a finished image can get a {asked} fix", WARNING
         params = gallery.fix_params_for(row, parts, self._settings)
         if params is None:
-            return None, (f"🎤 no {asked} detector installed "
-                          "(ComfyUI models/ultralytics/bbox)"), WARNING
+            folders = " or ".join(sorted({detector_folder(part) for part in parts}))
+            return None, f"🎤 no {asked} detector installed (ComfyUI {folders})", WARNING
         if gallery.level_matching_params(row, params) is not None:
             return None, f"🎤 already has this {asked} fix", WARNING
         fixing = name_parts(

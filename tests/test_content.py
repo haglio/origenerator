@@ -215,7 +215,8 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         (REPO_ROOT / "content.example.json").read_text()) if k != "_comment"}
 
     assert documented == {
-        "speech_python", "recipe_categories", "combine_recipes", "search_synonyms",
+        "speech_python", "lora_training_python", "lora_training_scripts",
+        "recipe_categories", "combine_recipes", "search_synonyms",
         "genau_recipes", "detail_fix_parts", "detector_labels", "genau_flick_prompts",
         "model_recommendations", "lora_recommendations",
         "picture_states", "picture_state_grid", "animation_paths",

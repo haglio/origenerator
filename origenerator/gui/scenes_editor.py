@@ -45,6 +45,7 @@ from PyQt6.QtWidgets import (
 from origenerator.gui import diff_text
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.icons import tab_close_icon
+from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
@@ -78,10 +79,9 @@ class _Scene(QFrame):
     def __init__(self, pd: ParamDef, prepare_length: Callable[[PresetComboBox], None],
                  lines: bool = True, parent=None):
         super().__init__(parent)
-        self.setObjectName("sceneCard")
         self._pd = pd
         column = QVBoxLayout(self)
-        column.setContentsMargins(6, 4, 6, 6)
+        border_as_a_set(self, column)
         column.setSpacing(4)
         # Kept narrow: this row sits beside the form's label column, so it is
         # the row that would push the pane's floor past its cap (see

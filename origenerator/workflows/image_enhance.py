@@ -41,7 +41,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     """
 
     name = "image_enhance"
-    version = "v003"
+    version = "v004"
     display_name = "Image Enhance"
     output_type = MediaType.IMAGE
     derives_size_from_input = True
@@ -65,6 +65,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "enhance_steps": 20,
             "enhance_denoise": 0.15,
             "enhance_detail_fixes": {},
+            "enhance_fix_prompts": {},
             "filename_prefix": "image/image_enhance",
         }
 

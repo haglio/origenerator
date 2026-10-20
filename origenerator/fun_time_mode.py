@@ -35,6 +35,7 @@ from origenerator.media import MediaType
 from origenerator.slideshow import Slide
 from origenerator.slideshow_buttons import PANEL_PLACES, PRESSES, PRESSES_ABOUT_A_FILE
 from origenerator.win32 import process_creation_time, this_process_creation_time
+from origenerator.workflows.detail_parts import published_fix_phrases
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +218,7 @@ def declaration() -> dict:
         "request_lines": [spelled_for(side, line) for side in SIDES
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
         "handoff": handoff(*_A_WINDOW),
+        "fix_phrases": list(published_fix_phrases()),
     }
 
 

@@ -26,14 +26,19 @@ alternative being a run that fails on submit.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLayout,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -46,6 +51,8 @@ from shared_ui.colors import (
     BORDER_SUBTLE,
     TEXT_MUTED,
 )
+from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -62,24 +69,34 @@ from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,
     NoWheelSpinBox,
 )
+from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import definition_help, param_help
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
     detail_fixes_of,
+    detector_folder,
     detector_for_part,
+    fix_prompts_of,
     part_table,
 )
+from origenerator.workflows.model_arch import SD15, SDXL
+from origenerator.workflows.model_files import NO_LORA, list_lora_files
 
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "
     "below. The original is kept, so an enhancement can always be compared "
     "against it or redone."
 )
+_TRAIN_TOOLTIP = (
+    "Trains this fix a LoRA from the photos in its folder in the library's "
+    "app_data\\origenerator\\fix photos, each cropped down to the part by the "
+    "fix's own detector. Nothing generates while it trains."
+)
 _NO_DETECTOR_TOOLTIP = (
     "Unavailable: ComfyUI hasn't got a model that finds {}. Install the Impact "
     "Subpack node pack, put one whose name says \"{}\" in its "
-    "models/ultralytics/bbox folder, and restart it."
+    "{} folder, and restart it."
 )
 # What a fix field costs around its digits: the padding either side below, its
 # 1px border, and the pixels a spinner keeps for its cursor and its own inner
@@ -287,10 +304,12 @@ class EnhancePanel(QWidget):
     """
 
     enhance_requested = pyqtSignal()
+    fix_training_requested = pyqtSignal(str)
 
     def __init__(self, on_change, parent=None):
         super().__init__(parent)
         self._on_change = on_change
+        self._fix_training: dict[str, str] = {}
         self._loading = False  # suppress the write-back while filling the fields
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
@@ -413,6 +432,9 @@ class EnhancePanel(QWidget):
         host.setSizePolicy(policy)
         self._fixes = {}
         self._fix_checks = {}
+        self._fix_prompt_buttons = {}
+        self._fix_prompts = {}
+        self._fix_prompt_windows = {}
         for part in part_table():
             flow.addWidget(self._fix_field(part))
         return host
@@ -423,25 +445,71 @@ class EnhancePanel(QWidget):
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
         label = self._labeled(part.name.capitalize(), widget)
+        prompts_button = fill_square_with_mark(QToolButton(), size=BUTTON_SIZE_HUD)
+        prompts_button.setText("✎")
+        prompts_button.setToolTip(param_help("enhance_fix_prompts"))
+        prompts_button.clicked.connect(lambda _on=False, part=part: self._edit_fix_prompts(part))
         if detector_for_part(part) is None:
-            reason = _NO_DETECTOR_TOOLTIP.format(part.name, part.matches[0])
+            reason = _NO_DETECTOR_TOOLTIP.format(part.name, part.matches[0],
+                                                 detector_folder(part))
             check.setEnabled(False)
-            for one in (check, widget, label):
+            prompts_button.setEnabled(False)
+            for one in (check, widget, label, prompts_button):
                 one.setToolTip(reason)
         check.toggled.connect(lambda _on, name=part.name: self._fix_toggled(name))
 
-        column = QWidget()
+        column = QFrame()
         grid = QGridLayout(column)
-        grid.setContentsMargins(0, 0, 0, 0)
+        border_as_a_set(column, grid)
         grid.setSpacing(2)
+        grid.addWidget(prompts_button, 0, 0, Qt.AlignmentFlag.AlignCenter)
         grid.addWidget(check, 0, 1, Qt.AlignmentFlag.AlignCenter)
         grid.addWidget(label, 1, 0)
         grid.addWidget(widget, 1, 1)
 
         self._fixes[part.name] = widget
         self._fix_checks[part.name] = check
+        self._fix_prompt_buttons[part.name] = prompts_button
         self._show_fix_on(part.name)
         return column
+
+    def _edit_fix_prompts(self, part) -> None:
+        open_already = self._fix_prompt_windows.get(part.name)
+        if open_already is not None:
+            open_already.raise_()
+            open_already.activateWindow()
+            return
+        current = fix_prompts_of(part, self._fix_prompts.get(part.name))
+        loras = list_lora_files([NO_LORA], accepts=(SDXL, SD15))
+        window = FixPromptsDialog(self, part, current, loras)
+        window.accepted.connect(lambda: self._keep_fix_prompts(part.name, window.prompts()))
+        window.finished.connect(lambda _result: self._fix_prompt_windows.pop(part.name, None))
+        window.finished.connect(window.deleteLater)
+        window.train.clicked.connect(lambda: self.fix_training_requested.emit(part.name))
+        window.show_training(self._fix_training.get(part.name))
+        self._fix_prompt_windows[part.name] = window
+        window.show_over_parent()
+
+    def _keep_fix_prompts(self, name: str, prompts: dict) -> None:
+        self._fix_prompts[name] = prompts
+        self._emit()
+
+    def show_fix_training(self, name: str, text: str | None) -> None:
+        if text is None:
+            self._fix_training.pop(name, None)
+        else:
+            self._fix_training[name] = text
+        window = self._fix_prompt_windows.get(name)
+        if window is not None:
+            window.show_training(text)
+
+    def use_fix_lora(self, name: str, lora: str) -> None:
+        part = next(part for part in part_table() if part.name == name)
+        self._keep_fix_prompts(name, dict(fix_prompts_of(part, self._fix_prompts.get(name)),
+                                          lora=lora))
+        window = self._fix_prompt_windows.get(name)
+        if window is not None:
+            window.choose_lora(lora)
 
     def _fix_toggled(self, name: str) -> None:
         """A part switched on or off: grey its name and number to match, and
@@ -569,6 +637,7 @@ class EnhancePanel(QWidget):
                 value = settings.params.get(key)
                 if value is not None:
                     _fill(widget, value)
+            self._fix_prompts = dict(settings.params.get("enhance_fix_prompts") or {})
             fixes = detail_fixes_of(settings.params)
             for name, widget in self._fixes.items():
                 # A part these settings don't name is off, its number left at
@@ -594,6 +663,7 @@ class EnhancePanel(QWidget):
             name: widget.value() for name, widget in self._fixes.items()
             if self._fix_checks[name].isChecked()
         }
+        params["enhance_fix_prompts"] = dict(self._fix_prompts)
         return EnhanceSettings(auto=self._auto.isChecked(), params=params)
 
     def _emit(self, *_args):
@@ -626,3 +696,77 @@ class EnhancePanel(QWidget):
         self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=merged))
         self._emit()
         event.acceptProposedAction()
+
+
+class FixPromptsDialog(QDialog):
+    def __init__(self, parent, part, current: dict, loras: list[str]):
+        super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+        self._part = part
+        self.setWindowModality(Qt.WindowModality.NonModal)
+        self.setWindowTitle(f"{part.name.capitalize()} fix prompts")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        heading = QLabel(self.windowTitle())
+        heading.setStyleSheet("font-weight: 600;")
+        layout.addWidget(heading)
+        self.positive = QPlainTextEdit(current["prompt"])
+        self.negative = QPlainTextEdit(current["avoid"])
+        side_by_side = QHBoxLayout()
+        for caption, field in (("Positive Prompt", self.positive),
+                               ("Negative Prompt", self.negative)):
+            column = QVBoxLayout()
+            column.addWidget(QLabel(caption))
+            column.addWidget(field, 1)
+            side_by_side.addLayout(column)
+        layout.addLayout(side_by_side, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        self.lora = NoWheelComboBox()
+        self.lora.addItems(loras)
+        self.lora.setCurrentText(current["lora"] or NO_LORA)
+        self.strength = NoWheelDoubleSpinBox()
+        self.strength.setRange(0.0, 2.0)
+        self.strength.setSingleStep(0.05)
+        self.strength.setValue(current["strength"])
+        self.train = QPushButton()
+        self.train.setToolTip(_TRAIN_TOOLTIP)
+        foot = QHBoxLayout()
+        for widget in (QLabel("LoRA"), self.lora, QLabel("LoRA Strength"), self.strength,
+                       self.train):
+            foot.addWidget(widget)
+        foot.addStretch(1)
+        foot.addWidget(buttons)
+        layout.addLayout(foot)
+
+    def show_training(self, text: str | None) -> None:
+        self.train.setText(text or "Train")
+        self.train.setEnabled(text is None)
+
+    def choose_lora(self, lora: str) -> None:
+        if self.lora.findText(lora) < 0:
+            self.lora.addItem(lora)
+        self.lora.setCurrentText(lora)
+
+    def prompts(self) -> dict:
+        return fix_prompts_of(self._part, {
+            "prompt": self.positive.toPlainText(), "avoid": self.negative.toPlainText(),
+            "lora": self.lora.currentText(), "strength": self.strength.value()})
+
+    def show_over_parent(self) -> None:
+        for watched in (self.parentWidget(), self.parentWidget().window()):
+            watched.installEventFilter(self)
+        self._cover_parent()
+        self.show()
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.Move, QEvent.Type.Resize):
+            self._cover_parent()
+        return super().eventFilter(watched, event)
+
+    def _cover_parent(self) -> None:
+        parent = self.parentWidget()
+        self.setGeometry(QRect(parent.mapToGlobal(QPoint(0, 0)), parent.size()))

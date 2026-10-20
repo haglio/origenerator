@@ -638,6 +638,21 @@ def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, t
 
 # --- handing the line over as the app closes ---------------------------------
 
+def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_is_let_go(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.hold_for_training(True)
+
+    held = _launch_video(queue, "v1", seed=1)
+    assert client.submit_job.call_count == 0
+    assert not queue.making_something()
+
+    queue.hold_for_training(False)
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [held.prompt_id]
+    assert queue.making_something()
+
+
 def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
     # There is about to be nobody watching, so every reason to keep the line on
     # this side is gone and the server can work through the rest alone.

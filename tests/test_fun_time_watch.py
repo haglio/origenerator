@@ -244,28 +244,31 @@ def _marked(state_dir):
     return mark.read_text(encoding="utf-8").split() if mark.exists() else None
 
 
-def test_an_open_app_says_beside_its_offer_that_a_slideshow_is_up(tmp_path):
-    watch = FunTimeWatch(tmp_path, take_over=lambda session: None, showing=lambda: True)
+def test_an_open_app_says_beside_its_offer_which_side_its_slideshow_is_showing_on(tmp_path):
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None,
+                         showing_on=lambda: "portrait")
 
-    assert _marked(tmp_path) == [str(os.getpid()), str(this_process_creation_time())]
+    assert _marked(tmp_path) == [str(os.getpid()), str(this_process_creation_time()), "portrait"]
     watch.withdraw()
 
 
-def test_the_slideshow_mark_comes_and_goes_with_the_slideshow(qtbot, tmp_path):
-    up = [False]
-    watch = FunTimeWatch(tmp_path, take_over=lambda session: None, showing=lambda: up[0])
+def test_the_slideshow_mark_follows_the_slideshow_from_monitor_to_monitor(qtbot, tmp_path):
+    on = [None]
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None, showing_on=lambda: on[0])
     assert _marked(tmp_path) is None
 
-    up[0] = True
-    qtbot.waitUntil(lambda: _marked(tmp_path) is not None)
-    up[0] = False
+    on[0] = "landscape"
+    qtbot.waitUntil(lambda: (_marked(tmp_path) or [None])[-1] == "landscape")
+    on[0] = "portrait"
+    qtbot.waitUntil(lambda: (_marked(tmp_path) or [None])[-1] == "portrait")
+    on[0] = None
     qtbot.waitUntil(lambda: _marked(tmp_path) is None)
     watch.withdraw()
 
 
 def test_a_window_taken_over_takes_its_slideshow_mark_down_with_its_offer(qtbot, tmp_path):
     taken = []
-    watch = FunTimeWatch(tmp_path, take_over=taken.append, showing=lambda: True)
+    watch = FunTimeWatch(tmp_path, take_over=taken.append, showing_on=lambda: "portrait")
 
     _takeover(tmp_path, pid=os.getpid())
     qtbot.waitUntil(lambda: bool(taken))
@@ -277,9 +280,9 @@ def test_a_window_taken_over_takes_its_slideshow_mark_down_with_its_offer(qtbot,
 def test_a_preview_marks_its_slideshow_in_the_everyday_copy_s_state_too(tmp_path):
     preview, everyday = _preview_and_production(tmp_path)
 
-    watch = FunTimeWatch(preview, take_over=lambda session: None, showing=lambda: True,
-                         library_state_dir=everyday)
+    watch = FunTimeWatch(preview, take_over=lambda session: None,
+                         showing_on=lambda: "landscape", library_state_dir=everyday)
 
     assert _marked(everyday) == _marked(preview) == [
-        str(os.getpid()), str(this_process_creation_time())]
+        str(os.getpid()), str(this_process_creation_time()), "landscape"]
     watch.withdraw()

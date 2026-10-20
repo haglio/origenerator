@@ -113,7 +113,7 @@ def test_the_scale_is_applied_before_pyqt_is_imported():
                   and ast.unparse(node.func).endswith("apply_room_scale"))
     imported = min(node.lineno for node in ast.walk(main)
                    if isinstance(node, ast.ImportFrom)
-                   and (node.module or "").startswith(("PyQt6", "origenerator.gui")))
+                   and (node.module or "").startswith(("PyQt6", "origenerator.gui", "shared_ui")))
     assert applied < imported
 
 

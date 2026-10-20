@@ -675,7 +675,7 @@ def main(argv: list[str] | None = None) -> int:
     _init_windows_taskbar_identity(fun_time and fun_time.taskbar_identity, preview)
     _name_this_process()
 
-    from origenerator.gui.application import application
+    from shared_ui.application import application
 
     # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
     # above, and letting Qt re-read those flags would only invite collisions.

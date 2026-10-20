@@ -6,10 +6,11 @@ import json
 
 import numpy as np
 import pytest
-from app_support.osr2_device import Osr2Mode
+from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
+from funestra.modes import Osr2State
 from funestra.satellite_hud import MARGIN
 from funestra.timeline import TIMELINE_HEIGHT
 from PyQt6.QtCore import QEvent, QPoint, QPointF
@@ -251,6 +252,15 @@ class TestTheOnePanelASlideshowWears:
         window = self._window(qtbot, clock=lambda: now[0])
         window.wear_the_hud("portrait")
         return window
+
+    def test_the_panel_says_why_the_broker_cannot_hear_the_osr2(self, qtbot, monkeypatch):
+        monkeypatch.setattr("origenerator.gui.slideshow_view.osr2_device.device_mode",
+                            lambda: Osr2Mode.OFF)
+        monkeypatch.setattr("origenerator.gui.slideshow_view.osr2_device.device_trouble",
+                            lambda: Osr2Trouble.NOT_ANSWERING)
+        window = self._window(qtbot)
+
+        assert window.hud_device.osr2 is Osr2State.NO_ANSWER
 
     def test_an_idle_device_leaves_the_panel_on_its_resting_beat(self, qtbot, monkeypatch):
         now = [0.0]

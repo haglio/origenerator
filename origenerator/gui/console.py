@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from types import SimpleNamespace
 
-from app_support.osr2_device import Osr2Mode
+from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
 from funestra.console import (
     OSR2_CONTROL_BUTTONS,
@@ -98,7 +98,7 @@ def _bars_drawn(bars) -> dict:
                 **asdict(control_limits(bars)))
 
 
-def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
+def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2Trouble | None = None,
                 control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ConsoleHud:
     """The console's OSR2 section as Fun Time's painter takes it.
 
@@ -109,17 +109,8 @@ def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
     device the readout is the script's line rather than the motion's, and the
     OSR2 row says FunScript -- the motion is stopped, and drawing it would be a
     picture of something nobody is sending.
-
-    ``device`` is what the OSR2 reads as (:func:`origenerator.osr2.device_mode`):
-    switched off, running its own auto mode, or taking this app's commands. A
-    motion running with the device off is a motion nobody is receiving, and the
-    console says so exactly as Fun Time's does: the OSR2 row reads "Off" and the
-    painter takes that as nothing driving, which grays the readout and holds the
-    trace still. The motion goes on — it cannot see the device either way — so
-    this is the only thing standing between a switched-off OSR2 and a console
-    animating a blue wave nothing is riding.
     """
-    shown = slideshow_device(motion, device=device, control=control, script=script)
+    shown = slideshow_device(motion, device=device, trouble=trouble, control=control, script=script)
     return ConsoleHud(
         console=ConsoleModel(
             main_mode=MainMode.GENAU,
@@ -155,15 +146,17 @@ class SlideshowDevice:
 
 
 def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Osr2Mode.CONTROLLED,
-                control: str = OSR2_CONTROL_UNANSWERED, script=None) -> SlideshowDevice:
+                     trouble: Osr2Trouble | None = None,
+                     control: str = OSR2_CONTROL_UNANSWERED, script=None) -> SlideshowDevice:
     """What the device is doing, as a panel takes it — see :class:`SlideshowDevice`.
 
     ``script`` is the funscript driver, when this app has one: while it has the
     device the readout is the script's line rather than the motion's, and the
     line says FunScript.  ``device`` is what the OSR2 reads as; switched off
-    nothing here is being received, so the line reads Off, the readout grays and
-    the trace holds still rather than animating a wave nobody is riding, and in
-    its own auto mode the line reads Auto.
+    nothing here is being received, so the line reads Off, or why the Broker
+    cannot hear it (``trouble``), the readout grays and the trace holds still
+    rather than animating a wave nobody is riding, and in its own auto mode the
+    line reads Auto.
     """
     on = device is not Osr2Mode.OFF
     scripted = script is not None and script.active and on
@@ -173,7 +166,7 @@ def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Os
         rows=() if pace_s is None else (pace_row(pace_s),),
         osr2_rows=(aim_row(learned=motion.state.learned.active,
                            shape=motion.state.state.shape.value, control=control),),
-        osr2=Osr2State.of(device, funscript_driving=scripted),
+        osr2=Osr2State.of(device, funscript_driving=scripted, trouble=trouble),
         drive=(script_hud(script, motion.state) if scripted
                else drive_hud(motion.state, driving)),
         max_intensity=motion.state.state.max_intensity,

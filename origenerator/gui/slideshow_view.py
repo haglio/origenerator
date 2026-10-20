@@ -1123,6 +1123,7 @@ class SlideshowView(QWidget):
         control = self._actions.osr2_control
         return slideshow_device(
             self._motion, pace_s=self.dwell_s, device=osr2_device.device_mode(),
+            trouble=osr2_device.device_trouble(),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None)
 

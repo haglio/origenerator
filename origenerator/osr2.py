@@ -1,10 +1,11 @@
 """Talk to the OSR2 device through the broker sibling.
 
-The broker owns the device (real serial ``COM4``) and forwards raw T-code sent to
-its UDP listener straight to it, suppressing MultiFunPlayer for a moment so the two
-don't fight (``osr2_broker/session.py``). So origenerator drives the device simply
-by streaming T-code here in sync with a playing video.  The device's own auto
-mode wins over that: while it runs, the broker drops what arrives here.
+The broker owns the device, on whichever serial port its USB socket is given, and
+forwards raw T-code sent to its UDP listener straight to it, suppressing
+MultiFunPlayer for a moment so the two don't fight. So origenerator drives the
+device simply by streaming T-code here in sync with a playing video.  The
+device's own auto mode wins over that: while it runs, the broker drops what
+arrives here.
 
 Everything is best-effort: UDP to nobody is a harmless no-op, so the app behaves
 the same whether or not the broker is running.
@@ -38,9 +39,17 @@ TCODE_UDP_PORT = ports.TCODE_UDP
 SHARED_STATE_DIR = project_dir("fun_time") / "state"
 
 
+def _state_dir(state_dir) -> Path:
+    return Path(state_dir) if state_dir is not None else SHARED_STATE_DIR
+
+
 def device_mode(*, now: float | None = None, state_dir=None) -> osr2_device.Osr2Mode:
-    return osr2_device.mode(
-        Path(state_dir) if state_dir is not None else SHARED_STATE_DIR, now=now)
+    return osr2_device.mode(_state_dir(state_dir), now=now)
+
+
+def device_trouble(*, now: float | None = None,
+                   state_dir=None) -> osr2_device.Osr2Trouble | None:
+    return osr2_device.trouble(_state_dir(state_dir), now=now)
 
 
 def format_position(pos_0_100: float, interval_ms: float) -> str:

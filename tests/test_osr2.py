@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from app_support.file_channel import consume_command_file
-from app_support.osr2_device import SILENT_ONCE_OFF_S, Osr2Mode
+from app_support.osr2_device import SILENT_ONCE_OFF_S, Osr2Mode, Osr2Trouble
 from app_support.osr2_hold import PARK
-from app_support.state_files import BROKER_CMD, BROKER_MODE, OSR2_SERIAL_RX
+from app_support.state_files import BROKER_CMD, BROKER_MODE, OSR2_NOT_FOUND, OSR2_SERIAL_RX
 
-from origenerator.osr2 import Osr2Broker, device_mode, format_position
+from origenerator.osr2 import Osr2Broker, device_mode, device_trouble, format_position
 
 
 class FakeSock:
@@ -75,6 +75,12 @@ def test_nothing_stamped_at_all_reads_as_off(tmp_path):
 
 def test_a_device_silent_for_the_whole_shared_window_reads_as_off(tmp_path):
     assert device_mode(now=1000.0, state_dir=_rx(tmp_path, 1000.0 - SILENT_ONCE_OFF_S)) is Osr2Mode.OFF
+
+
+def test_a_broker_that_cannot_find_the_osr2_says_why_it_is_unheard(tmp_path):
+    (tmp_path / OSR2_NOT_FOUND).write_text("999.5", encoding="utf-8")
+
+    assert device_trouble(now=1000.0, state_dir=tmp_path) is Osr2Trouble.NOT_FOUND
 
 
 def test_a_broker_named_nothing_streams_where_the_broker_listens():

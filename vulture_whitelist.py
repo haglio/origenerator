@@ -48,8 +48,9 @@ _.STROKE_TRIM  # noqa  # origenerator/generation_state.py:25, the source on a Ge
 
 # --- style-option fields written for Qt's painter to read, never read back here ---
 _.textVisible  # noqa  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
-_.features  # noqa  # origenerator/gui/seed_combo.py:32, the QStyleOptionViewItem the item delegate paints from
-_.decorationSize  # noqa  # origenerator/gui/seed_combo.py:33, the same option
+_.features  # noqa  # origenerator/gui/pictured_dropdown.py:118, the QStyleOptionViewItem the item delegate paints from
+_.decorationSize  # noqa  # origenerator/gui/pictured_dropdown.py:119, the same option
+_.showDecorationSelected  # noqa  # origenerator/gui/pictured_dropdown.py:152, the option a row's ground is drawn from
 
 # --- reachable from nothing yet ---
 _.to_logical_rect  # noqa  # origenerator/ui_scale.py:91, added in 23ee359 for the hosted app with only its tests calling it; the caller it waits for is that work's to land, not this landing's to decide

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QProxyStyle, QStyle, QStyleOptionViewItem
 
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from tests.pictured_rows import painted_row, square
@@ -64,3 +65,48 @@ def test_with_no_video_to_list_the_dropdown_is_live_and_empty(qtbot):
 
     assert dropdown.isEnabled()
     assert dropdown.count() == 0
+
+
+def _unlit(option):
+    option = QStyleOptionViewItem(option)
+    option.state &= ~QStyle.StateFlag.State_Selected
+    return option
+
+
+class _LitOverWhatItIsHanded(QProxyStyle):
+    """Lights an item under the mouse over the whole rect its drawing is handed,
+    in a wash that darkens where it is laid twice, as Windows 11's own style does."""
+
+    def drawPrimitive(self, element, option, painter, widget=None):
+        if element == QStyle.PrimitiveElement.PE_PanelItemViewItem:
+            option = _unlit(option)
+        super().drawPrimitive(element, option, painter, widget)
+
+    def drawControl(self, element, option, painter, widget=None):
+        if (element == QStyle.ControlElement.CE_ItemViewItem
+                and option.state & QStyle.StateFlag.State_Selected):
+            painter.fillRect(option.rect, QColor(0, 0, 255, 128))
+            option = _unlit(option)
+        super().drawControl(element, option, painter, widget)
+
+
+def test_the_row_under_the_mouse_is_lit_once_all_around_its_picture(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", square(tmp_path, "red"))])
+    style = _LitOverWhatItIsHanded("fusion")
+    style.setParent(dropdown)  # gone with the view it styles, never before it
+    dropdown.view().setStyle(style)
+    dropdown.showPopup()
+
+    plain = painted_row(dropdown, 0)
+    lit = painted_row(dropdown, 0, under_the_mouse=True)
+
+    middle = plain.height() // 2
+    picture = [x for x in range(plain.width()) if QColor(plain.pixel(x, middle)).saturation() == 0
+               and QColor(plain.pixel(x, middle)).lightness() > 60]
+    top = [y for y in range(plain.height()) if plain.pixel(picture[0], y) == plain.pixel(
+        picture[0], middle)]
+    around = ((picture[0] - 1, middle), (picture[-1] + 1, middle), (picture[0], top[0] - 1),
+              (picture[0], top[-1] + 1), (plain.width() - 4, middle))
+    assert len({lit.pixel(x, y) for x, y in around}) == 1
+    assert all(lit.pixel(x, y) != plain.pixel(x, y) for x, y in around)
+    dropdown.hidePopup()

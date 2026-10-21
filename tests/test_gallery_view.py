@@ -14392,7 +14392,7 @@ def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
     folder_id = _make_folder(view, "Favorites", [cat, dog])
     group = view.group_for_key(gallery.custom_folder_key(folder_id))
 
-    view._remove_from_custom_folder(group, dog)
+    view._remove_from_custom_folder(group, [dog])
 
     (record,) = view._db.list_custom_folders()
     assert record["folders"] == [cat]
@@ -14661,6 +14661,35 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     (record,) = view._db.list_custom_folders()
     assert record["id"] == folder_id and record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
+
+
+def test_an_item_can_be_taken_out_of_the_folder_of_your_own_showing_it(qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Keepers", [cat])
+    view._db.add_items_to_custom_folder(folder_id, ["i2"])
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])  # standing inside it
+    _answer_menu(monkeypatch, "Remove from “Keepers”")
+
+    view.generation_menu(["i2"], QPoint(0, 0))
+
+    (record,) = view._db.list_custom_folders()
+    assert record["items"] == [] and record["folders"] == [cat]
+    assert view._db.get_generation("i2") is not None  # taken out of it, not deleted
+
+
+def test_an_item_there_only_by_its_folder_offers_no_way_out_of_the_folder_of_your_own(
+        qtbot, monkeypatch):
+    # It is in there because its folder is, so only that folder can be taken out.
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Keepers", [cat])
+    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    view.generation_menu(["i1"], QPoint(0, 0))
+
+    assert labels and "Remove from “Keepers”" not in labels
 
 
 def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(

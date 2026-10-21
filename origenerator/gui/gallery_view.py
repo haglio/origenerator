@@ -212,6 +212,10 @@ def _kept_on_removal(custom) -> str:
     return f"The {held} it holds are kept."
 
 
+def _saved_custom_folder(group):
+    return group if isinstance(group, gallery.CustomGroup) and group.folder_id is not None else None
+
+
 def _takes_a_favorite(group) -> bool:
     return group is not None and not isinstance(group, gallery.CustomGroup)
 
@@ -2243,12 +2247,12 @@ class GalleryView(QWidget):
         self.refresh()
         self._re_aim()
 
-    def _remove_from_custom_folder(self, group, folder_key: str):
-        """Drop one gathered folder out of the custom folder on screen."""
-        gathered = self.group_for_key(folder_key)
-        identity = (self._folder_identity(gathered) if gathered is not None
-                    else (folder_key, None, None))
-        self._actions.custom_folders.remove_from(group.folder_id, folders=[identity])
+    def _remove_from_custom_folder(self, group, folder_keys=(), items=()):
+        """Take gathered folders and items out of the custom folder on screen."""
+        folders = [self._folder_identity(gathered)
+                   if (gathered := self.group_for_key(key)) is not None else (key, None, None)
+                   for key in folder_keys]
+        self._actions.custom_folders.remove_from(group.folder_id, folders, items)
         self.refresh()
         self._re_aim()
 
@@ -3706,7 +3710,8 @@ class GalleryView(QWidget):
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
         it the run had to be hunted down among the lower strip's rows. It sits
-        beside Enhance, the act that started it.
+        beside Enhance, the act that started it. And inside a custom folder, what
+        it holds on its own can be taken back out of it, as its folders can.
         """
         rows = [row for pid in prompt_ids
                 if (row := self._db.get_generation(pid)) is not None]
@@ -3722,6 +3727,11 @@ class GalleryView(QWidget):
             menu, [self._item_names.of(row["prompt_id"]) for row in rows])
         all_favorites = all(row.get("starred") for row in rows)
         favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
+        open_custom = _saved_custom_folder(self.current_group())
+        held = {row["prompt_id"] for row in open_custom.rows} if open_custom else set()
+        held_here = [row["prompt_id"] for row in rows if row["prompt_id"] in held]
+        remove_action = (menu.addAction(f"Remove from “{open_custom.label}”")
+                         if held_here else None)
         enhanceable = [row["prompt_id"] for row in rows
                        if gallery.is_enhanceable_row(row)]
         enhance_action = None
@@ -3743,6 +3753,8 @@ class GalleryView(QWidget):
             self.follow_link(rows[0]["prompt_id"])
         elif chosen is favorite_action:
             self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
+        elif remove_action is not None and chosen is remove_action:
+            self._remove_from_custom_folder(open_custom, items=held_here)
         elif enhance_action is not None and chosen is enhance_action:
             self._enhance.enhance_items(enhanceable)
         elif cancel_action is not None and chosen is cancel_action:
@@ -4077,10 +4089,9 @@ class GalleryView(QWidget):
         # Inside a folder the user made, a folder tile can also be taken out of it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
         # it isn't in any grouping from there.
-        open_custom = self.current_group()
+        open_custom = _saved_custom_folder(self.current_group())
         remove_action = None
-        if isinstance(open_custom, gallery.CustomGroup) and open_custom.folder_id is not None \
-                and any(m.key == group.key for m in gallery.child_groups(open_custom)):
+        if open_custom and any(m.key == group.key for m in gallery.child_groups(open_custom)):
             remove_action = menu.addAction(f"Remove from “{open_custom.label}”")
         add_menu = self._add_to_folder_menu(menu, key)
         delete_action = None
@@ -4092,7 +4103,7 @@ class GalleryView(QWidget):
         if chosen == favorite_action:
             self._toggle_favorite(key)
         elif remove_action is not None and chosen == remove_action:
-            self._remove_from_custom_folder(open_custom, group.key)
+            self._remove_from_custom_folder(open_custom, [group.key])
         elif chosen in add_menu:
             self._on_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:

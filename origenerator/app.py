@@ -115,9 +115,9 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
 
 
 def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_events=None):
-    import importlib.util
     import socket
 
+    from origenerator import comfyui_launcher
     from origenerator.comfyui_client import comfyui_responding
 
     def port_open():
@@ -139,19 +139,16 @@ def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump
         )
         return
 
-    # Try to use ComfyUIApp's server launcher
-    comfyuiapp_dir = comfyui_dir.parents[0]  # ComfyUIApp dir
-    server_script = comfyuiapp_dir / "scripts" / "comfyui_server.py"
+    server_script = comfyui_launcher.script(comfyui_dir)
     if not server_script.exists():
         logger.warning("ComfyUI not running and launcher not found at %s", server_script)
         return
 
     try:
-        spec = importlib.util.spec_from_file_location("comfyui_server", server_script)
-        server = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(server)
+        server = comfyui_launcher.load(comfyui_dir)
         logger.info("Starting ComfyUI server via %s...", server_script)
-        result = server.start(base_dir=comfyuiapp_dir, on_status=on_status, pump_events=pump_events)
+        result = server.start(base_dir=comfyui_dir.parent, on_status=on_status,
+                              pump_events=pump_events)
         if result.started:
             logger.info("ComfyUI server started (PID %s)", result.pid)
         elif result.error:

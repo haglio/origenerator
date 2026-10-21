@@ -1,6 +1,173 @@
 from __future__ import annotations
 
+import io
+import json
+import sys
+import types
+
+import pytest
+from PIL import Image
+
 from tools import fix_lora_trainer
+
+
+def _picture(size=(64, 48)) -> bytes:
+    written = io.BytesIO()
+    Image.new("RGB", size).save(written, "PNG")
+    return written.getvalue()
+
+
+def _job(tmp_path, photos: dict) -> dict:
+    folder = tmp_path / "Hands"
+    folder.mkdir()
+    for name, data in photos.items():
+        (folder / name).write_bytes(data)
+    work = tmp_path / "work"
+    return {"part": "hands", "photos": [str(folder / name) for name in photos],
+            "photos_folder": str(folder), "caption": "close-up photo of hands",
+            "detector": str(tmp_path / "hand_yolov8s.pt"), "work": str(work),
+            "status": str(work / "status.json"), "log": str(work / "training.log")}
+
+
+def test_a_photo_that_is_no_picture_stops_the_cropping_and_says_which_to_take_out(tmp_path):
+    job = _job(tmp_path, {"broken.jpg": b"not a picture"})
+
+    with pytest.raises(fix_lora_trainer.Stopped) as stopped:
+        fix_lora_trainer.crop(job, find=lambda image: None)
+
+    assert "broken.jpg" in str(stopped.value)
+    assert job["photos_folder"] in str(stopped.value)
+
+
+def test_photos_the_detector_finds_the_part_in_none_of_stop_the_training_and_say_so(tmp_path):
+    job = _job(tmp_path, {"one.png": _picture(), "two.png": _picture()})
+
+    with pytest.raises(fix_lora_trainer.Stopped) as stopped:
+        fix_lora_trainer.crop(job, find=lambda image: None)
+
+    assert "any of the 2 photos" in str(stopped.value)
+    assert job["photos_folder"] in str(stopped.value)
+
+
+def test_each_photo_the_part_is_found_in_becomes_a_square_crop_with_the_fixs_caption(tmp_path):
+    job = _job(tmp_path, {"found.png": _picture((400, 300)), "not.png": _picture()})
+
+    kept = fix_lora_trainer.crop(
+        job, find=lambda image: (10, 10, 50, 40) if image.size == (400, 300) else None)
+
+    crops = tmp_path / "work" / "crops"
+    assert kept == 1
+    with Image.open(crops / "0000.jpg") as cropped:
+        assert cropped.size == (1024, 1024)
+    assert (crops / "0000.txt").read_text(encoding="utf-8") == "close-up photo of hands"
+    assert sorted(path.name for path in crops.iterdir()) == ["0000.jpg", "0000.txt"]
+
+
+def test_a_detector_that_cannot_be_read_says_so_and_where_an_agent_can_read_why(
+        tmp_path, monkeypatch):
+    def unreadable(path):
+        raise AttributeError("Can't get attribute 'Segment26'")
+
+    monkeypatch.setitem(sys.modules, "ultralytics", types.SimpleNamespace(YOLO=unreadable))
+    job = _job(tmp_path, {"one.png": _picture()})
+
+    with pytest.raises(fix_lora_trainer.Stopped) as stopped:
+        fix_lora_trainer.crop(job)
+
+    assert "hand_yolov8s.pt" in str(stopped.value)
+    assert job["log"] in str(stopped.value)
+
+
+def _job_file(tmp_path) -> tuple[dict, str]:
+    job = _job(tmp_path, {})
+    (tmp_path / "work").mkdir()
+    path = tmp_path / "work" / "job.json"
+    path.write_text(json.dumps(job), encoding="utf-8")
+    return job, str(path)
+
+
+def _status(job) -> dict:
+    with open(job["status"], encoding="utf-8") as read:
+        return json.load(read)
+
+
+def test_a_step_that_stops_leaves_its_reason_where_the_app_reads_it(tmp_path, monkeypatch):
+    def stops(job):
+        raise fix_lora_trainer.Stopped("Take broken.jpg out.")
+
+    monkeypatch.setitem(fix_lora_trainer.STEPS, "crop", stops)
+    job, path = _job_file(tmp_path)
+
+    assert fix_lora_trainer.main(["crop", path]) == 1
+    assert _status(job) == {"state": "failed", "message": "Take broken.jpg out."}
+
+
+def test_a_step_that_breaks_says_what_it_was_doing_and_prints_why_into_the_log(
+        tmp_path, monkeypatch, capsys):
+    def breaks(job):
+        raise KeyError("no such column")
+
+    monkeypatch.setitem(fix_lora_trainer.STEPS, "train", breaks)
+    job, path = _job_file(tmp_path)
+
+    assert fix_lora_trainer.main(["train", path]) == 1
+    assert _status(job)["state"] == "failed"
+    assert "while training" in _status(job)["message"]
+    assert job["log"] in _status(job)["message"]
+    assert "no such column" in capsys.readouterr().err
+
+
+def _cropped_job(tmp_path, sd_script: str) -> dict:
+    job = _job(tmp_path, {})
+    scripts = tmp_path / "sd-scripts"
+    scripts.mkdir()
+    (scripts / "sdxl_train_network.py").write_text(sd_script, encoding="utf-8")
+    crops = tmp_path / "work" / "crops"
+    crops.mkdir(parents=True)
+    (crops / "0000.jpg").write_bytes(_picture())
+    return dict(job, sd_scripts=str(scripts), base_model="base.safetensors",
+                output_dir=str(tmp_path / "loras"), output_name="hands 2026-10-21 1500")
+
+
+def test_a_training_the_graphics_card_runs_out_of_memory_for_says_so(tmp_path):
+    job = _cropped_job(tmp_path, "import sys\n"
+                                 "print('torch.OutOfMemoryError: CUDA out of memory.')\n"
+                                 "sys.exit(1)\n")
+
+    with pytest.raises(fix_lora_trainer.Stopped) as stopped:
+        fix_lora_trainer.train(job)
+
+    assert "graphics card ran out of memory" in str(stopped.value)
+
+
+def test_a_training_that_breaks_otherwise_clears_the_photos_and_names_the_log(tmp_path):
+    job = _cropped_job(tmp_path, "import sys\nprint('ValueError: bad option')\nsys.exit(1)\n")
+
+    with pytest.raises(fix_lora_trainer.Stopped) as stopped:
+        fix_lora_trainer.train(job)
+
+    assert "Nothing about your photos caused it" in str(stopped.value)
+    assert job["log"] in str(stopped.value)
+
+
+def test_a_training_says_how_many_of_its_steps_are_done_as_it_goes(tmp_path):
+    job = _cropped_job(tmp_path, "import sys\n"
+                                 "print('steps:  30%|###       | 3/10 [00:03<00:07]')\n"
+                                 "sys.stdout.flush()\nsys.exit(1)\n")
+
+    with pytest.raises(fix_lora_trainer.Stopped):
+        fix_lora_trainer.train(job)
+
+    assert _status(job) == {"state": "training", "done": 3, "total": 10}
+
+
+def test_a_finished_training_names_its_lora_and_passes_on_what_it_printed(tmp_path, capfd):
+    job = _cropped_job(tmp_path, "print('steps:  50%|#####     | 5/10 [00:05<00:05]')\n")
+
+    fix_lora_trainer.train(job)
+
+    assert _status(job) == {"state": "done", "lora": "hands 2026-10-21 1500.safetensors"}
+    assert "5/10" in capfd.readouterr().out
 
 
 def test_a_part_is_cropped_to_a_square_twice_its_size_around_it():

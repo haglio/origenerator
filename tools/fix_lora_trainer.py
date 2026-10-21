@@ -1,11 +1,11 @@
 """Train a fix's LoRA from photos of its part, for Origenerator -- run by path,
-under the Python of the environment kohya's sd-scripts lives in, never imported
-by the app.
+never imported by the app, one step at a time under the Python that can run it:
 
-    python fix_lora_trainer.py job.json
+    python fix_lora_trainer.py crop job.json    # ComfyUI's, which reads every detector a fix uses
+    python fix_lora_trainer.py train job.json   # the one kohya's sd-scripts is installed in
 
 Only the plain functions are imported by the app's tests; everything heavy is
-imported inside :func:`main`, so this file loads anywhere.
+imported inside the step that needs it, so this file loads anywhere.
 """
 
 from __future__ import annotations
@@ -71,78 +71,143 @@ def _status(job: dict, **fields) -> None:
     Path(job["status"]).write_text(json.dumps(fields), encoding="utf-8")
 
 
-def _crop_photos(job: dict, crops) -> int:
-    from PIL import Image  # noqa: PLC0415
-    from ultralytics import YOLO  # noqa: PLC0415
-
-    detector = YOLO(job["detector"])
-    photos = job["photos"]
-    crops.mkdir(parents=True, exist_ok=True)
-    kept = 0
-    for index, photo in enumerate(photos, 1):
-        _status(job, state="cropping", done=index, total=len(photos))
-        with Image.open(photo) as opened:
-            image = opened.convert("RGB")
-        boxes = detector.predict(image, verbose=False)[0].boxes
-        if len(boxes) == 0:
-            continue
-        best = max(range(len(boxes)), key=lambda i: float(boxes.conf[i]))
-        box = [float(value) for value in boxes.xyxy[best]]
-        crop = image.crop(square_crop(box, image.size)).resize((1024, 1024), Image.LANCZOS)
-        crop.save(crops / f"{kept:04d}.jpg", quality=95)
-        (crops / f"{kept:04d}.txt").write_text(job["caption"], encoding="utf-8")
-        kept += 1
-    return kept
+class Stopped(Exception):
+    pass
 
 
-def _train(job: dict, images: str) -> int:
-    import os  # noqa: PLC0415
-    import re  # noqa: PLC0415
-    import subprocess  # noqa: PLC0415
+def _finder(job: dict):
     from pathlib import Path  # noqa: PLC0415
 
-    log = Path(job["work"]) / "training.log"
-    flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
-    with log.open("w", encoding="utf-8") as written:
-        process = subprocess.Popen(train_command(job, images), cwd=job["sd_scripts"],
-                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                   creationflags=flags,
-                                   env=training_environment(dict(os.environ)))
-        piece = b""
-        while chunk := process.stdout.read1(256):
-            written.write(chunk.decode("utf-8", "replace"))
-            piece = (piece + chunk)[-512:]
-            steps = re.findall(rb"steps:\s+\d+%\|[^|]*\|\s*(\d+)/(\d+)", piece)
-            if steps:
-                done, total = steps[-1]
-                _status(job, state="training", done=int(done), total=int(total))
-        return process.wait()
+    from ultralytics import YOLO  # noqa: PLC0415
+
+    try:
+        model = YOLO(job["detector"])
+    except Exception as error:
+        raise Stopped(f"The {job['part'].capitalize()} detector, {Path(job['detector']).name}, "
+                      "couldn't be read, so no photo was cropped. Nothing about your photos "
+                      f"caused it; an agent can read why in {job['log']}.") from error
+
+    def find(image):
+        boxes = model.predict(image, verbose=False)[0].boxes
+        if len(boxes) == 0:
+            return None
+        best = max(range(len(boxes)), key=lambda i: float(boxes.conf[i]))
+        return [float(value) for value in boxes.xyxy[best]]
+
+    return find
 
 
-def main(job_path: str) -> int:
-    import json  # noqa: PLC0415
+def crop(job: dict, find=None) -> int:
     import shutil  # noqa: PLC0415
     from pathlib import Path  # noqa: PLC0415
 
-    job = json.loads(Path(job_path).read_text(encoding="utf-8"))
+    from PIL import Image  # noqa: PLC0415
+
     work = Path(job["work"])
-    shutil.rmtree(work / "images", ignore_errors=True)
     crops = work / "crops"
+    shutil.rmtree(work / "images", ignore_errors=True)
     shutil.rmtree(crops, ignore_errors=True)
-    kept = _crop_photos(job, crops)
+    crops.mkdir(parents=True)
+    find = find or _finder(job)
+    photos = job["photos"]
+    kept = 0
+    for index, photo in enumerate(photos, 1):
+        _status(job, state="cropping", done=index, total=len(photos))
+        try:
+            with Image.open(photo) as opened:
+                image = opened.convert("RGB")
+        except (OSError, ValueError) as error:
+            raise Stopped(f"{Path(photo).name} couldn't be opened as a picture. Take it out of "
+                          f"{job['photos_folder']} or replace it, then press Train "
+                          "again.") from error
+        box = find(image)
+        if box is None:
+            continue
+        cropped = image.crop(square_crop(box, image.size)).resize((1024, 1024), Image.LANCZOS)
+        cropped.save(crops / f"{kept:04d}.jpg", quality=95)
+        (crops / f"{kept:04d}.txt").write_text(job["caption"], encoding="utf-8")
+        kept += 1
     if not kept:
-        _status(job, state="failed", message="The fix's detector found its part in none of the photos.")
-        return 1
+        name = job["part"].capitalize()
+        raise Stopped(f"The {name} detector didn't find {name} in any of the {len(photos)} "
+                      f"photos in {job['photos_folder']}. Add photos where {name} is clearly "
+                      "visible, then press Train again.")
+    return kept
+
+
+def _train(job: dict, images: str) -> tuple[int, bytes]:
+    import os  # noqa: PLC0415
+    import re  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+
+    flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
+    process = subprocess.Popen(train_command(job, images), cwd=job["sd_scripts"],
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               creationflags=flags, env=training_environment(dict(os.environ)))
+    tail = b""
+    while chunk := process.stdout.read1(256):
+        sys.stdout.buffer.write(chunk)
+        sys.stdout.buffer.flush()
+        tail = (tail + chunk)[-4096:]
+        steps = re.findall(rb"steps:\s+\d+%\|[^|]*\|\s*(\d+)/(\d+)", tail)
+        if steps:
+            done, total = steps[-1]
+            _status(job, state="training", done=int(done), total=int(total))
+    return process.wait(), tail
+
+
+_MEMORY_RAN_OUT = (b"OutOfMemoryError", b"CUDA out of memory")
+
+
+def _why_the_training_stopped(tail: bytes, log: str) -> str:
+    if any(sign in tail for sign in _MEMORY_RAN_OUT):
+        return ("The graphics card ran out of memory while training. Close anything else "
+                "using it, then press Train again.")
+    return ("The training program stopped with an error. Nothing about your photos caused "
+            f"it; an agent can read why in {log}.")
+
+
+def train(job: dict) -> None:
+    from pathlib import Path  # noqa: PLC0415
+
+    work = Path(job["work"])
+    crops = work / "crops"
     images = work / "images"
     images.mkdir(parents=True)
-    crops.rename(dataset_folder(str(images), job["part"], kept))
+    crops.rename(dataset_folder(str(images), job["part"], len(list(crops.glob("*.jpg")))))
     _status(job, state="training", done=0, total=0)
-    if _train(job, str(images)) != 0:
-        _status(job, state="failed", message=f"The training stopped; its log is {work / 'training.log'}.")
-        return 1
+    code, tail = _train(job, str(images))
+    if code != 0:
+        raise Stopped(_why_the_training_stopped(tail, job["log"]))
     _status(job, state="done", lora=f"{job['output_name']}.safetensors")
+
+
+STEPS = {"crop": crop, "train": train}
+_DOING = {"crop": "cropping the photos", "train": "training"}
+
+
+def main(argv: list[str]) -> int:
+    import json  # noqa: PLC0415
+    import traceback  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    step, job_path = argv
+    job = json.loads(Path(job_path).read_text(encoding="utf-8"))
+    try:
+        STEPS[step](job)
+    except Stopped as stopped:
+        _status(job, state="failed", message=str(stopped))
+        return 1
+    except Exception:
+        traceback.print_exc()
+        _status(job, state="failed", message=f"The training stopped with an error while "
+                                             f"{_DOING[step]}. An agent can read why in "
+                                             f"{job['log']}.")
+        return 1
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1]))
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    sys.exit(main(sys.argv[1:]))

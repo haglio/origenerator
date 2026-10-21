@@ -102,6 +102,7 @@ SCHEMA = {
         ("trimmed_from", "TEXT", 0, None, 0),
         ("provenance", "TEXT", 0, None, 0),
         ("picture_state", "TEXT", 0, None, 0),
+        ("shielded", "INTEGER", 1, "0", 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

@@ -118,7 +118,10 @@ CREATE TABLE IF NOT EXISTS generations (
     -- rather than anything its prompt asked for, which is why it is a column and
     -- not a param: NULL until someone has looked, and free to differ between two
     -- pictures of one settings folder. Never set on a video.
-    picture_state TEXT
+    picture_state TEXT,
+    -- The shield on a queue row: while set, nothing the queue does for later
+    -- work stops this run partway. On the row so a restart keeps it.
+    shielded        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -256,6 +259,7 @@ ADDED_COLUMNS = {
         "trimmed_from": "TEXT",
         "provenance": "TEXT",
         "picture_state": "TEXT",
+        "shielded": "INTEGER NOT NULL DEFAULT 0",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -284,7 +288,7 @@ GENERATION_COLUMNS = (
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
     "evolver_unsent_at", "genau_exported_at", "genau_unsent_at",
     "genau_requested_at", "recipe_category", "recipe_video_id",
-    "enhance_of", "trimmed_from", "provenance", "picture_state",
+    "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
 )
 
 

@@ -41,7 +41,8 @@ class InFlightItems:
 
     def __init__(self, *, db, jobs, auto, tree, image_rows: Callable[[], list],
                  on_cancel: Callable[[str], None], on_reveal: Callable[[str], None],
-                 on_go_to_item: Callable[[str], None]):
+                 on_go_to_item: Callable[[str], None],
+                 on_shield: Callable[[str, bool], None]):
         self._db = db
         self._jobs = jobs
         self._auto = auto
@@ -50,6 +51,7 @@ class InFlightItems:
         self._on_cancel = on_cancel
         self._on_reveal = on_reveal
         self._on_go_to_item = on_go_to_item
+        self._on_shield = on_shield
 
     def build(self, rows=None, requests=None) -> list[InFlightItem]:
         """Every queued/running generation as a card model, in the order the queue
@@ -107,6 +109,8 @@ class InFlightItems:
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 started = job.started_at  # None until ComfyUI actually starts it
                 cancel = partial(self._on_cancel, pid)
+                shield = partial(self._on_shield, pid)
+                shielded = job.shielded
                 stop_auto = partial(self._auto.stop, folder_key)
                 state = job.state
             else:  # a running row no live job holds — no live frame, progress, or cancel
@@ -115,6 +119,7 @@ class InFlightItems:
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
                 pass_progress, stage, stop_auto, state = None, "", None, row.get("status")
+                shield, shielded = None, bool(row.get("shielded"))
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
@@ -140,6 +145,8 @@ class InFlightItems:
                 reveal=reveal,
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 cancel=cancel,
+                shield=shield,
+                shielded=shielded,
                 # Its folder auto-looping makes that button "Next seed": the press
                 # discards this run and the loop launches another. A menu can
                 # offer the real stop beside it, which is what stop_auto is for.

@@ -9764,6 +9764,7 @@ class _FakeRerollJob:
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
         self.source = GenerationSource.GENERATED
         self.thumb_dir = THUMB_DIR
+        self.shielded = False
 
     def reconcile_with(self, history):
         pass  # the poll applies /history on every tracked re-roll; nothing here

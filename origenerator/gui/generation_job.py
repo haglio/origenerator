@@ -140,6 +140,7 @@ class GenerationJob(QObject):
         # asking for a video never jumps the pictures already waiting (see
         # JobQueue._launch and :mod:`origenerator.queue_line`).
         self.run_media_type = self.media_type
+        self.shielded = False
         self._output_dir = output_dir
         self._thumb_dir = thumb_dir
         # idle -> queued -> running -> finished/failed/canceled; and back to idle

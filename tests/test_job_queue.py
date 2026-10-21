@@ -1340,3 +1340,58 @@ def test_a_job_put_first_while_a_hand_over_is_out_takes_the_machine_when_it_land
     client.interrupt.assert_called_with(handed_over_next.prompt_id)
     assert client.submit_job.call_args_list[-1].args[1] == locked.prompt_id
     assert queue.queue_order == [locked.prompt_id, handed_over_next.prompt_id]
+
+
+# --- a shielded run keeps the machine until it is done ---------------------------
+
+def test_a_picture_asked_for_waits_behind_a_shielded_video_being_rendered(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    video = _launch_video(queue, "v", seed=1)
+    _rendering(client, video)
+    queue.shield(video.prompt_id, True)
+
+    image = _launch_image(queue, "i")
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [video.prompt_id, image.prompt_id]
+
+
+def test_what_a_slideshow_locks_on_waits_behind_a_shielded_run_being_rendered(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    video = _launch_video(queue, "v1", seed=1)
+    _rendering(client, video)
+    queue.shield(video.prompt_id, True)
+    locked = _launch_video(queue, "v2", seed=2)
+
+    queue.put_first({locked.prompt_id})
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [video.prompt_id, locked.prompt_id]
+
+
+def test_a_shield_on_the_run_being_made_survives_a_restart(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, _client())
+    video = _launch_video(queue, "v", seed=1)
+    queue.shield(video.prompt_id, True)
+
+    restarted = JobQueue(db, _client())
+    restarted.reconnect_running()
+
+    assert restarted.job_for_prompt(video.prompt_id).shielded
+
+
+def test_a_shield_on_a_run_still_waiting_survives_a_restart(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, _client())
+    _launch_video(queue, "v1", seed=1)
+    waiting = _launch_video(queue, "v2", seed=2)
+    queue.shield(waiting.prompt_id, True)
+
+    restarted = JobQueue(db, _client())
+    restarted.reconnect_running()
+
+    assert restarted.job_for_prompt(waiting.prompt_id).shielded

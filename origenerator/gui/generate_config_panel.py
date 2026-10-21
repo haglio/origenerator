@@ -1090,12 +1090,15 @@ class GenerateConfigPanel(QWidget):
     def name(self) -> str:
         if self._folder_request is not None:
             return self._folder_request.label
-        name = self._names.of((self._displayed_row or {}).get("prompt_id"))
+        name = self._item_name()
         if not name:
             key = self.workflow_and_signature()
             if key is not None:
                 name = config_folder_name(*key, self._db.folder_meta_map())
         return name
+
+    def _item_name(self) -> str:
+        return self._names.of((self._displayed_row or {}).get("prompt_id"))
 
     def tab_icon(self) -> QIcon:
         """The mark beside this tab's name: the displayed item's own thumbnail,
@@ -1530,11 +1533,8 @@ class GenerateConfigPanel(QWidget):
         ``request`` is the spoken request that made this row, when one did.
         """
         self.reread_folder_buttons()
-        # An image's files are all listed as its versions, so its block is at
-        # most the workflow version — it shows only when it has content rather
-        # than opening a bare gap above the form.
         self._metadata_block.setVisible(
-            self._metadata_block.show_row(row, self._upscale_of(row)))
+            self._metadata_block.show_row(row, self._upscale_of(row), self._item_name()))
         self._picture_state.show_row(row)
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()

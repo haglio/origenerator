@@ -37,7 +37,13 @@ def _image_row(**overrides):
 
 # --- section layout --------------------------------------------------------
 
-def test_basic_leads_with_the_output_file_and_the_date():
+def test_an_items_name_leads_the_block_and_is_what_its_copy_button_copies():
+    items = basic_section(_row(), name="AB12CD34 007").items
+    assert [(item.label, item.value, item.copy) for item in items[:2]] == [
+        ("Name", "AB12CD34 007", "AB12CD34 007"), ("File", "video/clip.mp4", "clip.mp4")]
+
+
+def test_the_output_file_comes_before_its_date():
     items = basic_section(_row(created_at="2026-07-01")).items
     assert items[0].label == "File"
     assert items[0].value == "video/clip.mp4"
@@ -173,11 +179,12 @@ def test_a_passthrough_param_does_not_grow_a_second_block():
 
 # --- an image's files belong to its versions, not to this block -------------
 
-def test_an_image_has_no_block_at_all():
+def test_an_images_block_leaves_its_file_to_the_version_list():
     # Its one file is its Original — listed down in the version list, beside the
     # enhancement (none, yet) that made it. Repeating it here under a second
     # label is exactly what moving it was for.
-    assert basic_section(_image_row()) is None
+    section = basic_section(_image_row(), name="AB12CD34 007")
+    assert [item.label for item in section.items] == ["Name"]
 
 
 def test_a_batch_still_lists_the_siblings_no_version_claims():

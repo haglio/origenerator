@@ -7373,6 +7373,67 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     view._slideshows.showing.close()
 
 
+def test_the_slideshow_begins_on_whichever_item_is_picked_in_the_folder(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    for picked in view.visible_prompt_ids():
+        view._browser.apply_selection(picked, _NO_MOD)
+        view._slideshows.start()
+        slideshow = view._slideshows.showing
+        qtbot.addWidget(slideshow)
+        assert slideshow._playlist.current().prompt_id == picked
+        slideshow.close()
+
+
+def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_begins_it(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._bank.slideshow.click()
+    minimized = view._slideshows.showing
+    qtbot.addWidget(minimized)
+    minimized.showMinimized()
+    picked = next(pid for pid in view.visible_prompt_ids()
+                  if pid != minimized._playlist.current().prompt_id)
+    view._browser.apply_selection(picked, _NO_MOD)
+
+    view._bank.slideshow.click()
+
+    assert view._slideshows.showing._playlist.current().prompt_id == picked
+    view._slideshows.showing.close()
+
+
+def test_with_two_items_picked_the_slideshow_comes_back_to_where_the_last_one_closed(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._slideshows.start()
+    last = view._slideshows.showing
+    qtbot.addWidget(last)
+    closed_on = last._playlist.current().prompt_id
+    last.close()
+    elsewhere = [pid for pid in view.visible_prompt_ids() if pid != closed_on]
+    view._browser.apply_selection(elsewhere[0], _NO_MOD)
+    view._browser.apply_selection(elsewhere[1], _CTRL)
+
+    view._slideshows.start()
+
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert slideshow._playlist.current().prompt_id == closed_on
+    slideshow.close()
+
+
 def _standalone_slideshow(qtbot, monkeypatch):
     """A fullscreen slideshow of two pictures, opened with no session under it."""
     _resolve_by_id(monkeypatch)
@@ -7570,6 +7631,31 @@ def test_a_slideshow_after_one_of_the_favorites_collection_is_not_held_to_the_fa
     slideshow.close()
 
 
+def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([
+        _row(f"i{n}", "sdxl_t2i", {"positive_prompt": "a cat", "steps": 50, "seed": n},
+             f"sdxl_t2i_i{n}.png", starred=1) for n in (1, 2, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
+    view._slideshows.start()
+    last = view._slideshows.showing
+    qtbot.addWidget(last)
+    closed_on = last._playlist.current().prompt_id
+    last.close()
+    picked = next(pid for pid in view.visible_prompt_ids() if pid != closed_on)
+    view._browser.apply_selection(picked, _NO_MOD)
+
+    view._slideshows.start()
+
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert slideshow._playlist.current().prompt_id == picked
+    assert slideshow.hud_favorites_filter
+    slideshow.close()
+
+
 def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
@@ -7596,6 +7682,23 @@ def test_a_slideshow_of_one_kinds_latest_plays_that_kind_alone(qtbot, monkeypatc
     qtbot.addWidget(view._slideshows.showing)
     assert [item[2] for item in view._slideshows.showing._playlist._items] == ["i1"]
     view._slideshows.showing.close()
+
+
+def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_recents(view)
+    newest, older = view.visible_prompt_ids()
+    view._browser.apply_selection(older, _NO_MOD)
+
+    view._slideshows.start()
+
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert slideshow._playlist.current().prompt_id == newest
+    slideshow.close()
 
 
 def test_the_enhanced_switch_narrows_a_slideshow_to_the_pictures_made_better(qtbot, monkeypatch):

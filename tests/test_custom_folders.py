@@ -58,13 +58,13 @@ def test_the_live_selection_names_no_saved_folder():
 
 # --- resolving a saved folder against the live tree --------------------------
 
-def test_a_custom_folder_resolves_its_items_out_of_the_tree():
+def test_a_custom_folder_resolves_its_folders_out_of_the_tree():
     rows = [_row("i1", "a cat"), _row("i2", "a dog")]
     tree = _tree(rows)
     cat, dog = [g.key for g in gallery.child_groups(_lora_folder(tree))]
 
     (folder,) = gallery.build_custom_folders(
-        tree, [{"id": 3, "name": "Favorites", "items": [cat, dog]}]
+        tree, [{"id": 3, "name": "Favorites", "folders": [cat, dog]}]
     )
 
     assert folder.key == gallery.custom_folder_key(3)
@@ -73,26 +73,26 @@ def test_a_custom_folder_resolves_its_items_out_of_the_tree():
     assert {r["prompt_id"] for r in gallery.rows_under(folder)} == {"i1", "i2"}
 
 
-def test_an_item_whose_folder_is_gone_is_skipped_not_dropped():
+def test_a_gathered_folder_that_is_gone_is_skipped_not_dropped():
     # The folder may come back (an undone delete, a reconcile) — so the grouping
-    # renders without it rather than forgetting it was ever an item.
+    # renders without it rather than forgetting it was ever gathered.
     rows = [_row("i1", "a cat")]
     tree = _tree(rows)
     record = {"id": 1, "name": "Mixed",
-              "items": ["image/sdxl_t2i/deadbeef", "image/sdxl_t2i"]}
+              "folders": ["image/sdxl_t2i/deadbeef", "image/sdxl_t2i"]}
 
     (folder,) = gallery.build_custom_folders(tree, [record])
 
     assert [g.key for g in gallery.child_groups(folder)] == ["image/sdxl_t2i"]
     # untouched
-    assert record["items"] == ["image/sdxl_t2i/deadbeef", "image/sdxl_t2i"]
+    assert record["folders"] == ["image/sdxl_t2i/deadbeef", "image/sdxl_t2i"]
 
 
 def test_an_empty_custom_folder_still_appears():
     # A folder you have made and named but not yet filled is exactly where you
     # are about to drop something.
     (folder,) = gallery.build_custom_folders(
-        _tree([_row("i1", "a cat")]), [{"id": 1, "name": "Later", "items": []}]
+        _tree([_row("i1", "a cat")]), [{"id": 1, "name": "Later", "folders": []}]
     )
     assert gallery.child_groups(folder) == []
     assert gallery.rows_under(folder) == []
@@ -107,7 +107,7 @@ def test_gathering_a_folder_and_its_parent_counts_each_item_once():
     leaf = gallery.child_groups(lora)[0]
 
     (folder,) = gallery.build_custom_folders(
-        tree, [{"id": 1, "name": "Overlapping", "items": [lora.key, leaf.key]}]
+        tree, [{"id": 1, "name": "Overlapping", "folders": [lora.key, leaf.key]}]
     )
 
     assert len(gallery.rows_under(folder)) == 2
@@ -115,7 +115,7 @@ def test_gathering_a_folder_and_its_parent_counts_each_item_once():
 
 def test_a_custom_folder_wears_no_recipe_level_but_names_its_tier():
     (folder,) = gallery.build_custom_folders(
-        _tree([_row("i1", "a cat")]), [{"id": 1, "name": "Mine", "items": []}]
+        _tree([_row("i1", "a cat")]), [{"id": 1, "name": "Mine", "folders": []}]
     )
     assert gallery.folder_level(folder) is None   # no lettered chip: it is no tier
     assert gallery.group_level(folder) == "custom"
@@ -123,10 +123,10 @@ def test_a_custom_folder_wears_no_recipe_level_but_names_its_tier():
 
 # --- storage -----------------------------------------------------------------
 
-def _db_with_folder(tmp_path, name="Favorites", items=(("image", "media", "i1"),)):
+def _db_with_folder(tmp_path, name="Favorites", folders=(("image", "media", "i1"),)):
     db = Database(tmp_path / "t.db")
     folder_id = db.create_custom_folder(name)
-    db.add_custom_folder_items(folder_id, list(items))
+    db.add_folders_to_custom_folder(folder_id, list(folders))
     return db, folder_id
 
 
@@ -136,66 +136,66 @@ def test_a_saved_folder_keeps_the_side_it_was_made_on(tmp_path):
     folder_id = db.create_custom_folder("Mine", side=PORTRAIT)
 
     assert db.list_custom_folders() == [
-        {"id": folder_id, "name": "Mine", "side": PORTRAIT, "items": []}]
+        {"id": folder_id, "name": "Mine", "side": PORTRAIT, "folders": []}]
 
 
-def test_a_saved_folder_lists_its_items_in_the_order_they_were_added(tmp_path):
+def test_a_saved_folder_lists_its_folders_in_the_order_they_were_added(tmp_path):
     db = Database(tmp_path / "t.db")
     folder_id = db.create_custom_folder("Favorites")
-    db.add_custom_folder_items(folder_id, [("b", "settings", "p2")])
-    db.add_custom_folder_items(folder_id, [("a", "settings", "p1"),
-                                             ("c", "settings", "p3")])
+    db.add_folders_to_custom_folder(folder_id, [("b", "settings", "p2")])
+    db.add_folders_to_custom_folder(folder_id, [("a", "settings", "p1"),
+                                                ("c", "settings", "p3")])
 
     (record,) = db.list_custom_folders()
-    assert record["items"] == ["b", "a", "c"]
+    assert record["folders"] == ["b", "a", "c"]
 
 
-def test_re_adding_an_item_keeps_its_place_rather_than_duplicating_it(tmp_path):
-    db, folder_id = _db_with_folder(tmp_path, items=[("a", "settings", "p1"),
+def test_re_adding_a_folder_keeps_its_place_rather_than_duplicating_it(tmp_path):
+    db, folder_id = _db_with_folder(tmp_path, folders=[("a", "settings", "p1"),
                                                        ("b", "settings", "p2")])
 
-    db.add_custom_folder_items(folder_id, [("a", "settings", "p9")])
+    db.add_folders_to_custom_folder(folder_id, [("a", "settings", "p9")])
 
     (record,) = db.list_custom_folders()
-    assert record["items"] == ["a", "b"]
-    identity = {m["folder_key"]: m["ref_prompt_id"] for m in db.custom_folder_items_full()}
+    assert record["folders"] == ["a", "b"]
+    identity = {m["folder_key"]: m["ref_prompt_id"] for m in db.folders_in_custom_folders()}
     assert identity["a"] == "p9"  # the identity refreshes even though the order holds
 
 
-def test_removing_a_folder_takes_its_items_with_it(tmp_path):
+def test_removing_a_custom_folder_takes_what_it_gathered_with_it(tmp_path):
     db, folder_id = _db_with_folder(tmp_path)
 
     db.delete_custom_folder(folder_id)
 
     assert db.list_custom_folders() == []
-    assert db.custom_folder_items_full() == []
+    assert db.folders_in_custom_folders() == []
 
 
-def test_repointing_an_item_keeps_its_place_in_the_folder(tmp_path):
+def test_repointing_a_gathered_folder_keeps_its_place(tmp_path):
     db = Database(tmp_path / "t.db")
     folder_id = db.create_custom_folder("Favorites")
-    db.add_custom_folder_items(folder_id, [("a", "settings", "p1"),
-                                             ("old", "settings", "p2"),
-                                             ("c", "settings", "p3")])
+    db.add_folders_to_custom_folder(folder_id, [("a", "settings", "p1"),
+                                                ("old", "settings", "p2"),
+                                                ("c", "settings", "p3")])
 
-    db.repoint_custom_folder_item(folder_id, "old", "new",
-                                    level="settings", ref_prompt_id="p2")
+    db.repoint_folder_in_custom_folder(folder_id, "old", "new",
+                                       level="settings", ref_prompt_id="p2")
 
     (record,) = db.list_custom_folders()
-    assert record["items"] == ["a", "new", "c"]
+    assert record["folders"] == ["a", "new", "c"]
 
 
-def test_repointing_onto_an_item_the_folder_already_holds_merges_them(tmp_path):
+def test_repointing_onto_a_folder_it_already_gathers_merges_them(tmp_path):
     db = Database(tmp_path / "t.db")
     folder_id = db.create_custom_folder("Favorites")
-    db.add_custom_folder_items(folder_id, [("live", "settings", "p1"),
-                                             ("stale", "settings", "p1")])
+    db.add_folders_to_custom_folder(folder_id, [("live", "settings", "p1"),
+                                                ("stale", "settings", "p1")])
 
-    db.repoint_custom_folder_item(folder_id, "stale", "live",
-                                    level="settings", ref_prompt_id="p1")
+    db.repoint_folder_in_custom_folder(folder_id, "stale", "live",
+                                       level="settings", ref_prompt_id="p1")
 
     (record,) = db.list_custom_folders()
-    assert record["items"] == ["live"]  # one folder can only be in a grouping once
+    assert record["folders"] == ["live"]  # one folder can only be in a grouping once
 
 
 # --- undo --------------------------------------------------------------------
@@ -217,11 +217,11 @@ def test_undoing_a_removal_brings_the_folder_back_whole(tmp_path):
     actions.undo()
 
     assert db.list_custom_folders() == [
-        {"id": folder_id, "name": "Favorites", "side": PORTRAIT, "items": ["a", "b"]}
+        {"id": folder_id, "name": "Favorites", "side": PORTRAIT, "folders": ["a", "b"]}
     ]
 
 
-def test_undoing_an_add_leaves_the_items_that_were_already_there(tmp_path):
+def test_undoing_an_add_leaves_the_folders_that_were_already_there(tmp_path):
     db, actions = _actions(tmp_path)
     folder_id = actions.custom_folders.create("Favorites", [("a", "settings", "p1")])
 
@@ -230,7 +230,7 @@ def test_undoing_an_add_leaves_the_items_that_were_already_there(tmp_path):
     actions.undo()
 
     (record,) = db.list_custom_folders()
-    assert record["items"] == ["a"]
+    assert record["folders"] == ["a"]
 
 
 def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
@@ -246,4 +246,4 @@ def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
 
     ((record,),) = (db.list_custom_folders(),)
     assert record["id"] == folder_id and record["side"] == PORTRAIT
-    assert record["name"] == "Mine" and record["items"] == ["image/sdxl_t2i"]
+    assert record["name"] == "Mine" and record["folders"] == ["image/sdxl_t2i"]

@@ -244,24 +244,24 @@ class Database:
     def delete_custom_folder(self, folder_id: int):
         return self.custom_folders.delete_custom_folder(folder_id)
 
-    def add_custom_folder_items(self, folder_id: int, items: list[tuple]):
-        return self.custom_folders.add_custom_folder_items(folder_id, items)
+    def add_folders_to_custom_folder(self, folder_id: int, folders: list[tuple]):
+        return self.custom_folders.add_folders_to_custom_folder(folder_id, folders)
 
-    def remove_custom_folder_item(self, folder_id: int, folder_key: str):
-        return self.custom_folders.remove_custom_folder_item(folder_id, folder_key)
+    def remove_folder_from_custom_folder(self, folder_id: int, folder_key: str):
+        return self.custom_folders.remove_folder_from_custom_folder(folder_id, folder_key)
 
     def list_custom_folders(self) -> list[dict]:
         return self.custom_folders.list_custom_folders()
 
-    def custom_folder_items_full(self) -> list[dict]:
-        return self.custom_folders.custom_folder_items_full()
+    def folders_in_custom_folders(self) -> list[dict]:
+        return self.custom_folders.folders_in_custom_folders()
 
-    def repoint_custom_folder_item(self, folder_id: int, old_key: str, new_key: str,
-                                     *, level: str | None, ref_prompt_id: str | None):
-        return self.custom_folders.repoint_custom_folder_item(
+    def repoint_folder_in_custom_folder(self, folder_id: int, old_key: str, new_key: str,
+                                        *, level: str | None, ref_prompt_id: str | None):
+        return self.custom_folders.repoint_folder_in_custom_folder(
             folder_id, old_key, new_key, level=level, ref_prompt_id=ref_prompt_id)
 
-    def stamp_custom_folder_item(self, folder_id: int, folder_key: str,
-                                   *, level: str | None, ref_prompt_id: str | None):
-        return self.custom_folders.stamp_custom_folder_item(
+    def stamp_folder_in_custom_folder(self, folder_id: int, folder_key: str,
+                                      *, level: str | None, ref_prompt_id: str | None):
+        return self.custom_folders.stamp_folder_in_custom_folder(
             folder_id, folder_key, level=level, ref_prompt_id=ref_prompt_id)

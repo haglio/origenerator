@@ -362,7 +362,7 @@ def test_a_library_that_named_the_folder_holdings_the_old_way_keeps_them(tmp_pat
 
     assert db.list_custom_folders() == [
         {"id": 1, "name": "Favorites", "side": None,
-         "items": ["image/sdxl_t2i", "image/flux_t2i"]}]
+         "folders": ["image/sdxl_t2i", "image/flux_t2i"]}]
     with sqlite3.connect(path) as conn:
         assert "custom_folder_members" not in _tables(conn)
 

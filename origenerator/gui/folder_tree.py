@@ -301,7 +301,9 @@ class FolderTree(QTreeWidget):
     def dragMoveEvent(self, event):
         """Accept only where the drag would land, so the cursor says outright
         where the folders or the item can go."""
-        super().dragMoveEvent(event)  # scrolls the tree while a drag is held at its edge
+        super().dragMoveEvent(event)  # scrolls the tree while a drag is held at its foot
+        if event.position().y() < self.autoScrollMargin():
+            self.scrollToTop()  # the folders of your own are there, where a drag nearly always goes
         if self._landing(event) is not None:
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()

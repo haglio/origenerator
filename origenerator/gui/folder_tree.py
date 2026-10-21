@@ -114,10 +114,11 @@ class FolderTree(QTreeWidget):
     dropped = pyqtSignal(str, list, list)  # collecting row's key, folder keys, prompt ids
 
     def __init__(self, group_role, takes_item=lambda _row_key, _prompt_id: False,
-                 parent=None):
+                 takes_folder=lambda _row_key, _folder_key: True, parent=None):
         super().__init__(parent)
         self._role = group_role
         self._takes_item = takes_item  # whether the row under a dragged item takes it
+        self._takes_folder = takes_folder  # and the same for each dragged folder
         self._delete = icons.delete_icon()
         self._star = icons.star_icon(filled=False)
         self._star_on = icons.star_icon(filled=True)  # a favorited leaf's filled star
@@ -247,19 +248,16 @@ class FolderTree(QTreeWidget):
                 keys.append(item.data(0, TREE_KEY_ROLE))
         return keys
 
-    def _gatherable(self, item) -> bool:
-        return (item is not None and item.data(0, self._role) is not None
-                and not item.data(0, DROP_KEY_ROLE))
-
     def startDrag(self, supported_actions):
         """Drag the picked folders as their keys. Dragging one row that isn't in
         the selection drags that row alone — the file-manager behavior, and what
         keeps a stale multi-selection from being dropped by accident."""
         pressed = self.currentItem()
-        if not self._gatherable(pressed):
+        if pressed is None or pressed.data(0, self._role) is None:
             return
-        picked = [item for item in self.selectedItems() if self._gatherable(item)]
-        keys = [item.data(0, TREE_KEY_ROLE) for item in (picked if pressed in picked else [pressed])]
+        keys = self.selected_folder_keys()
+        if pressed.data(0, TREE_KEY_ROLE) not in keys:
+            keys = [pressed.data(0, TREE_KEY_ROLE)]
         mime = QMimeData()
         mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
         drag = QDrag(self)
@@ -280,10 +278,11 @@ class FolderTree(QTreeWidget):
         target = row.data(0, DROP_KEY_ROLE) if row is not None else None
         if not isinstance(target, str):
             return None
-        folders = [key for key in self._dragged_keys(mime, source) if key != target]
+        row_key = row.data(0, TREE_KEY_ROLE)
+        folders = [key for key in self._dragged_keys(mime, source)
+                   if key not in (target, row_key) and self._takes_folder(row_key, key)]
         item = dragged_generation(mime)
-        items = ([item] if item is not None
-                 and self._takes_item(row.data(0, TREE_KEY_ROLE), item) else [])
+        items = [item] if item is not None and self._takes_item(row_key, item) else []
         return (target, folders, items) if folders or items else None
 
     def _dragged_keys(self, mime, source) -> list[str]:

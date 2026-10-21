@@ -9,9 +9,9 @@ updates every custom folder that gathers it.
 
 A saved folder is stored as a name plus a list of folder keys (see
 :meth:`origenerator.db.Database.list_custom_folders`); :func:`build_custom_folders`
-resolves those keys against the freshly built tree into a
-:class:`~origenerator.gallery.groups.CustomGroup`, which answers the same walkers
-every other folder does. A folder that isn't in the tree right now — its
+resolves those keys against the freshly built tree and the other saved folders
+into a :class:`~origenerator.gallery.groups.CustomGroup`, which answers the same
+walkers every other folder does. A folder that isn't in the tree right now — its
 generations deleted, or its key drifted before the reconcile catches up — is
 simply skipped rather than dropped from the saved list, so a folder that comes
 back rejoins the grouping it was in.
@@ -70,15 +70,24 @@ def build_custom_folders(tree: list, records) -> list[CustomGroup]:
     module docstring); an empty folder still appears, since a folder you have made
     and named but not yet filled is exactly where you are about to drop something.
     """
-    folders = index_folders(tree)
     items = {row["prompt_id"]: row for group in tree for row in rows_under(group)}
-    return [
-        CustomGroup(custom_folder_key(record["id"]), record["name"],
-                    [folders[key] for key in record["folders"] if key in folders],
+    built = [
+        CustomGroup(custom_folder_key(record["id"]), record["name"], [],
                     [items[prompt_id] for prompt_id in record["items"] if prompt_id in items],
                     folder_id=record["id"])
         for record in records
     ]
+    folders = index_folders(tree) | {group.key: group for group in built}
+    for group, record in zip(built, records):
+        group.children.extend(folders[key] for key in record["folders"]
+                              if key in folders and not holds(folders[key], group))
+    return built
+
+
+def holds(folder, other) -> bool:
+    """Whether ``other`` is ``folder``, or a custom folder anywhere inside it."""
+    return folder.key == other.key or any(
+        holds(child, other) for child in child_groups(folder) if isinstance(child, CustomGroup))
 
 
 def selection_group(groups: list) -> CustomGroup:

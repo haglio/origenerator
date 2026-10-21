@@ -213,6 +213,12 @@ def _kept_on_removal(custom) -> str:
     return f"The {held} it holds are kept."
 
 
+def _offer_taking_out(menu: QMenu, open_custom, group):
+    if open_custom and any(m.key == group.key for m in gallery.child_groups(open_custom)):
+        return menu.addAction(f"Remove from “{open_custom.label}”")
+    return None
+
+
 def _saved_custom_folder(group):
     return group if isinstance(group, gallery.CustomGroup) and group.folder_id is not None else None
 
@@ -689,7 +695,8 @@ class GalleryView(QWidget):
         # One tree per side, each under a standing label and each scrolling on
         # its own: the table of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
-        self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_folder_takes)
+        self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_folder_takes,
+                                     takes_folder=self._collecting_row_takes_folder)
         self._tree.offer_separate_and_together(self._fun_time is None)
         self._tree.sides_changed.connect(self._on_sides_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
@@ -2129,14 +2136,9 @@ class GalleryView(QWidget):
             self._re_aim()
 
     def _selected_groups(self) -> list:
-        """The folders the tree currently has picked, in tree order. A custom
-        folder is left out: gathering one into another would nest a grouping inside
-        a grouping, which the tree has nowhere to draw."""
-        return [
-            group for key in self._tree.selected_folder_keys()
-            if (group := self.group_for_key(key)) is not None
-            and not isinstance(group, gallery.CustomGroup)
-        ]
+        """The folders the tree currently has picked, in tree order."""
+        return [group for key in self._tree.selected_folder_keys()
+                if (group := self.group_for_key(key)) is not None]
 
     def _show_selection(self):
         """Render the picked folders as the folder they would make: their tiles in
@@ -2229,6 +2231,16 @@ class GalleryView(QWidget):
         leaf = self._leaf_by_id.get(prompt_id)
         return (isinstance(folder, gallery.CustomGroup) and leaf is not None
                 and _side_of(leaf.data(0, _TREE_KEY_ROLE)) == _side_of(row_key))
+
+    def _collecting_row_takes_folder(self, row_key: str, folder_key: str) -> bool:
+        """Favorites takes any folder that takes a star, a folder of your own any
+        folder but one that would end up inside itself."""
+        target, dragged = self.group_for_key(row_key), self.group_for_key(folder_key)
+        if dragged is None:
+            return False
+        if isinstance(target, gallery.CustomGroup):
+            return not gallery.holds(dragged, target)
+        return _takes_a_favorite(dragged)
 
     def _landing_in_the_open_custom_folder(self, mime, source):
         if _saved_custom_folder(self.current_group()) is None:
@@ -4094,13 +4106,8 @@ class GalleryView(QWidget):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
         favorite_action = menu.addAction("Unfavorite" if group.favorite else "Favorite")
-        # Inside a folder the user made, a folder tile can also be taken out of it.
-        # Right-clicking the same folder in the tree offers nothing of the sort —
-        # it isn't in any grouping from there.
         open_custom = _saved_custom_folder(self.current_group())
-        remove_action = None
-        if open_custom and any(m.key == group.key for m in gallery.child_groups(open_custom)):
-            remove_action = menu.addAction(f"Remove from “{open_custom.label}”")
+        remove_action = _offer_taking_out(menu, open_custom, group)
         add_menu = self._add_to_folder_menu(menu, key)
         delete_action = None
         if _is_deletable_folder(group):
@@ -4135,8 +4142,13 @@ class GalleryView(QWidget):
     def _custom_folder_context_menu(self, group, global_pos: QPoint):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
+        open_custom = _saved_custom_folder(self.current_group())
+        take_out_action = _offer_taking_out(menu, open_custom, group)
         remove_action = menu.addAction("Remove folder…")
-        if menu.exec(global_pos) == remove_action:
+        chosen = menu.exec(global_pos)
+        if take_out_action is not None and chosen == take_out_action:
+            self._remove_from_custom_folder(open_custom, [group.key])
+        elif chosen == remove_action:
             self._remove_custom_folder(group)
 
     def _toggle_favorite(self, key: str):

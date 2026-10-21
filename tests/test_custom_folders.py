@@ -123,6 +123,35 @@ def test_a_custom_folders_own_items_lead_and_one_inside_a_gathered_folder_counts
     assert [r["prompt_id"] for r in gallery.rows_under(folder)] == ["i1", "i2"]
 
 
+def test_a_custom_folder_inside_another_brings_what_it_holds():
+    tree = _tree([_row("i1", "a cat"), _row("i2", "a dog")])
+    cat, dog = gallery.child_groups(_lora_folder(tree))
+    inner = gallery.custom_folder_key(2)
+
+    outer_folder, _inner_folder = gallery.build_custom_folders(tree, [
+        {"id": 1, "name": "Outer", "folders": [cat.key, inner], "items": []},
+        {"id": 2, "name": "Inner", "folders": [dog.key], "items": []},
+    ])
+
+    assert [g.key for g in gallery.child_groups(outer_folder)] == [cat.key, inner]
+    assert {r["prompt_id"] for r in gallery.rows_under(outer_folder)} == {"i1", "i2"}
+
+
+def test_two_custom_folders_saved_inside_each_other_resolve_without_looping():
+    # An undo and a redo can leave each holding the other; the later link is left out.
+    tree = _tree([_row("i1", "a cat")])
+    a, b = gallery.custom_folder_key(1), gallery.custom_folder_key(2)
+
+    first, second = gallery.build_custom_folders(tree, [
+        {"id": 1, "name": "A", "folders": [b], "items": ["i1"]},
+        {"id": 2, "name": "B", "folders": [a], "items": []},
+    ])
+
+    assert [g.key for g in gallery.child_groups(first)] == [b]
+    assert gallery.child_groups(second) == []
+    assert [r["prompt_id"] for r in gallery.rows_under(first)] == ["i1"]
+
+
 def test_gathering_a_folder_and_its_parent_counts_each_item_once():
     # Otherwise the slideshow would play the overlap twice and the tile would
     # claim more items than the folder holds.

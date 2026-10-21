@@ -239,8 +239,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     that folder's side, which the TOC asks of the gallery through one
     method. 281 -> 282: the middle pane takes a drag while a folder of your own
     is open in it, and asks the TOC what that folder's own row would take,
-    through one method.)"""
+    through one method. 282 -> 283: a folder of your own can go inside another,
+    so which dragged folders a row in the TOC takes is the gallery's to answer
+    too, through one more.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 282
+               for x in _class_def(VIEW, "GalleryView").body) == 283
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

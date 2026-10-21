@@ -123,9 +123,10 @@ class SplitFolderTree(QWidget):
     context_menu_requested = pyqtSignal(object, object, str)
 
     def __init__(self, group_role, takes_item=lambda _row_key, _prompt_id: False,
-                 parent=None):
+                 takes_folder=lambda _row_key, _folder_key: True, parent=None):
         super().__init__(parent)
         self._takes_item = takes_item
+        self._takes_folder = takes_folder
         self._trees: dict[str, FolderTree] = {}
         self._sections: dict[str, QWidget] = {}   # each tree under its heading
         self._sides = SEPARATE
@@ -211,7 +212,8 @@ class SplitFolderTree(QWidget):
         column.addWidget(_rule())
         column.addSpacing(2)
 
-        tree = FolderTree(group_role, takes_item=self._takes_item)
+        tree = FolderTree(group_role, takes_item=self._takes_item,
+                          takes_folder=self._takes_folder)
         tree.setHeaderHidden(True)
         tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         tree.setMinimumHeight(_MIN_SECTION_HEIGHT)

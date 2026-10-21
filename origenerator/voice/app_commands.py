@@ -102,7 +102,6 @@ class AppCommand(Enum):
     LEARNED = "learned"
     LEARNED_ON = "learned_on"
     LEARNED_OFF = "learned_off"
-    OFFSET = "offset"
 
 
 @dataclass(frozen=True)
@@ -234,7 +233,6 @@ _say(AppCommand.PREVIOUS_SHAPE, "previous shape")
 _say(AppCommand.LEARNED, "human inspired")
 _say(AppCommand.LEARNED_ON, "human inspired on")
 _say(AppCommand.LEARNED_OFF, "human inspired off")
-_say(AppCommand.OFFSET, "offset")
 
 MOTION_MOVES: dict[AppCommand, tuple[str, int | bool | None]] = {
     AppCommand.SPEED_UP: ("adjust_speed", 5),
@@ -248,7 +246,6 @@ MOTION_MOVES: dict[AppCommand, tuple[str, int | bool | None]] = {
     AppCommand.LEARNED: ("toggle_learned", None),
     AppCommand.LEARNED_ON: ("set_learned", True),
     AppCommand.LEARNED_OFF: ("set_learned", False),
-    AppCommand.OFFSET: ("quarter_offset", None),
 }
 
 AUTO_SWITCH, AUDIO_SWITCH, DRIVE_SWITCH, MIC_SWITCH = "auto", "audio", "drive", "mic"

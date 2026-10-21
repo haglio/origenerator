@@ -103,7 +103,7 @@ def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
                  "genau_clip_seconds_down", "genau_clip_seconds_up"):
         assert gone not in actions, gone
     for kept in ("robot_hand_toggle_learned",
-                 "robot_hand_cycle_shape", "quarter_button", "robot_hand_release",
+                 "robot_hand_cycle_shape", "robot_hand_release",
                  "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
         assert kept in actions, kept
 
@@ -117,8 +117,7 @@ def test_the_console_declares_the_buttons_this_app_answers(qtbot):
 
     assert hud.console.rows == ()
     assert [[b.command for b in row if b.command] for row in hud.console.osr2_rows] == [
-        ["robot_hand_park", "robot_hand_toggle_learned", "robot_hand_cycle_shape",
-         "quarter_button"],
+        ["robot_hand_park", "robot_hand_toggle_learned", "robot_hand_cycle_shape"],
     ]
     assert hud.console.osr2_controls == ()
 
@@ -167,10 +166,10 @@ def test_the_motion_buttons_reach_the_driver(qtbot):
     motion.state.state.amplitude = 40
     panel.render_console()
     for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
-                   "robot_hand_toggle_learned", "robot_hand_cycle_shape", "quarter_button"):
+                   "robot_hand_toggle_learned", "robot_hand_cycle_shape"):
         _press(panel, action)
     assert motion.calls == [("speed", 5), ("amp", -10), ("center", 5),
-                            "learned", "shape", "quarter"]
+                            "learned", "shape"]
 
 
 def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):

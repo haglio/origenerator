@@ -31,9 +31,6 @@ class FakeMotion:
         self.calls.append("shape")
         motion_engine.cycle_shape(self.state.state)
 
-    def quarter_offset(self):
-        self.calls.append("quarter")
-
     def adjust_speed(self, delta):
         self.calls.append(("speed", delta))
 

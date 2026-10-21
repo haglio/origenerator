@@ -7,7 +7,7 @@ readout: at the main window's top left on a console of its own
 (:mod:`origenerator.gui.motion_panel`), and over a slideshow on the one panel it
 wears (:mod:`origenerator.gui.slideshow_panel`).  The keys are genau's own, so the
 muscle memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,
-I shape, ; human-inspired motion, backslash nudges a quarter cycle.
+I shape, ; human-inspired motion.
 """
 from __future__ import annotations
 
@@ -44,8 +44,6 @@ def apply_motion_key(motion, key, *, on_drive_toggle=None) -> bool:
         motion.cycle_shape()
     elif key == Qt.Key.Key_Semicolon:
         motion.toggle_learned()
-    elif key == Qt.Key.Key_Backslash:
-        motion.quarter_offset()
     else:
         return False
     return True

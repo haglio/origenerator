@@ -13548,9 +13548,6 @@ class _SignalMotion(QObject):
     def set_learned(self, on):
         self.calls.append(("learned", on))
 
-    def quarter_offset(self):
-        self.calls.append("nudge")
-
     def cycle_shape(self, step=1):
         self.calls.append(("shape", step))
 

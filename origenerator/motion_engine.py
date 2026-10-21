@@ -60,7 +60,6 @@ __all__ = [
     "enable_learned_motion",
     "position",
     "position_ahead",
-    "quarter_offset",
     "set_amplitude",
     "set_center",
     "set_max_intensity",
@@ -139,13 +138,6 @@ def take_settings(motion: Motion, saved) -> None:
         motion.state.shape = _SHAPES_BY_NAME[saved["shape"]]
     if saved.get("human_inspired") is True:
         enable_learned_motion(motion)
-
-
-def quarter_offset(motion: Motion) -> None:
-    """Jump a quarter cycle — genau's ``\\`` key, for when the motion is out of
-    step with what is on screen and you want it moved rather than restarted."""
-    motion.phase = (motion.phase + 0.25) % 1.0
-    motion.phase_total += 0.25
 
 
 def position(motion: Motion) -> float:

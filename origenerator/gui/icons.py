@@ -130,6 +130,10 @@ def autoloop_icon() -> QIcon:
     return glyph_icon("bolt", size=_SIZE)
 
 
+def shield_icon() -> QIcon:
+    return glyph_icon("shield", size=_SIZE)
+
+
 def slideshow_icon() -> QIcon:
     """A play triangle in a frame — play this folder as a fullscreen slideshow."""
     return glyph_icon("slideshow", size=_SIZE)

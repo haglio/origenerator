@@ -48,7 +48,7 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
           recipe_category="", recipe_thumbnail=None, recipe_prompt_edited=False,
-          starting=False, sent=None):
+          starting=False, sent=None, shield=None, shielded=False):
     return InFlightItem(key=key, caption=caption,
                         sent=status == "running" if sent is None else sent,
                         reading=RunReading(status=status, frame=frame, progress=progress,
@@ -60,7 +60,8 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                         job_kind=job_kind, requested=requested,
                         source_image=source_image, folder_thumbnails=folder_thumbnails,
                         recipe_category=recipe_category, recipe_thumbnail=recipe_thumbnail,
-                        recipe_prompt_edited=recipe_prompt_edited, starting=starting)
+                        recipe_prompt_edited=recipe_prompt_edited, starting=starting,
+                        shield=shield, shielded=shielded)
 
 
 def _picture(path, color=(0, 0, 255)):
@@ -501,6 +502,60 @@ def test_a_row_relabels_in_place_when_its_folders_loop_is_switched_off(queue):
     queue.set_items([_item(key="a", cancel=lambda: None)])
 
     assert queue.rows()[0]._cancel.text() == "Cancel"
+
+
+# --- the shield, which keeps a run going for the pictures asked for after it ----
+
+def test_every_row_leads_with_its_shield_just_left_of_its_cancel(queue):
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None),
+                     _item(key="b", status="queued", cancel=lambda: None,
+                           shield=lambda _on: None, auto_generating=True)])
+    QApplication.processEvents()
+
+    rows = queue.rows()
+    assert all(row._shield.isVisible() for row in rows)
+    assert all(row._shield.geometry().right() < row._cancel.geometry().left()
+               for row in rows)
+    assert len({row._shield.geometry().x() for row in rows}) == 1
+
+
+def test_pressing_a_rows_shield_puts_it_on_through_its_job(queue):
+    asked = []
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=asked.append)])
+    shield = queue.rows()[0]._shield
+
+    shield.click()
+
+    assert asked == [True]
+    assert shield.isChecked()
+
+
+def test_a_rows_shield_shows_whether_its_job_is_shielded_and_follows_it_in_place(queue):
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None,
+                           shielded=True)])
+    row = queue.rows()[0]
+    assert row._shield.isChecked()
+
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None)])
+
+    assert queue.rows() == [row]
+    assert not row._shield.isChecked()
+
+
+def test_the_shield_is_hidden_on_a_job_that_cannot_be_shielded_from_here(queue):
+    queue.set_items([_item(key="a")])
+    assert not queue.rows()[0]._shield.isVisible()
+
+
+def test_pressing_the_shield_does_not_also_open_the_folder(queue, qtbot):
+    revealed = []
+    queue.set_items([_item(key="a", reveal=lambda: revealed.append(True),
+                           cancel=lambda: None, shield=lambda _on: None)])
+    QApplication.processEvents()
+
+    qtbot.mouseClick(queue.rows()[0]._shield, Qt.MouseButton.LeftButton)
+
+    assert revealed == []
 
 
 # --- clicking a row goes to the job's folder ----------------------------------

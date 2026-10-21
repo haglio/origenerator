@@ -34,8 +34,8 @@ line, and started over once the pictures are done -- a run cannot be paused, so
 what it had rendered is thrown away, however close to done. That is the user's
 own call for this queue: their work goes first while they are working, and
 everything else's turn comes when they are not -- except a run they have
-shielded, which keeps the machine until it is done while the pictures wait
-right behind it. A video set aside goes back ahead of the videos still waiting
+shielded, which keeps the machine for as long as its shield is on while the
+pictures wait right behind it. A video set aside goes back ahead of the videos still waiting
 and after every picture; a picture set aside goes right after the one that took
 its place; work nobody asked for goes to the back. A video asked for takes the
 machine from nothing, and so does work nobody asked for.

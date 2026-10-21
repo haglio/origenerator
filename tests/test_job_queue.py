@@ -1427,3 +1427,50 @@ def test_a_shield_on_a_videos_start_frame_stays_on_the_video_made_from_it(qtbot,
     video = queue.newest_job_for("k")
     assert video is not frame and video.shielded
     assert db.get_generation(video.prompt_id)["shielded"]
+
+
+def test_taking_the_shield_off_hands_the_machine_to_the_picture_waiting_behind_it(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    video = _launch_video(queue, "v", seed=1)
+    _rendering(client, video)
+    queue.shield(video.prompt_id, True)
+    image = _launch_image(queue, "i")
+
+    queue.shield(video.prompt_id, False)
+
+    client.interrupt.assert_called_once_with(video.prompt_id)
+    assert client.submit_job.call_args_list[-1].args[1] == image.prompt_id
+    assert queue.queue_order == [image.prompt_id, video.prompt_id]
+
+
+def test_taking_the_shield_off_hands_the_machine_to_what_a_slideshow_is_locked_on(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    video = _launch_video(queue, "v1", seed=1)
+    _rendering(client, video)
+    queue.shield(video.prompt_id, True)
+    locked = _launch_video(queue, "v2", seed=2)
+    queue.put_first({locked.prompt_id})
+
+    queue.shield(video.prompt_id, False)
+
+    client.interrupt.assert_called_once_with(video.prompt_id)
+    assert client.submit_job.call_args_list[-1].args[1] == locked.prompt_id
+    assert queue.queue_order == [locked.prompt_id, video.prompt_id]
+
+
+def test_taking_the_shield_off_with_only_videos_waiting_leaves_the_run_going(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    video = _launch_video(queue, "v1", seed=1)
+    _rendering(client, video)
+    queue.shield(video.prompt_id, True)
+    later = _launch_video(queue, "v2", seed=2)
+
+    queue.shield(video.prompt_id, False)
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [video.prompt_id, later.prompt_id]

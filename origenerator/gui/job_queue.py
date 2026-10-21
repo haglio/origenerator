@@ -712,6 +712,11 @@ class JobQueue(QObject):
             return
         job.shielded = shielded
         self._db.set_shielded(prompt_id, shielded)
+        if not shielded and job in self._on_server and self._waiting:
+            front = self._waiting[0]
+            if queue_line.takes_the_front(front) or front.prompt_id in self._first:
+                self._set_aside_for(front)
+                self._pump()
 
     def put_first(self, prompt_ids):
         self._first = frozenset(prompt_ids)

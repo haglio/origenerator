@@ -24,7 +24,7 @@ dependencies = [
     "app-support @ git+https://github.com/haglio/app_support@v0.1.247",
     "funestra @ git+https://github.com/haglio/funestra@v0.1.546",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.220",
-    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.57",
+    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.65",
     "PyQt6>=6,<7",
     # Qt itself, which PyQt6 takes at any 6.11. 6.11.1 handed its wildcard-disconnect
     # warning to the Python message handler holding a signal/slot lock (QTBUG-145216);

@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from voice_core.listener import Engines
+from voice_core.speech import HearsSpeech
 from voice_core.whisper_reader import WhisperReader
 
 from origenerator.voice.dictation import request_bias
@@ -155,7 +156,7 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
     monkeypatch.setattr("origenerator.config.VOICE_MODEL_NAME", "a-model")
     monkeypatch.setattr("origenerator.config.VOICE_DEVICE_NAME", "a-microphone")
 
-    hearing = Hearing({"undo"})
+    hearing = Hearing({"undo", "genau"}, said_in={"genau": "de"}.get)
     hearing.start()
     hearing.stop()
 
@@ -172,3 +173,5 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
     assert engines.take_down is not engines.second_opinion
     assert set(engines.second_opinion_in) == {"de"}
     assert isinstance(engines.second_opinion_in["de"], WhisperReader)
+    # An utterance ends when its speaker pauses, however loud the room stays.
+    assert isinstance(engines.hears_speech, HearsSpeech)

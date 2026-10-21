@@ -595,6 +595,13 @@ def test_a_seed_drawn_by_ticking_random_heads_the_dropdown(panel):
     field.hidePopup()
 
 
+def test_the_seed_a_tab_picks_after_a_press_is_listed_only_once_it_is_used(panel):
+    panel._on_generate()
+    picked = panel._param_form.get_values()["seed"]
+
+    assert str(picked) not in _seeds_listed(panel, "seed")
+
+
 def test_a_drawn_seed_is_kept_at_the_size_the_tab_would_make(panel):
     panel._param_form.set_values({"seed": 5, "width": 832, "height": 1216})
 

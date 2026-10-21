@@ -844,7 +844,7 @@ class ParamForm(QWidget):
     def roll_random_seeds(self) -> None:
         for pd in self._seed_defs():
             if self._randomize_checks[pd.key].isChecked():
-                self.seed_drawn.emit(pd.key, self._draw(pd))
+                self._draw(pd)
 
     def _on_random_clicked(self, pd: ParamDef, checked: bool) -> None:
         drawn = self._follow_random(pd, checked)

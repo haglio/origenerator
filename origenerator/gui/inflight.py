@@ -212,6 +212,8 @@ def first_movable(items) -> int:
 
 
 ALREADY_MAKING_ONE_TIP = "This folder is already making one"
+SHIELD_TIP = ("Shield this generation: images you ask for while it is being made "
+              "wait for it instead of stopping it")
 
 
 def discard_run_text(auto_generating: bool) -> str:

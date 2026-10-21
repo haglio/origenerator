@@ -14,11 +14,11 @@ shared *server* is this half's to say — a row on the right is about one job of
 ours and nothing else. With nothing of ours in flight the same half says what
 that server is busy with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
-as a row of its own — the one being made at the top — each led by a Cancel, each
-opening its folder on a click or a double-click, and each draggable to a new
-place in the line. A row says what the job will cost and what kind of thing it
-is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a line of
-waiting work is read to find out how long the wait is, and the
+as a row of its own — the one being made at the top — each led by a shield and a
+Cancel, each opening its folder on a click or a double-click, and each draggable
+to a new place in the line. A row says what the job will cost and what kind of
+thing it is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a
+line of waiting work is read to find out how long the wait is, and the
 workflow-and-prompt name that used to be here is the same on every row of a
 folder being re-rolled. Beside that, a picture — the frame an image-to-video
 animates, the gray clip a dropped-video combine takes its settings from, or a
@@ -60,11 +60,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import BLUE, BORDER_SUBTLE
+from shared_ui.mark_button import fill_square_with_mark
 
+from origenerator.gui import icons
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.inflight import (
+    SHIELD_TIP,
     TICK_MS,
     discard_run_text,
     discard_run_tooltip,
@@ -77,6 +80,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
+from origenerator.gui.stylesheet import CHOSEN
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 # The strip's opening height, its floor, and so the widest the live thumbnail
@@ -344,9 +348,9 @@ class RunningPreview(OpensAFolder, QWidget):
 
 class QueueRow(OpensAFolder, QWidget):
     """One job in the line: what it costs, what it is, what it is made from, and
-    the button that throws it away.
+    the buttons that shield it and throw it away.
 
-    Read left to right: the button, then the job's picture, then what it is —
+    Read left to right: the buttons, then the job's picture, then what it is —
     ``"~2 min · Video · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
     line is the whole of what the row says about the job. The workflow-and-prompt
     name a Generate tab is titled with used to be here and is not: it answers
@@ -368,7 +372,7 @@ class QueueRow(OpensAFolder, QWidget):
     The picture block is one width whether it holds one picture or four, so the
     line of text beside it starts at the same place on every row.
 
-    The button reads "Cancel", or "Next seed" for a job whose folder is
+    The second button reads "Cancel", or "Next seed" for a job whose folder is
     auto-generating — where the press discards the seed and the loop starts
     another (:func:`inflight.discard_run_text`).
 
@@ -400,8 +404,16 @@ class QueueRow(OpensAFolder, QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(self.INSET, 3, 6, 3)
         layout.setSpacing(6)
-        # It leads the row: a button anywhere after a line that can elide was
+        # They lead the row: a button anywhere after a line that can elide was
         # pushed out of sight at the right-hand end.
+        self._shield = fill_square_with_mark(QPushButton(), size=self.HEIGHT - 12)
+        self._shield.setProperty(CHOSEN, True)
+        self._shield.setCheckable(True)
+        self._shield.setIcon(icons.shield_icon())
+        self._shield.setToolTip(SHIELD_TIP)
+        self._shield.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._shield.clicked.connect(self._on_shield)
+        layout.addWidget(self._shield)
         self._cancel = QPushButton()
         self._cancel.setObjectName("queueCancelBtn")
         self._cancel.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -448,6 +460,8 @@ class QueueRow(OpensAFolder, QWidget):
         self._cancel.setText(discard_run_text(item.auto_generating))
         self._cancel.setToolTip(discard_run_tooltip(item.auto_generating))
         self._cancel.setVisible(item.cancel is not None)
+        self._shield.setVisible(item.shield is not None)
+        self._shield.setChecked(item.shielded)
         self._render_thumbs(item)
 
     def _render_note(self):
@@ -494,9 +508,13 @@ class QueueRow(OpensAFolder, QWidget):
         if self._item.cancel is not None:
             self._item.cancel()
 
+    def _on_shield(self, shielded: bool):
+        if self._item.shield is not None:
+            self._item.shield(shielded)
+
     def folder_of(self, position):
         """Where this job will land — the whole row goes there, wherever it was
-        pressed, the Cancel in front of it being a button of its own."""
+        pressed, the buttons in front of it being buttons of their own."""
         return self._item.reveal
 
     def mouseMoveEvent(self, event):

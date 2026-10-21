@@ -19,15 +19,34 @@ from origenerator.gui.stylesheet import build_stylesheet
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
 
-def _panel(qtbot, start_pictures=None):
+class _Uses:
+    """What the controller keeps of the videos the panel says went into its slot."""
+
+    def __init__(self):
+        self.said: list[tuple[str, str]] = []
+
+    def record(self, intent, video):
+        self.said.append((intent, video))
+
+    def history(self, intent):
+        newest_first = (video for lane, video in reversed(self.said) if lane == intent)
+        return list(dict.fromkeys(newest_first))
+
+
+def _panel(qtbot, start_pictures=None, *, fitting=None, preview=None, uses=None):
     """Pictures are ``img*`` and videos ``vid*``; a video lends the image slot the
-    picture ``start_pictures`` names for it, and nothing when it names none."""
+    picture ``start_pictures`` names for it, and nothing when it names none.
+    ``fitting`` narrows the videos the video slot takes to the ones it holds."""
     start_pictures = start_pictures or {}
+    uses = uses if uses is not None else _Uses()
     panel = CombinePanel(
         image_lent_by=lambda pid: pid if pid.startswith("img") else start_pictures.get(pid),
-        video_lent_by=lambda pid: pid if pid.startswith("vid") else None,
-        preview=lambda pid: (None, None),
+        video_lent_by=lambda pid: pid if pid.startswith("vid") and (
+            fitting is None or pid in fitting) else None,
+        preview=preview or (lambda pid: (None, None)),
+        history=uses.history,
     )
+    panel.video_used.connect(uses.record)
     qtbot.addWidget(panel)
     return panel
 
@@ -511,10 +530,7 @@ def test_going_back_to_custom_brings_back_the_video_the_act_replaced(qtbot):
 
 def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtbot):
     fitting = {"vid1"}
-    panel = CombinePanel(image_lent_by=lambda pid: pid,
-                         video_lent_by=lambda pid: pid if pid in fitting else None,
-                         preview=lambda pid: (None, None))
-    qtbot.addWidget(panel)
+    panel = _panel(qtbot, fitting=fitting)
     panel.video_slot.set_item("vid1")
     _pick_act(panel, "alpha")
     fitting.clear()  # binned while the act was picked
@@ -526,10 +542,7 @@ def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtb
 
 def test_a_binned_video_leaves_the_slot_empty_rather_than_bringing_back_an_older_one(qtbot):
     fitting = {"vid1", "vid2"}
-    panel = CombinePanel(image_lent_by=lambda pid: pid,
-                         video_lent_by=lambda pid: pid if pid in fitting else None,
-                         preview=lambda pid: (None, None))
-    qtbot.addWidget(panel)
+    panel = _panel(qtbot, fitting=fitting)
     panel.video_slot.set_item("vid1")
     panel.video_slot.set_item("vid2")
     _pick_act(panel, "alpha")
@@ -602,10 +615,7 @@ def test_recent_keeps_every_video_the_lane_has_had(qtbot):
 
 def test_a_video_that_no_longer_fits_the_slot_is_not_listed(qtbot):
     fitting = {"vid1", "vid2"}
-    panel = CombinePanel(image_lent_by=lambda pid: pid,
-                         video_lent_by=lambda pid: pid if pid in fitting else None,
-                         preview=lambda pid: (None, None))
-    qtbot.addWidget(panel)
+    panel = _panel(qtbot, fitting=fitting)
     panel.video_slot.set_item("vid1")
     panel.video_slot.set_item("vid2")
     fitting.discard("vid1")  # binned since
@@ -658,22 +668,54 @@ def test_picking_an_act_keeps_the_room_recent_takes(qtbot):
     assert column.sizeHint().height() == height
 
 
-def test_each_lanes_recent_videos_handed_back_are_listed(qtbot):
-    panel = _panel(qtbot)
-    recent = {recipe_match.VIDEO: ["vid2", "vid1"], recipe_match.GENAU: ["vid3"]}
+def test_recent_lists_what_the_lane_was_given_before_this_session(qtbot):
+    uses = _Uses()
+    uses.record(recipe_match.VIDEO, "vid1")
+    uses.record(recipe_match.VIDEO, "vid2")
+    uses.record(recipe_match.GENAU, "vid3")
 
-    panel.set_recent_videos(recent)
+    panel = _panel(qtbot, uses=uses)
 
     assert _listed_under_recent(panel) == ["vid2", "vid1"]
-    assert panel.recent_videos() == recent
+    _pick_lane(panel, recipe_match.GENAU)
+    assert _listed_under_recent(panel) == ["vid3"]
+
+
+def test_recent_lists_the_video_in_the_slot_first_whatever_came_since(qtbot):
+    uses = _Uses()
+    panel = _panel(qtbot, uses=uses)
+    panel.video_slot.set_item("vid1")
+    uses.record(recipe_match.VIDEO, "vid2")  # given the slot in another copy of the app
+
+    assert _listed_under_recent(panel) == ["vid1", "vid2"]
+
+
+def test_a_video_put_in_the_slot_is_said_with_the_lane_it_went_in_under(qtbot):
+    uses = _Uses()
+    panel = _panel(qtbot, uses=uses)
+    _pick_lane(panel, recipe_match.GENAU)
+
+    panel.video_slot.set_item("vid1")
+
+    assert uses.said == [(recipe_match.GENAU, "vid1")]
+
+
+def test_a_lanes_video_shown_again_is_not_said_again(qtbot):
+    uses = _Uses()
+    panel = _panel(qtbot, uses=uses)
+    panel.video_slot.set_item("vid1")
+    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, recipe_match.VIDEO)
+    _pick_act(panel, "alpha")
+    _pick_act(panel, "")
+    panel.set_dropped_videos({recipe_match.VIDEO: "vid1"})
+
+    assert uses.said == [(recipe_match.VIDEO, "vid1")]
 
 
 def test_recent_reads_its_videos_only_when_it_opens(qtbot):
     asked = []
-    panel = CombinePanel(image_lent_by=lambda pid: pid,
-                         video_lent_by=lambda pid: pid if pid.startswith("vid") else None,
-                         preview=lambda pid: asked.append(pid) or (None, None))
-    qtbot.addWidget(panel)
+    panel = _panel(qtbot, preview=lambda pid: asked.append(pid) or (None, None))
 
     for n in range(5):
         panel.video_slot.set_item(f"vid{n}")
@@ -817,9 +859,7 @@ def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
 def test_the_act_list_is_labelled_the_way_a_pictures_own_action_is(qtbot):
     """One word for the two halves of the same vocabulary: what a picture shows,
     and what it can be made to do."""
-    panel = CombinePanel(lambda pid: True, lambda pid: True,
-                         lambda pid: (None, None))
-    qtbot.addWidget(panel)
+    panel = _panel(qtbot)
 
     assert ACTION_LABEL in [label.text() for label in panel.findChildren(QLabel)]
 

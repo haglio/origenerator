@@ -229,11 +229,11 @@ class GenerateConfigPanel(QWidget):
         # what says whether anything has actually been rewritten yet.
         self._folder_request: FolderRequest | None = None
         # Where this tab's settings came from, when the Combine panel opened them
-        # here: the act picked in its dropdown and the video whose recipe they
-        # are, as (category, video_prompt_id). Carried so a run launched from this
-        # tab — the combination as opened, or edited first — says in the queue what
-        # it was asked for. Nothing else on the form remembers either.
-        self._recipe_source: tuple[str, str | None] = ("", None)
+        # here: the act picked in its dropdown, the video whose recipe they are and
+        # the lane, as (category, video_prompt_id, intent). Carried so a run launched
+        # from this tab — as opened, or edited first — says in the queue what it was
+        # asked for. Nothing else on the form remembers any of them.
+        self._recipe_source: tuple[str, str | None, str] = ("", None, "")
         self._recipe_row: dict | None = None
         # Re-reads (shortly) whether Generate would reproduce a past run — see
         # refresh_generate_caption for why the answer isn't taken on the spot.
@@ -814,7 +814,8 @@ class GenerateConfigPanel(QWidget):
             batch.append(self._param_form.get_values())
         return batch
 
-    def set_recipe_source(self, category: str, video_prompt_id: str | None) -> None:
+    def set_recipe_source(self, category: str, video_prompt_id: str | None,
+                          intent: str) -> None:
         """Remember that these settings came out of Combine — the act off its
         dropdown, and the video whose recipe they are — and link to that video
         and the picture under the form, as the generation they make will.
@@ -823,7 +824,7 @@ class GenerateConfigPanel(QWidget):
         which clears this), so what the tab launches carries the mark whether it
         is run as opened or edited first.
         """
-        self._recipe_source = (category or "", video_prompt_id or None)
+        self._recipe_source = (category or "", video_prompt_id or None, intent)
         self._recipe_row = self._db.get_generation(video_prompt_id) if video_prompt_id else None
         self._related.show_row(self._the_row_generate_would_make(), self._image_rows())
 
@@ -832,9 +833,9 @@ class GenerateConfigPanel(QWidget):
                 "params_json": json.dumps(self._param_form.get_values()),
                 "recipe_video_id": self._recipe_source[1]}
 
-    def recipe_source(self) -> tuple[str, str | None]:
-        """``(category, video_prompt_id)`` for a tab Combine opened, else
-        ``("", None)`` — what a launch from here stamps on its row."""
+    def recipe_source(self) -> tuple[str, str | None, str]:
+        """``(category, video_prompt_id, intent)`` for a tab Combine opened, else
+        ``("", None, "")`` — what a launch from here stamps on its row."""
         return self._recipe_source
 
     def _recipe_prompts_differ(self) -> bool:
@@ -845,7 +846,7 @@ class GenerateConfigPanel(QWidget):
                                         self._recipe_row, workflow))
 
     def _forget_recipe_source(self) -> None:
-        self._recipe_source = ("", None)
+        self._recipe_source = ("", None, "")
         self._recipe_row = None
 
     def _mark_recipe_prompt_edits(self) -> None:

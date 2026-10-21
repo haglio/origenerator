@@ -30,6 +30,13 @@ from origenerator.db_schema import ADDED_COLUMNS, GENERATION_COLUMNS
 # (name, type, not_null, default, primary_key_position) per column, in
 # declaration order — exactly what `PRAGMA table_info` reports.
 SCHEMA = {
+    "combine_video_uses": (
+        ("id", "INTEGER", 0, None, 1),
+        ("intent", "TEXT", 1, None, 0),
+        ("video_prompt_id", "TEXT", 1, None, 0),
+        ("generation_prompt_id", "TEXT", 0, None, 0),
+        ("created_at", "TEXT", 1, "datetime('now')", 0),
+    ),
     "custom_folder_items": (
         ("folder_id", "INTEGER", 1, None, 1),
         ("folder_key", "TEXT", 1, None, 2),
@@ -233,6 +240,8 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
 # fails this file instead of quietly shipping a column every existing user's
 # database will never have.
 FIRST_SHIPPED = {
+    "combine_video_uses": {
+        "id", "intent", "video_prompt_id", "generation_prompt_id", "created_at"},
     "custom_folder_items": {
         "folder_id", "folder_key", "level", "ref_prompt_id", "position"},
     "custom_folders": {"id", "name", "created_at"},

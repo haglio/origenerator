@@ -69,21 +69,9 @@ class NoWheelComboBox(QComboBox):
             QStyle.ContentsType.CT_ComboBox, opt, text, self
         ).width()
 
-    def _shows_placeholder(self) -> bool:
-        return self.currentIndex() < 0 and bool(self.placeholderText())
-
     def display_text(self, width: int) -> str:
-        shown = self.placeholderText() if self._shows_placeholder() else self.currentText()
+        shown = self.currentText() if self.currentIndex() >= 0 else self.placeholderText()
         return self.fontMetrics().elidedText(shown, Qt.TextElideMode.ElideRight, width)
-
-    def label_option(self, width: int) -> QStyleOptionComboBox:
-        opt = QStyleOptionComboBox()
-        self.initStyleOption(opt)
-        opt.currentText = self.display_text(width)
-        if self._shows_placeholder():
-            opt.palette.setColor(QPalette.ColorRole.ButtonText,
-                                 opt.palette.color(QPalette.ColorRole.PlaceholderText))
-        return opt
 
     def paintEvent(self, event):
         painter = QStylePainter(self)
@@ -97,8 +85,8 @@ class NoWheelComboBox(QComboBox):
         )
         # The style insets the text a pixel each side before drawing it (see
         # QCommonStyle's CE_ComboBoxLabel); elide to what is left after that.
-        painter.drawControl(QStyle.ControlElement.CE_ComboBoxLabel,
-                            self.label_option(max(0, field.width() - 2)))
+        opt.currentText = self.display_text(max(0, field.width() - 2))
+        painter.drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt)
 
 
 class NoWheelSpinBox(QSpinBox):

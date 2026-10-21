@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt
-from PyQt6.QtGui import QColor, QImage, QPainter
+from PyQt6.QtGui import QColor, QImage
 from PyQt6.QtWidgets import (
     QAbstractSlider,
     QApplication,
     QFormLayout,
     QLabel,
     QPushButton,
-    QStyle,
     QStyleOptionViewItem,
     QWidget,
 )
@@ -35,6 +34,7 @@ from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
 from origenerator.workflows.model_files import NO_LORA
+from tests.pictured_rows import painted_row, square
 
 
 def test_field_labels_fit_the_heading_font(qtbot):
@@ -285,42 +285,15 @@ def test_a_seed_used_several_times_in_a_row_is_listed_once_for_the_stretch(qtbot
     field.hidePopup()
 
 
-def _square(tmp_path, color):
-    path = tmp_path / f"made-{color}.png"
-    picture = QImage(40, 40, QImage.Format.Format_RGB32)
-    picture.fill(QColor(color))
-    picture.save(str(path))
-    return str(path)
-
-
 def _red_square(tmp_path):
-    return _square(tmp_path, "red")
-
-
-def _painted_row(field, row, *, under_the_mouse=False):
-    view, index = field.view(), field.model().index(row, 0)
-    size = view.visualRect(index).size()
-    canvas = QImage(size, QImage.Format.Format_ARGB32)
-    canvas.fill(QColor("black"))
-    option = QStyleOptionViewItem()
-    option.initFrom(view)
-    option.rect = QRect(QPoint(0, 0), size)
-    option.widget = view
-    option.displayAlignment = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-    option.decorationAlignment = Qt.AlignmentFlag.AlignCenter
-    if under_the_mouse:
-        option.state |= QStyle.StateFlag.State_Selected
-    painter = QPainter(canvas)
-    field.itemDelegate().paint(painter, option, index)
-    painter.end()
-    return canvas
+    return square(tmp_path, "red")
 
 
 def test_each_seed_in_the_dropdown_wears_a_picture_of_what_it_made(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
-    row = _painted_row(field, 0)
+    row = painted_row(field, 0)
 
     assert row.height() > 2 * field.fontMetrics().height()
     assert row.pixelColor(row.height() // 2, row.height() // 2) == QColor("red")
@@ -328,12 +301,12 @@ def test_each_seed_in_the_dropdown_wears_a_picture_of_what_it_made(qtbot, tmp_pa
 
 
 def test_a_stretch_is_one_row_wearing_each_of_its_pictures_newest_on_top(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(5, _square(tmp_path, "red")),
-                                     SeedUse(5, _square(tmp_path, "blue")),
+    form, field = _seed_form(qtbot, [SeedUse(5, square(tmp_path, "red")),
+                                     SeedUse(5, square(tmp_path, "blue")),
                                      SeedUse(6, None)])
     field.showPopup()
 
-    stretch, single = _painted_row(field, 0), _painted_row(field, 1)
+    stretch, single = painted_row(field, 0), painted_row(field, 1)
 
     pitch = single.height()
     assert stretch.height() == 2 * pitch
@@ -351,8 +324,8 @@ def test_a_stretch_is_braced_between_its_pictures_and_its_seed(qtbot):
     form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None)])
     field.showPopup()
 
-    stretch = _painted_row(field, 0, under_the_mouse=True)
-    single = _painted_row(field, 1, under_the_mouse=True)
+    stretch = painted_row(field, 0, under_the_mouse=True)
+    single = painted_row(field, 1, under_the_mouse=True)
 
     pitch = single.height()
     seed_starts_at = min(point.x() for point in _lettering_in(single, right_of=pitch))
@@ -365,8 +338,8 @@ def test_a_stretch_prints_its_seed_once_beside_the_middle_of_its_pictures(qtbot)
                                      SeedUse(6, None)])
     field.showPopup()
 
-    stretch = _painted_row(field, 0, under_the_mouse=True)
-    single = _painted_row(field, 1, under_the_mouse=True)
+    stretch = painted_row(field, 0, under_the_mouse=True)
+    single = painted_row(field, 1, under_the_mouse=True)
 
     seed_starts_at = min(point.x() for point in _lettering_in(single, right_of=single.height()))
     seed = [point.y() for point in _lettering_in(stretch, right_of=seed_starts_at)]
@@ -379,7 +352,7 @@ def test_a_picture_in_the_dropdown_is_set_in_from_the_edges_of_its_row(qtbot, tm
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
-    row = _painted_row(field, 0)
+    row = painted_row(field, 0)
 
     middle = row.height() // 2
     assert row.pixelColor(0, middle) != QColor("red")
@@ -392,7 +365,7 @@ def test_a_picture_keeps_its_own_colors_on_the_row_under_the_mouse(qtbot, tmp_pa
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
-    row = _painted_row(field, 0, under_the_mouse=True)
+    row = painted_row(field, 0, under_the_mouse=True)
 
     assert row.pixelColor(row.height() // 2, row.height() // 2) == QColor("red")
     field.hidePopup()
@@ -407,7 +380,7 @@ def test_a_seed_nothing_was_made_with_shows_a_blank_of_the_shape_it_would_make(
     form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
     field.showPopup()
 
-    row = _painted_row(field, 0)
+    row = painted_row(field, 0)
 
     middle, edge = row.height() // 2, 5
     assert row.pixelColor(*beside(middle, edge)) == QColor("black")
@@ -431,7 +404,7 @@ def test_the_question_mark_on_a_blank_nearly_fills_it(qtbot, size):
     form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
     field.showPopup()
 
-    row = _painted_row(field, 0)
+    row = painted_row(field, 0)
 
     mark = _bounds_of(row, TEXT_MUTED, left_of=row.height())
     blank = _bounds_of(row, BORDER_DEFAULT, left_of=row.height()).united(mark)
@@ -548,8 +521,8 @@ def test_a_seed_picked_from_the_dropdown_keeps_its_picture_closed(qtbot, tmp_pat
 
 
 def test_picking_anywhere_on_a_stretch_takes_its_seed_with_its_newest_picture(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(30, _square(tmp_path, "red")),
-                                     SeedUse(30, _square(tmp_path, "blue")),
+    form, field = _seed_form(qtbot, [SeedUse(30, square(tmp_path, "red")),
+                                     SeedUse(30, square(tmp_path, "blue")),
                                      SeedUse(20, None)])
     field.showPopup()
     view = field.view()
@@ -650,7 +623,8 @@ def test_a_stretch_taller_than_the_list_scrolls_a_little_at_a_time(qtbot):
 def test_a_long_history_reads_pictures_only_for_the_seeds_on_screen(qtbot, monkeypatch,
                                                                      seed_of):
     read = []
-    monkeypatch.setattr(pictured_dropdown, "fitted_cell", lambda path, side: read.append(path))
+    monkeypatch.setattr(pictured_dropdown, "fitted_cell",
+                        lambda path, side, gray: read.append(path))
     history = [SeedUse(seed_of(n), f"thumbs/{n}.jpg") for n in range(3000)]
     form, field = _seed_form(qtbot, history)
     form.show()

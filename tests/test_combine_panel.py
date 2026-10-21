@@ -13,6 +13,7 @@ from origenerator import animation_paths, recipe_match
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.picture_state_picker import ACTION_LABEL
+from origenerator.gui.pictured_dropdown import PICTURES_ROLE
 from origenerator.gui.stylesheet import build_stylesheet
 
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
@@ -424,7 +425,7 @@ def _enabled(panel, text) -> bool:
     return panel._category.model().item(panel._category.findText(text)).isEnabled()
 
 
-def test_acts_with_no_video_to_mine_are_greyed_out(qtbot):
+def test_acts_with_no_video_to_mine_are_grayed_out(qtbot):
     panel = _panel(qtbot)
 
     panel.set_available_categories({"beta", "epsilon"})
@@ -445,7 +446,7 @@ def test_an_act_becomes_pickable_once_a_video_of_it_exists(qtbot):
     assert _enabled(panel, "dancing")
 
 
-def test_a_greyed_act_explains_itself(qtbot):
+def test_a_grayed_act_explains_itself(qtbot):
     panel = _panel(qtbot)
     panel.set_available_categories({"beta"})
     index = panel._category.findText("gamma")
@@ -523,6 +524,25 @@ def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtb
     assert panel.video_slot.current_id() is None
 
 
+def test_a_binned_video_leaves_the_slot_empty_rather_than_bringing_back_an_older_one(qtbot):
+    fitting = {"vid1", "vid2"}
+    panel = CombinePanel(image_lent_by=lambda pid: pid,
+                         video_lent_by=lambda pid: pid if pid in fitting else None,
+                         preview=lambda pid: (None, None))
+    qtbot.addWidget(panel)
+    panel.video_slot.set_item("vid1")
+    panel.video_slot.set_item("vid2")
+    _pick_act(panel, "alpha")
+    fitting.discard("vid2")  # binned while the act was picked
+
+    _pick_act(panel, "")
+    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, recipe_match.VIDEO)
+
+    assert panel.video_slot.current_id() is None
+    assert _listed_under_recent(panel) == ["vid1"]
+
+
 def test_each_lane_keeps_its_own_dropped_video(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
@@ -535,6 +555,141 @@ def test_each_lane_keeps_its_own_dropped_video(qtbot):
 
     _pick_lane(panel, recipe_match.GENAU)
     assert panel.video_slot.current_id() == "vid2"
+
+
+def _listed_under_recent(panel):
+    panel._recent_videos.refresh()
+    return [panel._recent_videos.itemData(row, PICTURES_ROLE)[0].prompt_id
+            for row in range(panel._recent_videos.count())]
+
+
+def test_a_video_put_in_the_slot_is_listed_under_recent(qtbot):
+    panel = _panel(qtbot)
+
+    panel.video_slot.set_item("vid1")
+
+    assert _listed_under_recent(panel) == ["vid1"]
+
+
+def test_recent_lists_the_newest_first_and_each_video_once(qtbot):
+    panel = _panel(qtbot)
+
+    for video in ("vid1", "vid2", "vid1", "vid3"):
+        panel.video_slot.set_item(video)
+
+    assert _listed_under_recent(panel) == ["vid3", "vid1", "vid2"]
+
+
+def test_each_lane_lists_the_videos_it_had(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+    _pick_lane(panel, recipe_match.GENAU)
+    panel.video_slot.set_item("vid2")
+
+    assert _listed_under_recent(panel) == ["vid2"]
+    _pick_lane(panel, recipe_match.VIDEO)
+    assert _listed_under_recent(panel) == ["vid1"]
+
+
+def test_recent_keeps_every_video_the_lane_has_had(qtbot):
+    panel = _panel(qtbot)
+
+    for n in range(40):
+        panel.video_slot.set_item(f"vid{n}")
+
+    assert _listed_under_recent(panel) == [f"vid{n}" for n in range(39, -1, -1)]
+
+
+def test_a_video_that_no_longer_fits_the_slot_is_not_listed(qtbot):
+    fitting = {"vid1", "vid2"}
+    panel = CombinePanel(image_lent_by=lambda pid: pid,
+                         video_lent_by=lambda pid: pid if pid in fitting else None,
+                         preview=lambda pid: (None, None))
+    qtbot.addWidget(panel)
+    panel.video_slot.set_item("vid1")
+    panel.video_slot.set_item("vid2")
+    fitting.discard("vid1")  # binned since
+
+    assert _listed_under_recent(panel) == ["vid2"]
+
+
+def test_picking_a_recent_video_puts_it_in_the_slot_and_lists_it_first(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+    panel.video_slot.set_item("vid2")
+    dropdown = panel._recent_videos
+    dropdown.showPopup()
+    view = dropdown.view()
+
+    qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
+                     pos=view.visualRect(dropdown.model().index(1, 0)).center())
+
+    assert panel.video_slot.current_id() == "vid1"
+    assert _listed_under_recent(panel) == ["vid1", "vid2"]
+
+
+def test_recent_sits_under_the_action_dropdown_left_of_the_video_slot(qtbot):
+    panel = _panel(qtbot)
+    column = panel._action_part.layout()
+    order = [column.itemAt(i).widget() for i in range(column.count())]
+    named = next(w for w in order if isinstance(w, QLabel) and w.text() == ACTION_LABEL)
+
+    assert order.index(panel._recent_videos) > order.index(named) > order.index(panel._category)
+
+
+def test_recent_shows_only_while_custom_is_picked(qtbot):
+    panel = _panel(qtbot)
+    assert not panel._recent_videos.isHidden()
+
+    _pick_act(panel, "gamma")
+    assert panel._recent_videos.isHidden()
+
+    _pick_act(panel, "")
+    assert not panel._recent_videos.isHidden()
+
+
+def test_picking_an_act_keeps_the_room_recent_takes(qtbot):
+    panel = _panel(qtbot)
+    column = panel._action_part
+    height = column.sizeHint().height()
+
+    _pick_act(panel, "alpha")
+
+    assert column.sizeHint().height() == height
+
+
+def test_each_lanes_recent_videos_handed_back_are_listed(qtbot):
+    panel = _panel(qtbot)
+    recent = {recipe_match.VIDEO: ["vid2", "vid1"], recipe_match.GENAU: ["vid3"]}
+
+    panel.set_recent_videos(recent)
+
+    assert _listed_under_recent(panel) == ["vid2", "vid1"]
+    assert panel.recent_videos() == recent
+
+
+def test_recent_reads_its_videos_only_when_it_opens(qtbot):
+    asked = []
+    panel = CombinePanel(image_lent_by=lambda pid: pid,
+                         video_lent_by=lambda pid: pid if pid.startswith("vid") else None,
+                         preview=lambda pid: asked.append(pid) or (None, None))
+    qtbot.addWidget(panel)
+
+    for n in range(5):
+        panel.video_slot.set_item(f"vid{n}")
+    _pick_lane(panel, recipe_match.GENAU)
+
+    assert asked == [f"vid{n}" for n in range(5)]
+
+
+def test_a_lane_that_has_had_no_video_lists_none_under_recent(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+
+    _pick_lane(panel, recipe_match.GENAU)
+
+    assert _listed_under_recent(panel) == []
+    assert panel._recent_videos.isEnabled()
 
 
 def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
@@ -615,7 +770,7 @@ def test_generate_carries_the_chosen_lane(qtbot):
 
 def test_switching_the_lane_announces_it_once(qtbot):
     # buttonToggled fires for both radios on one click — the off edge and the on
-    # edge — and the view answers each by re-greying the whole act list.
+    # edge — and the view answers each by re-graying the whole act list.
     panel = _panel(qtbot)
     heard = []
     panel.intent_changed.connect(heard.append)
@@ -627,14 +782,14 @@ def test_switching_the_lane_announces_it_once(qtbot):
     assert heard == [recipe_match.GENAU, recipe_match.VIDEO]
 
 
-def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
+def test_a_grayed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     panel = _panel(qtbot)
     _pick_lane(panel, recipe_match.GENAU)
     panel.set_available_categories({"beta"})
 
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
     # An act the video lane answers happily can still have no loop under it, so
-    # the greyed-out reason has to name which lane it is talking about.
+    # the grayed-out reason has to name which lane it is talking about.
     assert reason == "No past looping “gamma” flick to base a Genau recipe on yet"
 
 

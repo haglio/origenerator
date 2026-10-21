@@ -51,6 +51,7 @@ class FakePanel:
         self.intent = recipe_match.VIDEO
         self.category = ""
         self.dropped = {}
+        self.recent = {}
         self.available = None
         self.visible = None
         self.lit_for = []
@@ -80,6 +81,12 @@ class FakePanel:
         self.dropped = dict(videos)
         if not self.category:
             self.video_slot.set_item(self.dropped.get(self.intent))
+
+    def recent_videos(self):
+        return {lane: list(videos) for lane, videos in self.recent.items()}
+
+    def set_recent_videos(self, videos):
+        self.recent = {lane: list(held) for lane, held in videos.items()}
 
     def set_available_categories(self, categories):
         self.available = list(categories)
@@ -384,17 +391,19 @@ def test_a_panel_with_no_server_behind_it_hides(combine):
 # --- what a session keeps ---------------------------------------------------
 
 
-def test_the_session_keeps_the_picture_each_lanes_video_the_lane_and_the_act(combine):
+def test_the_session_keeps_the_picture_each_lanes_videos_the_lane_and_the_act(combine):
     # None of the four is recoverable from the others: an act says nothing about
     # which lane answers it.
     controller, _host = combine()
     controller.panel.image_slot.set_item("img")
     controller.panel.set_dropped_videos({recipe_match.VIDEO: "clip"})
+    controller.panel.set_recent_videos({recipe_match.VIDEO: ["clip", "older"]})
     controller.panel.set_intent(recipe_match.GENAU)
     controller.panel.set_category("waving")
 
     assert controller.selection() == {
         "image": "img", "videos": {recipe_match.VIDEO: "clip"},
+        "recent_videos": {recipe_match.VIDEO: ["clip", "older"]},
         "intent": recipe_match.GENAU, "category": "waving"}
 
 
@@ -409,9 +418,20 @@ def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combin
     assert controller.panel.video_slot.item == "loop"
 
 
+def test_a_restore_hands_each_lane_back_its_recent_videos_that_still_fit(combine):
+    controller, _host = combine(db=FakeDB([_video("clip"), _video("older"), _video("loop")]))
+
+    controller.restore({"videos": {recipe_match.VIDEO: "clip"},
+                        "recent_videos": {recipe_match.VIDEO: ["clip", "gone", "older"],
+                                          recipe_match.GENAU: ["loop"]}})
+
+    assert controller.panel.recent == {recipe_match.VIDEO: ["clip", "older"],
+                                       recipe_match.GENAU: ["loop"]}
+
+
 def test_a_restore_puts_the_lane_in_before_the_act(combine):
     # The lane decides which acts are answerable, and set_category refuses one
-    # that is greyed out under it.
+    # that is grayed out under it.
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
     controller.restore({"image": "img", "video": "clip",
@@ -774,7 +794,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
 # --- which acts are pickable at all -----------------------------------------
 
 
-def test_an_act_with_no_video_under_it_is_greyed_out(combine, monkeypatch):
+def test_an_act_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_image_conditioned",
                         lambda name: name == VIDEO_WORKFLOW)
     monkeypatch.setattr(module.recipe_match, "available_categories",
@@ -969,7 +989,7 @@ def test_the_acts_narrow_to_what_the_dropped_picture_can_start_from(combine,
 
 
 def test_a_picture_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
-    # Greying every act over a picture that says nothing about itself would read
+    # Graying every act over a picture that says nothing about itself would read
     # as the panel being broken.
     _paths(monkeypatch)
     monkeypatch.setattr(module.recipe_match, "available_categories",

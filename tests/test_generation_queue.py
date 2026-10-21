@@ -5,9 +5,10 @@ import time
 import pytest
 from PIL import Image
 from PyQt6 import sip
-from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPointF, Qt
+from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, Qt
 from PyQt6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QApplication
+from shared_ui.colors import BLUE
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.generation_queue import (
@@ -17,6 +18,7 @@ from origenerator.gui.generation_queue import (
     QueueRow,
 )
 from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.gui.stylesheet import build_stylesheet
 
 
 @pytest.fixture
@@ -25,6 +27,19 @@ def queue(qtbot):
     qtbot.addWidget(q)
     q.resize(800, 60)
     q.show()
+    return q
+
+
+@pytest.fixture
+def dressed(qtbot):
+    # The app's own style sheet grounds the column the rows sit in, so anything
+    # painted beneath that column is painted out of sight.
+    q = GenerationQueue()
+    q.setStyleSheet(build_stylesheet())
+    qtbot.addWidget(q)
+    q.resize(800, 60)
+    q.show()
+    qtbot.waitExposed(q)
     return q
 
 
@@ -67,6 +82,28 @@ def _png_bytes(side=200):
 def _four(queue):
     queue.set_items([_item(key="a"), _item(key="b", status="queued"),
                      _item(key="c", status="queued"), _item(key="d", status="queued")])
+
+
+def _settled(queue):
+    """The strip as it stands put on screen whole, so that what changes after
+    this shows only where it is repainted."""
+    QApplication.processEvents()
+    queue.repaint()
+
+
+def _on_screen(queue):
+    """What the strip's window shows, including whatever was never repainted."""
+    return QApplication.primaryScreen().grabWindow(queue.winId()).toImage()
+
+
+def _drawn(image, points, color) -> bool:
+    """Whether every pixel along a run of straight lines wears ``color``."""
+    for start, end in zip(points, points[1:]):
+        for x in range(min(start.x(), end.x()), max(start.x(), end.x()) + 1):
+            for y in range(min(start.y(), end.y()), max(start.y(), end.y()) + 1):
+                if image.pixelColor(x, y).name() != color.name():
+                    return False
+    return True
 
 
 # --- the shape of the strip ---------------------------------------------------
@@ -723,6 +760,31 @@ def test_a_drag_over_the_strip_marks_where_it_would_land(queue):
     queue.dragMoveEvent(_drag_event(queue, QDragMoveEvent, "d", 2))
 
     assert queue._drop_at == 2
+
+
+def test_the_mark_is_drawn_over_the_rows_in_the_apps_own_dress(dressed, qtbot):
+    # Painted beneath the column the rows sit in, it was never seen at all.
+    _four(dressed)
+    _settled(dressed)
+    row = dressed.rows()[2]
+    top = row.mapTo(dressed, row.rect().topLeft())
+    mark = [top + QPoint(1, 0), top + QPoint(row.width() - 2, 0)]
+
+    dressed.dragMoveEvent(_drag_event(dressed, QDragMoveEvent, "d", 2))
+
+    qtbot.waitUntil(lambda: _drawn(_on_screen(dressed), mark, BLUE))
+
+
+def test_what_the_rules_are_drawn_over_still_takes_every_press(queue):
+    # A press, a drag and a hover each go to whatever is under the pointer, and
+    # the rules lie over the whole strip.
+    _four(queue)
+    QApplication.processEvents()
+    row = queue.rows()[1]
+    frame = queue._running._frame
+
+    assert queue.childAt(row.mapTo(queue, row.rect().center())) is row
+    assert queue.childAt(frame.mapTo(queue, frame.rect().center())) is frame
 
 
 def test_the_mark_clears_when_the_drag_leaves(queue):

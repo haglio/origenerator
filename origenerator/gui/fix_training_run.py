@@ -54,9 +54,10 @@ class FixTrainingRun(QObject):
         if self._trainer is None:
             return RunReading(status=JobState.QUEUED, typical_seconds=self._typical)
         training = self._status.get("state") == "training"
+        counted = (self._status["done"], self._status["total"]) if self._status.get("total") else None
         return RunReading(status=JobState.RUNNING,
-                          progress=((self._status["done"], self._status["total"])
-                                    if self._status.get("total") else None),
+                          progress=counted if training else None,
+                          pass_progress=None if training else counted,
                           stage="Training" if training else "Cropping photos",
                           started_at=self._began, typical_seconds=self._typical)
 

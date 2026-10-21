@@ -96,7 +96,8 @@ def test_a_training_reads_how_far_its_cropping_and_then_its_steps_have_got(
     assert (run.reading().status, run.reading().stage) == (JobState.RUNNING, "Cropping photos")
 
     _say(tmp_path, state="cropping", done=2, total=8)
-    qtbot.waitUntil(lambda: run.reading().progress == (2, 8))
+    qtbot.waitUntil(lambda: run.reading().pass_progress == (2, 8))
+    assert run.reading().progress is None
     assert run.reading().started_at is not None
 
     _say(tmp_path, state="training", done=0, total=0)

@@ -380,3 +380,7 @@ def test_a_fix_redraws_through_the_lora_its_settings_give_it_at_their_strength()
 
 def test_prompts_for_a_part_the_enhancement_does_not_fix_are_never_run():
     assert detail_parts.fix_prompts({"enhance_fix_prompts": {"hands": {"prompt": "x"}}}) == {}
+
+
+def test_a_fix_is_found_by_the_name_the_panel_knows_it_by():
+    assert detail_parts.part_named("hands").name == "hands"

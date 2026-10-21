@@ -67,6 +67,9 @@ class FakePanel:
     def use_fix_lora(self, name, lora):
         self.used.append((name, lora))
 
+    def open_fix_prompts(self, name):
+        self.opened = name
+
 
 class FakeWorkflow:
     name = ENHANCE
@@ -761,9 +764,10 @@ _training_runs: list = []
 
 
 class FakeTrainingRun:
-    def __init__(self, job, queue, parent=None):
-        self.job, self.queue = job, queue
+    def __init__(self, job, queue, *, reveal, parent=None):
+        self.job, self.queue, self.reveal = job, queue, reveal
         self.progress, self.finished, self.failed = FakeSignal(), FakeSignal(), FakeSignal()
+        self.canceled = FakeSignal()
         self.began = False
         _training_runs.append(self)
 
@@ -823,3 +827,33 @@ def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
 
     assert controller.panel.used == [("hands", "fixes\\hands 2026-10-19 0130.safetensors")]
     assert controller.panel.training["hands"] is None
+
+
+def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start(
+        enhance, photos, monkeypatch):
+    told = []
+    monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: told.append(args))
+    (photos / "Hands").mkdir()
+    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    controller, _host = enhance()
+    controller.panel.fix_training_requested.emit("hands")
+    (run,) = _training_runs
+
+    run.canceled.emit()
+    controller.panel.fix_training_requested.emit("hands")
+
+    assert controller.panel.training["hands"] is None
+    assert told == []
+    assert len(_training_runs) == 2
+
+
+def test_going_to_a_training_from_the_queue_opens_its_fixs_prompts(enhance, photos):
+    (photos / "Hands").mkdir()
+    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    controller, _host = enhance()
+    controller.panel.fix_training_requested.emit("hands")
+    (run,) = _training_runs
+
+    run.reveal()
+
+    assert controller.panel.opened == "hands"

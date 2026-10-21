@@ -156,6 +156,7 @@ _KIND_TOOLTIPS = {
     JobKind.IMAGE: "An image",
     JobKind.VIDEO: "A video made from a start image",
     JobKind.ENHANCE: "An enhancement of an image already made",
+    JobKind.TRAINING: "A fix's LoRA being trained: nothing is sent to ComfyUI until it ends",
 }
 
 

@@ -185,11 +185,15 @@ class JobQueue(QObject):
         # the machine from what lands (see _set_aside_for and _pump).
         self._takes_over_on_landing: GenerationJob | None = None
         self._first: frozenset[str] = frozenset()
-        self._held_for_training = False
+        self._training = None
 
-    def hold_for_training(self, held: bool) -> None:
-        self._held_for_training = held
+    def hold_for_training(self, training) -> None:
+        self._training = training
         self._pump()
+
+    @property
+    def training(self):
+        return self._training
 
     def making_something(self) -> bool:
         return bool(self._on_server) or self._in_flight is not None
@@ -433,7 +437,7 @@ class JobQueue(QObject):
         its submit unanswered, the window alive meanwhile -- nothing else moves:
         whatever asked is answered when it lands, by the loop that sent it.
         """
-        if self._in_flight is not None or self._held_for_training:
+        if self._in_flight is not None or self._training is not None:
             return
         while not self._on_server and self._waiting:
             job = self._waiting.pop(0)

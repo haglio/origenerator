@@ -107,6 +107,10 @@ def part_table(content: dict | None = None) -> tuple:
     return _BUILTIN_PARTS + _overlay_parts(content)
 
 
+def part_named(name: str) -> DetailPart:
+    return next(part for part in part_table() if part.name == name)
+
+
 # A command is a few words; anything sentence-shaped is a prompt edit that
 # happens to start with "fix" ("fix the color of her eyes to blue").
 _MAX_COMMAND_WORDS = 6

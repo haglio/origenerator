@@ -1497,6 +1497,27 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
     assert panel._displayed_row["prompt_id"] == "img1"
 
 
+def test_an_arrow_after_a_level_is_clicked_puts_the_next_level_in_the_preview(
+        saved_panel, qtbot, tmp_path, monkeypatch):
+    panel, db = saved_panel
+    output_dir = tmp_path / "out"
+    (output_dir / "image").mkdir(parents=True)
+    for name in ("image_enhance_00001_.png", "sdxl_img1.png"):
+        (output_dir / "image" / name).write_bytes(b"x")
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    image = _enhanced_image_row(db)
+    panel.show_saved_generation(image, [image])
+    newest = _level_rows(panel)[0]
+    qtbot.mouseClick(newest, Qt.MouseButton.LeftButton)
+    panel._preview.show_media.reset_mock()
+
+    qtbot.keyClick(newest, Qt.Key.Key_Down)
+
+    panel._preview.show_media.assert_called_once_with(
+        output_dir / "image" / "sdxl_img1.png", "image", "img1"
+    )
+
+
 def test_the_preview_carries_the_shown_generations_corner_controls(saved_panel):
     # The acts on a generation belong on its picture, not in a bank under the
     # settings — the same three corners a gallery thumbnail of it wears.

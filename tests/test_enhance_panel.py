@@ -10,9 +10,11 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import QMimeData, QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QDropEvent, QPixmap
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
+    QLineEdit,
     QMenu,
     QPushButton,
     QScrollArea,
@@ -47,6 +49,7 @@ from origenerator.gui.enhance_versions import (
 )
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
+from tests import gestures
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
@@ -644,6 +647,72 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
 
     assert versions.selected_positions() == [0, 1]
     assert shown == [0]   # only the plain click moved the preview
+
+
+def _clicked_into(qtbot, position, count=2):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(count)))
+    shown = []
+    versions.level_selected.connect(shown.append)
+    row = _rows(versions)[position]
+    _click(qtbot, row)
+    return versions, row, shown
+
+
+def test_down_and_right_pick_and_show_the_level_under_the_one_clicked(qtbot):
+    versions, row, shown = _clicked_into(qtbot, 0)
+
+    qtbot.keyClick(row, Qt.Key.Key_Down)
+    qtbot.keyClick(row, Qt.Key.Key_Right)
+
+    assert shown == [0, 1, 2]
+    assert versions.selected_positions() == [2]
+
+
+def test_up_and_left_pick_and_show_the_level_over_the_one_clicked(qtbot):
+    versions, row, shown = _clicked_into(qtbot, 2)
+
+    qtbot.keyClick(row, Qt.Key.Key_Up)
+    qtbot.keyClick(row, Qt.Key.Key_Left)
+
+    assert shown == [2, 1, 0]
+    assert versions.selected_positions() == [0]
+
+
+@pytest.mark.parametrize(("clicked", "arrow"), [(0, Qt.Key.Key_Up), (2, Qt.Key.Key_Down)],
+                         ids=["the top", "the foot"])
+def test_an_arrow_off_either_end_of_the_list_stays_where_it_is(qtbot, clicked, arrow):
+    versions, row, shown = _clicked_into(qtbot, clicked)
+
+    qtbot.keyClick(row, arrow)
+
+    assert shown == [clicked]
+    assert versions.selected_positions() == [clicked]
+
+
+def test_the_arrows_are_the_lists_only_while_a_level_was_the_last_thing_clicked(qtbot):
+    window = QWidget()
+    column = QVBoxLayout(window)
+    field = QLineEdit()
+    versions = EnhanceVersions()
+    column.addWidget(field)
+    column.addWidget(versions)
+    qtbot.addWidget(window)
+    versions.show_levels(_items(_levels(2)))
+    window.show()
+    window.activateWindow()
+    QTest.qWaitForWindowActive(window)
+    shown = []
+    versions.level_selected.connect(shown.append)
+    row = _rows(versions)[0]
+
+    gestures.click(row, row.rect().center())
+    gestures.press_key(window, Qt.Key.Key_Down)
+    gestures.click(field, field.rect().center())
+    gestures.press_key(window, Qt.Key.Key_Down)
+
+    assert shown == [0, 1]
 
 
 def test_a_picked_level_is_filled_with_the_familys_blue(qtbot):

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
+from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 from shared_ui.colors import BLUE
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, RECENTS_KEY
 from origenerator.gallery.sides import LANDSCAPE
 from origenerator.gui import folder_tree, icons
+from origenerator.gui.drags import under_way
+from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.folder_tree import (
     COUNT_ROLE,
     DROP_KEY_ROLE,
@@ -20,6 +22,7 @@ from origenerator.gui.folder_tree import (
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.orientation import oriented_key
+from tests.drop_style_seen import worn
 from tests.heard_drags import HeardDrags
 
 _ROLE = Qt.ItemDataRole.UserRole
@@ -434,6 +437,73 @@ def test_a_folder_dragged_out_tells_every_place_a_drop_can_land(qtbot, monkeypat
     assert [(bytes(mime.data(FOLDER_KEYS_MIME)).decode("utf-8"), source)
             for mime, source in heard.started] == [(oriented_key("k/a", LANDSCAPE), tree)]
     assert heard.ended == 1
+
+
+# --- the drop style, on the rows a drag would land in ---------------------------
+
+def _style_of(tree, row):
+    """The drop style ``row`` wears across the whole width of the list."""
+    rect = tree.visualRect(tree.indexFromItem(row))
+    return worn(tree.viewport().grab().toImage(),
+                QRect(0, rect.top(), tree.viewport().width(), rect.height()))
+
+
+def _lit_for_a_folder(qtbot):
+    """A list Favorites is lit in, for folder A, with B an ordinary folder beside it."""
+    tree, favorites, _a, b = _collecting_tree(qtbot)
+    tree.setStyleSheet(build_stylesheet())
+    mime = _drag([oriented_key("k/a", LANDSCAPE)])
+    under_way.started.emit(mime, tree)
+    return tree, favorites, b, mime
+
+
+def test_favorites_lights_up_while_a_folder_it_would_take_is_dragged(qtbot):
+    tree, favorites, ordinary, _mime = _lit_for_a_folder(qtbot)
+
+    assert _style_of(tree, favorites) == LIT
+    assert _style_of(tree, ordinary) is None
+
+
+def test_a_folder_of_your_own_lights_for_an_item_it_would_take_and_favorites_does_not(qtbot):
+    tree, favorites, _a, _b = _collecting_tree(
+        qtbot, takes_item=lambda row_key, _prompt_id: row_key.startswith("__custom__"))
+    own = _folder_of_your_own(tree)
+    tree.setStyleSheet(build_stylesheet())
+    mime = generation_mime("p1")
+
+    under_way.started.emit(mime, None)
+
+    assert _style_of(tree, own) == LIT
+    assert _style_of(tree, favorites) is None
+
+
+def test_the_row_under_the_drag_lights_one_step_lighter(qtbot):
+    tree, favorites, _ordinary, mime = _lit_for_a_folder(qtbot)
+
+    _drag_move_at(tree, favorites, mime)
+
+    assert _style_of(tree, favorites) == AIMED
+
+
+def test_a_drag_leaving_the_list_leaves_the_row_it_was_over_only_lit(qtbot):
+    tree, favorites, _ordinary, mime = _lit_for_a_folder(qtbot)
+    _drag_move_at(tree, favorites, mime)
+
+    tree.dragLeaveEvent(QDragLeaveEvent())
+
+    assert _style_of(tree, favorites) == LIT
+
+
+def test_a_drag_let_go_over_a_row_leaves_it_dark_and_not_under_the_next_drag(qtbot):
+    tree, favorites, _ordinary, mime = _lit_for_a_folder(qtbot)
+    _drag_move_at(tree, favorites, mime)
+    _drop_at(tree, favorites, mime)
+    under_way.ended.emit()
+    assert _style_of(tree, favorites) is None
+
+    under_way.started.emit(mime, tree)
+
+    assert _style_of(tree, favorites) == LIT
 
 
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):

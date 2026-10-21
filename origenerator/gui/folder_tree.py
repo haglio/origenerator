@@ -34,8 +34,8 @@ from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtS
 from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon
 from PyQt6.QtWidgets import QAbstractItemView, QMenu, QStyledItemDelegate, QTreeWidget
 
-from origenerator.gui import icons
-from origenerator.gui.drags import carry
+from origenerator.gui import drop_style, icons
+from origenerator.gui.drags import carry, under_way
 from origenerator.gui.generation_drag import dragged_generation
 
 _ICON = 16   # on-screen size of each action
@@ -138,10 +138,14 @@ class FolderTree(QTreeWidget):
         # Several folders at once: Shift takes a run, Ctrl a scattered set — the
         # gesture that composes a custom folder.
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        # Folders drag out; only a collecting row takes them (see _drop_target_key).
+        # Folders drag out; only a collecting row takes them (see landing_on).
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+        self._under_way = None  # the payload and source of a drag in flight
+        self._aimed = None  # the tree key of the row that drag would land in
+        under_way.started.connect(self._light_for)
+        under_way.ended.connect(self._put_out)
 
     def setCurrentItem(self, item, column=0, command=None):
         """Navigate to one row, replacing whatever was picked.
@@ -187,7 +191,33 @@ class FolderTree(QTreeWidget):
         super().leaveEvent(event)
         self._set_hover(None)
 
+    def _light_for(self, mime, source):
+        self._under_way = (mime, source)
+        self.viewport().update()
+
+    def _put_out(self):
+        self._under_way = self._aimed = None
+        self.viewport().update()
+
+    def _aim(self, row):
+        key = row.data(0, TREE_KEY_ROLE) if row is not None else None
+        if key != self._aimed:
+            self._aimed = key
+            self.viewport().update()
+
+    def _drop_style_of(self, index) -> str | None:
+        if self._under_way is None:
+            return None
+        if self._aimed is not None and index.data(TREE_KEY_ROLE) == self._aimed:
+            return drop_style.AIMED
+        landing = self.landing_on(self.itemFromIndex(index), *self._under_way)
+        return drop_style.LIT if landing is not None else None
+
     def drawRow(self, painter, option, index):
+        state = self._drop_style_of(index)
+        if state is not None:
+            drop_style.paint(painter, QRect(0, option.rect.y(), self.viewport().width(),
+                                            option.rect.height()), drop_style.GROUNDS[state])
         super().drawRow(painter, option, index)
         mode = (QIcon.Mode.Selected if self.selectionModel().isSelected(index)
                 else QIcon.Mode.Normal)
@@ -265,9 +295,9 @@ class FolderTree(QTreeWidget):
         drag.setMimeData(mime)
         carry(drag, mime, self, Qt.DropAction.CopyAction)
 
-    def _landing(self, event) -> tuple[str, list, list] | None:
-        return self.landing_on(self.itemAt(event.position().toPoint()), event.mimeData(),
-                               event.source())
+    def _row_and_landing(self, event):
+        row = self.itemAt(event.position().toPoint())
+        return row, self.landing_on(row, event.mimeData(), event.source())
 
     def landing_on(self, row, mime, source) -> tuple[str, list, list] | None:
         """``row``'s collecting key and the folders and items a drag would leave
@@ -307,18 +337,24 @@ class FolderTree(QTreeWidget):
         super().dragMoveEvent(event)  # scrolls the tree while a drag is held at its foot
         if event.position().y() < self.autoScrollMargin():
             self.scrollToTop()  # the folders of your own are there, where a drag nearly always goes
-        if self._landing(event) is not None:
-            event.setDropAction(Qt.DropAction.CopyAction)
-            event.accept()
-        else:
+        row, landing = self._row_and_landing(event)
+        self._aim(row if landing is not None else None)
+        if landing is None:
             event.ignore()
+            return
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
+
+    def dragLeaveEvent(self, event):
+        super().dragLeaveEvent(event)
+        self._aim(None)
 
     def dropEvent(self, event):
         """Hand the drop to the view and consume it. The base implementation is
         deliberately not called: the tree's shape is derived from the generations,
         so a drop must never move a row."""
         super().dragLeaveEvent(QDragLeaveEvent())  # the drag is over, and so is its scrolling
-        landing = self._landing(event)
+        _row, landing = self._row_and_landing(event)
         if landing is None:
             event.ignore()
             return

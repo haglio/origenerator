@@ -195,7 +195,7 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
     source_pixmap(Combination(picture), CELL)
 
     reads = []
-    monkeypatch.setattr(queue_thumbs, "_fit_in_square",
+    monkeypatch.setattr(queue_thumbs, "_fitted",
                         lambda *a: reads.append(a) or None)
     again = source_pixmap(Combination(picture), CELL)
 
@@ -214,7 +214,7 @@ def test_the_cells_held_stop_at_a_bound_letting_go_of_the_longest_unused(
         fitted_cell(path, CELL)
 
     reads = []
-    monkeypatch.setattr(queue_thumbs, "_fit_in_square",
+    monkeypatch.setattr(queue_thumbs, "_fitted",
                         lambda *args: reads.append(args[0]) or None)
     for path in (a, c, b):
         fitted_cell(path, CELL)

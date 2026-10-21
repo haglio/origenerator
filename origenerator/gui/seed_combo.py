@@ -11,7 +11,7 @@ from origenerator.gui.pictured_dropdown import (
     PICTURES_ROLE,
     PicturedDropdown,
     picture_of,
-    unmade_cell,
+    unmade_picture,
 )
 from origenerator.seed_history import SeedUse
 
@@ -29,6 +29,7 @@ class SeedComboBox(PicturedDropdown):
         self.setCompleter(None)
         self._picture = QLabel(self)
         self._picture.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.editTextChanged.connect(self._refresh_picture)
         self.activated.connect(self._remember_pick)
         self._refresh_picture()
@@ -62,7 +63,7 @@ class SeedComboBox(PicturedDropdown):
         use = self._use_the_field_shows()
         picture = picture_of(use, side) if use is not None else None
         self._picture.setPixmap(
-            picture or unmade_cell(side, use.size if use is not None else self._tab_size))
+            picture or unmade_picture(side, use.size if use is not None else self._tab_size))
         self._place_picture()
 
     def _use_the_field_shows(self) -> SeedUse | None:
@@ -78,7 +79,7 @@ class SeedComboBox(PicturedDropdown):
         super().showPopup()
 
     def _rows_of(self, uses: list[SeedUse]):
-        most_in_a_row = max(1, _TALLEST_ROW_A_LIST_LAYS_OUT // self._pitch())
+        most_in_a_row = max(1, _TALLEST_ROW_A_LIST_LAYS_OUT // self._picture_row_height())
         for seed, stretch in groupby(uses, key=attrgetter("seed")):
             stretch = tuple(stretch)
             for start in range(0, len(stretch), most_in_a_row):

@@ -490,10 +490,9 @@ def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made
                       ParamDef("height", "Height", "int", 800, max_val=4096)])
     qtbot.addWidget(form)
 
-    picture = form._widgets["seed"]._picture.pixmap().toImage()
+    picture = form._widgets["seed"]._picture.pixmap()
 
-    assert picture.pixelColor(0, picture.height() // 2).alpha() == 0
-    assert picture.pixelColor(picture.width() // 2, 1).alpha() > 0
+    assert abs(picture.height() - 2 * picture.width()) <= 1
 
 
 def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qtbot):
@@ -504,9 +503,8 @@ def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qt
 
     form._widgets["input_image"].setText("frame.png")
 
-    picture = form._widgets["seed"]._picture.pixmap().toImage()
-    assert picture.pixelColor(0, picture.height() // 2).alpha() == 0
-    assert picture.pixelColor(picture.width() // 2, 1).alpha() > 0
+    picture = form._widgets["seed"]._picture.pixmap()
+    assert abs(picture.height() - 2 * picture.width()) <= 1
 
 
 def test_a_seed_picked_from_the_dropdown_keeps_its_picture_closed(qtbot, tmp_path):
@@ -623,7 +621,7 @@ def test_a_stretch_taller_than_the_list_scrolls_a_little_at_a_time(qtbot):
 def test_a_long_history_reads_pictures_only_for_the_seeds_on_screen(qtbot, monkeypatch,
                                                                      seed_of):
     read = []
-    monkeypatch.setattr(pictured_dropdown, "fitted_cell",
+    monkeypatch.setattr(pictured_dropdown, "fitted_picture",
                         lambda path, side, gray: read.append(path))
     history = [SeedUse(seed_of(n), f"thumbs/{n}.jpg") for n in range(3000)]
     form, field = _seed_form(qtbot, history)

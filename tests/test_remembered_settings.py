@@ -88,8 +88,6 @@ CONSOLE_PRESSES_REMEMBERED_AS = {
 }
 CONSOLE_PRESSES_THAT_ARE_NO_SETTING = {
     "a read-out, which nothing presses": "",
-    "a nudge of the motion a quarter cycle on, which Fun Time counts as none either":
-        "quarter_button",
 }
 
 

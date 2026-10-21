@@ -63,7 +63,6 @@ def test_the_motion_bars_keep_fun_times_phrases():
     assert match_app_command("slow down") is AppCommand.SPEED_DOWN
     assert match_app_command("amp down") is AppCommand.AMP_DOWN
     assert match_app_command("center up") is AppCommand.CENTER_UP
-    assert match_app_command("offset") is AppCommand.OFFSET
 
 
 def test_human_inspired_motion_answers_a_flip_and_an_explicit_on_and_off():

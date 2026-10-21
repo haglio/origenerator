@@ -298,11 +298,6 @@ class Osr2MotionDriver(QObject):
             else:
                 motion_engine.disable_learned_motion(self._state)
 
-    def quarter_offset(self) -> None:
-        r"""Shift the motion a quarter cycle (genau's ``\``)."""
-        with self._lock:
-            motion_engine.quarter_offset(self._state)
-
     @property
     def held(self) -> str | None:
         return self._held

@@ -249,8 +249,6 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
         motion.toggle_learned()
     elif action == "robot_hand_cycle_shape":
         motion.cycle_shape()
-    elif action == "quarter_button":
-        motion.quarter_offset()
     else:
         return False
     return True

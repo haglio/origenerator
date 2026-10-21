@@ -35,7 +35,7 @@ def test_a_hosting_session_hears_what_this_app_answers_while_hosted(phrase):
 
 
 @pytest.mark.parametrize("phrase", [
-    "speed up", "amp fifty", "max center", "next shape", "human inspired", "offset",
+    "speed up", "amp fifty", "max center", "next shape", "human inspired",
     "audio on", "drive off", "osr two control on", "mic off",
 ])
 def test_a_hosting_session_does_not_hear_what_it_answers_itself(phrase):

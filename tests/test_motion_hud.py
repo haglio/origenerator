@@ -38,7 +38,6 @@ _KEYS = [
     (Qt.Key.Key_O, ("adjust_center", 5)),
     (Qt.Key.Key_I, ("cycle_shape",)),
     (Qt.Key.Key_Semicolon, ("toggle_learned",)),
-    (Qt.Key.Key_Backslash, ("quarter_offset",)),
 ]
 
 

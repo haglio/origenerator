@@ -203,9 +203,6 @@ class FakeMotion:
     def set_learned(self, on):
         self.learned = on
 
-    def quarter_offset(self):
-        pass
-
     def set_speed(self, value):
         self.speed = value
 

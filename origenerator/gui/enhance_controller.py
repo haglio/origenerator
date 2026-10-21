@@ -151,7 +151,9 @@ class EnhanceController:
     def take_up_trainings(self) -> None:
         for job in fix_training.trainings():
             trainer = fix_training.trainer_of(job)
-            if trainer is not None and trainer.running():
+            if trainer is None:
+                continue
+            if trainer.running():
                 if self._training is None:
                     self._watch(job).adopt(trainer)
             elif (lora := fix_training.untaken_lora(job)) is not None:

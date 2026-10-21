@@ -913,3 +913,14 @@ def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(
 
     assert controller.panel.used == [("hands", "fixes\\hands 2026-10-21 1500.safetensors")]
     assert _training_runs == []
+
+
+def test_a_lora_from_a_training_before_its_program_was_recorded_is_left_where_it_was_put(
+        enhance, photos, monkeypatch):
+    _kept_training(photos, state="done", lora="hands 2026-10-19 1444.safetensors")
+    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: None)
+    controller, _host = enhance()
+
+    controller.take_up_trainings()
+
+    assert controller.panel.used == []

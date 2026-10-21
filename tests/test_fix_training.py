@@ -127,6 +127,13 @@ def test_no_training_was_ever_started_where_there_is_no_record_of_one(tmp_path):
     assert fix_training.trainer_of(_work(tmp_path)) is None
 
 
+def test_a_training_from_before_its_program_was_recorded_has_none(tmp_path):
+    job = _work(tmp_path)
+    del job["process"]
+
+    assert fix_training.trainer_of(job) is None
+
+
 def test_the_python_that_crops_is_the_one_comfyuis_own_launcher_runs_comfyui_on(
         monkeypatch, tmp_path):
     scripts = tmp_path / "ComfyUIApp" / "scripts"

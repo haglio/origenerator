@@ -17,6 +17,7 @@ from origenerator.osr2_motion_driver import (
     Osr2MotionDriver,
     _TickThread,
 )
+from tests.running_ahead_support import record_the_app_running_ahead
 
 
 class FakeBroker:
@@ -482,3 +483,26 @@ def test_settings_that_no_longer_read_leave_the_motion_where_it_opens(saved):
     motion_engine.take_settings(motion, saved)
 
     assert motion_engine.settings_of(motion) == motion_engine.settings_of(motion_engine.Motion())
+
+
+def test_the_app_runs_ahead_of_background_work_while_the_motion_drives(qtbot, monkeypatch):
+    raised = record_the_app_running_ahead(monkeypatch)
+    driver, _broker, _clock = _driver(qtbot)
+
+    driver.start()
+    assert raised == ["ahead"]
+
+    driver.stop()
+    assert raised == ["ahead", "back"]
+
+
+def test_a_paused_room_lets_the_app_go_back_behind_background_work(qtbot, monkeypatch):
+    raised = record_the_app_running_ahead(monkeypatch)
+    driver, _broker, _clock = _driver(qtbot)
+    driver.start()
+
+    driver.set_frozen(True)
+    assert raised == ["ahead", "back"]
+
+    driver.set_frozen(False)
+    assert raised == ["ahead", "back", "ahead"]

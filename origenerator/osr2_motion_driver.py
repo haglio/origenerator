@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from contextlib import ExitStack
 
 from app_support.osr2_hold import PARK, RESUME
 from funestra.console import HOLD_VERB
@@ -35,6 +36,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from origenerator import motion_engine
 from origenerator.motion_engine import Motion
 from origenerator.osr2 import Osr2Broker
+from origenerator.running_ahead import ahead_while_playing
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +121,7 @@ class Osr2MotionDriver(QObject):
         self._interval_s = interval_ms / 1000.0
         self._make_ticker = ticker_factory or _TickThread
         self._ticker = None
+        self._running_ahead = ExitStack()
         self._held: str | None = None
         self._frozen = False
         self._asked: str | None = None
@@ -176,6 +179,7 @@ class Osr2MotionDriver(QObject):
                 self._last_tick = now
                 self._glide_from(now)
                 self.poll()  # move on the keypress, not a tick later
+                self._running_ahead.enter_context(ahead_while_playing())
                 self._ticker = self._make_ticker(self.poll, self._interval_s)
                 self._ticker.start()
         else:
@@ -196,6 +200,7 @@ class Osr2MotionDriver(QObject):
         ticker, self._ticker = self._ticker, None
         if ticker is not None:
             ticker.stop()  # waits, so no tick can land after a park
+        self._running_ahead.close()
 
     def poll(self) -> None:
         """One tick: carry the phase up to now, then name where the motion will

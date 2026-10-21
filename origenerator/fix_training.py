@@ -94,7 +94,7 @@ def start(job: dict) -> Trainer:
 def trainer_of(job: dict) -> Trainer | None:
     try:
         return Trainer(**json.loads(Path(job["process"]).read_text(encoding="utf-8")))
-    except (OSError, ValueError, TypeError):
+    except (KeyError, OSError, ValueError, TypeError):
         return None
 
 

@@ -379,38 +379,46 @@ class CustomFolderActions:
             redo=redo,
         ))
 
-    def add_to(self, folder_id: int, folders: list[tuple]) -> None:
-        """Add folders to a custom folder, as one undoable step. Folders already
-        in it are left alone by the undo — they were there before this add."""
+    def add_to(self, folder_id: int, folders: list[tuple] = (),
+               items: list[str] = ()) -> None:
+        """Add folders and items to a custom folder, as one undoable step. What
+        is already in it is left alone by the undo — it was there before this add."""
         record = self._find(folder_id)
         if record is None:
             return
-        held = set(record["folders"])
-        added = [m for m in folders if m[0] not in held]
-        if not added:
+        held_folders, held_items = set(record["folders"]), set(record["items"])
+        added_folders = [m for m in folders if m[0] not in held_folders]
+        added_items = [p for p in items if p not in held_items]
+        if not (added_folders or added_items):
             return
-        self._db.add_folders_to_custom_folder(folder_id, added)
+        self._db.add_folders_to_custom_folder(folder_id, added_folders)
+        self._db.add_items_to_custom_folder(folder_id, added_items)
 
         def undo() -> str | None:
-            for folder_key, *_ in added:
+            for folder_key, *_ in added_folders:
                 self._db.remove_folder_from_custom_folder(folder_id, folder_key)
+            self._db.remove_items_from_custom_folder(folder_id, added_items)
             return None
 
-        self._history.push(UndoEntry(_add_label(len(added), record["name"]), undo,
-                                     redo=lambda: self.add_to(folder_id, added)))
-
-    def remove_from(self, folder_id: int, folder_key: str,
-                    *, level=None, ref_prompt_id=None) -> None:
-        """Drop one gathered folder out of a custom folder. The folder itself and
-        its generations are untouched — only the grouping loses it."""
-        self._db.remove_folder_from_custom_folder(folder_id, folder_key)
         self._history.push(UndoEntry(
-            "Remove from folder",
-            lambda: self._db.add_folders_to_custom_folder(
-                folder_id, [(folder_key, level, ref_prompt_id)]),
-            redo=lambda: self.remove_from(
-                folder_id, folder_key, level=level, ref_prompt_id=ref_prompt_id),
-        ))
+            _add_label(added_folders, added_items, record["name"]), undo,
+            redo=lambda: self.add_to(folder_id, added_folders, added_items)))
+
+    def remove_from(self, folder_id: int, folders: list[tuple] = (),
+                    items: list[str] = ()) -> None:
+        """Take gathered folders and items out of a custom folder. They and their
+        generations are untouched — only the grouping loses them."""
+        for folder_key, *_ in folders:
+            self._db.remove_folder_from_custom_folder(folder_id, folder_key)
+        self._db.remove_items_from_custom_folder(folder_id, items)
+
+        def undo() -> str | None:
+            self._db.add_folders_to_custom_folder(folder_id, list(folders))
+            self._db.add_items_to_custom_folder(folder_id, list(items))
+            return None
+
+        self._history.push(UndoEntry("Remove from folder", undo,
+                                     redo=lambda: self.remove_from(folder_id, folders, items)))
 
     def delete(self, folder_id: int) -> None:
         """Remove a custom folder outright. Undo brings it back at the same id —
@@ -428,12 +436,13 @@ class CustomFolderActions:
         # query happened to return.
         order = {key: i for i, key in enumerate(record["folders"])}
         folders.sort(key=lambda m: order[m[0]])
-        name, side = record["name"], record["side"]
+        name, side, items = record["name"], record["side"], record["items"]
         self._db.delete_custom_folder(folder_id)
 
         def undo() -> str | None:
             self._db.create_custom_folder(name, folder_id, side)
             self._db.add_folders_to_custom_folder(folder_id, folders)
+            self._db.add_items_to_custom_folder(folder_id, items)
             return None
 
         self._history.push(UndoEntry(f"Remove folder “{name}”", undo,
@@ -454,5 +463,7 @@ def _level_label(count: int) -> str:
     return f"Delete {count} version{'s' if count != 1 else ''}"
 
 
-def _add_label(count: int, name: str) -> str:
-    return f"Add {count} folder{'s' if count != 1 else ''} to “{name}”"
+def _add_label(folders: list, items: list, name: str) -> str:
+    what = [f"{len(things)} {word}{'s' if len(things) != 1 else ''}"
+            for things, word in ((folders, "folder"), (items, "item")) if things]
+    return f"Add {' and '.join(what)} to “{name}”"

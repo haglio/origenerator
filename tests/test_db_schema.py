@@ -37,6 +37,11 @@ SCHEMA = {
         ("generation_prompt_id", "TEXT", 0, None, 0),
         ("created_at", "TEXT", 1, "datetime('now')", 0),
     ),
+    "custom_folder_generations": (
+        ("folder_id", "INTEGER", 1, None, 1),
+        ("prompt_id", "TEXT", 1, None, 2),
+        ("position", "INTEGER", 1, "0", 0),
+    ),
     "custom_folder_items": (
         ("folder_id", "INTEGER", 1, None, 1),
         ("folder_key", "TEXT", 1, None, 2),
@@ -244,6 +249,7 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
 FIRST_SHIPPED = {
     "combine_video_uses": {
         "id", "intent", "video_prompt_id", "generation_prompt_id", "created_at"},
+    "custom_folder_generations": {"folder_id", "prompt_id", "position"},
     "custom_folder_items": {
         "folder_id", "folder_key", "level", "ref_prompt_id", "position"},
     "custom_folders": {"id", "name", "created_at"},
@@ -362,7 +368,7 @@ def test_a_library_that_named_the_folder_holdings_the_old_way_keeps_them(tmp_pat
 
     assert db.list_custom_folders() == [
         {"id": 1, "name": "Favorites", "side": None,
-         "folders": ["image/sdxl_t2i", "image/flux_t2i"]}]
+         "folders": ["image/sdxl_t2i", "image/flux_t2i"], "items": []}]
     with sqlite3.connect(path) as conn:
         assert "custom_folder_members" not in _tables(conn)
 

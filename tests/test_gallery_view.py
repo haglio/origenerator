@@ -237,7 +237,7 @@ class FakeDB:
         self._rows = list(rows)
         self._by_id = {r["prompt_id"]: r for r in rows}
         self._meta = {}
-        self._custom = {}       # folder id -> {"name", "folders": {key: (level, ref)}}
+        self._custom = {}       # folder id -> {"name", "folders": {key: (level, ref)}, "items"}
         self._next_custom = 1
         self._deletions = {}    # prompt_id -> the held-deletion record, newest last
         self._requests = {}     # prompt_id -> its spoken-request record, newest last
@@ -365,7 +365,7 @@ class FakeDB:
         if folder_id is None:
             folder_id = self._next_custom
         self._next_custom = max(self._next_custom, folder_id) + 1
-        self._custom[folder_id] = {"name": name, "side": side, "folders": {}}
+        self._custom[folder_id] = {"name": name, "side": side, "folders": {}, "items": {}}
         return folder_id
 
     def delete_custom_folder(self, folder_id):
@@ -378,8 +378,16 @@ class FakeDB:
     def remove_folder_from_custom_folder(self, folder_id, folder_key):
         self._custom[folder_id]["folders"].pop(folder_key, None)
 
+    def add_items_to_custom_folder(self, folder_id, prompt_ids):
+        self._custom[folder_id]["items"].update(dict.fromkeys(prompt_ids))
+
+    def remove_items_from_custom_folder(self, folder_id, prompt_ids):
+        for prompt_id in prompt_ids:
+            self._custom[folder_id]["items"].pop(prompt_id, None)
+
     def list_custom_folders(self):
-        return [{"id": fid, "name": f["name"], "side": f["side"], "folders": list(f["folders"])}
+        return [{"id": fid, "name": f["name"], "side": f["side"], "folders": list(f["folders"]),
+                 "items": list(f["items"])}
                 for fid, f in sorted(self._custom.items())]
 
     def folders_in_custom_folders(self):
@@ -14232,6 +14240,21 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     assert row.childCount() == 0  # flat like a collection: its items live elsewhere
     assert view._browser._visible_keys == [cat]
     assert {r["prompt_id"] for r in view.rows_to_play()} == {"i1"}
+
+
+def test_a_custom_folder_shows_the_items_it_holds_ahead_of_its_folders(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Mine", [dog])
+    view._db.add_items_to_custom_folder(folder_id, ["i1"])
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
+
+    assert _shown(_top_level(view._tree)["Mine"]) == "(2) Mine"
+    assert _tile_kinds_in_order(view) == [ThumbnailWidget, FolderTile]
+    assert view._browser.visible_prompt_ids() == ["i1"]
+    assert view._browser._visible_keys == [dog]
+    assert [r["prompt_id"] for r in view.rows_to_play()] == ["i1", "i2"]
 
 
 def test_a_custom_folder_leads_with_how_many_items_it_gathers_counting_each_once(qtbot):

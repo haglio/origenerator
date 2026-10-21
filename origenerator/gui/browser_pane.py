@@ -214,6 +214,8 @@ def _time_heading(text: str) -> QLabel:
 
 
 _NOW_HEADING = "Now"
+_NO_BOOKMARKS = ("No bookmarks yet.\n\nStar an image or video from its right-click menu, "
+                 "or favorite a folder from the list, to collect them here.")
 
 
 def _open_sections(flow, headings, *, opens_now=False, draw_leading=lambda: None):
@@ -358,9 +360,10 @@ class BrowserPane(QObject):
                 render=self._render_recents),
             FAVORITES_KEY: PaneCollection(
                 rows=self._combined_favorite_rows,
-                render=lambda: self._show_favorites(
+                render=lambda: self._show_gathered(
+                    self._favorite_items(self._collection_side, self._collection_folder),
                     self._favorite_folders(self._collection_side, self._collection_folder),
-                    self._favorite_items(self._collection_side, self._collection_folder))),
+                    show_stars=False, empty=_NO_BOOKMARKS)),
             EXPERIMENTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._experiment_rows, side, folder),
                 render=self._render_experiments),
@@ -544,26 +547,31 @@ class BrowserPane(QObject):
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)
 
-    # --- a folder the user composed: its gathered folders, wherever they live ---
+    # --- a folder the user composed: what it gathers, wherever that lives ---
 
     def show_custom_folder(self, group):
-        """Render a custom folder (saved, or the live multi-selection): a tile per
-        gathered folder, each captioned with its breadcrumb.
+        """Render a custom folder (saved, or the live multi-selection) the way
+        Favorites shows what it gathers."""
+        self._show_gathered(group.rows, gallery.child_groups(group), show_stars=True,
+                            empty=f"“{group.label}” is empty.\n\nDrag folders from the list "
+                                  "onto it, or pick several folders with Shift/Ctrl and "
+                                  "group them.")
+
+    def _show_gathered(self, rows, groups, *, show_stars: bool, empty: str):
+        """Items as thumbnails, then a tile per folder, each captioned with its
+        breadcrumb.
 
         The breadcrumb is what makes this readable at all — a grouping can hold two
         folders that are both called "30 steps" from opposite corners of the tree,
-        so the bare label the hierarchy relies on isn't enough here (the Favorites
-        collection shows its folders the same way, for the same reason).
+        so the bare label the hierarchy relies on isn't enough here.
         """
-        folders = gallery.child_groups(group)
         container, flow = self._new_tile_pane()
-        for folder in folders:
-            self._add_folder_tile(flow, folder, favorite=folder.favorite,
-                                  context=self._tree.folder_context(folder.key))
-        self.show_widget(container if folders else self._empty_state(
-            f"“{group.label}” is empty.\n\nDrag folders from the list onto it, or "
-            "pick several folders with Shift/Ctrl and group them."
-        ))
+        for row in rows:
+            self._add_collection_thumbnail(flow, row)
+        for group in groups:
+            self._add_folder_tile(flow, group, favorite=show_stars and group.favorite,
+                                  context=self._tree.folder_context(group.key))
+        self.show_widget(container if (rows or groups) else self._empty_state(empty))
 
     # --- the search results: whatever the query reached, wherever it lives ---
 
@@ -1121,25 +1129,6 @@ class BrowserPane(QObject):
             row for group in self._favorite_folders(side, folder)
             for row in gallery.rows_under(group)
         ])
-
-    def _show_favorites(self, groups, rows):
-        """The Favorites collection: the individual favorited images and videos as
-        thumbnails, then one tile per bookmarked folder (each captioned with its
-        breadcrumb so identically-named folders stay tellable apart). A favorited
-        item previews here on click and opens its own folder on double-click; a
-        folder tile lists its sub-folders."""
-        container, flow = self._new_tile_pane()
-        for row in rows:
-            self._add_collection_thumbnail(flow, row)
-        for group in groups:
-            self._add_folder_tile(flow, group, favorite=False,
-                                  context=self._tree.folder_context(group.key))
-        # An empty collection teaches how to fill it rather than showing a blank pane.
-        self.show_widget(container if (rows or groups) else self._empty_state(
-            "No bookmarks yet.\n\nStar an image or video from its right-click menu, "
-            "or favorite a folder from the list, to collect them here."
-        ))
-
 
     @staticmethod
     def _empty_state(text: str) -> QWidget:

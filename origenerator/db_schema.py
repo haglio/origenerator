@@ -138,9 +138,9 @@ CREATE TABLE IF NOT EXISTS folder_meta (
     ref_prompt_id TEXT
 );
 
--- A folder the user composed by hand out of other folders (see
--- origenerator.gallery.custom). The name is the whole of it; what it holds lives
--- in custom_folder_items.
+-- A folder the user composed by hand (see origenerator.gallery.custom). The name
+-- is the whole of it; the folders it gathers live in custom_folder_items, and the
+-- images and videos it holds on their own in custom_folder_generations.
 CREATE TABLE IF NOT EXISTS custom_folders (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
@@ -158,6 +158,13 @@ CREATE TABLE IF NOT EXISTS custom_folder_items (
     -- The order they were added, so a custom folder lists what it holds that way.
     position      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (folder_id, folder_key)
+);
+
+CREATE TABLE IF NOT EXISTS custom_folder_generations (
+    folder_id INTEGER NOT NULL REFERENCES custom_folders(id) ON DELETE CASCADE,
+    prompt_id TEXT    NOT NULL,
+    position  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (folder_id, prompt_id)
 );
 
 -- A request and the generation it queued: the item it was made about, what was

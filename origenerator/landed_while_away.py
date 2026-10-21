@@ -16,7 +16,7 @@ from pathlib import Path
 
 from app_support.logging_utils import configure_logging, install_exception_logging
 
-from origenerator import app_link
+from origenerator import app_link, fix_training
 from origenerator.comfyui_api import ComfyUIApi
 from origenerator.completion import extract_completion, mark_generation_completed
 from origenerator.config import (
@@ -68,15 +68,30 @@ def take_what_landed(db, api, row: dict, *, output_dir: Path, thumb_dir: Path) -
                                      ok=True, seconds=duration))
 
 
+def _training_ended(job: dict, announce) -> bool:
+    trainer = fix_training.trainer_of(job)
+    if trainer is not None and trainer.running():
+        return False
+    status = fix_training.read_status(job) or {}
+    notice = notice_for(fix_training.outcome_of(
+        job, ok=status.get("state") == "done",
+        seconds=None if trainer is None else time.time() - trainer.began))
+    if notice is not None:
+        announce(notice)
+    return True
+
+
 def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monotonic,
           output_dir: Path = COMFYUI_OUTPUT_DIR, thumb_dir: Path = THUMB_DIR,
           poll_seconds: float = POLL_SECONDS,
-          patience_seconds: float = PATIENCE_SECONDS) -> None:
+          patience_seconds: float = PATIENCE_SECONDS, trainings=None) -> None:
     """Wait out every run the app left in flight, announcing each as it lands."""
+    training = list(fix_training.running_trainings() if trainings is None else trainings)
     giving_up_at = now() + patience_seconds
     while not app_is_running():
+        training = [job for job in training if not _training_ended(job, announce)]
         waiting = runs_in_flight(db)
-        if not waiting:
+        if not waiting and not training:
             logger.info("Stopped waiting: every run left in flight has landed")
             return
         for row in waiting:
@@ -103,7 +118,7 @@ def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
 
     *identity* is the name Windows draws over this copy's notifications.
     """
-    if not runs_in_flight(db):
+    if not runs_in_flight(db) and not fix_training.running_trainings():
         return False
     (spawn or _start_a_watcher)(identity)
     return True

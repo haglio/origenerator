@@ -9,6 +9,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -216,3 +217,49 @@ def test_the_watcher_asks_whether_a_copy_holds_the_library_it_waits_for(tmp_path
     finally:
         claim.let_go()
     assert not asked["app_is_running"]()
+
+
+def _training(tmp_path, monkeypatch, *, ends_with: dict, after_naps: int = 0):
+    job = {"part": "hands", "status": str(tmp_path / "status.json")}
+    trainer = SimpleNamespace(alive=after_naps > 0, began=time.time() - 2952)
+    trainer.running = lambda: trainer.alive
+    monkeypatch.setattr(landed_while_away.fix_training, "trainer_of", lambda kept: trainer)
+    naps = []
+
+    def nap(_seconds):
+        naps.append(_seconds)
+        if len(naps) >= after_naps:
+            trainer.alive = False
+            Path(job["status"]).write_text(json.dumps(ends_with), encoding="utf-8")
+
+    if not after_naps:
+        Path(job["status"]).write_text(json.dumps(ends_with), encoding="utf-8")
+    return job, nap
+
+
+def test_a_training_that_ends_while_the_app_is_closed_is_announced(tmp_path, monkeypatch):
+    job, nap = _training(tmp_path, monkeypatch,
+                         ends_with={"state": "done", "lora": "hands 2026-10-21 1500.safetensors"})
+
+    said = _watch(Database(tmp_path / "t.db"), _Api({}), tmp_path, sleep=nap, trainings=[job])
+
+    assert [(notice.title, notice.body) for notice in said] == [("LoRA ready", "Hands fix · 49:12")]
+
+
+def test_a_training_still_going_is_waited_out_and_its_failure_announced(tmp_path, monkeypatch):
+    job, nap = _training(tmp_path, monkeypatch, after_naps=2,
+                         ends_with={"state": "failed", "message": "Out of memory."})
+
+    said = _watch(Database(tmp_path / "t.db"), _Api({}), tmp_path, sleep=nap, trainings=[job])
+
+    assert [notice.title for notice in said] == ["Training failed"]
+
+
+def test_quitting_while_a_training_runs_hands_it_to_a_process_of_its_own(tmp_path, monkeypatch):
+    monkeypatch.setattr(landed_while_away.fix_training, "running_trainings",
+                        lambda: [{"part": "hands"}])
+    started = []
+
+    assert landed_while_away.hand_over_what_is_in_flight(
+        Database(tmp_path / "t.db"), "Origenerator", spawn=started.append) is True
+    assert started == ["Origenerator"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from origenerator import config, fix_training
@@ -27,22 +28,28 @@ class _Queue:
         self.freed += 1
 
 
-class _Step:
+class _Trainer:
     def __init__(self):
-        self.code = None
+        self.alive = True
+        self.stopped = 0
+        self.began = time.time()
 
-    def poll(self):
-        return self.code
+    def running(self) -> bool:
+        return self.alive
+
+    def stop(self) -> None:
+        self.stopped += 1
+        self.alive = False
 
 
 def _run(qtbot, monkeypatch, tmp_path, *, busy=False):
     monkeypatch.setattr(fix_training_run, "POLL_MS", 5)
     monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
-    started: list[tuple[str, _Step]] = []
+    started: list[_Trainer] = []
 
-    def start(job, step):
-        started.append((step, _Step()))
-        return started[-1][1]
+    def start(job):
+        started.append(_Trainer())
+        return started[-1]
 
     monkeypatch.setattr(fix_training, "start", start)
     queue = _Queue(busy)
@@ -56,7 +63,7 @@ def _say(tmp_path, **status) -> None:
     Path(tmp_path / "status.json").write_text(json.dumps(status), encoding="utf-8")
 
 
-def test_a_training_waits_for_what_comfyui_is_making_then_frees_it_and_crops(
+def test_a_training_waits_for_what_comfyui_is_making_then_frees_it_and_starts(
         qtbot, monkeypatch, tmp_path):
     run, queue, started = _run(qtbot, monkeypatch, tmp_path, busy=True)
 
@@ -64,11 +71,12 @@ def test_a_training_waits_for_what_comfyui_is_making_then_frees_it_and_crops(
     qtbot.wait(30)
     assert queue.held == [run]
     assert started == []
+    assert not run.running
 
     queue.busy = False
     qtbot.waitUntil(lambda: bool(started))
     assert queue.freed == 1
-    assert [step for step, _process in started] == ["crop"]
+    assert run.running
 
 
 def test_a_training_waiting_its_turn_reads_as_queued_with_nothing_to_count(
@@ -85,18 +93,14 @@ def test_a_training_reads_how_far_its_cropping_and_then_its_steps_have_got(
     run, _queue, started = _run(qtbot, monkeypatch, tmp_path)
     run.begin()
     qtbot.waitUntil(lambda: bool(started))
+    assert (run.reading().status, run.reading().stage) == (JobState.RUNNING, "Cropping photos")
 
     _say(tmp_path, state="cropping", done=2, total=8)
     qtbot.waitUntil(lambda: run.reading().progress == (2, 8))
-    assert (run.reading().status, run.reading().stage) == (JobState.RUNNING, "Cropping photos")
     assert run.reading().started_at is not None
 
-    started[0][1].code = 0
-    qtbot.waitUntil(lambda: run.reading().stage == "Training")
-    assert run.reading().progress is None
-
     _say(tmp_path, state="training", done=0, total=0)
-    qtbot.wait(20)
+    qtbot.waitUntil(lambda: run.reading().stage == "Training")
     assert run.reading().progress is None
 
     _say(tmp_path, state="training", done=30, total=2000)
@@ -115,22 +119,10 @@ def test_a_training_counts_down_from_how_long_the_last_ones_took_and_adds_its_ow
 
     with qtbot.waitSignal(run.finished):
         _say(tmp_path, state="done", lora="hands 2026-10-21 1500.safetensors")
-        started[0][1].code = 0
+        started[0].alive = False
 
     (seconds,) = noted
     assert 0 <= seconds < 60
-
-
-def test_photos_cropped_without_a_hitch_are_trained_on_next(qtbot, monkeypatch, tmp_path):
-    run, _queue, started = _run(qtbot, monkeypatch, tmp_path)
-    run.begin()
-    qtbot.waitUntil(lambda: bool(started))
-
-    _say(tmp_path, state="cropping", done=3, total=3)
-    started[0][1].code = 0
-
-    qtbot.waitUntil(lambda: len(started) == 2)
-    assert [step for step, _process in started] == ["crop", "train"]
 
 
 def test_a_finished_training_lets_the_queue_go_and_names_the_lora_it_made(
@@ -141,12 +133,13 @@ def test_a_finished_training_lets_the_queue_go_and_names_the_lora_it_made(
 
     with qtbot.waitSignal(run.finished) as made:
         _say(tmp_path, state="done", lora="hands 2026-10-19 0130.safetensors")
-        started[0][1].code = 0
+        started[0].alive = False
 
-    assert made.args == ["fixes\\hands 2026-10-19 0130.safetensors"]
+    assert made.args == [fix_training.lora_of({"lora": "hands 2026-10-19 0130.safetensors"})]
     (outcome,) = queue.ended
     assert (outcome.kind, outcome.recipe, outcome.ok) == ("Training", "Hands fix", True)
     assert 0 <= outcome.seconds < 60
+    assert not run.running
 
 
 def test_a_failed_training_lets_the_queue_go_and_says_why(qtbot, monkeypatch, tmp_path):
@@ -156,39 +149,36 @@ def test_a_failed_training_lets_the_queue_go_and_says_why(qtbot, monkeypatch, tm
 
     with qtbot.waitSignal(run.failed) as stopped:
         _say(tmp_path, state="failed", message="The detector found nothing.")
-        started[0][1].code = 1
+        started[0].alive = False
 
     assert stopped.args == ["The detector found nothing."]
     (outcome,) = queue.ended
     assert (outcome.kind, outcome.ok) == ("Training", False)
 
 
-def test_a_step_that_quits_without_a_word_says_so_and_where_its_log_is(
+def test_a_training_that_quits_without_a_word_says_so_and_where_its_log_is(
         qtbot, monkeypatch, tmp_path):
     run, _queue, started = _run(qtbot, monkeypatch, tmp_path)
     run.begin()
     qtbot.waitUntil(lambda: bool(started))
 
     with qtbot.waitSignal(run.failed) as stopped:
-        started[0][1].code = 3221225786
+        started[0].alive = False
 
     assert "quit without saying why" in stopped.args[0]
     assert str(tmp_path / "training.log") in stopped.args[0]
 
 
-def test_a_canceled_training_stops_its_step_lets_the_queue_go_and_says_nothing_more(
+def test_a_canceled_training_stops_its_program_lets_the_queue_go_and_says_nothing_more(
         qtbot, monkeypatch, tmp_path):
     run, queue, started = _run(qtbot, monkeypatch, tmp_path)
-    stopped = []
-    monkeypatch.setattr(fix_training, "stop", stopped.append)
     run.begin()
     qtbot.waitUntil(lambda: bool(started))
 
     with qtbot.waitSignal(run.canceled):
         run.cancel()
-    started[0][1].code = 1
 
-    assert stopped == [started[0][1]]
+    assert started[0].stopped == 1
     assert queue.ended == [None]
     with qtbot.assertNotEmitted(run.failed), qtbot.assertNotEmitted(run.finished):
         qtbot.wait(30)
@@ -208,11 +198,11 @@ def test_a_training_canceled_while_it_waits_its_turn_starts_nothing(
     assert queue.ended == [None]
 
 
-def test_a_step_that_cannot_be_started_says_why_and_lets_the_queue_go(
+def test_a_training_that_cannot_be_started_says_why_and_lets_the_queue_go(
         qtbot, monkeypatch, tmp_path):
     run, queue, _started = _run(qtbot, monkeypatch, tmp_path)
 
-    def unstartable(job, step):
+    def unstartable(job):
         raise FileNotFoundError("No usable Python interpreter found.")
 
     monkeypatch.setattr(fix_training, "start", unstartable)
@@ -223,3 +213,19 @@ def test_a_step_that_cannot_be_started_says_why_and_lets_the_queue_go(
     assert "couldn't be started" in stopped.args[0]
     assert "No usable Python interpreter found." in stopped.args[0]
     assert [outcome.ok for outcome in queue.ended] == [False]
+
+
+def test_a_training_left_running_by_an_earlier_launch_holds_the_line_at_once(
+        qtbot, monkeypatch, tmp_path):
+    run, queue, started = _run(qtbot, monkeypatch, tmp_path, busy=True)
+    trainer = _Trainer()
+
+    run.adopt(trainer)
+
+    assert queue.held == [run]
+    assert run.running
+    assert started == []
+    assert queue.freed == 0
+    with qtbot.waitSignal(run.finished):
+        _say(tmp_path, state="done", lora="hands 2026-10-21 1500.safetensors")
+        trainer.alive = False

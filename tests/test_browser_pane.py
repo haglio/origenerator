@@ -92,6 +92,7 @@ class _StubJobQueue:
     def __init__(self, order=(), leading=None):
         self.jobs_by_folder = {}
         self.queue_order = list(order)
+        self.training = None
         self._leading = leading
 
     def job_for(self, key):

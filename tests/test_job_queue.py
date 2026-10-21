@@ -641,6 +641,10 @@ def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, t
 class _Training(QObject):
     ended = pyqtSignal(object)
 
+    def __init__(self, running=True):
+        super().__init__()
+        self.running = running
+
 
 def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_ends(qtbot, tmp_path):
     client = _client()
@@ -697,6 +701,30 @@ def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
         being_made.prompt_id, second.prompt_id, third.prompt_id
     ]
     assert db.get_generation(third.prompt_id)["status"] == "running"
+
+
+def test_closing_while_a_training_runs_leaves_the_line_for_the_next_launch(qtbot, tmp_path):
+    # A training outlives the app, and anything ComfyUI is handed now would
+    # fight it for the graphics card until one of the two ran out of memory.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.hold_for_training(_Training(running=True))
+    waiting = _launch_video(queue, "v1", seed=1)
+
+    assert queue.flush_to_server() == 0
+    client.submit_job.assert_not_called()
+    assert db.get_generation(waiting.prompt_id)["status"] == "pending"
+
+
+def test_closing_while_a_training_waits_its_turn_hands_the_line_over_as_ever(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    queue.hold_for_training(_Training(running=False))
+    waiting = _launch_video(queue, "v1", seed=1)
+
+    assert queue.flush_to_server() == 1
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [waiting.prompt_id]
 
 
 def test_a_submit_refused_as_the_app_closes_is_reported_like_any_other(qtbot, tmp_path):

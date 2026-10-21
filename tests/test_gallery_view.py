@@ -50,6 +50,7 @@ from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
     evolver_export,
+    fix_training,
     gallery,
     motion_engine,
     osr2_driver,
@@ -2332,6 +2333,31 @@ def test_the_absence_batch_can_be_handed_a_policy_of_its_own(qtbot):
 
     assert view.queue_experiments_for_absence() == 0
     assert policy.asked  # the batch came from the policy handed in, not one built here
+
+
+class _RunningTraining(QObject):
+    ended = pyqtSignal(object)
+    running = True
+
+
+def test_closing_while_a_fixs_training_runs_queues_no_work_for_the_absence(qtbot):
+    class Counting:
+        def __init__(self):
+            self.asked = 0
+
+        def propose(self, rows):
+            self.asked += 1
+
+    policy = Counting()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]),
+                       client=_reroll_client(), experiment_policy=policy)
+    qtbot.addWidget(view)
+    view.set_experiments_enabled(True)
+    view._jobs.hold_for_training(_RunningTraining())
+
+    assert view.queue_experiments_for_absence() == 0
+    assert view.queue_base_renders_for_absence() == 0
+    assert policy.asked == 0
 
 
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
@@ -8745,6 +8771,26 @@ def test_reconnect_running_rerolls_rebinds_a_live_job(qtbot, tmp_path):
     assert key in view._live_jobs
     assert view._live_jobs[key].prompt_id == "rr"
     client.submit_job.assert_not_called()  # reconnected, never resubmitted
+
+
+def test_a_training_left_running_is_taken_up_before_the_line_it_held_is_sent(
+        qtbot, tmp_path, monkeypatch):
+    db = _seeded_db(tmp_path, seed=7)
+    _insert_running_reroll(db, "waiting")
+    db.update_generation("waiting", status="pending")
+    trainer = SimpleNamespace(running=lambda: True, began=0.0)
+    job = {"part": "hands", "status": str(tmp_path / "status.json"),
+           "log": str(tmp_path / "training.log")}
+    monkeypatch.setattr(fix_training, "trainings", lambda: [job])
+    monkeypatch.setattr(fix_training, "trainer_of", lambda kept: trainer)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+
+    view.reconnect_running_jobs()
+
+    assert view._jobs.training is not None
+    client.submit_job.assert_not_called()
 
 
 def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):

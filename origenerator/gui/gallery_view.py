@@ -1153,7 +1153,7 @@ class GalleryView(QWidget):
         if is_branch_session():
             logger.info("Branch session: experiments left to the production app")
             return 0
-        if not self.experiments_enabled():
+        if not self.experiments_enabled() or self._jobs.training_holds_the_machine():
             return 0
         return queue_experiments(
             self._db.list_generations(), self._experiment_policy,
@@ -1175,6 +1175,8 @@ class GalleryView(QWidget):
         """
         if is_branch_session():
             logger.info("Branch session: base re-renders left to the production app")
+            return 0
+        if self._jobs.training_holds_the_machine():
             return 0
         return queue_base_renders(self._db.list_generations(), self._launch_base_render)
 
@@ -3349,6 +3351,7 @@ class GalleryView(QWidget):
         each shows live progress and records its completion again. Called once at
         startup; a tab's Generate is itself a re-roll, so every still-running row is
         the re-roll controller's to reconnect."""
+        self._enhance.take_up_trainings()
         self._jobs.reconnect_running()
 
     def _cancel_reroll(self, key: str):

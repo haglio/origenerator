@@ -9,6 +9,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -769,15 +770,20 @@ class FakeTrainingRun:
         self.progress, self.finished, self.failed = FakeSignal(), FakeSignal(), FakeSignal()
         self.canceled = FakeSignal()
         self.began = False
+        self.adopted = None
         _training_runs.append(self)
 
     def begin(self):
         self.began = True
 
+    def adopt(self, trainer):
+        self.adopted = trainer
+
 
 @pytest.fixture
 def photos(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
     monkeypatch.setattr(config, "LORA_TRAINING_PYTHON", tmp_path / "python.exe")
     monkeypatch.setattr(config, "LORA_TRAINING_SCRIPTS", tmp_path / "sd-scripts")
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
@@ -823,10 +829,14 @@ def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
 
     run.progress.emit("Training 40%")
     assert controller.panel.training["hands"] == "Training 40%"
+    Path(run.job["work"]).mkdir(parents=True)
+    Path(run.job["status"]).write_text(json.dumps(
+        {"state": "done", "lora": "hands 2026-10-19 0130.safetensors"}), encoding="utf-8")
     run.finished.emit("fixes\\hands 2026-10-19 0130.safetensors")
 
     assert controller.panel.used == [("hands", "fixes\\hands 2026-10-19 0130.safetensors")]
     assert controller.panel.training["hands"] is None
+    assert module.fix_training.untaken_lora(run.job) is None
 
 
 def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start(
@@ -857,3 +867,49 @@ def test_going_to_a_training_from_the_queue_opens_its_fixs_prompts(enhance, phot
     run.reveal()
 
     assert controller.panel.opened == "hands"
+
+
+class _KeptTrainer:
+    def __init__(self, alive):
+        self.alive = alive
+
+    def running(self):
+        return self.alive
+
+
+def _kept_training(photos, part="hands", **status) -> dict:
+    work = photos / "fix training" / part
+    work.mkdir(parents=True)
+    job = {"part": part, "work": str(work), "status": str(work / "status.json"),
+           "job_file": str(work / "job.json"), "process": str(work / "process.json")}
+    Path(job["job_file"]).write_text(json.dumps(job), encoding="utf-8")
+    if status:
+        Path(job["status"]).write_text(json.dumps(status), encoding="utf-8")
+    return job
+
+
+def test_a_training_an_earlier_launch_left_running_is_taken_up_and_holds_the_line(
+        enhance, photos, monkeypatch):
+    _kept_training(photos)
+    trainer = _KeptTrainer(alive=True)
+    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: trainer)
+    controller, _host = enhance()
+
+    controller.take_up_trainings()
+
+    (run,) = _training_runs
+    assert run.adopted is trainer
+    assert run.job["part"] == "hands"
+
+
+def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(
+        enhance, photos, monkeypatch):
+    _kept_training(photos, state="done", lora="hands 2026-10-21 1500.safetensors")
+    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: _KeptTrainer(alive=False))
+    controller, _host = enhance()
+
+    controller.take_up_trainings()
+    controller.take_up_trainings()
+
+    assert controller.panel.used == [("hands", "fixes\\hands 2026-10-21 1500.safetensors")]
+    assert _training_runs == []

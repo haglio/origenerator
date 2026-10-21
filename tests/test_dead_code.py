@@ -362,11 +362,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # what the tree measured.
 # 17457 when the frames over the two shapes' lists became shared_ui's marks,
 # taken down to what the tree measured.
-# 17446 when every menu naming an item or a folder came to offer Copy name,
-# taken down to what the tree measured: the Trash's, a folder of your own's and
-# a pick of folders' menus lost docstrings their tests say, and a picture's
+# 17438 when every menu naming an item or a folder came to offer Copy name and
+# a tab's Basic section a Name line, taken down to what the tree measured: the
+# Trash's, a folder of your own's and a pick of folders' menus and the Basic
+# section's builder lost docstrings their tests say, and a picture's menu
 # stopped counting its acts.
-MAX_PROSE_LINES = 17446
+MAX_PROSE_LINES = 17438
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

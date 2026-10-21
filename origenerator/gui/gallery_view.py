@@ -92,6 +92,7 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
+from origenerator.gui.copy_names import offer_copy_names
 from origenerator.gui.deferred import defer
 from origenerator.gui.enhance_controller import EnhanceController, Offer
 from origenerator.gui.folder_path_header import FolderPathHeader
@@ -3638,8 +3639,7 @@ class GalleryView(QWidget):
 
         One menu rather than one per surface: a thumbnail in the browser pane and
         the preview in a config tab are looking at the same generation, so a
-        right-click has to reach the same four acts either way — go to its folder,
-        bookmark it, enhance it, bin it.
+        right-click has to reach the same acts either way.
 
         "Go to folder" is left off when the pane already IS that folder, which is
         what makes it appear exactly where it is worth having: in the collections and
@@ -3651,7 +3651,7 @@ class GalleryView(QWidget):
         reads Unfavorite only when every picked item is already favorited, and toggles
         the whole selection to the opposite state.
 
-        A fifth act appears only while something is being made of a picked image:
+        Another act appears only while something is being made of a picked image:
         cancel the enhancement in flight. An enhancement has no card of its own —
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
@@ -3668,6 +3668,8 @@ class GalleryView(QWidget):
         folder_action = None
         if count == 1 and self._can_open_containing_folder(rows[0]):
             folder_action = menu.addAction("Go to folder")
+        offer_copy_names(menu, [self._item_names.of(row["prompt_id"]) for row in rows])
+        if not menu.isEmpty():
             menu.addSeparator()
         all_favorites = all(row.get("starred") for row in rows)
         favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)

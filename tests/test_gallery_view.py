@@ -3044,6 +3044,7 @@ def _answer_menu(monkeypatch, label):
         act = find(menu)
         if act is None:  # loudly, not as a menu the user dismissed
             raise AssertionError(f"no menu entry reading {label!r}")
+        act.trigger()  # as Qt does for the entry clicked, before exec returns it
         return act
 
     monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", pick)
@@ -3068,7 +3069,7 @@ def _menu_labels(monkeypatch, labels):
     )
 
 
-def test_right_clicking_a_recent_item_offers_its_folder_favorite_enhance_and_delete(
+def test_right_clicking_a_recent_item_offers_its_folder_its_name_favorite_enhance_and_delete(
         qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
@@ -3083,7 +3084,7 @@ def test_right_clicking_a_recent_item_offers_its_folder_favorite_enhance_and_del
 
     # A collection gathers items from all over, so where this one actually lives is
     # the question its menu is most often asked — it leads, above a separator.
-    assert labels == ["Go to folder", "", "Favorite 1 item", "Enhance 1 image",
+    assert labels == ["Go to folder", "Copy name", "", "Favorite 1 item", "Enhance 1 image",
                       "Delete 1 item"]
     assert view.selected_prompt_ids() == ["i2"]  # right-clicking picked it
 
@@ -3101,7 +3102,7 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
 
     _right_click(view, "i1")
 
-    assert labels == ["Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
+    assert labels == ["Copy name", "", "Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
 
 
 def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(
@@ -3117,6 +3118,56 @@ def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(
 
     assert view._tree.currentItem() is view._leaf_by_id["i2"]
     assert view.selected_prompt_ids() == ["i2"]
+
+
+def _name_of(row, number):
+    return f"{gallery.folder_id(gallery.settings_folder_key(row))} {number:03d}"
+
+
+def test_copy_name_puts_the_items_name_on_the_clipboard(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy name")
+
+    _right_click(view, "i1")
+
+    assert QApplication.clipboard().text() == _name_of(rows[0], 1)
+
+
+def test_copying_the_names_of_picked_items_puts_them_one_to_a_line(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._browser.apply_selection("i1", _NO_MOD)
+    view._browser.apply_selection("i3", _CTRL)
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy 2 names")
+
+    _right_click(view, "i3")
+
+    assert QApplication.clipboard().text() == "\n".join(
+        [_name_of(rows[0], 2), _name_of(rows[2], 0)])
+
+
+def test_an_item_the_gallery_has_not_named_yet_offers_no_name_to_copy(qtbot, monkeypatch):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    db.add(_image("i2", "a cat", 50, 2))  # landed since the gallery last drew
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    view.generation_menu(["i2"], QPoint(0, 0))
+
+    assert labels == ["Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
 
 
 def _folder_buttons(view):
@@ -5853,10 +5904,7 @@ def test_right_click_favorite_bookmarks_the_picked_thumbnail(qtbot, monkeypatch)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    # The menu's first entry is Favorite/Unfavorite (Delete is last).
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
-    )
+    _answer_menu(monkeypatch, "Favorite 1 item")
 
     view._browser._thumbnail_context_menu("i1", QPoint(0, 0))
 
@@ -5872,15 +5920,10 @@ def test_right_click_unfavorite_clears_a_favorite_thumbnail(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    labels = []
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec",
-        lambda self, *a: (labels.append(self.actions()[0].text()), self.actions()[0])[1],
-    )
+    _answer_menu(monkeypatch, "Unfavorite 1 item")  # a favorited item offers Unfavorite
 
     view._browser._thumbnail_context_menu("i1", QPoint(0, 0))
 
-    assert labels == ["Unfavorite 1 item"]                 # a favorited item offers Unfavorite
     assert not db.get_generation("i1")["starred"]      # cleared
 
 
@@ -5894,9 +5937,7 @@ def test_right_click_favorite_acts_on_the_whole_multi_selection(qtbot, monkeypat
     _open_leaf(view)
     view._browser.apply_selection("i1", _NO_MOD)
     view._browser.apply_selection("i3", _CTRL)  # i1 + i3 selected
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
-    )
+    _answer_menu(monkeypatch, "Favorite 2 items")
 
     view._browser._thumbnail_context_menu("i3", QPoint(0, 0))
 

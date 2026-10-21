@@ -286,12 +286,20 @@ is the two hooks that call the guard, below.
   is why it lives here rather than in it: the dependency gate installs exactly
   what pyproject declares, and the voice's torch is not the app's to declare.
   `GenerationJob.start` runs it before a job with lines is submitted.
-- `tools/fix_lora_trainer.py` — trains a fix's LoRA: crops each photo in that
-  fix's folder under `app_data\origenerator\fix photos` down to the part with
-  the fix's own detector, then runs kohya's sd-scripts on the crops into
-  ComfyUI's `loras\fixes`. Run by path under the `lora_training_python` the
-  overlay names, for the same reason as the voice: sd-scripts' pins are not
-  this app's to declare. The Train button in a fix's prompts window starts it.
+- `tools/fix_lora_trainer.py` — trains a fix's LoRA in two steps, each run by
+  path under the Python that can do it. `crop` cuts each photo in that fix's
+  folder under `app_data\origenerator\fix photos` down to the part with the
+  fix's own detector, under the Python ComfyUI runs on, which ComfyUIApp's
+  launcher names (`comfyui_python()`): that is the one environment certain to
+  read every detector a fix uses, since a fix's detector is ComfyUI's model,
+  and a copy of ultralytics anywhere else falls out of step with it -- the training
+  environment's could not read a newer detector on 2026-10-21, and the training
+  died before it touched a photo. `train` runs kohya's sd-scripts on the crops
+  into ComfyUI's `loras\fixes`, under the `lora_training_python` the overlay
+  names, for the same reason as the voice: sd-scripts' pins are not this app's
+  to declare. Both steps print into the run's `training.log` and leave their
+  word, a failure's reason included, in its `status.json`. The Train button in
+  a fix's prompts window starts it.
 - `tools/open_from_notification.py` — what Windows runs when a notification of
   this app's is clicked, registered as the command for the `origenerator:` link
   every notice carries. It hands the generation to the copy that has the

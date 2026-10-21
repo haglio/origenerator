@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from origenerator import config
+from origenerator import comfyui_launcher, config
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part
 
 TRAINER = Path(__file__).resolve().parents[1] / "tools" / "fix_lora_trainer.py"
@@ -31,9 +31,11 @@ def photo_files(folder: Path) -> list[Path]:
 def training_job(part, checkpoint: str, now: datetime) -> dict:
     models = config.COMFYUI_DIR / "models"
     work = config.FIX_TRAINING_DIR / part.name
+    folder = photos_folder(part)
     return {
         "part": part.name,
-        "photos": [str(path) for path in photo_files(photos_folder(part))],
+        "photos": [str(path) for path in photo_files(folder)],
+        "photos_folder": str(folder),
         "detector": str(config.COMFYUI_DIR / detector_folder(part) / detector_for_part(part)),
         "caption": f"close-up photo of {part.name}",
         "base_model": str(models / "checkpoints" / checkpoint),
@@ -42,17 +44,30 @@ def training_job(part, checkpoint: str, now: datetime) -> dict:
         "output_name": f"{part.name} {now:%Y-%m-%d %H%M}",
         "work": str(work),
         "status": str(work / "status.json"),
+        "log": str(work / "training.log"),
     }
 
 
-def start(job: dict) -> subprocess.Popen:
+def comfyui_python() -> Path:
+    return comfyui_launcher.load(config.COMFYUI_DIR).comfyui_python()
+
+
+_PYTHONS = {"crop": lambda: comfyui_python(), "train": lambda: config.LORA_TRAINING_PYTHON}
+STEPS = tuple(_PYTHONS)
+
+
+def start(job: dict, step: str) -> subprocess.Popen:
     work = Path(job["work"])
     work.mkdir(parents=True, exist_ok=True)
-    Path(job["status"]).unlink(missing_ok=True)
     job_file = work / "job.json"
-    job_file.write_text(json.dumps(job), encoding="utf-8")
-    return subprocess.Popen([str(config.LORA_TRAINING_PYTHON), str(TRAINER), str(job_file)],
-                            creationflags=_IN_THE_BACKGROUND)
+    if step == STEPS[0]:
+        Path(job["status"]).unlink(missing_ok=True)
+        Path(job["log"]).unlink(missing_ok=True)
+        job_file.write_text(json.dumps(job), encoding="utf-8")
+    with open(job["log"], "ab") as log:
+        return subprocess.Popen([str(_PYTHONS[step]()), str(TRAINER), step, str(job_file)],
+                                stdout=log, stderr=subprocess.STDOUT,
+                                creationflags=_IN_THE_BACKGROUND)
 
 
 def read_status(job: dict) -> dict | None:

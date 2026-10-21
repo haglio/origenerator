@@ -143,13 +143,12 @@ class JobQueue(QObject):
     is free, which is what lets an image jump ahead of a video.
 
     User work owns the GPU: launching any user job first cancels every in-flight
-    background experiment, the one generator of jobs the user didn't ask for, so
-    a Generate starts at once instead of queuing after a long experiment run.
-    And the user's image work owns it outright: whatever is being rendered when a
-    picture is asked for is set aside -- stopped, and put back in the line to
-    start over once the pictures are done (:meth:`_set_aside_for`) -- unless it
-    is what a slideshow is locked on (:meth:`put_first`) or a run the user
-    shielded (:meth:`shield`)."""
+    background experiment, the one generator of jobs the user didn't ask for, so a
+    Generate starts at once instead of queuing after a long experiment run. And the
+    user's image work owns it outright: whatever is being rendered when a picture is
+    asked for is set aside -- stopped, and put back in the line to start over once
+    the pictures are done (:meth:`_set_aside_for`) -- unless a slideshow is locked
+    on it (:meth:`put_first`) or it is shielded (:meth:`shield`)."""
 
     changed = pyqtSignal()            # the set of live jobs changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
@@ -689,7 +688,6 @@ class JobQueue(QObject):
         self._enqueue(job)
 
     def _take_back(self, key: str, job: GenerationJob, row: dict):
-        """Track a previous session's run again, as its row left it."""
         job.origin = job.prompt_id  # a resumed run's chain, if any, is already done
         job.shielded = bool(row.get("shielded"))
         self._register(key, job, self._on_finished)

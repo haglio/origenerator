@@ -34,8 +34,8 @@ pictures there might have been.
 Every scaled cell is cached by (file, size, gray) — the strip re-renders on
 every poll, and a start frame is a full-size render off disk. That fitting and
 that cache are :func:`fitted_cell`, which is public because the pair drawn by
-:func:`~origenerator.gui.combination_view.combination_pixmap` and the seed
-dropdown's pictures are the same kind of cell, and a second cache of it would
+:func:`~origenerator.gui.combination_view.combination_pixmap` and the pictures
+in a dropdown's rows are the same kind of cell, and a second cache of it would
 be a second full-size decode a second.
 """
 from __future__ import annotations

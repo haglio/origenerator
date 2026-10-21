@@ -40,6 +40,7 @@ from origenerator.orientation import oriented_key
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
+from tests.test_combine_panel import _listed_under_recent
 from tests.test_gallery_view import _collection, _select_first_leaf, _selected_folder
 from tests.test_hard_to_miss import _faded_backgrounds
 
@@ -1088,7 +1089,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
     assert "vid_run" in gv._browser._inflight_cards
 
 
-def _seed_combine_db(tmp_path):
+def _seed_combine_db(tmp_path, videos=("vid",)):
     """Put a completed image + i2v video in the window's DB so the combine slots
     can be filled from persisted ids."""
     db = Database(tmp_path / "t.db")
@@ -1098,13 +1099,14 @@ def _seed_combine_db(tmp_path):
                          workflow_json="{}")
     db.update_generation("img", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_img.png"}]))
-    db.insert_generation(prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v",
-                         positive_prompt="dance", seed=42,
-                         params_json=json.dumps(dict(
-                             WORKFLOW_REGISTRY["wan22_i2v"].default_params(), seed=42)),
-                         workflow_json="{}")
-    db.update_generation("vid", status="completed",
-                         output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4"}]))
+    for video in videos:
+        db.insert_generation(prompt_id=video, workflow_name="wan22_i2v", workflow_version="v",
+                             positive_prompt="dance", seed=42,
+                             params_json=json.dumps(dict(
+                                 WORKFLOW_REGISTRY["wan22_i2v"].default_params(), seed=42)),
+                             workflow_json="{}")
+        db.update_generation(video, status="completed",
+                             output_files=json.dumps([{"filename": f"wan22_i2v_{video}.mp4"}]))
 
 
 def test_close_event_persists_combine_selection(qtbot, tmp_path):
@@ -1305,6 +1307,21 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     assert combine.video_slot.current_id() is None
     combine._video_radio.setChecked(True)
     assert combine.video_slot.current_id() == "vid"
+
+
+def test_the_videos_recent_lists_come_back_after_close_and_reopen(qtbot, tmp_path):
+    _seed_combine_db(tmp_path, videos=("vid", "vid2"))
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._combine.panel.video_slot.set_item("vid")
+    first._gallery_view._combine.panel.video_slot.set_item("vid2")
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    combine = reopened._gallery_view._combine.panel
+    assert combine.video_slot.current_id() == "vid2"
+    assert _listed_under_recent(combine) == ["vid2", "vid"]
 
 
 def _fun_time_session(main=(10, 20, 800, 600)):

@@ -70,8 +70,8 @@ def _height_of(margins: QMargins) -> int:
     return QRect(0, 0, 0, 0).marginsAdded(margins).height()
 
 
-def picture_of(picture, side: int) -> QPixmap | None:
-    return (fitted_cell(picture.thumbnail, side) if picture.thumbnail
+def picture_of(picture, side: int, gray: bool = False) -> QPixmap | None:
+    return (fitted_cell(picture.thumbnail, side, gray) if picture.thumbnail
             else unmade_cell(side, picture.size))
 
 
@@ -100,6 +100,10 @@ def _lettering_color(option: QStyleOptionViewItem) -> QColor:
 
 
 class _PicturedRows(QStyledItemDelegate):
+    def __init__(self, parent, *, gray: bool):
+        super().__init__(parent)
+        self._gray = gray
+
     def sizeHint(self, option, index):
         widest = super().sizeHint(option, index).grownBy(_ROW_INSET).width() + _BRACE_COLUMN
         return QSize(widest, self.pitch(option) * len(index.data(PICTURES_ROLE)))
@@ -121,7 +125,7 @@ class _PicturedRows(QStyledItemDelegate):
         pictures = index.data(PICTURES_ROLE)
         places = _picture_places(style, filled, len(pictures))
         for picture, place in zip(pictures, places):
-            drawn = picture_of(picture, _PICTURE_SIDE) if place.intersects(
+            drawn = picture_of(picture, _PICTURE_SIDE, self._gray) if place.intersects(
                 painter.viewport()) else None
             if drawn is not None:
                 painter.drawPixmap(place.topLeft(), drawn)
@@ -154,9 +158,9 @@ def _picture_places(style, option: QStyleOptionViewItem, count: int) -> list[QRe
 class PicturedDropdown(NoWheelComboBox):
     floor_chars = 1
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, gray: bool = False):
         super().__init__(parent)
-        self.setItemDelegate(_PicturedRows(self))
+        self.setItemDelegate(_PicturedRows(self, gray=gray))
         self.view().setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
     def showPopup(self):

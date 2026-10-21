@@ -4,8 +4,7 @@ A video dropped into the combine panel is not what is being made — it is the
 recipe the run will follow. In full color beside the frame it will animate it
 reads as a second subject, and a queue row showing it alone reads as a job that
 is that video. Gray says outright that it is a setting rather than a result, so
-every surface a config-only video reaches — the combine slot, the queue row's
-picture block, and the pane a combination opens in — draws it through here.
+every surface a config-only video reaches draws it through here.
 
 Alpha is carried across rather than flattened, so a picture with a cut-out edge
 stays cut out instead of gaining a gray square around it.

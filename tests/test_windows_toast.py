@@ -36,6 +36,15 @@ def test_a_toast_says_the_two_lines_and_carries_the_link_a_click_follows():
     assert image.get("src") == "file:///C:/marks/ready.png"
 
 
+def test_a_toast_about_no_item_has_no_link_for_a_click_to_follow():
+    xml = windows_toast.toast_xml("LoRA ready", "Hands fix · 49:12", link=None)
+
+    toast, lines, _image = _read(xml)
+    assert (toast.get("activationType"), toast.get("launch")) == (None, None)
+    assert lines == ["LoRA ready", "Hands fix · 49:12"]
+    assert windows_toast.document_of(xml)
+
+
 def test_a_recipe_name_with_markup_in_it_is_said_rather_than_read():
     # Whatever a recipe or a workflow is called is somebody's words, and
     # Windows reads a toast as a document.

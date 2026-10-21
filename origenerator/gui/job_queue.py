@@ -189,7 +189,13 @@ class JobQueue(QObject):
 
     def hold_for_training(self, training) -> None:
         self._training = training
+        training.ended.connect(self._let_go_of_training)
+
+    def _let_go_of_training(self, outcome) -> None:
+        self._training = None
         self._pump()
+        if outcome is not None:
+            self.run_ended.emit(outcome)
 
     @property
     def training(self):

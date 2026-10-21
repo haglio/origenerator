@@ -17,8 +17,8 @@ _FILED_WITH = "runs"
 
 def raise_notice(identity: str, notice: Notice, *, mark: Path | None = None) -> None:
     try:
-        show(identity, toast_xml(notice.title, notice.body,
-                                 link=app_link.link_to(notice.generation), mark=mark),
+        link = app_link.link_to(notice.generation) if notice.generation else None
+        show(identity, toast_xml(notice.title, notice.body, link=link, mark=mark),
              tag=_tag_of(notice.generation), group=_FILED_WITH)
     except OSError as e:
         logger.warning("Windows would not raise the notification: %s", e)

@@ -237,8 +237,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     so it is one method beside Clear's. 280 -> 281: an item dragged over a
     folder of your own in the TOC goes in only where the gallery shows it on
     that folder's side, which the TOC asks of the gallery through one
-    method.)"""
+    method. 281 -> 282: the middle pane takes a drag while a folder of your own
+    is open in it, and asks the TOC what that folder's own row would take,
+    through one method.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 281
+               for x in _class_def(VIEW, "GalleryView").body) == 282
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

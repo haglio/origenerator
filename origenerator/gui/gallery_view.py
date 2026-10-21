@@ -95,6 +95,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.deferred import defer
+from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import EnhanceController, Offer
 from origenerator.gui.folder_path_header import FolderPathHeader
 from origenerator.gui.folder_request_tile import FolderRequestTile
@@ -449,6 +450,8 @@ class GalleryView(QWidget):
         # scroll area is its canvas — built here so it can be handed over, placed
         # into the layout by _build_ui.
         self._scroll = BrowserScrollArea()
+        DropTarget(self._scroll.viewport(), self._landing_in_the_open_custom_folder,
+                   self._on_dropped)
         self._browser = BrowserPane(
             self._scroll, db, self._jobs, self._auto,
             TreeNavigation(
@@ -2226,6 +2229,11 @@ class GalleryView(QWidget):
         leaf = self._leaf_by_id.get(prompt_id)
         return (isinstance(folder, gallery.CustomGroup) and leaf is not None
                 and _side_of(leaf.data(0, _TREE_KEY_ROLE)) == _side_of(row_key))
+
+    def _landing_in_the_open_custom_folder(self, mime, source):
+        if _saved_custom_folder(self.current_group()) is None:
+            return None
+        return self._tree.landing_on(self._tree.currentItem(), mime, source)
 
     def _new_custom_folder(self, side: str):
         """Make an empty folder of the user's own — the tree's right-click action,

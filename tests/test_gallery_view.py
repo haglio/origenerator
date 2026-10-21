@@ -21,6 +21,7 @@ from PyQt6.QtCore import (
     QCoreApplication,
     QEvent,
     QMargins,
+    QMimeData,
     QObject,
     QPoint,
     QPointF,
@@ -30,7 +31,15 @@ from PyQt6.QtCore import (
     QTimer,
     pyqtSignal,
 )
-from PyQt6.QtGui import QDrag, QDragMoveEvent, QDropEvent, QKeyEvent, QMovie
+from PyQt6.QtGui import (
+    QDrag,
+    QDragEnterEvent,
+    QDragLeaveEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QKeyEvent,
+    QMovie,
+)
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -98,7 +107,7 @@ from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.folder_tree import RECENT_ROLE, _action_rects
+from origenerator.gui.folder_tree import FOLDER_KEYS_MIME, RECENT_ROLE, TREE_KEY_ROLE, _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generating_tile import GeneratingTile
@@ -14335,6 +14344,75 @@ def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
 
     assert not _drop_on(_top_level(view._tree)["Mine"], mime)
     assert view._db.list_custom_folders()[0]["items"] == []
+
+
+def _drop_in_the_middle_pane(view, mime, source=None) -> bool:
+    """Drag ``mime`` over the middle pane and let it go there; whether the pane
+    took it. ``source`` stands in for where the drag started, as a real one
+    names it."""
+    pane = view._scroll.viewport()
+    spot = QPointF(pane.rect().center())
+    held = (spot.toPoint(), Qt.DropAction.CopyAction, mime,
+            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    enter, move = QDragEnterEvent(*held), QDragMoveEvent(*held)
+    drop = QDropEvent(spot, *held[1:])
+    for event in (enter, move, drop):
+        event.source = lambda: source
+    QApplication.sendEvent(pane, enter)
+    QApplication.sendEvent(pane, move)
+    QApplication.sendEvent(pane, drop if move.isAccepted() else QDragLeaveEvent())
+    return move.isAccepted()
+
+
+def test_an_item_dropped_into_an_open_custom_folder_goes_in(qtbot):
+    view, _cat, dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Mine", [dog])
+    view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
+    mime = generation_mime("i1")
+
+    assert _drop_in_the_middle_pane(view, mime)
+
+    assert view._db.list_custom_folders()[0]["items"] == ["i1"]
+    assert view._browser.visible_prompt_ids() == ["i1"]  # drawn again with it
+
+
+def _folder_drag(view, key):
+    """The payload a drag of ``key``'s row out of the TOC carries."""
+    mime = QMimeData()
+    mime.setData(FOLDER_KEYS_MIME, view._tree_item_for(key).data(0, TREE_KEY_ROLE).encode())
+    return mime
+
+
+def test_a_folder_dragged_from_the_toc_into_an_open_custom_folder_goes_in(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Mine", [dog])
+    view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
+    mime = _folder_drag(view, cat)
+
+    assert _drop_in_the_middle_pane(view, mime, source=_side(view._tree))
+
+    assert view._db.list_custom_folders()[0]["folders"] == [dog, cat]
+
+
+def test_an_open_custom_folder_refuses_a_folder_from_the_other_shapes_list(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Mine", [dog])
+    view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
+    mime = _folder_drag(view, cat)
+
+    assert not _drop_in_the_middle_pane(view, mime, source=_side(view._tree, PORTRAIT))
+
+    assert view._db.list_custom_folders()[0]["folders"] == [dog]
+
+
+def test_open_favorites_takes_no_drop_though_its_row_does(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
+    mime = _folder_drag(view, cat)
+
+    assert not _drop_in_the_middle_pane(view, mime, source=_side(view._tree))
+
+    assert not view.group_for_key(cat).favorite
 
 
 def test_dropping_a_folder_onto_favorite_favorites_it(qtbot):

@@ -239,6 +239,10 @@ class SplitFolderTree(QWidget):
         holder = item.treeWidget() if item is not None else None
         return next((side for side, tree in self._trees.items() if tree is holder), None)
 
+    def landing_on(self, item, mime, source):
+        side = self.side_of_item(item)
+        return self._trees[side].landing_on(item, mime, source) if side is not None else None
+
     # --- one selection across them all --------------------------------------
 
     def _on_current(self, side: str, current, previous) -> None:

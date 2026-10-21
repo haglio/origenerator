@@ -1127,7 +1127,7 @@ def test_images_and_videos_offer_on_their_menus_what_all_offers(qtbot, monkeypat
         _tree_menu(view, key)
         menus.append(labels)
 
-    assert menus == [["Favorite"]] * 3
+    assert menus == [["Copy name", "", "Favorite"]] * 3
 
 
 def test_the_delete_key_on_images_deletes_nothing(qtbot):
@@ -14085,7 +14085,7 @@ def _square_menu(view, key):
     gestures.right_click(square, square.rect().center())
 
 
-def test_a_folders_menu_offers_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):
+def test_a_folders_menu_offers_its_name_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -14094,7 +14094,42 @@ def test_a_folders_menu_offers_favorite_and_a_delete_kept_apart(qtbot, monkeypat
 
     # The separator is the point: the one entry that destroys anything sits below
     # it, away from the one that costs nothing.
-    assert labels == ["Favorite", "", "Delete folder…"]
+    assert labels == ["Copy name", "", "Favorite", "", "Delete folder…"]
+
+
+def test_copy_name_on_a_folder_copies_its_code(qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy name")
+
+    _tree_menu(view, cat)
+
+    code = gallery.folder_id(gallery.settings_folder_key(_image("i1", "a cat", 50, 1)))
+    assert QApplication.clipboard().text() == code
+
+
+def test_copy_name_on_a_folder_given_a_name_copies_that_name(qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    view._db.upsert_folder_meta(cat, custom_name="Moonlit set", favorite=False,
+                                level=None, ref_prompt_id=None)
+    view.refresh()
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy name")
+
+    _tree_menu(view, cat)
+
+    assert QApplication.clipboard().text() == "Moonlit set"
+
+
+def test_a_folder_squares_menu_copies_its_name_too(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    view._tree.setCurrentItem(view._tree_item_for(dog).parent())  # both, as squares
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy name")
+
+    _square_menu(view, dog)
+
+    assert QApplication.clipboard().text() == view._tree_item_for(dog).text(0)
 
 
 def test_a_workflows_menu_offers_no_delete(qtbot, monkeypatch):
@@ -14105,7 +14140,7 @@ def test_a_workflows_menu_offers_no_delete(qtbot, monkeypatch):
 
     _tree_menu(view, _key(_image_workflow(view._tree)))
 
-    assert labels == ["Favorite"]
+    assert labels == ["Copy name", "", "Favorite"]
 
 
 def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(
@@ -14181,7 +14216,7 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
 
 
-def test_the_menu_over_a_folder_of_your_own_offers_only_its_removal(
+def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
         qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat])
@@ -14192,7 +14227,19 @@ def test_the_menu_over_a_folder_of_your_own_offers_only_its_removal(
 
     # No star (a bookmark of a bookmark collection gathers nothing) and no delete —
     # removing one of these must never reach the generations it gathers.
-    assert labels == ["Remove folder…"]
+    assert labels == ["Copy name", "", "Remove folder…"]
+
+
+def test_copy_name_on_a_folder_of_your_own_copies_the_name_you_gave_it(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Keepers", [cat])
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy name")
+
+    _tree_menu(view, gallery.custom_folder_key(folder_id))
+
+    assert QApplication.clipboard().text() == "Keepers"
 
 
 def test_removing_a_folder_of_your_own_from_its_menu_keeps_what_it_gathered(
@@ -14269,6 +14316,19 @@ def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkey
     assert record["items"] == [cat, dog]  # both, not the one under the cursor
 
 
+def test_copying_the_names_of_picked_folders_puts_them_one_to_a_line(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy 2 names")
+
+    _tree_menu(view, dog)
+
+    codes = [gallery.folder_id(gallery.settings_folder_key(_image(pid, prompt, 50, 1)))
+             for pid, prompt in (("i1", "a cat"), ("i2", "a dog"))]
+    assert QApplication.clipboard().text() == "\n".join(codes)
+
+
 def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(
         qtbot, monkeypatch):
     # Otherwise a right-click on a folder the user did not pick would act on the
@@ -14281,7 +14341,7 @@ def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(
 
     _tree_menu(view, fish)
 
-    assert labels == ["Favorite", "", "Delete folder…"]
+    assert labels == ["Copy name", "", "Favorite", "", "Delete folder…"]
 
 
 # --- somebody else's queue on the shared ComfyUI ----------------------------

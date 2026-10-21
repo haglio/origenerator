@@ -3994,10 +3994,10 @@ class GalleryView(QWidget):
             self._new_custom_folder(side)
 
     def _selection_context_menu(self, global_pos: QPoint):
-        """The picked folders as a set: save them as a folder of your own."""
-        count = len(gallery.child_groups(self._selection_group))
+        picked = gallery.child_groups(self._selection_group)
         menu = QMenu(self)
-        group_action = menu.addAction(f"Group {count} folders into a new folder…")
+        _offer_copy_names_above_a_line(menu, [group.label for group in picked])
+        group_action = menu.addAction(f"Group {len(picked)} folders into a new folder…")
         if menu.exec(global_pos) == group_action:
             self._group_selection()
 
@@ -4009,6 +4009,7 @@ class GalleryView(QWidget):
             self._custom_folder_context_menu(group, global_pos)
             return
         menu = QMenu(self)
+        _offer_copy_names_above_a_line(menu, [group.label])
         favorite_action = menu.addAction("Unfavorite" if group.favorite else "Favorite")
         # Inside a folder the user made, an item tile can also be dropped from it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
@@ -4047,10 +4048,8 @@ class GalleryView(QWidget):
         return {submenu.addAction(folder.label): folder.key for folder in targets}
 
     def _custom_folder_context_menu(self, group, global_pos: QPoint):
-        """A folder the user made: remove the grouping. It has no star (a
-        bookmark of a bookmark collection gathers nothing) and no delete — removing
-        it must never touch the generations it gathers."""
         menu = QMenu(self)
+        _offer_copy_names_above_a_line(menu, [group.label])
         remove_action = menu.addAction("Remove folder…")
         if menu.exec(global_pos) == remove_action:
             self._remove_custom_folder(group)

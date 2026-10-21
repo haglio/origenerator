@@ -16,10 +16,10 @@ from voice_core.listener import (
     Engines,
     ListenerEvents,
     ListenerSettings,
+    engines_for,
 )
 from voice_core.listening import Heard
 from voice_core.listening_thread import ListeningThread
-from voice_core.whisper_reader import WhisperReader
 
 from origenerator import config
 from origenerator.voice.dictation import request_bias
@@ -54,14 +54,13 @@ class Hearing(QObject):
         self._thread.stop()
 
     def _listener(self) -> CommandListener:
+        events = ListenerEvents(heard=self._on_heard, speech=self._on_speech)
         return CommandListener(
             self._rules,
             ListenerSettings(model_name=config.VOICE_MODEL_NAME,
                              device_name=config.VOICE_DEVICE_NAME, speech_hint=request_bias()),
-            ListenerEvents(heard=self._on_heard, speech=self._on_speech),
-            self._engines or Engines(second_opinion=WhisperReader(),
-                                     take_down=WhisperReader(for_dictation=True),
-                                     second_opinion_in={"de": WhisperReader(language="de")}))
+            events,
+            self._engines or engines_for(self._rules, events))
 
     def _on_heard(self, heard: Heard) -> None:
         if heard.recognition.phrase:

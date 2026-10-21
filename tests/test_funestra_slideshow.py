@@ -1079,6 +1079,14 @@ def test_a_slideshow_picked_back_up_plays_what_is_being_made_before_where_it_lef
     assert "PLAY_FILE three.png" in _sent(slideshow)
 
 
+def test_a_slideshow_picked_back_up_on_a_locked_slide_stays_on_it(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhancing={"id-3": "running"}))
+
+    slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-2", locked=True))
+
+    assert slideshow.locked_on == "id-2"
+
+
 def _clocked_slideshow(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> FunestraSlideshow:
     slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
                            **fields)

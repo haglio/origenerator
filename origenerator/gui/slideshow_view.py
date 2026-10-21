@@ -680,9 +680,8 @@ class SlideshowView(QWidget):
         if self._live or not self._set.resume(state):
             return False
         self._playlist.set_locked(state.locked)
-        led = self._set.lead_with_what_is_being_made()
         self._show_current()
-        if state.level_index and not led:
+        if state.level_index and self._current_prompt_id() == state.current:
             # A fresh slide sits at its top version, so the remembered index is
             # exactly the number of steps down to the one that was on screen.
             self._step_level(state.level_index)

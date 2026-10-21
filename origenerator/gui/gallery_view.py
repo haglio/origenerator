@@ -98,6 +98,7 @@ from origenerator.gui.enhance_controller import EnhanceController, Offer
 from origenerator.gui.folder_path_header import FolderPathHeader
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
+from origenerator.gui.folder_tree import offer_collapse_and_expand
 from origenerator.gui.gallery_navigation import NavigationController
 from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_tree import (
@@ -4001,7 +4002,8 @@ class GalleryView(QWidget):
         if item.data(0, _GROUP_ROLE) is not None:
             # The row under the cursor, not the folder it draws: the same folder
             # on the other side is a different row with its own menu.
-            self._folder_context_menu(item.data(0, _TREE_KEY_ROLE), global_pos)
+            self._folder_context_menu(item.data(0, _TREE_KEY_ROLE), global_pos,
+                                      toc_rows=[item])
 
     def _empty_tree_context_menu(self, global_pos: QPoint, side: str):
         """Below the last row there is no folder to act on, so the only thing on
@@ -4016,10 +4018,14 @@ class GalleryView(QWidget):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, names)
         group_action = menu.addAction(f"Group {len(names)} folders into a new folder…")
-        if menu.exec(global_pos) == group_action:
+        collapse_and_expand = offer_collapse_and_expand(menu, self._tree.selectedItems())
+        chosen = menu.exec(global_pos)
+        if chosen == group_action:
             self._group_selection()
+        elif chosen in collapse_and_expand:
+            collapse_and_expand[chosen]()
 
-    def _folder_context_menu(self, key: str, global_pos: QPoint):
+    def _folder_context_menu(self, key: str, global_pos: QPoint, toc_rows=()):
         group = self.group_for_key(key)
         if group is None:
             return
@@ -4042,6 +4048,7 @@ class GalleryView(QWidget):
         if _is_deletable_folder(group):
             menu.addSeparator()
             delete_action = menu.addAction("Delete folder…")
+        collapse_and_expand = offer_collapse_and_expand(menu, toc_rows)
         chosen = menu.exec(global_pos)
         if chosen == favorite_action:
             self._toggle_favorite(key)
@@ -4051,6 +4058,8 @@ class GalleryView(QWidget):
             self._on_folders_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
             self._delete_folder(group)
+        elif chosen in collapse_and_expand:
+            collapse_and_expand[chosen]()
 
     def _add_to_folder_menu(self, menu: QMenu, key: str) -> dict:
         """An "Add to" sub-menu naming each of the user's folders — the menu route

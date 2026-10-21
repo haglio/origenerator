@@ -1144,7 +1144,7 @@ def test_images_and_videos_offer_on_their_menus_what_all_offers(qtbot, monkeypat
         _tree_menu(view, key)
         menus.append(labels)
 
-    assert menus == [["Copy name", "", "Favorite"]] * 3
+    assert menus == [["Copy name", "", "Favorite", "", "Collapse all", "Expand all"]] * 3
 
 
 def test_the_delete_key_on_images_deletes_nothing(qtbot):
@@ -14376,7 +14376,7 @@ def test_a_workflows_menu_offers_no_delete(qtbot, monkeypatch):
 
     _tree_menu(view, _key(_image_workflow(view._tree)))
 
-    assert labels == ["Copy name", "", "Favorite"]
+    assert "Delete folder…" not in labels
 
 
 def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(
@@ -14578,6 +14578,96 @@ def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(
     _tree_menu(view, fish)
 
     assert labels == ["Copy name", "", "Favorite", "", "Delete folder…"]
+
+
+def test_expand_all_opens_the_folder_and_every_folder_inside_it(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    _answer_menu(monkeypatch, "Expand all")
+
+    _tree_menu(view, _key(_image_workflow(view._tree)))
+
+    workflow = _image_workflow(view._tree)
+    model = _at(workflow, 0)
+    assert [workflow.isExpanded(), model.isExpanded(), _at(model, 0).isExpanded()] == [
+        True, True, True]
+
+
+def test_collapse_all_shuts_the_folder_and_every_folder_inside_it(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    model = _at(_image_workflow(view._tree), 0)
+    for row in (_image_workflow(view._tree), model, _at(model, 0)):
+        row.setExpanded(True)
+    _answer_menu(monkeypatch, "Collapse all")
+
+    _tree_menu(view, _key(_image_workflow(view._tree)))
+
+    workflow = _image_workflow(view._tree)
+    model = _at(workflow, 0)
+    assert [workflow.isExpanded(), model.isExpanded(), _at(model, 0).isExpanded()] == [
+        False, False, False]
+
+
+def test_collapse_all_and_expand_all_come_last_on_a_folders_menu(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, _key(_at(_image_workflow(view._tree), 0)))
+
+    assert labels == ["Copy name", "", "Favorite", "", "Delete folder…", "",
+                      "Collapse all", "Expand all"]
+
+
+def test_a_folder_squares_menu_offers_no_collapse_all_or_expand_all(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    model = _key(_at(_image_workflow(view._tree), 0))
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _square_menu(view, model)
+
+    assert labels == ["Copy name", "", "Favorite", "", "Delete folder…"]
+
+
+def _two_model_view(qtbot):
+    """A view whose image workflow holds two model folders, each with a folder
+    inside it, returned by key."""
+    rows = [_row(prompt_id, "sdxl_t2i",
+                 {"positive_prompt": "a cat", "steps": 50, "seed": 1, "checkpoint": checkpoint},
+                 f"sdxl_t2i_{prompt_id}.png")
+            for prompt_id, checkpoint in (("i1", "first.safetensors"),
+                                          ("i2", "second.safetensors"))]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    return view, *(_key(_at(_image_workflow(view._tree), n)) for n in (0, 1))
+
+
+def test_expand_all_opens_every_picked_folder_and_every_folder_inside_each(
+        qtbot, monkeypatch):
+    view, first, second = _two_model_view(qtbot)
+    _pick(view, first, second)
+    _answer_menu(monkeypatch, "Expand all")
+
+    _tree_menu(view, first)
+
+    models = [view._tree_item_for(key) for key in (first, second)]
+    assert [row.isExpanded() for model in models for row in (model, _at(model, 0))] == [
+        True] * 4
+
+
+def test_the_picked_folders_menu_offers_collapse_all_and_expand_all_last(
+        qtbot, monkeypatch):
+    view, first, second = _two_model_view(qtbot)
+    _pick(view, first, second)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, second)
+
+    assert labels == ["Copy 2 names", "", "Group 2 folders into a new folder…", "",
+                      "Collapse all", "Expand all"]
 
 
 # --- somebody else's queue on the shared ComfyUI ----------------------------

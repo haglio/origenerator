@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon
-from PyQt6.QtWidgets import QAbstractItemView, QStyledItemDelegate, QTreeWidget
+from PyQt6.QtWidgets import QAbstractItemView, QMenu, QStyledItemDelegate, QTreeWidget
 
 from origenerator.gui import icons
 
@@ -69,6 +69,21 @@ def _action_rects(content: QRect):
     star = QRect(content.left() - _PAD - _ICON, y, _ICON, _ICON)
     delete = QRect(star.left() - _PAD - _ICON, y, _ICON, _ICON)
     return star, delete
+
+
+def offer_collapse_and_expand(menu: QMenu, rows) -> dict:
+    if not any(row.childCount() for row in rows):
+        return {}
+    menu.addSeparator()
+    return {menu.addAction("Collapse all"): lambda: _expand_throughout(rows, False),
+            menu.addAction("Expand all"): lambda: _expand_throughout(rows, True)}
+
+
+def _expand_throughout(rows, expanded: bool) -> None:
+    for row in rows:
+        if row.childCount():
+            row.setExpanded(expanded)
+            _expand_throughout((row.child(i) for i in range(row.childCount())), expanded)
 
 
 def _mark_rect(content: QRect) -> QRect:

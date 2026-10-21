@@ -14,7 +14,7 @@ switch is on.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from types import SimpleNamespace
 
 from app_support.osr2_device import Osr2Mode
@@ -38,7 +38,7 @@ from funestra.drive_readout import (
 )
 from funestra.hud_button import Button
 from funestra.modes import MainMode, Osr2State
-from funestra.robot_hand import POSITION_MAX
+from funestra.robot_hand import POSITION_MAX, control_limits
 
 from origenerator import motion_engine
 from origenerator.console_commands import level_asked_for, max_intensity_asked_for
@@ -54,21 +54,6 @@ _TRACE_SECONDS = 12.0
 REPAINT_MS = 100
 
 
-def _limits(state) -> drive_layout.Limits:
-    """Which bars have run out of road — what dims the mark that would now do
-    nothing."""
-    bars = state.state
-    half = bars.amplitude // 2
-    return drive_layout.Limits(
-        spd_at_min=bars.speed <= motion_engine.MIN_SPEED,
-        spd_at_max=bars.speed >= motion_engine.MAX_SPEED,
-        amp_at_min=bars.amplitude <= 0,
-        amp_at_max=bars.amplitude >= 100,
-        ctr_at_min=bars.intended_center <= half,
-        ctr_at_max=bars.intended_center >= 100 - half,
-    )
-
-
 def drive_hud(state, active: bool) -> DriveHud:
     """The live motion as the readout's own view of it.
 
@@ -78,18 +63,12 @@ def drive_hud(state, active: bool) -> DriveHud:
     device is a picture of a motion nobody is making, and it goes gray exactly
     as Fun Time's does.
     """
-    bars = state.state
-    limits = _limits(state)
     heights, slide = motion_engine.trace_window(state, drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)
     return DriveHud(
-        speed=bars.speed, amplitude=bars.amplitude, center=bars.center,
-        shape=bars.shape.value,
+        **_bars_drawn(state.state),
         position=round(POSITION_MAX * motion_engine.position(state) / 100),
         driven=DRIVEN_BY_ROBOT_HAND if active else DRIVEN_BY_NOTHING,
         trace_seconds=_TRACE_SECONDS,
-        spd_at_min=limits.spd_at_min, spd_at_max=limits.spd_at_max,
-        amp_at_min=limits.amp_at_min, amp_at_max=limits.amp_at_max,
-        ctr_at_min=limits.ctr_at_min, ctr_at_max=limits.ctr_at_max,
         waveform=tuple(heights[:drive_layout.TRACE_SAMPLES]),
         slide=slide,
         edge=heights[drive_layout.TRACE_SAMPLES],
@@ -106,12 +85,16 @@ def script_hud(script, motion) -> DriveHud:
     while something other than the motion is sending.
     """
     heights = script.trace(drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)
-    bars = motion.state
     return DriveHud(
-        speed=bars.speed, amplitude=bars.amplitude, center=bars.center,
-        shape=bars.shape.value,
+        **_bars_drawn(motion.state),
         position=round(POSITION_MAX * (heights[0] if heights else 0.0)),
         driven=DRIVEN_BY_FUNSCRIPT, trace_seconds=_TRACE_SECONDS, waveform=heights)
+
+
+def _bars_drawn(bars) -> dict:
+    return dict(speed=bars.speed, amplitude=bars.amplitude, center=bars.center,
+                shape=bars.shape.value, max_intensity=bars.max_intensity,
+                **asdict(control_limits(bars)))
 
 
 def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,

@@ -61,12 +61,13 @@ class Database:
                           negative_prompt: str | None = None, seed: int | None = None,
                           params_json: str, workflow_json: str,
                           source: str = GenerationSource.GENERATED,
-                          provenance: str | None = None):
+                          provenance: str | None = None, shielded: bool = False):
         return self.generations.insert_generation(
             prompt_id=prompt_id, workflow_name=workflow_name,
             workflow_version=workflow_version, positive_prompt=positive_prompt,
             negative_prompt=negative_prompt, seed=seed, params_json=params_json,
-            workflow_json=workflow_json, source=source, provenance=provenance)
+            workflow_json=workflow_json, source=source, provenance=provenance,
+            shielded=shielded)
 
     def update_generation(self, prompt_id: str, **fields):
         return self.generations.update_generation(prompt_id, **fields)

@@ -1409,3 +1409,21 @@ def test_a_user_launch_leaves_a_shielded_experiment_running(qtbot, tmp_path):
 
     client.interrupt.assert_not_called()
     assert queue.has("exp-key")
+
+
+def test_a_shield_on_a_videos_start_frame_stays_on_the_video_made_from_it(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    image = _image_row()
+    db.restore_generation(image)
+    queue.start_reroll("k", gallery.SettingsGroup("k", "settings", [_video_row()]), [image])
+    frame = queue.newest_job_for("k")
+    queue.shield(frame.prompt_id, True)
+
+    frame.finished.emit([{"filename": "frame_002.png", "subfolder": "", "type": "output"}],
+                        None, 1.0)
+
+    video = queue.newest_job_for("k")
+    assert video is not frame and video.shielded
+    assert db.get_generation(video.prompt_id)["shielded"]

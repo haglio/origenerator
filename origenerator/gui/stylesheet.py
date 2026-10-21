@@ -404,7 +404,7 @@ def build_stylesheet() -> str:
     }}
     QLabel#dropSlot {{
         border: 1px dashed {_h(BORDER_PANEL)};
-        border-radius: 4px;
+        border-radius: {drop_style.RADIUS}px;
         color: {_h(TEXT_MUTED)};
         padding: 8px;
     }}

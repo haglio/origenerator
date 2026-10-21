@@ -1075,6 +1075,15 @@ def test_clearing_another_apps_work_goes_back_to_the_gallery(qtbot):
     assert cleared == [True]
 
 
+def test_start_now_goes_back_to_the_gallery(qtbot):
+    started = []
+    view = _view(qtbot, actions=SlideshowActions(start_now=lambda: started.append(True)))
+
+    view.start_now()
+
+    assert started == [True]
+
+
 # --- locking also stars, and a double-click leaves ---------------------------
 
 def test_locking_favorites_the_item_on_screen(qtbot):

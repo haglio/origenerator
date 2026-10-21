@@ -239,6 +239,16 @@ def discard_run_tooltip(auto_generating: bool) -> str:
             else "Cancel this generation")
 
 
+START_NOW_TEXT = "Start now"
+START_NOW_TOOLTIP = "Start the video now instead of a minute after your last picture"
+CLEAR_TEXT = "Clear"
+
+
+def clear_queue_tooltip(foreign: int) -> str:
+    return (f"Drop the {foreign} job{'' if foreign == 1 else 's'} another app has"
+            " queued on ComfyUI")
+
+
 def stop_loop_text() -> str:
     """The menu entry that ends an auto-generate loop and the run inside it.
 
@@ -264,19 +274,22 @@ def queue_wait_text(foreign_ahead: int | None, starts_at: float | None = None, *
                     now=time.monotonic) -> str | None:
     """How a job's wait reads while another app's work is ahead of it on ComfyUI,
     or while it is a video waiting out the minute after a picture
-    (:meth:`JobQueue.starts_at`, on the queue's clock).
-
-    A wait on the user's own jobs earns no line: ComfyUI is working through
-    exactly what they asked for, and "waiting in ComfyUI" there sends them
-    hunting for phantom jobs that are their own. ``None`` is every surface's
-    cue to say what it always said.
+    (:meth:`JobQueue.starts_at`, on the queue's clock). A wait on the user's own
+    jobs earns no line: "waiting in ComfyUI" would send them hunting for phantom
+    jobs that are their own. ``None`` is every surface's cue to say what it always said.
     """
     if foreign_ahead:
         return (f"Waiting on {foreign_ahead} job{'' if foreign_ahead == 1 else 's'}"
                 " from another app")
-    if starts_at is not None and (left := starts_at - now()) > 0:
+    if (left := seconds_until_start(starts_at, now=now)) is not None:
         return f"Starts in {clock_duration(math.ceil(left))}"
     return None
+
+
+def seconds_until_start(starts_at: float | None, *, now=time.monotonic) -> float | None:
+    if starts_at is None or (left := starts_at - now()) <= 0:
+        return None
+    return left
 
 
 def starting_row_text(starting: bool) -> str | None:

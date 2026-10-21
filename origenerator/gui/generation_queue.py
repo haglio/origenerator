@@ -49,6 +49,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QMimeData, QPoint, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPainter, QPen, QPixmap, QPolygon
 from PyQt6.QtWidgets import (
+    QWIDGETSIZE_MAX,
     QApplication,
     QFrame,
     QHBoxLayout,
@@ -67,8 +68,12 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.inflight import (
+    CLEAR_TEXT,
     SHIELD_TIP,
+    START_NOW_TEXT,
+    START_NOW_TOOLTIP,
     TICK_MS,
+    clear_queue_tooltip,
     discard_run_text,
     discard_run_tooltip,
     first_movable,
@@ -76,6 +81,7 @@ from origenerator.gui.inflight import (
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
+    seconds_until_start,
     starting_row_text,
 )
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
@@ -170,6 +176,8 @@ class RunningPreview(OpensAFolder, QWidget):
     something to click through to a folder.
     """
 
+    start_now_requested = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.key = None
@@ -208,11 +216,22 @@ class RunningPreview(OpensAFolder, QWidget):
         # ours that a bar could be measuring. It wraps rather than eliding: the
         # width here is the bar's, chosen for a line of readings that is shorter
         # than a sentence, and a truncated explanation explains nothing.
+        self._under_the_bar = QWidget()
+        self._under_the_bar.setMinimumWidth(_BAR_WIDTH)
+        under_the_bar = QHBoxLayout(self._under_the_bar)
+        under_the_bar.setContentsMargins(0, 0, 0, 0)
+        under_the_bar.setSpacing(_HALVES_GAP)
         self._caption = QLabel()
         self._caption.setObjectName("estimateLabel")  # muted secondary text
         self._caption.setWordWrap(True)
-        self._caption.setFixedWidth(_BAR_WIDTH)  # a long line wraps, not widens
-        column.addWidget(self._caption)
+        under_the_bar.addWidget(self._caption, 1)
+        self._start_now = QPushButton(START_NOW_TEXT)
+        self._start_now.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._start_now.setToolTip(START_NOW_TOOLTIP)
+        self._start_now.clicked.connect(self.start_now_requested)
+        under_the_bar.addWidget(self._start_now)
+        under_the_bar.addStretch(0)
+        column.addWidget(self._under_the_bar)
         column.addStretch(1)
         layout.addLayout(column)
 
@@ -234,7 +253,7 @@ class RunningPreview(OpensAFolder, QWidget):
         space its bar has stood down from.
         """
         self._caption.setText(text)
-        self._caption.setVisible(bool(text) or self._item is None)
+        self._under_the_bar.setVisible(bool(text) or self._item is None)
 
     def status_text(self) -> str:
         """What this half is saying about the head of the line, as one string:
@@ -265,7 +284,8 @@ class RunningPreview(OpensAFolder, QWidget):
             self._frame.unsetCursor()  # nothing to go to, so nothing to invite a click
             self._render_frame(None)
             self._progress.hide()
-            self._caption.show()
+            self._under_the_bar.show()
+            self._offer_start_now(False)
             self._tick.stop()
             return
         # The hand rides on the frame rather than on the half, so it appears over
@@ -292,10 +312,19 @@ class RunningPreview(OpensAFolder, QWidget):
         # Under the bar, whatever holds the job up that the bar cannot say for
         # itself, and the reason it sweeps rather than fills.
         self.show_foreign(queue_wait_text(self._item.foreign_ahead, self._item.starts_at) or "")
+        self._offer_start_now(seconds_until_start(self._item.starts_at) is not None)
         self._progress.show_progress(
             self._item.reading.caption(),
             *self._item.reading.bars(),
         )
+
+    def _offer_start_now(self, offered: bool) -> None:
+        line = self._under_the_bar.layout()
+        line.setStretchFactor(self._caption, 0 if offered else 1)
+        line.setStretch(line.count() - 1, 1 if offered else 0)
+        self._caption.setWordWrap(not offered)
+        self._under_the_bar.setMaximumWidth(QWIDGETSIZE_MAX if offered else _BAR_WIDTH)
+        self._start_now.setVisible(offered)
 
     def _render_frame(self, item):
         """What is being made, or — until ComfyUI has streamed a frame of it —
@@ -555,6 +584,7 @@ class GenerationQueue(QWidget):
 
     reorder_requested = pyqtSignal(list)  # prompt ids, in the order they were dropped into
     clear_queue_requested = pyqtSignal()  # wipe another app's work off ComfyUI
+    start_now_requested = pyqtSignal()  # end the minute a video waits after a picture
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -578,10 +608,11 @@ class GenerationQueue(QWidget):
         layout.setSpacing(_HALVES_GAP)
         outer.addLayout(layout, 1)
         self._running = RunningPreview()
+        self._running.start_now_requested.connect(self.start_now_requested)
         layout.addWidget(self._running)
         # Only ever offered for another app's work — the user's own queue is what
         # he asked for, and every row of it carries its own Cancel already.
-        self._clear = QPushButton("Clear")
+        self._clear = QPushButton(CLEAR_TEXT)
         self._clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self._clear.clicked.connect(self.clear_queue_requested)
         self._clear.hide()
@@ -659,10 +690,7 @@ class GenerationQueue(QWidget):
         leader = items[0] if items else None
         self._running.show_item(leader)
         self._clear.setVisible(bool(foreign_queued))
-        self._clear.setToolTip(
-            f"Drop the {foreign_queued} job{'' if foreign_queued == 1 else 's'}"
-            " another app has queued on ComfyUI"
-        )
+        self._clear.setToolTip(clear_queue_tooltip(foreign_queued))
         free_half = ""
         if leader is None:
             free_half = foreign_queue_text(foreign_queued) or ""

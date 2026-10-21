@@ -38,7 +38,11 @@ from shared_ui.palette import (
 )
 
 from origenerator.gui.inflight import (
+    CLEAR_TEXT,
     SHIELD_TIP,
+    START_NOW_TEXT,
+    START_NOW_TOOLTIP,
+    clear_queue_tooltip,
     discard_run_text,
     discard_run_tooltip,
     first_movable,
@@ -46,22 +50,23 @@ from origenerator.gui.inflight import (
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
+    seconds_until_start,
     starting_row_text,
 )
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 # What a press on this block posts, and what the slideshow does with each: shield the
-# job or throw it away, go to the folder it will land in, drop another app's work.
+# job or throw it away, go to its folder, drop another app's work, start a video now.
 SHIELD = "queue_shield"
 CANCEL = "queue_cancel"
 OPEN = "queue_open"
 CLEAR = "queue_clear"
+START_NOW = "queue_start_now"
 # The head's picture goes where its row goes, and says so under its own verb:
 # it is a picture of the job being made, not a row that can be dragged anywhere.
 FRAME = "queue_frame"
 
-CLEAR_WORD = "Clear"
 FRAME_TOOLTIP = "Open the folder this run will land in"
 
 # How many rows the block draws at once. The strip opens about this tall in the
@@ -157,6 +162,7 @@ class Leader:
     progress: tuple[int, int] | None
     pass_progress: tuple[int, int] | None
     wait: str
+    start_now: bool = False
 
 
 @dataclass(frozen=True)
@@ -205,12 +211,15 @@ class QueueSection:
         if self.leader is None:
             if not self.foreign:
                 return 0, 0
-            width = text_width(_tiny(), self.idle_note) + _GAP + _word_width(CLEAR_WORD)
+            width = text_width(_tiny(), self.idle_note) + _GAP + _word_width(CLEAR_TEXT)
             return width, max(_line_height(), CTRL_BTN)
         bar = text_width(_tiny(), self.leader.caption) + 2 * _BAR_PAD
-        column = max(bar, text_width(_tiny(), self.leader.wait))
+        under_the_bar = text_width(_tiny(), self.leader.wait)
+        if self.leader.start_now:
+            under_the_bar += _GAP + _word_width(START_NOW_TEXT)
+        column = max(bar, under_the_bar)
         if self.foreign:
-            column += _GAP + _word_width(CLEAR_WORD)
+            column += _GAP + _word_width(CLEAR_TEXT)
         return _FRAME + _GAP + column, _FRAME
 
     def _row_width(self, line: JobLine) -> int:
@@ -254,27 +263,32 @@ class QueueSection:
             column = x + frame_width + _GAP
             room = max(0, x + width - column)
         if self.foreign:
-            room = max(0, room - _GAP - self._paint_clear(image, draw, x + width, y,
-                                                          pointer, targets))
+            room = max(0, room - _GAP - self._paint_word(
+                image, draw, column + room, y, pointer, targets,
+                Button(CLEAR, CLEAR_TEXT, clear_queue_tooltip(self.foreign))))
         if self.leader is not None:
             self._paint_bar(draw, column, y, room)
             if self.leader.wait:
-                self._say(draw, column, y + _BAR_H + BLOCK_GAP + _line_height() / 2,
-                          room, self.leader.wait)
+                middle = y + _BAR_H + BLOCK_GAP + _line_height() / 2
+                said = self._say(draw, column, middle, room, self.leader.wait)
+                if self.leader.start_now:
+                    word = _word_width(START_NOW_TEXT)
+                    self._paint_word(image, draw, column + said + _GAP + word,
+                                     round(middle - CTRL_BTN / 2), pointer, targets,
+                                     Button(START_NOW, START_NOW_TEXT, START_NOW_TOOLTIP))
             return
         if self.idle_note:
             self._say(draw, column, y + CTRL_BTN / 2, room, self.idle_note)
 
-    def _paint_clear(self, image, draw, right, y, pointer, targets) -> int:
-        word = _word_width(CLEAR_WORD)
-        _paint_button(image, draw, (right - word, y, word, CTRL_BTN),
-                      Button(CLEAR, CLEAR_WORD, _clear_tooltip(self.foreign)),
-                      pointer, targets)
+    def _paint_word(self, image, draw, right, y, pointer, targets, button) -> int:
+        word = _word_width(button.glyph)
+        _paint_button(image, draw, (right - word, y, word, CTRL_BTN), button, pointer, targets)
         return word
 
-    def _say(self, draw, x, y, room, text) -> None:
-        draw.text((x, y), fit_text(_tiny(), text, room), font=_tiny(),
-                  anchor="lm", fill=(*TEXT_MUTED, 255))
+    def _say(self, draw, x, y, room, text) -> int:
+        fitted = fit_text(_tiny(), text, room)
+        draw.text((x, y), fitted, font=_tiny(), anchor="lm", fill=(*TEXT_MUTED, 255))
+        return text_width(_tiny(), fitted)
 
     def _paint_bar(self, draw, x, y, width) -> None:
         """The clock, written across the bar it measures — the reading
@@ -368,11 +382,6 @@ def _paint_button(image, draw, rect, button, pointer, targets) -> None:
     draw_button(image, draw, rect, button, hovered=_on(rect, pointer),
                 glyph_font=_glyphs(), word_font=_tiny())
     targets.append((rect, button))
-
-
-def _clear_tooltip(foreign: int) -> str:
-    return (f"Drop the {foreign} job{'' if foreign == 1 else 's'} another app has"
-            " queued on ComfyUI")
 
 
 def _fraction(progress) -> float | None:
@@ -517,6 +526,7 @@ def _leader(item) -> Leader:
         progress=item.reading.bars()[0],
         pass_progress=item.reading.bars()[1],
         wait=queue_wait_text(item.foreign_ahead, item.starts_at) or "",
+        start_now=seconds_until_start(item.starts_at) is not None,
     )
 
 
@@ -584,6 +594,8 @@ class QueuePointer:
                 item.cancel()
         elif verb == CLEAR:
             self._host.clear_foreign_queue()
+        elif verb == START_NOW:
+            self._host.start_now()
 
     def drag(self, px: int, py: int) -> None:
         """A press on a row that travels is a drag, and the block marks where it

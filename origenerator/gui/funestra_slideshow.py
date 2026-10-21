@@ -805,6 +805,9 @@ class FunestraSlideshow(QObject):
     def clear_foreign_queue(self) -> None:
         """Nor a Clear to press."""
 
+    def start_now(self) -> None:
+        """Nor a Start now."""
+
     def osr2_drive_target(self):
         """What the one device switch would follow here.  Nothing: inside a
         session the OSR2 is the Main Funestra's alone, and the clip is the

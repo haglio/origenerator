@@ -9364,6 +9364,24 @@ def test_a_run_waiting_out_the_minute_after_a_picture_says_when_it_starts(
     assert _preview_of(view).show_message.call_args.args[0] == "Starts in 0:43"
 
 
+def test_start_now_on_the_job_queue_starts_the_video_waiting_out_the_minute(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, picture = _running_reroll(view)  # a picture asked for: videos wait a minute
+    view._jobs.start_prepared("video/k", _WAN_I2V, dict(_WAN_I2V.default_params(), seed=3))
+    video = view._jobs.newest_job_for("video/k")
+    view._jobs.cancel_job(picture.prompt_id)
+    view._update_queue()
+    assert view._queue._running.status_text().startswith("Starts in")
+
+    view._queue._running._start_now.click()
+
+    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
+    assert not view._queue._running.status_text().startswith("Starts in")
+
+
 def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
     # Once ComfyUI is rendering it, the frame is the answer — don't paint over it.
     view, client = _waiting_view(qtbot, tmp_path, backlog=3)

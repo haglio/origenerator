@@ -14,12 +14,14 @@ from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import (
     InFlightItem,
     RunReading,
+    clear_queue_tooltip,
     discard_run_text,
     discard_run_tooltip,
     foreign_queue_text,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
+    seconds_until_start,
     starting_row_text,
     stop_loop_text,
     stop_loop_tooltip,
@@ -159,6 +161,17 @@ def test_a_video_waiting_out_the_minute_after_a_picture_counts_down_to_its_start
 
 def test_a_start_already_due_says_nothing_rather_than_count_past_it():
     assert queue_wait_text(None, starts_at=1000.0, now=lambda: 1000.5) is None
+
+
+def test_clear_says_how_many_of_another_apps_jobs_it_drops():
+    assert clear_queue_tooltip(1) == "Drop the 1 job another app has queued on ComfyUI"
+    assert clear_queue_tooltip(3) == "Drop the 3 jobs another app has queued on ComfyUI"
+
+
+def test_a_start_still_to_come_is_counted_down_and_one_already_due_is_not():
+    assert seconds_until_start(1042.0, now=lambda: 1000.0) == 42.0
+    assert seconds_until_start(1000.0, now=lambda: 1000.5) is None
+    assert seconds_until_start(None) is None
 
 
 def test_a_row_that_is_not_a_job_yet_says_it_is_not_in_the_line():

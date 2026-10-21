@@ -9985,6 +9985,24 @@ def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
     view._select_reroll.assert_called_once_with(folder)  # ...and its live card
 
 
+def test_clicking_an_enhancements_row_in_the_queue_goes_to_its_image(qtbot, tmp_path):
+    # An enhancement lands on the image it improves, never in a folder of its
+    # own, so a click on its row that looked for its folder opened nothing.
+    view = GalleryView(_enhanceable_db(tmp_path, count=2), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view.enhance_items(["g1"])
+    view._tree.setCurrentItem(_image_workflow(view._tree))  # browse away from it
+    view._update_queue()
+    (row,) = view._queue.rows()
+
+    qtbot.mouseClick(row, Qt.MouseButton.LeftButton)
+
+    assert view.selected_prompt_ids() == ["g1"]
+    assert view._browser._thumb_widgets["g1"].is_selected()
+    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == "g1"
+
+
 def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     # What the running half counts down from: the live job's own start time and
     # the median of what this workflow's finished runs actually took.

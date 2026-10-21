@@ -85,7 +85,8 @@ class FakeTree:
 @pytest.fixture
 def build():
     def make(rows=(), *, requests=(), jobs_by_folder=None, order=(),
-             looping=(), image_rows=(), groups=None, cancelled=None, revealed=None):
+             looping=(), image_rows=(), groups=None, cancelled=None, revealed=None,
+             went_to=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
             jobs=FakeJobQueue(jobs_by_folder, order),
@@ -94,6 +95,7 @@ def build():
             image_rows=lambda: list(image_rows),
             on_cancel=(cancelled if cancelled is not None else lambda _p: None),
             on_reveal=(revealed if revealed is not None else lambda _k: None),
+            on_go_to_item=(went_to if went_to is not None else lambda _p: None),
         )
         return model.build()
     return make
@@ -189,6 +191,17 @@ def test_a_cards_cancel_and_reveal_are_the_callers_own(build):
     items[0].cancel()
     items[0].reveal()
     assert (cancelled, revealed) == (["g1"], [key])
+
+
+def test_an_enhancements_card_goes_nowhere_once_its_image_is_gone(build):
+    went_to, revealed = [], []
+    enhancement = _row("e1", workflow="image_enhance", enhance_of="deleted",
+                       params={"input_image": "sdxl_t2i_deleted.png [output]"})
+    items = build([enhancement], went_to=went_to.append, revealed=revealed.append)
+
+    items[0].reveal()
+
+    assert (went_to, revealed) == ([], [])
 
 
 def test_a_run_asked_for_of_a_picture_stands_under_that_picture(build):

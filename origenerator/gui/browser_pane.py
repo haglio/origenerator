@@ -346,6 +346,7 @@ class BrowserPane(QObject):
             image_rows=host.image_rows,
             on_cancel=self.cancel_requested.emit,
             on_reveal=self.reveal_reroll_requested.emit,
+            on_go_to_item=self.item_jump_requested.emit,
         )
         # What each collection gathers and how it draws that, bound rather than
         # named: a renamed renderer is an AttributeError at construction instead

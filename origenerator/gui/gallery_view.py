@@ -202,6 +202,16 @@ class _SearchScope(NamedTuple):
     ids: set[str] | None
 
 
+def _kept_on_removal(custom) -> str:
+    folders, items = len(gallery.child_groups(custom)), len(custom.rows)
+    if not items:
+        return f"The {folders} folder{'s' if folders != 1 else ''} it holds, and their items, are kept."
+    held = f"{items} item{'s' if items != 1 else ''}"
+    if folders:
+        held = f"{folders} folder{'s' if folders != 1 else ''} and {held}"
+    return f"The {held} it holds are kept."
+
+
 def _takes_a_favorite(group) -> bool:
     return group is not None and not isinstance(group, gallery.CustomGroup)
 
@@ -672,7 +682,7 @@ class GalleryView(QWidget):
         # One tree per side, each under a standing label and each scrolling on
         # its own: the table of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
-        self._tree = SplitFolderTree(_GROUP_ROLE)  # its rows offer star/delete themselves
+        self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_folder_takes)
         self._tree.offer_separate_and_together(self._fun_time is None)
         self._tree.sides_changed.connect(self._on_sides_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
@@ -684,7 +694,7 @@ class GalleryView(QWidget):
         self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
         self._tree.favorite_clicked.connect(self._toggle_favorite)          # hover-row action
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
-        self._tree.folders_dropped.connect(self._on_folders_dropped)
+        self._tree.dropped.connect(self._on_dropped)
         # What voice heard, the search field over the folder list, and the
         # combine panel: three sections under handles of their own, the same
         # handle the folder list's own sections are parted by — so the sections
@@ -2186,9 +2196,10 @@ class GalleryView(QWidget):
         if item is not None:
             self._tree.setCurrentItem(item)
 
-    def _on_folders_dropped(self, target_key: str, keys: list):
-        """Folders dragged onto a collecting row: Favorites favorites them (the drag-and-
-        drop way to bookmark), a custom folder gathers them."""
+    def _on_dropped(self, target_key: str, keys: list, prompt_ids: list = ()):
+        """Folders or an item dragged onto a collecting row: Favorites favorites the
+        folders (the drag-and-drop way to bookmark), a custom folder gathers them
+        and takes the item."""
         groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
         if target_key == _FAVORITES_KEY:
             for group in groups:
@@ -2200,9 +2211,17 @@ class GalleryView(QWidget):
         if folder_id is None:
             return
         self._actions.custom_folders.add_to(
-            folder_id, [self._folder_identity(g) for g in groups]
+            folder_id, [self._folder_identity(g) for g in groups], prompt_ids
         )
         self._open_custom_folder(folder_id)
+
+    def _custom_folder_takes(self, row_key: str, prompt_id: str) -> bool:
+        """Whether the TOC row ``row_key`` is a folder of your own that an item
+        dragged over it can go in: one the gallery shows, on the row's own side."""
+        folder = self.group_for_key(row_key)
+        leaf = self._leaf_by_id.get(prompt_id)
+        return (isinstance(folder, gallery.CustomGroup) and leaf is not None
+                and _side_of(leaf.data(0, _TREE_KEY_ROLE)) == _side_of(row_key))
 
     def _new_custom_folder(self, side: str):
         """Make an empty folder of the user's own — the tree's right-click action,
@@ -2213,15 +2232,10 @@ class GalleryView(QWidget):
                 self._actions.custom_folders.create(name.strip(), [], side))
 
     def _remove_custom_folder(self, group):
-        """Delete a folder the user made. Only the grouping goes — its gathered
-        folders and their generations are untouched — so the confirmation says so
-        rather than reading like the delete that trashes files."""
-        count = len(gallery.child_groups(group))
-        plural = "s" if count != 1 else ""
-        if not self._confirm(
-            f"Remove the folder “{group.label}”?\n\n"
-            f"The {count} folder{plural} it holds, and their items, are kept."
-        ):
+        """Delete a folder the user made. Only the grouping goes — what it gathers
+        is untouched — so the confirmation says so rather than reading like the
+        delete that trashes files."""
+        if not self._confirm(f"Remove the folder “{group.label}”?\n\n{_kept_on_removal(group)}"):
             return
         self._actions.custom_folders.delete(group.folder_id)
         self._tree.clearSelection()
@@ -4080,7 +4094,7 @@ class GalleryView(QWidget):
         elif remove_action is not None and chosen == remove_action:
             self._remove_from_custom_folder(open_custom, group.key)
         elif chosen in add_menu:
-            self._on_folders_dropped(add_menu[chosen], [key])
+            self._on_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
             self._delete_folders([group])
         elif chosen in collapse_and_expand:

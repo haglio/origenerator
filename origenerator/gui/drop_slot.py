@@ -20,7 +20,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from origenerator.gui.generation_drag import GENERATION_MIME
+from origenerator.gui.generation_drag import dragged_generation
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
@@ -40,9 +40,9 @@ class DropZone(QWidget):
         return tuple(slot for slot in self._slots if not slot.isHidden())
 
     def _landing(self, mime) -> dict[DropSlot, str]:
-        if not mime.hasFormat(GENERATION_MIME):
+        dropped = dragged_generation(mime)
+        if dropped is None:
             return {}
-        dropped = bytes(mime.data(GENERATION_MIME)).decode("utf-8")
         lent = {slot: slot.lent_by(dropped) for slot in self.reaches()}
         return {slot: held for slot, held in lent.items() if held is not None}
 

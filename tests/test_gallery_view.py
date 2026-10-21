@@ -23,13 +23,14 @@ from PyQt6.QtCore import (
     QMargins,
     QObject,
     QPoint,
+    QPointF,
     QRect,
     QSize,
     Qt,
     QTimer,
     pyqtSignal,
 )
-from PyQt6.QtGui import QDrag, QKeyEvent, QMovie
+from PyQt6.QtGui import QDrag, QDragMoveEvent, QDropEvent, QKeyEvent, QMovie
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -101,6 +102,7 @@ from origenerator.gui.folder_tree import RECENT_ROLE, _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generating_tile import GeneratingTile
+from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.job_queue import JobQueue
@@ -14276,17 +14278,69 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat])
 
-    view._on_folders_dropped(gallery.custom_folder_key(folder_id), [dog])
+    view._on_dropped(gallery.custom_folder_key(folder_id), [dog])
 
     (record,) = view._db.list_custom_folders()
     assert record["folders"] == [cat, dog]
     assert view._browser._visible_keys == [cat, dog]  # landed on it
 
 
+def _drop_on(row, mime) -> bool:
+    """Drag ``mime`` over a TOC row and let it go there, as a drag from anywhere
+    in the window ends; whether the row took it. The caller holds ``mime``: a
+    synthetic drop event does not own it."""
+    tree = row.treeWidget()
+    spot = QPointF(tree.visualRect(tree.indexFromItem(row)).center())
+    move = QDragMoveEvent(spot.toPoint(), Qt.DropAction.CopyAction, mime,
+                          Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    tree.dragMoveEvent(move)
+    tree.dropEvent(QDropEvent(spot, Qt.DropAction.CopyAction, mime,
+                              Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+    return move.isAccepted()
+
+
+def test_an_item_dropped_on_a_custom_folders_row_goes_in_and_the_folder_opens(qtbot):
+    view, _cat, dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Mine", [dog])
+    view.show()
+    qtbot.waitExposed(view)
+    mime = generation_mime("i1")
+
+    assert _drop_on(_top_level(view._tree)["Mine"], mime)
+
+    (record,) = view._db.list_custom_folders()
+    assert record["items"] == ["i1"]
+    assert view.current_group().key == gallery.custom_folder_key(folder_id)
+
+
+def test_a_folder_of_your_own_refuses_an_item_of_the_other_shape(qtbot):
+    # The same rule a folder dragged out of the other half meets.
+    view, _cat, _dog = _two_leaf_view(qtbot, extra=[_tall("t1", "a fish")])
+    _make_folder(view, "Mine", [])
+    view.show()
+    qtbot.waitExposed(view)
+    mime = generation_mime("t1")
+
+    assert not _drop_on(_top_level(view._tree)["Mine"], mime)
+    assert view._db.list_custom_folders()[0]["items"] == []
+
+
+def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
+    # One in the Trash, or still being made: it would land and never be seen.
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Mine", [])
+    view.show()
+    qtbot.waitExposed(view)
+    mime = generation_mime("not-in-any-folder")
+
+    assert not _drop_on(_top_level(view._tree)["Mine"], mime)
+    assert view._db.list_custom_folders()[0]["items"] == []
+
+
 def test_dropping_a_folder_onto_favorite_favorites_it(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
 
-    view._on_folders_dropped(FAVORITES_KEY, [cat])
+    view._on_dropped(FAVORITES_KEY, [cat])
 
     assert view._db.folder_meta_map()[cat]["starred"] is True
 
@@ -14295,7 +14349,7 @@ def test_dropping_a_favorite_folder_onto_favorites_leaves_it_a_favorite(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     view._toggle_favorite(cat)
 
-    view._on_folders_dropped(FAVORITES_KEY, [cat])
+    view._on_dropped(FAVORITES_KEY, [cat])
 
     assert view._db.folder_meta_map()[cat]["starred"] is True
 
@@ -14304,7 +14358,7 @@ def test_a_folder_the_user_made_dropped_onto_favorites_takes_no_favorite(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
 
-    view._on_folders_dropped(FAVORITES_KEY, [made])
+    view._on_dropped(FAVORITES_KEY, [made])
 
     assert made not in view._db.folder_meta_map()
 
@@ -14315,7 +14369,7 @@ def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     row = view._tree_item_for(cat)
 
-    view._on_folders_dropped(FAVORITES_KEY, [cat])
+    view._on_dropped(FAVORITES_KEY, [cat])
 
     assert view._tree_item_for(cat) is row
     assert row.data(0, _GROUP_ROLE).favorite
@@ -14327,7 +14381,7 @@ def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [])
 
-    view._on_folders_dropped(gallery.custom_folder_key(folder_id), [cat])
+    view._on_dropped(gallery.custom_folder_key(folder_id), [cat])
 
     (held,) = view._db.folders_in_custom_folders()
     assert (held["level"], held["ref_prompt_id"]) == ("settings", "i1")
@@ -14355,6 +14409,39 @@ def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
     assert view._db.list_custom_folders() == []
     assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
     assert "Keepers" not in _top_level(view._tree)
+
+
+def test_removing_a_folder_of_your_own_says_the_items_it_holds_are_kept(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Keepers", [cat])
+    view._db.add_items_to_custom_folder(folder_id, ["i2"])
+    view.refresh()
+    asked = []
+    view._confirm = lambda text: asked.append(text) and False
+
+    view._remove_custom_folder(view.group_for_key(gallery.custom_folder_key(folder_id)))
+
+    assert asked == ["Remove the folder “Keepers”?\n\n"
+                     "The 1 folder and 1 item it holds are kept."]
+
+
+def test_a_folder_of_your_own_says_folders_and_items_can_be_dropped_on_it(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Keepers", [cat])
+
+    assert _top_level(view._tree)["Keepers"].toolTip(0).endswith(
+        "drop folders or items here to add them")
+
+
+def test_an_empty_folder_of_your_own_says_items_can_be_dragged_onto_it(qtbot):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Keepers", [])
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])
+
+    assert view._scroll.widget().text() == (
+        "“Keepers” is empty.\n\nDrag folders from the list, or items, onto it, "
+        "or pick several folders with Shift/Ctrl and group them.")
 
 
 def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):

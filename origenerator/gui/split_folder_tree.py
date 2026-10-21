@@ -119,11 +119,13 @@ class SplitFolderTree(QWidget):
     itemSelectionChanged = pyqtSignal()
     favorite_clicked = pyqtSignal(object)      # folder key
     delete_clicked = pyqtSignal(object)    # folder key
-    folders_dropped = pyqtSignal(str, list)  # collecting row's key, dropped tree keys
+    dropped = pyqtSignal(str, list, list)  # collecting row's key, folder tree keys, prompt ids
     context_menu_requested = pyqtSignal(object, object, str)
 
-    def __init__(self, group_role, parent=None):
+    def __init__(self, group_role, takes_item=lambda _row_key, _prompt_id: False,
+                 parent=None):
         super().__init__(parent)
+        self._takes_item = takes_item
         self._trees: dict[str, FolderTree] = {}
         self._sections: dict[str, QWidget] = {}   # each tree under its heading
         self._sides = SEPARATE
@@ -209,7 +211,7 @@ class SplitFolderTree(QWidget):
         column.addWidget(_rule())
         column.addSpacing(2)
 
-        tree = FolderTree(group_role)
+        tree = FolderTree(group_role, takes_item=self._takes_item)
         tree.setHeaderHidden(True)
         tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         tree.setMinimumHeight(_MIN_SECTION_HEIGHT)
@@ -220,7 +222,7 @@ class SplitFolderTree(QWidget):
         tree.itemSelectionChanged.connect(self.itemSelectionChanged)
         tree.favorite_clicked.connect(self.favorite_clicked)
         tree.delete_clicked.connect(self.delete_clicked)
-        tree.folders_dropped.connect(self.folders_dropped)
+        tree.dropped.connect(self.dropped)
         column.addWidget(tree, 1)
 
         self._trees[side] = tree

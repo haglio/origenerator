@@ -1,8 +1,11 @@
 """Train a fix's LoRA from photos of its part, for Origenerator -- run by path,
-never imported by the app, one step at a time under the Python that can run it:
+never imported by the app, each step under the Python that can run it:
 
+    python fix_lora_trainer.py run job.json     # the one kohya's sd-scripts is installed in
     python fix_lora_trainer.py crop job.json    # ComfyUI's, which reads every detector a fix uses
-    python fix_lora_trainer.py train job.json   # the one kohya's sd-scripts is installed in
+
+``run`` is the whole training, and crops by starting ``crop`` under ComfyUI's
+Python, so the training is one program that goes on if the app closes.
 
 Only the plain functions are imported by the app's tests; everything heavy is
 imported inside the step that needs it, so this file loads anywhere.
@@ -11,6 +14,7 @@ imported inside the step that needs it, so this file loads anywhere.
 from __future__ import annotations
 
 import math
+import subprocess
 import sys
 
 # How many times the training sees a photo in all, spread over however many
@@ -62,6 +66,10 @@ def square_crop(box, size) -> tuple[int, int, int, int]:
     x = min(max((left + right) / 2 - side / 2, 0), width - side)
     y = min(max((top + bottom) / 2 - side / 2, 0), height - side)
     return round(x), round(y), round(x + side), round(y + side)
+
+
+_IN_THE_BACKGROUND = (getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                      | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
 
 
 def _status(job: dict, **fields) -> None:
@@ -138,12 +146,11 @@ def crop(job: dict, find=None) -> int:
 def _train(job: dict, images: str) -> tuple[int, bytes]:
     import os  # noqa: PLC0415
     import re  # noqa: PLC0415
-    import subprocess  # noqa: PLC0415
 
-    flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
     process = subprocess.Popen(train_command(job, images), cwd=job["sd_scripts"],
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                               creationflags=flags, env=training_environment(dict(os.environ)))
+                               creationflags=_IN_THE_BACKGROUND,
+                               env=training_environment(dict(os.environ)))
     tail = b""
     while chunk := process.stdout.read1(256):
         sys.stdout.buffer.write(chunk)
@@ -156,7 +163,7 @@ def _train(job: dict, images: str) -> tuple[int, bytes]:
     return process.wait(), tail
 
 
-_MEMORY_RAN_OUT = (b"OutOfMemoryError", b"CUDA out of memory")
+_MEMORY_RAN_OUT = (b"OutOfMemoryError", b"CUDA out of memory", b"CUDA error: out of memory")
 
 
 def _why_the_training_stopped(tail: bytes, log: str) -> str:
@@ -182,8 +189,31 @@ def train(job: dict) -> None:
     _status(job, state="done", lora=f"{job['output_name']}.safetensors")
 
 
-STEPS = {"crop": crop, "train": train}
-_DOING = {"crop": "cropping the photos", "train": "training"}
+def _said_why(job: dict) -> bool:
+    import json  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    try:
+        return json.loads(Path(job["status"]).read_text(encoding="utf-8"))["state"] == "failed"
+    except (OSError, ValueError, KeyError):
+        return False
+
+
+def run(job: dict) -> None:
+    from pathlib import Path  # noqa: PLC0415
+
+    cropping = subprocess.run([job["comfyui_python"], str(Path(__file__).resolve()), "crop",
+                               job["job_file"]], creationflags=_IN_THE_BACKGROUND)
+    if cropping.returncode != 0:
+        if _said_why(job):
+            raise Stopped()
+        raise Stopped("The photo cropping quit without saying why. An agent can read what "
+                      f"it printed in {job['log']}.")
+    train(job)
+
+
+STEPS = {"run": run, "crop": crop}
+_DOING = {"run": "training", "crop": "cropping the photos"}
 
 
 def main(argv: list[str]) -> int:
@@ -196,7 +226,8 @@ def main(argv: list[str]) -> int:
     try:
         STEPS[step](job)
     except Stopped as stopped:
-        _status(job, state="failed", message=str(stopped))
+        if str(stopped):
+            _status(job, state="failed", message=str(stopped))
         return 1
     except Exception:
         traceback.print_exc()

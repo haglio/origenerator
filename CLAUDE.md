@@ -294,12 +294,18 @@ is the two hooks that call the guard, below.
   read every detector a fix uses, since a fix's detector is ComfyUI's model,
   and a copy of ultralytics anywhere else falls out of step with it -- the training
   environment's could not read a newer detector on 2026-10-21, and the training
-  died before it touched a photo. `train` runs kohya's sd-scripts on the crops
-  into ComfyUI's `loras\fixes`, under the `lora_training_python` the overlay
-  names, for the same reason as the voice: sd-scripts' pins are not this app's
-  to declare. Both steps print into the run's `training.log` and leave their
-  word, a failure's reason included, in its `status.json`. The Train button in
-  a fix's prompts window starts it.
+  died before it touched a photo. `run` is the whole training, started by the
+  Train button under the `lora_training_python` the overlay names (sd-scripts'
+  pins are not this app's to declare, the same reason as the voice's): it starts
+  `crop`, then runs kohya's sd-scripts on the crops into ComfyUI's `loras\fixes`.
+  Both print into the run's `training.log` and leave their word, a failure's
+  reason included, in its `status.json`; `process.json` names the program, so
+  any launch can tell a training still running from one that ended. A training
+  goes on when the app closes, as a run in ComfyUI does: nothing is handed to
+  ComfyUI while it runs (on 2026-10-21 a close handed ComfyUI the line a training
+  held, the two fought over the graphics card and the training ran out of
+  memory), the next launch holds the line for it again, and the watcher left at
+  closing announces its end.
 - `tools/open_from_notification.py` — what Windows runs when a notification of
   this app's is clicked, registered as the command for the `origenerator:` link
   every notice carries. It hands the generation to the copy that has the

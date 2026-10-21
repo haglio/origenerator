@@ -146,13 +146,26 @@ class EnhanceController:
             return
         job = fix_training.training_job(part, self._model_to_train_for(),
                                         datetime.now().astimezone())
+        self._watch(job).begin()
+
+    def take_up_trainings(self) -> None:
+        for job in fix_training.trainings():
+            trainer = fix_training.trainer_of(job)
+            if trainer is not None and trainer.running():
+                if self._training is None:
+                    self._watch(job).adopt(trainer)
+            elif (lora := fix_training.untaken_lora(job)) is not None:
+                self._take(job, lora)
+
+    def _watch(self, job: dict) -> FixTrainingRun:
+        name = job["part"]
         self._training = FixTrainingRun(job, self._jobs,
                                         reveal=lambda: self.panel.open_fix_prompts(name))
         self._training.progress.connect(lambda text: self.panel.show_fix_training(name, text))
-        self._training.finished.connect(lambda lora: self._training_ended(name, lora))
-        self._training.failed.connect(lambda why: self._training_ended(name, None, why))
-        self._training.canceled.connect(lambda: self._training_ended(name, None))
-        self._training.begin()
+        self._training.finished.connect(lambda lora: self._training_ended(job, lora))
+        self._training.failed.connect(lambda why: self._training_ended(job, None, why))
+        self._training.canceled.connect(lambda: self._training_ended(job, None))
+        return self._training
 
     def _model_to_train_for(self) -> str:
         chosen = self._settings.params.get("checkpoint")
@@ -160,13 +173,17 @@ class EnhanceController:
             return WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW].default_params()["checkpoint"]
         return chosen
 
-    def _training_ended(self, name: str, lora: str | None, why: str = "") -> None:
+    def _training_ended(self, job: dict, lora: str | None, why: str = "") -> None:
         self._training = None
-        self.panel.show_fix_training(name, None)
+        self.panel.show_fix_training(job["part"], None)
         if lora:
-            self.panel.use_fix_lora(name, lora)
+            self._take(job, lora)
         elif why:
             QMessageBox.warning(self.panel, "Train", why)
+
+    def _take(self, job: dict, lora: str) -> None:
+        self.panel.use_fix_lora(job["part"], lora)
+        fix_training.mark_taken(job)
 
     # --- what it runs at ------------------------------------------------------
 

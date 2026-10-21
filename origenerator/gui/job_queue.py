@@ -201,6 +201,9 @@ class JobQueue(QObject):
     def training(self):
         return self._training
 
+    def training_holds_the_machine(self) -> bool:
+        return self._training is not None and self._training.running
+
     def making_something(self) -> bool:
         return bool(self._on_server) or self._in_flight is not None
 
@@ -502,6 +505,10 @@ class JobQueue(QObject):
         the moment there is no longer a user to keep it for. Every rule this
         queue has is about not interrupting somebody who is watching.
         """
+        if self.training_holds_the_machine():
+            logger.info("Left %d queued job(s) for the next launch: a fix's training holds "
+                        "the graphics card", len(self._waiting))
+            return 0
         handed = 0
         for job in list(self._waiting):
             self._waiting.remove(job)

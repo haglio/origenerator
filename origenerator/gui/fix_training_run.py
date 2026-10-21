@@ -2,18 +2,18 @@
 
 The trainer needs the graphics card to itself, so nothing new is handed to
 ComfyUI while it runs: it waits for what ComfyUI is making, has ComfyUI let go
-of its models, and lets the queue go again when it ends either way."""
+of its models, and lets the queue go again when it ends either way. The
+training is a program of its own that outlives the app, so a launch finds one
+an earlier launch left running and holds the line for it (:meth:`adopt`)."""
 
 from __future__ import annotations
 
 import logging
 import time
-from pathlib import PureWindowsPath
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator import fix_training
-from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
 from origenerator.run_notice import RunOutcome
@@ -21,7 +21,6 @@ from origenerator.run_notice import RunOutcome
 logger = logging.getLogger(__name__)
 
 POLL_MS = 2000
-_STAGES = {"crop": ("cropping", "Cropping photos"), "train": ("training", "Training")}
 
 
 class FixTrainingRun(QObject):
@@ -36,87 +35,92 @@ class FixTrainingRun(QObject):
         self._job = job
         self._queue = queue
         self.reveal = reveal
-        self._step_name = None
-        self._process = None
+        self._trainer = None
         self._status: dict = {}
-        self._started_at = None
+        self._began = None
         self._typical = None
         self._timer = QTimer(self)
-        self._timer.timeout.connect(self._step)
+        self._timer.timeout.connect(self._look)
 
     @property
     def name(self) -> str:
         return self._job["part"]
 
+    @property
+    def running(self) -> bool:
+        return self._trainer is not None and self._trainer.running()
+
     def reading(self) -> RunReading:
-        if self._process is None:
+        if self._trainer is None:
             return RunReading(status=JobState.QUEUED, typical_seconds=self._typical)
-        state, stage = _STAGES[self._step_name]
-        counted = self._status.get("state") == state and self._status.get("total")
+        training = self._status.get("state") == "training"
         return RunReading(status=JobState.RUNNING,
-                          progress=(self._status["done"], self._status["total"]) if counted else None,
-                          stage=stage, started_at=self._started_at,
-                          typical_seconds=self._typical)
+                          progress=((self._status["done"], self._status["total"])
+                                    if self._status.get("total") else None),
+                          stage="Training" if training else "Cropping photos",
+                          started_at=self._began, typical_seconds=self._typical)
 
     def begin(self) -> None:
+        self._hold_the_line()
+        self.progress.emit("Waiting")
+        self._look()
+
+    def adopt(self, trainer) -> None:
+        self._trainer = trainer
+        self._began = trainer.began
+        self._hold_the_line()
+        self.progress.emit("Training")
+
+    def _hold_the_line(self) -> None:
         self._typical = fix_training.typical_seconds()
         self._queue.hold_for_training(self)
-        self.progress.emit("Waiting")
         self._timer.start(POLL_MS)
-        self._step()
 
-    def _step(self) -> None:
-        if self._process is None:
+    def _look(self) -> None:
+        if self._trainer is None:
             if not self._queue.making_something():
                 self._queue.free_comfyui_memory()
-                self._started_at = time.time()
-                self._start(fix_training.STEPS[0])
+                self._start()
             return
-        code = self._process.poll()
+        alive = self._trainer.running()
         status = self._status = fix_training.read_status(self._job) or {}
-        if code is not None:
-            logger.info("Fix training %s: its %s step ended with exit code %s, saying %s",
-                        self._job.get("part"), self._step_name, code, status)
+        if not alive:
+            logger.info("Fix training %s: its program ended, saying %s", self.name, status)
         if status.get("state") == "done":
             outcome = self._outcome(ok=True)
             fix_training.note_duration(outcome.seconds)
             self._end(outcome)
-            self.finished.emit(str(PureWindowsPath("fixes") / status["lora"]))
+            self.finished.emit(fix_training.lora_of(status))
         elif status.get("state") == "failed":
             self._fail(status["message"])
-        elif code == 0 and self._step_name != fix_training.STEPS[-1]:
-            self._start(fix_training.STEPS[fix_training.STEPS.index(self._step_name) + 1])
-        elif code is not None:
+        elif not alive:
             self._fail("The training program quit without saying why. An agent can read "
                        f"what it printed in {self._job['log']}.")
         elif status.get("total"):
             done = round(100 * status["done"] / status["total"])
-            word = "Cropping" if status["state"] == "cropping" else "Training"
+            word = "Training" if status["state"] == "training" else "Cropping"
             self.progress.emit(f"{word} {done}%")
 
-    def _start(self, step: str) -> None:
-        self._step_name = step
+    def _start(self) -> None:
         try:
-            self._process = fix_training.start(self._job, step)
+            self._trainer = fix_training.start(self._job)
         except Exception as error:
-            logger.exception("Fix training %s: its %s step could not be started",
-                             self._job.get("part"), step)
+            logger.exception("Fix training %s could not be started", self.name)
             self._fail(f"The training couldn't be started: {error}")
             return
-        self.progress.emit("Cropping" if step == fix_training.STEPS[0] else "Training")
+        self._began = self._trainer.began
+        self.progress.emit("Cropping")
 
     def cancel(self) -> None:
-        if self._process is not None:
-            fix_training.stop(self._process)
-        logger.info("Fix training %s: canceled during its %s step", self._job.get("part"),
-                    self._step_name or "wait")
+        if self._trainer is not None:
+            self._trainer.stop()
+        logger.info("Fix training %s: canceled", self.name)
         self._end(None)
         self.canceled.emit()
 
     def _outcome(self, *, ok: bool) -> RunOutcome:
-        seconds = None if self._started_at is None else time.time() - self._started_at
-        return RunOutcome(kind=JobKind.TRAINING, recipe=f"{self.name.capitalize()} fix",
-                          seconds=seconds, ok=ok, source="", generation="")
+        return fix_training.outcome_of(
+            self._job, ok=ok, seconds=None if self._began is None else time.time() - self._began)
 
     def _fail(self, why: str) -> None:
         self._end(self._outcome(ok=False))

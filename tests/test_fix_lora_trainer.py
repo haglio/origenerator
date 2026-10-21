@@ -4,6 +4,7 @@ import io
 import json
 import sys
 import types
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -91,6 +92,57 @@ def _status(job) -> dict:
         return json.load(read)
 
 
+def _whole_run(tmp_path, monkeypatch, *, crop_code: int, crop_says=None):
+    job, _path = _job_file(tmp_path)
+    job.update(comfyui_python="C:/comfyui/python.exe", job_file=str(tmp_path / "job.json"))
+    Path(job["job_file"]).write_text(json.dumps(job), encoding="utf-8")
+    done = []
+
+    def cropping(command, **options):
+        done.append(command)
+        if crop_says is not None:
+            Path(job["status"]).write_text(json.dumps(crop_says), encoding="utf-8")
+        return types.SimpleNamespace(returncode=crop_code)
+
+    monkeypatch.setattr(fix_lora_trainer.subprocess, "run", cropping)
+    monkeypatch.setattr(fix_lora_trainer, "train", lambda job: done.append("trained"))
+    return job, done
+
+
+def test_a_whole_training_crops_under_comfyuis_python_and_then_trains(tmp_path, monkeypatch):
+    job, done = _whole_run(tmp_path, monkeypatch, crop_code=0)
+
+    fix_lora_trainer.run(job)
+
+    crop, trained = done
+    assert crop[0] == "C:/comfyui/python.exe"
+    assert crop[2:] == ["crop", job["job_file"]]
+    assert trained == "trained"
+
+
+def test_photos_the_cropping_stopped_on_are_not_trained_on_and_its_reason_stands(
+        tmp_path, monkeypatch):
+    said = {"state": "failed", "message": "Take broken.jpg out."}
+    job, done = _whole_run(tmp_path, monkeypatch, crop_code=1, crop_says=said)
+    monkeypatch.setitem(fix_lora_trainer.STEPS, "run", fix_lora_trainer.run)
+
+    assert fix_lora_trainer.main(["run", job["job_file"]]) == 1
+    assert "trained" not in done
+    assert _status(job) == said
+
+
+def test_a_cropping_that_quit_without_a_word_says_so_and_where_its_log_is(
+        tmp_path, monkeypatch):
+    job, done = _whole_run(tmp_path, monkeypatch, crop_code=3221225786)
+
+    with pytest.raises(fix_lora_trainer.Stopped) as stopped:
+        fix_lora_trainer.run(job)
+
+    assert "quit without saying why" in str(stopped.value)
+    assert job["log"] in str(stopped.value)
+    assert "trained" not in done
+
+
 def test_a_step_that_stops_leaves_its_reason_where_the_app_reads_it(tmp_path, monkeypatch):
     def stops(job):
         raise fix_lora_trainer.Stopped("Take broken.jpg out.")
@@ -107,10 +159,10 @@ def test_a_step_that_breaks_says_what_it_was_doing_and_prints_why_into_the_log(
     def breaks(job):
         raise KeyError("no such column")
 
-    monkeypatch.setitem(fix_lora_trainer.STEPS, "train", breaks)
+    monkeypatch.setitem(fix_lora_trainer.STEPS, "run", breaks)
     job, path = _job_file(tmp_path)
 
-    assert fix_lora_trainer.main(["train", path]) == 1
+    assert fix_lora_trainer.main(["run", path]) == 1
     assert _status(job)["state"] == "failed"
     assert "while training" in _status(job)["message"]
     assert job["log"] in _status(job)["message"]
@@ -129,10 +181,10 @@ def _cropped_job(tmp_path, sd_script: str) -> dict:
                 output_dir=str(tmp_path / "loras"), output_name="hands 2026-10-21 1500")
 
 
-def test_a_training_the_graphics_card_runs_out_of_memory_for_says_so(tmp_path):
-    job = _cropped_job(tmp_path, "import sys\n"
-                                 "print('torch.OutOfMemoryError: CUDA out of memory.')\n"
-                                 "sys.exit(1)\n")
+@pytest.mark.parametrize("said", ["torch.OutOfMemoryError: CUDA out of memory.",
+                                  "torch.AcceleratorError: CUDA error: out of memory"])
+def test_a_training_the_graphics_card_runs_out_of_memory_for_says_so(tmp_path, said):
+    job = _cropped_job(tmp_path, f"import sys\nprint({said!r})\nsys.exit(1)\n")
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.train(job)

@@ -22,9 +22,11 @@ one size, and nothing shown for the one case with genuinely no picture to show.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import QObject, QPoint, Qt
 from PyQt6.QtGui import QDrag, QPixmap
 from PyQt6.QtWidgets import QApplication
+
+from origenerator.gui.drags import carry
 
 # Every drag's picture fits inside this. Roughly a drop slot's own preview, so what
 # is under the cursor reads as the thing that is about to land in the slot —
@@ -77,14 +79,11 @@ class DragOut(QObject):
     with no settings to take) checks that before asking, so the press is still
     waiting if the reason goes away.
 
-    The gesture owns the drag and announces it, and has no Qt parent, on
-    purpose: a poll can redraw the gallery grid or the queue's line while a drag
-    is in flight, deleting the widget it came out of, and a drag or an
-    announcement owned by that widget went with it and took the app down.
+    The gesture owns the drag and has no Qt parent, on purpose: a poll can
+    redraw the gallery grid or the queue's line while a drag is in flight,
+    deleting the widget it came out of, and a drag owned by that widget went
+    with it and took the app down.
     """
-
-    started = pyqtSignal(str)  # the dragged generation's prompt_id, "" for anything else
-    ended = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -118,19 +117,10 @@ class DragOut(QObject):
         self._origin = None
         return True
 
-    def start(self, mime, pixmap: QPixmap, *, prompt_id: str = "",
+    def start(self, mime, pixmap: QPixmap, *,
               action: Qt.DropAction = Qt.DropAction.CopyAction) -> None:
-        """Carry *mime* out, with *pixmap* trailing the cursor.
-
-        :attr:`started` and :attr:`ended` bracket the whole gesture rather than
-        the call: ``QDrag.exec`` is modal, so a drop slot lit by the first stays
-        lit until the drop, and the second fires even when the drag is abandoned.
-        """
+        """Carry *mime* out, with *pixmap* trailing the cursor."""
         drag = QDrag(self)
         drag.setMimeData(mime)
         set_drag_thumbnail(drag, pixmap)
-        self.started.emit(prompt_id)
-        try:
-            drag.exec(action)
-        finally:
-            self.ended.emit()
+        carry(drag, mime, self, action)

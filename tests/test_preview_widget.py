@@ -24,6 +24,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
+from tests.heard_drags import HeardDrags
 
 
 def _scripted_video(tmp_path, name="clip.mp4"):
@@ -746,14 +747,12 @@ def test_a_transient_view_disarms_the_drag(make_preview, transient, tmp_path):
 def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_path, drags):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"), "gen1")
-    started, ended = [], []
-    w.drag_out.started.connect(started.append)
-    w.drag_out.ended.connect(lambda: ended.append(True))
+    heard = HeardDrags()
 
     _drag_out(w)
 
-    assert started == ["gen1"]      # announced so a combine slot lights at drag start
-    assert ended == [True]          # and cleared when the gesture ends
+    assert heard.generations() == ["gen1"]  # announced so a drop place lights at the start
+    assert heard.ended == 1                 # and put out when the gesture ends
     (drag,) = drags
     assert bytes(drag.mime.data(GENERATION_MIME)).decode() == "gen1"
 
@@ -811,25 +810,23 @@ def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, drags):
     # and that must not stop the drag.
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4", "gen1")
-    started = []
-    w.drag_out.started.connect(started.append)
+    heard = HeardDrags()
 
     _drag_out(w)
 
     (drag,) = drags
-    assert started == ["gen1"]
+    assert heard.generations() == ["gen1"]
     assert drag.pixmap is None
 
 
 def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, drags):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))  # a file no generation owns
-    started = []
-    w.drag_out.started.connect(started.append)
+    heard = HeardDrags()
 
     _drag_out(w)
 
-    assert started == []
+    assert heard.started == []
     assert drags == []  # no QDrag was ever built
 
 

@@ -11,6 +11,7 @@ from shared_ui.testing import ground
 
 from origenerator import animation_paths, recipe_match
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
+from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.gui.pictured_dropdown import PICTURES_ROLE
@@ -323,18 +324,20 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
                                      intent=recipe_match.VIDEO, edit_first=True)]
 
 
-def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
+def test_a_drag_under_way_lights_only_the_slot_it_fits(qtbot):
     panel = _panel(qtbot)  # image slot accepts img*, video slot accepts vid*
+    picture, video = generation_mime("img7"), generation_mime("vid7")
 
-    panel.show_drop_candidates("img7")
+    under_way.started.emit(picture, None)
     assert panel.image_slot._label.property("dragActive") is True
     assert panel.video_slot._label.property("dragActive") is False
+    under_way.ended.emit()
 
-    panel.show_drop_candidates("vid7")  # a video now: the other slot lights instead
+    under_way.started.emit(video, None)  # a video now: the other slot lights instead
     assert panel.image_slot._label.property("dragActive") is False
     assert panel.video_slot._label.property("dragActive") is True
 
-    panel.clear_drop_candidates()
+    under_way.ended.emit()
     assert panel.image_slot._label.property("dragActive") is False
     assert panel.video_slot._label.property("dragActive") is False
 

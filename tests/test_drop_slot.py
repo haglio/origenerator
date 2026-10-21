@@ -8,6 +8,7 @@ from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QM
 from shared_ui.colors import hovered
 from shared_ui.testing import ground
 
+from origenerator.gui.drags import under_way
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.media_badge import MediaBadge
@@ -180,6 +181,20 @@ def test_an_ordinary_slot_keeps_its_color(qtbot, tmp_path):
     _drop(slot, "img1")
 
     assert slot._label.pixmap().toImage().pixelColor(2, 2).red() > 150
+
+
+def test_a_slot_lights_while_a_drag_it_would_take_is_under_way(qtbot):
+    slot = _slot(qtbot, lent_by=_pictures_only)
+    picture, video = generation_mime("img1"), generation_mime("vid1")
+
+    under_way.started.emit(picture, None)
+    assert slot._label.property("dragActive") is True
+    under_way.ended.emit()
+    assert slot._label.property("dragActive") is False
+
+    under_way.started.emit(video, None)
+    assert slot._label.property("dragActive") is False
+    under_way.ended.emit()
 
 
 def test_set_candidate_lights_and_clears_the_slot(qtbot):

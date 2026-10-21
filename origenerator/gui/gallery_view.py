@@ -539,10 +539,6 @@ class GalleryView(QWidget):
         self._enhance = EnhanceController(
             self, db=db, jobs=self._jobs, browser=self._browser,
             slideshows=self._slideshows, info_tabs_of=lambda: self._info_tabs)
-        # A thumbnail or a preview picked up anywhere lights the slot it fits,
-        # so the drop target is obvious from the start of the gesture.
-        self._browser.drag_started.connect(self._combine.drag_started)
-        self._browser.drag_ended.connect(self._combine.drag_ended)
         # Everything spoken: the microphone, the caption that says what it heard,
         # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
         # caption is placed by _build_ui, and the bank it presses is bound to it
@@ -977,10 +973,6 @@ class GalleryView(QWidget):
         panel.set_enhance_settings(self._enhance.settings)
         panel.set_fullscreen_factory(self._slideshows.open_on_preview)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
-        # Dragging the tab's preview out lights the combine slot it fits, like a
-        # browser thumbnail (see :meth:`CombineController.drag_started`).
-        panel.preview_drag_started.connect(self._combine.drag_started)
-        panel.preview_drag_ended.connect(self._combine.drag_ended)
         panel.form_replaced.connect(self._retarget_find)
         # Every keystroke in a tab's form moves the text an open find is marking
         # up — re-run rather than leave highlights on words that shifted.

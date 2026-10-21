@@ -1658,18 +1658,6 @@ def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, m
     assert panel._preview._generation is None  # nothing on screen to drag
 
 
-def test_panel_forwards_the_preview_drag_signals(panel):
-    started, ended = [], []
-    panel.preview_drag_started.connect(started.append)
-    panel.preview_drag_ended.connect(lambda: ended.append(True))
-
-    panel._preview.drag_out.started.emit("gen9")
-    panel._preview.drag_out.ended.emit()
-
-    assert started == ["gen9"]  # relayed for the view to light the combine slot
-    assert ended == [True]
-
-
 def test_the_tab_watches_no_run_of_its_own(panel):
     # Generate submits and is done with it. It used to fill with the tracked run's
     # steps, which took a third telling of one run — differently worded from the

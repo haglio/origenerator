@@ -267,33 +267,36 @@ class FolderTree(QTreeWidget):
         drag.exec(Qt.DropAction.CopyAction)
 
     def _landing(self, event) -> tuple[str, list, list] | None:
-        """The collecting row under the drag and the folders and items it would
-        take, or ``None`` where a drop would land on an ordinary folder, a
+        return self.landing_on(self.itemAt(event.position().toPoint()), event.mimeData(),
+                               event.source())
+
+    def landing_on(self, row, mime, source) -> tuple[str, list, list] | None:
+        """``row``'s collecting key and the folders and items a drag would leave
+        there, or ``None`` where it would land on an ordinary folder, a
         collection that collects nothing, or the empty space below the tree.
 
         A row can't collect itself, and dropping a folder back where it came from
         is nothing, so neither counts as landing."""
-        index = self.indexAt(event.position().toPoint())
-        target = index.data(DROP_KEY_ROLE) if index.isValid() else None
+        target = row.data(0, DROP_KEY_ROLE) if row is not None else None
         if not isinstance(target, str):
             return None
-        folders = [key for key in self._dragged_keys(event) if key != target]
-        item = dragged_generation(event.mimeData())
+        folders = [key for key in self._dragged_keys(mime, source) if key != target]
+        item = dragged_generation(mime)
         items = ([item] if item is not None
-                 and self._takes_item(index.data(TREE_KEY_ROLE), item) else [])
+                 and self._takes_item(row.data(0, TREE_KEY_ROLE), item) else [])
         return (target, folders, items) if folders or items else None
 
-    def _dragged_keys(self, event) -> list[str]:
-        source = event.source()
+    def _dragged_keys(self, mime, source) -> list[str]:
         if isinstance(source, FolderTree) and source is not self:
             return []
-        data = event.mimeData().data(FOLDER_KEYS_MIME)
+        data = mime.data(FOLDER_KEYS_MIME)
         if data.isEmpty():
             return []
         return [key for key in bytes(data).decode("utf-8").split("\n") if key]
 
     def dragEnterEvent(self, event):
-        if self._dragged_keys(event) or dragged_generation(event.mimeData()) is not None:
+        mime = event.mimeData()
+        if self._dragged_keys(mime, event.source()) or dragged_generation(mime) is not None:
             event.accept()
         else:
             event.ignore()

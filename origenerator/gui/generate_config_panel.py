@@ -1084,12 +1084,17 @@ class GenerateConfigPanel(QWidget):
         """
         if self._folder_request is not None:
             return self._folder_request.title()
+        return self.name() or "New generation"
+
+    def name(self) -> str:
+        if self._folder_request is not None:
+            return self._folder_request.label
         name = self._names.of((self._displayed_row or {}).get("prompt_id"))
         if not name:
             key = self.workflow_and_signature()
             if key is not None:
                 name = config_folder_name(*key, self._db.folder_meta_map())
-        return name or "New generation"
+        return name
 
     def tab_icon(self) -> QIcon:
         """The mark beside this tab's name: the displayed item's own thumbnail,

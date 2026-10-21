@@ -1100,6 +1100,10 @@ class GenerateConfigPanel(QWidget):
     def _item_name(self) -> str:
         return self._names.of((self._displayed_row or {}).get("prompt_id"))
 
+    def reread_name(self) -> None:
+        if self._displayed_row is not None:
+            self._metadata_block.setVisible(self._metadata_block.show_name(self._item_name()))
+
     def tab_icon(self) -> QIcon:
         """The mark beside this tab's name: the displayed item's own thumbnail,
         else the plain image/video mark for what this config makes.

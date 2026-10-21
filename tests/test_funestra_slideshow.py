@@ -1097,6 +1097,16 @@ def test_a_slideshow_opened_on_a_slide_and_picked_back_up_there_puts_nothing_in_
     assert slideshow.hud_prompt_id == "id-2"
 
 
+def test_a_slideshow_opened_on_a_slide_and_picked_back_up_there_has_the_funestra_play_it_once(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, start=2)
+
+    slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-3"),
+                     opened_on_it=True)
+
+    assert _sent(slideshow).count("PLAY_FILE three.png") == 1
+
+
 def _clocked_slideshow(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> FunestraSlideshow:
     slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
                            **fields)

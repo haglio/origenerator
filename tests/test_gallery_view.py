@@ -12019,6 +12019,24 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1
 
 
+def test_a_queue_rows_shield_keeps_its_run_going_for_the_picture_asked_for_after_it(
+        qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view.enhance_items(["g0"])
+    (first,) = view._jobs.all_jobs
+    client.progress.emit(first.prompt_id, "s", 1, 10)
+    view._update_queue()
+
+    view._queue.rows()[0]._shield.click()
+    view.enhance_items(["g1"])
+
+    client.interrupt.assert_not_called()
+    assert view._jobs.queue_order[0] == first.prompt_id
+
+
 def _cancel_from_the_queue(view, job):
     view._update_queue()
     (queued,) = view._queue.rows()

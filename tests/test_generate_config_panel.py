@@ -1518,6 +1518,22 @@ def test_an_arrow_after_a_level_is_clicked_puts_the_next_level_in_the_preview(
     )
 
 
+def test_up_onto_the_enhance_row_and_enter_asks_for_an_enhance_of_the_image(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _enhanced_image_row(db)
+    panel.set_enhance_settings(gallery.EnhanceSettings(params={"enhance_scale": 3.0}))
+    panel.show_saved_generation(image, [image])
+    asked = []
+    panel.enhance_requested.connect(asked.append)
+    newest = _level_rows(panel)[0]
+    qtbot.mouseClick(newest, Qt.MouseButton.LeftButton)
+
+    qtbot.keyClick(newest, Qt.Key.Key_Up)
+    qtbot.keyClick(newest, Qt.Key.Key_Return)
+
+    assert asked == ["img1"]
+
+
 def test_the_preview_carries_the_shown_generations_corner_controls(saved_panel):
     # The acts on a generation belong on its picture, not in a bank under the
     # settings — the same three corners a gallery thumbnail of it wears.

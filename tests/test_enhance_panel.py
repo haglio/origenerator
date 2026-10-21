@@ -691,6 +691,62 @@ def test_an_arrow_off_either_end_of_the_list_stays_where_it_is(qtbot, clicked, a
     assert versions.selected_positions() == [clicked]
 
 
+def _clicked_under_the_enhance_row(qtbot, duplicate_of=None):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x · 20 steps", duplicate_of))
+    (enhance_row,) = versions._host.findChildren(_AddRow)
+    row = _rows(versions)[0]
+    _click(qtbot, row)
+    return versions, row, enhance_row
+
+
+def test_up_from_the_top_level_takes_the_highlight_onto_the_enhance_row(qtbot):
+    versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
+
+    qtbot.keyClick(row, Qt.Key.Key_Up)
+
+    assert enhance_row.is_selected()
+    assert versions.selected_positions() == []
+
+
+@pytest.mark.parametrize("enter", [Qt.Key.Key_Return, Qt.Key.Key_Enter],
+                         ids=["Enter", "the number pad's Enter"])
+def test_enter_on_the_highlighted_enhance_row_enhances_as_a_click_would(qtbot, enter):
+    versions, row, _enhance_row = _clicked_under_the_enhance_row(qtbot)
+    pressed = []
+    versions.enhance_requested.connect(lambda: pressed.append(True))
+    qtbot.keyClick(row, Qt.Key.Key_Up)
+
+    qtbot.keyClick(row, enter)
+
+    assert pressed == [True]
+
+
+def test_enter_on_a_dimmed_enhance_row_enhances_nothing_as_a_click_would_not(qtbot):
+    versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot, duplicate_of=0)
+    pressed = []
+    versions.enhance_requested.connect(lambda: pressed.append(True))
+    qtbot.keyClick(row, Qt.Key.Key_Up)
+
+    qtbot.keyClick(row, Qt.Key.Key_Return)
+
+    assert enhance_row.is_selected()
+    assert pressed == []
+
+
+def test_down_from_the_enhance_row_picks_and_shows_the_top_level_again(qtbot):
+    versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
+    shown = []
+    versions.level_selected.connect(shown.append)
+    qtbot.keyClick(row, Qt.Key.Key_Up)
+
+    qtbot.keyClick(row, Qt.Key.Key_Down)
+
+    assert shown == [0]
+    assert (enhance_row.is_selected(), versions.selected_positions()) == (False, [0])
+
+
 def test_the_arrows_are_the_lists_only_while_a_level_was_the_last_thing_clicked(qtbot):
     window = QWidget()
     column = QVBoxLayout(window)

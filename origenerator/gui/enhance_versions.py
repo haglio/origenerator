@@ -95,6 +95,7 @@ _PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
 _ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: 3px;"
 _ARROW_STEPS = {Qt.Key.Key_Up: -1, Qt.Key.Key_Left: -1,
                 Qt.Key.Key_Down: 1, Qt.Key.Key_Right: 1}
+_ENHANCE_ROW = -1  # where the arrows stand on the row above the top level
 
 
 def enhance_level_mime(params: dict) -> QMimeData:
@@ -207,7 +208,19 @@ class _Row(QWidget):
         self._facts = facts
         self._fact_cells: list[QWidget] = []
         self._resting_ink: dict[QLabel, str] = {}
+        self._selected = False
         row.addLayout(facts, 1)
+
+    def is_selected(self) -> bool:
+        return self._selected
+
+    def set_selected(self, selected: bool) -> None:
+        if selected == self._selected:
+            return
+        self._selected = selected
+        self.setStyleSheet(_SELECTED_ROW_CSS if selected else _ROW_CSS)
+        for label, resting in self._resting_ink.items():
+            label.setStyleSheet(_PICKED_FACT_CSS if selected else resting)
 
     def minimumSizeHint(self):
         """As narrow as the row gets — which is the wrapped arrangement's width,
@@ -292,7 +305,6 @@ class _LevelRow(_Row):
         self._position = position
         self._params = dict(level.params)
         self.drag_out = DragOut()
-        self._selected = False
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
         # The picture that trails the cursor when this row is dragged, cut once
         # from the file rather than from the 96px tile — the same size every other
@@ -326,17 +338,6 @@ class _LevelRow(_Row):
 
     def position(self) -> int:
         return self._position
-
-    def is_selected(self) -> bool:
-        return self._selected
-
-    def set_selected(self, selected: bool) -> None:
-        if selected == self._selected:
-            return
-        self._selected = selected
-        self.setStyleSheet(_SELECTED_ROW_CSS if selected else _ROW_CSS)
-        for label, resting in self._resting_ink.items():
-            label.setStyleSheet(_PICKED_FACT_CSS if selected else resting)
 
     def set_highlighted(self, on: bool) -> None:
         """Light this level's picture — what the ``+ Enhance`` row points at
@@ -443,9 +444,13 @@ class _AddRow(_Row):
         self.hovered.emit(False)
         super().leaveEvent(event)
 
-    def mouseReleaseEvent(self, event):
-        if self._enabled and event.button() == Qt.MouseButton.LeftButton:
+    def press(self) -> None:
+        if self._enabled:
             self.clicked.emit()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.press()
 
 
 class EnhanceVersions(QWidget):
@@ -478,6 +483,7 @@ class EnhanceVersions(QWidget):
         QVBoxLayout(self._host)
         self._section.content_form().addRow(self._host)
         self._pending: _PendingRow | None = None
+        self._enhance_row: _AddRow | None = None
         self._rows: list[_LevelRow] = []
         self._arrows_from: int | None = None
         self._deletable = True
@@ -525,6 +531,7 @@ class EnhanceVersions(QWidget):
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(6)
         self._pending = None
+        self._enhance_row = None
         self._rows = []
         self._arrows_from = None
         self._deletable = deletable
@@ -535,11 +542,11 @@ class EnhanceVersions(QWidget):
             self._pending.update_pending(pending)
             column.addWidget(self._pending)
         elif add is not None:
-            card = _AddRow(add.settings, add.duplicate_of)
-            card.clicked.connect(self.enhance_requested)
-            card.hovered.connect(
+            self._enhance_row = _AddRow(add.settings, add.duplicate_of)
+            self._enhance_row.clicked.connect(self.enhance_requested)
+            self._enhance_row.hovered.connect(
                 lambda on, at=add.duplicate_of: self._highlight_level(at, on))
-            column.addWidget(card)
+            column.addWidget(self._enhance_row)
         for position, (level, image_path) in enumerate(items):
             row = _LevelRow(level, position, image_path, created_fallback, held_days)
             row.clicked.connect(self._on_row_clicked)
@@ -563,21 +570,33 @@ class EnhanceVersions(QWidget):
         under each ctrl-click would fight it."""
         self._arrows_from = position
         if modifiers & Qt.KeyboardModifier.ControlModifier:
+            if self._enhance_row is not None:
+                self._enhance_row.set_selected(False)
             for row in self._rows:
                 if row.position() == position:
                     row.set_selected(not row.is_selected())
             return
         self._pick_and_show(position)
 
-    def _pick_and_show(self, position: int) -> None:
+    def _pick_only(self, position: int) -> None:
+        if self._enhance_row is not None:
+            self._enhance_row.set_selected(position == _ENHANCE_ROW)
         for row in self._rows:
             row.set_selected(row.position() == position)
+
+    def _pick_and_show(self, position: int) -> None:
+        self._pick_only(position)
         self.level_selected.emit(position)
 
     def _step_to(self, position: int) -> None:
-        position = max(0, min(position, len(self._rows) - 1))
-        if position != self._arrows_from:
-            self._arrows_from = position
+        top = _ENHANCE_ROW if self._enhance_row is not None else 0
+        position = max(top, min(position, len(self._rows) - 1))
+        if position == self._arrows_from:
+            return
+        self._arrows_from = position
+        if position == _ENHANCE_ROW:
+            self._pick_only(position)
+        else:
             self._pick_and_show(position)
 
     def _on_row_menu(self, position: int, global_pos: QPoint):
@@ -586,8 +605,7 @@ class EnhanceVersions(QWidget):
         A right-click on an unpicked row picks it first, so the menu always acts
         on what it appeared over — the same rule the thumbnail menu follows."""
         if position not in self.selected_positions():
-            for row in self._rows:
-                row.set_selected(row.position() == position)
+            self._pick_only(position)
         picked = self.selected_positions()
         if not picked:
             return
@@ -616,11 +634,16 @@ class EnhanceVersions(QWidget):
 
     def keyPressEvent(self, event):
         """Delete or Backspace bins the picked levels — the keys that delete a
-        picked thumbnail, over the picked versions instead — and an arrow picks
-        and shows the level over or under the one last clicked."""
+        picked thumbnail, over the picked versions instead — an arrow picks
+        and shows the row over or under the one last clicked, and Enter presses
+        the Enhance row the arrows have reached."""
         step = _ARROW_STEPS.get(event.key())
         if step is not None and self._arrows_from is not None:
             self._step_to(self._arrows_from + step)
+            return
+        if (event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+                and self._arrows_from == _ENHANCE_ROW):
+            self._enhance_row.press()
             return
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
             picked = self.selected_positions()

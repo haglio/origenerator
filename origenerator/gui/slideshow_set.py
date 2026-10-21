@@ -665,8 +665,7 @@ def item_note(slideshow_set: SlideshowSet, *, levels, level_index: int) -> str:
         return GENERATING
     parts = []
     if len(levels) > 1:
-        label = levels[level_index][2]
-        parts.append(f"{label} — {level_index + 1} of {len(levels)}")
+        parts.append(levels[level_index][2])
     enhancement = slideshow_set.enhancement_of(slideshow_set.current_prompt_id())
     if enhancement:
         parts.append(_ENHANCEMENT_WORDS[enhancement])

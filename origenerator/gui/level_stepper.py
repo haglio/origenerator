@@ -65,7 +65,7 @@ class LevelStepper:
         return versions[self._index]
 
     def levels(self, *, base: str) -> list[tuple]:
-        """The versions of the picture on screen — what the corner counts off."""
+        """The versions of the picture on screen — what the HUD names one of."""
         return self._by_path.get(self._base or base) or []
 
     @property

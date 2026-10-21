@@ -236,7 +236,7 @@ def test_a_picture_being_made_holds_the_screen_half_as_long_as_the_pace():
     assert slideshow_set.pace_for(plain, 5) == 5
 
 
-_TWO_VERSIONS = [("one_enhanced.png", "image", "Enhance 1"), ("one.png", "image", "Original")]
+_TWO_VERSIONS = [("one_enhanced.png", "image", "Enhancement 1/1"), ("one.png", "image", "Original")]
 
 
 def test_the_note_on_a_picture_filed_once_with_nothing_in_flight_says_nothing():
@@ -245,10 +245,11 @@ def test_the_note_on_a_picture_filed_once_with_nothing_in_flight_says_nothing():
     assert item_note(slideshow_set, levels=[], level_index=0) == ""
 
 
-def test_the_note_names_the_version_on_screen_and_how_many_there_are():
+def test_the_note_names_the_version_on_screen_by_its_name_alone():
     slideshow_set, _dealt = _set()
 
-    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=1) == "Original — 2 of 2"
+    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=0) == "Enhancement 1/1"
+    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=1) == "Original"
 
 
 def test_the_note_says_whether_a_better_version_is_being_made_or_waiting():
@@ -259,7 +260,7 @@ def test_the_note_says_whether_a_better_version_is_being_made_or_waiting():
     slideshow_set.note_enhancing({"id-1": "running"})
     assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancing…"
     assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=0) == (
-        "Enhance 1 — 1 of 2 · Enhancing…")
+        "Enhancement 1/1 · Enhancing…")
 
 
 def test_an_enhancement_this_slideshow_asked_for_waits_until_the_gallery_says_otherwise():

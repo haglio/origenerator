@@ -74,7 +74,7 @@ class EnhanceLevel:
     """One version of an image or a video: its file, and how it came to be.
 
     ``index`` counts enhancements from the original (0), so the labels read
-    "Original", "Enhance 1", "Enhance 2"… ``params`` are the settings that produced
+    "Original", "Enhancement 1/2", "Enhancement 2/2"… ``params`` are the settings that produced
     it — empty for the original, and for any level folded in before the settings
     were recorded — and ``settings`` is those settings as a line of text. Both:
     the string captions the tile, the dict is what a tile dragged onto the
@@ -155,15 +155,18 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     inline = ({} if row.get("original_files")
               else level_settings(parse_params(row.get("params_json"))))
 
-    def level(index: int, f: dict) -> EnhanceLevel:
+    def levels_of(enhanced: list[dict]) -> list[EnhanceLevel]:
+        count = len(enhanced)
+        return [level(count - i, count, f) for i, f in enumerate(enhanced)]
+
+    def level(index: int, count: int, f: dict) -> EnhanceLevel:
         entry = history.get(f.get("filename")) or {}
         params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
-        return EnhanceLevel(index, f"Enhance {index}", f, level_settings(params))
+        return EnhanceLevel(index, f"Enhancement {index}/{count}", f, level_settings(params))
 
     originals = original_files_of(row)
     if originals and len(files) > len(originals):
-        enhanced = files[:len(files) - len(originals)]
-        levels = [level(len(enhanced) - i, f) for i, f in enumerate(enhanced)]
+        levels = levels_of(files[:len(files) - len(originals)])
         # The pre-enhance file, level 0 — the one a re-enhance runs from, and
         # the one the list offers as "what this looked like before".
         levels.append(EnhanceLevel(0, "Original", originals[0]))
@@ -174,12 +177,12 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
         # many files sit ahead of a "before" that no longer exists.
         enhanced = [f for f in files if f.get("filename") in history]
         if enhanced:
-            return [level(len(enhanced) - i, f) for i, f in enumerate(enhanced)]
+            return levels_of(enhanced)
     if is_enhanced_row(row):
         # Enhanced with nothing kept under it: the row's leading file IS the
         # enhancement. Only that one — a batch's other files are its siblings,
         # not versions of it.
-        return [level(1, files[0])]
+        return levels_of(files[:1])
     return []
 
 

@@ -196,7 +196,7 @@ def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
         "enhance_denoise": 0.15,
     }))
     (level,) = enhance_levels(row)
-    assert level.label == "Enhance 1"
+    assert level.label == "Enhancement 1/1"
     assert level.settings == "2x · 20 steps · 0.15 redraw"
     assert level.file["filename"] == "sdxl_t2i_src.png"
 
@@ -212,7 +212,7 @@ def test_a_batch_the_tail_finished_lists_one_level_not_one_per_file():
             {"filename": "sdxl_t2i_b.png", "subfolder": "image", "type": "output"},
         ]),
     )
-    assert [lvl.label for lvl in enhance_levels(row)] == ["Enhance 1"]
+    assert [lvl.label for lvl in enhance_levels(row)] == ["Enhancement 1/1"]
 
 
 def test_a_batch_of_several_files_is_not_mistaken_for_levels():
@@ -235,12 +235,22 @@ def test_each_fold_adds_a_level_naming_the_settings_that_made_it(tmp_path):
 
     levels = enhance_levels(db.get_generation("src"))
     # Most-enhanced first — which is also what the preview opens on.
-    assert [lvl.label for lvl in levels] == ["Enhance 2", "Enhance 1", "Original"]
+    assert [lvl.label for lvl in levels] == ["Enhancement 2/2", "Enhancement 1/2", "Original"]
     assert levels[0].file["filename"] == "image_enhance_00002_.png"
     assert levels[0].settings == "3x · 40 steps · 0.35 redraw"
     assert levels[1].settings == "2x · 20 steps · 0.15 redraw"
     assert levels[2].settings == ""      # an original was not enhanced at anything
     assert levels[2].is_original
+
+
+def test_each_enhancement_is_counted_out_of_the_enhancements_and_the_original_is_not(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    _add_and_fold(db, "e1", "image_enhance_00001_.png", enhance_scale=2.0)
+    _add_and_fold(db, "e2", "image_enhance_00002_.png", enhance_scale=3.0)
+
+    assert [lvl.label for lvl in enhance_levels(db.get_generation("src"))] == [
+        "Enhancement 2/2", "Enhancement 1/2", "Original"]
 
 
 def test_a_level_folded_before_settings_were_recorded_still_lists(tmp_path):
@@ -252,7 +262,7 @@ def test_a_level_folded_before_settings_were_recorded_still_lists(tmp_path):
     db.update_generation("src", enhance_history=None)
 
     levels = enhance_levels(db.get_generation("src"))
-    assert [lvl.label for lvl in levels] == ["Enhance 1", "Original"]
+    assert [lvl.label for lvl in levels] == ["Enhancement 1/1", "Original"]
     assert levels[0].settings == ""
 
 
@@ -358,7 +368,7 @@ def test_removing_an_enhancement_leaves_the_others(tmp_path):
     row = _folded(tmp_path, count=2)
     updates = remove_enhance_levels(row, ["image_enhance_00002_.png"])
     after = dict(row, **updates)
-    assert [lvl.label for lvl in enhance_levels(after)] == ["Enhance 1", "Original"]
+    assert [lvl.label for lvl in enhance_levels(after)] == ["Enhancement 1/1", "Original"]
     # The surviving level keeps its own settings, its own run id and its own
     # finish — they ride with the level they belong to, so binning the newer
     # enhancement takes the place in the Recents collection it had lifted the image
@@ -385,7 +395,7 @@ def test_removing_the_original_keeps_every_enhancement_named(tmp_path):
     row = _folded(tmp_path, count=2)
     after = dict(row, **remove_enhance_levels(row, ["sdxl_t2i_src.png"]))
     levels = enhance_levels(after)
-    assert [lvl.label for lvl in levels] == ["Enhance 2", "Enhance 1"]
+    assert [lvl.label for lvl in levels] == ["Enhancement 2/2", "Enhancement 1/2"]
     assert levels[0].params == {"enhance_scale": 3.0}
     assert gallery.is_enhanced_row(after)   # still an enhanced image, badge and all
 

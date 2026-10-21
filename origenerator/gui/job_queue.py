@@ -546,7 +546,7 @@ class JobQueue(QObject):
 
     def _preempt_experiments(self):
         """Clear the GPU for user work: cancel every in-flight background
-        experiment before a user launch is submitted.
+        experiment the user has not shielded before a user launch is submitted.
 
         Experiments belong to the closed app, and opening it drops the batch the
         last absence left (see :func:`origenerator.experiments.background
@@ -559,7 +559,7 @@ class JobQueue(QObject):
         """
         for jobs in list(self._jobs.values()):
             for job in list(jobs):
-                if job.source == GenerationSource.EXPERIMENT:
+                if job.source == GenerationSource.EXPERIMENT and not job.shielded:
                     logger.info(
                         "Preempting background experiment %s for user work", job.prompt_id
                     )

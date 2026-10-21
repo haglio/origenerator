@@ -1395,3 +1395,17 @@ def test_a_shield_on_a_run_still_waiting_survives_a_restart(qtbot, tmp_path):
     restarted.reconnect_running()
 
     assert restarted.job_for_prompt(waiting.prompt_id).shielded
+
+
+def test_a_user_launch_leaves_a_shielded_experiment_running(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    queue.start_prepared("exp-key", _I2V, _params(), source="experiment")
+    experiment = queue.job_for("exp-key")
+    _rendering(client, experiment)
+    queue.shield(experiment.prompt_id, True)
+
+    queue.start_prepared("user-key", _I2V, _params(seed=7))
+
+    client.interrupt.assert_not_called()
+    assert queue.has("exp-key")

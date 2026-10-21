@@ -667,6 +667,10 @@ class SlideshowView(QWidget):
         if self._actions.clear_queue is not None:
             self._actions.clear_queue()
 
+    def start_now(self) -> None:
+        if self._actions.start_now is not None:
+            self._actions.start_now()
+
     # --- picking a closed slideshow back up ---------------------------------
 
     def state(self) -> SlideshowState:

@@ -1122,6 +1122,15 @@ def test_a_video_set_aside_says_no_start_while_the_picture_is_being_made(qtbot, 
     assert queue.starts_at(video.prompt_id) is None
 
 
+def test_start_now_starts_the_video_waiting_out_the_minute_at_once(qtbot, tmp_path):
+    client, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+
+    queue.start_now()
+
+    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
+    assert not queue._videos_wait.isActive()
+
+
 def test_a_video_held_for_a_training_says_no_start(qtbot, tmp_path):
     _client_, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
 

@@ -391,6 +391,7 @@ class FakeHost:
         self.reconciles = 0
         self.room_paused = []
         self.cleared_queue = 0
+        self.started_now = 0
         self.queue = ([], 0)
         self.visible = [row["prompt_id"] for row in self.rows]
         self.picked = []
@@ -427,6 +428,9 @@ class FakeHost:
 
     def clear_foreign_queue(self):
         self.cleared_queue += 1
+
+    def start_now(self):
+        self.started_now += 1
 
     def follow_link(self, prompt_id):
         self.followed.append(prompt_id)
@@ -1586,6 +1590,15 @@ def test_the_blocks_clear_drops_another_apps_work(slideshows):
     made[0].actions.clear_queue()
 
     assert host.cleared_queue == 1
+
+
+def test_the_blocks_start_now_starts_the_video_waiting_out_the_minute(slideshows):
+    director, host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+
+    made[0].actions.start_now()
+
+    assert host.started_now == 1
 
 
 def test_a_row_dragged_down_the_block_re_lines_the_queue(slideshows):

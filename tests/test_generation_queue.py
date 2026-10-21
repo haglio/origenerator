@@ -5,7 +5,7 @@ import time
 import pytest
 from PIL import Image
 from PyQt6 import sip
-from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, Qt
+from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, BORDER_SUBTLE
@@ -214,7 +214,7 @@ def test_the_clock_is_written_across_the_bar_it_measures(queue):
 
     assert preview._progress.caption() == "50% · 1:30 elapsed · ~6:02 left"
     assert preview._progress.isTextVisible()
-    assert preview._caption.isHidden()  # the plain line stands down for the bar
+    assert not preview._caption.isVisible()  # the plain line stands down for the bar
 
 
 def test_the_thumbnail_fills_the_strip_from_its_top_edge_into_its_lower_left_corner(queue):
@@ -647,7 +647,7 @@ def test_the_wait_is_written_under_the_bar_it_explains(queue):
 
     assert half._progress.isVisible() and half._progress.maximum() == 0  # sweeping
     assert half._caption.isVisible()
-    assert half._caption.y() > half._progress.y()
+    assert half._caption.mapTo(half, QPoint(0, 0)).y() > half._progress.y()
 
 
 def test_a_job_of_ours_being_made_keeps_the_slot_for_its_bar(queue):
@@ -668,6 +668,65 @@ def test_the_countdown_advances_between_polls(queue):
     queue._running._item.starts_at -= 3  # as if three seconds had gone by
     queue._running._tick.timeout.emit()
     assert _timing(queue) == "Starts in 0:40"
+
+
+def test_start_now_is_offered_beside_a_countdown(queue):
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    assert not queue._running._start_now.isHidden()
+
+
+def test_start_now_is_not_offered_where_nothing_counts_down(queue):
+    queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
+    assert queue._running._start_now.isHidden()
+    queue.set_items([_item(key="j2", status="queued")])
+    assert queue._running._start_now.isHidden()
+    queue.set_items([])
+    assert queue._running._start_now.isHidden()
+
+
+def test_start_now_goes_with_the_countdown_when_it_runs_out_between_polls(queue):
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    queue._running._item.starts_at -= 60  # as if the minute had run out
+    queue._running._tick.timeout.emit()
+    assert queue._running._start_now.isHidden()
+
+
+def test_pressing_start_now_asks_for_the_waiting_video(queue):
+    asked = []
+    queue.start_now_requested.connect(lambda: asked.append(True))
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+
+    queue._running._start_now.click()
+
+    assert asked == [True]
+
+
+def test_start_now_sits_under_the_bar_just_right_of_the_countdown(queue):
+    # Where the user put it, 2026-10-22.
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)],
+                    foreign_queued=2)
+    QApplication.processEvents()
+    bar, caption, start_now = (queue._running._progress, queue._running._caption,
+                               queue._running._start_now)
+
+    def place(widget):
+        return QRect(widget.mapTo(queue, QPoint(0, 0)), widget.size())
+
+    end_of_the_words = place(caption).left() + caption.fontMetrics().horizontalAdvance(
+        caption.text())
+    assert place(start_now).top() > place(bar).bottom()
+    assert end_of_the_words < place(start_now).left() <= end_of_the_words + 16
+    assert caption.height() < 2 * caption.fontMetrics().lineSpacing()  # one line
+
+
+def test_a_line_too_long_for_the_bar_wraps_at_the_bars_width(queue):
+    queue.set_items([_item(status="queued", foreign_ahead=3)])
+    queue._running.show_foreign("Waiting on 3 jobs from another app. " * 4)
+    QApplication.processEvents()
+    bar, caption = queue._running._progress, queue._running._caption
+
+    assert caption.width() <= bar.width()
+    assert caption.height() >= 2 * caption.fontMetrics().lineSpacing()
 
 
 def test_the_users_own_queue_needs_no_explaining(queue):

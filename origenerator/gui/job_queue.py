@@ -466,6 +466,11 @@ class JobQueue(QObject):
             if newcomer is not None and self._key_of(newcomer) is not None:
                 self._set_aside_for(newcomer)
 
+    def start_now(self) -> None:
+        self._picture_asked_at = None
+        self._videos_wait.stop()
+        self._pump()
+
     def starts_at(self, prompt_id: str) -> float | None:
         """When ``prompt_id`` starts, on this clock, if only the minute's wait holds it."""
         if (not self._waiting or self._waiting[0].prompt_id != prompt_id

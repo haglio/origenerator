@@ -190,3 +190,6 @@ class SlideshowHost(Protocol):
 
     def clear_foreign_queue(self) -> None:
         """Drop another app's work off ComfyUI, as that block's Clear asks."""
+
+    def start_now(self) -> None:
+        """End the minute a video waits after a picture, as that block's Start now asks."""

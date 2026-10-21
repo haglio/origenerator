@@ -115,6 +115,7 @@ from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.gui.inflight import (
+    clear_queue_tooltip,
     discard_run_text,
     discard_run_tooltip,
     queue_wait_text,
@@ -651,6 +652,7 @@ class GalleryView(QWidget):
         self._queue = GenerationQueue()
         self._queue.reorder_requested.connect(self._jobs.reorder)
         self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
+        self._queue.start_now_requested.connect(self.start_now)
         self._arrangement = PaneArrangement(
             toc=toc, browser=browser, info_pane=self._build_info_pane(),
             info_tabs=self._info_tabs, queue=self._queue)
@@ -3571,6 +3573,10 @@ class GalleryView(QWidget):
         if queue is not None:
             self._foreign_queue = queue
 
+    def start_now(self):
+        self._jobs.start_now()
+        self._update_queue()
+
     def clear_foreign_queue(self):
         """Wipe another app's work off ComfyUI, on the user's say-so.
 
@@ -3604,8 +3610,7 @@ class GalleryView(QWidget):
         that is often the user's own running job."""
         reply = QMessageBox.question(
             self, "Clear ComfyUI's queue",
-            f"Drop the {total} job{'' if total == 1 else 's'} another app has"
-            " queued on ComfyUI?\n\nAnything you queued from here is left alone;"
+            f"{clear_queue_tooltip(total)}?\n\nAnything you queued from here is left alone;"
             " one of theirs already running is interrupted.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )

@@ -232,8 +232,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the way Delete deletes it, so it is one method beside Delete's. 278 -> 279:
     a lock in the room, a lock on one of the app's own slideshows and a clicked
     notice each put their item in front of him through one method, which asks
-    a hosting room for this window's place.)"""
+    a hosting room for this window's place. 279 -> 280: Start now ends the
+    minute a video waits after a picture, from the job queue or a slideshow's,
+    so it is one method beside Clear's.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 279
+               for x in _class_def(VIEW, "GalleryView").body) == 280
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

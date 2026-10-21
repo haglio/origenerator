@@ -7,7 +7,16 @@ import numpy as np
 from PIL import Image
 from shared_ui.palette import RED
 
-from origenerator.gui.hud_queue import CANCEL, CLEAR, OPEN, SHIELD, QueuePointer, queue_section
+from origenerator.gui.hud_queue import (
+    CANCEL,
+    CLEAR,
+    FRAME,
+    OPEN,
+    SHIELD,
+    START_NOW,
+    QueuePointer,
+    queue_section,
+)
 from origenerator.gui.inflight import InFlightItem, RunReading
 
 
@@ -80,6 +89,24 @@ def _posted(targets) -> list[str]:
     return [button.command for _rect, button in targets]
 
 
+def test_a_video_waiting_out_the_minute_offers_start_now_beside_its_countdown():
+    section = queue_section([_item("waiting-one", job_kind="Video",
+                                   starts_at=time.monotonic() + 42.5)], 0)
+
+    _image, targets = _painted(section)
+
+    assert [button.glyph for _rect, button in targets
+            if button.command == START_NOW] == ["Start now"]
+
+
+def test_start_now_is_offered_only_while_a_countdown_runs():
+    for leader in (_item("running-one", status="running", started_at=0.0, typical_seconds=30),
+                   _item("waiting-one", job_kind="Video"),
+                   _item("due-one", job_kind="Video", starts_at=time.monotonic() - 1)):
+        _image, targets = _painted(queue_section([leader], 0))
+        assert START_NOW not in _posted(targets)
+
+
 def test_a_row_carries_the_button_that_throws_its_job_away():
     section = queue_section([_item("j1", cancel=lambda: None),
                              _item("j2", cancel=lambda: None, auto_generating=True)], 0)
@@ -139,12 +166,16 @@ class _Host:
         self.hud_queue = (items, foreign)
         self.relined = []
         self.cleared = 0
+        self.started_now = 0
 
     def requeue(self, keys):
         self.relined.append(list(keys))
 
     def clear_foreign_queue(self):
         self.cleared += 1
+
+    def start_now(self):
+        self.started_now += 1
 
 
 def _pointer_over(items, foreign=0):
@@ -206,6 +237,26 @@ class TestThePointerOnTheBlock:
         pointer.press(*_middle_of(pointer, CLEAR))
 
         assert host.cleared == 1
+
+    def test_start_now_starts_the_video_waiting_out_the_minute(self):
+        pointer, host = _pointer_over([_item("v1", job_kind="Video",
+                                             starts_at=time.monotonic() + 42.5)])
+
+        pointer.press(*_middle_of(pointer, START_NOW))
+
+        assert host.started_now == 1
+
+    def test_start_now_sits_under_the_bar_and_clear_keeps_the_bars_row(self):
+        # Where the user put it in the job queue, 2026-10-22: under the bar,
+        # just right of the countdown.
+        pointer, _host = _pointer_over([_item("v1", job_kind="Video",
+                                              starts_at=time.monotonic() + 42.5)], 3)
+        frame_x, _y, frame_width, _h = pointer.where(f"{FRAME}|v1")
+        start_x, start_y, _w, _h = pointer.where(START_NOW)
+        _x, clear_y, _w, _h = pointer.where(CLEAR)
+
+        assert start_x > frame_x + frame_width
+        assert start_y > clear_y
 
     def test_a_row_dragged_down_the_line_re_lines_the_queue(self):
         pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),

@@ -468,8 +468,8 @@ class SlideshowDirector:
         if resume is not None:
             # After the levels a window armed above: the version a slide was
             # left showing is only a version once they are armed.
-            slideshow.resume(resume)
-        if kwargs.get("start") is None:
+            slideshow.resume(resume, opened_on_it=keep_the_slide)
+        if not keep_the_slide:
             self._offer_the_frames(slideshow, location, self._host.queue_now()[0])
             if follows_a_run:
                 slideshow.follow_what_is_being_made()

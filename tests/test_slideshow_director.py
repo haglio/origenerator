@@ -148,8 +148,9 @@ class FakeSlideshow:
     def set_levels(self, levels):
         self.levels = levels
 
-    def resume(self, state):
+    def resume(self, state, *, opened_on_it=False):
         self.resumed = state
+        self.resumed_on_its_slide = opened_on_it
 
     def take_up(self, filters, *, keep_the_slide=False):
         self.taken_up = (filters, keep_the_slide)
@@ -1537,6 +1538,21 @@ def test_what_is_on_screen_opens_on_the_one_item_picked_and_is_led_nowhere_else(
 
     assert made[0].opened_with.get("start") == 1
     assert (made[0].leads, made[0].resumed) == (0, None)
+
+
+def test_the_one_item_picked_where_the_last_slideshow_closed_is_picked_back_up_leading_nothing(
+        slideshows):
+    host = FakeHost(location="workflow/a", rows=[_row("g1"), _row("g2")])
+    director, _host, made = slideshows(host)
+    director.open([("a.png", "image", "g1", None), ("b.png", "image", "g2", None)])
+    made[0].state_at_close = SlideshowState(order=("g1", "g2"), current="g2")
+    made[0].close()
+    host.picked = ["g2"]
+
+    director.start()
+
+    assert (made[1].resumed, made[1].resumed_on_its_slide) == (made[0].state_at_close, True)
+    assert made[1].leads == 0
 
 
 def test_nothing_to_play_opens_no_slideshow_at_all(slideshows):

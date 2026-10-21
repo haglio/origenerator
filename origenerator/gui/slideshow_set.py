@@ -486,13 +486,13 @@ class SlideshowSet:
                               level_index=level_index, loop=loop.axis,
                               loop_pool=tuple(slide.prompt_id for slide in loop.pool))
 
-    def resume(self, state: SlideshowState) -> bool:
+    def resume(self, state: SlideshowState, *, lead: bool = True) -> bool:
         pool = self._pool_left_looping(state)
         if pool:
             self.start_loop(state.loop, pool)
         if not self.playlist.resume(state.order, state.current):
             return False
-        if not state.locked:
+        if lead and not state.locked:
             self.lead_with_what_is_being_made()
         return True
 

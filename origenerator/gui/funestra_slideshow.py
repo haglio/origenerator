@@ -851,10 +851,10 @@ class FunestraSlideshow(QObject):
         """Where this slideshow is, in the terms a later one can be opened at."""
         return self._set.state(locked=self._locked, level_index=self._levels.index)
 
-    def resume(self, state: SlideshowState) -> bool:
+    def resume(self, state: SlideshowState, *, opened_on_it: bool = False) -> bool:
         """Open where a closed slideshow left off rather than at the top of a fresh
         pass.  Returns whether the place carried."""
-        if not self._set.resume(state):
+        if not self._set.resume(state, lead=not opened_on_it):
             return False
         self._hand_over(land=True)
         if state.level_index and self._set.current_prompt_id() == state.current:

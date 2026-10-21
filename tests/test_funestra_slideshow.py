@@ -1087,6 +1087,16 @@ def test_a_slideshow_picked_back_up_on_a_locked_slide_stays_on_it(qtbot, tmp_pat
     assert slideshow.locked_on == "id-2"
 
 
+def test_a_slideshow_opened_on_a_slide_and_picked_back_up_there_puts_nothing_in_front_of_it(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, start=1, hud=HudFacts(enhancing={"id-3": "running"}))
+
+    slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-2"),
+                     opened_on_it=True)
+
+    assert slideshow.hud_prompt_id == "id-2"
+
+
 def _clocked_slideshow(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> FunestraSlideshow:
     slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
                            **fields)

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QEvent, QMimeData, QPoint, QRect, QSize, Qt
-from PyQt6.QtGui import QDropEvent, QPixmap
+from PyQt6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
+from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QPixmap
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QApplication,
@@ -37,6 +37,8 @@ from origenerator.gallery import (
 from origenerator.gui import drag_thumbnail
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
+from origenerator.gui.drags import under_way
+from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import (
     EnhanceOffer,
@@ -51,6 +53,7 @@ from origenerator.gui.enhance_versions import (
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 from tests import gestures
+from tests.drop_style_seen import worn
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
@@ -354,7 +357,7 @@ def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
     assert not panel._fixes["faces"].isEnabled()
 
 
-def test_an_unticked_parts_name_and_number_grey_out(qtbot):
+def test_an_unticked_parts_name_and_number_gray_out(qtbot):
     # Which parts are on has to be readable down the line at a glance, not
     # worked out tick by tick.
     panel, _ = _panel(qtbot)
@@ -1208,6 +1211,23 @@ def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     assert versions.update_pending(None) is False
 
 
+def _held(mime) -> tuple:
+    return (Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier)
+
+
+def _brought_over(panel, mime):
+    """A drag of ``mime`` brought over ``panel`` and held there. Qt hands a
+    drag's later events to the widget that took its first."""
+    QApplication.sendEvent(panel, QDragEnterEvent(QPoint(5, 5), *_held(mime)))
+    QApplication.sendEvent(panel, QDragMoveEvent(QPoint(5, 5), *_held(mime)))
+
+
+def _dropped_on(panel, mime):
+    _brought_over(panel, mime)
+    QApplication.sendEvent(panel, QDropEvent(QPointF(5, 5), *_held(mime)))
+
+
 def test_dropping_a_level_absorbs_its_settings(qtbot):
     panel, edits = _panel(qtbot)
     panel._auto.setChecked(True)
@@ -1215,10 +1235,8 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
     # Held in a local: a QMimeData freed mid-event takes the handler with it.
     mime = enhance_level_mime({"enhance_scale": 3.0, "enhance_steps": 40,
                                "enhance_denoise": 0.35})
-    event = QDropEvent(QPoint(5, 5).toPointF(), Qt.DropAction.CopyAction, mime,
-                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
-    panel.dropEvent(event)
+    _dropped_on(panel, mime)
 
     settings = panel.settings()
     assert settings.params["enhance_scale"] == 3.0
@@ -1227,6 +1245,62 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
     # The drop says what to enhance at, not whether to keep enhancing.
     assert settings.auto is True
     assert edits and edits[-1] == settings
+
+
+def _in_the_app(qtbot, panel):
+    """``panel`` shown in a pane of the window, dressed as the app dresses it."""
+    host = QWidget()
+    QVBoxLayout(host).addWidget(panel)
+    host.setStyleSheet(build_stylesheet())
+    qtbot.addWidget(host)
+    host.resize(420, 700)
+    host.show()
+    qtbot.waitExposed(host)
+    return panel
+
+
+def _drop_styles_worn(panel) -> set:
+    """The drop style the panel wears, read off its ground in the title row and
+    under the settings, where nothing is drawn."""
+    heading = next(label for label in panel.findChildren(QLabel) if label.text() == "Enhance")
+    settings = panel.findChild(QScrollArea).geometry()
+    image = panel.grab().toImage()
+    return {worn(image, panel.rect(), spot) for spot in (
+        QPoint(heading.geometry().right() + 10, heading.geometry().center().y()),
+        QPoint(settings.left() + 5, settings.bottom() - 5))}
+
+
+def test_the_panel_lights_while_a_version_it_would_take_is_dragged(qtbot):
+    panel = _in_the_app(qtbot, _panel(qtbot)[0])
+    assert _drop_styles_worn(panel) == {None}
+
+    under_way.started.emit(enhance_level_mime({"enhance_scale": 3.0}), None)
+
+    assert _drop_styles_worn(panel) == {LIT}
+    under_way.ended.emit()
+
+
+def test_the_panel_under_the_drag_lights_one_step_lighter(qtbot):
+    panel = _in_the_app(qtbot, _panel(qtbot)[0])
+    mime = enhance_level_mime({"enhance_scale": 3.0})
+    under_way.started.emit(mime, None)
+
+    _brought_over(panel, mime)
+
+    assert _drop_styles_worn(panel) == {AIMED}
+    QApplication.sendEvent(panel, QDragLeaveEvent())
+    under_way.ended.emit()
+
+
+def test_the_panel_stays_as_it_is_while_anything_else_is_dragged(qtbot):
+    panel = _in_the_app(qtbot, _panel(qtbot)[0])
+    mime = QMimeData()
+    mime.setText("just some text")
+
+    under_way.started.emit(mime, None)
+
+    assert _drop_styles_worn(panel) == {None}
+    under_way.ended.emit()
 
 
 def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):

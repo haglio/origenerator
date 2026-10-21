@@ -17,6 +17,7 @@ class DropTarget(QObject):
         self._landing = landing
         self._drop = drop
         self._edge = DropEdge(zone)
+        zone.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)  # to wear a ground of its own
         taker = zone.viewport() if isinstance(zone, QAbstractScrollArea) else zone
         taker.setAcceptDrops(True)
         taker.installEventFilter(self)

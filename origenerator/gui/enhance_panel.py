@@ -19,7 +19,7 @@ the settings that made that version become the ones on the panel, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
 
 Each part the detail pass can redraw is a tick and a denoise to run it
-at: the tick is whether that part is fixed at all, so an unticked part greys its
+at: the tick is whether that part is fixed at all, so an unticked part grays its
 own name and number rather than making zero mean off. A part whose detector
 isn't installed in ComfyUI can't be ticked at all, and says why — the
 alternative being a run that fails on submit.
@@ -63,6 +63,7 @@ from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
 )
+from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.metadata_block import reveal_button
@@ -268,6 +269,11 @@ class _FieldGrid(QGridLayout):
         self._stacked = stacked
 
 
+def _settings_dragged(mime, _source) -> tuple[dict] | None:
+    params = params_from_mime(mime)
+    return None if params is None else (params,)
+
+
 class _SettingsScroll(QScrollArea):
     """The settings, scrolling down once the panel is squeezed shorter than they
     are, and sideways once it is squeezed narrower.
@@ -277,6 +283,7 @@ class _SettingsScroll(QScrollArea):
 
     def __init__(self, settings: QWidget):
         super().__init__()
+        self.setObjectName("enhanceSettings")
         self.setWidget(settings)
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
@@ -317,7 +324,6 @@ class EnhancePanel(QWidget):
         self._loading = False  # suppress the write-back while filling the fields
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
-        self.setAcceptDrops(True)  # a version tile dropped here hands its settings over
         self.setObjectName("enhancePanel")
         self.setStyleSheet(_DISABLED_CSS + _FIX_FIELD_CSS + _ENHANCE_BUTTON_CSS)
 
@@ -396,6 +402,7 @@ class EnhancePanel(QWidget):
         action_row.addStretch(1)
         action_row.addWidget(self._enhance_button)
         column.addLayout(action_row)
+        DropTarget(self, _settings_dragged, self._take_settings)  # a version's, dragged here
 
     def _fix_row(self) -> QWidget:
         """Every fixable part on one line: a tick over its name and the
@@ -404,7 +411,7 @@ class EnhancePanel(QWidget):
         The tick is what turns a part's fix on, so the number underneath is free
         to sit at the denoise it would run at whether or not it is running —
         tick a part and it fixes at that, untick it and the number is still
-        there for next time, greyed along with the name so the line reads at a
+        there for next time, grayed along with the name so the line reads at a
         glance as which parts are on.
 
         Each number is exactly as wide as its digits need — no floor, no share
@@ -517,13 +524,13 @@ class EnhancePanel(QWidget):
             window.choose_lora(lora)
 
     def _fix_toggled(self, name: str) -> None:
-        """A part switched on or off: grey its name and number to match, and
+        """A part switched on or off: gray its name and number to match, and
         report the settings the panel now reads as."""
         self._show_fix_on(name)
         self._emit()
 
     def _show_fix_on(self, name: str) -> None:
-        """Grey one part's name and number unless it is ticked."""
+        """Gray one part's name and number unless it is ticked."""
         check = self._fix_checks[name]
         widget = self._fixes[name]
         on = check.isChecked() and check.isEnabled()
@@ -675,32 +682,11 @@ class EnhancePanel(QWidget):
         if not self._loading:
             self._on_change(self.settings())
 
-    # --- absorbing a dragged enhancement level -----------------------------
-
-    def dragEnterEvent(self, event):
-        if params_from_mime(event.mimeData()) is not None:
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dragMoveEvent(self, event):
-        self.dragEnterEvent(event)
-
-    def dropEvent(self, event):
-        """Take the settings of the version dropped on us.
-
-        The auto tick is left as it is: the drop says what to enhance *at*, not
-        whether to keep enhancing.
-        """
-        params = params_from_mime(event.mimeData())
-        if params is None:
-            event.ignore()
-            return
+    def _take_settings(self, params: dict) -> None:
         merged = dict(self.settings().params)
         merged.update({k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS})
         self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=merged))
         self._emit()
-        event.acceptProposedAction()
 
 
 class FixPromptsDialog(QDialog):

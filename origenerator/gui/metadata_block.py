@@ -193,6 +193,10 @@ def _dressed(btn: QPushButton, name: str) -> QPushButton:
     return btn
 
 
+def reveal_button() -> QPushButton:
+    return _dressed(ElidingButton("Show in Explorer"), "revealButton")
+
+
 def _reveal_button(target: str) -> QPushButton:
     """A "Show in Explorer" button revealing the output file selected in the OS
     file manager. Grayed out (with a hint) when the file is no longer on disk —
@@ -201,7 +205,7 @@ def _reveal_button(target: str) -> QPushButton:
     The longest label on any file row, so it is the one that decides how narrow a
     pane holding file rows can be squeezed: it elides rather than hold that width
     (see :mod:`origenerator.gui.eliding`)."""
-    btn = _dressed(ElidingButton("Show in Explorer"), "revealButton")
+    btn = reveal_button()
     exists = Path(target).exists()
     btn.setEnabled(exists)
     btn.setToolTip("Show this file in Explorer" if exists else "File not found on disk")

@@ -18,3 +18,7 @@ def show_in_explorer(path: Path) -> None:
     """Open Explorer with ``path`` selected. The caller ensures ``path`` exists;
     otherwise Explorer ignores the selection and opens a default location."""
     subprocess.run(["explorer", "/select,", os.path.realpath(path)], creationflags=_NO_WINDOW)
+
+
+def open_in_explorer(folder: Path) -> None:
+    subprocess.run(["explorer", os.path.realpath(folder)], creationflags=_NO_WINDOW)

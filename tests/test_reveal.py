@@ -44,3 +44,14 @@ def test_a_file_reached_through_a_folder_link_is_shown_where_it_really_is(monkey
 
     (cmd,), _ = calls[0]
     assert cmd == ["explorer", "/select,", str(pictures / "picture_00001_.png")]
+
+
+def test_a_folder_is_opened_itself_with_no_console_window(monkeypatch):
+    calls = _capture_run(monkeypatch)
+    folder = Path("C:/Users/Example/Pictures")
+
+    reveal.open_in_explorer(folder)
+
+    (cmd,), kwargs = calls[0]
+    assert cmd == ["explorer", str(folder)]
+    assert kwargs["creationflags"] == reveal._NO_WINDOW

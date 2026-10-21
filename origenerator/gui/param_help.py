@@ -443,9 +443,12 @@ def param_help(key: str) -> str:
 
 
 def definition_help(pd: ParamDef, recommendation: str = "") -> str:
-    advice = recommendation or " ".join(filter(None, (good_range_text(pd),
-                                                      RECOMMENDED.get(pd.key, ""))))
-    return " ".join(filter(None, (PARAM_HELP.get(pd.key, ""), advice)))
+    return " ".join(filter(None, (PARAM_HELP.get(pd.key, ""), advice_help(pd, recommendation))))
+
+
+def advice_help(pd: ParamDef, recommendation: str = "") -> str:
+    return recommendation or " ".join(filter(None, (good_range_text(pd),
+                                                    RECOMMENDED.get(pd.key, ""))))
 
 
 def option_help(key: str, option: str) -> str:

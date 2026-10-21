@@ -3034,6 +3034,18 @@ def test_the_workflows_warning_carries_every_warning_and_resolves_them_all(
     assert _drawing_settings(blank_panel)[2:] == (40, 6.0)
 
 
+def test_a_story_too_long_for_its_good_range_is_among_the_workflows_warnings(qtbot, blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+
+    form.set_values({"scene_frames": [241], "frame_count": 241})
+    assert "Scenes: 15 s. Good range: 5–10 s. Click to use 10 s." in (
+        blank_panel._workflow_warning.toolTip().split("\n"))
+    qtbot.mouseClick(blank_panel._workflow_warning, Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["frame_count"] == 161
+
+
 def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtbot, blank_panel):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
     panel = _on_screen(qtbot, blank_panel)

@@ -49,7 +49,13 @@ from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
-from origenerator.workflows.base import ParamDef, chained_frames, scene_prompts, story_of
+from origenerator.workflows.base import (
+    ParamDef,
+    chained_frames,
+    chained_to,
+    scene_prompts,
+    story_of,
+)
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 
 LINES_PLACEHOLDER = "What she says in this scene, spoken in the voice set under Audio"
@@ -302,3 +308,6 @@ class ScenesEditor(QWidget):
         """The clip's length: the scenes end to end, each after the first
         starting on the frame before it."""
         return chained_frames(self.scene_frames())
+
+    def set_total_frames(self, frames: int) -> None:
+        self.set_scene_frames(chained_to(int(frames), self.scene_frames(), int(self._pd.min_val)))

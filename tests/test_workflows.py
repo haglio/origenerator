@@ -26,6 +26,7 @@ from origenerator.workflows.base import (
     SINGLE_WINDOW_FRAMES,
     ParamDef,
     WorkflowTemplate,
+    chained_to,
 )
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.duration import seconds_for_frames
@@ -2451,6 +2452,14 @@ def test_segment_lengths_stay_on_the_models_frame_grid():
         parts = lengths(count)
         assert parts[0] + sum(n - 1 for n in parts[1:]) == count
         assert all(n % 4 == 1 and 5 <= n <= 161 for n in parts), count
+
+
+def test_a_story_its_last_scene_cannot_shorten_enough_shortens_the_scene_before_it():
+    assert chained_to(161, [161, 81], shortest=5) == [157, 5]
+
+
+def test_a_story_too_short_for_its_good_range_lengthens_its_last_scene():
+    assert chained_to(81, [5, 5], shortest=5) == [5, 77]
 
 
 def test_the_last_scene_carries_on_through_the_scenes_after_it():

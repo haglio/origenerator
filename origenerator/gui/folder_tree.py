@@ -22,18 +22,20 @@ say where the work has been.
 
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
 set) and dragged onto a *collecting* row — one carrying its key under
-``DROP_KEY_ROLE``: the Favorites collection, or a custom folder. A drop emits
-``folders_dropped`` and is never applied to the tree itself, so nothing is ever
-reparented; what a collecting row does with the dropped folders is the view's
+``DROP_KEY_ROLE``: the Favorites collection, or a custom folder — and so can an
+item dragged from anywhere in the window, onto a row the view says takes it. A
+drop emits ``dropped`` and is never applied to the tree itself, so nothing is ever
+reparented; what a collecting row does with what lands on it is the view's
 business, not this widget's.
 """
 from __future__ import annotations
 
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QDrag, QIcon
+from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon
 from PyQt6.QtWidgets import QAbstractItemView, QMenu, QStyledItemDelegate, QTreeWidget
 
 from origenerator.gui import icons
+from origenerator.gui.generation_drag import dragged_generation
 
 _ICON = 16   # on-screen size of each action
 _PAD = 4     # gap between the label and the icons, and between the two icons
@@ -109,11 +111,13 @@ class FolderTree(QTreeWidget):
 
     favorite_clicked = pyqtSignal(object)    # folder key
     delete_clicked = pyqtSignal(object)  # folder key
-    folders_dropped = pyqtSignal(str, list)  # collecting row's key, dropped folder keys
+    dropped = pyqtSignal(str, list, list)  # collecting row's key, folder keys, prompt ids
 
-    def __init__(self, group_role, parent=None):
+    def __init__(self, group_role, takes_item=lambda _row_key, _prompt_id: False,
+                 parent=None):
         super().__init__(parent)
         self._role = group_role
+        self._takes_item = takes_item  # whether the row under a dragged item takes it
         self._delete = icons.delete_icon()
         self._star = icons.star_icon(filled=False)
         self._star_on = icons.star_icon(filled=True)  # a favorited leaf's filled star
@@ -261,13 +265,22 @@ class FolderTree(QTreeWidget):
         drag.setMimeData(mime)
         drag.exec(Qt.DropAction.CopyAction)
 
-    def _drop_target_key(self, pos) -> str | None:
-        """The key of the collecting row under ``pos``, or ``None`` where a drop
-        would land on an ordinary folder, a collection that collects nothing, or the
-        empty space below the tree."""
-        index = self.indexAt(pos)
-        key = index.data(DROP_KEY_ROLE) if index.isValid() else None
-        return key if isinstance(key, str) else None
+    def _landing(self, event) -> tuple[str, list, list] | None:
+        """The collecting row under the drag and the folders and items it would
+        take, or ``None`` where a drop would land on an ordinary folder, a
+        collection that collects nothing, or the empty space below the tree.
+
+        A row can't collect itself, and dropping a folder back where it came from
+        is nothing, so neither counts as landing."""
+        index = self.indexAt(event.position().toPoint())
+        target = index.data(DROP_KEY_ROLE) if index.isValid() else None
+        if not isinstance(target, str):
+            return None
+        folders = [key for key in self._dragged_keys(event) if key != target]
+        item = dragged_generation(event.mimeData())
+        items = ([item] if item is not None
+                 and self._takes_item(index.data(TREE_KEY_ROLE), item) else [])
+        return (target, folders, items) if folders or items else None
 
     def _dragged_keys(self, event) -> list[str]:
         source = event.source()
@@ -279,19 +292,16 @@ class FolderTree(QTreeWidget):
         return [key for key in bytes(data).decode("utf-8").split("\n") if key]
 
     def dragEnterEvent(self, event):
-        if self._dragged_keys(event):
+        if self._dragged_keys(event) or dragged_generation(event.mimeData()) is not None:
             event.accept()
         else:
             event.ignore()
 
     def dragMoveEvent(self, event):
-        """Accept only over a collecting row, so the cursor says outright where the
-        folders can land."""
-        target = self._drop_target_key(event.position().toPoint())
-        keys = self._dragged_keys(event)
-        # A row can't collect itself, and dropping a folder back where it came from
-        # is nothing — refuse both rather than accept a no-op.
-        if target is not None and [k for k in keys if k != target]:
+        """Accept only where the drag would land, so the cursor says outright
+        where the folders or the item can go."""
+        super().dragMoveEvent(event)  # scrolls the tree while a drag is held at its edge
+        if self._landing(event) is not None:
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
         else:
@@ -301,11 +311,11 @@ class FolderTree(QTreeWidget):
         """Hand the drop to the view and consume it. The base implementation is
         deliberately not called: the tree's shape is derived from the generations,
         so a drop must never move a row."""
-        target = self._drop_target_key(event.position().toPoint())
-        keys = [k for k in self._dragged_keys(event) if k != target]
-        if target is None or not keys:
+        super().dragLeaveEvent(QDragLeaveEvent())  # the drag is over, and so is its scrolling
+        landing = self._landing(event)
+        if landing is None:
             event.ignore()
             return
         event.setDropAction(Qt.DropAction.CopyAction)
         event.accept()
-        self.folders_dropped.emit(target, keys)
+        self.dropped.emit(*landing)

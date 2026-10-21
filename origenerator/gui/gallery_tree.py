@@ -224,7 +224,7 @@ class GalleryTree:
         item = QTreeWidgetItem([group.label])
         item.setIcon(0, icons.custom_folder_icon())
         item.setToolTip(0, f"{group.label} — {count} item{'s' if count != 1 else ''} "
-                           "in a folder you made; drop folders here to add them")
+                           "in a folder you made; drop folders or items here to add them")
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, count)
         item.setData(0, DROP_KEY_ROLE, group.key)  # the folder gathers, not the side

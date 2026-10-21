@@ -553,9 +553,9 @@ class BrowserPane(QObject):
         """Render a custom folder (saved, or the live multi-selection) the way
         Favorites shows what it gathers."""
         self._show_gathered(group.rows, gallery.child_groups(group), show_stars=True,
-                            empty=f"“{group.label}” is empty.\n\nDrag folders from the list "
-                                  "onto it, or pick several folders with Shift/Ctrl and "
-                                  "group them.")
+                            empty=f"“{group.label}” is empty.\n\nDrag folders from the list, "
+                                  "or items, onto it, or pick several folders with "
+                                  "Shift/Ctrl and group them.")
 
     def _show_gathered(self, rows, groups, *, show_stars: bool, empty: str):
         """Items as thumbnails, then a tile per folder, each captioned with its

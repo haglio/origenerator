@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
-from PyQt6.QtGui import QDragMoveEvent, QDropEvent
+from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 from shared_ui.colors import BLUE
 
@@ -17,6 +17,7 @@ from origenerator.gui.folder_tree import (
     FolderTree,
     _action_rects,
 )
+from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.orientation import oriented_key
 
@@ -205,12 +206,13 @@ def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
 
 # --- picking several folders, and dragging them onto a collecting row ---------
 
-def _collecting_tree(qtbot):
+def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False):
     """A tree with a collecting row, the Favorites collection, atop two ordinary folders."""
-    tree = FolderTree(_ROLE)
+    tree = FolderTree(_ROLE, takes_item=takes_item)
     qtbot.addWidget(tree)
     collection = QTreeWidgetItem(["Favorites"])
     collection.setData(0, DROP_KEY_ROLE, "__starred__")
+    collection.setData(0, TREE_KEY_ROLE, oriented_key("__starred__", LANDSCAPE))
     a = _folder_row("A", "k/a")
     b = _folder_row("B", "k/b")
     for item in (collection, a, b):
@@ -305,7 +307,7 @@ def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, mo
     tree, collection, a, b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
     dropped = []
-    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
     tree.setCurrentItem(a)
     b.setSelected(True)
 
@@ -323,7 +325,7 @@ def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch
     tree, collection, a, b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
     dropped = []
-    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
     tree.setCurrentItem(a)
     a.setSelected(False)
     b.setSelected(True)  # the pick is elsewhere; the pressed row is A
@@ -349,7 +351,7 @@ def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
     tree, collection, a, b = _collecting_tree(qtbot)
     dropped = []
-    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
 
     mime = _drag(["k/a", "k/b"])
 
@@ -365,7 +367,7 @@ def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
 def test_an_ordinary_folder_refuses_a_drop(qtbot):
     tree, _collection, a, b = _collecting_tree(qtbot)
     dropped = []
-    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
 
     mime = _drag(["k/a"])
 
@@ -378,7 +380,7 @@ def test_an_ordinary_folder_refuses_a_drop(qtbot):
 def test_a_collecting_row_refuses_a_drop_of_only_itself(qtbot):
     tree, collection, _a, _b = _collecting_tree(qtbot)
     dropped = []
-    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
 
     mime = _drag(["__starred__"])
 
@@ -391,7 +393,7 @@ def test_a_collecting_row_refuses_a_drop_of_only_itself(qtbot):
 def test_a_drop_carrying_something_other_than_folders_is_ignored(qtbot):
     tree, collection, _a, _b = _collecting_tree(qtbot)
     dropped = []
-    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
     text = QMimeData()
     text.setText("k/a")  # a plain-text drag from anywhere else
 
@@ -399,6 +401,108 @@ def test_a_drop_carrying_something_other_than_folders_is_ignored(qtbot):
     _drop_at(tree, collection, text)
 
     assert dropped == []
+
+
+def test_an_item_dropped_on_a_collecting_row_that_takes_it_is_reported(qtbot):
+    asked = []
+
+    def takes(row_key, prompt_id):
+        asked.append((row_key, prompt_id))
+        return True
+
+    tree, collection, _a, _b = _collecting_tree(qtbot, takes_item=takes)
+    dropped = []
+    tree.dropped.connect(lambda key, keys, items: dropped.append((key, keys, items)))
+    mime = generation_mime("p1")
+
+    assert _drag_move_at(tree, collection, mime).isAccepted()
+    _drop_at(tree, collection, mime)
+
+    assert dropped == [("__starred__", [], ["p1"])]
+    assert asked[-1] == (oriented_key("__starred__", LANDSCAPE), "p1")
+
+
+def test_an_item_a_collecting_row_does_not_take_is_refused(qtbot):
+    tree, collection, _a, _b = _collecting_tree(qtbot)  # takes no item
+    dropped = []
+    tree.dropped.connect(lambda *landed: dropped.append(landed))
+    mime = generation_mime("p1")
+
+    assert not _drag_move_at(tree, collection, mime).isAccepted()
+    _drop_at(tree, collection, mime)
+
+    assert dropped == []
+
+
+def test_an_ordinary_folder_refuses_an_item(qtbot):
+    # Only a collecting row is asked; a derived folder's contents are its settings'.
+    tree, _collection, a, _b = _collecting_tree(qtbot, takes_item=lambda *_: True)
+    dropped = []
+    tree.dropped.connect(lambda *landed: dropped.append(landed))
+    mime = generation_mime("p1")
+
+    assert not _drag_move_at(tree, a, mime).isAccepted()
+    _drop_at(tree, a, mime)
+
+    assert dropped == []
+
+
+def test_an_item_drag_is_let_into_the_tree(qtbot):
+    # Refused at the door, it would never be offered a row to land on.
+    tree, collection, _a, _b = _collecting_tree(qtbot)
+    mime = generation_mime("p1")
+    pos = tree.visualRect(tree.indexFromItem(collection)).center()
+    enter = QDragEnterEvent(pos, Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+
+    tree.dragEnterEvent(enter)
+
+    assert enter.isAccepted()
+
+
+def _scrolled_to_its_foot(qtbot):
+    """A tree too long for its height, scrolled down as far as it goes, where the
+    folders of your own at its head are out of sight."""
+    tree = FolderTree(_ROLE)
+    qtbot.addWidget(tree)
+    for n in range(100):
+        tree.addTopLevelItem(_folder_row(f"Folder {n}", f"k/{n}"))
+    tree.resize(200, 150)
+    tree.show()
+    qtbot.waitExposed(tree)
+    bar = tree.verticalScrollBar()
+    bar.setValue(bar.maximum())
+    return tree, bar
+
+
+def _held_at_the_top_edge(tree, mime):
+    return QDragMoveEvent(QPoint(40, 2), Qt.DropAction.CopyAction, mime,
+                          Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+
+
+def test_a_drag_held_at_the_top_edge_scrolls_the_tree_up(qtbot):
+    tree, bar = _scrolled_to_its_foot(qtbot)
+    start = bar.value()
+    mime = generation_mime("p1")
+
+    tree.dragMoveEvent(_held_at_the_top_edge(tree, mime))
+
+    qtbot.waitUntil(lambda: bar.value() < start, timeout=3000)
+
+
+def test_letting_a_drag_go_at_the_edge_stops_the_scrolling(qtbot):
+    tree, bar = _scrolled_to_its_foot(qtbot)
+    start = bar.value()
+    mime = generation_mime("p1")
+    tree.dragMoveEvent(_held_at_the_top_edge(tree, mime))
+    qtbot.waitUntil(lambda: bar.value() < start, timeout=3000)
+
+    tree.dropEvent(QDropEvent(QPointF(40, 2), Qt.DropAction.CopyAction, mime,
+                              Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+    settled = bar.value()
+    qtbot.wait(500)
+
+    assert bar.value() == settled
 
 
 def _is_blue(color) -> bool:
@@ -566,7 +670,7 @@ def test_folders_dragged_from_the_other_half_land_nowhere(qtbot):
     mime = QMimeData()
     mime.setData(FOLDER_KEYS_MIME, a.data(0, TREE_KEY_ROLE).encode("utf-8"))
     dropped = []
-    tree.folders_dropped.connect(lambda target, keys: dropped.append(keys))
+    tree.dropped.connect(lambda _target, keys, _items: dropped.append(keys))
     pos = QPointF(tree.visualRect(tree.indexFromItem(collection)).center())
     move = QDragMoveEvent(pos.toPoint(), Qt.DropAction.CopyAction, mime,
                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)

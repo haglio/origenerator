@@ -234,8 +234,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     notice each put their item in front of him through one method, which asks
     a hosting room for this window's place. 279 -> 280: Start now ends the
     minute a video waits after a picture, from the job queue or a slideshow's,
-    so it is one method beside Clear's.)"""
+    so it is one method beside Clear's. 280 -> 281: an item dragged over a
+    folder of your own in the TOC goes in only where the gallery shows it on
+    that folder's side, which the TOC asks of the gallery through one
+    method.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 280
+               for x in _class_def(VIEW, "GalleryView").body) == 281
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

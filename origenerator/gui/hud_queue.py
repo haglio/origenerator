@@ -516,7 +516,7 @@ def _leader(item) -> Leader:
         compact=item.reading.caption(compact=True),
         progress=item.reading.bars()[0],
         pass_progress=item.reading.bars()[1],
-        wait=queue_wait_text(item.foreign_ahead) or "",
+        wait=queue_wait_text(item.foreign_ahead, item.starts_at) or "",
     )
 
 

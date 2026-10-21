@@ -9341,13 +9341,27 @@ def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
 
 
 def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_path):
-    # Only another app's work earns the extra line: waiting on his own queue means
-    # ComfyUI is generating something he asked for, which is no mystery at all.
+    # Waiting on his own queue means ComfyUI is generating something he asked
+    # for, which is no mystery at all.
     view, _client = _waiting_view(qtbot, tmp_path, backlog=0)
 
     view._poll()
 
     assert _preview_of(view).show_message.call_args.args[0] == "Waiting for preview…"
+
+
+def test_a_run_waiting_out_the_minute_after_a_picture_says_when_it_starts(
+        qtbot, tmp_path, monkeypatch):
+    view, _client = _waiting_view(qtbot, tmp_path, backlog=0)
+    waiting, = view._live_jobs.values()
+    # The half-second keeps the count a clear half-second off a rollover.
+    start = time.monotonic() + 42.5
+    monkeypatch.setattr(view._jobs, "starts_at",
+                        lambda prompt_id: start if prompt_id == waiting.prompt_id else None)
+
+    view._poll()
+
+    assert _preview_of(view).show_message.call_args.args[0] == "Starts in 0:43"
 
 
 def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):

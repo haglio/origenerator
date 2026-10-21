@@ -103,6 +103,23 @@ def test_card_names_another_apps_hold_instead_of_a_bare_queued(qtbot):
     assert card._scrim.text() == "Waiting on 2 jobs from another app"
 
 
+def test_a_video_waiting_out_the_minute_after_a_picture_counts_down_to_its_start(qtbot):
+    # The half-second keeps the count a clear half-second off a rollover.
+    card = InFlightCard(_item(status="queued", starts_at=time.monotonic() + 42.5))
+    qtbot.addWidget(card)
+    assert card._scrim.text() == "Starts in 0:43"
+
+
+def test_the_countdown_advances_between_polls(qtbot):
+    card = InFlightCard(_item(status="queued", starts_at=time.monotonic() + 42.5))
+    qtbot.addWidget(card)
+
+    card._item.starts_at -= 3  # as if three seconds had gone by
+    card._tick.timeout.emit()
+    assert card._scrim.text() == "Starts in 0:40"
+    assert card._tick.isActive()
+
+
 def test_a_queue_of_the_users_own_jobs_says_nothing_extra(qtbot):
     # Waiting on his own queue is no mystery — ComfyUI is working through what he
     # asked for — so the card says what it always said.

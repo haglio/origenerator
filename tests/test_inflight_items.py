@@ -48,7 +48,7 @@ class FakeDb:
 
 
 class FakeJob:
-    def __init__(self, prompt_id, *, state="running", started_at=None):
+    def __init__(self, prompt_id, *, state="running", started_at=None, starts_at=None):
         self.prompt_id = prompt_id
         self.state = state
         self.started_at = started_at
@@ -59,6 +59,7 @@ class FakeJob:
         self.foreign_ahead = None
         self.params = {}
         self.shielded = False
+        self.queue_says_it_starts_at = starts_at
 
 
 class FakeJobQueue:
@@ -66,6 +67,10 @@ class FakeJobQueue:
         self.jobs_by_folder = jobs_by_folder or {}
         self.queue_order = list(order)
         self.training = training
+
+    def starts_at(self, prompt_id):
+        return next((job.queue_says_it_starts_at for jobs in self.jobs_by_folder.values()
+                     for job in jobs if job.prompt_id == prompt_id), None)
 
 
 class FakeTraining:
@@ -151,6 +156,15 @@ def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build):
     card, = items
     assert (card.reading.frame, card.reading.progress, card.reading.stage) == (b"frame", (5, 20), "Render")
     assert card.cancel is not None
+
+
+def test_a_video_waiting_out_the_minute_after_a_picture_carries_when_it_starts(build):
+    job = FakeJob("g1", state="queued", starts_at=1060.0)
+    items = build([_row("g1", status="pending")],
+                  jobs_by_folder={"video/wan22_i2v/aaa": [job]})
+
+    card, = items
+    assert card.starts_at == 1060.0
 
 
 def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build):

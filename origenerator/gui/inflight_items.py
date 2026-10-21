@@ -108,6 +108,7 @@ class InFlightItems:
                 pass_progress = job.last_pass_progress  # the band along the bar's foot
                 stage = job.last_stage                   # and what it is doing
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
+                starts_at = self._jobs.starts_at(pid)
                 started = job.started_at  # None until ComfyUI actually starts it
                 cancel = partial(self._on_cancel, pid)
                 shield = partial(self._on_shield, pid)
@@ -119,6 +120,7 @@ class InFlightItems:
                     image_index = gallery.build_image_config_index(self._image_rows())
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
+                starts_at = None
                 pass_progress, stage, stop_auto, state = None, "", None, row.get("status")
                 shield, shielded = None, bool(row.get("shielded"))
             workflow_name = row.get("workflow_name") or ""
@@ -154,6 +156,7 @@ class InFlightItems:
                 auto_generating=self._auto.is_active(folder_key),
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,
+                starts_at=starts_at,
                 job_kind=kind,
                 requested=pid in requested,
                 # Only where the start frame is what the run is *of*: a video

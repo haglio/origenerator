@@ -1042,20 +1042,108 @@ def test_an_image_takes_the_machine_from_a_video_being_rendered(qtbot, tmp_path)
     assert db.get_generation(rendering.prompt_id)["status"] == "pending"
 
 
-def test_the_video_set_aside_starts_over_once_the_image_is_done(qtbot, tmp_path):
+def test_the_video_set_aside_starts_over_a_minute_after_the_image_was_asked_for(
+        qtbot, tmp_path):
     client = _client()
     client.forget_history = MagicMock()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    now = [1000.0]
+    queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
     video = _launch_video(queue, "v", seed=1)
     _rendering(client, video)
     image = _launch_image(queue, "i")
-
+    now[0] = 1010.0
     image.finished.emit([{"filename": "out.png"}], None, 1.0)
+
+    assert client.submit_job.call_args_list[-1].args[1] == image.prompt_id
+
+    now[0] = 1060.0
+    queue._videos_wait.timeout.emit()  # the minute is up, delivered the way the timer does
 
     assert [c.args[1] for c in client.submit_job.call_args_list] == [
         video.prompt_id, image.prompt_id, video.prompt_id
     ]
     assert queue.queue_order == [video.prompt_id]
+
+
+def _a_video_waiting_on_a_picture(tmp_path, now):
+    """A video set aside for a picture asked for at ``now``, the picture done
+    ten seconds later: the video is waiting out the rest of the minute."""
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
+    video = _launch_video(queue, "v", seed=1)
+    _rendering(client, video)
+    image = _launch_image(queue, "i")
+    now[0] += 10
+    image.finished.emit([{"filename": "out.png"}], None, 1.0)
+    return client, queue, video
+
+
+def test_the_wait_is_timed_for_what_is_left_of_the_minute(qtbot, tmp_path):
+    _client_, queue, _video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+
+    assert queue._videos_wait.isActive()
+    assert queue._videos_wait.interval() == 50_000
+
+
+def test_a_picture_asked_for_during_the_wait_starts_at_once_and_the_minute_starts_again(
+        qtbot, tmp_path):
+    now = [1000.0]
+    client, queue, video = _a_video_waiting_on_a_picture(tmp_path, now)
+    now[0] = 1030.0
+
+    another = _launch_image(queue, "i2")
+
+    assert client.submit_job.call_args_list[-1].args[1] == another.prompt_id
+    another.finished.emit([{"filename": "out.png"}], None, 1.0)
+    now[0] = 1060.0
+    queue._videos_wait.timeout.emit()
+    assert client.submit_job.call_args_list[-1].args[1] == another.prompt_id
+    assert queue._videos_wait.interval() == 30_000
+    now[0] = 1090.0
+    queue._videos_wait.timeout.emit()
+    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
+
+
+def test_the_video_waiting_out_the_minute_says_when_it_starts(qtbot, tmp_path):
+    _client_, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+
+    assert queue.starts_at(video.prompt_id) == 1060.0
+
+
+def test_a_video_set_aside_says_no_start_while_the_picture_is_being_made(qtbot, tmp_path):
+    # Until the picture is done it is the picture the video waits on, which
+    # has its own bar; a start time would be a promise the picture could break.
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: 1000.0)
+    video = _launch_video(queue, "v", seed=1)
+    _rendering(client, video)
+    _launch_image(queue, "i")
+
+    assert queue.starts_at(video.prompt_id) is None
+
+
+def test_a_video_held_for_a_training_says_no_start(qtbot, tmp_path):
+    _client_, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+
+    queue.hold_for_training(_Training())
+
+    assert queue.starts_at(video.prompt_id) is None
+
+
+def test_only_the_video_at_the_front_says_when_it_starts(qtbot, tmp_path):
+    now = [1000.0]
+    _client_, queue, _video = _a_video_waiting_on_a_picture(tmp_path, now)
+
+    behind = _launch_video(queue, "v2", seed=2)
+
+    assert queue.starts_at(behind.prompt_id) is None
+
+
+def test_a_video_waiting_out_the_minute_goes_to_comfyui_as_the_app_closes(qtbot, tmp_path):
+    client, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+
+    assert queue.flush_to_server() == 1
+    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
 
 
 def test_a_video_set_aside_shows_as_one_that_has_not_started(qtbot, tmp_path):
@@ -1256,7 +1344,8 @@ def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_
     # the file exists, and its turn coming round again is when that is found.
     client = _client()
     db = Database(tmp_path / "test.db")
-    queue = JobQueue(db, client)
+    now = [1000.0]
+    queue = JobQueue(db, client, clock=lambda: now[0])
     video = _launch_video(queue, "v", seed=1)
     _rendering(client, video)
     image = _launch_image(queue, "i")
@@ -1264,8 +1353,10 @@ def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_
         _I2V.output_node_id: {"gifs": [{"filename": "out.mp4", "subfolder": ""}]},
     }})
     client.forget_history = MagicMock()
-
     image.finished.emit([{"filename": "out.png"}], None, 1.0)
+
+    now[0] = 1060.0
+    queue._videos_wait.timeout.emit()
 
     assert client.submit_job.call_count == 2  # the video's first send, and the image
     assert db.get_generation(video.prompt_id)["status"] == "completed"

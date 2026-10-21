@@ -13,20 +13,22 @@ which is also all the tile of an image being enhanced is handed
 (:mod:`origenerator.gui.thumbnail_widget`): that tile has a picture, a name and
 a click of its own already.
 
-:func:`queue_wait_text` is here for the same reason: what a wait on another app
-reads like is one wording, shared by every surface that has to say it — as is
+:func:`queue_wait_text` is here for the same reason: how a wait reads is one
+wording, shared by every surface that has to say it — as is
 :func:`discard_run_text`, the label on the button that throws the run in flight
 away, which three panes each draw, and :func:`stop_loop_text`, the menu entry
 beside it that ends the loop as well as the run.
 """
 from __future__ import annotations
 
+import math
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
-from origenerator.timing import RunTiming, elapsed_since, queue_estimate_label
+from origenerator.timing import RunTiming, clock_duration, elapsed_since, queue_estimate_label
 
 
 @dataclass
@@ -48,6 +50,7 @@ class InFlightItem:
     # job for is not one this session can stop either.
     stop_auto: Callable[[], None] | None = None
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
+    starts_at: float | None = None  # when a video waiting out the minute after a picture starts
     # What kind of work this is in one word — "Image", "Video", "Enhance"
     # (:func:`gallery.job_kind_label`), or "" for a workflow this build has no
     # template for. The workflow's display name is in :attr:`caption` and answers
@@ -257,20 +260,23 @@ def stop_loop_tooltip() -> str:
     return "Throw this run away and switch the loop off"
 
 
-def queue_wait_text(foreign_ahead: int | None) -> str | None:
-    """How a job's wait reads while another app is holding ComfyUI in front of it.
+def queue_wait_text(foreign_ahead: int | None, starts_at: float | None = None, *,
+                    now=time.monotonic) -> str | None:
+    """How a job's wait reads while another app's work is ahead of it on ComfyUI,
+    or while it is a video waiting out the minute after a picture
+    (:meth:`JobQueue.starts_at`, on the queue's clock).
 
-    Only another app's work earns this line. A wait on the user's own jobs is
-    no mystery — ComfyUI is working through exactly what they asked for, and they
-    can read the rest of the queue in the lower strip — so saying "waiting in
-    ComfyUI" there sends them hunting for phantom jobs that are their own.
-
-    ``None`` when nothing foreign is ahead: every surface's cue to say what it
-    always said.
+    A wait on the user's own jobs earns no line: ComfyUI is working through
+    exactly what they asked for, and "waiting in ComfyUI" there sends them
+    hunting for phantom jobs that are their own. ``None`` is every surface's
+    cue to say what it always said.
     """
-    if not foreign_ahead:
-        return None
-    return f"Waiting on {foreign_ahead} job{'' if foreign_ahead == 1 else 's'} from another app"
+    if foreign_ahead:
+        return (f"Waiting on {foreign_ahead} job{'' if foreign_ahead == 1 else 's'}"
+                " from another app")
+    if starts_at is not None and (left := starts_at - now()) > 0:
+        return f"Starts in {clock_duration(math.ceil(left))}"
+    return None
 
 
 def starting_row_text(starting: bool) -> str | None:

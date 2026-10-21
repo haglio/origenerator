@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PIL import Image
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt
+from PyQt6.QtGui import QColor, QImage, QMovie
 from PyQt6.QtWidgets import QProxyStyle, QStyle, QStyleOptionViewItem
 
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
+from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
 from tests.pictured_rows import painted_row, square
 
 
@@ -26,7 +28,7 @@ def test_each_video_is_a_row_wearing_its_picture_drained_of_color(qtbot, tmp_pat
 
     row = painted_row(dropdown, 0)
 
-    middle = row.pixelColor(row.height() // 2, row.height() // 2)
+    middle = row.pixelColor(_where_the_picture_is(row).center())
     assert dropdown.count() == 1
     assert middle.saturation() == 0 and middle.lightness() > 0
     dropdown.hidePopup()
@@ -38,9 +40,7 @@ def test_a_video_with_no_picture_shows_a_blank_square(qtbot):
 
     row = painted_row(dropdown, 0)
 
-    middle, edge = row.height() // 2, 5
-    assert row.pixelColor(edge + 1, middle) != QColor("black")
-    assert row.pixelColor(middle, edge + 1) != QColor("black")
+    assert _where_the_picture_is(row).size() == THUMBNAIL_BOX
     dropdown.hidePopup()
 
 
@@ -109,4 +109,106 @@ def test_the_row_under_the_mouse_is_lit_once_all_around_its_picture(qtbot, tmp_p
               (picture[0], top[-1] + 1), (plain.width() - 4, middle))
     assert len({lit.pixel(x, y) for x, y in around}) == 1
     assert all(lit.pixel(x, y) != plain.pixel(x, y) for x, y in around)
+    dropdown.hidePopup()
+
+
+def _picture(tmp_path, width, height) -> str:
+    path = tmp_path / f"made-{width}x{height}.png"
+    picture = QImage(width, height, QImage.Format.Format_RGB32)
+    picture.fill(QColor("red"))
+    picture.save(str(path))
+    return str(path)
+
+
+def _looping_clip(tmp_path) -> str:
+    path = tmp_path / "clip.webp"
+    frames = [Image.new("RGB", (160, 90), color) for color in ((255, 0, 0), (0, 255, 0))]
+    frames[0].save(path, format="WEBP", save_all=True, append_images=frames[1:],
+                   duration=100, loop=0)
+    return str(path)
+
+
+def _where_the_picture_is(row: QImage) -> QRect:
+    inked = [(x, y) for y in range(row.height()) for x in range(row.width())
+             if QColor(row.pixel(x, y)).lightness() > 40]
+    xs, ys = [x for x, _ in inked], [y for _, y in inked]
+    return QRect(QPoint(min(xs), min(ys)), QPoint(max(xs), max(ys)))
+
+
+def test_a_row_draws_its_picture_the_size_the_drop_box_does(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", _picture(tmp_path, 300, 150))])
+    dropdown.showPopup()
+
+    row = painted_row(dropdown, 0)
+
+    assert _where_the_picture_is(row).size() == QSize(300, 150).scaled(
+        THUMBNAIL_BOX, Qt.AspectRatioMode.KeepAspectRatio)
+    dropdown.hidePopup()
+
+
+def test_a_tall_pictures_row_is_taller_than_a_wide_pictures_row(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("tall", _picture(tmp_path, 150, 300)),
+                                 RecentVideo("wide", _picture(tmp_path, 300, 150))])
+    dropdown.showPopup()
+
+    tall, wide = (dropdown.view().visualRect(dropdown.model().index(row, 0)).height()
+                  for row in (0, 1))
+
+    assert tall - wide == THUMBNAIL_BOX.height() - THUMBNAIL_BOX.height() // 2
+    dropdown.hidePopup()
+
+
+def test_a_rows_picture_sits_in_the_middle_of_the_row(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", _picture(tmp_path, 150, 300))])
+    dropdown.showPopup()
+
+    row = painted_row(dropdown, 0)
+
+    assert abs(_where_the_picture_is(row).center().x() - row.width() // 2) <= 1
+    dropdown.hidePopup()
+
+
+def test_a_videos_picture_plays_in_its_row(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None, _looping_clip(tmp_path))])
+    dropdown.showPopup()
+    first = painted_row(dropdown, 0)
+    middle = _where_the_picture_is(first).center()
+
+    qtbot.waitUntil(lambda: painted_row(dropdown, 0).pixel(middle) != first.pixel(middle),
+                    timeout=3000)
+    dropdown.hidePopup()
+
+
+def test_closing_the_list_stops_its_videos(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None, _looping_clip(tmp_path))])
+    dropdown.showPopup()
+    painted_row(dropdown, 0)
+
+    dropdown.hidePopup()
+
+    assert not [movie for movie in dropdown.findChildren(QMovie)
+                if movie.state() == QMovie.MovieState.Running]
+
+
+class _Redraws(QObject):
+    def __init__(self):
+        super().__init__()
+        self.count = 0
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Paint:
+            self.count += 1
+        return False
+
+
+def test_the_open_list_redraws_a_playing_video_by_itself(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None, _looping_clip(tmp_path))])
+    dropdown.showPopup()
+    painted_row(dropdown, 0)
+    qtbot.wait(300)
+    redraws = _Redraws()
+    dropdown.view().viewport().installEventFilter(redraws)
+
+    qtbot.waitUntil(lambda: redraws.count > 0, timeout=3000)
+    dropdown.view().viewport().removeEventFilter(redraws)
     dropdown.hidePopup()

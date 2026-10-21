@@ -33,23 +33,25 @@ pictures there might have been.
 
 Every scaled cell is cached by (file, size, gray) — the strip re-renders on
 every poll, and a start frame is a full-size render off disk. That fitting and
-that cache are :func:`fitted_cell`, which is public because the pair drawn by
-:func:`~origenerator.gui.combination_view.combination_pixmap` and the pictures
-in a dropdown's rows are the same kind of cell, and a second cache of it would
-be a second full-size decode a second.
+that cache are :func:`fitted_cell`, public because the pair drawn by
+:func:`~origenerator.gui.combination_view.combination_pixmap` is the same kind of
+cell, and :func:`fitted_picture`, the same picture without the square around it,
+which a dropdown's rows draw; a second cache would be a second full-size decode a
+second.
 """
 from __future__ import annotations
 
 import os
 from collections import OrderedDict
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import QLabel
 from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator.gui.combination import Combination, draw_plus, draw_recipe, plus_width
 from origenerator.gui.grayscale import grayscale_pixmap
+from origenerator.gui.thumbnail_box import centered_in_square, fitted_in
 
 # The gap between cells, in pixels. One is enough to read as separate pictures;
 # two at this size is a visible stripe between them.
@@ -87,13 +89,21 @@ def fitted_cell(path, side: int, gray: bool = False) -> QPixmap | None:
     ``gray`` drains the color out for a picture shown only for what it configures;
     it is part of the cache key, so one file can be held both ways at once.
     """
+    return _held(path, side, gray, squared=True)
+
+
+def fitted_picture(path, side: int, gray: bool = False) -> QPixmap | None:
+    return _held(path, side, gray, squared=False)
+
+
+def _held(path, side: int, gray: bool, *, squared: bool) -> QPixmap | None:
     if not path:
         return None
-    key = (str(path), side, gray, _written(path))
+    key = (str(path), side, gray, squared, _written(path))
     if key in _CELLS:
         _CELLS.move_to_end(key)
     else:
-        fitted = _fit_in_square(QPixmap(str(path)), side)
+        fitted = _fitted(QPixmap(str(path)), side, squared)
         _CELLS[key] = (grayscale_pixmap(fitted)
                        if gray and fitted is not None else fitted)
         if len(_CELLS) > _MOST_CELLS:
@@ -101,27 +111,18 @@ def fitted_cell(path, side: int, gray: bool = False) -> QPixmap | None:
     return _CELLS[key]
 
 
-def _fit_in_square(pixmap: QPixmap, side: int) -> QPixmap | None:
-    """``pixmap`` scaled to fit whole inside a ``side``x``side`` square, centered,
-    the rest of the square left clear — letterboxed, or pillarboxed for a tall one.
+def _fitted(pixmap: QPixmap, side: int, squared: bool) -> QPixmap | None:
+    """``pixmap`` scaled to fit whole inside a ``side``x``side`` square, and when
+    ``squared`` centered on it with the rest left clear — letterboxed, or
+    pillarboxed for a tall one.
 
-    The square itself is always the full ``side``, whatever shape went in, so the
+    A squared cell is always the full ``side``, whatever shape went in, so the
     cells stay a grid however mixed the pictures in it are.
     """
     if pixmap.isNull():
         return None
-    scaled = pixmap.scaled(
-        side, side,
-        Qt.AspectRatioMode.KeepAspectRatio,
-        Qt.TransformationMode.SmoothTransformation,
-    )
-    cell = QPixmap(side, side)
-    cell.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(cell)
-    painter.drawPixmap((side - scaled.width()) // 2, (side - scaled.height()) // 2,
-                       scaled)
-    painter.end()
-    return cell
+    scaled = fitted_in(pixmap, QSize(side, side))
+    return centered_in_square(scaled, side) if squared else scaled
 
 
 def _slot_color() -> QColor:

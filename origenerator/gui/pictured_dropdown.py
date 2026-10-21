@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from functools import cache
+from collections.abc import Callable
+from functools import cache, lru_cache
 
-from PyQt6.QtCore import QMargins, QModelIndex, QPointF, QRect, QRectF, QSize, Qt
+from PyQt6.QtCore import QMargins, QPoint, QPointF, QRect, QRectF, QSize, Qt
 from PyQt6.QtGui import (
     QColor,
     QFont,
+    QImageReader,
     QPainter,
     QPainterPath,
     QPalette,
@@ -22,11 +24,12 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED
 
+from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.no_wheel import NoWheelComboBox
-from origenerator.gui.queue_thumbs import fitted_cell
+from origenerator.gui.queue_thumbs import fitted_picture
+from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
 
 PICTURES_ROLE = Qt.ItemDataRole.UserRole
-_PICTURE_SIDE = 48
 _ROW_INSET = QMargins(3, 3, 3, 3)
 _BRACE_GAP = 4
 _BRACE_WIDTH = 10
@@ -36,19 +39,18 @@ _LIT = (QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_MouseOver
 
 
 @cache
-def unmade_cell(side: int, size: tuple[int, int] | None) -> QPixmap:
+def unmade_picture(side: int, size: tuple[int, int] | None) -> QPixmap:
     width, height = size or (1, 1)
     scale = side / max(width, height)
     shape = QRect(0, 0, max(1, round(width * scale)), max(1, round(height * scale)))
-    shape.moveCenter(QRect(0, 0, side, side).center())
-    cell = QPixmap(side, side)
-    cell.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(cell)
+    picture = QPixmap(shape.size())
+    picture.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(picture)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.fillRect(shape, QColor(BORDER_DEFAULT))
     painter.fillPath(_question_mark_filling(QRectF(shape)), QColor(TEXT_MUTED))
     painter.end()
-    return cell
+    return picture
 
 
 def _question_mark_filling(blank: QRectF) -> QPainterPath:
@@ -72,9 +74,31 @@ def _height_of(margins: QMargins) -> int:
     return QRect(0, 0, 0, 0).marginsAdded(margins).height()
 
 
+_INSET_HEIGHT = _height_of(_ROW_INSET)
+
+
 def picture_of(picture, side: int, gray: bool = False) -> QPixmap | None:
-    return (fitted_cell(picture.thumbnail, side, gray) if picture.thumbnail
-            else unmade_cell(side, picture.size))
+    return (fitted_picture(picture.thumbnail, side, gray) if picture.thumbnail
+            else unmade_picture(side, picture.size))
+
+
+def _shape_in_the_box(picture) -> QSize:
+    return _shape_of(picture).scaled(THUMBNAIL_BOX, Qt.AspectRatioMode.KeepAspectRatio)
+
+
+def _shape_of(picture) -> QSize:
+    if picture.thumbnail:
+        width, height = _shape_on_disk(str(picture.thumbnail))
+        if width > 0 and height > 0:
+            return QSize(width, height)
+    width, height = picture.size or (1, 1)
+    return QSize(width, height)
+
+
+@lru_cache(maxsize=1024)
+def _shape_on_disk(path: str) -> tuple[int, int]:
+    size = QImageReader(path).size()
+    return size.width(), size.height()
 
 
 def _brace(span: QRectF) -> QPainterPath:
@@ -102,21 +126,19 @@ def _lettering_color(option: QStyleOptionViewItem) -> QColor:
 
 
 class _PicturedRows(QStyledItemDelegate):
-    def __init__(self, parent, *, gray: bool):
+    def __init__(self, parent, *, gray: bool, frame_of: Callable[[object], QPixmap | None]):
         super().__init__(parent)
         self._gray = gray
+        self._frame_of = frame_of
 
     def sizeHint(self, option, index):
         widest = super().sizeHint(option, index).grownBy(_ROW_INSET).width() + _BRACE_COLUMN
-        return QSize(widest, self.pitch(option) * len(index.data(PICTURES_ROLE)))
-
-    def pitch(self, option) -> int:
-        return super().sizeHint(option, QModelIndex()).grownBy(_ROW_INSET).height()
+        return QSize(widest, sum(shape.height() + _INSET_HEIGHT for shape in _shapes(index)))
 
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         option.features |= QStyleOptionViewItem.ViewItemFeature.HasDecoration
-        option.decorationSize = QSize(_PICTURE_SIDE, _PICTURE_SIDE)
+        option.decorationSize = THUMBNAIL_BOX
 
     def paint(self, painter, option, index):
         style = option.widget.style() if option.widget else QApplication.style()
@@ -125,12 +147,11 @@ class _PicturedRows(QStyledItemDelegate):
         filled = QStyleOptionViewItem(option)
         self.initStyleOption(filled, index)
         pictures = index.data(PICTURES_ROLE)
-        places = _picture_places(style, filled, len(pictures))
+        places = _picture_places(option.rect, _shapes(index), worded=bool(index.data()))
         for picture, place in zip(pictures, places):
-            drawn = picture_of(picture, _PICTURE_SIDE, self._gray) if place.intersects(
-                painter.viewport()) else None
+            drawn = self._drawn(picture) if place.intersects(painter.viewport()) else None
             if drawn is not None:
-                painter.drawPixmap(place.topLeft(), drawn)
+                painter.drawPixmap(place.center() - drawn.rect().center(), drawn)
         span = QRectF(places[0].right() + _BRACE_GAP, places[0].top(), _BRACE_WIDTH,
                       places[-1].bottomLeft().y() - places[0].top())
         if len(pictures) > 1:
@@ -147,21 +168,38 @@ class _PicturedRows(QStyledItemDelegate):
         style.drawControl(QStyle.ControlElement.CE_ItemViewItem, text, painter, option.widget)
 
 
+    def _drawn(self, picture) -> QPixmap | None:
+        frame = self._frame_of(picture)
+        if frame is None:
+            return picture_of(picture, THUMBNAIL_BOX.width(), self._gray)
+        return grayscale_pixmap(frame) if self._gray else frame
+
+
 def _ground_of(option: QStyleOptionViewItem) -> QStyleOptionViewItem:
     ground = QStyleOptionViewItem(option)
     ground.showDecorationSelected = True
     return ground
 
 
-def _picture_places(style, option: QStyleOptionViewItem, count: int) -> list[QRect]:
-    pitch = option.rect.height() // count
+def _shapes(index) -> list[QSize]:
+    pictures = index.data(PICTURES_ROLE)
+    if index.data():
+        return [THUMBNAIL_BOX] * len(pictures)
+    return [_shape_in_the_box(picture) for picture in pictures]
+
+
+def _picture_places(rect: QRect, shapes: list[QSize], *, worded: bool) -> list[QRect]:
     places = []
-    for row in range(count):
-        cell = QStyleOptionViewItem(option)
-        cell.rect = QRect(option.rect.left(), option.rect.top() + row * pitch,
-                          option.rect.width(), pitch).marginsRemoved(_ROW_INSET)
-        places.append(style.subElementRect(QStyle.SubElement.SE_ItemViewItemDecoration, cell,
-                                           option.widget))
+    top = rect.top()
+    for shape in shapes:
+        cell = QRect(rect.left(), top, rect.width(),
+                     shape.height() + _INSET_HEIGHT).marginsRemoved(_ROW_INSET)
+        if worded:
+            cell.setWidth(THUMBNAIL_BOX.width())
+        place = QRect(QPoint(0, 0), shape)
+        place.moveCenter(cell.center())
+        places.append(place)
+        top += shape.height() + _INSET_HEIGHT
     return places
 
 
@@ -170,7 +208,7 @@ class PicturedDropdown(NoWheelComboBox):
 
     def __init__(self, parent=None, *, gray: bool = False):
         super().__init__(parent)
-        self.setItemDelegate(_PicturedRows(self, gray=gray))
+        self.setItemDelegate(_PicturedRows(self, gray=gray, frame_of=self._frame_of))
         self.view().setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
     def showPopup(self):
@@ -183,10 +221,13 @@ class PicturedDropdown(NoWheelComboBox):
         popup = view.parentWidget()
         chrome = sum(_height_of(margins) for margins in (
             popup.contentsMargins(), view.contentsMargins(), view.viewportMargins()))
-        popup.setMaximumHeight(self.maxVisibleItems() * self._pitch() + chrome)
+        popup.setMaximumHeight(self.maxVisibleItems() * self._picture_row_height() + chrome)
 
-    def _pitch(self) -> int:
-        return self.itemDelegate().pitch(self._row_option())
+    def _picture_row_height(self) -> int:
+        return THUMBNAIL_BOX.height() + _INSET_HEIGHT
+
+    def _frame_of(self, picture) -> QPixmap | None:
+        return None
 
     def _row_option(self) -> QStyleOptionViewItem:
         view = self.view()

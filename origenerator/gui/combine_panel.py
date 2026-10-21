@@ -347,7 +347,7 @@ class CombinePanel(QWidget):
         held = self.video_slot.current_id()
         listed = dict.fromkeys(video for video in (held, *self._history(self.selected_intent()))
                                if video)
-        return [RecentVideo(video, self._preview(video)[0])
+        return [RecentVideo(video, *self._preview(video))
                 for video in listed if self.video_slot.accepts(video)]
 
     def _show_dropped(self):

@@ -7417,6 +7417,29 @@ def test_with_two_items_picked_the_slideshow_comes_back_to_where_the_last_one_cl
     slideshow.close()
 
 
+def test_the_item_picked_comes_first_though_another_in_the_folder_is_being_enhanced(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._slideshows.start()
+    last = view._slideshows.showing
+    qtbot.addWidget(last)
+    last.close()
+    (picked,) = view.selected_prompt_ids()   # the slide it closed on
+    enhancing = next(pid for pid in view.visible_prompt_ids() if pid != picked)
+    view._slideshows.note_enhancing({enhancing: "running"})
+
+    view._slideshows.start()
+
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert slideshow._playlist.current().prompt_id == picked
+    slideshow.close()
+
+
 def _standalone_slideshow(qtbot, monkeypatch):
     """A fullscreen slideshow of two pictures, opened with no session under it."""
     _resolve_by_id(monkeypatch)

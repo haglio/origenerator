@@ -59,7 +59,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import BLUE
+from shared_ui.colors import BLUE, BORDER_SUBTLE
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
@@ -90,6 +90,7 @@ _STRIP_HEIGHT = 88
 # narrower than its caption elides the countdown away. The queue's names are
 # long, so the rest of the strip still goes to the line.
 _BAR_WIDTH = 290
+_HALVES_GAP = 8
 # Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
 # (which carries its own type) can't be dropped into the queue as a reorder.
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
@@ -382,6 +383,7 @@ class QueueRow(OpensAFolder, QWidget):
     # margins, so the pictures are as big as a row that still reads as a row can
     # make them. The block itself is four of these across.
     THUMB = HEIGHT - 6
+    INSET = 4
 
     def __init__(self, item, *, movable=True, parent=None):
         super().__init__(parent)
@@ -396,7 +398,7 @@ class QueueRow(OpensAFolder, QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 3, 6, 3)
+        layout.setContentsMargins(self.INSET, 3, 6, 3)
         layout.setSpacing(6)
         # It leads the row: a button anywhere after a line that can elide was
         # pushed out of sight at the right-hand end.
@@ -557,7 +559,7 @@ class GenerationQueue(QWidget):
         # Flush at the left and both ends, so the live frame fills the strip's
         # lower-left corner; only the far right is held off the window edge.
         layout.setContentsMargins(0, 0, 4, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(_HALVES_GAP)
         outer.addLayout(layout, 1)
         self._running = RunningPreview()
         layout.addWidget(self._running)
@@ -595,6 +597,7 @@ class GenerationQueue(QWidget):
         self._scroll.setWidget(self._host)
         layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
         self._rules = _Rules(self._drawn_rules, self)
+        self._scroll.verticalScrollBar().valueChanged.connect(self._rules.update)
 
         self.set_items([])
 
@@ -672,8 +675,23 @@ class GenerationQueue(QWidget):
         # The scroll area would otherwise squeeze the whole line into its own
         # height, stacking the rows on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
+        self._rules.update()
 
     # --- the rules drawn over the strip -------------------------------------
+
+    def head_rule(self) -> list[QPoint]:
+        rows = self.rows()
+        if not rows:
+            return []
+        head = rows[0]
+        left_half_ends = self._scroll.x() - _HALVES_GAP - 1
+        rows_start = self._scroll.x() + QueueRow.INSET
+        x = (left_half_ends + rows_start) // 2
+        up = QPoint(x, self.height() - 1)
+        foot = head.mapTo(self, head.rect().bottomRight())
+        if foot.y() < self._scroll.y():
+            return [up, QPoint(x, self._scroll.y())]
+        return [up, QPoint(x, foot.y()), foot]
 
     def _drop_rule(self) -> list[QPoint]:
         rows = self.rows()
@@ -685,7 +703,7 @@ class GenerationQueue(QWidget):
         return [QPoint(top_left.x(), y), QPoint(top_left.x() + row.width(), y)]
 
     def _drawn_rules(self):
-        return [(QPen(BLUE, 2), self._drop_rule())]
+        return [(QPen(BORDER_SUBTLE, 1), self.head_rule()), (QPen(BLUE, 2), self._drop_rule())]
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

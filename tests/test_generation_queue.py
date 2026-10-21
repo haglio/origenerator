@@ -8,7 +8,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, Qt
 from PyQt6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QApplication
-from shared_ui.colors import BLUE
+from shared_ui.colors import BLUE, BORDER_SUBTLE
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.generation_queue import (
@@ -353,6 +353,108 @@ def test_a_live_frame_updates_the_rows_without_rebuilding_them(queue):
 
     assert queue.rows()[1] is row
     assert row._lead.text() == "~10 min · Video"
+
+
+# --- the rule between the job being made and the jobs behind it ---------------
+
+def test_a_rule_runs_up_beside_the_live_half_and_along_the_foot_of_its_row(queue):
+    # The job being made is shown twice, as the whole left half and as the top
+    # row of the line. The rule says the two are one: up the gap between the
+    # halves from the strip's foot to the foot of that row, then along the
+    # row's foot to its end, walling off only the jobs waiting behind it.
+    _four(queue)
+    QApplication.processEvents()
+    head = queue.rows()[0]
+    foot = head.mapTo(queue, head.rect().bottomRight())
+
+    up, corner, along = queue.head_rule()
+
+    assert queue._running.geometry().right() < up.x() == corner.x() < queue._scroll.x()
+    assert up.y() == queue.height() - 1
+    assert (corner.y(), along.y(), along.x()) == (foot.y(), foot.y(), foot.x())
+
+
+def test_the_rule_stands_midway_between_the_bar_and_the_cancels_leading_the_rows(queue):
+    # Give or take the one pixel a gap of even width cannot split.
+    queue.set_items([_item(key="a", cancel=lambda: None),
+                     _item(key="b", status="queued", cancel=lambda: None)])
+    QApplication.processEvents()
+    rule = queue.head_rule()[0].x()
+    bar_ends = queue._running.geometry().right()
+    cancel = queue.rows()[1]._cancel
+    cancel_starts = cancel.mapTo(queue, cancel.rect().topLeft()).x()
+
+    assert abs((rule - bar_ends) - (cancel_starts - rule)) <= 1
+
+
+def test_no_rule_stands_beside_another_apps_backlog_with_nothing_of_ours_in_it(queue):
+    # The left half is up to say what another app is doing, but with no job of
+    # ours in the line there is no row of it to join to that half.
+    queue.set_items([], foreign_queued=2)
+
+    assert queue.head_rule() == []
+
+
+def test_a_line_scrolled_past_its_head_runs_the_rule_straight_up_the_strip(queue):
+    # The left half then stands beside nothing but jobs waiting behind it, so
+    # the rule keeps it apart from every one of them.
+    queue.set_items([_item(key=f"j{i}", status="queued") for i in range(6)])
+    QApplication.processEvents()
+    bar = queue._scroll.verticalScrollBar()
+    bar.setValue(bar.maximum())
+
+    up, top = queue.head_rule()
+
+    assert up.x() == top.x()
+    assert (up.y(), top.y()) == (queue.height() - 1, 0)
+
+
+def _rule_on_screen(queue):
+    return _drawn(_on_screen(queue), queue.head_rule(), BORDER_SUBTLE)
+
+
+def test_the_rule_is_drawn_over_the_rows_in_the_apps_own_dress(dressed, qtbot):
+    _four(dressed)
+
+    qtbot.waitUntil(lambda: _rule_on_screen(dressed))
+
+
+def test_the_rule_rides_up_with_the_head_row_as_the_line_scrolls(dressed, qtbot):
+    # Nothing is left standing in the gap where the corner was, either.
+    _four(dressed)
+    _settled(dressed)
+    was = dressed.head_rule()[1]
+
+    dressed._scroll.verticalScrollBar().setValue(20)
+
+    qtbot.waitUntil(lambda: _rule_on_screen(dressed))
+    where_the_corner_was = QPoint(dressed._scroll.x() - 1, was.y())
+    assert _on_screen(dressed).pixelColor(where_the_corner_was).name() != BORDER_SUBTLE.name()
+
+
+def test_our_first_job_beside_another_apps_backlog_brings_its_rule(dressed, qtbot):
+    # The left half is up already, saying what the other app is doing, so
+    # nothing on that side moves when our job arrives; the rule comes up anyway.
+    dressed.set_items([], foreign_queued=2)
+    _settled(dressed)
+
+    dressed.set_items([_item(status="queued", foreign_ahead=2)], foreign_queued=2)
+
+    qtbot.waitUntil(lambda: _rule_on_screen(dressed))
+
+
+def test_the_rule_keeps_to_the_gap_when_the_live_half_widens(dressed, qtbot, tmp_path):
+    # A combine's job stands its frame and its recipe side by side in the
+    # corner, twice the width of one picture, which pushes the line over.
+    dressed.set_items([_item(job_kind="Video")])
+    _settled(dressed)
+    was = dressed.head_rule()[0]
+
+    dressed.set_items([_item(job_kind="Video", source_image=_picture(tmp_path / "frame.png"),
+                             recipe_thumbnail=_picture(tmp_path / "recipe.png"))])
+
+    qtbot.waitUntil(lambda: dressed.head_rule()[0].x() > was.x() and _rule_on_screen(dressed))
+    assert _on_screen(dressed).pixelColor(was).name() != BORDER_SUBTLE.name()
 
 
 # --- cancel, spelled the way the Generate tab spells it -----------------------

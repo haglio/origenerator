@@ -65,8 +65,8 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from pytestqt.qtbot import QtBot
 
-from origenerator import config, notice_toast, osr2_driver, osr2_motion_driver
-from origenerator.gui import desktop_notices, funestra_pane, motion_panel, omnipause, voice_router
+from origenerator import config, notice_toast, osr2_driver, osr2_motion_driver, running_ahead
+from origenerator.gui import desktop_notices, motion_panel, omnipause, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
@@ -374,10 +374,9 @@ def alert_sounds(monkeypatch):
 
 
 def keep_the_run_at_its_own_priority(setattr) -> None:
-    """A run is background work: a Funestra a test opens never puts it ahead of
-    the apps in use on this computer. The test that needs the real block puts
-    it back."""
-    setattr(funestra_pane, "ahead_on_the_processor", contextlib.nullcontext)
+    """A run is background work: nothing a test plays puts it ahead of the apps
+    in use on this computer. The test that needs the real block puts it back."""
+    setattr(running_ahead, "_THIS_APP", running_ahead.AheadWhilePlaying(contextlib.nullcontext))
 
 
 @pytest.fixture(autouse=True)

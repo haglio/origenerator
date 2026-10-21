@@ -9,6 +9,7 @@ the preview loops), and parks the device when it lets go.
 from __future__ import annotations
 
 import logging
+from contextlib import ExitStack
 
 from app_support.funscript import read_actions
 from app_support.osr2_hold import PARK, RESUME
@@ -19,6 +20,7 @@ from PyQt6.QtCore import QObject, QTimer
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of
 from origenerator.osr2 import Osr2Broker
+from origenerator.running_ahead import ahead_while_playing
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,7 @@ class Osr2Driver(QObject):
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self.poll)
         self._frozen = False
+        self._running_ahead = ExitStack()
 
     def set_frozen(self, frozen: bool) -> None:
         if frozen == self._frozen:
@@ -81,6 +84,7 @@ class Osr2Driver(QObject):
         self._duration_ms = self._script.actions[-1][0]
         self._streaming = False  # for a one-shot "first T-code sent" log line
         self._broker.ask(PARK if self._frozen else RESUME)
+        self._running_ahead.enter_context(ahead_while_playing())
         self._timer.start()
         logger.info("OSR2 drive engaged: %d actions, %d ms",
                     len(self._script.actions), self._duration_ms)
@@ -90,6 +94,7 @@ class Osr2Driver(QObject):
         if self._player is None:
             return
         self._timer.stop()
+        self._running_ahead.close()
         self._player = None
         self._script = None
         self._duration_ms = 0

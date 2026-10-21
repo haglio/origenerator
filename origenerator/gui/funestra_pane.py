@@ -24,7 +24,6 @@ from contextlib import ExitStack
 from pathlib import Path
 
 from funestra.funestra import Channels, Funestra
-from funestra.funestra_priority import ahead_on_the_processor
 from funestra.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
@@ -37,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 
 from origenerator.config import project_dir
+from origenerator.running_ahead import ahead_while_playing
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ class FunestraPane(QWidget):
         if land is not None and self._funestra.playback.current_video != land:
             self.hand_over(items, land=land)
         self._stack.setCurrentWidget(self._window)
-        self._running_ahead.enter_context(ahead_on_the_processor())
+        self._running_ahead.enter_context(ahead_while_playing())
         self._tick.start()
         self._mover = threading.Thread(target=self._move_until_closed,
                                        name="slideshow-mover", daemon=True)

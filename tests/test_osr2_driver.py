@@ -4,6 +4,7 @@ from app_support.osr2_hold import PARK, RESUME
 from funestra.funscript import Funscript
 
 from origenerator.osr2_driver import Osr2Driver
+from tests.running_ahead_support import record_the_app_running_ahead
 
 
 class FakeBroker:
@@ -197,3 +198,14 @@ def test_a_script_started_in_a_frozen_room_waits_for_it_to_play(qapp):
     driver.set_frozen(False)
     driver.poll()
     assert broker.positions == [(100, 500)]
+
+
+def test_the_app_runs_ahead_of_background_work_while_a_video_drives(qapp, monkeypatch):
+    raised = record_the_app_running_ahead(monkeypatch)
+    driver = Osr2Driver(broker=FakeBroker())
+
+    driver.start(FakePlayer(pos=0), ACTIONS)
+    assert raised == ["ahead"]
+
+    driver.stop()
+    assert raised == ["ahead", "back"]

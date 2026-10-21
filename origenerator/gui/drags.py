@@ -1,10 +1,5 @@
-"""Every drag the app starts, announced to every place a drop can land.
-
-The sources are scattered -- a thumbnail, a Generate tab's preview, a version
-row, a folder in the TOC -- and so are the places that take what they carry, so
-each source hands its drag to :func:`carry` and each place listens to
-:data:`under_way`, lighting while a drag it would take is in flight.
-"""
+"""Every drag the app starts, told to every place a drop can land: wherever it
+starts, it goes through :func:`carry`, and every such place hears :data:`under_way`."""
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal

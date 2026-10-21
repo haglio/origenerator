@@ -21,7 +21,7 @@ from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui.drags import under_way
-from origenerator.gui.drop_style import AIMED, LIT
+from origenerator.gui.drop_style import AIMED, LIT, light
 from origenerator.gui.generation_drag import dragged_generation
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
@@ -191,20 +191,13 @@ class DropSlot(DropZone):
         return self.lent_by(prompt_id) is not None
 
     def _light_for(self, mime, _source):
-        self._light(LIT, bool(self._landing(mime)))
+        light(self._label, LIT, bool(self._landing(mime)))
 
     def _put_out_for_the_drag(self):
-        self._light(LIT, False)
+        light(self._label, LIT, False)
 
     def set_targeted(self, targeted: bool):
-        self._light(AIMED, targeted)
-
-    def _light(self, state: str, on: bool):
-        if self._label.property(state) == on:
-            return
-        self._label.setProperty(state, on)
-        self._label.style().unpolish(self._label)
-        self._label.style().polish(self._label)
+        light(self._label, AIMED, targeted)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._current_id is not None:

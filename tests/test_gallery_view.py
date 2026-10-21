@@ -1588,7 +1588,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
     _search_for(view, "cat")
 
     assert view.current_group() is None
-    assert view._current_deletable_folder() is None
+    assert view._current_deletable_folders() == []
     assert not view._bank.auto.isVisible()
 
 
@@ -4647,7 +4647,7 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     view._browser._thumbnail_clicked("a", _NO_MOD)                       # viewing it
     assert view._selected["prompt_id"] == "a"
     view._confirm = lambda text: True
-    view._delete_folder(view._current_deletable_folder())
+    view._delete_folders(view._current_deletable_folders())
     assert db.get_generation("a") is None
     assert view._selected is None                       # navigated off the emptied folder
 
@@ -6121,7 +6121,7 @@ def test_delete_folder_refuses_a_workflow_group(qtbot):
     view.refresh()
     view._confirm = lambda text: True
 
-    view._delete_folder(_image_workflow(view._tree).data(0, _GROUP_ROLE))
+    view._delete_folders([_image_workflow(view._tree).data(0, _GROUP_ROLE)])
 
     assert actions.deleted == []  # only folders inside a workflow may go
 
@@ -14065,14 +14065,18 @@ def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
     assert view._bank.group.isHidden()
 
 
-def test_delete_is_dark_while_several_folders_are_picked(qtbot):
-    # Otherwise Delete would wipe whichever single row happened to be current.
-    view, cat, dog = _two_leaf_view(qtbot)
-
+def test_delete_takes_every_picked_folder_not_only_the_current_one(qtbot):
+    actions = FakeActions()
+    view, cat, dog = _two_leaf_view(qtbot, actions=actions)
     _pick(view, cat, dog)
+    asked = []
+    view._confirm = lambda text: asked.append(text) or True
 
-    assert view._current_deletable_folder() is None
-    assert not view._bank.delete.isEnabled()
+    assert view._bank.delete.toolTip() == "Delete 2 folders"
+    view._bank.delete.click()
+
+    assert asked == ["Delete 2 folders and their 2 items?"]
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
 
 
 def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, monkeypatch):
@@ -14667,7 +14671,46 @@ def test_the_picked_folders_menu_offers_collapse_all_and_expand_all_last(
     _tree_menu(view, second)
 
     assert labels == ["Copy 2 names", "", "Group 2 folders into a new folder…", "",
-                      "Collapse all", "Expand all"]
+                      "Delete 2 folders…", "", "Collapse all", "Expand all"]
+
+
+def test_the_picked_folders_menu_offers_to_delete_them(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, dog)
+
+    assert labels == ["Copy 2 names", "", "Group 2 folders into a new folder…", "",
+                      "Delete 2 folders…"]
+
+
+def test_deleting_the_picked_folders_asks_first_then_takes_them_all(qtbot, monkeypatch):
+    actions = FakeActions()
+    view, cat, dog = _two_leaf_view(qtbot, actions=actions)
+    _pick(view, cat, dog)
+    asked = []
+    view._confirm = lambda text: asked.append(text) or True
+    _answer_menu(monkeypatch, "Delete 2 folders…")
+
+    _tree_menu(view, dog)
+
+    assert asked == ["Delete 2 folders and their 2 items?"]
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
+
+
+def test_picked_folders_offer_no_delete_when_one_of_them_cannot_be_deleted(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _pick(view, cat, _key(_image_workflow(view._tree)))
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, cat)
+
+    assert "Delete 2 folders…" not in labels
+    assert not view._bank.delete.isEnabled()
 
 
 # --- somebody else's queue on the shared ComfyUI ----------------------------

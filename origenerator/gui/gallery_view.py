@@ -2353,8 +2353,8 @@ class GalleryView(QWidget):
         selection).
 
         While several folders are picked that's the unsaved folder they make, so
-        everything reading this — the slideshow, the title, the average, the delete
-        button — sees one folder whether or not it has been saved yet.
+        everything reading this — the slideshow, the title, the average — sees one
+        folder whether or not it has been saved yet.
 
         A running search is ``None`` for the same reason a collection is: the tree
         still has a row selected, but that folder is not what the pane is showing,
@@ -2917,8 +2917,8 @@ class GalleryView(QWidget):
                           f"folder “{group.label}”")
 
     def _delete_offer(self) -> Button:
-        """Delete, aimed the same way: the picked thumbnails, else the folder on
-        screen, with the tip saying which.
+        """Delete, aimed the same way: the picked thumbnails, else the folder or
+        the picked folders on screen, with the tip saying which.
 
         In the bin the button's one remaining meaning is "for good", and the tip
         has to say so before it is clicked.
@@ -2931,10 +2931,12 @@ class GalleryView(QWidget):
                 if count else "Pick an item to delete permanently")
         if count:
             return Button(tip=f"Delete {count} item{'s' if count != 1 else ''}")
-        folder = self._current_deletable_folder()
-        if folder is None:
+        folders = self._current_deletable_folders()
+        if not folders:
             return Button(enabled=False, tip="Nothing to delete")
-        return Button(tip=f"Delete folder “{folder.label}”")
+        if len(folders) == 1:
+            return Button(tip=f"Delete folder “{folders[0].label}”")
+        return Button(tip=f"Delete {len(folders)} folders")
 
     def _favoritable_folder(self):
         """The folder on screen if a star can be set on it, else ``None``.
@@ -3775,7 +3777,7 @@ class GalleryView(QWidget):
         return True
 
     def _delete_selection(self):
-        """Delete picked thumbnails, or the current folder if none are picked.
+        """Delete picked thumbnails, or else the folder or picked folders on screen.
 
         In the Trash collection the picked items are already deleted, so Delete means
         the only deletion left: ending them for good. Same button, same key, the
@@ -3789,9 +3791,7 @@ class GalleryView(QWidget):
             rows = [self._db.get_generation(pid) for pid in self.selected_prompt_ids()]
             self._delete_rows([r for r in rows if r])
             return
-        group = self._current_deletable_folder()
-        if group is not None:
-            self._delete_folder(group)
+        self._delete_folders(self._current_deletable_folders())
 
     def _copy_names_of_the_selection(self):
         if self._browser.selected_ids:
@@ -3872,39 +3872,44 @@ class GalleryView(QWidget):
         self._browser.clear_selection()
         self.refresh()
 
-    def _current_deletable_folder(self):
-        """The folder on screen if it may be deleted, else ``None`` — which covers
-        a multi-selection: its unsaved folder isn't deletable, so Delete stays dark
-        rather than quietly wiping whichever one row happens to be current."""
-        group = self.current_group()
-        return group if _is_deletable_folder(group) else None
+    def _current_deletable_folders(self) -> list:
+        if self._showing_search():
+            return []
+        if self._selection_group is None:
+            folders = [self.current_group()]
+        else:
+            folders = [self.group_for_key(key) for key in self._tree.selected_folder_keys()]
+        return folders if all(_is_deletable_folder(group) for group in folders) else []
 
-    def _delete_folder(self, group):
-        if not _is_deletable_folder(group):
+    def _delete_folders(self, groups):
+        if not groups or not all(_is_deletable_folder(group) for group in groups):
             return
-        rows = gallery.rows_under(group)
+        rows = list({row["prompt_id"]: row for group in groups
+                     for row in gallery.rows_under(group)}.values())
         if not rows:
             return
         plural = "s" if len(rows) != 1 else ""
-        if not self._confirm(f"Delete “{group.label}” and its {len(rows)} item{plural}?"):
+        named = (f"“{groups[0].label}” and its" if len(groups) == 1
+                 else f"{len(groups)} folders and their")
+        if not self._confirm(f"Delete {named} {len(rows)} item{plural}?"):
             return
-        # Return to the most recent folder we were in that survives this delete;
-        # fall back to the deleted folder's parent (not the top of the tree) when
-        # history offers no survivor, so the view stays where the user was working.
-        target = self._post_delete_target(group)
+        target = self._post_delete_target(groups)
         if target is not None:
             self._tree.setCurrentItem(target)
         self._delete_rows(rows)
 
-    def _post_delete_target(self, group):
-        """The tree item to select after deleting ``group``: the most recently
-        visited folder that isn't inside the deleted subtree, else its parent."""
-        doomed = self._keys_under(group)
+    def _post_delete_target(self, groups):
+        """The tree item to select after deleting ``groups``: the most recently
+        visited folder that isn't inside a deleted subtree, else the nearest one
+        above the first of them that survives."""
+        doomed = set().union(*(self._keys_under(group) for group in groups))
         for key in reversed(self._folder_history):
             if key not in doomed and (item := self._item_by_key.get(key)) is not None:
                 return item
-        item = self._tree_item_for(group.key)
-        return item.parent() if item is not None else None
+        item = self._tree_item_for(groups[0].key)
+        while item is not None and item.data(0, _TREE_KEY_ROLE) in doomed:
+            item = item.parent()
+        return item
 
     def _keys_under(self, group) -> set[str]:
         """The tree keys of every row drawing ``group``, and of every row nested
@@ -4018,10 +4023,17 @@ class GalleryView(QWidget):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, names)
         group_action = menu.addAction(f"Group {len(names)} folders into a new folder…")
+        doomed = self._current_deletable_folders()
+        delete_action = None
+        if doomed:
+            menu.addSeparator()
+            delete_action = menu.addAction(f"Delete {len(doomed)} folders…")
         collapse_and_expand = offer_collapse_and_expand(menu, self._tree.selectedItems())
         chosen = menu.exec(global_pos)
         if chosen == group_action:
             self._group_selection()
+        elif delete_action is not None and chosen == delete_action:
+            self._delete_folders(doomed)
         elif chosen in collapse_and_expand:
             collapse_and_expand[chosen]()
 
@@ -4057,7 +4069,7 @@ class GalleryView(QWidget):
         elif chosen in add_menu:
             self._on_folders_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
-            self._delete_folder(group)
+            self._delete_folders([group])
         elif chosen in collapse_and_expand:
             collapse_and_expand[chosen]()
 
@@ -4106,7 +4118,7 @@ class GalleryView(QWidget):
         """Delete the folder a hover-row trash click names."""
         group = self.group_for_key(key)
         if group is not None:
-            self._delete_folder(group)
+            self._delete_folders([group])
 
     # --- the selected generation drives a config tab -----------------------
 

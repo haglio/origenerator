@@ -78,3 +78,24 @@ def test_a_plain_runs_notice_points_at_the_run_itself():
            "prompt_id": "pic-9"}
 
     assert outcome_of_row(row, ok=True, seconds=99.0).generation == "pic-9"
+
+
+def test_a_finished_training_says_its_fixs_lora_is_ready_and_how_long_it_took():
+    outcome = RunOutcome(kind="Training", recipe="Hands fix", seconds=2952.0, ok=True,
+                         source="", generation="")
+    notice = notice_for(outcome)
+    assert (notice.title, notice.body, notice.ok) == ("LoRA ready", "Hands fix · 49:12", True)
+
+
+def test_a_training_that_stopped_says_the_training_failed():
+    outcome = RunOutcome(kind="Training", recipe="Hands fix", seconds=600.0, ok=False,
+                         source="", generation="")
+    notice = notice_for(outcome)
+    assert (notice.title, notice.body, notice.ok) == (
+        "Training failed", "Hands fix · stopped after 10:00", False)
+
+
+def test_a_training_that_stopped_at_once_interrupts_nobody():
+    outcome = RunOutcome(kind="Training", recipe="Hands fix", seconds=5.0, ok=False,
+                         source="", generation="")
+    assert notice_for(outcome) is None

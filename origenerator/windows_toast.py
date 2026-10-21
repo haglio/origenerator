@@ -53,12 +53,13 @@ class _GUID(ctypes.Structure):
                 ("Data3", ctypes.c_uint16), ("Data4", ctypes.c_ubyte * 8)]
 
 
-def toast_xml(title: str, body: str, *, link: str, mark: Path | None = None) -> str:
+def toast_xml(title: str, body: str, *, link: str | None, mark: Path | None = None) -> str:
     """What Windows draws for one notice, and where a click on it goes."""
     glyph = (f"<image placement=\"appLogoOverride\" src={quoteattr(mark.as_uri())}/>"
              if mark is not None else "")
+    goes = f" activationType=\"protocol\" launch={quoteattr(link)}" if link else ""
     return (
-        f"<toast activationType=\"protocol\" launch={quoteattr(link)}>"
+        f"<toast{goes}>"
         "<visual><binding template=\"ToastGeneric\">"
         f"<text>{escape(title)}</text><text>{escape(body)}</text>{glyph}"
         "</binding></visual></toast>"

@@ -13,10 +13,12 @@ class _Queue:
     def __init__(self, busy: bool):
         self.busy = busy
         self.held: list = []
+        self.ended: list = []
         self.freed = 0
 
     def hold_for_training(self, training) -> None:
         self.held.append(training)
+        training.ended.connect(self.ended.append)
 
     def making_something(self) -> bool:
         return self.busy
@@ -142,7 +144,9 @@ def test_a_finished_training_lets_the_queue_go_and_names_the_lora_it_made(
         started[0][1].code = 0
 
     assert made.args == ["fixes\\hands 2026-10-19 0130.safetensors"]
-    assert queue.held == [run, None]
+    (outcome,) = queue.ended
+    assert (outcome.kind, outcome.recipe, outcome.ok) == ("Training", "Hands fix", True)
+    assert 0 <= outcome.seconds < 60
 
 
 def test_a_failed_training_lets_the_queue_go_and_says_why(qtbot, monkeypatch, tmp_path):
@@ -155,7 +159,8 @@ def test_a_failed_training_lets_the_queue_go_and_says_why(qtbot, monkeypatch, tm
         started[0][1].code = 1
 
     assert stopped.args == ["The detector found nothing."]
-    assert queue.held == [run, None]
+    (outcome,) = queue.ended
+    assert (outcome.kind, outcome.ok) == ("Training", False)
 
 
 def test_a_step_that_quits_without_a_word_says_so_and_where_its_log_is(
@@ -184,7 +189,7 @@ def test_a_canceled_training_stops_its_step_lets_the_queue_go_and_says_nothing_m
     started[0][1].code = 1
 
     assert stopped == [started[0][1]]
-    assert queue.held == [run, None]
+    assert queue.ended == [None]
     with qtbot.assertNotEmitted(run.failed), qtbot.assertNotEmitted(run.finished):
         qtbot.wait(30)
 
@@ -200,7 +205,7 @@ def test_a_training_canceled_while_it_waits_its_turn_starts_nothing(
     qtbot.wait(30)
 
     assert started == []
-    assert queue.held == [run, None]
+    assert queue.ended == [None]
 
 
 def test_a_step_that_cannot_be_started_says_why_and_lets_the_queue_go(
@@ -217,4 +222,4 @@ def test_a_step_that_cannot_be_started_says_why_and_lets_the_queue_go(
 
     assert "couldn't be started" in stopped.args[0]
     assert "No usable Python interpreter found." in stopped.args[0]
-    assert queue.held == [run, None]
+    assert [outcome.ok for outcome in queue.ended] == [False]

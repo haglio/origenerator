@@ -33,20 +33,21 @@ class Notice:
     generation: str
 
 
+def _title(outcome: RunOutcome) -> str | None:
+    if outcome.kind == JobKind.TRAINING:
+        return "LoRA ready" if outcome.ok else "Training failed"
+    if outcome.kind == JobKind.VIDEO and outcome.source == GenerationSource.GENERATED:
+        return f"{outcome.kind} {'ready' if outcome.ok else 'failed'}"
+    return None
+
+
 def notice_for(outcome: RunOutcome) -> Notice | None:
-    if outcome.kind != JobKind.VIDEO:
-        return None
-    if outcome.source != GenerationSource.GENERATED:
-        return None
-    if outcome.seconds is None or outcome.seconds < LONG_RUN_SECONDS:
+    title = _title(outcome)
+    if title is None or outcome.seconds is None or outcome.seconds < LONG_RUN_SECONDS:
         return None
     took = clock_duration(outcome.seconds)
-    if outcome.ok:
-        return Notice(f"{outcome.kind} ready", f"{outcome.recipe} · {took}", ok=True,
-                      generation=outcome.generation)
-    return Notice(f"{outcome.kind} failed",
-                  f"{outcome.recipe} · stopped after {took}", ok=False,
-                  generation=outcome.generation)
+    body = f"{outcome.recipe} · {took}" if outcome.ok else f"{outcome.recipe} · stopped after {took}"
+    return Notice(title, body, ok=outcome.ok, generation=outcome.generation)
 
 
 def outcome_of_row(row: dict, *, ok: bool, seconds: float | None) -> RunOutcome:

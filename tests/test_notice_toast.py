@@ -69,3 +69,12 @@ def test_windows_refusing_the_take_back_costs_the_app_nothing(monkeypatch, caplo
         notice_toast.take_back_notice("Example.App", _RUN)
 
     assert "not listening" in caplog.text
+
+
+def test_a_notice_about_no_item_is_raised_with_no_link(monkeypatch):
+    raised = []
+    monkeypatch.setattr(notice_toast, "show", lambda app_id, xml, **filing: raised.append(xml))
+
+    notice_toast.raise_notice("Example.App", _notice(generation=""))
+
+    assert "launch" not in raised[0]

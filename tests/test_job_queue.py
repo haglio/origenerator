@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from PIL import Image
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -638,11 +638,15 @@ def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, t
 
 # --- handing the line over as the app closes ---------------------------------
 
-def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_is_let_go(qtbot, tmp_path):
+class _Training(QObject):
+    ended = pyqtSignal(object)
+
+
+def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_ends(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    training = object()
+    training = _Training()
     queue.hold_for_training(training)
 
     held = _launch_video(queue, "v1", seed=1)
@@ -650,10 +654,32 @@ def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_is_let_go(qt
     assert not queue.making_something()
     assert queue.training is training
 
-    queue.hold_for_training(None)
+    training.ended.emit(None)
     assert [call.args[1] for call in client.submit_job.call_args_list] == [held.prompt_id]
     assert queue.making_something()
     assert queue.training is None
+
+
+def test_a_training_that_ends_says_what_it_came_to_the_way_a_run_does(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    training = _Training()
+    queue.hold_for_training(training)
+    outcome = RunOutcome(kind="Training", recipe="Hands fix", seconds=2952.0, ok=True,
+                         source="", generation="")
+
+    with qtbot.waitSignal(queue.run_ended) as said:
+        training.ended.emit(outcome)
+
+    assert said.args == [outcome]
+
+
+def test_a_canceled_training_says_nothing_of_what_it_came_to(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    training = _Training()
+    queue.hold_for_training(training)
+
+    with qtbot.assertNotEmitted(queue.run_ended):
+        training.ended.emit(None)
 
 
 def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):

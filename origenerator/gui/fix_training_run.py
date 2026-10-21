@@ -13,8 +13,10 @@ from pathlib import PureWindowsPath
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator import fix_training
+from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
+from origenerator.run_notice import RunOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ class FixTrainingRun(QObject):
     finished = pyqtSignal(str)
     failed = pyqtSignal(str)
     canceled = pyqtSignal()
+    ended = pyqtSignal(object)
 
     def __init__(self, job: dict, queue, *, reveal, parent=None):
         super().__init__(parent)
@@ -75,18 +78,17 @@ class FixTrainingRun(QObject):
             logger.info("Fix training %s: its %s step ended with exit code %s, saying %s",
                         self._job.get("part"), self._step_name, code, status)
         if status.get("state") == "done":
-            fix_training.note_duration(time.time() - self._started_at)
-            self._end()
+            outcome = self._outcome(ok=True)
+            fix_training.note_duration(outcome.seconds)
+            self._end(outcome)
             self.finished.emit(str(PureWindowsPath("fixes") / status["lora"]))
         elif status.get("state") == "failed":
-            self._end()
-            self.failed.emit(status["message"])
+            self._fail(status["message"])
         elif code == 0 and self._step_name != fix_training.STEPS[-1]:
             self._start(fix_training.STEPS[fix_training.STEPS.index(self._step_name) + 1])
         elif code is not None:
-            self._end()
-            self.failed.emit("The training program quit without saying why. An agent can "
-                             f"read what it printed in {self._job['log']}.")
+            self._fail("The training program quit without saying why. An agent can read "
+                       f"what it printed in {self._job['log']}.")
         elif status.get("total"):
             done = round(100 * status["done"] / status["total"])
             word = "Cropping" if status["state"] == "cropping" else "Training"
@@ -99,8 +101,7 @@ class FixTrainingRun(QObject):
         except Exception as error:
             logger.exception("Fix training %s: its %s step could not be started",
                              self._job.get("part"), step)
-            self._end()
-            self.failed.emit(f"The training couldn't be started: {error}")
+            self._fail(f"The training couldn't be started: {error}")
             return
         self.progress.emit("Cropping" if step == fix_training.STEPS[0] else "Training")
 
@@ -109,9 +110,18 @@ class FixTrainingRun(QObject):
             fix_training.stop(self._process)
         logger.info("Fix training %s: canceled during its %s step", self._job.get("part"),
                     self._step_name or "wait")
-        self._end()
+        self._end(None)
         self.canceled.emit()
 
-    def _end(self) -> None:
+    def _outcome(self, *, ok: bool) -> RunOutcome:
+        seconds = None if self._started_at is None else time.time() - self._started_at
+        return RunOutcome(kind=JobKind.TRAINING, recipe=f"{self.name.capitalize()} fix",
+                          seconds=seconds, ok=ok, source="", generation="")
+
+    def _fail(self, why: str) -> None:
+        self._end(self._outcome(ok=False))
+        self.failed.emit(why)
+
+    def _end(self, outcome: RunOutcome | None) -> None:
         self._timer.stop()
-        self._queue.hold_for_training(None)
+        self.ended.emit(outcome)

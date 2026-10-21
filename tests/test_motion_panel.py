@@ -9,7 +9,8 @@ from __future__ import annotations
 import itertools
 import random
 
-from app_support.osr2_device import Osr2Mode
+import pytest
+from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
 from funestra.console import (
     OSR2_CONTROL_BUTTONS,
@@ -399,6 +400,18 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
     assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
 
 
+@pytest.mark.parametrize(("trouble", "said"), [(Osr2Trouble.NOT_FOUND, Osr2State.UNPLUGGED),
+                                               (Osr2Trouble.NOT_ANSWERING, Osr2State.NO_ANSWER)])
+def test_an_osr2_the_broker_cannot_hear_says_why_and_drives_nothing(qtbot, trouble, said):
+    motion = FakeMotion()
+    motion.active = True
+
+    hud = console_hud(motion, device=Osr2Mode.OFF, trouble=trouble)
+
+    assert hud.console.osr2 is said
+    assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
+
+
 def test_the_panel_redraws_once_the_device_switches_under_what_it_drew(qtbot):
     device = {"on": False}
     panel = MotionPanel(FakeMotion(),
@@ -409,6 +422,18 @@ def test_the_panel_redraws_once_the_device_switches_under_what_it_drew(qtbot):
 
     assert panel._redraw_if_the_device_switched() is False
     device["on"] = True
+    assert panel._redraw_if_the_device_switched() is True
+
+
+def test_the_panel_redraws_once_the_broker_says_why_it_cannot_hear_the_osr2(qtbot):
+    trouble = {"now": None}
+    panel = MotionPanel(FakeMotion(), device=lambda: Osr2Mode.OFF,
+                        trouble=lambda: trouble["now"], control=FakeControl(state=OSR2_PARKED))
+    qtbot.addWidget(panel)
+    panel.render_console()
+
+    assert panel._redraw_if_the_device_switched() is False
+    trouble["now"] = Osr2Trouble.NOT_FOUND
     assert panel._redraw_if_the_device_switched() is True
 
 

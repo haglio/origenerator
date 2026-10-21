@@ -328,6 +328,7 @@ def keep_off_the_device(setattr) -> None:
     # device being off inject their own.
     setattr(motion_panel.osr2, "device_mode",
             lambda **_kw: motion_panel.osr2.osr2_device.Osr2Mode.CONTROLLED)
+    setattr(motion_panel.osr2, "device_trouble", lambda **_kw: None)
 
 
 @pytest.fixture(autouse=True)

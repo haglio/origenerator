@@ -48,7 +48,7 @@ class MotionPanel(QWidget):
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, motion, parent=None, device=None, control=None):
+    def __init__(self, motion, parent=None, device=None, control=None, trouble=None):
         super().__init__(parent)
         self._motion = motion
         # The app's one OSR2 switch: the control-state group's four buttons
@@ -61,9 +61,10 @@ class MotionPanel(QWidget):
             # And whenever the app re-aims the device: which driver has it moves
             # with the video in front as much as with a press on this panel.
             control.settled.connect(self.refresh)
-        # How to ask what the OSR2 reads as, or None for the real read.
-        # Injectable so a test never reaches the machine's own broker stamps.
+        # How to ask what the OSR2 reads as and why the Broker cannot hear it, or
+        # None for the real reads: a test never reaches the machine's own stamps.
         self._ask_device = device
+        self._ask_trouble = trouble
         self._drawn_device = None
         self._painter = ConsolePainter(device_only=True)
         self.setMouseTracking(True)
@@ -180,8 +181,9 @@ class MotionPanel(QWidget):
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         self._drawn_device = self._device()
+        device, trouble = self._drawn_device
         return self._painter.rgba(console_hud(
-            self._motion, device=self._drawn_device,
+            self._motion, device=device, trouble=trouble,
             control=self._osr2_control(), script=self._script()))
 
     def _redraw_if_the_device_switched(self) -> bool:
@@ -191,11 +193,13 @@ class MotionPanel(QWidget):
         return True
 
     def _device(self):
-        """What the OSR2 reads as, asked afresh on every draw — the device is
-        switched on and off, and into its own auto mode, without this app
-        knowing, so there is nothing to cache the answer against."""
+        """What the OSR2 reads as, and why the Broker cannot hear it when it
+        cannot, asked afresh on every draw — the device is switched on and off,
+        and into its own auto mode, without this app knowing, so there is
+        nothing to cache the answer against."""
         ask = self._ask_device if self._ask_device is not None else osr2.device_mode
-        return ask()
+        ask_why = self._ask_trouble if self._ask_trouble is not None else osr2.device_trouble
+        return ask(), ask_why()
 
     def paintEvent(self, event):
         raw, (width, height) = self.render_console()

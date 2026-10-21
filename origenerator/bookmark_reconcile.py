@@ -122,7 +122,8 @@ def reconcile_custom_folders(db, folders: Folders | None = None) -> dict:
 
     Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
     """
-    gathered = db.folders_in_custom_folders()
+    gathered = [held for held in db.folders_in_custom_folders()
+                if gallery.custom_folder_id(held["folder_key"]) is None]
     if not gathered:
         return dict(_NOTHING)
     folders = index_folders(db) if folders is None else folders

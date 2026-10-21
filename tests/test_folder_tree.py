@@ -206,9 +206,10 @@ def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
 
 # --- picking several folders, and dragging them onto a collecting row ---------
 
-def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False):
+def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False,
+                     takes_folder=lambda _row_key, _folder_key: True):
     """A tree with a collecting row, the Favorites collection, atop two ordinary folders."""
-    tree = FolderTree(_ROLE, takes_item=takes_item)
+    tree = FolderTree(_ROLE, takes_item=takes_item, takes_folder=takes_folder)
     qtbot.addWidget(tree)
     collection = QTreeWidgetItem(["Favorites"])
     collection.setData(0, DROP_KEY_ROLE, "__starred__")
@@ -356,19 +357,23 @@ def _folder_of_your_own(tree):
     return own
 
 
-def test_a_folder_of_your_own_starts_no_drag_at_all(qtbot, monkeypatch):
-    # Nothing gathers a row that gathers, so a drag of one could only look taken.
-    tree, _collection, _a, _b = _collecting_tree(qtbot)
+def test_a_folder_of_your_own_drags_like_any_folder(qtbot, monkeypatch):
+    # Another folder of your own can take it, so its row is picked up as any row is.
+    tree, collection, _a, _b = _collecting_tree(qtbot)
     own = _folder_of_your_own(tree)
     started = _started_drags(monkeypatch)
+    dropped = []
+    tree.dropped.connect(lambda _key, keys, _items: dropped.append(keys))
     tree.setCurrentItem(own)
 
     tree.startDrag(Qt.DropAction.CopyAction)
+    (drag,) = started
+    _drop_at(tree, collection, drag.mime)
 
-    assert started == []
+    assert dropped == [[oriented_key("__custom__/1", LANDSCAPE)]]
 
 
-def test_a_picked_folder_of_your_own_is_left_out_of_a_drag(qtbot, monkeypatch):
+def test_a_picked_folder_of_your_own_goes_along_in_a_drag(qtbot, monkeypatch):
     tree, collection, a, _b = _collecting_tree(qtbot)
     own = _folder_of_your_own(tree)
     started = _started_drags(monkeypatch)
@@ -381,7 +386,40 @@ def test_a_picked_folder_of_your_own_is_left_out_of_a_drag(qtbot, monkeypatch):
     (drag,) = started
     _drop_at(tree, collection, drag.mime)
 
+    assert dropped == [[oriented_key("k/a", LANDSCAPE), oriented_key("__custom__/1", LANDSCAPE)]]
+
+
+def test_a_collecting_row_refuses_a_folder_it_does_not_take(qtbot):
+    asked = []
+
+    def takes(row_key, folder_key):
+        asked.append((row_key, folder_key))
+        return folder_key != oriented_key("k/b", LANDSCAPE)
+
+    tree, collection, _a, _b = _collecting_tree(qtbot, takes_folder=takes)
+    dropped = []
+    tree.dropped.connect(lambda _key, keys, _items: dropped.append(keys))
+    refused, taken = _drag([oriented_key("k/b", LANDSCAPE)]), _drag(
+        [oriented_key("k/a", LANDSCAPE), oriented_key("k/b", LANDSCAPE)])
+
+    assert not _drag_move_at(tree, collection, refused).isAccepted()
+    _drop_at(tree, collection, taken)
+
     assert dropped == [[oriented_key("k/a", LANDSCAPE)]]
+    assert asked[-1] == (oriented_key("__starred__", LANDSCAPE), oriented_key("k/b", LANDSCAPE))
+
+
+def test_a_folder_of_your_own_dropped_on_itself_is_refused(qtbot):
+    tree, _collection, _a, _b = _collecting_tree(qtbot)
+    own = _folder_of_your_own(tree)
+    dropped = []
+    tree.dropped.connect(lambda *landed: dropped.append(landed))
+    itself = _drag([own.data(0, TREE_KEY_ROLE)])
+
+    assert not _drag_move_at(tree, own, itself).isAccepted()
+    _drop_at(tree, own, itself)
+
+    assert dropped == []
 
 
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):

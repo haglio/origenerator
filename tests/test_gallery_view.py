@@ -14211,6 +14211,19 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
     assert view._browser._visible_keys == [cat, dog]
 
 
+def test_grouping_picked_folders_takes_a_custom_folder_among_them(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    mine = gallery.custom_folder_key(_make_folder(view, "Mine", [dog]))
+    _pick(view, mine, cat)
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Both", True)))
+
+    view._group_selection()
+
+    record = next(r for r in view._db.list_custom_folders() if r["name"] == "Both")
+    assert sorted(record["folders"]) == sorted([mine, cat])
+
+
 def test_declining_the_name_prompt_makes_no_folder(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
@@ -14403,6 +14416,48 @@ def test_an_open_custom_folder_refuses_a_folder_from_the_other_shapes_list(qtbot
     assert not _drop_in_the_middle_pane(view, mime, source=_side(view._tree, PORTRAIT))
 
     assert view._db.list_custom_folders()[0]["folders"] == [dog]
+
+
+def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [dog]))
+    _make_folder(view, "Outer", [cat])
+    view.show()
+    qtbot.waitExposed(view)
+    mime = _folder_drag(view, inner)
+
+    assert _drop_on(_top_level(view._tree)["Outer"], mime)
+
+    outer = next(r for r in view._db.list_custom_folders() if r["name"] == "Outer")
+    assert outer["folders"] == [cat, inner]
+    assert _shown(_top_level(view._tree)["Outer"]) == "(2) Outer"
+    assert view._browser._visible_keys == [cat, inner]  # landed on it
+    assert "Inner" in _top_level(view._tree)  # still a folder of its own in the TOC
+
+
+def test_a_custom_folder_cannot_go_inside_one_it_holds(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
+    outer = gallery.custom_folder_key(_make_folder(view, "Outer", [inner]))
+    view.show()
+    qtbot.waitExposed(view)
+    mime = _folder_drag(view, outer)
+
+    assert not _drop_on(_top_level(view._tree)["Inner"], mime)
+
+    inner_record = next(r for r in view._db.list_custom_folders() if r["name"] == "Inner")
+    assert inner_record["folders"] == [cat]
+
+
+def test_a_custom_folder_dragged_onto_favorites_is_refused(qtbot):
+    # Favorites stars what lands on it, and a custom folder takes no star.
+    view, cat, _dog = _two_leaf_view(qtbot)
+    mine = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
+    view.show()
+    qtbot.waitExposed(view)
+    mime = _folder_drag(view, mine)
+
+    assert not _drop_on(_alls(view._tree)["Favorites"], mime)
 
 
 def test_open_favorites_takes_no_drop_though_its_row_does(qtbot):
@@ -14608,6 +14663,20 @@ def _square_menu(view, key):
                  if tile.key == key]
     view._scroll.ensureWidgetVisible(square)
     gestures.right_click(square, square.rect().center())
+
+
+def test_a_custom_folder_inside_another_can_be_taken_back_out_of_it(qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
+    _make_folder(view, "Outer", [inner])
+    view._tree.setCurrentItem(_top_level(view._tree)["Outer"])  # standing inside it
+    _answer_menu(monkeypatch, "Remove from “Outer”")
+
+    _square_menu(view, inner)
+
+    outer = next(r for r in view._db.list_custom_folders() if r["name"] == "Outer")
+    assert outer["folders"] == []
+    assert "Inner" in _top_level(view._tree)  # taken out of it, not removed
 
 
 def test_a_folders_menu_offers_its_name_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):

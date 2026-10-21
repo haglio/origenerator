@@ -441,6 +441,20 @@ def test_reconcile_keeps_a_gathered_folder_that_is_simply_gone(tmp_path):
     assert summary["orphaned"] == 1
 
 
+def test_reconcile_leaves_a_custom_folder_inside_another_as_it_is(tmp_path):
+    # Its key is its id, which no change to how folder keys are worked out moves.
+    db = Database(tmp_path / "t.db")
+    _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                   filename="sdxl_t2i_p1.png")
+    inner = gallery.custom_folder_key(db.create_custom_folder("Inner"))
+    _folder_holding(db, (inner, "custom", "p1"))
+
+    summary = reconcile_custom_folders(db)
+
+    assert db.list_custom_folders()[1]["folders"] == [inner]
+    assert summary == {"refreshed": 0, "repointed": 0, "orphaned": 0}
+
+
 def test_reconcile_with_no_custom_folders_is_a_noop(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},

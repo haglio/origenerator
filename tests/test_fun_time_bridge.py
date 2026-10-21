@@ -940,6 +940,19 @@ def test_a_clip_this_app_did_not_make_leaves_the_gallery_where_it_stands(qtbot, 
     _press(bridge, tmp_path, r"GO_TO|C:\library\genau\clips\scene one 0012.mp4")
 
     assert view.selected_prompt_ids() == ["i1"]
+    assert _the_room_was_told(tmp_path) == []
+
+
+def test_a_clip_the_session_names_that_this_app_made_asks_the_room_to_show_this_app(
+        qtbot, tmp_path):
+    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
+        _image("i1", "a cat", 50, 1),
+        _row("v7", "wan22_i2v", {"seed": 7}, "wan22_i2v_00007_.mp4")])
+    view.refresh()
+
+    _press(bridge, tmp_path, r"GO_TO|C:\library\videos\wan22_i2v_00007_.mp4")
+
+    assert _the_room_was_told(tmp_path) == ["origenerator_activate"]
 
 
 def test_the_session_says_where_each_sides_panel_sits(qtbot, tmp_path):

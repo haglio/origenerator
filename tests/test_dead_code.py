@@ -367,7 +367,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # Trash's, a folder of your own's and a pick of folders' menus and the Basic
 # section's builder lost docstrings their tests say, and a picture's menu
 # stopped counting its acts.
-MAX_PROSE_LINES = 17438
+# 17420 when a lock in the room, a slideshow's own lock and a clicked notice came
+# to put their item in front of him through one routine, GalleryView.show_generation,
+# taken down to what the tree measured; why a lock lands on the item and not a
+# sibling is test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab's.
+MAX_PROSE_LINES = 17420
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

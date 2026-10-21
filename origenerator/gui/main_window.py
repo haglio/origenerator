@@ -17,7 +17,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
-from origenerator.fun_time_bridge import FunTimeBridge, ask_for_origenerator_mode
+from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
 from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
@@ -231,16 +231,14 @@ class OrigeneratorWindow(QMainWindow):
         What a clicked notification comes to (:mod:`origenerator.app_link`).
         Standalone that means this window over whatever they had moved on to;
         hosted, the window is the session's to show and taking the foreground
-        for it would put it over the room instead, so the room is asked for the
-        mode this window is seen in and shows it when it gets there.
+        for it would put it over the room instead, so the gallery asks the room
+        for it, as it does for a lock in the room.
         """
-        if self._fun_time is not None:
-            ask_for_origenerator_mode(self._fun_time.dashboard_cmd_file)
-        else:
+        if self._fun_time is None:
             self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
             self.show()
             bring_to_front(self)
-        self._gallery_view.follow_link(prompt_id)
+        self._gallery_view.show_generation(prompt_id)
 
     def the_session_has_the_device(self, held: bool) -> None:
         """A Fun Time session running beside this window has the OSR2, or not."""

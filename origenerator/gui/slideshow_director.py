@@ -131,6 +131,9 @@ class SlideshowHost(Protocol):
     def follow_link(self, prompt_id: str) -> None:
         """Land on this generation: its folder, its tile, its config tab."""
 
+    def show_generation(self, prompt_id: str) -> None:
+        """That, with a hosting room asked for this window's place first."""
+
     def reveal(self, prompt_id: str) -> bool: ...
 
     def trash_generation(self, prompt_id: str) -> None:
@@ -491,9 +494,9 @@ class SlideshowDirector:
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
-            # Two of these are a session's: a lock opens the locked item as a
-            # generate tab, and a reset means the REGION's base state.
-            lock=(self._open_generate_tab_for
+            # Two of these are a session's: a lock puts the locked item in
+            # front of him, and a reset means the REGION's base state.
+            lock=(self._show_the_locked_generation
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
             reorder=self.reorder_slideshow,
@@ -988,21 +991,10 @@ class SlideshowDirector:
         if not self._giving_them_back and not self._host.reveal(prompt_id):
             self._host.follow_link(prompt_id)
 
-    def _open_generate_tab_for(self, prompt_id: str) -> None:
-        """A lock on a hosted slideshow: go to the locked item, in the browser and in
-        the tabs — the way the RFB answers a lock by opening the video's tab.
-
-        The item itself, not one of its siblings.  Asking the pane to reveal a
-        config brings forward whichever tab is already on that SETTINGS folder,
-        and every seed of one recipe shares that folder — so the tab that came
-        up was a sibling of the locked picture rather than the picture, which is
-        the "wrong item, a similar one" this used to open.  So the browser is
-        navigated to the item itself (its own folder, its own tile picked), and
-        that navigation loads the row into a tab the way a click on it would.
-        """
+    def _show_the_locked_generation(self, prompt_id: str) -> None:
         if self._host.row_for(prompt_id) is None:
             return
-        self._host.follow_link(prompt_id)  # its folder, its tile, its tab
+        self._host.show_generation(prompt_id)
 
     # --- the satellite regions ----------------------------------------------
 

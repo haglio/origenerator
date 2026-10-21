@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 from shared_ui.palette import RED
 
-from origenerator.gui.hud_queue import CANCEL, CLEAR, OPEN, QueuePointer, queue_section
+from origenerator.gui.hud_queue import CANCEL, CLEAR, OPEN, SHIELD, QueuePointer, queue_section
 from origenerator.gui.inflight import InFlightItem, RunReading
 
 
@@ -81,6 +81,21 @@ def test_a_row_carries_the_button_that_throws_its_job_away():
             if button.command == "queue_cancel|j2"] == ["Next seed"]
 
 
+def test_a_row_leads_with_a_shield_just_left_of_its_cancel_lit_while_shielded():
+    section = queue_section([_item("j1", cancel=lambda: None, shield=lambda _on: None,
+                                   shielded=True),
+                             _item("j2", cancel=lambda: None, shield=lambda _on: None)], 0)
+
+    _image, targets = _painted(section)
+
+    drawn = {button.command: (rect, button) for rect, button in targets}
+    (shield_x, _y, shield_width, _h), shield = drawn[f"{SHIELD}|j1"]
+    (cancel_x, *_rest), _cancel = drawn[f"{CANCEL}|j1"]
+    assert shield_x + shield_width <= cancel_x
+    assert shield.lit
+    assert not drawn[f"{SHIELD}|j2"][1].lit
+
+
 def test_a_row_is_a_way_into_the_folder_its_job_will_land_in():
     section = queue_section([_item("j1")], 0)
 
@@ -153,6 +168,16 @@ class TestThePointerOnTheBlock:
         pointer.press(*_middle_of(pointer, f"{CANCEL}|j1"))
 
         assert stopped == ["j1"]
+
+    def test_a_press_on_a_rows_shield_puts_it_on_and_lights_it_at_once(self):
+        asked = []
+        pointer, host = _pointer_over([_item("j1", cancel=lambda: None,
+                                             shield=asked.append, typical_seconds=30)])
+
+        pointer.press(*_middle_of(pointer, f"{SHIELD}|j1"))
+
+        assert asked == [True]
+        assert queue_section(*host.hud_queue).lines[0].shielded
 
     def test_a_press_on_a_row_goes_to_the_folder_its_job_will_land_in(self):
         opened = []

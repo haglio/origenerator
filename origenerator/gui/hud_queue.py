@@ -6,8 +6,8 @@ the panel the slideshow already wears rather than on a plate of its own, which w
 be a second HUD.
 
 It says what the strip says: the job being made with its live frame and the
-clock across its bar, then each waiting job as a row -- the button that throws
-it away, the picture it is made from, and what it costs.  They go back as the
+clock across its bar, then each waiting job as a row -- its shield, the button
+that throws it away, the picture it is made from, and what it costs.  They go as the
 panel's own declared buttons (:class:`funestra.hud_button.Button`), so it
 presses and names them exactly as it presses its own.
 """
@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from functools import cache
 
 from funestra.hud_button import Button
+from funestra.hud_marks import shared_mark
 from funestra.hud_panel import (
     SYMBOL_FONT,
     draw_button,
@@ -37,6 +38,7 @@ from shared_ui.palette import (
 )
 
 from origenerator.gui.inflight import (
+    SHIELD_TIP,
     discard_run_text,
     discard_run_tooltip,
     first_movable,
@@ -49,8 +51,9 @@ from origenerator.gui.inflight import (
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-# What a press on this block posts, and what the slideshow does with each: throw the
-# job away, go to the folder it will land in, drop another app's work.
+# What a press on this block posts, and what the slideshow does with each: shield the
+# job or throw it away, go to the folder it will land in, drop another app's work.
+SHIELD = "queue_shield"
 CANCEL = "queue_cancel"
 OPEN = "queue_open"
 CLEAR = "queue_clear"
@@ -133,6 +136,8 @@ class JobLine:
     tooltip: str
     discard: str
     discard_tooltip: str
+    shieldable: bool
+    shielded: bool
     movable: bool
     source: tuple[str | None, str | None]
     recipe_edited: bool
@@ -210,6 +215,8 @@ class QueueSection:
 
     def _row_width(self, line: JobLine) -> int:
         width = _BLOCK_W + _GAP + text_width(_tiny(), line.lead)
+        if line.shieldable:
+            width += CTRL_BTN + _GAP
         if line.discard:
             width += _word_width(line.discard) + _GAP
         if line.note:
@@ -260,11 +267,9 @@ class QueueSection:
 
     def _paint_clear(self, image, draw, right, y, pointer, targets) -> int:
         word = _word_width(CLEAR_WORD)
-        rect = (right - word, y, word, CTRL_BTN)
-        button = Button(CLEAR, CLEAR_WORD, _clear_tooltip(self.foreign))
-        draw_button(image, draw, rect, button, hovered=_on(rect, pointer),
-                    glyph_font=_glyphs(), word_font=_tiny())
-        targets.append((rect, button))
+        _paint_button(image, draw, (right - word, y, word, CTRL_BTN),
+                      Button(CLEAR, CLEAR_WORD, _clear_tooltip(self.foreign)),
+                      pointer, targets)
         return word
 
     def _say(self, draw, x, y, room, text) -> None:
@@ -311,14 +316,18 @@ class QueueSection:
         for index, line in enumerate(self.drawn):
             row = y + index * _ROW_H
             cursor = x
+            if line.shieldable:
+                _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
+                              Button(f"{SHIELD}|{line.key}", shared_mark("shield"),
+                                     SHIELD_TIP, width=CTRL_BTN, lit=line.shielded),
+                              pointer, targets)
+                cursor += CTRL_BTN + _GAP
             if line.discard:
                 word = _word_width(line.discard)
-                rect = (cursor, row, word, CTRL_BTN)
-                button = Button(f"{CANCEL}|{line.key}", line.discard,
-                                line.discard_tooltip, width=word)
-                draw_button(image, draw, rect, button, hovered=_on(rect, pointer),
-                            glyph_font=_glyphs(), word_font=_tiny())
-                targets.append((rect, button))
+                _paint_button(image, draw, (cursor, row, word, CTRL_BTN),
+                              Button(f"{CANCEL}|{line.key}", line.discard,
+                                     line.discard_tooltip, width=word),
+                              pointer, targets)
                 cursor += word + _GAP
             _paint_pictures(image, draw, cursor, row, line)
             cursor += _BLOCK_W + _GAP
@@ -353,6 +362,12 @@ class QueueSection:
             draw.ellipse([dot_x - _MARK_DOT, middle_y - _MARK_DOT,
                           dot_x + _MARK_DOT, middle_y + _MARK_DOT],
                          fill=(*TEXT_PRIMARY, 255))
+
+
+def _paint_button(image, draw, rect, button, pointer, targets) -> None:
+    draw_button(image, draw, rect, button, hovered=_on(rect, pointer),
+                glyph_font=_glyphs(), word_font=_tiny())
+    targets.append((rect, button))
 
 
 def _clear_tooltip(foreign: int) -> str:
@@ -481,6 +496,8 @@ def _line(item) -> JobLine:
         tooltip=f"{item.caption}\n\n{queue_lead_tooltip(item)}",
         discard=discard_run_text(item.auto_generating) if item.cancel is not None else "",
         discard_tooltip=discard_run_tooltip(item.auto_generating),
+        shieldable=item.shield is not None,
+        shielded=item.shielded,
         movable=not item.sent,
         source=(str(frame) if frame is not None else None, item.recipe_thumbnail),
         recipe_edited=item.recipe_prompt_edited,
@@ -524,7 +541,7 @@ class QueuePointer:
 
     The panel hands it a press, a drag, the button coming up and the wheel,
     and it places each against the rows and buttons as they were last painted:
-    a press on a row's button throws that job away, a press on the row goes
+    a press on a row's shield or Cancel shields or drops its job, one on the row goes
     to the folder its job will land in once the button comes up where it went
     down, and a press that travels picks the row up and drops it further down
     the line.  Which row the window opens on and where a drag would land are
@@ -556,6 +573,11 @@ class QueuePointer:
             # down the line -- so the press is held until the release says
             # which.  The head's picture is pressed for the folder alone.
             self._press = (key, px, py, verb == OPEN)
+        elif verb == SHIELD:
+            item = self._item(key)
+            if item is not None and item.shield is not None:
+                item.shielded = not item.shielded
+                item.shield(item.shielded)
         elif verb == CANCEL:
             item = self._item(key)
             if item is not None and item.cancel is not None:

@@ -148,7 +148,8 @@ class JobQueue(QObject):
     And the user's image work owns it outright: whatever is being rendered when a
     picture is asked for is set aside -- stopped, and put back in the line to
     start over once the pictures are done (:meth:`_set_aside_for`) -- unless it
-    is what a slideshow is locked on (:meth:`put_first`)."""
+    is what a slideshow is locked on (:meth:`put_first`) or a run the user
+    shielded (:meth:`shield`)."""
 
     changed = pyqtSignal()            # the set of live jobs changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
@@ -517,7 +518,7 @@ class JobQueue(QObject):
             del self._jobs[key]
 
     def _set_aside_for(self, newcomer: GenerationJob):
-        """Take everything but what is put first off the server for
+        """Take everything but what is put first or shielded off the server for
         ``newcomer``, and put each job back in the line to start over once the
         newcomer is done (:mod:`origenerator.queue_line` says why).
 
@@ -530,7 +531,8 @@ class JobQueue(QObject):
         if self._in_flight is not None:
             self._takes_over_on_landing = newcomer
         for job in reversed(list(self._on_server)):
-            if job is newcomer or job.prompt_id in self._first or not job.defer():
+            if (job is newcomer or job.prompt_id in self._first or job.shielded
+                    or not job.defer()):
                 continue
             self._on_server.remove(job)
             self._waiting.insert(queue_line.rejoin_index(self._waiting, job, newcomer), job)
@@ -651,8 +653,7 @@ class JobQueue(QObject):
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
             return
-        job.origin = job.prompt_id  # a resumed run's chain, if any, is already done
-        self._register(key, job, self._on_finished)
+        self._take_back(key, job, row)
         self._on_server.append(job)  # it is ComfyUI's to finish, not ours to send
 
     def _readopt(self, row: dict, image_index: dict):
@@ -681,9 +682,14 @@ class JobQueue(QObject):
             logger.warning("Dropping a queued generation we can no longer build: %s", e)
             self._db.delete_generation(row["prompt_id"])
             return
-        job.origin = job.prompt_id
-        self._register(key, job, self._on_finished)
+        self._take_back(key, job, row)
         self._enqueue(job)
+
+    def _take_back(self, key: str, job: GenerationJob, row: dict):
+        """Track a previous session's run again, as its row left it."""
+        job.origin = job.prompt_id  # a resumed run's chain, if any, is already done
+        job.shielded = bool(row.get("shielded"))
+        self._register(key, job, self._on_finished)
 
     @property
     def queue_order(self) -> list[str]:
@@ -696,6 +702,13 @@ class JobQueue(QObject):
         """
         making_first = sorted(self._on_server, key=lambda job: job.state != JobState.RUNNING)
         return [job.prompt_id for job in making_first + self._waiting]
+
+    def shield(self, prompt_id: str, shielded: bool) -> None:
+        job = self.job_for_prompt(prompt_id)
+        if job is None:
+            return
+        job.shielded = shielded
+        self._db.set_shielded(prompt_id, shielded)
 
     def put_first(self, prompt_ids):
         self._first = frozenset(prompt_ids)

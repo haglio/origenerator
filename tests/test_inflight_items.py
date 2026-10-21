@@ -55,6 +55,7 @@ class FakeJob:
         self.last_stage = "Render" if state == "running" else ""
         self.foreign_ahead = None
         self.params = {}
+        self.shielded = False
 
 
 class FakeJobQueue:
@@ -86,7 +87,7 @@ class FakeTree:
 def build():
     def make(rows=(), *, requests=(), jobs_by_folder=None, order=(),
              looping=(), image_rows=(), groups=None, cancelled=None, revealed=None,
-             went_to=None):
+             went_to=None, shielded=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
             jobs=FakeJobQueue(jobs_by_folder, order),
@@ -96,6 +97,7 @@ def build():
             on_cancel=(cancelled if cancelled is not None else lambda _p: None),
             on_reveal=(revealed if revealed is not None else lambda _k: None),
             on_go_to_item=(went_to if went_to is not None else lambda _p: None),
+            on_shield=(shielded if shielded is not None else lambda _p, _on: None),
         )
         return model.build()
     return make
@@ -115,7 +117,8 @@ def test_a_running_row_no_live_job_holds_still_gets_a_plain_card(build):
     items = build([_row("g1", status="running")])
 
     card, = items
-    assert (card.reading.frame, card.reading.progress, card.cancel) == (None, None, None)
+    assert (card.reading.frame, card.reading.progress, card.cancel, card.shield) == (
+        None, None, None, None)
     assert card.reading.status == "running"
 
 
@@ -202,6 +205,19 @@ def test_an_enhancements_card_goes_nowhere_once_its_image_is_gone(build):
     items[0].reveal()
 
     assert (went_to, revealed) == ([], [])
+
+
+def test_a_cards_shield_is_its_jobs_and_is_set_through_the_caller(build):
+    shielded = []
+    job = FakeJob("g1")
+    job.shielded = True
+    items = build([_row("g1", status="running")],
+                  jobs_by_folder={"image/sdxl_t2i/aaa": [job]},
+                  shielded=lambda prompt_id, on: shielded.append((prompt_id, on)))
+
+    assert items[0].shielded
+    items[0].shield(False)
+    assert shielded == [("g1", False)]
 
 
 def test_a_run_asked_for_of_a_picture_stands_under_that_picture(build):

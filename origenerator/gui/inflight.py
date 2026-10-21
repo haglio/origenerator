@@ -39,6 +39,8 @@ class InFlightItem:
     reveal: Callable[[], None]   # go to its folder and live tile, or to the image it enhances
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
+    shield: Callable[[bool], None] | None = None  # put its shield on or off, where cancel can stop it
+    shielded: bool = False
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
     # End the loop its folder is on. What a menu's real stop calls before
     # :attr:`cancel`, since discarding the run under a live loop only starts the

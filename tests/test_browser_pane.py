@@ -97,6 +97,9 @@ class _StubJobQueue:
     def job_for(self, key):
         return None if self._leading is None else SimpleNamespace(prompt_id=self._leading)
 
+    def shield(self, prompt_id, shielded):
+        pass
+
 
 class _StubAuto:
     def is_active(self, key):

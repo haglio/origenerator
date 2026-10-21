@@ -208,6 +208,9 @@ class GenerationStore(Store):
         the sorting back, which puts it among the ones still to be looked at."""
         self._set(prompt_id, "picture_state", state or None)
 
+    def set_shielded(self, prompt_id: str, shielded: bool):
+        self._set(prompt_id, "shielded", 1 if shielded else 0)
+
     def mark_evolver_exported(self, prompt_id: str):
         """Record that this generation's video was sent to Evolver's inbox.
 

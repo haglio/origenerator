@@ -97,6 +97,9 @@ class Database:
     def set_picture_state(self, prompt_id: str, state: str | None):
         return self.generations.set_picture_state(prompt_id, state)
 
+    def set_shielded(self, prompt_id: str, shielded: bool):
+        return self.generations.set_shielded(prompt_id, shielded)
+
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)
 

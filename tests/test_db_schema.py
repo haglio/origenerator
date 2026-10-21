@@ -413,6 +413,25 @@ def test_a_held_deletion_from_before_the_rename_is_moved_onto_the_new_keys(tmp_p
                                                      "motion_ceiling": 490}
 
 
+def test_a_seed_kept_before_kinds_were_is_a_videos_when_a_sound_seed_was_kept_with_it(tmp_path):
+    path = tmp_path / "origenerator.db"
+    with sqlite3.connect(path) as conn:
+        _create_without(conn, "seed_uses", {"media_type"})
+        conn.executemany(
+            "INSERT INTO seed_uses (kind, seed_key, seed, created_at) VALUES (?, ?, ?, ?)",
+            [("drawn", "noise_seed", 11, "2026-10-20 10:00:00"),
+             ("drawn", "audio_seed", 12, "2026-10-20 10:00:01"),
+             ("drawn", "noise_seed", 21, "2026-10-20 11:00:00"),
+             ("canceled", "seed", 31, "2026-10-20 12:00:00"),
+             ("canceled", "audio_seed", 32, "2026-10-20 12:00:00"),
+             ("drawn", "seed", 41, "2026-10-20 12:00:00")])
+
+    db = Database(path)
+
+    assert {use["seed"]: use["media_type"] for use in db.list_seed_uses()} == {
+        11: "video", 12: "video", 21: "image", 31: "video", 32: "video", 41: "image"}
+
+
 def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):
     # The table recorded what each worktree's copied database had bookmarked,
     # for adoption at the next live launch; there are no copies now, so it is

@@ -149,13 +149,6 @@ def _record(seed, created_at, *, kind="drawn", seed_key="seed", thumbnail_path=N
             "thumbnail_path": thumbnail_path, "media_type": media_type, "created_at": created_at}
 
 
-def test_a_seed_drawn_before_seeds_were_told_apart_is_offered_to_both_kinds():
-    records = [_record(60, "2026-09-26 00:00:01", media_type=None)]
-
-    assert [use.seed for use in seed_history([], "seed", records, makes=IMAGES)] == [60]
-    assert [use.seed for use in seed_history([], "seed", records, makes=VIDEOS)] == [60]
-
-
 def test_seeds_drawn_and_seeds_used_come_in_the_order_they_happened():
     rows = [{**_row("g2", seed=20), "created_at": "2026-09-26 00:00:03"},
             {**_row("g1", seed=10), "created_at": "2026-09-26 00:00:01"}]

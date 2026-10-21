@@ -27,8 +27,8 @@ class SeedUseKind(StrEnum):
 
 def seed_history(rows, key: str, records=(), *, makes: MediaType) -> list[SeedUse]:
     rows = [row for row in rows if gallery.media_type_of_row(row) == makes]
-    records = [record for record in records if _role(record["seed_key"]) == _role(key)
-               and record["media_type"] in (makes, None)]
+    records = [record for record in records
+               if _role(record["seed_key"]) == _role(key) and record["media_type"] == makes]
     used = [*_uses_in_rows(rows, key),
             *(_use_in(record) for record in records if record["kind"] != SeedUseKind.DRAWN)]
     last_used = {}

@@ -371,10 +371,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # to put their item in front of him through one routine, GalleryView.show_generation,
 # taken down to what the tree measured; why a lock lands on the item and not a
 # sibling is test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab's.
-# 17406 when every drag came to tell every place it could drop and the drop
+# 17403 when every drag came to tell every place it could drop and the drop
 # zones' style came from one definition, taken down to what the tree measured:
 # the relays that carried a drag to Combine went, and the slot's own light switch.
-MAX_PROSE_LINES = 17406
+MAX_PROSE_LINES = 17403
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

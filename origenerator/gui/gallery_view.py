@@ -456,8 +456,7 @@ class GalleryView(QWidget):
         # scroll area is its canvas — built here so it can be handed over, placed
         # into the layout by _build_ui.
         self._scroll = BrowserScrollArea()
-        DropTarget(self._scroll.viewport(), self._landing_in_the_open_custom_folder,
-                   self._on_dropped)
+        DropTarget(self._scroll, self._landing_in_the_open_custom_folder, self._on_dropped)
         self._browser = BrowserPane(
             self._scroll, db, self._jobs, self._auto,
             TreeNavigation(

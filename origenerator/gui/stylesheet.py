@@ -411,6 +411,11 @@ def build_stylesheet() -> str:
     QLabel#dropSlot[{drop_style.LIT}="true"], QLabel#dropSlot[{drop_style.AIMED}="true"] {{
         border: 1px solid {_h(drop_style.EDGE)};
         color: {_h(TEXT_PRIMARY)};
+    }}
+    /* What fills a pane that takes drops is clear, so the pane's own ground
+       shows through it when the drop zones' style lights the pane. */
+    BrowserScrollArea > QWidget#qt_scrollarea_viewport > .QWidget {{
+        background-color: transparent;
     }}{drop_style.ground_rules()}
     """
 

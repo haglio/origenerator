@@ -106,6 +106,7 @@ from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.drags import under_way
+from origenerator.gui.drop_style import LIT
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
@@ -124,6 +125,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.slideshow_panel import slideshow_hud_model
+from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, key_holds, oriented_key
@@ -138,6 +140,7 @@ from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import gestures
+from tests.drop_style_seen import worn
 from tests.lit_switches import lit_in
 from tests.slideshow_hud_support import engine_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
@@ -14484,6 +14487,39 @@ def test_open_favorites_takes_no_drop_though_its_row_does(qtbot):
     mime = _folder_drag(view, cat)
 
     assert not _drop_in_the_middle_pane(view, mime, source=_side(view._tree))
+
+
+def _middle_pane_style(view, qtbot):
+    """The drop style the middle pane wears, read where nothing in it is drawn."""
+    view.setStyleSheet(build_stylesheet())
+    view.show()
+    qtbot.waitExposed(view)
+    pane = view._scroll.rect()
+    return worn(view._scroll.grab().toImage(), pane,
+                QPoint(pane.right() - 3, pane.bottom() - 3))
+
+
+def test_an_open_custom_folder_lights_while_an_item_it_would_take_is_dragged(qtbot):
+    view, _cat, dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Mine", [dog])
+    view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
+    mime = generation_mime("i1")
+
+    under_way.started.emit(mime, None)
+
+    assert _middle_pane_style(view, qtbot) == LIT
+    under_way.ended.emit()
+
+
+def test_open_favorites_stays_as_it_is_while_a_folder_is_dragged(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
+    mime = _folder_drag(view, cat)
+
+    under_way.started.emit(mime, _side(view._tree))
+
+    assert _middle_pane_style(view, qtbot) is None
+    under_way.ended.emit()
 
     assert not view.group_for_key(cat).favorite
 

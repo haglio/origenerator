@@ -89,6 +89,26 @@ def test_clicking_the_favorite_icon_on_a_leaf_emits_favorite_clicked(qtbot):
     assert fired == ["m/w/mo/key"]
 
 
+def _is_red(color) -> bool:
+    return color.red() > color.green() + 50 and color.red() > color.blue() + 50
+
+
+def test_a_picked_row_can_be_told_to_offer_no_delete(qtbot):
+    tree, leaf = _tree_with_leaf(qtbot)
+    tree.setCurrentItem(leaf)
+    fired = []
+    tree.delete_clicked.connect(fired.append)
+    _, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+    qtbot.mouseMove(tree.viewport(), delete_rect.center())
+    assert _wears_within(tree, leaf, delete_rect, _is_red)
+
+    tree.offer_delete_on_picked_rows(False)
+    shown = _wears_within(tree, leaf, delete_rect, _is_red)
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=delete_rect.center())
+
+    assert (shown, fired) == (False, [])
+
+
 def test_a_parent_row_offers_no_actions(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
     parent = leaf.parent()  # "Model" has a child, so it is a non-leaf

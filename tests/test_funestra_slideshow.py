@@ -12,7 +12,7 @@ from pathlib import Path
 
 from funestra.file_channel import consume_command_file
 from funestra.funestra_verbs import play_file
-from funestra.hud_status import LATEST_LABEL
+from funestra.hud_title import LATEST_LABEL
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
 from funestra.status import FunestraStatus, status_fields
@@ -301,7 +301,7 @@ def test_narrowing_reaches_a_funestra_partway_through_reading_the_last_list(qtbo
 
 def test_the_panel_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
     """The session draws the panel on the Funestra, so this app publishes the
-    model for it: the slideshow's map, its status line and the buttons it answers —
+    model for it: the slideshow's map, its title and the buttons it answers —
     and not the mode pair, which is the session's own to add."""
     slideshow = _slideshow(qtbot, tmp_path)
 

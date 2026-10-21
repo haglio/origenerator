@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 from funestra.hud_placement import HudCorner
-from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from PIL import Image
 from PyQt6.QtCore import Qt
 

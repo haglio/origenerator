@@ -30,6 +30,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from shared_ui.orientation import orientation_of_size
+
 from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
 from origenerator.slideshow import Slide
@@ -347,7 +349,7 @@ def region_for_size(width: int, height: int) -> str:
 
     A square subject goes to the landscape region — the roomier of the two.
     """
-    return "portrait" if height > width else "landscape"
+    return orientation_of_size(width, height)
 
 
 def _measured_size(slide: Slide) -> tuple[int, int] | None:

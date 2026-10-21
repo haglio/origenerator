@@ -497,7 +497,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     assert model.current_action == "Source image"
     assert (model.seed_count, model.action_count) == (2, 3)
     assert model.playing == ("corner", 0) and model.active_loop == ""
-    assert model.lock_label == "Unlocked · Shuffle"
+    assert model.title == "Unlocked · Shuffle"
     # And the mode pair leads the panel, with this mode lit: the way back to
     # the Funestra under the slideshow.
     assert [(button.command, button.lit) for button in model.rows[0]] == [
@@ -571,7 +571,7 @@ def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monke
 def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypatch):
     """Recents is the Funestras' Latest: the collection lists newest first and its
     slideshow plays that order, where every other set shuffles — and the
-    slideshow's HUD status line says which."""
+    slideshow's HUD title says which."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view, "_current_collection_key", lambda: RECENTS_KEY)
@@ -599,7 +599,7 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
     assert slideshow.hud_favorites_filter is True
     assert slideshow.pass_size() == 1  # narrowed to the one favorite
     model = slideshow_hud_model("portrait", slideshow)
-    assert _lit(model, "portrait_fmode") and "F-Mode" in model.lock_label
+    assert _lit(model, "portrait_fmode") and "F-Mode" in model.title
 
     slideshow.press("portrait_fmode")
     assert slideshow.pass_size() == 3  # widened back
@@ -703,8 +703,8 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     # A seed loop lights the row it is playing, which is what that row's
     # button says about it; an act filter would light every row it keeps.
     assert model.filter_query == model.current_action == "Source image"
-    assert model.lock_label.startswith("Looping seeds")
-    assert "Unlocked" not in model.lock_label
+    assert model.title.startswith("Looping seeds")
+    assert "Unlocked" not in model.title
     assert slideshow._note.text() == "Looping seeds: 2"
 
     slideshow.press("portrait_no_loop")
@@ -714,7 +714,7 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     assert slideshow._playlist.current()[2] == "g1"
     dropped = slideshow_hud_model("portrait", slideshow)
     assert dropped.active_loop == ""
-    assert "Looping" not in dropped.lock_label
+    assert "Looping" not in dropped.title
 
 
 def test_more_seeds_widens_the_row_to_the_nearest_configurations_and_loops_it(
@@ -755,7 +755,7 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(slideshow)
     model = slideshow_hud_model("portrait", slideshow)
     assert model.active_loop == ""
-    assert model.lock_label == "Unlocked · Shuffle"
+    assert model.title == "Unlocked · Shuffle"
 
 
 def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypatch):
@@ -1637,7 +1637,7 @@ def test_a_hosted_slideshows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot
     """The two filters a slideshow has are the two switches its HUD carries: F-mode
     over the favorites, and beside it the switch keeping only the pictures the
     slideshow has enhanced.  A press lands on the slideshow itself, hosted like standalone
-    — it is the slideshow's own narrowing, not the session's — and the status line
+    — it is the slideshow's own narrowing, not the session's — and the title
     names the cut beside the rest."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -1653,7 +1653,7 @@ def test_a_hosted_slideshows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot
     assert slideshow.hud_enhanced_mode is True
     assert slideshow.pass_size() == 1          # narrowed to the one enhanced
     model = slideshow_hud_model("portrait", slideshow)
-    assert _lit(model, "portrait_enhanced") and "Enhanceds" in model.lock_label
+    assert _lit(model, "portrait_enhanced") and "Enhanceds" in model.title
     # Nothing went out on the session's channel: the switch is the slideshow's own.
     assert not (tmp_path / "dashboard_cmd.txt").exists()
 

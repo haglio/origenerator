@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
 
 from origenerator import evolver_export
@@ -43,7 +44,7 @@ from origenerator.gallery import (
     settings_signature,
     workflow_output_type,
 )
-from origenerator.gallery.sides import PORTRAIT, orientation_of_size
+from origenerator.gallery.sides import PORTRAIT
 from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,

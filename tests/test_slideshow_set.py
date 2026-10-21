@@ -10,7 +10,7 @@ from __future__ import annotations
 import random
 
 import pytest
-from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions

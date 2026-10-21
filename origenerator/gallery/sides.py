@@ -13,10 +13,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
-PORTRAIT = "portrait"
-LANDSCAPE = "landscape"
+from shared_ui.orientation import LANDSCAPE, ORIENTATIONS, PORTRAIT
+
 BOTH = "both"
-ORIENTATIONS = (PORTRAIT, LANDSCAPE)
 SIDES = (*ORIENTATIONS, BOTH)
 SIDE_LABELS = {PORTRAIT: "Portrait", LANDSCAPE: "Landscape", BOTH: "Both"}
 SEPARATE = ORIENTATIONS
@@ -29,10 +28,6 @@ _SHAPES_ON = {
     BOTH: _EVERY_SHAPE,
     None: _EVERY_SHAPE,  # no side at all, where nothing is narrowing
 }
-
-
-def orientation_of_size(width: int, height: int) -> str:
-    return PORTRAIT if height > width else LANDSCAPE
 
 
 def side_holds(side: str | None, orientation: str | None) -> bool:

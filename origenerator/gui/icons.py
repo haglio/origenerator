@@ -13,12 +13,9 @@ of workflow/model/LoRA a folder is; the media-type badges
 (:func:`media_type_badge`) are corner chips marking a Recents tile as an image
 or a video.
 
-:func:`side_mark` and :func:`separate_mark` are the marks over the table of
-contents and on the radio that chooses how it is drawn: a frame of the
-proportions each side holds, drawn here because what they say is the difference
-between them rather than any one named mark.  :func:`recent_mark_icon`
-is the dot at the start of the row of a folder lately worked in, drawn here for the
-same reason: it is a color saying one thing, not a mark anyone reads.
+:func:`recent_mark_icon` is the dot at the start of the row of a folder lately
+worked in, drawn here because it is a color saying one thing, not a mark anyone
+reads.
 
 The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
 :func:`corner_enhance_icon`) are the marks a generation's picture wears in its
@@ -49,7 +46,7 @@ from shared_ui.colors import (
     TEXT_SECONDARY,
 )
 from shared_ui.icon_geometry import shapes_of
-from shared_ui.icons import CANVAS, PEN_WIDTH, draw_glyph, glyph_icon, glyph_pixmap
+from shared_ui.icons import CANVAS, draw_glyph, glyph_icon, glyph_pixmap
 
 from origenerator.gallery.collection import (
     COLLECTION_LABELS,
@@ -350,70 +347,18 @@ def media_type_icon(media_type: str) -> QIcon:
 
 # --- the shape a side of the table of contents holds ------------------------
 
-# A frame of the very proportions each side holds, on the shared square canvas
-# so the headings' words start at the same x. Drawn here rather than added to
-# the family's glyph list because these are not one mark but a set whose whole
-# content is the difference between them, and no other window in the family
-# shows the libraries side by side.
-_PROPORTION_LONG = 42.0
-_PROPORTION_SHORT = 28.0
-_PROPORTION_RADIUS = 5.0
 MARK_BESIDE_A_WORD = 15  # on-screen size, for a mark that sits level with a word
-_UPRIGHT = (_PROPORTION_SHORT, _PROPORTION_LONG)
-_LYING_DOWN = (_PROPORTION_LONG, _PROPORTION_SHORT)
-# Both is the two frames crossed rather than a third drawing: what that side
-# holds IS the other two.
-_SIDE_FRAMES = {PORTRAIT: (_UPRIGHT,), LANDSCAPE: (_LYING_DOWN,),
-                BOTH: (_UPRIGHT, _LYING_DOWN)}
-# The same pair uncrossed and side by side: two lists rather than one, measured
-# off the canvas so the pair cannot come out wider than the square it is on.
-_PAIR_GAP = 4.0
-_PAIR_SHORT = ((_SIZE - 2 * PEN_WIDTH - _PAIR_GAP)
-               / (1 + _PROPORTION_LONG / _PROPORTION_SHORT))
-_PAIR_LONG = _PAIR_SHORT * _PROPORTION_LONG / _PROPORTION_SHORT
-
-
-def _frame_pen(painter: QPainter) -> None:
-    pen = QPen(TEXT_PRIMARY)
-    pen.setWidthF(PEN_WIDTH)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-
-
-def _rounded(painter: QPainter, x: float, y: float, width: float, height: float) -> None:
-    painter.drawRoundedRect(QRectF(x, y, width, height),
-                            _PROPORTION_RADIUS, _PROPORTION_RADIUS)
+_SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}
 
 
 @cache
 def side_mark(side: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
-    """The frame -- or, for Both, the crossed pair -- one side of the list holds.
-
-    Painted at the size it is shown rather than rendered large and resampled,
-    which at this size costs a pen a pixel and a half wide its edges.
-    """
-    def draw(painter: QPainter):
-        painter.scale(size / _SIZE, size / _SIZE)
-        _frame_pen(painter)
-        for width, height in _SIDE_FRAMES[side]:
-            _rounded(painter, (_SIZE - width) / 2, (_SIZE - height) / 2, width, height)
-
-    return _painted(draw, size)
+    return glyph_pixmap(_SIDE_MARKS[side], size, TEXT_PRIMARY)
 
 
 @cache
 def separate_mark(size: int) -> QPixmap:
-    """The two frames side by side: a list of each shape rather than one of
-    both. Sized by its caller, the radio over the list being the only one."""
-    def draw(painter: QPainter):
-        painter.scale(size / _SIZE, size / _SIZE)
-        _frame_pen(painter)
-        left = (_SIZE - (_PAIR_SHORT + _PAIR_GAP + _PAIR_LONG)) / 2
-        _rounded(painter, left, (_SIZE - _PAIR_LONG) / 2, _PAIR_SHORT, _PAIR_LONG)
-        _rounded(painter, left + _PAIR_SHORT + _PAIR_GAP, (_SIZE - _PAIR_SHORT) / 2,
-                 _PAIR_LONG, _PAIR_SHORT)
-
-    return _painted(draw, size)
+    return glyph_pixmap("portrait_beside_landscape", size, TEXT_PRIMARY)
 
 
 # --- the controls a picture wears in its corners --------------------------

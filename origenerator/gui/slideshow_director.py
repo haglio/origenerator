@@ -25,7 +25,7 @@ from functools import partial
 from typing import Protocol
 
 from funestra.hud_placement import HudCorner
-from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.modes import read_mode
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget
@@ -315,7 +315,7 @@ class SlideshowDirector:
             return
         # Recents is Latest, exactly as on a Fun Time Funestra: the collection lists
         # newest first and its slideshow plays that order, where every other
-        # set shuffles — and the slideshow's HUD status line says which.  Latest
+        # set shuffles — and the slideshow's HUD title says which.  Latest
         # opens on the newest rather than where the last Latest slideshow stopped:
         # the newest is what it is opened for.
         latest = collection is not None and collection.which == _RECENTS_KEY
@@ -801,7 +801,7 @@ class SlideshowDirector:
 
     def _wear_the_hud(self, view, side: str) -> None:
         """Put the Funestras' own HUD on *view* — the same panel, rendered by the
-        same shared code: the status line, this side's transport, and the nav
+        same shared code: the title, this side's transport, and the nav
         map speaking the set as a seed family.  The view's own furnishings come
         off with it, because the map says all of it.
 
@@ -1420,7 +1420,7 @@ class SlideshowDirector:
         """The spoken "favorites": the slideshow's own F-mode switch, flipped.
 
         The same thing its HUD button does and the same thing the word does on
-        a Funestra, so the readout — the lit button and the status line — says so
+        a Funestra, so the readout — the lit button and the title — says so
         without anything here having to draw it."""
         slideshow = self.surface_for(side)
         if slideshow is None:

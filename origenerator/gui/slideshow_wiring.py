@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 
-from funestra.hud_status import SHUFFLE_LABEL
+from funestra.hud_title import SHUFFLE_LABEL
 
 from origenerator.slideshow import SlideshowFilters
 

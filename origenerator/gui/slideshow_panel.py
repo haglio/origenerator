@@ -10,7 +10,7 @@ Funestra hands it over in process, and the Funestra draws it.
 
 from __future__ import annotations
 
-from funestra.hud_status import looping_label, status_line
+from funestra.hud_title import hud_title, looping_label
 from funestra.satellite_hud import HudCell, HudModel
 
 from origenerator.gui.slideshow_map import SEED_AXIS
@@ -60,17 +60,17 @@ def slideshow_hud_model(side: str, host, *, hosted: bool = True,
     return HudModel(
         funestra=side,
         locked=locked,
-        # The line says what the map's light says, in the words a satellite
+        # The title says what the map's light says, in the words a satellite
         # says it in -- the two HUDs are one HUD in two places.  Nothing
         # playing_set when nothing is looping, so a slideshow browsing its set reads
         # "Unlocked · Shuffle" exactly as a satellite browsing its library does;
         # and it names both narrowings beside the rest — F-mode over the
         # favorites, and the enhanced-only switch a slideshow's HUD is the one
         # panel here to carry.
-        lock_label=status_line(playing_set=looping_label(shown.loop) if shown.loop else "",
-                               locked=locked, order=order_label,
-                               f_mode=favorites_filter, enhanced=enhanced,
-                               filter_label=act_filter),
+        title=hud_title(playing_set=looping_label(shown.loop) if shown.loop else "",
+                        locked=locked, order=order_label,
+                        f_mode=favorites_filter, enhanced=enhanced,
+                        filters=(act_filter,)),
         # The Funestras' favorite star, over the same items the Favorites
         # collection lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,

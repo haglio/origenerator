@@ -360,7 +360,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # are generated at, and left why it is published to tests/test_gallery_contract.py.
 # 17485 when the fixes took prompts, a LoRA and a Train button, taken down to
 # what the tree measured.
-MAX_PROSE_LINES = 17485
+# 17457 when the frames over the two shapes' lists became shared_ui's marks,
+# taken down to what the tree measured.
+MAX_PROSE_LINES = 17457
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

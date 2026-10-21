@@ -20,6 +20,7 @@ from origenerator.gui.folder_tree import (
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.orientation import oriented_key
+from tests.heard_drags import HeardDrags
 
 _ROLE = Qt.ItemDataRole.UserRole
 
@@ -420,6 +421,19 @@ def test_a_folder_of_your_own_dropped_on_itself_is_refused(qtbot):
     _drop_at(tree, own, itself)
 
     assert dropped == []
+
+
+def test_a_folder_dragged_out_tells_every_place_a_drop_can_land(qtbot, monkeypatch):
+    tree, _collection, a, _b = _collecting_tree(qtbot)
+    _started_drags(monkeypatch)
+    heard = HeardDrags()
+    tree.setCurrentItem(a)
+
+    tree.startDrag(Qt.DropAction.CopyAction)
+
+    assert [(bytes(mime.data(FOLDER_KEYS_MIME)).decode("utf-8"), source)
+            for mime, source in heard.started] == [(oriented_key("k/a", LANDSCAPE), tree)]
+    assert heard.ended == 1
 
 
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):

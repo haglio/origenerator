@@ -35,6 +35,7 @@ from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon
 from PyQt6.QtWidgets import QAbstractItemView, QMenu, QStyledItemDelegate, QTreeWidget
 
 from origenerator.gui import icons
+from origenerator.gui.drags import carry
 from origenerator.gui.generation_drag import dragged_generation
 
 _ICON = 16   # on-screen size of each action
@@ -262,7 +263,7 @@ class FolderTree(QTreeWidget):
         mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
         drag = QDrag(self)
         drag.setMimeData(mime)
-        drag.exec(Qt.DropAction.CopyAction)
+        carry(drag, mime, self, Qt.DropAction.CopyAction)
 
     def _landing(self, event) -> tuple[str, list, list] | None:
         return self.landing_on(self.itemAt(event.position().toPoint()), event.mimeData(),

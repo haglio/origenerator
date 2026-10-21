@@ -266,6 +266,23 @@ def test_both_regions_can_hold_a_slideshow_at_once(qtbot, tmp_path, monkeypatch)
         qtbot.addWidget(slideshow)
 
 
+def test_a_slideshow_in_a_session_begins_on_the_one_item_picked(qtbot, tmp_path, monkeypatch):
+    view = _fun_time_view(qtbot)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    last = view._slideshows._region_slideshows["portrait"]
+    qtbot.addWidget(last)
+    closed_on = last._playlist.current().prompt_id
+    last.close()
+    picked = next(f"id-tall-{n}" for n in range(3) if f"id-tall-{n}" != closed_on)
+    monkeypatch.setattr(view, "selected_prompt_ids", lambda: [picked])
+
+    view._slideshows.start()
+
+    slideshow = view._slideshows._region_slideshows["portrait"]
+    qtbot.addWidget(slideshow)
+    assert slideshow._playlist.current().prompt_id == picked
+
+
 def test_esc_reaching_a_gallery_in_a_session_asks_the_session_for_omnipause(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))

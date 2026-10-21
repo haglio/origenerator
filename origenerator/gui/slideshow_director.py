@@ -118,6 +118,9 @@ class SlideshowHost(Protocol):
     def visible_prompt_ids(self) -> list[str]:
         """The generations the browser lists, in the order shown."""
 
+    def selected_prompt_ids(self) -> list[str]:
+        """The generations picked in the browser, in the order shown."""
+
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
         app's -- the block a slideshow's panel hangs at its foot."""
@@ -170,6 +173,10 @@ def _still_up(slideshow):
     return slideshow if slideshow is not None and slideshow.is_showing() else None
 
 
+def _place_of(prompt_id: str, items) -> int | None:
+    return next((index for index, item in enumerate(items) if item[2] == prompt_id), None)
+
+
 class SlideshowDirector:
     """Every fullscreen slideshow this window has open, and the words about them."""
 
@@ -215,6 +222,7 @@ class SlideshowDirector:
         # Where the last slideshow was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
         self._slideshow_state = SlideshowState()
+        self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
         self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
         self._held_at_stamp = None
@@ -292,9 +300,9 @@ class SlideshowDirector:
 
     def start(self, *, side: str | None = None):
         """Open what's on screen — a folder, or the Latest/Favorites collection —
-        as a fullscreen slideshow, shuffled and running at the app-wide pace,
-        and standing where the last slideshow was left when this comes back to
-        it."""
+        as a fullscreen slideshow running at the app-wide pace, standing on the
+        one generation picked there, else where the last slideshow was left
+        when this comes back to it."""
         location = self._host.slideshow_location()
         base, located_on = _split_collection_key(location)
         collection = folder_collection(base)
@@ -316,16 +324,29 @@ class SlideshowDirector:
         # Recents is Latest, exactly as on a Fun Time Funestra: the collection lists
         # newest first and its slideshow plays that order, where every other
         # set shuffles — and the slideshow's HUD title says which.  Latest
-        # opens on the newest rather than where the last Latest slideshow stopped:
-        # the newest is what it is opened for.
+        # opens on the newest, whatever is picked or wherever the last Latest
+        # slideshow stopped: the newest is what it is opened for.
         latest = collection is not None and collection.which == _RECENTS_KEY
-        self.open(items, rows=rows, location=location, side=side,
-                  resume=None if latest else self._place_coming_back_to(location, items),
+        picked = [] if latest else self._picked_since_the_slideshow_up_opened()
+        one_picked = picked[0] if len(picked) == 1 else None
+        resume = None if latest else self._place_coming_back_to(location, items)
+        start = _place_of(one_picked, items) if one_picked is not None else None
+        picked_elsewhere = (start is not None and resume is not None
+                            and resume.current != one_picked)
+        self.open(items, rows=rows, location=location, side=side, start=start,
+                  resume=None if picked_elsewhere else resume,
                   filters=replace(self._filters, favorites=True) if favorites else None,
                   **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),
                     "latest" if latest else "shuffled")
+
+    def _picked_since_the_slideshow_up_opened(self) -> list[str]:
+        picked = self._host.selected_prompt_ids()
+        if (_still_up(self._slideshow) is not None
+                and tuple(picked) == self._picked_as_the_slideshow_up_opened):
+            return []
+        return picked
 
     def _order(self, latest: bool) -> dict:
         return {"shuffle": in_order if latest else None,
@@ -351,8 +372,7 @@ class SlideshowDirector:
             rows = (listed if any(row["prompt_id"] == generation for row in listed)
                     else self.rows_at(self._location_of(self._host.row_for(generation))))
             items = self.items_of(rows)
-            start = next((i for i, item in enumerate(items) if item[2] == generation),
-                         None)
+            start = _place_of(generation, items)
             if start is None:
                 items, start = [(media[0], media[1], generation, None)], 0
                 rows = [row for row in [self._host.row_for(generation)] if row is not None]
@@ -382,8 +402,7 @@ class SlideshowDirector:
         and a double-click's differ only in the order they pass.
         ``folder_items`` is what to arm a slideshow that opened over a running
         generation with, since that one has no items of its own yet, and
-        ``resume`` where a closed slideshow left off, for one picking that back up
-        rather than naming its own opening slide.
+        ``resume`` where a closed slideshow left off, for one picking that back up.
 
         ``rows`` are the library rows *items* were built from, and the folder
         rows for a live slideshow armed with one: the enhanced switch and the
@@ -438,6 +457,7 @@ class SlideshowDirector:
                                        levels=levels,
                                        folder_items=folder_items, **kwargs)
         self._slideshow = slideshow
+        self._picked_as_the_slideshow_up_opened = tuple(self._host.selected_prompt_ids())
         already_live = any(live is slideshow for live, _where in self._live_slideshows)
         self._live_slideshows = [entry for entry in self._live_slideshows
                                  if entry[0] is not slideshow]

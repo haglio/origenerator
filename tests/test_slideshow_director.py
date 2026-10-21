@@ -391,6 +391,7 @@ class FakeHost:
         self.cleared_queue = 0
         self.queue = ([], 0)
         self.visible = [row["prompt_id"] for row in self.rows]
+        self.picked = []
 
     def slideshow_location(self):
         return self.location
@@ -415,6 +416,9 @@ class FakeHost:
 
     def visible_prompt_ids(self):
         return list(self.visible)
+
+    def selected_prompt_ids(self):
+        return list(self.picked)
 
     def queue_now(self):
         return self.queue
@@ -1522,6 +1526,17 @@ def test_what_is_on_screen_opens_where_the_last_slideshow_left_off(slideshows):
     director.start()
 
     assert made[1].resumed == SlideshowState(order=("g1",), current="g1")
+
+
+def test_what_is_on_screen_opens_on_the_one_item_picked_and_is_led_nowhere_else(slideshows):
+    host = FakeHost(location="workflow/a", rows=[_row("g1"), _row("g2")])
+    host.picked = ["g2"]
+    director, _host, made = slideshows(host)
+
+    director.start()
+
+    assert made[0].opened_with.get("start") == 1
+    assert (made[0].leads, made[0].resumed) == (0, None)
 
 
 def test_nothing_to_play_opens_no_slideshow_at_all(slideshows):

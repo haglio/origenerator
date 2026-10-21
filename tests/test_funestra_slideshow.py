@@ -27,6 +27,7 @@ from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
+from origenerator.slideshow_buttons import answer
 from tests.slideshow_support import slides_named
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
@@ -660,6 +661,24 @@ class TestVersions:
         slideshow.slideshow_step_version(-1)
 
         assert _sent(slideshow) == ["PLAY_FILE one_enhanced.png"]
+
+    def test_the_sessions_shift_left_counts_the_enhancements_down_and_shift_right_up(
+            self, qtbot, tmp_path):
+        """The session sends Shift+Left as cycle_version_back, and Shift+Right as
+        cycle_version, which the band's versions button sends too."""
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+        slideshow.set_levels({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
+                                          ("one_1.png", "image", "Enhancement 1/2"),
+                                          ("one.png", "image", "Original")]})
+
+        opened = []
+        for press in ("cycle_version_back", "cycle_version_back",
+                      "cycle_version", "cycle_version"):
+            answer(slideshow, press)
+            opened += [line for line in _sent(slideshow) if line.startswith("PLAY_FILE")]
+
+        assert opened == ["PLAY_FILE one_1.png", "PLAY_FILE one.png",
+                          "PLAY_FILE one_1.png", "PLAY_FILE one_2.png"]
 
     def test_an_item_filed_once_is_left_alone_rather_than_stepping_the_set(
             self, qtbot, tmp_path):

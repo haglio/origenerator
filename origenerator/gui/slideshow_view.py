@@ -690,7 +690,7 @@ class SlideshowView(QWidget):
         if state.level_index and self._current_prompt_id() == state.current:
             # A fresh slide sits at its top version, so the remembered index is
             # exactly the number of steps down to the one that was on screen.
-            self._step_level(state.level_index)
+            self.slideshow_step_version(state.level_index)
         return True
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
@@ -851,9 +851,6 @@ class SlideshowView(QWidget):
         return len(self._levels.levels(base=self._current_base())) > 1
 
     def slideshow_step_version(self, delta: int) -> None:
-        self._step_level(delta)
-
-    def _step_level(self, delta: int) -> None:
         """Step ``delta`` versions within the item on screen: an image's
         enhancement levels, or a video's Evolver upscale and the video itself.
 
@@ -1566,9 +1563,9 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Escape:
             self._toggle_pause()
         elif key == Qt.Key.Key_Left:
-            self._step_level(-1) if shifted else self._step(-1)
+            answer(self, "cycle_version_back") if shifted else self._step(-1)
         elif key == Qt.Key.Key_Right:
-            self._step_level(1) if shifted else self._step(1)
+            answer(self, "cycle_version") if shifted else self._step(1)
         elif key == Qt.Key.Key_Up:
             self.slideshow_nav("up") if shifted else self._delete_current()
         elif key == Qt.Key.Key_Down:

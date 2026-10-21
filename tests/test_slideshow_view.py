@@ -1565,16 +1565,20 @@ def test_shift_arrows_step_the_versions_of_the_image_on_screen(qtbot, tmp_path):
 
 
 @_ARROW_KEYS_OR_WASD
-def test_shift_left_steps_back_the_way_shift_right_came(qtbot, tmp_path, arrows):
+def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
+        qtbot, tmp_path, arrows):
     newest, middle, original = (_png(tmp_path / n) for n in ("e2.png", "e1.png", "src.png"))
     view = _view(qtbot, [(newest, "image", "id-a")])
-    view.set_levels({newest: [(newest, "image"), (middle, "image"), (original, "image")]})
+    view.set_levels({newest: [(newest, "image", "Enhancement 2/2"),
+                              (middle, "image", "Enhancement 1/2"),
+                              (original, "image", "Original")]})
 
-    _shift(view, arrows.right)
-    _shift(view, arrows.right)
-    _shift(view, arrows.left)
+    named = []
+    for arrow in (arrows.left, arrows.left, arrows.right, arrows.right):
+        _shift(view, arrow)
+        named.append(view.hud_item_note)
 
-    assert _media_on_screen(view) == middle
+    assert named == ["Enhancement 1/2", "Original", "Enhancement 1/2", "Enhancement 2/2"]
 
 
 def _opened_still(view) -> bool:
@@ -2169,7 +2173,7 @@ def test_a_reopened_slideshow_shows_the_version_that_was_on_screen(qtbot, tmp_pa
     levels = {enhanced: [(enhanced, "image"), (original, "image")]}
     closed = _view(qtbot, [(enhanced, "image", "id-a")])
     closed.set_levels(levels)
-    _shift(closed, Qt.Key.Key_Right)   # stepped down to the original
+    _shift(closed, Qt.Key.Key_Left)    # stepped down to the original
 
     reopened = _view(qtbot, [(enhanced, "image", "id-a")])
     reopened.set_levels(levels)        # armed before the resume, as the gallery does

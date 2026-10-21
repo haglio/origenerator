@@ -93,6 +93,8 @@ _SELECTED_ROW_CSS = (
 )
 _PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
 _ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: 3px;"
+_ARROW_STEPS = {Qt.Key.Key_Up: -1, Qt.Key.Key_Left: -1,
+                Qt.Key.Key_Down: 1, Qt.Key.Key_Right: 1}
 
 
 def enhance_level_mime(params: dict) -> QMimeData:
@@ -477,6 +479,7 @@ class EnhanceVersions(QWidget):
         self._section.content_form().addRow(self._host)
         self._pending: _PendingRow | None = None
         self._rows: list[_LevelRow] = []
+        self._arrows_from: int | None = None
         self._deletable = True
         self.hide()
 
@@ -523,6 +526,7 @@ class EnhanceVersions(QWidget):
         column.setSpacing(6)
         self._pending = None
         self._rows = []
+        self._arrows_from = None
         self._deletable = deletable
         # One leading slot, held by whichever of the two applies: the run in
         # flight if there is one, else the row that would start it.
@@ -557,14 +561,24 @@ class EnhanceVersions(QWidget):
         Ctrl adds to the picking without moving the preview — the gesture is
         "these ones", aimed at the Delete that follows, and swapping the picture
         under each ctrl-click would fight it."""
+        self._arrows_from = position
         if modifiers & Qt.KeyboardModifier.ControlModifier:
             for row in self._rows:
                 if row.position() == position:
                     row.set_selected(not row.is_selected())
             return
+        self._pick_and_show(position)
+
+    def _pick_and_show(self, position: int) -> None:
         for row in self._rows:
             row.set_selected(row.position() == position)
         self.level_selected.emit(position)
+
+    def _step_to(self, position: int) -> None:
+        position = max(0, min(position, len(self._rows) - 1))
+        if position != self._arrows_from:
+            self._arrows_from = position
+            self._pick_and_show(position)
 
     def _on_row_menu(self, position: int, global_pos: QPoint):
         """The right-click menu: Delete, over whatever is picked.
@@ -602,7 +616,12 @@ class EnhanceVersions(QWidget):
 
     def keyPressEvent(self, event):
         """Delete or Backspace bins the picked levels — the keys that delete a
-        picked thumbnail, over the picked versions instead."""
+        picked thumbnail, over the picked versions instead — and an arrow picks
+        and shows the level over or under the one last clicked."""
+        step = _ARROW_STEPS.get(event.key())
+        if step is not None and self._arrows_from is not None:
+            self._step_to(self._arrows_from + step)
+            return
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
             picked = self.selected_positions()
             if self._may_delete(picked):

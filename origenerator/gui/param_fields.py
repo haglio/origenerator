@@ -68,10 +68,10 @@ class _Seed(FieldKind):
     randomizable = True
 
     def __init__(self, history: SeedHistory | None = None):
-        self._history = history or (lambda key: [])
+        self._history = history or SeedHistory(lambda key: [], lambda item: None)
 
     def make(self, pd):
-        widget = SeedComboBox(lambda: self._history(pd.key))
+        widget = SeedComboBox(lambda: self._history.uses(pd.key), self._history.looping_preview)
         widget.lineEdit().setPlaceholderText("64-bit integer seed")
         widget.setEditText(str(pd.default))
         return widget

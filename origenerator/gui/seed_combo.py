@@ -19,8 +19,9 @@ _TALLEST_ROW_A_LIST_LAYS_OUT = 32767
 
 
 class SeedComboBox(PicturedDropdown):
-    def __init__(self, history: Callable[[], list[SeedUse]], parent=None):
-        super().__init__(parent)
+    def __init__(self, history: Callable[[], list[SeedUse]],
+                 looping_preview: Callable[[str], str | None], parent=None):
+        super().__init__(parent, looping_preview=looping_preview)
         self._history = history
         self._item: SeedUse | None = None
         self._tab_size: tuple[int, int] | None = None

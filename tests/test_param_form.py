@@ -28,7 +28,7 @@ from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
-from origenerator.seed_history import SeedUse
+from origenerator.seed_history import SeedHistory, SeedUse
 from origenerator.setting_advice import Advice, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -261,7 +261,8 @@ def test_seed_copy_button_sits_left_of_the_random_tick(qtbot):
 
 def _seed_form(qtbot, history, **kwargs):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)],
-                     seed_history=lambda key: history, **kwargs)
+                     seed_history=SeedHistory(lambda key: history, lambda item: None),
+                     **kwargs)
     qtbot.addWidget(form)
     return form, form._widgets["seed"]
 

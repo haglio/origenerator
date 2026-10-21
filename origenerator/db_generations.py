@@ -357,7 +357,7 @@ class GenerationStore(Store):
     def seed_history_rows(self) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT seed, params_json, output_files, thumbnail_path, status,"
+                "SELECT prompt_id, seed, params_json, output_files, thumbnail_path, status,"
                 " workflow_name, created_at FROM generations ORDER BY id DESC"
             ).fetchall()
             return [dict(r) for r in rows]

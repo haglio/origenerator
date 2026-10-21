@@ -26,11 +26,13 @@ from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
+    THUMB_DIR,
 )
 from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery import (
     EnhanceSettings,
+    animated_preview_path,
     config_folder_key,
     config_folder_name,
     describe_enhance_params,
@@ -84,7 +86,7 @@ from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.picture_states import state_names
-from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
+from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
     fresh_settings,
     recommendations,
@@ -608,7 +610,8 @@ class GenerateConfigPanel(QWidget):
                                          hidden_keys=wf.enhance_keys(),
                                          pins_reused_seed=wf.pins_reused_seed(),
                                          heights=self._heights,
-                                         seed_history=self._seed_history))
+                                         seed_history=SeedHistory(
+                                             self._seed_uses, self._looping_preview)))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {
@@ -918,9 +921,13 @@ class GenerateConfigPanel(QWidget):
             self._param_form.show_item(merge_denormalized(row) if row is not None else {},
                                        (row or {}).get("thumbnail_path"))
 
-    def _seed_history(self, key: str) -> list[SeedUse]:
+    def _seed_uses(self, key: str) -> list[SeedUse]:
         return seed_history(self._db.seed_history_rows(), key, self._db.list_seed_uses(),
                             makes=self._makes())
+
+    def _looping_preview(self, item: str) -> str | None:
+        row = self._db.get_generation(item)
+        return animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR) if row else None
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)

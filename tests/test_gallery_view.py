@@ -2539,7 +2539,8 @@ def _trash_collection_view(qtbot, actions, held=(("d1", "a cat"),)):
 _TWO_HELD = (("d1", "a cat"), ("d2", "a dog"))
 
 
-def test_a_trash_tiles_menu_carries_the_two_acts_a_deleted_item_has(qtbot, monkeypatch):
+def test_a_trash_tiles_menu_offers_the_names_and_the_two_acts_a_deleted_item_has(
+        qtbot, monkeypatch):
     # The hover corners act on the one tile under the pointer; the menu acts on
     # the whole pick, which is the only way to answer for a batch at once.
     view = _trash_collection_view(qtbot, FakeActions(), held=_TWO_HELD)
@@ -2549,7 +2550,21 @@ def test_a_trash_tiles_menu_carries_the_two_acts_a_deleted_item_has(qtbot, monke
 
     _right_click(view, "d1")
 
-    assert labels == ["Restore 2 items", "Delete 2 items permanently"]
+    assert labels == ["Copy 2 names", "", "Restore 2 items", "Delete 2 items permanently"]
+
+
+def test_a_trash_tiles_menu_copies_the_names_the_picked_items_had(qtbot, monkeypatch):
+    view = _trash_collection_view(qtbot, FakeActions(), held=_TWO_HELD)
+    view._browser.apply_selection("d2", _CTRL)
+    QApplication.clipboard().clear()
+    _answer_menu(monkeypatch, "Copy 2 names")
+
+    _right_click(view, "d1")
+
+    names = {"d1": _name_of(_image("d1", "a cat", 50, 1), 0),
+             "d2": _name_of(_image("d2", "a dog", 50, 2), 0)}
+    assert QApplication.clipboard().text() == "\n".join(
+        names[prompt_id] for prompt_id in view.selected_prompt_ids())  # as the tiles stand
 
 
 def test_restoring_from_a_trash_tiles_menu_brings_the_whole_pick_back(qtbot, monkeypatch):

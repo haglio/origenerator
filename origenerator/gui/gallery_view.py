@@ -203,6 +203,12 @@ def _takes_a_favorite(group) -> bool:
     return group is not None and not isinstance(group, gallery.CustomGroup)
 
 
+def _offer_copy_names_above_a_line(menu: QMenu, names: list[str]) -> None:
+    offer_copy_names(menu, names)
+    if not menu.isEmpty():
+        menu.addSeparator()
+
+
 def _is_deletable_folder(group) -> bool:
     """Whether a folder may be deleted: anything nested inside a workflow.
 
@@ -3668,9 +3674,8 @@ class GalleryView(QWidget):
         folder_action = None
         if count == 1 and self._can_open_containing_folder(rows[0]):
             folder_action = menu.addAction("Go to folder")
-        offer_copy_names(menu, [self._item_names.of(row["prompt_id"]) for row in rows])
-        if not menu.isEmpty():
-            menu.addSeparator()
+        _offer_copy_names_above_a_line(
+            menu, [self._item_names.of(row["prompt_id"]) for row in rows])
         all_favorites = all(row.get("starred") for row in rows)
         favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
         enhanceable = [row["prompt_id"] for row in rows
@@ -3791,13 +3796,10 @@ class GalleryView(QWidget):
             self.purge_from_trash([prompt_id])
 
     def _trash_menu(self, global_pos):
-        """Right-click in the Trash collection: restore or permanently delete the
-        picked items — the same two actions the tiles' hover corners carry,
-        reachable for a whole selection at once. The pane has already narrowed
-        the selection to the tile under the cursor when it was outside it."""
         ids = self.selected_prompt_ids()
         suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
         menu = QMenu(self)
+        _offer_copy_names_above_a_line(menu, [self._item_names.of(pid) for pid in ids])
         restore_action = menu.addAction("Restore" + suffix)
         purge_action = menu.addAction("Delete" + suffix + " permanently")
         chosen = menu.exec(global_pos)

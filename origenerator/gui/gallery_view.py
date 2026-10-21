@@ -43,6 +43,7 @@ from origenerator.config import (
 from origenerator.db import Database
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
+from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
 from origenerator.gallery.collection import (
@@ -4197,7 +4198,12 @@ class GalleryView(QWidget):
     def go_to_file(self, path: str):
         prompt_id = gallery.generation_of_file(path, self._db.list_generations())
         if prompt_id is not None:
-            self.follow_link(prompt_id)
+            self.show_generation(prompt_id)
+
+    def show_generation(self, prompt_id: str) -> None:
+        if self._fun_time is not None:
+            ask_for_origenerator_mode(self._fun_time.dashboard_cmd_file)
+        self.follow_link(prompt_id)
 
     def _go_to_generation(self, prompt_id: str):
         """Go to a generation: open the folder holding it, draw that folder, pick

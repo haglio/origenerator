@@ -892,6 +892,23 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
     assert len(opened) == 1
 
 
+def test_a_lock_on_a_hosted_slideshow_asks_the_room_to_show_this_app_once(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([_image("id-tall-0", "a cat", 50, 1)]),
+                       fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
+    slideshow = view._slideshows._region_slideshows["portrait"]
+    qtbot.addWidget(slideshow)
+
+    slideshow._flip_lock()
+    slideshow._flip_lock()
+
+    told = tmp_path / "dashboard_cmd.txt"
+    lines = told.read_text(encoding="utf-8").split() if told.exists() else []
+    assert lines.count("origenerator_activate") == 1
+
+
 def test_a_standalone_slideshow_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
     """The lock-opens-a-tab answer is the hosting session's convention; the
     standalone app's fullscreen slideshow keeps its lock to itself."""

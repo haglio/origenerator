@@ -229,8 +229,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     what was running went, and one asks whether the OSR2 is moving. 278 -> 277:
     Esc in a text field is the field's even while the OSR2 moves, so that
     question went too. 277 -> 278: Ctrl+C copies the names of what is picked,
-    the way Delete deletes it, so it is one method beside Delete's.)"""
+    the way Delete deletes it, so it is one method beside Delete's. 278 -> 279:
+    a lock in the room, a lock on one of the app's own slideshows and a clicked
+    notice each put their item in front of him through one method, which asks
+    a hosting room for this window's place.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 278
+               for x in _class_def(VIEW, "GalleryView").body) == 279
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

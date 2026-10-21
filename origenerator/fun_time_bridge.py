@@ -11,10 +11,10 @@ slideshows the way it reaches the Funestras:
   Funestra switching INTO origenerator mode), ``PORTRAIT_CLOSE_SLIDESHOW``
   clears it again and ``CLOSE_SLIDESHOWS`` clears both;
   ``FILTER_ENHANCED`` flips the enhanced-only switch a slideshow's HUD and the
-  session's console both carry; ``GO_TO|<file>`` lands the gallery on the
-  generation a file is a copy of, and ``RELEASE`` gives a window the session
-  took over back to standalone.  Every line it answers is declared in
-  :mod:`origenerator.fun_time_mode`, which publishes them for the session.
+  session's console both carry; ``GO_TO|<file>`` puts the generation a file
+  is a copy of in front of him, asking the room for this window's place;
+  ``RELEASE`` gives a taken-over window back to standalone.  Every line it
+  answers is declared in :mod:`origenerator.fun_time_mode`, which publishes them.
 * The paused flag freezes the slideshows the way it freezes the Funestras, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open slideshows, so a slideshow opened mid-pause opens frozen.

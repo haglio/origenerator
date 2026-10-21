@@ -382,6 +382,7 @@ class FakeHost:
         self.groups = groups or {}
         self.said = []
         self.followed = []
+        self.shown = []
         self.revealed = []
         self.trashed = []
         self.favorited = []
@@ -429,6 +430,9 @@ class FakeHost:
 
     def follow_link(self, prompt_id):
         self.followed.append(prompt_id)
+
+    def show_generation(self, prompt_id):
+        self.shown.append(prompt_id)
 
     def reveal(self, prompt_id):
         self.revealed.append(prompt_id)

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import ast
 from collections import Counter
+from pathlib import Path
 
 from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.icon_geometry import glyph_names
 from shared_ui.icons import glyph_pixmap
 from shared_ui.spacing import BUTTON_MARK
 
+import origenerator
 from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
@@ -365,6 +369,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
         (icons.undo_icon(), "undo_arrow", TEXT_PRIMARY),
         (icons.redo_icon(), "redo_arrow", TEXT_PRIMARY),
         (icons.autoloop_icon(), "bolt", TEXT_PRIMARY),
+        (icons.shield_icon(), "shield", TEXT_PRIMARY),
         (icons.slideshow_icon(), "slideshow", TEXT_PRIMARY),
         (icons.enhance_icon(), "plus", AMBER),
         (icons.mic_icon(), "mic", TEXT_PRIMARY),
@@ -394,3 +399,35 @@ def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
                        (icons.recovery_action_icon("purge"), "trash")):
         drawn = icon.pixmap(QSize(48, 48)).toImage()
         assert drawn == glyph_pixmap(name, 48, white).toImage(), name
+
+
+# Where each call that names one of shared_ui's marks takes the name.
+_MARK_ARGUMENT = {"glyph_icon": 0, "glyph_pixmap": 0, "shapes_of": 0, "shared_mark": 0,
+                  "draw_glyph": 1}
+
+
+def _names_in(argument):
+    if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+        yield argument.value
+    elif isinstance(argument, ast.IfExp):
+        yield from _names_in(argument.body)
+        yield from _names_in(argument.orelse)
+
+
+def test_every_mark_this_app_names_is_one_its_shared_ui_draws():
+    # A mark the installed shared_ui does not have is drawn as its stand-in and
+    # nothing fails: the button only looks broken. So a mark added to shared_ui
+    # for this app counts here until the release that has it is pinned.
+    named = set()
+    for path in Path(origenerator.__file__).parent.rglob("*.py"):
+        for call in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(call, ast.Call):
+                continue
+            position = _MARK_ARGUMENT.get(getattr(call.func, "id", None)
+                                          or getattr(call.func, "attr", None))
+            if position is None or len(call.args) <= position:
+                continue
+            named |= set(_names_in(call.args[position]))
+
+    assert "trash" in named
+    assert named - set(glyph_names()) == set()

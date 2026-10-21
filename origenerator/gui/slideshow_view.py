@@ -308,6 +308,8 @@ class SlideshowView(QWidget):
             self._showing_media = None if current.is_live else (current.path, current.media_type)
             self._frames_on_screen = False
             self._frame_on_funestra = None
+        if self._pane.playback is not None:
+            self._hand_the_pace_over(self._pane.playback)  # read as a file opens
         self._pane.hand_over(items, land=self._showing if land else None)
         self._settle()
 
@@ -317,16 +319,20 @@ class SlideshowView(QWidget):
         playback = self._pane.playback
         if playback is None:
             return
-        playback.set_pace(self._dwell_s)
-        # A lock is repeat-one, as it is on a Fun Time satellite; a slideshow
-        # following a run holds its frames the same way, and so does a pace
-        # of nought, since nought means nothing moves on its own -- a finished
-        # clip included.
-        playback.set_locked(self._playlist.locked or self._live or not self._dwell_s)
+        self._hand_the_pace_over(playback)
         self._loads_seen = playback.loads
         self._refusal_checked = False
         self._held_s = 0.0
         self._last_tick = self._clock()
+
+    def _hand_the_pace_over(self, playback) -> None:
+        pace = self._levels.pace(self._dwell_s)
+        playback.set_pace(pace)
+        # A lock is repeat-one, as it is on a Fun Time satellite; a slideshow
+        # following a run holds its frames the same way, and so does a pace
+        # of nought, since nought means nothing moves on its own -- a finished
+        # clip included.
+        playback.set_locked(self._playlist.locked or self._live or not pace)
 
     def _the_funestra_opened(self) -> None:
         self._settle()
@@ -399,7 +405,7 @@ class SlideshowView(QWidget):
         self._held_s = 0.0
 
     def _move_on_early(self) -> None:
-        if not (self._moves_on_early and self._dwell_s):
+        if not (self._moves_on_early and self._levels.pace(self._dwell_s)):
             return
         current = self._playlist.current()
         if current is None or self._held_s < self._set.pace_for(current, self._dwell_s):
@@ -872,6 +878,7 @@ class SlideshowView(QWidget):
         self._frame_on_funestra = None
         playback = self._pane.playback
         if playback is not None:
+            self._hand_the_pace_over(playback)
             playback.play_file(item.path, item.funscript)
             self._loads_seen = playback.loads
 
@@ -1281,7 +1288,7 @@ class SlideshowView(QWidget):
             return
         self._dwell_s = seconds
         self._playlist.image_dwell_ms = seconds * 1000
-        if self._live:
+        if self._live or self._levels.stepping:
             return
         playback = self._pane.playback
         if playback is None:
@@ -1399,7 +1406,7 @@ class SlideshowView(QWidget):
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
-                self._levels.restart()
+                self._levels.back_to_the_top()
                 self._frames_on_screen = False
                 self._swap_in(path, media_type)
                 self._move_on_early_from(self._playlist.current())

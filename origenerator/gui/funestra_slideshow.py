@@ -155,23 +155,30 @@ class FunestraSlideshow(QObject):
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)
         write_playlist(self.channel.playlist,
                        [self._funestra_item(item) for item in rotated])
-        if land and current is not None and self._file_of(current) != self._showing:
+        lands = land and current is not None and self._file_of(current) != self._showing
+        if lands:
+            self._levels.restart()
+        self._tell_the_pace()  # ahead of the file it opens, which reads it
+        if lands:
             # Before the reload, which then keeps it: after, it would load twice.
             self._send(play_file(self._funestra_item(current)))
         self._send(RELOAD_PLAYLIST)
-        self._tell_the_pace()
 
     def _tell_the_pace(self) -> None:
         self._pace_told = self._funestra_pace()
         self._send(f"{SET_PACE} {self._pace_told}")
 
     def _funestra_pace(self) -> int:
-        """The slideshow's pace, or nought while something holds the slide on
-        screen still: a spoken request, or the run it was opened over."""
+        """The slideshow's pace, or nought while a spoken request, the run it was
+        opened over or a comparison of its versions holds the slide still."""
         current = self._set.playlist.current()
         on_the_run = (current is not None and current.is_live
                       and current.prompt_id == self._following)
-        return 0 if self._request_holds_it or on_the_run else self._dwell_s
+        return 0 if self._request_holds_it or on_the_run else self._levels.pace(self._dwell_s)
+
+    def _keep_the_pace(self) -> None:
+        if self._funestra_pace() != self._pace_told:
+            self._tell_the_pace()
 
     def _file_of(self, slide) -> str:
         if slide.is_live:
@@ -246,8 +253,7 @@ class FunestraSlideshow(QObject):
         elif not (status.paused or status.locked or self._request_holds_it):
             self._held_s += now - self._last_tick
         self._last_tick = now
-        if self._funestra_pace() != self._pace_told:
-            self._tell_the_pace()
+        self._keep_the_pace()
         self._move_on_early_from_what_is_being_made()
         self._publish()
 
@@ -293,7 +299,7 @@ class FunestraSlideshow(QObject):
         return len(self._levels.levels(base=self._current_base())) > 1
 
     def slideshow_step_version(self, delta: int) -> None:
-        """Put another copy of the item on screen up: an image's enhancement
+        """Put another version of the item on screen up: an image's enhancement
         levels, or a video's Evolver upscale and the video itself.
 
         An item filed once is left alone rather than paged, since the shift was
@@ -306,7 +312,12 @@ class FunestraSlideshow(QObject):
         if level is None:
             return
         path, media_type, _label = level
+        self._keep_the_pace()
         self._send(play_file(playlist_item(path, media_type)))
+
+    def _leave_the_versions(self) -> None:
+        self._levels.restart()
+        self._keep_the_pace()
 
     def _current_base(self) -> str:
         """The file the set lists the item on screen under — what its versions
@@ -356,6 +367,7 @@ class FunestraSlideshow(QObject):
         self._unlock()
         if delta > 0:
             self._set.end_a_loop_of_one()
+        self._leave_the_versions()
         self._send(NEXT if delta > 0 else PREV)
 
     def step(self, delta: int) -> None:
@@ -411,6 +423,7 @@ class FunestraSlideshow(QObject):
         item = self._set.playlist.current()
         if item is None:
             return
+        self._leave_the_versions()
         self._lock(False)  # the locked slide is the one being culled
         if self._set.unfavorite_current(self._actions.unfavorite):
             self._note("Unfavorited")
@@ -522,6 +535,7 @@ class FunestraSlideshow(QObject):
         (see :meth:`_pass_changed`).
         """
         self._set.jump_to(slide)
+        self._leave_the_versions()
         self._send(play_file(self._funestra_item(slide)))
         self._publish()
 
@@ -697,6 +711,7 @@ class FunestraSlideshow(QObject):
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._set.playlist.replace_item(prompt_id, path, media_type, still):
             if self._set.current_prompt_id() == prompt_id:
+                self._levels.back_to_the_top()
                 self._frame_on_funestra = None
                 self._send(f"{SHOW_FRAME} {path}")
             self._hand_over()
@@ -843,6 +858,7 @@ class FunestraSlideshow(QObject):
         it lands back on the file only if it is the last one this slideshow has.
         """
         if self._showing and any(str(path) == self._showing for path in paths):
+            self._leave_the_versions()
             self._send(NEXT)
 
     # --- picking a slideshow back up, and giving it back --------------------

@@ -13,6 +13,7 @@ from pathlib import Path
 class FakeEngine:
     def __init__(self, *, duration_ms: float = 5_000.0) -> None:
         self.opened: list[Path] = []
+        self.opened_at_pace: list[float | None] = []
         self.playlist: list[Path] = []
         self.playlist_pos = 0
         self.duration_ms = duration_ms
@@ -41,6 +42,7 @@ class FakeEngine:
 
     def load(self, path: Path) -> None:
         self.opened.append(path)
+        self.opened_at_pace.append(self.pace_s)
         self.playlist = [path]
         self.playlist_pos = 0
         self.position_ms = 0.0

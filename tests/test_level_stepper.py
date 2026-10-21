@@ -120,3 +120,25 @@ def test_a_stepper_is_stepping_from_the_first_step_until_it_restarts(armed):
     assert armed.stepping
     armed.restart()
     assert not armed.stepping
+
+
+def test_versions_gone_a_level_deeper_are_stepped_from_their_new_top_still_stepping(armed):
+    armed.step(1, base="a.png")
+    armed.add({"a-v4.png": [("a-v4.png", "image", "Level 4"), *_LEVELS["a.png"]]})
+
+    armed.back_to_the_top()
+
+    assert (armed.stepping, armed.index) == (True, 0)
+    assert armed.step(1, base="a-v4.png") == ("a-v3.png", "image", "Level 3")
+
+
+def test_the_slideshow_waits_at_a_pace_of_nought_until_another_picture_comes_up(armed):
+    paces = [armed.pace(6)]
+    armed.step(1, base="a.png")
+    paces.append(armed.pace(6))
+    armed.back_to_the_top()
+    paces.append(armed.pace(6))
+    armed.restart()
+    paces.append(armed.pace(6))
+
+    assert paces == [6, 0, 0, 6]

@@ -27,18 +27,17 @@ Work nobody asked for — a background experiment, a base re-render — never jo
 the front whatever it makes, because putting one in front of the user's own work
 would be the whole cost of the feature.
 
-The front of the line is not enough on its own, because a run already on the
-GPU holds it until it is done, minutes for a video. So **whatever is being
-rendered is set aside for the user's image work**: stopped, put back in the
-line, and started over once the pictures are done -- a run cannot be paused, so
-what it had rendered is thrown away, however close to done. That is the user's
-own call for this queue: their work goes first while they are working, and
-everything else's turn comes when they are not -- except a run they have
-shielded, which keeps the machine for as long as its shield is on while the
-pictures wait right behind it. A video set aside goes back ahead of the videos still waiting
-and after every picture; a picture set aside goes right after the one that took
-its place; work nobody asked for goes to the back. A video asked for takes the
-machine from nothing, and so does work nobody asked for.
+The front of the line is not enough on its own, because a run already on the GPU
+holds it until it is done, minutes for a video. So **whatever is being rendered
+is set aside for the user's image work**: stopped, put back in the line, and
+started over once the pictures are done -- a run cannot be paused, so what it
+had rendered is thrown away, however close to done. That is the user's own call
+for this queue: their work goes first while they are working, and everything
+else's turn comes when they are not, except a run they shield, which keeps the
+machine while its shield is on. A video set aside goes back ahead of the videos
+still waiting and after every picture; a picture set aside goes right after the
+one that took its place; work nobody asked for goes to the back. A video asked
+for takes the machine from nothing, and so does work nobody asked for.
 
 Pure ordering, no Qt and no server: it works on anything carrying a
 ``media_type`` ("image"/"video"), an optional ``run_media_type`` for a stage whose

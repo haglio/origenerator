@@ -564,7 +564,8 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
   to it, the libraries it pins first, as soon as nothing of his runs from it;
   every launcher here does the same just before it starts Origenerator. So a change
   reaches him the next time he opens Origenerator, and worktrees update with
-  `git rebase origin/main`.
+  `git rebase origin/main`. A hotfix he asks for goes ahead of that only through
+  the hotfixing skill's route, which runs the checks `[tool.haglio.hotfix]` names.
 - **A red required check** (`.github/workflows/merge-gate.yml`) can't land.
 
 Everything else in the global CLAUDE.md — work in a worktree, green tests before

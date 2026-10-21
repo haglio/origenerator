@@ -20,9 +20,11 @@ import logging
 import os
 import threading
 import time
+from contextlib import ExitStack
 from pathlib import Path
 
 from funestra.funestra import Channels, Funestra
+from funestra.funestra_priority import ahead_on_the_processor
 from funestra.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
@@ -76,6 +78,7 @@ class FunestraPane(QWidget):
         self._tick.timeout.connect(self.tick)
         self._stop_moving = threading.Event()
         self._mover: threading.Thread | None = None
+        self._running_ahead = ExitStack()
 
     @property
     def playback(self):
@@ -124,6 +127,7 @@ class FunestraPane(QWidget):
         if land is not None and self._funestra.playback.current_video != land:
             self.hand_over(items, land=land)
         self._stack.setCurrentWidget(self._window)
+        self._running_ahead.enter_context(ahead_on_the_processor())
         self._tick.start()
         self._mover = threading.Thread(target=self._move_until_closed,
                                        name="slideshow-mover", daemon=True)
@@ -185,6 +189,7 @@ class FunestraPane(QWidget):
         self._tick.stop()
         if self._funestra is not None:
             self._funestra.close()
+        self._running_ahead.close()
 
     # --- the pointer, handed to the Funestra in its window's own pixels -----
 

@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 import os
 import time
+from contextlib import contextmanager
 
 from funestra.console import ModeHud
 from funestra.funestra import User
+from funestra.funestra_priority import ahead_on_the_processor
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.playlist import PlaylistItem
 from funestra.pointer import OMNIPAUSE_TOGGLE
@@ -292,13 +294,34 @@ def test_closing_the_pane_closes_the_funestra_and_what_runs_on_it(qtbot, tmp_pat
     assert running[0].closed is True
 
 
-def test_the_picture_keeps_moving_while_the_window_is_busy(qtbot, tmp_path):
-    pane, engine, _running = _pane(qtbot)
-    pane.hand_over(_items(tmp_path, "one"))
+def test_the_app_runs_ahead_of_background_work_while_its_funestra_is_open(qtbot, tmp_path, monkeypatch):
+    ahead = []
 
-    time.sleep(0.3)
-    moved_while_busy = engine.pushes
+    @contextmanager
+    def recorded_ahead():
+        ahead.append("ahead")
+        yield
+        ahead.append("back")
+
+    monkeypatch.setattr(funestra_pane, "ahead_on_the_processor", recorded_ahead)
+    pane, _engine, _running = _pane(qtbot)
+    pane.hand_over(_items(tmp_path, "one"))
+    assert ahead == ["ahead"]
+
     pane.close_engine()
+
+    assert ahead == ["ahead", "back"]
+
+
+def test_the_picture_keeps_moving_while_the_window_and_the_computer_are_busy(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(funestra_pane, "ahead_on_the_processor", ahead_on_the_processor)
+    pane, engine, _running = _pane(qtbot)
+    try:
+        pane.hand_over(_items(tmp_path, "one"))
+        time.sleep(0.3)
+        moved_while_busy = engine.pushes
+    finally:
+        pane.close_engine()
 
     assert moved_while_busy >= 5
 

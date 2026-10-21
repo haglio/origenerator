@@ -919,12 +919,16 @@ class GenerateConfigPanel(QWidget):
                                        (row or {}).get("thumbnail_path"))
 
     def _seed_history(self, key: str) -> list[SeedUse]:
-        return seed_history(self._db.seed_history_rows(), key, self._db.list_seed_uses())
+        return seed_history(self._db.seed_history_rows(), key, self._db.list_seed_uses(),
+                            makes=self._makes())
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)
         self._db.record_seed_use(kind=SeedUseKind.DRAWN, seed_key=key, seed=seed,
-                                 width=width, height=height)
+                                 media_type=self._makes(), width=width, height=height)
+
+    def _makes(self) -> MediaType | None:
+        return workflow_output_type(self._workflow_combo.currentData())
 
     def _image_rows(self):
         return self._library.now().image_rows
@@ -1115,8 +1119,7 @@ class GenerateConfigPanel(QWidget):
         thumb = (row or {}).get("thumbnail_path")
         if thumb and Path(thumb).exists():
             return QIcon(QPixmap(str(thumb)))
-        media = (media_type_of_row(row) if row is not None
-                 else workflow_output_type(self._workflow_combo.currentData()))
+        media = media_type_of_row(row) if row is not None else self._makes()
         return icons.media_type_icon(media) if media else QIcon()
 
     def prefill(self, workflow_name: str, params: dict):

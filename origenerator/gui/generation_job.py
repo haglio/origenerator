@@ -101,7 +101,7 @@ def record_unfinished_run(db, job: GenerationJob, kind: SeedUseKind) -> None:
     for key in job.workflow.seed_keys():
         if job.params.get(key) is not None:
             db.record_seed_use(kind=kind, seed_key=key, seed=int(job.params[key]),
-                               width=width, height=height,
+                               media_type=job.workflow.output_type, width=width, height=height,
                                thumbnail_path=str(thumbnail) if thumbnail else None)
 
 

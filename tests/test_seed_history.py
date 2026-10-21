@@ -1,5 +1,5 @@
-"""The seeds a Generate tab's Seed dropdown offers: every seed the library has
-used, newest first, each beside a picture of the item it made.
+"""The seeds a Generate tab's Seed dropdown offers: every seed used for the kind of
+item the tab makes, newest first, each beside a picture of the item it made.
 
 Fixture rows are fabricated (see CLAUDE.md).
 """
@@ -10,9 +10,13 @@ import json
 from PIL import Image
 
 from origenerator.db import Database
+from origenerator.media import MediaType
 from origenerator.seed_history import SeedUse, seed_history
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import WorkflowTemplate
+
+IMAGES = MediaType.IMAGE
+VIDEOS = MediaType.VIDEO
 
 
 def _row(prompt_id, **params):
@@ -24,10 +28,15 @@ def _row(prompt_id, **params):
     }
 
 
+def _video(prompt_id, workflow_name="wan22_i2v", **params):
+    return {**_row(prompt_id, **params), "workflow_name": workflow_name,
+            "output_files": json.dumps([{"filename": f"{prompt_id}.mp4"}])}
+
+
 def test_the_seeds_come_newest_first_each_beside_the_item_it_made():
     rows = [_row("g3", seed=30), _row("g2", seed=20), _row("g1", seed=10)]
 
-    assert seed_history(rows, "seed") == [
+    assert seed_history(rows, "seed", makes=IMAGES) == [
         SeedUse(30, "thumbs/g3.jpg"),
         SeedUse(20, "thumbs/g2.jpg"),
         SeedUse(10, "thumbs/g1.jpg"),
@@ -37,27 +46,32 @@ def test_the_seeds_come_newest_first_each_beside_the_item_it_made():
 def test_a_seed_used_again_is_listed_each_time_beside_what_it_made_that_time():
     rows = [_row("g3", seed=10), _row("g2", seed=20), _row("g1", seed=10)]
 
-    assert seed_history(rows, "seed") == [
+    assert seed_history(rows, "seed", makes=IMAGES) == [
         SeedUse(10, "thumbs/g3.jpg"),
         SeedUse(20, "thumbs/g2.jpg"),
         SeedUse(10, "thumbs/g1.jpg"),
     ]
 
 
-def test_a_clip_offers_its_seed_to_every_seed_field_and_its_sound_seed_to_sound_seeds():
-    rows = [_row("v1", noise_seed=11, audio_seed=33), _row("g1", seed=10)]
+def test_an_image_tab_lists_images_seeds_and_a_video_tab_videos_seeds():
+    rows = [_video("v1", noise_seed=11, audio_seed=33), _row("g1", seed=10)]
 
-    assert seed_history(rows, "seed") == seed_history(rows, "noise_seed") == [
-        SeedUse(11, "thumbs/v1.jpg"),
-        SeedUse(10, "thumbs/g1.jpg"),
-    ]
-    assert seed_history(rows, "audio_seed") == [SeedUse(33, "thumbs/v1.jpg")]
+    assert seed_history(rows, "seed", makes=IMAGES) == [SeedUse(10, "thumbs/g1.jpg")]
+    assert seed_history(rows, "noise_seed", makes=VIDEOS) == [SeedUse(11, "thumbs/v1.jpg")]
+    assert seed_history(rows, "audio_seed", makes=VIDEOS) == [SeedUse(33, "thumbs/v1.jpg")]
+
+
+def test_an_image_made_by_a_video_model_is_listed_with_the_images():
+    still = {**_row("i1", noise_seed=7), "workflow_name": "wan22_t2i"}
+
+    assert seed_history([still], "noise_seed", makes=IMAGES) == [SeedUse(7, "thumbs/i1.jpg")]
+    assert seed_history([still], "noise_seed", makes=VIDEOS) == []
 
 
 def test_a_video_is_listed_by_the_seed_its_seed_field_holds_not_its_unused_second_one():
-    loop = {**_row("v1", seed=0, noise_seed=123), "workflow_name": "wan22_flf2v_loop"}
+    loop = _video("v1", "wan22_flf2v_loop", seed=0, noise_seed=123)
 
-    assert seed_history([loop], "noise_seed") == [SeedUse(123, "thumbs/v1.jpg")]
+    assert seed_history([loop], "noise_seed", makes=VIDEOS) == [SeedUse(123, "thumbs/v1.jpg")]
 
 
 def test_listing_a_big_librarys_seeds_never_builds_a_workflows_form(monkeypatch):
@@ -65,17 +79,16 @@ def test_listing_a_big_librarys_seeds_never_builds_a_workflows_form(monkeypatch)
         raise AssertionError("building a form reads the model folders on disk, once per row")
 
     monkeypatch.setattr(WorkflowTemplate, "seed_keys", a_form_scan)
-    rows = [{**_row(f"v{n}", seed=0, noise_seed=n + 1), "workflow_name": "wan22_i2v"}
-            for n in range(5000)]
+    rows = [_video(f"v{n}", seed=0, noise_seed=n + 1) for n in range(5000)]
 
-    assert len(seed_history(rows, "noise_seed")) == 5000
+    assert len(seed_history(rows, "noise_seed", makes=VIDEOS)) == 5000
 
 
 def test_a_run_that_ended_having_made_nothing_offers_no_seed_of_its_own():
     failed = {**_row("g3", seed=30), "output_files": None, "status": "error"}
     emptied = {**_row("g2", seed=20), "output_files": "[]", "status": "completed"}
 
-    assert seed_history([failed, emptied, _row("g1", seed=10)], "seed") == [
+    assert seed_history([failed, emptied, _row("g1", seed=10)], "seed", makes=IMAGES) == [
         SeedUse(10, "thumbs/g1.jpg"),
     ]
 
@@ -84,7 +97,7 @@ def test_a_run_in_flight_is_listed_with_no_picture_yet_at_the_size_it_will_be():
     running = {**_row("g2", seed=20, width=832, height=1216),
                "output_files": None, "status": "running"}
 
-    assert seed_history([running, _row("g1", seed=10)], "seed") == [
+    assert seed_history([running, _row("g1", seed=10)], "seed", makes=IMAGES) == [
         SeedUse(20, None, (832, 1216)),
         SeedUse(10, "thumbs/g1.jpg"),
     ]
@@ -99,7 +112,7 @@ def test_a_clip_in_flight_is_sized_by_the_frame_it_starts_from(tmp_path):
     derived = WORKFLOW_REGISTRY["wan22_i2v"].derived_display_size(params)
 
     assert derived is not None
-    assert seed_history([running], "noise_seed") == [SeedUse(5, None, derived)]
+    assert seed_history([running], "noise_seed", makes=VIDEOS) == [SeedUse(5, None, derived)]
 
 
 def test_the_library_hands_over_every_generation_newest_first(tmp_path):
@@ -113,7 +126,7 @@ def test_the_library_hands_over_every_generation_newest_first(tmp_path):
                              output_files=json.dumps([{"filename": f"{prompt_id}.png"}]),
                              thumbnail_path=f"thumbs/{prompt_id}.jpg")
 
-    assert seed_history(db.seed_history_rows(), "seed") == [
+    assert seed_history(db.seed_history_rows(), "seed", makes=IMAGES) == [
         SeedUse(20, "thumbs/gen-20.jpg"),
         SeedUse(10, "thumbs/gen-10.jpg"),
     ]
@@ -122,16 +135,25 @@ def test_the_library_hands_over_every_generation_newest_first(tmp_path):
 def test_a_seed_drawn_and_never_generated_is_listed_with_no_picture_at_its_size(tmp_path):
     db = Database(tmp_path / "test.db")
 
-    db.record_seed_use(kind="drawn", seed_key="seed", seed=77, width=832, height=1216)
+    db.record_seed_use(kind="drawn", seed_key="seed", seed=77, width=832, height=1216,
+                       media_type=IMAGES)
 
-    assert seed_history(db.seed_history_rows(), "seed", db.list_seed_uses()) == [
-        SeedUse(77, None, (832, 1216)),
-    ]
+    assert seed_history(db.seed_history_rows(), "seed", db.list_seed_uses(),
+                        makes=IMAGES) == [SeedUse(77, None, (832, 1216))]
+    assert seed_history(db.seed_history_rows(), "seed", db.list_seed_uses(), makes=VIDEOS) == []
 
 
-def _record(seed, created_at, *, kind="drawn", seed_key="seed", thumbnail_path=None):
+def _record(seed, created_at, *, kind="drawn", seed_key="seed", thumbnail_path=None,
+            media_type=IMAGES):
     return {"kind": kind, "seed_key": seed_key, "seed": seed, "width": None, "height": None,
-            "thumbnail_path": thumbnail_path, "created_at": created_at}
+            "thumbnail_path": thumbnail_path, "media_type": media_type, "created_at": created_at}
+
+
+def test_a_seed_drawn_before_seeds_were_told_apart_is_offered_to_both_kinds():
+    records = [_record(60, "2026-09-26 00:00:01", media_type=None)]
+
+    assert [use.seed for use in seed_history([], "seed", records, makes=IMAGES)] == [60]
+    assert [use.seed for use in seed_history([], "seed", records, makes=VIDEOS)] == [60]
 
 
 def test_seeds_drawn_and_seeds_used_come_in_the_order_they_happened():
@@ -139,22 +161,23 @@ def test_seeds_drawn_and_seeds_used_come_in_the_order_they_happened():
             {**_row("g1", seed=10), "created_at": "2026-09-26 00:00:01"}]
     records = [_record(40, "2026-09-26 00:00:04"), _record(30, "2026-09-26 00:00:02")]
 
-    assert [use.seed for use in seed_history(rows, "seed", records)] == [40, 20, 30, 10]
+    assert [use.seed for use in seed_history(rows, "seed", records, makes=IMAGES)] == [
+        40, 20, 30, 10]
 
 
 def test_a_seed_drawn_for_the_sound_is_offered_only_where_sound_seeds_go():
-    records = [_record(50, "2026-09-26 00:00:02", seed_key="audio_seed"),
-               _record(40, "2026-09-26 00:00:01", seed_key="noise_seed")]
+    records = [_record(50, "2026-09-26 00:00:02", seed_key="audio_seed", media_type=VIDEOS),
+               _record(40, "2026-09-26 00:00:01", seed_key="noise_seed", media_type=VIDEOS)]
 
-    assert [use.seed for use in seed_history([], "seed", records)] == [40]
-    assert [use.seed for use in seed_history([], "audio_seed", records)] == [50]
+    assert [use.seed for use in seed_history([], "seed", records, makes=VIDEOS)] == [40]
+    assert [use.seed for use in seed_history([], "audio_seed", records, makes=VIDEOS)] == [50]
 
 
 def test_a_drawn_seed_that_went_on_to_be_generated_is_listed_once_as_what_it_made():
     rows = [{**_row("g1", seed=40), "created_at": "2026-09-26 00:00:05"}]
     records = [_record(40, "2026-09-26 00:00:04")]
 
-    assert seed_history(rows, "seed", records) == [SeedUse(40, "thumbs/g1.jpg")]
+    assert seed_history(rows, "seed", records, makes=IMAGES) == [SeedUse(40, "thumbs/g1.jpg")]
 
 
 def test_a_stopped_run_stays_listed_beside_its_last_frame_after_its_seed_is_used_again():
@@ -162,7 +185,7 @@ def test_a_stopped_run_stays_listed_beside_its_last_frame_after_its_seed_is_used
                _record(40, "2026-09-26 00:00:04")]
     rows = [{**_row("g1", seed=40), "created_at": "2026-09-26 00:00:06"}]
 
-    assert seed_history(rows, "seed", records) == [
+    assert seed_history(rows, "seed", records, makes=IMAGES) == [
         SeedUse(40, "thumbs/g1.jpg"),
         SeedUse(40, "thumbs/c.jpg"),
     ]

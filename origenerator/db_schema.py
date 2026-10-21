@@ -208,7 +208,8 @@ CREATE TABLE IF NOT EXISTS seed_uses (
     width          INTEGER,
     height         INTEGER,
     thumbnail_path TEXT,
-    created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
+    created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+    media_type     TEXT
 );
 
 -- A video put in Combine's (custom) slot by hand, under the lane showing then,
@@ -258,6 +259,9 @@ ADDED_COLUMNS = {
     },
     "custom_folders": {
         "side": "TEXT",
+    },
+    "seed_uses": {
+        "media_type": "TEXT",
     },
 }
 

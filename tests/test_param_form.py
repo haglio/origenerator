@@ -2039,7 +2039,8 @@ def test_one_composition_focus_gives_both_passes_its_value(qtbot):
     assert (form.get_values()["shift_high"], form.get_values()["shift_low"]) == (6.0, 6.0)
 
 
-_STEPS_ADVICE = {"steps": Advice("Example Model's page recommends 20–40 steps.", 40)}
+_STEPS_ADVICE = {"steps": Advice("Example Model's page recommends 20–40 steps.",
+                                 value=50, fix=40)}
 
 
 def test_a_setting_off_its_recommendation_wears_a_warning_with_the_advice(qtbot):
@@ -2057,20 +2058,22 @@ def test_a_setting_off_its_recommendation_wears_a_warning_with_the_advice(qtbot)
 
 
 _SAMPLER_ADVICE = {"sampler_name": Advice("Example Model's page recommends euler_ancestral.",
-                                          "euler_ancestral")}
+                                          value="heun", fix="euler_ancestral")}
 
 
 def test_a_section_warns_with_every_warning_inside_it_one_per_line(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
     qtbot.addWidget(form)
+    form.set_values({"steps": 50, "sampler_name": "heun"})
 
     form.set_warnings({**_SAMPLER_ADVICE, **_STEPS_ADVICE})
 
     calibration = form._sections["Calibration"].warning
     assert not calibration.isHidden()
     assert calibration.toolTip() == (
-        "Steps: Example Model's page recommends 20–40 steps. Click to use 40.\n"
-        "Sampler: Example Model's page recommends euler_ancestral. Click to use euler_ancestral.")
+        "Steps: 50. Example Model's page recommends 20–40 steps. Click to use 40.\n"
+        "Sampler: heun. Example Model's page recommends euler_ancestral. "
+        "Click to use euler_ancestral.")
     assert form._sections["Models & LoRAs"].warning.isHidden()
     form.set_warnings({})
     assert calibration.isHidden()
@@ -2103,8 +2106,9 @@ def test_clicking_a_warning_sets_its_setting_to_the_recommended_value(qtbot):
 
 
 _STRENGTH_ADVICE = {"lora_strength_high": Advice(
-    "Example LoRA's page recommends a strength of 0.8–1.2.", 1.2)}
-_PROMPT_STRENGTH_ADVICE = {"cfg_high": Advice("Example Model's page recommends 3–6.", 6.0)}
+    "Example LoRA's page recommends a strength of 0.8–1.2.", value=1.5, fix=1.2)}
+_PROMPT_STRENGTH_ADVICE = {"cfg_high": Advice("Example Model's page recommends 3–6.",
+                                              value=9.0, fix=6.0)}
 
 
 def _wan_form(qtbot):
@@ -2129,9 +2133,9 @@ def test_the_whole_forms_warnings_read_and_resolve_in_the_order_of_its_sections(
     form.set_warnings({**_STEPS_ADVICE, **_STRENGTH_ADVICE})
 
     assert form.every_warning() == (
-        "LoRA Strength (First Pass): Example LoRA's page recommends a strength of 0.8–1.2. "
-        "Click to use 1.2.\n"
-        "Steps: Example Model's page recommends 20–40 steps. Click to use 40.")
+        "LoRA Strength (First Pass): 1.5. Example LoRA's page recommends a strength of "
+        "0.8–1.2. Click to use 1.2.\n"
+        "Steps: 50. Example Model's page recommends 20–40 steps. Click to use 40.")
     form.resolve_every_warning()
     values = form.get_values()
     assert (values["steps"], values["lora_strength_high"]) == (40, 1.2)

@@ -435,7 +435,8 @@ class ParamForm(QWidget):
         return f"{found.text} Click to use {found.fix_shown}." if found else ""
 
     def _warnings_about(self, keys: list[str]) -> str:
-        return "\n".join(f"{self._labels[key].text()}: {self._warning(key)}"
+        return "\n".join(f"{self._labels[key].text()}: {self._advice[key].value_shown}. "
+                         f"{self._warning(key)}"
                          for key in keys if key in self._advice)
 
     def show_prompt_diff(self, key: str, before: str, after: str) -> None:

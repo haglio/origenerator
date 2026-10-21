@@ -3026,8 +3026,8 @@ def test_the_workflows_warning_carries_every_warning_and_resolves_them_all(
 
     form.set_values({"steps": 80, "cfg": 9.0})
     assert warning.toolTip() == (
-        "Steps: Default Model's page recommends 20–40 steps. Click to use 40.\n"
-        "Prompt Strength: Default Model's page recommends 3–6. Click to use 6.")
+        "Steps: 80. Default Model's page recommends 20–40 steps. Click to use 40.\n"
+        "Prompt Strength: 9. Default Model's page recommends 3–6. Click to use 6.")
     qtbot.mouseClick(warning, Qt.MouseButton.LeftButton)
 
     assert warning.isHidden()

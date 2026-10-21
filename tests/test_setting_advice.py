@@ -206,8 +206,17 @@ def test_with_no_page_only_the_step_spacing_its_sampler_wants_is_quoted():
         "scheduler": "dpmpp_2m works best with karras or exponential."}
 
 
+_DURATION = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161,
+                     step=4, unit="s", rate=16, good=(81, 161))
+
+
 def test_a_durations_fix_is_shown_in_seconds():
-    duration = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161,
-                        step=4, unit="s", rate=16, good=(81, 161))
-    found = setting_advice({"frame_count": 201}, [duration])["frame_count"]
+    found = setting_advice({"frame_count": 201}, [_DURATION])["frame_count"]
     assert (found.fix, found.fix_shown) == (161, "10 s")
+
+
+def test_an_advice_says_the_value_it_advises_against_the_way_it_says_its_fix():
+    advice = setting_advice(_picture(sampler_name="heun", steps=50, cfg=7.5, frame_count=201),
+                            [_DURATION])
+    assert {key: found.value_shown for key, found in advice.items()} == {
+        "sampler_name": "heun", "steps": "50", "cfg": "7.5", "frame_count": "12.6 s"}

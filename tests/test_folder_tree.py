@@ -496,9 +496,7 @@ def test_an_item_drag_is_let_into_the_tree(qtbot):
     assert enter.isAccepted()
 
 
-def _scrolled_to_its_foot(qtbot):
-    """A tree too long for its height, scrolled down as far as it goes, where the
-    folders of your own at its head are out of sight."""
+def _too_long_for_its_height(qtbot):
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     for n in range(100):
@@ -506,34 +504,42 @@ def _scrolled_to_its_foot(qtbot):
     tree.resize(200, 150)
     tree.show()
     qtbot.waitExposed(tree)
-    bar = tree.verticalScrollBar()
-    bar.setValue(bar.maximum())
-    return tree, bar
+    return tree, tree.verticalScrollBar()
 
 
-def _held_at_the_top_edge(tree, mime):
-    return QDragMoveEvent(QPoint(40, 2), Qt.DropAction.CopyAction, mime,
+def _held_at(spot, mime):
+    return QDragMoveEvent(spot, Qt.DropAction.CopyAction, mime,
                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
 
-def test_a_drag_held_at_the_top_edge_scrolls_the_tree_up(qtbot):
-    tree, bar = _scrolled_to_its_foot(qtbot)
-    start = bar.value()
+def test_a_drag_held_at_the_top_edge_jumps_the_tree_to_its_top(qtbot):
+    # Where the folders of your own are, and almost always where the drag is going.
+    tree, bar = _too_long_for_its_height(qtbot)
+    bar.setValue(bar.maximum())
     mime = generation_mime("p1")
 
-    tree.dragMoveEvent(_held_at_the_top_edge(tree, mime))
+    tree.dragMoveEvent(_held_at(QPoint(40, 2), mime))
 
-    qtbot.waitUntil(lambda: bar.value() < start, timeout=3000)
+    assert bar.value() == 0
+
+
+def test_a_drag_held_at_the_bottom_edge_scrolls_the_tree_down(qtbot):
+    tree, bar = _too_long_for_its_height(qtbot)
+    mime = generation_mime("p1")
+
+    tree.dragMoveEvent(_held_at(QPoint(40, tree.viewport().height() - 2), mime))
+
+    qtbot.waitUntil(lambda: bar.value() > 0, timeout=3000)
 
 
 def test_letting_a_drag_go_at_the_edge_stops_the_scrolling(qtbot):
-    tree, bar = _scrolled_to_its_foot(qtbot)
-    start = bar.value()
+    tree, bar = _too_long_for_its_height(qtbot)
+    foot = QPoint(40, tree.viewport().height() - 2)
     mime = generation_mime("p1")
-    tree.dragMoveEvent(_held_at_the_top_edge(tree, mime))
-    qtbot.waitUntil(lambda: bar.value() < start, timeout=3000)
+    tree.dragMoveEvent(_held_at(foot, mime))
+    qtbot.waitUntil(lambda: bar.value() > 0, timeout=3000)
 
-    tree.dropEvent(QDropEvent(QPointF(40, 2), Qt.DropAction.CopyAction, mime,
+    tree.dropEvent(QDropEvent(QPointF(foot), Qt.DropAction.CopyAction, mime,
                               Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
     settled = bar.value()
     qtbot.wait(500)

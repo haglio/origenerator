@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
@@ -24,8 +24,7 @@ from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
-
-_PREVIEW_SIZE = 96  # the dropped thumbnail fits inside this; small enough for a 120px pane
+from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 
 class DropZone(QWidget):
@@ -117,7 +116,7 @@ class DropSlot(DropZone):
         self._label.setProperty("dropTarget", False)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setWordWrap(True)
-        self._label.setMinimumHeight(_PREVIEW_SIZE)
+        self._label.setMinimumHeight(THUMBNAIL_BOX.height())
         layout.addWidget(self._label)
         # A corner chip naming this slot's kind, shown only once something's dropped.
         self._badge = MediaBadge(kind, self)
@@ -160,17 +159,14 @@ class DropSlot(DropZone):
         thumb_path, movie_path = self._preview(self._current_id)
         if movie_path and Path(movie_path).exists():
             self._label.setText("")
-            self._movie = looping_movie(movie_path, QSize(_PREVIEW_SIZE, _PREVIEW_SIZE), self._label)
+            self._movie = looping_movie(movie_path, THUMBNAIL_BOX, self._label)
             if self._grayscale:
                 play_grayscale(self._movie, self._label)  # still loops, just drained
             else:
                 self._label.setMovie(self._movie)
         elif thumb_path and Path(thumb_path).exists() and not QPixmap(str(thumb_path)).isNull():
             self._label.setText("")
-            picture = QPixmap(str(thumb_path)).scaled(
-                _PREVIEW_SIZE, _PREVIEW_SIZE,
-                Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
-            )
+            picture = fitted_in_the_box(QPixmap(str(thumb_path)))
             self._label.setPixmap(grayscale_pixmap(picture) if self._grayscale else picture)
         else:
             self._label.setText("✓")  # held, but no thumbnail to show

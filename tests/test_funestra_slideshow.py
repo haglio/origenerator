@@ -458,7 +458,7 @@ def test_a_lock_picked_back_up_is_the_lock_alone(qtbot, tmp_path):
     assert asked == []
 
 
-_ONE_LISTED_AT_ITS_NEWEST = {"one.png": [("one.png", "image", "Enhance 2"),
+_ONE_LISTED_AT_ITS_NEWEST = {"one.png": [("one.png", "image", "Enhancement 1/1"),
                                           ("one_original.png", "image", "Original")]}
 
 
@@ -580,7 +580,7 @@ def test_a_hosted_reset_lets_go_of_the_lock_before_handing_over_the_base_set(qtb
     assert slideshow.locked is False
 
 
-_LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhance 2"),
+_LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
                        ("one.png", "image", "Original")]}
 
 
@@ -646,7 +646,7 @@ class TestVersions:
         place the last item was stepped to."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_levels({**_LEVELS,
-                              "two.png": [("two_enhanced.png", "image", "Enhance 1"),
+                              "two.png": [("two_enhanced.png", "image", "Enhancement 1/1"),
                                           ("two.png", "image", "Original")]})
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
@@ -1030,7 +1030,7 @@ def test_the_panel_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
 
     slideshow.set_levels(_LEVELS)
 
-    assert _panel(slideshow).item_note == "Enhance 2 — 1 of 2"
+    assert _panel(slideshow).item_note == "Enhancement 1/1"
 
 
 def test_the_panel_says_whether_a_better_version_is_being_made_or_waiting(qtbot, tmp_path):
@@ -1259,7 +1259,7 @@ def test_a_picture_enhanced_during_the_slideshow_steps_its_versions_on_the_funes
     slideshow.tick()
     _sent(slideshow)
 
-    slideshow.add_levels({"one_enhanced.png": [("one_enhanced.png", "image", "Enhance 1"),
+    slideshow.add_levels({"one_enhanced.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
                                                ("one.png", "image", "Original")]})
     slideshow.slideshow_step_version(1)
 

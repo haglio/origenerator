@@ -72,7 +72,7 @@ def _levels(count, params=None):
     if not count:
         return []
     return [
-        EnhanceLevel(i, f"Enhance {i}", {"filename": f"e{i}.png", "subfolder": "image"},
+        EnhanceLevel(i, f"Enhancement {i}/{count}", {"filename": f"e{i}.png", "subfolder": "image"},
                      dict(params or {}))
         for i in range(count, 0, -1)
     ] + [EnhanceLevel(0, "Original", {"filename": "src.png", "subfolder": "image"})]
@@ -490,7 +490,7 @@ def test_a_lone_enhancement_is_still_worth_showing(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items([
-        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"},
+        EnhanceLevel(1, "Enhancement 1/1", {"filename": "img.png"},
                      {"enhance_scale": 2.0, "enhance_steps": 20}),
     ]))
     assert not versions.isHidden()
@@ -502,7 +502,7 @@ def test_levels_are_shown_newest_first(qtbot):
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)))
     assert not versions.isHidden()
-    assert _labels(versions) == ["Enhance 2", "Enhance 1", "Original"]
+    assert _labels(versions) == ["Enhancement 2/2", "Enhancement 1/2", "Original"]
 
 
 def test_clicking_a_level_reports_its_position(qtbot):
@@ -560,7 +560,7 @@ def test_rebuilding_for_another_image_drops_the_old_rows(qtbot):
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)))
     versions.show_levels(_items(_levels(1)))
-    assert _labels(versions) == ["Enhance 1", "Original"]
+    assert _labels(versions) == ["Enhancement 1/1", "Original"]
 
 
 # --- picking levels and binning them ---------------------------------------

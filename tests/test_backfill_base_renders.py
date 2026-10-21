@@ -2,7 +2,7 @@
 
 Those rows kept one file and no "before". The base is recoverable because it is
 reproducible: the same seed and recipe with the tail off reproduces the pixels
-that pass made, and attaching it gives the row the ``Original`` / ``Enhance 1``
+that pass made, and attaching it gives the row the ``Original`` / ``Enhancement 1/1``
 pair it should have had. The work rides the absence the background experimenter
 uses, since it is a full render per row and there are a great many of them.
 """
@@ -177,7 +177,7 @@ def test_attaching_the_base_gives_the_row_its_two_levels(tmp_path):
     assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
         ["sdxl_t2i_a.png", "sdxl_t2i_a_base.png"]
     assert [lvl.label for lvl in gallery.enhance_levels(upgraded)] == \
-        ["Enhance 1", "Original"]
+        ["Enhancement 1/1", "Original"]
     assert gallery.original_files_of(upgraded)[0]["filename"] == "sdxl_t2i_a_base.png"
 
 

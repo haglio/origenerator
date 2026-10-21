@@ -325,7 +325,7 @@ def test_each_version_carries_its_own_file_row(tmp_path):
     row = db.get_generation("src")
     levels = gallery.displayed_levels(row)
     assert [(lvl.label, file_item(lvl.file).value) for lvl in levels] == [
-        ("Enhance 1", "image/image_enhance_00001_.png"),
+        ("Enhancement 1/1", "image/image_enhance_00001_.png"),
         ("Original", "image/sdxl_t2i_src.png"),
     ]
     assert basic_section(row) is None
@@ -433,7 +433,7 @@ def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
     assert upgraded["starred"] == 1
     assert is_enhanced_row(upgraded)
     assert [lvl.label for lvl in gallery.displayed_levels(upgraded)] == \
-        ["Enhance 1", "Original"]
+        ["Enhancement 1/1", "Original"]
 
 
 def test_a_rebuilt_level_keeps_the_settings_that_made_it(tmp_path):
@@ -475,7 +475,7 @@ def test_sweep_stacks_a_rebuilt_chain_oldest_first(tmp_path):
     assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
         ["image_enhance_00002_.png", "image_enhance_00001_.png", "sdxl_t2i_src.png"]
     assert [lvl.label for lvl in gallery.displayed_levels(upgraded)] == \
-        ["Enhance 2", "Enhance 1", "Original"]
+        ["Enhancement 2/2", "Enhancement 1/2", "Original"]
 
 
 def test_sweep_leaves_an_ordinary_image_alone(tmp_path):

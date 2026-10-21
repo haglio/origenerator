@@ -1604,12 +1604,12 @@ def test_stepping_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_p
 def test_the_hud_says_which_version_is_on_screen(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a")])
-    view.set_levels({enhanced: [(enhanced, "image", "Enhance 1"),
+    view.set_levels({enhanced: [(enhanced, "image", "Enhancement 1/1"),
                                 (original, "image", "Original")]})
 
-    assert view.hud_item_note == "Enhance 1 — 1 of 2"
+    assert view.hud_item_note == "Enhancement 1/1"
     _shift(view, Qt.Key.Key_Right)
-    assert view.hud_item_note == "Original — 2 of 2"
+    assert view.hud_item_note == "Original"
     assert view._note.isHidden()
 
 
@@ -2416,8 +2416,8 @@ def test_the_version_the_last_slideshow_was_on_is_not_stepped_on_what_is_being_m
         qtbot, tmp_path):
     a, a_base, c, c_base = (_png(tmp_path / n) for n in ("a.png", "a0.png", "c.png", "c0.png"))
     items = [(a, "image", "id-a"), (c, "image", "id-c")]
-    levels = {a: [(a, "image", "Enhance 1"), (a_base, "image", "Original")],
-              c: [(c, "image", "Enhance 1"), (c_base, "image", "Original")]}
+    levels = {a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")],
+              c: [(c, "image", "Enhancement 1/1"), (c_base, "image", "Original")]}
     closed = _view(qtbot, items)
     closed.set_levels(levels)
     _shift(closed, Qt.Key.Key_Right)
@@ -2446,11 +2446,11 @@ def test_a_picture_enhanced_during_the_slideshow_steps_its_versions_without_reop
     view.set_levels({})
     view.note_enhanced("id-a", better)
 
-    view.add_levels({better: [(better, "image", "Enhance 1"), (a, "image", "Original")]})
+    view.add_levels({better: [(better, "image", "Enhancement 1/1"), (a, "image", "Original")]})
     _shift(view, Qt.Key.Key_Right)
 
     assert _media_on_screen(view) == a
-    assert view.hud_item_note == "Original — 2 of 2"
+    assert view.hud_item_note == "Original"
 
 
 def test_a_picture_being_enhanced_shows_the_enhancement_as_it_comes_in(qtbot):
@@ -2571,7 +2571,7 @@ def test_a_version_stepped_to_while_the_picture_is_enhanced_stays_up(qtbot, tmp_
     a, a_base = (_png(tmp_path / n) for n in ("a.png", "a0.png"))
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")],
                  image_dwell_ms=4000)
-    view.set_levels({a: [(a, "image", "Enhance 1"), (a_base, "image", "Original")]})
+    view.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
 
     _shift(view, Qt.Key.Key_Right)
@@ -2668,15 +2668,15 @@ def test_an_enhancement_landing_on_an_older_version_stepped_to_counts_from_the_n
     a, a_base, better = (_png(tmp_path / n) for n in ("a.png", "a0.png", "a2.png"))
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")],
                  image_dwell_ms=4000)
-    view.set_levels({a: [(a, "image", "Enhance 1"), (a_base, "image", "Original")]})
+    view.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _shift(view, Qt.Key.Key_Right)
 
     view.note_enhanced("id-a", better)
-    view.add_levels({better: [(better, "image", "Enhance 2"), (a, "image", "Enhance 1"),
-                              (a_base, "image", "Original")]})
+    view.add_levels({better: [(better, "image", "Enhancement 2/2"),
+                              (a, "image", "Enhancement 1/2"), (a_base, "image", "Original")]})
 
     assert _media_on_screen(view) == better
-    assert view.hud_item_note == "Enhance 2 — 1 of 3"
+    assert view.hud_item_note == "Enhancement 2/2"
 
 
 def test_a_funestra_that_opens_after_the_pass_is_handed_over_takes_the_pace(qtbot):

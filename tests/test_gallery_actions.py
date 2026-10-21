@@ -514,7 +514,7 @@ def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
 
     updated = db.get_generation("p1")
     (level,) = enhance_levels(updated)
-    assert level.label == "Enhance 1"
+    assert level.label == "Enhancement 1/1"
     assert level.params == {"enhance_scale": 2.0}
 
 

@@ -12731,7 +12731,7 @@ def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
     assert gallery.is_enhanced_row(upgraded)
     # One enhancement, one level above the original.
     assert [lvl.label for lvl in gallery.enhance_levels(upgraded)] == \
-        ["Enhance 1", "Original"]
+        ["Enhancement 1/1", "Original"]
 
 
 def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_path):
@@ -14843,7 +14843,7 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
     assert [p.name for p, _kind, _label in levels] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     # Each carries its label, so the note can say which version is on screen.
-    assert [label for _p, _kind, label in levels] == ["Enhance 1", "Original"]
+    assert [label for _p, _kind, label in levels] == ["Enhancement 1/1", "Original"]
     # And Down asks through the gallery, which holds the settings.
     assert slideshow._actions.enhance == view.enhance_from_slideshow
     slideshow.close()

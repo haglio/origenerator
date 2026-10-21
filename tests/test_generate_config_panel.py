@@ -1369,7 +1369,7 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     assert not panel._versions.isHidden()
     rows = _level_rows(panel)
     first = " / ".join(t for t in _row_texts(rows[0]) if t and t != "—")
-    assert first.startswith("Enhance 1")
+    assert first.startswith("Enhancement 1/1")
     assert "2x" in first and "20 steps" in first and "0.15 redraw" in first
     assert "Original" in _row_texts(rows[1])
 

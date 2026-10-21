@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import cache, lru_cache
+from pathlib import Path
 
 from PyQt6.QtCore import QMargins, QPoint, QPointF, QRect, QRectF, QSize, Qt
 from PyQt6.QtGui import (
     QColor,
     QFont,
     QImageReader,
+    QMovie,
     QPainter,
     QPainterPath,
     QPalette,
@@ -25,6 +27,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED
 
 from origenerator.gui.grayscale import grayscale_pixmap
+from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.queue_thumbs import fitted_picture
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
@@ -126,7 +129,8 @@ def _lettering_color(option: QStyleOptionViewItem) -> QColor:
 
 
 class _PicturedRows(QStyledItemDelegate):
-    def __init__(self, parent, *, gray: bool, frame_of: Callable[[object], QPixmap | None]):
+    def __init__(self, parent, *, gray: bool,
+                 frame_of: Callable[[object, int], QPixmap | None]):
         super().__init__(parent)
         self._gray = gray
         self._frame_of = frame_of
@@ -149,7 +153,8 @@ class _PicturedRows(QStyledItemDelegate):
         pictures = index.data(PICTURES_ROLE)
         places = _picture_places(option.rect, _shapes(index), worded=bool(index.data()))
         for picture, place in zip(pictures, places):
-            drawn = self._drawn(picture) if place.intersects(painter.viewport()) else None
+            drawn = (self._drawn(picture, index.row())
+                     if place.intersects(painter.viewport()) else None)
             if drawn is not None:
                 painter.drawPixmap(place.center() - drawn.rect().center(), drawn)
         span = QRectF(places[0].right() + _BRACE_GAP, places[0].top(), _BRACE_WIDTH,
@@ -168,8 +173,8 @@ class _PicturedRows(QStyledItemDelegate):
         style.drawControl(QStyle.ControlElement.CE_ItemViewItem, text, painter, option.widget)
 
 
-    def _drawn(self, picture) -> QPixmap | None:
-        frame = self._frame_of(picture)
+    def _drawn(self, picture, row: int) -> QPixmap | None:
+        frame = self._frame_of(picture, row)
         if frame is None:
             return picture_of(picture, THUMBNAIL_BOX.width(), self._gray)
         return grayscale_pixmap(frame) if self._gray else frame
@@ -206,8 +211,11 @@ def _picture_places(rect: QRect, shapes: list[QSize], *, worded: bool) -> list[Q
 class PicturedDropdown(NoWheelComboBox):
     floor_chars = 1
 
-    def __init__(self, parent=None, *, gray: bool = False):
+    def __init__(self, parent=None, *, gray: bool = False,
+                 looping_preview: Callable[[str], str | None] | None = None):
         super().__init__(parent)
+        self._looping_preview = looping_preview or (lambda item: None)
+        self._stills: set[str] = set()
         self.setItemDelegate(_PicturedRows(self, gray=gray, frame_of=self._frame_of))
         self.view().setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
@@ -226,8 +234,32 @@ class PicturedDropdown(NoWheelComboBox):
     def _picture_row_height(self) -> int:
         return THUMBNAIL_BOX.height() + _INSET_HEIGHT
 
-    def _frame_of(self, picture) -> QPixmap | None:
-        return None
+    def hidePopup(self):
+        super().hidePopup()
+        self._stop_playing()
+
+    def _frame_of(self, picture, row: int) -> QPixmap | None:
+        if not picture.item:
+            return None
+        movie = self.findChild(QMovie, picture.item) or self._play(picture.item, row)
+        frame = movie.currentPixmap() if movie is not None else None
+        return frame if frame is not None and not frame.isNull() else None
+
+    def _play(self, item: str, row: int) -> QMovie | None:
+        preview = None if item in self._stills else self._looping_preview(item)
+        if not preview or not Path(preview).exists():
+            self._stills.add(item)
+            return None
+        movie = looping_movie(preview, THUMBNAIL_BOX, self)
+        movie.setObjectName(item)
+        movie.frameChanged.connect(lambda _frame: self.view().update(self.model().index(row, 0)))
+        return movie
+
+    def _stop_playing(self) -> None:
+        for movie in self.findChildren(QMovie):
+            movie.stop()
+            movie.setObjectName("")
+            movie.deleteLater()
 
     def _row_option(self) -> QStyleOptionViewItem:
         view = self.view()
@@ -238,6 +270,8 @@ class PicturedDropdown(NoWheelComboBox):
         return option
 
     def _list_rows(self, rows) -> None:
+        self._stop_playing()
+        self._stills = set()
         self.clear()
         for text, pictures in rows:
             self.addItem(text)

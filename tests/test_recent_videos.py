@@ -10,8 +10,8 @@ from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
 from tests.pictured_rows import painted_row, square
 
 
-def _dropdown(qtbot, videos):
-    dropdown = RecentVideos(lambda: videos)
+def _dropdown(qtbot, videos, looping_previews=None):
+    dropdown = RecentVideos(lambda: videos, (looping_previews or {}).get)
     qtbot.addWidget(dropdown)
     return dropdown
 
@@ -169,7 +169,7 @@ def test_a_rows_picture_sits_in_the_middle_of_the_row(qtbot, tmp_path):
 
 
 def test_a_videos_picture_plays_in_its_row(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None, _looping_clip(tmp_path))])
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": _looping_clip(tmp_path)})
     dropdown.showPopup()
     first = painted_row(dropdown, 0)
     middle = _where_the_picture_is(first).center()
@@ -180,7 +180,7 @@ def test_a_videos_picture_plays_in_its_row(qtbot, tmp_path):
 
 
 def test_closing_the_list_stops_its_videos(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None, _looping_clip(tmp_path))])
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": _looping_clip(tmp_path)})
     dropdown.showPopup()
     painted_row(dropdown, 0)
 
@@ -202,7 +202,7 @@ class _Redraws(QObject):
 
 
 def test_the_open_list_redraws_a_playing_video_by_itself(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None, _looping_clip(tmp_path))])
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": _looping_clip(tmp_path)})
     dropdown.showPopup()
     painted_row(dropdown, 0)
     qtbot.wait(300)

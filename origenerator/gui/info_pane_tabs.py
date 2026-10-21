@@ -567,9 +567,10 @@ class InfoPaneTabs(QTabWidget):
         for panel in self.config_panels():
             panel.refresh_displayed(row, image_rows)
 
-    def retitle_tabs(self):
+    def reread_names(self):
         for panel in self.config_panels():
             self.setTabText(self.indexOf(panel), panel.title())
+            panel.reread_name()
 
     def reconcile_previews(self, live_ids):
         for panel in self.config_panels():

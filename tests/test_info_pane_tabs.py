@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtWidgets import QApplication, QInputDialog, QMenu, QTabBar
+from PyQt6.QtWidgets import QApplication, QInputDialog, QLabel, QMenu, QTabBar
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -243,6 +243,26 @@ def test_copy_name_on_a_tab_copies_the_name_of_the_item_it_shows(qtbot, tmp_path
     _entry(tabs._tab_menu(0), "Copy name").trigger()
 
     assert QApplication.clipboard().text() == f"{folder_id(settings_folder_key(row))} 000"
+
+
+def test_a_name_given_to_an_item_after_its_tab_showed_it_reaches_the_tab_and_name_line(
+        qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    row = _complete_gen(db, "g1", _sdxl_full(positive_prompt="a wizard", seed=1),
+                        "sdxl_g1.png")
+    names = ItemNames(db)
+    tabs = InfoPaneTabs(ComfyUIClient(), db, names=names)
+    qtbot.addWidget(tabs)
+    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.load_selection(row, [row])
+    names.take([row], [], {})  # the gallery numbers it on its next draw
+
+    tabs.reread_names()
+
+    name = f"{folder_id(settings_folder_key(row))} 000"
+    block = tabs.current_config_panel()._metadata_block
+    on_the_block = [label.text() for label in block.findChildren(QLabel)]
+    assert (tabs.tabText(0), name in on_the_block, block.isHidden()) == (name, True, False)
 
 
 def test_copy_name_on_a_tab_showing_no_item_copies_the_folder_name_it_wears(tabs):

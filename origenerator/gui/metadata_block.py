@@ -53,6 +53,7 @@ class MetadataBlock(QWidget):
     def __init__(self, parent=None, *, go_to_folder: QAction | None = None):
         super().__init__(parent)
         self._go_to_folder = go_to_folder
+        self._shown: tuple[dict, Path | None, str] | None = None
         self._section: MetaSection | None = None
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
@@ -66,8 +67,15 @@ class MetadataBlock(QWidget):
         An image's files are all versions, listed with the level that made each
         — and so are a video's once Evolver has upscaled it — so what is left
         here can be as little as the way to the folder, or nothing at all."""
+        self._shown = (row, upscale, name)
         self._section = basic_section(row, upscale, name=name)
         self._render(self._section)
+        return self.has_content()
+
+    def show_name(self, name: str) -> bool:
+        if self._shown is not None and self._shown[2] != name:
+            row, upscale, _old = self._shown
+            self.show_row(row, upscale, name)
         return self.has_content()
 
     def has_content(self) -> bool:

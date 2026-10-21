@@ -1663,7 +1663,7 @@ class GalleryView(QWidget):
         # trashed item) is taken off a tab now.
         self._selected_row = None
         self._info_tabs.reconcile_previews(self._live_ids)
-        self._info_tabs.retitle_tabs()
+        self._info_tabs.reread_names()
         # _tree_item_for rather than a bare lookup, so a restore target saved as
         # a folder key — a session from before the tree grew sides — still lands
         # on that folder instead of falling back to the default.

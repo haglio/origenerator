@@ -119,6 +119,17 @@ def test_the_name_lines_copy_button_copies_the_items_name(block):
             QApplication.clipboard().text()) == (True, "AB12CD34 007")
 
 
+def test_the_name_it_already_shows_leaves_the_block_alone(block):
+    # Asked again after every redraw of the gallery, while the name may be the
+    # text someone is selecting on it.
+    block.show_row(_row(), name="AB12CD34 007")
+    section = block.findChild(CollapsibleSection)
+
+    block.show_name("AB12CD34 007")
+
+    assert block.findChild(CollapsibleSection) is section
+
+
 def test_copy_button_copies_just_the_filename(block):
     block.show_row(_row())
     copy_btns = [b for b in block.findChildren(QPushButton)

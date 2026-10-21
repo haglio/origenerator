@@ -490,7 +490,11 @@ class SlideshowSet:
         pool = self._pool_left_looping(state)
         if pool:
             self.start_loop(state.loop, pool)
-        return self.playlist.resume(state.order, state.current)
+        if not self.playlist.resume(state.order, state.current):
+            return False
+        if not state.locked:
+            self.lead_with_what_is_being_made()
+        return True
 
     def _pool_left_looping(self, state: SlideshowState) -> tuple[Slide, ...]:
         if not state.loop or self._slides_of is None:

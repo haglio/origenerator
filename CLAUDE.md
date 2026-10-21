@@ -72,7 +72,9 @@ for one thing cost four. So:
   writing to the user says TOC and caret, and other names for the same two
   things -- tree, folder list, folder tree, arrow, chevron -- take nothing
   new. The back and forward buttons' chevrons and the text cursor's caret
-  are other things, and keep their words.
+  are other things, and keep their words. A folder with no folders inside
+  it, and so no caret, is a **leaf folder**: the settings folders at the
+  end of each path, which hold the items themselves.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 

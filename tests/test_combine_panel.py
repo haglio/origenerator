@@ -572,7 +572,7 @@ def test_each_lane_keeps_its_own_dropped_video(qtbot):
 
 def _listed_under_recent(panel):
     panel._recent_videos.refresh()
-    return [panel._recent_videos.itemData(row, PICTURES_ROLE)[0].prompt_id
+    return [panel._recent_videos.itemData(row, PICTURES_ROLE)[0].item
             for row in range(panel._recent_videos.count())]
 
 

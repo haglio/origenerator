@@ -127,7 +127,8 @@ class CombinePanel(QWidget):
         self.video_slot.activated.connect(self.item_activated)
         self._dropped: dict[str, str] = {}
         self._folder_generating = False
-        self._recent_videos = RecentVideos(self._recent_rows)
+        self._recent_videos = RecentVideos(self._recent_rows,
+                                           lambda video: self._preview(video)[1])
         self._recent_videos.picked.connect(self.video_slot.set_item)
         _keep_its_room_when_hidden(self._recent_videos)
 
@@ -347,7 +348,7 @@ class CombinePanel(QWidget):
         held = self.video_slot.current_id()
         listed = dict.fromkeys(video for video in (held, *self._history(self.selected_intent()))
                                if video)
-        return [RecentVideo(video, *self._preview(video))
+        return [RecentVideo(video, self._preview(video)[0])
                 for video in listed if self.video_slot.accepts(video)]
 
     def _show_dropped(self):

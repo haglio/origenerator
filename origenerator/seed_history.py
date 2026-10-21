@@ -14,6 +14,7 @@ class SeedUse:
     seed: int
     thumbnail: str | None
     size: tuple[int, int] | None = None
+    item: str | None = None
 
 
 SeedHistory = Callable[[str], list[SeedUse]]

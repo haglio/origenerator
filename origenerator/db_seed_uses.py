@@ -1,6 +1,20 @@
 from __future__ import annotations
 
 from origenerator.db_connection import Store
+from origenerator.media import MediaType
+
+_SOUND_SEED = "audio_seed"
+
+
+def give_old_seed_uses_their_kind(conn) -> None:
+    conn.execute(
+        "UPDATE seed_uses SET media_type = ? WHERE media_type IS NULL AND (seed_key = ?"
+        " OR EXISTS (SELECT 1 FROM seed_uses AS sound WHERE sound.seed_key = ?"
+        " AND sound.kind = seed_uses.kind AND ABS(strftime('%s', sound.created_at)"
+        " - strftime('%s', seed_uses.created_at)) <= 1))",
+        (MediaType.VIDEO, _SOUND_SEED, _SOUND_SEED))
+    conn.execute("UPDATE seed_uses SET media_type = ? WHERE media_type IS NULL",
+                 (MediaType.IMAGE,))
 
 
 class SeedUseStore(Store):

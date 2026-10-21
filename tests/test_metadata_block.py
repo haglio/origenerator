@@ -108,6 +108,17 @@ def test_a_long_unbroken_value_is_given_places_to_wrap(block):
     assert raw == [f"video/{zwsp}loops/{zwsp}wan22_{zwsp}i2v_{zwsp}00042_{zwsp}.{zwsp}mp4"]
 
 
+def test_the_name_lines_copy_button_copies_the_items_name(block):
+    block.show_row(_row(), name="AB12CD34 007")
+    name_copy, _file_copy = [b for b in block.findChildren(QPushButton)
+                             if b.objectName() == "copyButton"]
+
+    name_copy.click()
+
+    assert ("AB12CD34 007" in _texts(block),
+            QApplication.clipboard().text()) == (True, "AB12CD34 007")
+
+
 def test_copy_button_copies_just_the_filename(block):
     block.show_row(_row())
     copy_btns = [b for b in block.findChildren(QPushButton)

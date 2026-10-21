@@ -1,13 +1,13 @@
 """The read-only facts about one generation that belong with neither the params
-nor the form: the output file, when the run happened, and which workflow version
-made it.
+nor the form: its name, the output file, when the run happened, and which
+workflow version made it.
 
 The gallery's info-pane tab is an editable :class:`GenerateConfigPanel`. It renders
 the prompts and every parameter as fields (the ones the workflow lays out are
 editable; the rest — an import's extras, hidden passthrough like vae or clip — show
-as read-only rows in the same form). So what is left for this block is the output
-file, its timestamp and the workflow version, shown as a compact ``Basic`` section
-above the form.
+as read-only rows in the same form). So what is left for this block is its name,
+the output file, its timestamp and the workflow version, shown as a compact
+``Basic`` section above the form.
 
 An image's files are not one of those things any more: each is a version of the
 image, made by its own enhancement at its own settings and at its own moment, so
@@ -123,21 +123,16 @@ def created_item(file: dict, fallback: str = "", *,
     return MetaItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
 
 
-def basic_section(row: dict, upscale: Path | None = None) -> MetaSection | None:
-    """The at-a-glance facts kept at the top: what this run produced, when, and
-    which workflow version made it.
-
-    ``None`` — no block at all — when there is none of that to show: every file
-    the row holds is listed as one of its versions (a video's among them once
-    Evolver has made its ``upscale``), and no workflow version is recorded yet."""
+def basic_section(row: dict, upscale: Path | None = None, *,
+                  name: str = "") -> MetaSection | None:
     listed = {level.file.get("filename")
               for level in gallery.displayed_levels(row, upscale)}
     files = [f for f in gallery.row_output_files(row)
              if f.get("filename") and f.get("filename") not in listed]
-    items = []
+    items = [MetaItem("Name", name, copy=name)] if name else []
     if files:
         held = row.get("days_in_trash")
-        items = [file_item(f, held_days=held) for f in files]
+        items += [file_item(f, held_days=held) for f in files]
         items.append(MetaItem("Created", str(row.get("created_at", ""))))
     if row.get("provenance"):
         items.append(_version_line(json.loads(row["provenance"])))

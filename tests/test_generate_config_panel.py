@@ -40,6 +40,7 @@ from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
+from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import scale_to_total_pixels
@@ -1234,6 +1235,20 @@ def _metadata_texts(panel):
     """Every label in the panel's metadata block, minus the wrapping zero-widths."""
     return [lbl.text().replace("\u200b", "")
             for lbl in panel._metadata_block.findChildren(QLabel)]
+
+
+def test_a_tab_showing_an_item_puts_its_name_on_the_name_line(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    image = _image_row(db)
+    names = ItemNames(db)
+    names.take([image], [], {})
+    panel = GenerateConfigPanel(ComfyUIClient(), db, names=names)
+    qtbot.addWidget(panel)
+    panel._preview.show_media = MagicMock()
+
+    panel.show_saved_generation(image, [image])
+
+    assert f"{folder_id(settings_folder_key(image))} 000" in _metadata_texts(panel)
 
 
 def test_a_fresh_tab_shows_no_footer(saved_panel):

@@ -1,9 +1,9 @@
 """Render a generation's read-only metadata as one compact titled block.
 
 Sits at the top of the info-pane tab's scroll, above the editable form, and
-shows only what the form and the version list can't: a file no version claims,
-when the run happened, and which workflow version made it. The model lives in
-:mod:`origenerator.generation_metadata`; this does the Qt rendering.
+shows only what the form and the version list can't: the item's name, a file no
+version claims, when the run happened, and which workflow version made it. The
+model lives in :mod:`origenerator.generation_metadata`; this does the Qt rendering.
 
 The block is a titled set of ``label: value`` rows, led by the generation's "Go
 to folder" — the one act here that is the row's rather than one file's.
@@ -60,13 +60,13 @@ class MetadataBlock(QWidget):
         self._block: CollapsibleSection | None = None
         self._folded = False
 
-    def show_row(self, row: dict, upscale=None) -> bool:
+    def show_row(self, row: dict, upscale=None, name: str = "") -> bool:
         """Render this row's section, reporting whether it has anything in it.
 
         An image's files are all versions, listed with the level that made each
         — and so are a video's once Evolver has upscaled it — so what is left
         here can be as little as the way to the folder, or nothing at all."""
-        self._section = basic_section(row, upscale)
+        self._section = basic_section(row, upscale, name=name)
         self._render(self._section)
         return self.has_content()
 

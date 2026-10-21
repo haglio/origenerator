@@ -21,6 +21,7 @@ from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui.drags import under_way
+from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.generation_drag import dragged_generation
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
@@ -113,8 +114,8 @@ class DropSlot(DropZone):
         # paints no stylesheet border without WA_StyledBackground.
         self._label = QLabel(placeholder)
         self._label.setObjectName("dropSlot")
-        self._label.setProperty("dragActive", False)  # lit while a matching drag is underway
-        self._label.setProperty("dropTarget", False)
+        self._label.setProperty(LIT, False)
+        self._label.setProperty(AIMED, False)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setWordWrap(True)
         self._label.setMinimumHeight(THUMBNAIL_BOX.height())
@@ -190,21 +191,13 @@ class DropSlot(DropZone):
         return self.lent_by(prompt_id) is not None
 
     def _light_for(self, mime, _source):
-        self.set_candidate(bool(self._landing(mime)))
+        self._light(LIT, bool(self._landing(mime)))
 
     def _put_out_for_the_drag(self):
-        self.set_candidate(False)
-
-    def set_candidate(self, active: bool):
-        """Light the slot as a valid target for the in-progress drag (or clear it).
-
-        Driven by the drag's start/end, not by hover, so the drop zone stands out
-        the moment a matching drag begins — you see where to aim before arriving.
-        """
-        self._light("dragActive", active)
+        self._light(LIT, False)
 
     def set_targeted(self, targeted: bool):
-        self._light("dropTarget", targeted)
+        self._light(AIMED, targeted)
 
     def _light(self, state: str, on: bool):
         if self._label.property(state) == on:

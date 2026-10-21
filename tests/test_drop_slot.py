@@ -10,9 +10,11 @@ from shared_ui.testing import ground
 
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
+from tests.drop_style_seen import worn
 
 
 def _slot(qtbot, kind="image", lent_by=lambda pid: pid,
@@ -197,16 +199,6 @@ def test_a_slot_lights_while_a_drag_it_would_take_is_under_way(qtbot):
     under_way.ended.emit()
 
 
-def test_set_candidate_lights_and_clears_the_slot(qtbot):
-    slot = _slot(qtbot)
-
-    slot.set_candidate(True)
-    assert slot._label.property("dragActive") is True   # the drop zone stands out
-
-    slot.set_candidate(False)
-    assert slot._label.property("dragActive") is False  # cleared when the drag ends
-
-
 def test_a_drag_over_the_slot_lights_it_as_where_the_drop_lands(qtbot):
     slot = _slot(qtbot)
 
@@ -248,17 +240,35 @@ def test_letting_go_over_the_slot_puts_it_out(qtbot):
     assert slot._label.property("dropTarget") is False
 
 
-def test_the_slot_under_the_drag_sits_one_step_lighter_than_one_only_lit_for_it(qtbot):
-    slot = _slot(qtbot)
+def _shown_in_the_app(qtbot, slot):
     slot.setStyleSheet(build_stylesheet())
     slot.show()
     qtbot.waitExposed(slot)
-    slot.set_candidate(True)
+    return slot
+
+
+def _style_worn(slot):
+    return worn(slot._label.grab().toImage(), slot._label.rect())
+
+
+def test_a_slot_a_drag_would_land_in_wears_the_drop_style(qtbot):
+    slot = _shown_in_the_app(qtbot, _slot(qtbot))
+    assert _style_worn(slot) is None
+
+    under_way.started.emit(generation_mime("img1"), None)
+
+    assert _style_worn(slot) == LIT
+
+
+def test_the_slot_under_the_drag_sits_one_step_lighter_than_one_only_lit_for_it(qtbot):
+    slot = _shown_in_the_app(qtbot, _slot(qtbot))
+    under_way.started.emit(generation_mime("img1"), None)
     lit = ground(slot._label)
 
     _drag_enter(slot, "img1")
 
     assert ground(slot._label) == hovered(QColor(lit)).name()
+    assert _style_worn(slot) == AIMED
 
 
 def test_accepts_delegates_to_the_predicate(qtbot):

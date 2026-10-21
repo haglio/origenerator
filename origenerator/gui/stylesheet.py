@@ -20,6 +20,7 @@ from shared_ui.preview_icon import app_icon
 from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.config import PROJECT_DIR
+from origenerator.gui import drop_style
 from origenerator.gui.panes import BORDER_NAME, BORDERED_SET
 from origenerator.gui.tooltip_shape import shape_long_tooltips
 from origenerator.spin_arrows import arrow_paths
@@ -407,16 +408,10 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_MUTED)};
         padding: 8px;
     }}
-    QLabel#dropSlot[dragActive="true"] {{
-        border: 1px solid {_h(BLUE)};
-        background-color: {_h(BG_TERTIARY)};
+    QLabel#dropSlot[{drop_style.LIT}="true"], QLabel#dropSlot[{drop_style.AIMED}="true"] {{
+        border: 1px solid {_h(drop_style.EDGE)};
         color: {_h(TEXT_PRIMARY)};
-    }}
-    QLabel#dropSlot[dropTarget="true"] {{
-        border: 1px solid {_h(BLUE)};
-        background-color: {_h(hovered(BG_TERTIARY))};
-        color: {_h(TEXT_PRIMARY)};
-    }}
+    }}{drop_style.ground_rules()}
     """
 
 

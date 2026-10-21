@@ -20,7 +20,7 @@ from typing import Any
 
 from funestra.hud_button import FIT_THE_WORD, Button
 from funestra.hud_marks import FMODE_ICON, shared_mark
-from funestra.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.console_commands import FILTER, spelled_for
 

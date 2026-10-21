@@ -13,6 +13,7 @@ from pathlib import Path
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 from PIL import Image
+from shared_ui.orientation import orientation_of_size
 
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
@@ -32,7 +33,6 @@ from origenerator.gallery import (
     row_output_files,
     workflow_output_type,
 )
-from origenerator.gallery.sides import orientation_of_size
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type

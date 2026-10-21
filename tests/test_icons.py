@@ -10,6 +10,7 @@ from shared_ui.icons import glyph_pixmap
 from shared_ui.spacing import BUTTON_MARK
 
 from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
 from origenerator.media import MediaType
 
@@ -123,6 +124,17 @@ def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
     # the upright frame's left edge and the lying-down one's right edge were cut
     # off at the sides of the button.
     assert not _ink_at_the_edges(icons.separate_mark(BUTTON_MARK))
+
+
+def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(qtbot):
+    marks = {PORTRAIT: "portrait", LANDSCAPE: "landscape", BOTH: "portrait_and_landscape"}
+
+    for side, mark in marks.items():
+        for size in (icons.MARK_BESIDE_A_WORD, BUTTON_MARK):
+            assert (icons.side_mark(side, size).toImage()
+                    == glyph_pixmap(mark, size, TEXT_PRIMARY).toImage()), (side, size)
+    assert (icons.separate_mark(BUTTON_MARK).toImage()
+            == glyph_pixmap("portrait_beside_landscape", BUTTON_MARK, TEXT_PRIMARY).toImage())
 
 
 def test_a_collection_mark_is_drawn_once():

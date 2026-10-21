@@ -7606,7 +7606,7 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_pictures_made_better(qtb
 
 def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypatch):
     # The button sits beside F-mode on the HUD every slideshow wears, and pressing it
-    # lands on the slideshow itself, hosted or not; the status line names the cut.
+    # lands on the slideshow itself, hosted or not; the title names the cut.
 
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -7626,7 +7626,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
     assert [item[2] for item in slideshow._playlist._items] == ["i2"]
     model = slideshow_hud_model(slideshow.hud_side, slideshow, hosted=False)
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{slideshow.hud_side}_enhanced"] and "Enhanceds" in model.lock_label
+    assert lit[f"{slideshow.hud_side}_enhanced"] and "Enhanceds" in model.title
     slideshow.close()
 
 

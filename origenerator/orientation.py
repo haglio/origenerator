@@ -33,10 +33,11 @@ from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
+from shared_ui.orientation import orientation_of_size
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
-from origenerator.gallery.sides import LANDSCAPE, SIDES, on_side, orientation_of_size
+from origenerator.gallery.sides import LANDSCAPE, SIDES, on_side
 from origenerator.gallery.signatures import READINGS_KEPT, canonical_settings
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path

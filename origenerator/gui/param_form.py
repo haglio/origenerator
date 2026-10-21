@@ -17,10 +17,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.orientation import orientation_of_size
 from shared_ui.tick_control import TickControl
 
 from origenerator.config import COMFYUI_INPUT_DIR
-from origenerator.gallery.sides import SIDE_LABELS, orientation_of_size
+from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton

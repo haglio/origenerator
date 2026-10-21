@@ -2,7 +2,7 @@
 face, its tooltip and the state it draws."""
 from __future__ import annotations
 
-from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.slideshow_buttons import answer, slideshow_rows
 

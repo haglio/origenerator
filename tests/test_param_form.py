@@ -30,7 +30,7 @@ from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.seed_history import SeedUse
-from origenerator.setting_advice import Advice
+from origenerator.setting_advice import Advice, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
@@ -2139,6 +2139,40 @@ def test_the_whole_forms_warnings_read_and_resolve_in_the_order_of_its_sections(
     form.resolve_every_warning()
     values = form.get_values()
     assert (values["steps"], values["lora_strength_high"]) == (40, 1.2)
+
+
+def _duration_advice(form):
+    return setting_advice({"frame_count": form.get_values()["frame_count"]}, form.definitions())
+
+
+def test_a_storys_length_off_its_good_range_warns_beside_its_scenes(qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "a\n---\nb", "scene_frames": [81, 161]})
+
+    form.set_warnings(_duration_advice(form))
+
+    assert form._warning_marks["scene_frames"].toolTip() == (
+        "Good range: 5–10 s. Click to use 10 s.")
+    assert form.every_warning() == "Scenes: 15 s. Good range: 5–10 s. Click to use 10 s."
+
+
+def test_the_scenes_tooltip_says_the_good_range_their_warning_holds_the_story_to(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
+                     size_deriver=lambda values: (464, 912))
+    qtbot.addWidget(form)
+
+    assert " Good range: 5–10 s. " in form._labels["scene_frames"].toolTip()
+
+
+def test_clicking_the_warning_beside_scenes_shortens_the_last_scene_to_fit(qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "a\n---\nb", "scene_frames": [81, 161]})
+    form.set_warnings(_duration_advice(form))
+
+    qtbot.mouseClick(form._warning_marks["scene_frames"], Qt.MouseButton.LeftButton)
+
+    values = form.get_values()
+    assert (values["scene_frames"], values["frame_count"]) == ([81, 81], 161)
 
 
 def test_resolving_a_warning_leaves_the_rest_of_the_form_as_it_was(qtbot):

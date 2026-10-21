@@ -29,7 +29,7 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
-from origenerator.gui.param_help import definition_help, option_help, param_help
+from origenerator.gui.param_help import advice_help, definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
@@ -192,6 +192,7 @@ class ParamForm(QWidget):
         # None for a workflow with one prompt and one length.
         scenes_def = next((pd for pd in self._param_defs if pd.type == ParamType.SCENES), None)
         self._scenes: ScenesEditor | None = None
+        self._scenes_row = scenes_def.key if scenes_def is not None else None
         if scenes_def is not None:
             self._scenes = ScenesEditor(
                 scenes_def, lambda w, pd=scenes_def: grey_out_of_reach(pd, w),
@@ -314,13 +315,20 @@ class ParamForm(QWidget):
 
     def _explain(self, key: str) -> None:
         pd = self._defs.get(key)
-        explained = (definition_help(pd, self._recommendations.get(key, "")) if pd is not None
-                     else param_help(key))
+        explained = self._help(pd) if pd is not None else param_help(key)
         label = self._labels[key]
         label.setToolTip(explained or label.text())
         widget = self._widgets.get(key)
         if widget is not None and explained:
             widget.setToolTip(explained)
+
+    def _help(self, pd: ParamDef) -> str:
+        warned_here = [other for other in self._param_defs
+                       if other.key != pd.key and self._row_of(other.key) == pd.key]
+        return " ".join(filter(None, [
+            definition_help(pd, self._recommendations.get(pd.key, "")),
+            *(advice_help(other, self._recommendations.get(other.key, ""))
+              for other in warned_here)]))
 
     def explain(self, recommendations: dict[str, str]) -> None:
         self._recommendations = dict(recommendations)
@@ -397,8 +405,13 @@ class ParamForm(QWidget):
 
     def _resolve_warnings(self, keys: list[str]) -> None:
         for key in keys:
-            if key in self._advice:
-                self._write_field(self._defs[key], self._advice[key].fix)
+            found = self._advice.get(key)
+            if found is None:
+                continue
+            if key == self._scenes_row:
+                self._scenes.set_total_frames(found.fix)
+            else:
+                self._write_field(self._defs[key], found.fix)
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
         for key, good in choices.items():
@@ -415,11 +428,14 @@ class ParamForm(QWidget):
                                          Qt.ItemDataRole.ToolTipRole)
 
     def set_warnings(self, advice: dict[str, Advice]) -> None:
-        self._advice = dict(advice)
+        self._advice = {self._row_of(key): found for key, found in advice.items()}
         for key, mark in self._warning_marks.items():
             mark.warn(self._warning(key))
         for title, section in self._sections.items():
             section.warning.warn(self._warnings_about(self._present_keys[title]))
+
+    def _row_of(self, key: str) -> str:
+        return self._scenes_row if self._scenes is not None and key in _SCENE_KEYS else key
 
     def every_warning(self) -> str:
         return self._warnings_about(self._keys_in_order())

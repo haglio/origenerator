@@ -131,6 +131,14 @@ def chained_frames(lengths: list[int]) -> int:
     return lengths[0] + sum(length - 1 for length in lengths[1:])
 
 
+def chained_to(total: int, lengths: list[int], shortest: int) -> list[int]:
+    fitted = list(lengths)
+    fitted[-1] += max(0, total - chained_frames(fitted))
+    for index in reversed(range(len(fitted))):
+        fitted[index] -= max(0, min(chained_frames(fitted) - total, fitted[index] - shortest))
+    return fitted
+
+
 def scene_prompts(text: str) -> list[str]:
     """The scenes a positive prompt tells, split at :data:`SCENE_BREAK` lines --
     or the one prompt exactly as typed when it has none."""

@@ -142,12 +142,12 @@ class Database:
     def custom_combinations(self) -> list[dict]:
         return self.generations.custom_combinations()
 
-    def record_seed_use(self, *, kind: str, seed_key: str, seed: int,
+    def record_seed_use(self, *, kind: str, seed_key: str, seed: int, media_type: str,
                         width: int | None = None, height: int | None = None,
                         thumbnail_path: str | None = None) -> None:
         return self.seed_uses.record_seed_use(
-            kind=kind, seed_key=seed_key, seed=seed, width=width, height=height,
-            thumbnail_path=thumbnail_path)
+            kind=kind, seed_key=seed_key, seed=seed, media_type=media_type, width=width,
+            height=height, thumbnail_path=thumbnail_path)
 
     def list_seed_uses(self) -> list[dict]:
         return self.seed_uses.list_seed_uses()

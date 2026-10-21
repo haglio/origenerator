@@ -544,12 +544,25 @@ def test_a_tabs_seed_drops_down_every_seed_the_library_used_newest_first(panel):
             params_json=json.dumps({"seed": seed}), workflow_json="{}")
         panel._db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": f"{prompt_id}.png", "subfolder": "image"}]))
-    field = panel._param_form._widgets["seed"]
 
+    assert _seeds_listed(panel, "seed") == ["20", "10"]
+
+
+def test_a_tabs_seed_dropdown_lists_only_the_seeds_of_the_kind_it_makes(panel):
+    _image_row(panel._db)
+    _video_row(panel._db, noise_seed=30)
+
+    assert _seeds_listed(panel, "seed") == ["1"]
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    assert _seeds_listed(panel, "noise_seed") == ["30"]
+
+
+def _seeds_listed(panel, key):
+    field = panel._param_form._widgets[key]
     field.showPopup()
-
-    assert [field.itemText(row) for row in range(field.count())] == ["20", "10"]
+    listed = [field.itemText(row) for row in range(field.count())]
     field.hidePopup()
+    return listed
 
 
 def test_a_seed_drawn_by_ticking_random_heads_the_dropdown(panel):
@@ -571,6 +584,14 @@ def test_a_drawn_seed_is_kept_at_the_size_the_tab_would_make(panel):
 
     record = panel._db.list_seed_uses()[0]
     assert (record["width"], record["height"]) == (832, 1216)
+
+
+def test_a_drawn_seed_is_kept_for_the_kind_of_item_the_tab_makes(panel):
+    panel._param_form.set_values({"seed": 5})
+
+    panel._param_form._randomize_checks["seed"].click()
+
+    assert panel._db.list_seed_uses()[0]["media_type"] == MediaType.IMAGE
 
 
 def test_use_random_seed_switches_the_seed_to_random(panel):

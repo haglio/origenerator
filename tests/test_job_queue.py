@@ -531,8 +531,8 @@ def test_a_canceled_run_keeps_its_seeds_beside_the_last_frame_it_streamed(qtbot,
     queue.cancel_job(job.prompt_id)
 
     kept = db.list_seed_uses()
-    assert {(r["kind"], r["seed_key"], r["seed"]) for r in kept} == {
-        ("canceled", "noise_seed", 11), ("canceled", "audio_seed", 33)}
+    assert {(r["kind"], r["seed_key"], r["seed"], r["media_type"]) for r in kept} == {
+        ("canceled", "noise_seed", 11, "video"), ("canceled", "audio_seed", 33, "video")}
     assert all(Path(r["thumbnail_path"]).is_file() for r in kept)
 
 

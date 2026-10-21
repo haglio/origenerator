@@ -125,6 +125,7 @@ SCHEMA = {
         ("height", "INTEGER", 0, None, 0),
         ("thumbnail_path", "TEXT", 0, None, 0),
         ("created_at", "TEXT", 1, "datetime('now')", 0),
+        ("media_type", "TEXT", 0, None, 0),
     ),
 }
 

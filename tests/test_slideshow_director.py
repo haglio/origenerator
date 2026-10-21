@@ -1822,6 +1822,19 @@ def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows
     assert host.favorited == []
 
 
+def test_a_lock_on_a_hosted_slideshow_puts_the_generation_it_holds_in_front_of_him(slideshows):
+    rows = [_picture("g1", "a red fox", seed=1)]
+    director, host, made = slideshows(FakeHost(rows=rows), db=FakeDB(rows),
+                                      fun_time=FakeSession())
+    director.open(director.items_of(rows), location="a-folder", side="portrait")
+
+    made[0].actions.lock("g1")
+    made[0].actions.lock("nobody")
+
+    assert host.shown == ["g1"]
+    assert host.followed == []
+
+
 def _a_sitting():
     """Newest first, as a collection lists: two seeds of one picture, another picture,
     then two more seeds of the first."""

@@ -56,6 +56,7 @@ from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
+from origenerator import fix_training
 from origenerator.gallery import (
     ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,
@@ -64,6 +65,7 @@ from origenerator.gallery import (
 )
 from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.metadata_block import reveal_button
 from origenerator.gui.no_wheel import (
     NoWheelComboBox,
     NoWheelDoubleSpinBox,
@@ -71,6 +73,7 @@ from origenerator.gui.no_wheel import (
 )
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import definition_help, param_help
+from origenerator.reveal import open_in_explorer
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -736,9 +739,16 @@ class FixPromptsDialog(QDialog):
         self.strength.setValue(current["strength"])
         self.train = QPushButton()
         self.train.setToolTip(_TRAIN_TOOLTIP)
+        self._photos_folder = fix_training.photos_folder(part)
+        self.photo_count = QLabel()
+        self.photo_count.setToolTip(str(self._photos_folder))
+        self.show_photos = reveal_button()
+        self.show_photos.setToolTip(f"Open {self._photos_folder} in Explorer")
+        self.show_photos.clicked.connect(self._show_photos)
+        self._count_photos()
         foot = QHBoxLayout()
         for widget in (QLabel("LoRA"), self.lora, QLabel("LoRA Strength"), self.strength,
-                       self.train):
+                       self.train, self.photo_count, self.show_photos):
             foot.addWidget(widget)
         foot.addStretch(1)
         foot.addWidget(buttons)
@@ -747,6 +757,19 @@ class FixPromptsDialog(QDialog):
     def show_training(self, text: str | None) -> None:
         self.train.setText(text or "Train")
         self.train.setEnabled(text is None)
+
+    def _count_photos(self) -> None:
+        count = len(fix_training.photo_files(self._photos_folder))
+        self.photo_count.setText(f"{count} photo{'' if count == 1 else 's'}")
+
+    def _show_photos(self) -> None:
+        self._photos_folder.mkdir(parents=True, exist_ok=True)
+        open_in_explorer(self._photos_folder)
+
+    def event(self, event) -> bool:
+        if event.type() == QEvent.Type.WindowActivate:
+            self._count_photos()
+        return super().event(event)
 
     def choose_lora(self, lora: str) -> None:
         if self.lora.findText(lora) < 0:

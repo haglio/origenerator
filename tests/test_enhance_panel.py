@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QMimeData, QPoint, QRect, QSize, Qt
+from PyQt6.QtCore import QEvent, QMimeData, QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QDropEvent, QPixmap
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
@@ -27,6 +27,7 @@ from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.gui.enhance_panel as enhance_panel_module
 import origenerator.workflows.detail_parts as parts
+from origenerator import config
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceLevel,
@@ -1399,6 +1400,57 @@ def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):
         window.train.click()
 
     assert asked.args == ["hands"]
+
+
+def _fix_photos(monkeypatch, tmp_path, *names):
+    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+    if names:
+        (tmp_path / "Hands").mkdir()
+    for name in names:
+        (tmp_path / "Hands" / name).write_bytes(b"")
+    return tmp_path / "Hands"
+
+
+def test_beside_train_a_fixs_prompts_say_how_many_photos_its_folder_holds(
+        qtbot, monkeypatch, tmp_path):
+    folder = _fix_photos(monkeypatch, tmp_path, "one.jpg", "two.png", "notes.txt")
+    panel, _edits = _panel(qtbot)
+
+    panel._fix_prompt_buttons["hands"].click()
+
+    window = panel._fix_prompt_windows["hands"]
+    assert window.photo_count.text() == "2 photos"
+    assert window.photo_count.toolTip() == str(folder)
+
+
+def test_a_fixs_photos_are_counted_again_each_time_its_prompts_come_to_the_front(
+        qtbot, monkeypatch, tmp_path):
+    folder = _fix_photos(monkeypatch, tmp_path, "one.jpg")
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    assert window.photo_count.text() == "1 photo"
+
+    (folder / "two.jpg").write_bytes(b"")
+    QApplication.sendEvent(window, QEvent(QEvent.Type.WindowActivate))
+
+    assert window.photo_count.text() == "2 photos"
+
+
+def test_show_in_explorer_opens_a_fixs_photos_folder_making_it_first_if_need_be(
+        qtbot, monkeypatch, tmp_path):
+    folder = _fix_photos(monkeypatch, tmp_path)
+    opened = []
+    monkeypatch.setattr(enhance_panel_module, "open_in_explorer", opened.append)
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    assert window.photo_count.text() == "0 photos"
+
+    window.show_photos.click()
+
+    assert opened == [folder]
+    assert folder.is_dir()
 
 
 def test_a_fixs_train_button_says_how_its_training_is_going_until_it_ends(qtbot):

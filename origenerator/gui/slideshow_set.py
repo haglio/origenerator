@@ -112,11 +112,14 @@ class SlideshowSet:
 
     def _deal(self, items, *, image_dwell_ms: int, start=None,
               shuffle=None) -> SlideshowPlaylist:
-        kwargs = {"image_dwell_ms": image_dwell_ms, "start": start}
         shuffle = self._shuffle if shuffle is None else shuffle
-        if shuffle is not None:  # else the playlist uses its own random shuffle
-            kwargs["shuffle"] = shuffle
-        return SlideshowPlaylist(items, **kwargs)
+        if shuffle is not None:
+            return SlideshowPlaylist(items, image_dwell_ms=image_dwell_ms,
+                                     shuffle=shuffle, start=start)
+        shuffled = SlideshowPlaylist(items, image_dwell_ms=image_dwell_ms)
+        if start is not None and 0 <= start < len(shuffled):
+            shuffled.lead_with(start)
+        return shuffled
 
     def reseed(self, items, *, start=None, shuffle=None) -> None:
         """Play *items* instead, from the top or from *start*.

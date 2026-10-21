@@ -168,6 +168,18 @@ def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded
     assert slideshow_set.order_label == SHUFFLE_LABEL
 
 
+def test_a_shuffled_pass_begun_on_a_slide_plays_every_other_one_before_coming_back(seeded):
+    slideshow_set = SlideshowSet(_TWELVE, image_dwell_ms=4000, actions=SlideshowActions(),
+                                 start=5)
+    played = [slideshow_set.current_prompt_id()]
+    for _ in _TWELVE[1:]:
+        slideshow_set.step(1)
+        played.append(slideshow_set.current_prompt_id())
+
+    assert played[0] == "id-5"
+    assert sorted(played) == sorted(item[2] for item in _TWELVE)
+
+
 # --- a picture that something is being made of -------------------------------
 
 def test_a_pass_dealt_while_a_picture_of_it_is_being_enhanced_opens_on_it():

@@ -432,6 +432,40 @@ def test_a_seed_kept_before_kinds_were_is_a_videos_when_a_sound_seed_was_kept_wi
         11: "video", 12: "video", 21: "image", 31: "video", 32: "video", 41: "image"}
 
 
+def test_the_seed_a_tab_picked_for_its_next_press_is_forgotten_when_the_library_opens(tmp_path):
+    path = tmp_path / "origenerator.db"
+    Database(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "INSERT INTO generations (prompt_id, workflow_name, workflow_version, status,"
+            " params_json, workflow_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (*_row_with({"seed": 7}), "2026-10-20 10:00:00"))
+        conn.executemany(
+            "INSERT INTO seed_uses (kind, seed_key, seed, media_type, created_at)"
+            " VALUES (?, 'seed', ?, 'image', ?)",
+            [("drawn", 11, "2026-10-20 10:00:01"), ("drawn", 22, "2026-10-20 10:30:00"),
+             ("canceled", 33, "2026-10-20 10:00:02")])
+
+    db = Database(path)
+
+    assert {use["seed"] for use in db.list_seed_uses()} == {22, 33}
+
+
+def test_a_seed_picked_after_a_press_whose_item_is_in_the_trash_is_forgotten_too(tmp_path):
+    path = tmp_path / "origenerator.db"
+    Database(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute("INSERT INTO deletions (prompt_id, row_json, batch_json) VALUES (?, ?, ?)",
+                     ("p1", json.dumps({"prompt_id": "p1", "created_at": "2026-10-20 10:00:00"}),
+                      "{}"))
+        conn.execute("INSERT INTO seed_uses (kind, seed_key, seed, media_type, created_at)"
+                     " VALUES ('drawn', 'seed', 11, 'image', '2026-10-20 10:00:01')")
+
+    db = Database(path)
+
+    assert db.list_seed_uses() == []
+
+
 def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):
     # The table recorded what each worktree's copied database had bookmarked,
     # for adoption at the next live launch; there are no copies now, so it is

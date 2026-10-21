@@ -11,7 +11,10 @@ is migrated in place rather than rebuilt.
 """
 from __future__ import annotations
 
-from origenerator.db_seed_uses import give_old_seed_uses_their_kind
+from origenerator.db_seed_uses import (
+    forget_the_seeds_tabs_picked_for_their_next_press,
+    give_old_seed_uses_their_kind,
+)
 from origenerator.param_keys import migrate_stored_params
 
 SCHEMA = """\
@@ -325,3 +328,4 @@ def migrate(conn) -> None:
     conn.execute("DROP TABLE IF EXISTS branch_curation")
     migrate_stored_params(conn)
     give_old_seed_uses_their_kind(conn)
+    forget_the_seeds_tabs_picked_for_their_next_press(conn)

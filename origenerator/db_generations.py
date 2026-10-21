@@ -95,17 +95,18 @@ class GenerationStore(Store):
         workflow_json: str,
         source: str = GenerationSource.GENERATED,
         provenance: str | None = None,
+        shielded: bool = False,
     ):
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO generations
                    (prompt_id, source, workflow_name, workflow_version,
                     positive_prompt, negative_prompt, seed,
-                    params_json, workflow_json, provenance)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    params_json, workflow_json, provenance, shielded)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (prompt_id, source, workflow_name, workflow_version,
                  positive_prompt, negative_prompt, seed,
-                 params_json, workflow_json, provenance),
+                 params_json, workflow_json, provenance, 1 if shielded else 0),
             )
 
     def update_generation(self, prompt_id: str, **fields):

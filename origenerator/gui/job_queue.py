@@ -362,7 +362,8 @@ class JobQueue(QObject):
         workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
         return (source, workflow) if workflow is not None else None
 
-    def _launch(self, key, workflow, params, on_finished, *, origin=None, run_media_type=None):
+    def _launch(self, key, workflow, params, on_finished, *, origin=None, run_media_type=None,
+                shielded=False):
         """``origin`` is the prompt id the run began under, carried across a chained
         i2v's image→video hand-off so both stages read as one run. ``run_media_type``
         is what that whole run makes, for a stage that doesn't make it itself: the
@@ -371,13 +372,14 @@ class JobQueue(QObject):
         waiting.
         """
         job = self._new_job(key, workflow, params, on_finished,
-                            origin=origin, run_media_type=run_media_type)
+                            origin=origin, run_media_type=run_media_type, shielded=shielded)
         if job is not None:
             self._enqueue(job)
             self._admit(job)
 
     def _new_job(self, key, workflow, params, on_finished, *,
-                 source=GenerationSource.GENERATED, origin=None, run_media_type=None):
+                 source=GenerationSource.GENERATED, origin=None, run_media_type=None,
+                 shielded=False):
         """The job joins the line rather than the server: its row is written first
         (``pending``, the row it will run under) so a restart can find it either
         way, and :meth:`_pump` hands it over when its turn comes."""
@@ -390,6 +392,7 @@ class JobQueue(QObject):
             return None
         job.origin = origin or job.prompt_id  # a chained stage keeps the first id
         job.run_media_type = run_media_type or job.media_type
+        job.shielded = shielded
         self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
         return job
@@ -773,7 +776,7 @@ class JobQueue(QObject):
         if input_ref is not None:
             video_params = {**video_params, "input_image": input_ref}
         self._launch(key, video_workflow, video_params, self._on_finished,
-                     origin=image_job.origin)
+                     origin=image_job.origin, shielded=image_job.shielded)
         self._pump()  # in case the video stage couldn't even be built
 
     def _on_finished(self, key, job, files, thumb_path, duration):

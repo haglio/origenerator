@@ -88,6 +88,7 @@ def insert_generation_row(db, job):
         workflow_json=json.dumps(job.payload),
         source=job.source,
         provenance=json.dumps(provenance.at_launch(job.workflow)),
+        shielded=job.shielded,
     )
 
 

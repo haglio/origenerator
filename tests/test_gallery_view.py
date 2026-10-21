@@ -3185,6 +3185,72 @@ def test_an_item_the_gallery_has_not_named_yet_offers_no_name_to_copy(qtbot, mon
     assert labels == ["Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
 
 
+def _press_ctrl_c(view, monkeypatch):
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: True)
+    return view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_C, _CTRL))
+
+
+def test_ctrl_c_copies_the_names_of_the_picked_items_one_to_a_line(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._browser.apply_selection("i1", _NO_MOD)
+    view._browser.apply_selection("i3", _CTRL)
+    QApplication.clipboard().clear()
+
+    _press_ctrl_c(view, monkeypatch)
+
+    assert QApplication.clipboard().text() == "\n".join(
+        [_name_of(rows[0], 2), _name_of(rows[2], 0)])
+
+
+def test_ctrl_c_with_no_item_picked_copies_the_folders_name(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._browser.clear_selection()
+    QApplication.clipboard().clear()
+
+    _press_ctrl_c(view, monkeypatch)
+
+    assert QApplication.clipboard().text() == gallery.folder_id(
+        gallery.settings_folder_key(rows[0]))
+
+
+def test_ctrl_c_over_picked_folders_copies_each_folders_name(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+    view._browser.clear_selection()
+    QApplication.clipboard().clear()
+
+    _press_ctrl_c(view, monkeypatch)
+
+    assert QApplication.clipboard().text() == "\n".join(
+        gallery.folder_id(gallery.settings_folder_key(_image(pid, prompt, 50, 1)))
+        for pid, prompt in (("i1", "a cat"), ("i2", "a dog")))
+
+
+def test_ctrl_c_in_a_focused_text_field_is_left_to_the_field(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    view._browser.apply_selection("i1", _NO_MOD)
+    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    editor = QLineEdit()
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QApplication.focusWidget", lambda: editor
+    )
+    QApplication.clipboard().setText("words copied from the field")
+
+    taken = view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_C, _CTRL))
+
+    assert (taken, QApplication.clipboard().text()) == (False, "words copied from the field")
+
+
 def _folder_buttons(view):
     """The "Go to folder" buttons the front tab is actually drawing."""
     panel = view._info_tabs.current_config_panel()

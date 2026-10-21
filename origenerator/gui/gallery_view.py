@@ -92,7 +92,7 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
-from origenerator.gui.copy_names import offer_copy_names
+from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.deferred import defer
 from origenerator.gui.enhance_controller import EnhanceController, Offer
 from origenerator.gui.folder_path_header import FolderPathHeader
@@ -207,6 +207,10 @@ def _offer_copy_names_above_a_line(menu: QMenu, names: list[str]) -> None:
     offer_copy_names(menu, names)
     if not menu.isEmpty():
         menu.addSeparator()
+
+
+def _names_of_the_picked_folders(selection_group) -> list[str]:
+    return [group.label for group in gallery.child_groups(selection_group)]
 
 
 def _is_deletable_folder(group) -> bool:
@@ -554,6 +558,10 @@ class GalleryView(QWidget):
                 # for it (diagnosed from a real Delete press arriving as Key_Insert).
                 if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
                     self._delete_selection()
+                    return True
+                if (event.key() == Qt.Key.Key_C
+                        and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+                    self._copy_names_of_the_selection()
                     return True
                 if (event.key() == Qt.Key.Key_Z
                         and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
@@ -3782,6 +3790,14 @@ class GalleryView(QWidget):
         if group is not None:
             self._delete_folder(group)
 
+    def _copy_names_of_the_selection(self):
+        if self._browser.selected_ids:
+            copy_names([self._item_names.of(pid) for pid in self.selected_prompt_ids()])
+        elif self._selection_group is not None:
+            copy_names(_names_of_the_picked_folders(self._selection_group))
+        elif (group := self.current_group()) is not None:
+            copy_names([group.label])
+
     # --- the Trash collection: restoring a delete, or ending it --------------
 
     def _bin_records(self) -> list[dict]:
@@ -3994,10 +4010,10 @@ class GalleryView(QWidget):
             self._new_custom_folder(side)
 
     def _selection_context_menu(self, global_pos: QPoint):
-        picked = gallery.child_groups(self._selection_group)
+        names = _names_of_the_picked_folders(self._selection_group)
         menu = QMenu(self)
-        _offer_copy_names_above_a_line(menu, [group.label for group in picked])
-        group_action = menu.addAction(f"Group {len(picked)} folders into a new folder…")
+        _offer_copy_names_above_a_line(menu, names)
+        group_action = menu.addAction(f"Group {len(names)} folders into a new folder…")
         if menu.exec(global_pos) == group_action:
             self._group_selection()
 

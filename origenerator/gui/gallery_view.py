@@ -3309,11 +3309,12 @@ class GalleryView(QWidget):
             self._generating_tile.set_selected(True)
 
     def _wait_note(self, key: str) -> str | None:
-        """What re-roll ``key`` is waiting on, when another app is holding ComfyUI
-        in front of it — a following tab's wait text, in place of a bare 'waiting
-        for preview'. Its own folder's queue isn't a wait worth naming."""
+        """What holds re-roll ``key`` up, when that is not its own folder's queue: a
+        following tab's wait text, in place of a bare 'waiting for preview'."""
         job = self._live_jobs.get(key)
-        return queue_wait_text(job.foreign_ahead) if job is not None else None
+        if job is None:
+            return None
+        return queue_wait_text(job.foreign_ahead, self._jobs.starts_at(job.prompt_id))
 
     def _refresh_wait_note(self):
         """Keep that wait text current between rebuilds, in every tab standing on

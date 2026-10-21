@@ -123,12 +123,10 @@ class InFlightCard(QWidget):
             ))
         else:
             self._show_backdrop(item)
-        self._scrim.cover(self._image, self._stage_message(item), inset=_BORDER_PX)
-        self._bar.raise_()  # the scrim it sits on was just raised over everything
         self._render_timing()
-        # Only a job ComfyUI has actually started has a clock to advance; ticking a
-        # queued one would redraw a line that cannot change.
-        if item.reading.started_at is None:
+        # Only a job ComfyUI has started, or one counting down to its start, has
+        # a clock to advance; ticking any other would redraw a line that cannot change.
+        if item.reading.started_at is None and item.starts_at is None:
             self._tick.stop()
         else:
             self._tick.start()
@@ -148,9 +146,9 @@ class InFlightCard(QWidget):
 
     @staticmethod
     def _stage_message(item: InFlightItem) -> str:
-        """What the scrim says about this job: the stage it is at, or — when the
-        hold is another app's — what it is waiting on."""
-        return (queue_wait_text(item.foreign_ahead)
+        """What the scrim says about this job: the stage it is at, or — when
+        something other than its own run holds it — what it is waiting on."""
+        return (queue_wait_text(item.foreign_ahead, item.starts_at)
                 or {"running": "Generating…", "speaking": "Speaking her lines…"}.get(
                     item.reading.status, "Queued…"))
 
@@ -161,7 +159,8 @@ class InFlightCard(QWidget):
         so the bar stays indeterminate with nothing written on it: its wait is the
         queue's to explain, not a zero counting up over a bar that has not moved.
         """
-
+        self._scrim.cover(self._image, self._stage_message(self._item), inset=_BORDER_PX)
+        self._bar.raise_()  # the scrim it sits on was just raised over everything
         self._bar.show_progress(
             # A tile's width takes the compact reading: what pass is being
             # taken, how far along, and how much longer. The strip's queue has

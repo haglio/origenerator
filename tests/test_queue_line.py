@@ -144,3 +144,28 @@ def test_work_nobody_asked_for_set_aside_rejoins_at_the_back():
     line = [newcomer, _video()]
     for source in ("experiment", "base_render"):
         assert queue_line.rejoin_index(line, _job("image", source), newcomer) == 2
+
+
+# --- when a video may start ------------------------------------------------------
+
+def test_a_video_waits_until_a_minute_after_the_last_picture_asked_for():
+    # A picture asked for stops the video being made, so one started in the gap
+    # before the user's next picture is only stopped again: its render thrown
+    # away, and that picture slowed by the switch (the user's call, 2026-10-21).
+    assert queue_line.wait_before_starting(_video(), seconds_since_a_picture=10) == 50
+
+
+def test_a_picture_never_waits():
+    assert queue_line.wait_before_starting(_image(), seconds_since_a_picture=10) == 0
+
+
+def test_a_video_waits_no_longer_once_the_minute_is_up():
+    assert queue_line.wait_before_starting(_video(), seconds_since_a_picture=75) == 0
+
+
+def test_a_video_waits_for_nothing_before_any_picture_is_asked_for():
+    assert queue_line.wait_before_starting(_video(), seconds_since_a_picture=None) == 0
+
+
+def test_a_videos_start_frame_waits_with_the_videos():
+    assert queue_line.wait_before_starting(_video_frame(), seconds_since_a_picture=10) == 50

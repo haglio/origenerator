@@ -1,6 +1,8 @@
 """The generation queue as a block of the one panel a slideshow wears."""
 from __future__ import annotations
 
+import time
+
 import numpy as np
 from PIL import Image
 from shared_ui.palette import RED
@@ -51,6 +53,14 @@ def test_a_video_waiting_at_the_head_of_the_line_leads_the_block():
 
     assert section.leader.key == "waiting-one"
     assert section.idle_note == ""
+
+
+def test_a_video_waiting_out_the_minute_after_a_picture_says_when_it_starts():
+    # The half-second keeps the count a clear half-second off a rollover.
+    section = queue_section([_item("waiting-one", job_kind="Video",
+                                   starts_at=time.monotonic() + 42.5)], 0)
+
+    assert section.leader.wait == "Starts in 0:43"
 
 
 def test_with_nothing_of_ours_in_flight_the_block_names_another_apps_backlog():

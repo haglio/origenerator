@@ -44,7 +44,7 @@ def dressed(qtbot):
 
 
 def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
-          progress=None, reveal=None, cancel=None, foreign_ahead=None,
+          progress=None, reveal=None, cancel=None, foreign_ahead=None, starts_at=None,
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
           recipe_category="", recipe_thumbnail=None, recipe_prompt_edited=False,
@@ -55,7 +55,7 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                                            started_at=started_at,
                                            typical_seconds=typical_seconds),
                         reveal=reveal or (lambda: None), cancel=cancel,
-                        foreign_ahead=foreign_ahead,
+                        foreign_ahead=foreign_ahead, starts_at=starts_at,
                         auto_generating=auto_generating,
                         job_kind=job_kind, requested=requested,
                         source_image=source_image, folder_thumbnails=folder_thumbnails,
@@ -655,6 +655,19 @@ def test_a_job_of_ours_being_made_keeps_the_slot_for_its_bar(queue):
     # under the bar stands down rather than sitting there empty.
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
     assert not queue._running._caption.isVisible()
+
+
+def test_a_video_waiting_out_the_minute_after_a_picture_counts_down_under_the_bar(queue):
+    # The half-second keeps the count a clear half-second off a rollover.
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    assert _timing(queue) == "Starts in 0:43"
+
+
+def test_the_countdown_advances_between_polls(queue):
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    queue._running._item.starts_at -= 3  # as if three seconds had gone by
+    queue._running._tick.timeout.emit()
+    assert _timing(queue) == "Starts in 0:40"
 
 
 def test_the_users_own_queue_needs_no_explaining(queue):

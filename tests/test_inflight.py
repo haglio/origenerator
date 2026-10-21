@@ -142,7 +142,7 @@ def test_the_menu_carries_the_act_the_button_has_no_room_for():
 
 # --- the waits -----------------------------------------------------------
 
-def test_only_another_apps_work_earns_a_line_about_waiting():
+def test_a_wait_on_the_users_own_jobs_earns_no_line():
     assert queue_wait_text(None) is None
     assert queue_wait_text(0) is None
 
@@ -150,6 +150,15 @@ def test_only_another_apps_work_earns_a_line_about_waiting():
 def test_a_wait_on_another_app_counts_its_jobs_and_says_job_or_jobs():
     assert queue_wait_text(1) == "Waiting on 1 job from another app"
     assert queue_wait_text(4) == "Waiting on 4 jobs from another app"
+
+
+def test_a_video_waiting_out_the_minute_after_a_picture_counts_down_to_its_start():
+    # Its bar sweeps as if it were being made, and nothing is.
+    assert queue_wait_text(None, starts_at=1042.3, now=lambda: 1000.0) == "Starts in 0:43"
+
+
+def test_a_start_already_due_says_nothing_rather_than_count_past_it():
+    assert queue_wait_text(None, starts_at=1000.0, now=lambda: 1000.5) is None
 
 
 def test_a_row_that_is_not_a_job_yet_says_it_is_not_in_the_line():

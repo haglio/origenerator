@@ -19,10 +19,11 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 import time
 
-from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, pyqtSignal
 
 from origenerator import gallery, queue_line
 from origenerator.completion import mark_generation_completed
@@ -169,10 +170,15 @@ class JobQueue(QObject):
     # there is no tile left to write the news on.
     run_ended = pyqtSignal(object)
 
-    def __init__(self, db, client, parent=None):
+    def __init__(self, db, client, parent=None, *, clock=time.monotonic):
         super().__init__(parent)
         self._db = db
         self._client = client
+        self._clock = clock
+        self._picture_asked_at: float | None = None
+        self._videos_wait = QTimer(self)
+        self._videos_wait.setSingleShot(True)
+        self._videos_wait.timeout.connect(self._pump)
         self._jobs: dict[str, list[GenerationJob]] = {}  # folder key -> its live jobs
         self._progress_persist_at: dict[str, float] = {}  # prompt_id -> last-write time
         # The queue proper: what ComfyUI is holding for us (one job, normally —
@@ -420,6 +426,7 @@ class JobQueue(QObject):
         if newcomer.source != GenerationSource.EXPERIMENT:
             self._preempt_experiments()
         if queue_line.takes_the_front(newcomer):
+            self._picture_asked_at = self._clock()
             self._set_aside_for(newcomer)
         # Announced before the hand-over, not after: the server can take a
         # minute to answer, and the launch is in the line the moment its row is
@@ -446,9 +453,10 @@ class JobQueue(QObject):
         its submit unanswered, the window alive meanwhile -- nothing else moves:
         whatever asked is answered when it lands, by the loop that sent it.
         """
-        if self._in_flight is not None or self._training is not None:
-            return
-        while not self._on_server and self._waiting:
+        while self._waiting and self._free_for_the_next_job():
+            if (wait := self._wait_at_the_front()) > 0:
+                self._videos_wait.start(math.ceil(wait * 1000))
+                return
             job = self._waiting.pop(0)
             if not self._hand_over(job):
                 continue
@@ -457,6 +465,22 @@ class JobQueue(QObject):
             newcomer, self._takes_over_on_landing = self._takes_over_on_landing, None
             if newcomer is not None and self._key_of(newcomer) is not None:
                 self._set_aside_for(newcomer)
+
+    def starts_at(self, prompt_id: str) -> float | None:
+        """When ``prompt_id`` starts, on this clock, if only the minute's wait holds it."""
+        if (not self._waiting or self._waiting[0].prompt_id != prompt_id
+                or not self._free_for_the_next_job()):
+            return None
+        wait = self._wait_at_the_front()
+        return self._clock() + wait if wait > 0 else None
+
+    def _free_for_the_next_job(self) -> bool:
+        return not (self._on_server or self._in_flight is not None or self._training is not None)
+
+    def _wait_at_the_front(self) -> float:
+        since = (None if self._picture_asked_at is None
+                 else self._clock() - self._picture_asked_at)
+        return queue_line.wait_before_starting(self._waiting[0], since)
 
     def _hand_over(self, job: GenerationJob, *, closing: bool = False) -> bool:
         """Submit one job to ComfyUI, reporting whether the server took it.

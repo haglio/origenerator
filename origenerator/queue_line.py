@@ -37,9 +37,11 @@ else's turn comes when they are not, except a run they shield, which keeps the
 machine while its shield is on. A video set aside goes back ahead of the videos
 still waiting and after every picture; a picture set aside goes right after the
 one that took its place; work nobody asked for goes to the back. A video asked
-for takes the machine from nothing, and so does work nobody asked for.
+for takes the machine from nothing, and so does work nobody asked for. Nor does a
+video start within a minute of the last picture asked for, when the next picture
+would only set it aside again, or wait for it behind its shield.
 
-Pure ordering, no Qt and no server: it works on anything carrying a
+Pure rules, no Qt and no server: they work on anything carrying a
 ``media_type`` ("image"/"video"), an optional ``run_media_type`` for a stage whose
 run makes something other than what it makes itself, a ``source`` and a
 ``prompt_id``, which is what makes it testable without a running ComfyUI.
@@ -48,6 +50,8 @@ from __future__ import annotations
 
 from origenerator.generation_state import GenerationSource
 from origenerator.media import MediaType
+
+VIDEOS_WAIT_AFTER_A_PICTURE_S = 60.0
 
 
 def is_video(job) -> bool:
@@ -107,3 +111,9 @@ def rejoin_index(line: list, job, newcomer) -> int:
         return 1 + next((index for index, other in enumerate(line) if other is newcomer), -1)
     return 1 + max((index for index, other in enumerate(line) if takes_the_front(other)),
                    default=-1)
+
+
+def wait_before_starting(job, seconds_since_a_picture: float | None) -> float:
+    if seconds_since_a_picture is None or not is_video(job):
+        return 0.0
+    return max(0.0, VIDEOS_WAIT_AFTER_A_PICTURE_S - seconds_since_a_picture)

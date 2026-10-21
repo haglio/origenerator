@@ -271,10 +271,6 @@ class RunningPreview(OpensAFolder, QWidget):
         # The hand rides on the frame rather than on the half, so it appears over
         # the one thing here that goes anywhere.
         self._frame.setCursor(Qt.CursorShape.PointingHandCursor)
-        # A job of ours takes the slot back for its own bar — except while another
-        # app's work is what is holding it up, which is the one thing that bar
-        # cannot say for itself, and the reason it is sweeping rather than filling.
-        self.show_foreign(queue_wait_text(item.foreign_ahead) or "")
         self._progress.show()
         self._render_frame(item)
         self._render_timing()
@@ -293,7 +289,9 @@ class RunningPreview(OpensAFolder, QWidget):
         """
         if self._item is None:
             return
-
+        # Under the bar, whatever holds the job up that the bar cannot say for
+        # itself, and the reason it sweeps rather than fills.
+        self.show_foreign(queue_wait_text(self._item.foreign_ahead, self._item.starts_at) or "")
         self._progress.show_progress(
             self._item.reading.caption(),
             *self._item.reading.bars(),

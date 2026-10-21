@@ -76,7 +76,7 @@ def index_folders(db) -> Folders:
 
 
 def reconcile_bookmarks(db) -> dict:
-    if not db.folder_meta_full() and not db.custom_folder_items_full():
+    if not db.folder_meta_full() and not db.folders_in_custom_folders():
         return {"folder_meta": dict(_NOTHING), "custom_folders": dict(_NOTHING),
                 "custom_folder_sides": 0}
     folders = index_folders(db)
@@ -115,29 +115,29 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
 
 
 def reconcile_custom_folders(db, folders: Folders | None = None) -> dict:
-    """Re-point custom-folder items whose folder key no longer matches.
+    """Re-point gathered folders whose folder key no longer matches.
 
     A custom folder gathers folders by key, so it drifts exactly the way a star
     does — and a grouping the user built by hand is worth no less than a star.
 
     Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
     """
-    items = db.custom_folder_items_full()
-    if not items:
+    gathered = db.folders_in_custom_folders()
+    if not gathered:
         return dict(_NOTHING)
     folders = index_folders(db) if folders is None else folders
 
-    def refresh(item, identity):
+    def refresh(held, identity):
         level, ref = identity
-        db.stamp_custom_folder_item(item["folder_id"], item["folder_key"],
-                                      level=level, ref_prompt_id=ref)
+        db.stamp_folder_in_custom_folder(held["folder_id"], held["folder_key"],
+                                         level=level, ref_prompt_id=ref)
 
-    def repoint(item, target, identity):
+    def repoint(held, target, identity):
         level, ref = identity
-        db.repoint_custom_folder_item(item["folder_id"], item["folder_key"],
-                                        target, level=level, ref_prompt_id=ref)
+        db.repoint_folder_in_custom_folder(held["folder_id"], held["folder_key"],
+                                           target, level=level, ref_prompt_id=ref)
 
-    summary = _reconcile_keys(items, folders, refresh, repoint)
+    summary = _reconcile_keys(gathered, folders, refresh, repoint)
     logger.info("Reconciled custom folders: %(refreshed)d refreshed, "
                 "%(repointed)d re-pointed, %(orphaned)d orphaned", summary)
     return summary
@@ -162,7 +162,7 @@ def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
     *refresh* takes ``(row, identity)`` and *repoint* ``(row, target, identity)``,
     where an identity is the ``(level, prompt_id)`` of a folder that is
     there today. Everything else — which key is live, which dangles, and where a
-    dangling one belongs — is the same question for a star and for a folder's item.
+    dangling one belongs — is the same question for a star and for a gathered folder.
     """
     summary = dict(_NOTHING)
     for row in rows:

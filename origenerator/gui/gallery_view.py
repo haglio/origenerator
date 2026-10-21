@@ -2164,11 +2164,11 @@ class GalleryView(QWidget):
         if not ok or not name.strip():
             return
         folder_id = self._actions.custom_folders.create(
-            name.strip(), [self._item_identity(f) for f in folders], self.side_in_view()
+            name.strip(), [self._folder_identity(f) for f in folders], self.side_in_view()
         )
         self._open_custom_folder(folder_id)
 
-    def _item_identity(self, group) -> tuple:
+    def _folder_identity(self, group) -> tuple:
         """A gathered folder as ``(key, level, ref_prompt_id)`` — its key plus the
         identity the reconcile re-derives it from when a key formula moves."""
         rows = gallery.rows_under(group)
@@ -2200,7 +2200,7 @@ class GalleryView(QWidget):
         if folder_id is None:
             return
         self._actions.custom_folders.add_to(
-            folder_id, [self._item_identity(g) for g in groups]
+            folder_id, [self._folder_identity(g) for g in groups]
         )
         self._open_custom_folder(folder_id)
 
@@ -2229,12 +2229,13 @@ class GalleryView(QWidget):
         self.refresh()
         self._re_aim()
 
-    def _remove_from_custom_folder(self, group, item_key: str):
+    def _remove_from_custom_folder(self, group, folder_key: str):
         """Drop one gathered folder out of the custom folder on screen."""
-        item = self.group_for_key(item_key)
-        identity = self._item_identity(item) if item is not None else (item_key, None, None)
+        gathered = self.group_for_key(folder_key)
+        identity = (self._folder_identity(gathered) if gathered is not None
+                    else (folder_key, None, None))
         self._actions.custom_folders.remove_from(
-            group.folder_id, item_key, level=identity[1], ref_prompt_id=identity[2]
+            group.folder_id, folder_key, level=identity[1], ref_prompt_id=identity[2]
         )
         self.refresh()
         self._re_aim()
@@ -4061,7 +4062,7 @@ class GalleryView(QWidget):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
         favorite_action = menu.addAction("Unfavorite" if group.favorite else "Favorite")
-        # Inside a folder the user made, an item tile can also be dropped from it.
+        # Inside a folder the user made, a folder tile can also be taken out of it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
         # it isn't in any grouping from there.
         open_custom = self.current_group()

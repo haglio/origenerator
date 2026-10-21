@@ -7,11 +7,11 @@ result. It holds *references* to folders, never copies of them, so a gathered
 folder keeps its place in the hierarchy and gaining or losing generations
 updates every custom folder that gathers it.
 
-A saved folder is stored as a name plus an item list (see
+A saved folder is stored as a name plus a list of folder keys (see
 :meth:`origenerator.db.Database.list_custom_folders`); :func:`build_custom_folders`
-resolves those item keys against the freshly built tree into a
+resolves those keys against the freshly built tree into a
 :class:`~origenerator.gallery.groups.CustomGroup`, which answers the same walkers
-every other folder does. An item whose folder isn't in the tree right now — its
+every other folder does. A folder that isn't in the tree right now — its
 generations deleted, or its key drifted before the reconcile catches up — is
 simply skipped rather than dropped from the saved list, so a folder that comes
 back rejoins the grouping it was in.
@@ -65,20 +65,18 @@ def build_custom_folders(tree: list, records) -> list[CustomGroup]:
     """Resolve saved custom folders against ``tree``.
 
     ``records`` are the rows :meth:`Database.list_custom_folders` returns —
-    ``{"id", "name", "side", "items"}`` with ``items`` a list of folder keys in the
-    order they were added. Items that don't resolve are skipped (see the module
-    docstring); an empty folder still appears, since a folder you have made and
-    named but not yet filled is exactly where you are about to drop something.
+    ``{"id", "name", "side", "folders"}`` with ``folders`` a list of folder keys in
+    the order they were added. Folders that don't resolve are skipped (see the
+    module docstring); an empty folder still appears, since a folder you have made
+    and named but not yet filled is exactly where you are about to drop something.
     """
     index = index_folders(tree)
-    folders = []
-    for record in records:
-        items = [index[key] for key in record["items"] if key in index]
-        folders.append(CustomGroup(
-            custom_folder_key(record["id"]), record["name"], items,
-            folder_id=record["id"],
-        ))
-    return folders
+    return [
+        CustomGroup(custom_folder_key(record["id"]), record["name"],
+                    [index[key] for key in record["folders"] if key in index],
+                    folder_id=record["id"])
+        for record in records
+    ]
 
 
 def selection_group(groups: list) -> CustomGroup:

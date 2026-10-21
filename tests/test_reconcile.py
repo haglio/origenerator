@@ -370,13 +370,13 @@ def test_reconcile_with_no_bookmarks_is_a_noop(tmp_path):
 
 # --- reconciling what a custom folder holds ----------------------------------
 
-def _folder_holding(db, *items):
+def _folder_holding(db, *folders):
     folder_id = db.create_custom_folder("Favorites")
-    db.add_custom_folder_items(folder_id, list(items))
+    db.add_folders_to_custom_folder(folder_id, list(folders))
     return folder_id
 
 
-def test_reconcile_repoints_an_item_orphaned_by_a_formula_change(tmp_path):
+def test_reconcile_repoints_a_gathered_folder_orphaned_by_a_formula_change(tmp_path):
     # A folder the user gathered by hand drifts exactly the way a star does.
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
@@ -388,12 +388,12 @@ def test_reconcile_repoints_an_item_orphaned_by_a_formula_change(tmp_path):
     summary = reconcile_custom_folders(db)
 
     (record,) = db.list_custom_folders()
-    assert record["items"] == [current_key]  # the grouping followed the folder
+    assert record["folders"] == [current_key]  # the grouping followed the folder
     assert record["id"] == folder_id
     assert summary["repointed"] == 1
 
 
-def test_reconcile_backfills_identity_onto_a_live_item(tmp_path):
+def test_reconcile_backfills_identity_onto_a_live_gathered_folder(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
@@ -401,12 +401,12 @@ def test_reconcile_backfills_identity_onto_a_live_item(tmp_path):
 
     summary = reconcile_custom_folders(db)
 
-    (item,) = db.custom_folder_items_full()
-    assert (item["level"], item["ref_prompt_id"]) == ("settings", "p1")
+    (held,) = db.folders_in_custom_folders()
+    assert (held["level"], held["ref_prompt_id"]) == ("settings", "p1")
     assert summary["refreshed"] == 1
 
 
-def test_reconcile_remaps_an_item_through_its_stored_identity(tmp_path, monkeypatch):
+def test_reconcile_remaps_a_gathered_folder_through_its_stored_identity(tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
@@ -422,11 +422,11 @@ def test_reconcile_remaps_an_item_through_its_stored_identity(tmp_path, monkeypa
 
     summary = reconcile_custom_folders(db)
 
-    assert db.list_custom_folders()[0]["items"] == [new_key]
+    assert db.list_custom_folders()[0]["folders"] == [new_key]
     assert summary["repointed"] == 1
 
 
-def test_reconcile_keeps_an_item_whose_folder_is_simply_gone(tmp_path):
+def test_reconcile_keeps_a_gathered_folder_that_is_simply_gone(tmp_path):
     # Its generations may come back (an undone delete), and a grouping the user
     # built by hand is never silently thinned.
     db = Database(tmp_path / "t.db")
@@ -437,7 +437,7 @@ def test_reconcile_keeps_an_item_whose_folder_is_simply_gone(tmp_path):
 
     summary = reconcile_custom_folders(db)
 
-    assert db.list_custom_folders()[0]["items"] == [dead]
+    assert db.list_custom_folders()[0]["folders"] == [dead]
     assert summary["orphaned"] == 1
 
 
@@ -485,7 +485,7 @@ def test_a_folder_that_has_a_side_keeps_it_whatever_it_gathers(tmp_path):
     db = Database(tmp_path / "t.db")
     tall = _shaped(db, "t1", 100, 200)
     folder_id = db.create_custom_folder("Mine", side=LANDSCAPE)
-    db.add_custom_folder_items(folder_id, [(gallery.settings_folder_key(tall), None, None)])
+    db.add_folders_to_custom_folder(folder_id, [(gallery.settings_folder_key(tall), None, None)])
 
     reconcile_bookmarks(db)
 
@@ -504,7 +504,7 @@ def _a_library_with_both_kinds_of_bookmark(tmp_path):
     legacy_key = gallery.legacy_settings_folder_key(row)
     db.set_folder_favorite(legacy_key, True)
     folder_id = db.create_custom_folder("Scene One")
-    db.add_custom_folder_items(folder_id, [(legacy_key, None, None)])
+    db.add_folders_to_custom_folder(folder_id, [(legacy_key, None, None)])
     return db, row, legacy_key
 
 

@@ -237,7 +237,7 @@ class FakeDB:
         self._rows = list(rows)
         self._by_id = {r["prompt_id"]: r for r in rows}
         self._meta = {}
-        self._custom = {}       # folder id -> {"name", "items": {key: (level, ref)}}
+        self._custom = {}       # folder id -> {"name", "folders": {key: (level, ref)}}
         self._next_custom = 1
         self._deletions = {}    # prompt_id -> the held-deletion record, newest last
         self._requests = {}     # prompt_id -> its spoken-request record, newest last
@@ -365,27 +365,27 @@ class FakeDB:
         if folder_id is None:
             folder_id = self._next_custom
         self._next_custom = max(self._next_custom, folder_id) + 1
-        self._custom[folder_id] = {"name": name, "side": side, "items": {}}
+        self._custom[folder_id] = {"name": name, "side": side, "folders": {}}
         return folder_id
 
     def delete_custom_folder(self, folder_id):
         self._custom.pop(folder_id, None)
 
-    def add_custom_folder_items(self, folder_id, items):
-        for folder_key, level, ref in items:
-            self._custom[folder_id]["items"][folder_key] = (level, ref)
+    def add_folders_to_custom_folder(self, folder_id, folders):
+        for folder_key, level, ref in folders:
+            self._custom[folder_id]["folders"][folder_key] = (level, ref)
 
-    def remove_custom_folder_item(self, folder_id, folder_key):
-        self._custom[folder_id]["items"].pop(folder_key, None)
+    def remove_folder_from_custom_folder(self, folder_id, folder_key):
+        self._custom[folder_id]["folders"].pop(folder_key, None)
 
     def list_custom_folders(self):
-        return [{"id": fid, "name": f["name"], "side": f["side"], "items": list(f["items"])}
+        return [{"id": fid, "name": f["name"], "side": f["side"], "folders": list(f["folders"])}
                 for fid, f in sorted(self._custom.items())]
 
-    def custom_folder_items_full(self):
+    def folders_in_custom_folders(self):
         return [{"folder_id": fid, "folder_key": key, "level": level, "ref_prompt_id": ref}
                 for fid, f in self._custom.items()
-                for key, (level, ref) in f["items"].items()]
+                for key, (level, ref) in f["folders"].items()]
 
     def add(self, row):  # test helper: simulate a new generation landing
         self._rows.insert(0, row)
@@ -14186,7 +14186,7 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
 
     (record,) = view._db.list_custom_folders()
     assert record["name"] == "Favorites"
-    assert record["items"] == [cat, dog]
+    assert record["folders"] == [cat, dog]
     # ...and the view has landed on it, showing what it gathered.
     assert _top_level(view._tree)["Favorites"] is view._tree.currentItem()
     assert view._browser._visible_keys == [cat, dog]
@@ -14205,7 +14205,7 @@ def test_declining_the_name_prompt_makes_no_folder(qtbot, monkeypatch):
 
 def _make_folder(view, name, keys):
     folder_id = view._db.create_custom_folder(name)
-    view._db.add_custom_folder_items(
+    view._db.add_folders_to_custom_folder(
         folder_id, [(key, "settings", None) for key in keys]
     )
     view.refresh()
@@ -14256,7 +14256,7 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
     view._on_folders_dropped(gallery.custom_folder_key(folder_id), [dog])
 
     (record,) = view._db.list_custom_folders()
-    assert record["items"] == [cat, dog]
+    assert record["folders"] == [cat, dog]
     assert view._browser._visible_keys == [cat, dog]  # landed on it
 
 
@@ -14299,15 +14299,15 @@ def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):
 
 
 def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
-    # Without (level, ref) an item cannot be re-derived when a key formula
-    # moves, and the grouping silently loses the folder.
+    # Without (level, ref) a gathered folder cannot be re-derived when a key
+    # formula moves, and the grouping silently loses it.
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [])
 
     view._on_folders_dropped(gallery.custom_folder_key(folder_id), [cat])
 
-    (item,) = view._db.custom_folder_items_full()
-    assert (item["level"], item["ref_prompt_id"]) == ("settings", "i1")
+    (held,) = view._db.folders_in_custom_folders()
+    assert (held["level"], held["ref_prompt_id"]) == ("settings", "i1")
 
 
 def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
@@ -14318,7 +14318,7 @@ def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
     view._remove_from_custom_folder(group, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["items"] == [cat]
+    assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # the folder itself survives
 
 
@@ -14500,7 +14500,7 @@ def test_a_folders_menu_lists_the_folders_of_your_own_it_could_join(qtbot, monke
     _tree_menu(view, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["items"] == [cat, dog]
+    assert record["folders"] == [cat, dog]
 
 
 def test_a_folders_menu_offers_only_the_folders_of_your_own_on_its_side(qtbot, monkeypatch):
@@ -14549,7 +14549,7 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     _square_menu(view, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["id"] == folder_id and record["items"] == [cat]
+    assert record["id"] == folder_id and record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
 
 
@@ -14602,7 +14602,7 @@ def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
     _tree_menu(view)  # no row under the cursor
 
     (record,) = view._db.list_custom_folders()
-    assert record["name"] == "Keepers" and record["items"] == []
+    assert record["name"] == "Keepers" and record["folders"] == []
     assert _top_level(view._tree)["Keepers"] is view._tree.currentItem()
 
 
@@ -14650,7 +14650,7 @@ def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkey
     _tree_menu(view, cat)
 
     (record,) = view._db.list_custom_folders()
-    assert record["items"] == [cat, dog]  # both, not the one under the cursor
+    assert record["folders"] == [cat, dog]  # both, not the one under the cursor
 
 
 def test_copying_the_names_of_picked_folders_puts_them_one_to_a_line(qtbot, monkeypatch):

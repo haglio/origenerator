@@ -36,7 +36,7 @@ class InFlightItem:
     key: str                     # stable id: the job's prompt id
     caption: str                 # what a surface labels the job (workflow › prompt)
     reading: RunReading          # how the run itself is going
-    reveal: Callable[[], None]   # show the job's gallery folder and its live tile
+    reveal: Callable[[], None]   # go to its folder and live tile, or to the image it enhances
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"

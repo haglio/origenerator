@@ -13,7 +13,9 @@ do while this sat inside it.
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
+from functools import partial
 
 from origenerator import gallery, timing
 from origenerator.generation_state import GenerationStatus
@@ -23,6 +25,8 @@ from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
+logger = logging.getLogger(__name__)
+
 # The kinds whose start frame is what the run is *of*, rather than one input
 # among several: a video animating a picture, and an enhancement of one.
 SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
@@ -31,12 +35,13 @@ SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
 class InFlightItems:
     """The queue's cards, built from the tables and the controller under them.
 
-    ``on_cancel`` and ``on_reveal`` are what a card's buttons do -- the pane
-    passes its own signals -- so nothing here needs to be a widget.
+    ``on_cancel``, ``on_reveal`` and ``on_go_to_item`` are what a card's buttons
+    do -- the pane passes its own signals -- so nothing here needs to be a widget.
     """
 
     def __init__(self, *, db, jobs, auto, tree, image_rows: Callable[[], list],
-                 on_cancel: Callable[[str], None], on_reveal: Callable[[str], None]):
+                 on_cancel: Callable[[str], None], on_reveal: Callable[[str], None],
+                 on_go_to_item: Callable[[str], None]):
         self._db = db
         self._jobs = jobs
         self._auto = auto
@@ -44,6 +49,7 @@ class InFlightItems:
         self._image_rows = image_rows
         self._on_cancel = on_cancel
         self._on_reveal = on_reveal
+        self._on_go_to_item = on_go_to_item
 
     def build(self, rows=None, requests=None) -> list[InFlightItem]:
         """Every queued/running generation as a card model, in the order the queue
@@ -100,8 +106,8 @@ class InFlightItems:
                 stage = job.last_stage                   # and what it is doing
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 started = job.started_at  # None until ComfyUI actually starts it
-                cancel = lambda p=pid: self._on_cancel(p)
-                stop_auto = lambda k=folder_key: self._auto.stop(k)
+                cancel = partial(self._on_cancel, pid)
+                stop_auto = partial(self._auto.stop, folder_key)
                 state = job.state
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
@@ -115,6 +121,10 @@ class InFlightItems:
             recipe = (None if row.get("recipe_category")
                       else row_by_id.get(row.get("recipe_video_id")))
             workflow = WORKFLOW_REGISTRY.get(workflow_name)
+            if kind == gallery.JobKind.ENHANCE:
+                reveal = partial(self._go_to_the_image_of, row)
+            else:
+                reveal = partial(self._on_reveal, folder_key)
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(workflow_name, params),
@@ -127,7 +137,7 @@ class InFlightItems:
                     started_at=started,
                     typical_seconds=self._typical_seconds(workflow_name, typical),
                 ),
-                reveal=lambda k=folder_key: self._on_reveal(k),
+                reveal=reveal,
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 cancel=cancel,
                 # Its folder auto-looping makes that button "Next seed": the press
@@ -170,6 +180,14 @@ class InFlightItems:
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    not it.reading.rendering))
         return items
+
+    def _go_to_the_image_of(self, enhancement: dict) -> None:
+        image = gallery.enhance_target_id(enhancement, self._image_rows())
+        if image is None:
+            logger.info("Nothing to go to for %s: the image it enhances is gone",
+                        enhancement.get("prompt_id"))
+            return
+        self._on_go_to_item(image)
 
     @staticmethod
     def _source_picture(requested_of, row_by_id: dict, params: dict,

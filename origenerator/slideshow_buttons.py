@@ -117,9 +117,11 @@ def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = 
     return (_mode_row(), band) if mode_row else (band,)
 
 
+_NEWER, _OLDER = -1, 1
+
 # What each press asks of a slideshow, by the name its verb carries after the side:
-# the band's buttons, the map's own chrome and the session's own keys, all in
-# the Funestras' spelling.
+# the band's buttons, the map's own chrome, the session's own keys and a window's
+# shifted arrows, all in the Funestras' spelling.
 _PRESSES: dict[str, Callable[[Any], object]] = {
     "prev": lambda host: host.slideshow_step(-1),
     "next": lambda host: host.slideshow_step(1),
@@ -147,8 +149,8 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "nav_down": lambda host: host.slideshow_nav("down"),
     "cycle_seed": lambda host: host.slideshow_nav("right"),
     "cycle_action": lambda host: host.slideshow_nav("down"),
-    "cycle_version": lambda host: host.slideshow_step_version(1),
-    "cycle_version_back": lambda host: host.slideshow_step_version(-1),
+    "cycle_version": lambda host: host.slideshow_step_version(_NEWER),
+    "cycle_version_back": lambda host: host.slideshow_step_version(_OLDER),
 }
 # The map's thumbnails, whose presses carry the item they were made on.
 _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
@@ -168,11 +170,11 @@ def answer(host, action: str, argument: str = "") -> bool:
     carries after the side ("next", "fmode", "play_video"), and say whether the
     slideshow had an answer.
 
-    One table for every way a press reaches a slideshow — its own window's panel,
-    a session routing a Funestra's panel back here, and the session's own keys
-    — so a button means the same thing whichever of them drew it.  ``False``
-    for minimize, which is a window's rather than a slideshow's, and for the
-    Funestras' chrome about acts, which a slideshow has no counterpart for.
+    One table for every way a press reaches a slideshow — its own window's panel
+    and shifted arrows, a session routing a Funestra's panel back here, and the
+    session's own keys — so a button means the same thing whichever of them drew
+    it.  ``False`` for minimize, which is a window's rather than a slideshow's, and
+    for the Funestras' chrome about acts, which a slideshow has no counterpart for.
     """
     if action in _PRESSES:
         _PRESSES[action](host)

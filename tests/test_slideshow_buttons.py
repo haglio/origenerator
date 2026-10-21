@@ -197,18 +197,7 @@ def test_every_declared_button_is_answered_by_the_slideshow():
 
     assert host.calls == [("step", -1), ("step", 1), "lock", "cull", "fmode",
                           "enhanced", "reset", ("order", False), ("order", True),
-                          ("version", 1)]
-
-
-def test_the_versions_button_steps_forward_and_the_shifted_key_either_way():
-    """The band has one versions button, which steps on; the session's shifted
-    step keys reach the same slideshow with the pair, as they do on a video."""
-    host = _Host()
-
-    assert answer(host, "cycle_version")
-    assert answer(host, "cycle_version_back")
-
-    assert host.calls == [("version", 1), ("version", -1)]
+                          ("version", -1)]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_locks_it():

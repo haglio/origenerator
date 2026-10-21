@@ -348,6 +348,42 @@ def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
     assert started == []
 
 
+def _folder_of_your_own(tree):
+    """A row that holds a folder and collects as well, as a custom folder's does."""
+    own = _folder_row("Mine", "__custom__/1")
+    own.setData(0, DROP_KEY_ROLE, "__custom__/1")
+    tree.addTopLevelItem(own)
+    return own
+
+
+def test_a_folder_of_your_own_starts_no_drag_at_all(qtbot, monkeypatch):
+    # Nothing gathers a row that gathers, so a drag of one could only look taken.
+    tree, _collection, _a, _b = _collecting_tree(qtbot)
+    own = _folder_of_your_own(tree)
+    started = _started_drags(monkeypatch)
+    tree.setCurrentItem(own)
+
+    tree.startDrag(Qt.DropAction.CopyAction)
+
+    assert started == []
+
+
+def test_a_picked_folder_of_your_own_is_left_out_of_a_drag(qtbot, monkeypatch):
+    tree, collection, a, _b = _collecting_tree(qtbot)
+    own = _folder_of_your_own(tree)
+    started = _started_drags(monkeypatch)
+    dropped = []
+    tree.dropped.connect(lambda _key, keys, _items: dropped.append(keys))
+    tree.setCurrentItem(a)
+    own.setSelected(True)
+
+    tree.startDrag(Qt.DropAction.CopyAction)
+    (drag,) = started
+    _drop_at(tree, collection, drag.mime)
+
+    assert dropped == [[oriented_key("k/a", LANDSCAPE)]]
+
+
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
     tree, collection, a, b = _collecting_tree(qtbot)
     dropped = []

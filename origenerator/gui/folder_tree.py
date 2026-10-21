@@ -247,18 +247,19 @@ class FolderTree(QTreeWidget):
                 keys.append(item.data(0, TREE_KEY_ROLE))
         return keys
 
+    def _gatherable(self, item) -> bool:
+        return (item is not None and item.data(0, self._role) is not None
+                and not item.data(0, DROP_KEY_ROLE))
+
     def startDrag(self, supported_actions):
         """Drag the picked folders as their keys. Dragging one row that isn't in
         the selection drags that row alone — the file-manager behavior, and what
         keeps a stale multi-selection from being dropped by accident."""
         pressed = self.currentItem()
-        group = pressed.data(0, self._role) if pressed is not None else None
-        if group is None:
+        if not self._gatherable(pressed):
             return
-        pressed_key = pressed.data(0, TREE_KEY_ROLE)
-        keys = self.selected_folder_keys()
-        if pressed_key not in keys:
-            keys = [pressed_key]
+        picked = [item for item in self.selectedItems() if self._gatherable(item)]
+        keys = [item.data(0, TREE_KEY_ROLE) for item in (picked if pressed in picked else [pressed])]
         mime = QMimeData()
         mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
         drag = QDrag(self)

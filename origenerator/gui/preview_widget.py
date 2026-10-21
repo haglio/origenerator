@@ -582,11 +582,8 @@ class PreviewWidget(QWidget):
     def _start_drag(self, prompt_id: str) -> None:
         """Carry the shown generation out under the shared drag type, so a combine
         slot can read its prompt_id — the same payload a gallery thumbnail drags."""
-        self.drag_out.start(
-            generation_mime(prompt_id),
-            self._drag_picture(),  # what is shown trails the cursor
-            prompt_id=prompt_id,
-        )
+        self.drag_out.start(generation_mime(prompt_id),
+                            self._drag_picture())  # what is shown trails the cursor
 
     def _drag_picture(self) -> QPixmap:
         if self.is_showing_video():

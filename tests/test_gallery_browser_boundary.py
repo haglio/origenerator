@@ -241,8 +241,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     is open in it, and asks the TOC what that folder's own row would take,
     through one method. 282 -> 283: a folder of your own can go inside another,
     so which dragged folders a row in the TOC takes is the gallery's to answer
-    too, through one more.)"""
+    too, through one more. And the pane 85 -> 84: every drag the app starts
+    reaches every place it could drop by itself, so the pane's relay of its
+    tiles' drags to Combine went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 283
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 85
+               for x in _class_def(PANE, "BrowserPane").body) == 84

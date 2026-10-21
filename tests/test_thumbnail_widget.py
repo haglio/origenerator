@@ -17,6 +17,7 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
+from tests.heard_drags import HeardDrags
 
 
 def _corners(tile):
@@ -130,12 +131,11 @@ def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
     _RecordingDrag.last = None
     tw = ThumbnailWidget("p1", None, "label")  # "No preview"
     qtbot.addWidget(tw)
-    started = []
-    tw.drag_out.started.connect(started.append)
+    heard = HeardDrags()
 
     _drag_out(qtbot, tw)
 
-    assert started == ["p1"]
+    assert heard.generations() == ["p1"]
     assert _RecordingDrag.last.pixmap is None
 
 

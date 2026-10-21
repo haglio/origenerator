@@ -307,17 +307,6 @@ class CombinePanel(QWidget):
             if not usable and self._category.currentIndex() == index:
                 self._category.setCurrentIndex(0)
 
-    def show_drop_candidates(self, prompt_id: str):
-        """Light whichever slot accepts a now-dragging item, so its target is
-        obvious the instant the drag begins — before the cursor gets there."""
-        self.image_slot.set_candidate(self.image_slot.accepts(prompt_id))
-        self.video_slot.set_candidate(self.video_slot.accepts(prompt_id))
-
-    def clear_drop_candidates(self):
-        """Drop the drag-target highlight from both slots (the drag ended)."""
-        self.image_slot.set_candidate(False)
-        self.video_slot.set_candidate(False)
-
     # --- mutual exclusion: an act and a dropped video never coexist -------
 
     def _on_category_changed(self):

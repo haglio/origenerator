@@ -39,6 +39,7 @@ from PyQt6.QtGui import (
     QDropEvent,
     QKeyEvent,
     QMovie,
+    QPixmap,
 )
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
@@ -104,6 +105,7 @@ from origenerator.gui import generating_tile as generating_tile_module
 from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
+from origenerator.gui.drags import under_way
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
@@ -13054,20 +13056,33 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
     }
 
 
-def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
+def _lit_while_dragging(monkeypatch, drag_out, mime, slots) -> dict:
+    """Carry ``mime`` out through ``drag_out`` and say which of ``slots`` were lit
+    while it was under way, before it reached any of them."""
+    lit = {}
+
+    def drag_loop(_drag, _action):
+        lit.update({name: slot._label.property("dragActive") for name, slot in slots.items()})
+
+    monkeypatch.setattr(QDrag, "exec", drag_loop)
+    drag_out.start(mime, QPixmap())
+    return lit
+
+
+def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     tw = ThumbnailWidget("vid", None, "v")  # a video tile, wired like a real one
     qtbot.addWidget(tw)
-    view._browser._wire_drag(tw)
+    panel = view._combine.panel
+    mime = generation_mime("vid")
 
-    tw.drag_out.started.emit("vid")  # the drag begins — before reaching any slot
-    assert view._combine.panel.video_slot._label.property("dragActive") is True
-    assert view._combine.panel.image_slot._label.property("dragActive") is False
+    lit = _lit_while_dragging(monkeypatch, tw.drag_out, mime,
+                              {"video": panel.video_slot, "image": panel.image_slot})
 
-    tw.drag_out.ended.emit()
-    assert view._combine.panel.video_slot._label.property("dragActive") is False
+    assert lit == {"video": True, "image": False}
+    assert panel.video_slot._label.property("dragActive") is False  # put out at the end
 
 
 def test_a_video_dragged_from_a_picture_the_gallery_holds_lights_the_image_slot_too(
@@ -13078,11 +13093,13 @@ def test_a_video_dragged_from_a_picture_the_gallery_holds_lights_the_image_slot_
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
+    mime = generation_mime("vid")
 
-    view._combine.drag_started("vid")
+    under_way.started.emit(mime, None)
 
     assert view._combine.panel.image_slot._label.property("dragActive") is True
     assert view._combine.panel.video_slot._label.property("dragActive") is True
+    under_way.ended.emit()
 
 
 def test_combines_generate_grays_while_the_pair_dropped_in_it_is_being_made(qtbot, tmp_path):
@@ -13097,19 +13114,20 @@ def test_combines_generate_grays_while_the_pair_dropped_in_it_is_being_made(qtbo
     assert not panel._generate_btn.isEnabled()
 
 
-def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
+def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, monkeypatch):
     # The front generate tab's preview drags onto combine like a browser thumbnail.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
+    preview = view._info_tabs.current_config_panel()._preview
+    combine = view._combine.panel
+    mime = generation_mime("vid")
 
-    panel.preview_drag_started.emit("vid")  # the drag begins — before reaching a slot
-    assert view._combine.panel.video_slot._label.property("dragActive") is True
-    assert view._combine.panel.image_slot._label.property("dragActive") is False
+    lit = _lit_while_dragging(monkeypatch, preview.drag_out, mime,
+                              {"video": combine.video_slot, "image": combine.image_slot})
 
-    panel.preview_drag_ended.emit()
-    assert view._combine.panel.video_slot._label.property("dragActive") is False
+    assert lit == {"video": True, "image": False}
+    assert combine.video_slot._label.property("dragActive") is False
 
 
 def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(

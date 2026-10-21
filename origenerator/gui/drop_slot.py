@@ -20,6 +20,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import dragged_generation
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
@@ -121,6 +122,8 @@ class DropSlot(DropZone):
         # A corner chip naming this slot's kind, shown only once something's dropped.
         self._badge = MediaBadge(kind, self)
         self._render()
+        under_way.started.connect(self._light_for)
+        under_way.ended.connect(self._put_out_for_the_drag)
 
     # --- state ------------------------------------------------------------
 
@@ -185,6 +188,12 @@ class DropSlot(DropZone):
 
     def accepts(self, prompt_id: str) -> bool:
         return self.lent_by(prompt_id) is not None
+
+    def _light_for(self, mime, _source):
+        self.set_candidate(bool(self._landing(mime)))
+
+    def _put_out_for_the_drag(self):
+        self.set_candidate(False)
 
     def set_candidate(self, active: bool):
         """Light the slot as a valid target for the in-progress drag (or clear it).

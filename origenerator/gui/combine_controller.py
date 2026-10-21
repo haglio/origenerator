@@ -249,15 +249,6 @@ class CombineController(QObject):
                                        if video and self._accepts_video(video)})
         self.panel.set_category(saved.get("category") or "")
 
-    def drag_started(self, prompt_id: str) -> None:
-        """A generation began dragging — from a browser thumbnail or a generate tab's
-        preview: light the combine slot it fits, so the drop target is obvious from
-        the very start of the gesture."""
-        self.panel.show_drop_candidates(prompt_id)
-
-    def drag_ended(self) -> None:
-        self.panel.clear_drop_candidates()
-
     def rebuildable_videos(self, rows: list[dict]) -> list[dict]:
         """The completed, rebuildable i2v videos among ``rows`` — the pool an act's
         recipe is mined from (each carries the prompt it was made from, which names

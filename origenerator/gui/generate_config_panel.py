@@ -177,8 +177,6 @@ class GenerateConfigPanel(QWidget):
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     how_many_chosen = pyqtSignal(int)
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
-    preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
-    preview_drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
     levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
 
@@ -320,10 +318,6 @@ class GenerateConfigPanel(QWidget):
         outside), the browsed generation's output when one is loaded, and the
         newest matching result otherwise."""
         self._preview = PreviewWidget(show_timeline=True)
-        # Dragging the shown generation out of the preview onto a combine slot, like a
-        # gallery thumbnail: relay the drag start/end so the view can light the slots.
-        self._preview.drag_out.started.connect(self.preview_drag_started)
-        self._preview.drag_out.ended.connect(self.preview_drag_ended)
         # Its corners and its right-click go to the gallery, which owns the
         # bookmark, the bin and the enhance queue — the same route the browser
         # pane's thumbnails take, so an act means the same thing either side.

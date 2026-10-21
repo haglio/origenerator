@@ -327,8 +327,6 @@ class BrowserPane(QObject):
     experiment_verdict = pyqtSignal(str, str)      # a review tile's keep/reject
     trash_action_triggered = pyqtSignal(str, str)  # a deleted tile's restore/purge
     cancel_requested = pyqtSignal(str)      # an in-flight row's ✕: drop that run
-    drag_started = pyqtSignal(str)          # a tile began dragging (combine slots)
-    drag_ended = pyqtSignal()
     selection_changed = pyqtSignal()        # the multi-selection moved or cleared
     pane_reset = pyqtSignal()  # the outgoing pane's state is being dropped
 
@@ -809,7 +807,6 @@ class BrowserPane(QObject):
             tw.control_triggered.connect(self._on_tile_control)
             if corner_actions:
                 tw.corner_action_triggered.connect(self.experiment_verdict)
-            self._wire_drag(tw)
 
         return self._draw_tile(
             flow, row, _REVIEW_TILE if corner_actions else _COLLECTION_TILE, wire,
@@ -1220,7 +1217,6 @@ class BrowserPane(QObject):
             tw.control_triggered.connect(self._on_tile_control)
             if i2v:
                 tw.corner_action_triggered.connect(self.seed_reroll_requested)
-            self._wire_drag(tw)
 
         def draw(row):
             self._draw_tile(
@@ -1298,11 +1294,6 @@ class BrowserPane(QObject):
     @staticmethod
     def _preview_paths(group) -> list[str]:
         return _thumbnails_of(gallery.rows_under(group))
-
-    def _wire_drag(self, tw: ThumbnailWidget):
-        """Light the combine slot a tile fits while it's being dragged out."""
-        tw.drag_out.started.connect(self.drag_started)
-        tw.drag_out.ended.connect(self.drag_ended)
 
     def _drill_into(self, key: str):
         """Open a folder tile's folder — the view answers by selecting its tree

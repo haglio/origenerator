@@ -387,11 +387,7 @@ class ThumbnailWidget(QWidget):
             return
         # The tile's picture trails the cursor — the frame a video tile's looping
         # WebP is on, as much as a still image's pixmap.
-        self.drag_out.start(
-            generation_mime(self.prompt_id),
-            label_thumbnail(self._image_label),
-            prompt_id=self.prompt_id,
-        )
+        self.drag_out.start(generation_mime(self.prompt_id), label_thumbnail(self._image_label))
 
     def mouseDoubleClickEvent(self, event):
         # A left double-click is an "open" gesture; the first click's press has

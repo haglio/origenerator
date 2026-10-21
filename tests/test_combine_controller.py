@@ -54,8 +54,6 @@ class FakePanel:
         self.dropped = {}
         self.available = None
         self.visible = None
-        self.lit_for = []
-        self.cleared = 0
         self.folder_generating = None
         self.combine_requested = _Signal()
         self.animation_settings_requested = _Signal()
@@ -88,12 +86,6 @@ class FakePanel:
 
     def setVisible(self, visible):
         self.visible = visible
-
-    def show_drop_candidates(self, prompt_id):
-        self.lit_for.append(prompt_id)
-
-    def clear_drop_candidates(self):
-        self.cleared += 1
 
     def note_folder_generating(self, generating):
         self.folder_generating = generating
@@ -848,16 +840,6 @@ def test_switching_lanes_re_asks_which_acts_are_answerable(combine, monkeypatch)
     controller.panel.intent_changed.emit(recipe_match.GENAU)
 
     assert seen == [recipe_match.GENAU]
-
-
-def test_a_drag_lights_the_slot_it_fits(combine):
-    controller, _host = combine()
-
-    controller.drag_started("img")
-    controller.drag_ended()
-
-    assert controller.panel.lit_for == ["img"]
-    assert controller.panel.cleared == 1
 
 
 def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine, monkeypatch):

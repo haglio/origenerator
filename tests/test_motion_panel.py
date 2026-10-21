@@ -221,6 +221,36 @@ def test_the_osr2_line_carries_the_max_intensity_the_motion_is_held_to(qtbot):
     assert console_hud(motion).console.max_intensity == 35
 
 
+def test_the_readout_carries_the_max_intensity_the_motion_is_held_to(qtbot):
+    motion = FakeMotion()
+    motion.set_max_intensity(40)
+
+    assert drive_hud(motion.state, True).max_intensity == 40
+
+
+def test_the_readout_under_a_funscript_carries_the_max_intensity_too(qtbot):
+    script = FakeScript()
+    control = FakeControl(script=script)
+    panel, motion = _panel(qtbot, control=control)
+    motion.set_max_intensity(40)
+
+    drive = console_hud(motion, control=control.state(), script=script).drive
+
+    assert (drive.driven, drive.max_intensity) == ("funscript", 40)
+
+
+def test_the_speed_plus_dims_where_the_max_intensity_stops_the_speed(qtbot):
+    panel, motion = _panel(qtbot)
+    motion.active = True
+    motion.set_max_intensity(40)
+    motion_engine.set_speed(motion.state.state, motion_engine.MAX_SPEED)
+    panel.render_console()
+
+    plus, minus = (next(b for _r, b in panel._painter.buttons if b.command == command)
+                   for command in ("robot_hand_speed_up", "robot_hand_speed_down"))
+    assert plus.dim and not minus.dim
+
+
 def test_the_max_intensity_slider_asks_the_apps_one_switch_for_the_level(qtbot):
     control = FakeControl()
     panel, motion = _panel(qtbot, control=control)

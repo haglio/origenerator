@@ -2234,9 +2234,7 @@ class GalleryView(QWidget):
         gathered = self.group_for_key(folder_key)
         identity = (self._folder_identity(gathered) if gathered is not None
                     else (folder_key, None, None))
-        self._actions.custom_folders.remove_from(
-            group.folder_id, folder_key, level=identity[1], ref_prompt_id=identity[2]
-        )
+        self._actions.custom_folders.remove_from(group.folder_id, folders=[identity])
         self.refresh()
         self._re_aim()
 

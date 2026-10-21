@@ -35,6 +35,7 @@ def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> N
                                   custom_name=bookmark.get("custom_name"),
                                   favorite=bool(bookmark.get("starred")),
                                   level=bookmark.get("level"), ref_prompt_id=stays)
+    db.repoint_item_in_custom_folders(gone, stays)
     for held in db.folders_in_custom_folders():
         if held.get("ref_prompt_id") == gone:
             db.stamp_folder_in_custom_folder(held["folder_id"], held["folder_key"],

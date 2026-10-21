@@ -247,6 +247,15 @@ class Database:
     def add_folders_to_custom_folder(self, folder_id: int, folders: list[tuple]):
         return self.custom_folders.add_folders_to_custom_folder(folder_id, folders)
 
+    def add_items_to_custom_folder(self, folder_id: int, prompt_ids: list[str]):
+        return self.custom_folders.add_items_to_custom_folder(folder_id, prompt_ids)
+
+    def remove_items_from_custom_folder(self, folder_id: int, prompt_ids: list[str]):
+        return self.custom_folders.remove_items_from_custom_folder(folder_id, prompt_ids)
+
+    def repoint_item_in_custom_folders(self, old_prompt_id: str, new_prompt_id: str):
+        return self.custom_folders.repoint_item_in_custom_folders(old_prompt_id, new_prompt_id)
+
     def remove_folder_from_custom_folder(self, folder_id: int, folder_key: str):
         return self.custom_folders.remove_folder_from_custom_folder(folder_id, folder_key)
 

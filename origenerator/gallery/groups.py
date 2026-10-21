@@ -14,7 +14,7 @@ other folder (see :mod:`origenerator.gallery.custom`).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import ClassVar
 
 _HIERARCHY_LEVELS = ("workflow", "model", "lora", "source_image")
@@ -103,18 +103,18 @@ class AllGroup:
 
 @dataclass
 class CustomGroup:
-    """A folder the user composed: the folders they gathered into it, in the
-    order they were added.
+    """A folder the user composed: the folders they gathered into it and the
+    items they put in it on their own, each in the order they were added.
 
-    Unlike every tier above, its items can sit at any depth and in any branch —
-    it is a grouping, not a projection — so it holds resolved child *groups*
-    rather than rows, and nothing nests beneath it in the tree. ``folder_id`` is
-    the saved custom folder it renders (``None`` for the throwaway one a live
-    multi-selection makes)."""
+    Unlike every tier above, what it gathers can sit at any depth and in any
+    branch — it is a grouping, not a projection — so nothing nests beneath it in
+    the tree. ``folder_id`` is the saved custom folder it renders (``None`` for
+    the throwaway one a live multi-selection makes)."""
 
     key: str
     label: str
     children: list
+    rows: list = field(default_factory=list)
     folder_id: int | None = None
     favorite: bool = False
     level: ClassVar[str] = "custom"
@@ -151,7 +151,7 @@ def rows_under(group) -> list[dict]:
     if not isinstance(group, CustomGroup):
         return rows  # the hierarchy proper never nests a folder under two parents
     seen, unique = set(), []
-    for row in rows:
+    for row in [*group.rows, *rows]:
         if row["prompt_id"] not in seen:
             seen.add(row["prompt_id"])
             unique.append(row)

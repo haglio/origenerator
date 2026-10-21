@@ -139,6 +139,38 @@ def test_a_starred_folder_keyed_from_the_folded_record_keeps_its_star(tmp_path):
     assert bookmark["ref_prompt_id"] == "first"
 
 
+def test_a_folder_of_your_own_holding_the_folded_record_holds_the_picture_still(tmp_path):
+    output_dir = tmp_path / "output"
+    _picture(output_dir, "sdxl_t2i_00008_.png")
+    db = Database(tmp_path / "test.db")
+    _row(db, "first", filename="sdxl_t2i_00008_.png")
+    _row(db, "repeat", filename="sdxl_t2i_00008_.png")
+    _row(db, "other", filename="sdxl_t2i_00009_.png")
+    _picture(output_dir, "sdxl_t2i_00009_.png")
+    folder_id = db.create_custom_folder("Mine")
+    db.add_items_to_custom_folder(folder_id, ["repeat", "other"])
+
+    repair_records(db, output_dir)
+
+    (record,) = db.list_custom_folders()
+    assert record["items"] == ["first", "other"]
+
+
+def test_a_folder_of_your_own_holding_both_records_of_one_picture_holds_it_once(tmp_path):
+    output_dir = tmp_path / "output"
+    _picture(output_dir, "sdxl_t2i_00010_.png")
+    db = Database(tmp_path / "test.db")
+    _row(db, "first", filename="sdxl_t2i_00010_.png")
+    _row(db, "repeat", filename="sdxl_t2i_00010_.png")
+    folder_id = db.create_custom_folder("Mine")
+    db.add_items_to_custom_folder(folder_id, ["first", "repeat"])
+
+    repair_records(db, output_dir)
+
+    (record,) = db.list_custom_folders()
+    assert record["items"] == ["first"]
+
+
 def test_a_combine_made_from_the_folded_record_names_the_record_that_stays(tmp_path):
     output_dir = tmp_path / "output"
     _picture(output_dir, "sdxl_t2i_00008_.png")

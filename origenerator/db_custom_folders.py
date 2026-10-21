@@ -1,9 +1,9 @@
 """The folders the user composes by hand, and what each one gathers.
 
-Two of the six tables `Database` used to hold all of, and they are one concern:
-`custom_folders` is the name, `custom_folder_items` the folders it gathers (see
-origenerator.gallery.custom). A custom folder holds references, not copies -- the
-gathered folders and their generations outlive it.
+`custom_folders` is the name, `custom_folder_items` the folders it gathers and
+`custom_folder_generations` the items it holds on their own (see
+origenerator.gallery.custom). A custom folder holds references, not copies -- what
+it gathers outlives it.
 
 A gathered folder is stored by tree key, so it drifts when a key formula moves
 exactly as a `folder_meta` bookmark does, and carries the same identity columns for
@@ -39,8 +39,8 @@ class CustomFolderStore(Store):
         """Drop a custom folder and everything it holds. The gathered folders and
         their generations are untouched — it holds references, not copies."""
         with self._connect() as conn:
-            conn.execute("DELETE FROM custom_folder_items WHERE folder_id = ?",
-                         (folder_id,))
+            for table in ("custom_folder_items", "custom_folder_generations"):
+                conn.execute(f"DELETE FROM {table} WHERE folder_id = ?", (folder_id,))
             conn.execute("DELETE FROM custom_folders WHERE id = ?", (folder_id,))
 
     def add_folders_to_custom_folder(self, folder_id: int, folders: list[tuple]):
@@ -68,6 +68,35 @@ class CustomFolderStore(Store):
                 )
                 position += 1
 
+    def add_items_to_custom_folder(self, folder_id: int, prompt_ids: list[str]):
+        with self._connect() as conn:
+            (last,) = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) FROM custom_folder_generations "
+                "WHERE folder_id = ?", (folder_id,)
+            ).fetchone()
+            for position, prompt_id in enumerate(prompt_ids, start=int(last) + 1):
+                conn.execute(
+                    "INSERT OR IGNORE INTO custom_folder_generations "
+                    "(folder_id, prompt_id, position) "
+                    "VALUES (?, ?, ?)", (folder_id, prompt_id, position),
+                )
+
+    def remove_items_from_custom_folder(self, folder_id: int, prompt_ids: list[str]):
+        with self._connect() as conn:
+            conn.executemany(
+                "DELETE FROM custom_folder_generations WHERE folder_id = ? AND prompt_id = ?",
+                [(folder_id, prompt_id) for prompt_id in prompt_ids],
+            )
+
+    def repoint_item_in_custom_folders(self, old_prompt_id: str, new_prompt_id: str):
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE OR IGNORE custom_folder_generations SET prompt_id = ? "
+                "WHERE prompt_id = ?", (new_prompt_id, old_prompt_id),
+            )
+            conn.execute("DELETE FROM custom_folder_generations WHERE prompt_id = ?",
+                         (old_prompt_id,))
+
     def remove_folder_from_custom_folder(self, folder_id: int, folder_key: str):
         with self._connect() as conn:
             conn.execute(
@@ -80,7 +109,8 @@ class CustomFolderStore(Store):
         oldest first, each folder list in the order it was built up."""
         with self._connect() as conn:
             folders = [
-                {"id": r["id"], "name": r["name"], "side": r["side"], "folders": []}
+                {"id": r["id"], "name": r["name"], "side": r["side"], "folders": [],
+                 "items": []}
                 for r in conn.execute(
                     "SELECT id, name, side FROM custom_folders ORDER BY id"
                 )
@@ -93,6 +123,13 @@ class CustomFolderStore(Store):
                 folder = by_id.get(r["folder_id"])
                 if folder is not None:
                     folder["folders"].append(r["folder_key"])
+            for r in conn.execute(
+                "SELECT folder_id, prompt_id FROM custom_folder_generations "
+                "ORDER BY folder_id, position, rowid"
+            ):
+                folder = by_id.get(r["folder_id"])
+                if folder is not None:
+                    folder["items"].append(r["prompt_id"])
             return folders
 
     def folders_in_custom_folders(self) -> list[dict]:

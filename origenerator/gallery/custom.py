@@ -22,7 +22,7 @@ recoverable from the key alone.
 """
 from __future__ import annotations
 
-from origenerator.gallery.groups import CustomGroup, child_groups
+from origenerator.gallery.groups import CustomGroup, child_groups, rows_under
 
 CUSTOM_PREFIX = "__custom__/"
 # The throwaway folder a live multi-selection stands up: never saved, so it needs
@@ -70,10 +70,12 @@ def build_custom_folders(tree: list, records) -> list[CustomGroup]:
     module docstring); an empty folder still appears, since a folder you have made
     and named but not yet filled is exactly where you are about to drop something.
     """
-    index = index_folders(tree)
+    folders = index_folders(tree)
+    items = {row["prompt_id"]: row for group in tree for row in rows_under(group)}
     return [
         CustomGroup(custom_folder_key(record["id"]), record["name"],
-                    [index[key] for key in record["folders"] if key in index],
+                    [folders[key] for key in record["folders"] if key in folders],
+                    [items[prompt_id] for prompt_id in record["items"] if prompt_id in items],
                     folder_id=record["id"])
         for record in records
     ]

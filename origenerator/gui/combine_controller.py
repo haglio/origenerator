@@ -53,6 +53,7 @@ from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.prompts import VIDEO_SCENE_MATCH_SYSTEM_PROMPT
+from origenerator.video_history import video_history
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -138,7 +139,9 @@ class CombineController(QObject):
         # Combine: drop an image + an i2v video, Generate re-runs that video's
         # recipe on the image. Needs a client to generate, so it hides without one.
         self.panel = CombinePanel(
-            self._picture_lent_by, self._recipe_lent_by, self._slot_preview)
+            self._picture_lent_by, self._recipe_lent_by, self._slot_preview,
+            self._video_history)
+        self.panel.video_used.connect(self._db.record_combine_video_use)
         # Both Generate paths go through a wrapper that puts a stand-in row in the
         # line first: the work between the press and a real job is seconds long,
         # and a button that seems to do nothing reads as an app that has died.
@@ -208,11 +211,14 @@ class CombineController(QObject):
             return (None, None)
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
+    def _video_history(self, intent: str) -> list[str]:
+        return video_history(self._db.custom_combinations(), intent,
+                             self._db.list_combine_video_uses())
+
     def selection(self) -> dict:
         return {
             "image": self.panel.image_slot.current_id(),
             "videos": self.panel.dropped_videos(),
-            "recent_videos": self.panel.recent_videos(),
             "intent": self.panel.selected_intent(),
             "category": self.panel.selected_category(),
         }
@@ -241,18 +247,7 @@ class CombineController(QObject):
             videos = {self.panel.selected_intent(): saved.get("video")}
         self.panel.set_dropped_videos({lane: video for lane, video in videos.items()
                                        if video and self._accepts_video(video)})
-        recent = saved.get("recent_videos")
-        if not isinstance(recent, dict):
-            recent = {}
-        newest_first = {lane: [videos.get(lane), *recent.get(lane, ())]
-                        for lane in {*videos, *recent}}
-        fitting = {lane: self._fitting_videos(held) for lane, held in newest_first.items()}
-        self.panel.set_recent_videos({lane: held for lane, held in fitting.items() if held})
         self.panel.set_category(saved.get("category") or "")
-
-    def _fitting_videos(self, videos) -> list[str]:
-        return [video for video in dict.fromkeys(videos)
-                if video and self._accepts_video(video)]
 
     def drag_started(self, prompt_id: str) -> None:
         """A generation began dragging — from a browser thumbnail or a generate tab's
@@ -454,10 +449,11 @@ class CombineController(QObject):
         if built is None:
             return
         workflow, params, video_row, image_row = built
-        self._open_prepared(workflow, params, image_row, video_row, category, video_id)
+        self._open_prepared(workflow, params, image_row, video_row, category, video_id,
+                            intent)
 
     def _open_prepared(self, workflow, params, image_row, video_row,
-                       category: str, video_id: str | None) -> None:
+                       category: str, video_id: str | None, intent: str) -> None:
         """Hand a built combination to a generate tab: its settings on the form, its
         two halves in the preview, and the mark saying where they came from,
         which the links under the form show.
@@ -470,7 +466,7 @@ class CombineController(QObject):
         panel = self._info_tabs_of().open_config(workflow.name, params)
         if panel is None:
             return
-        panel.set_recipe_source(category, video_id)
+        panel.set_recipe_source(category, video_id, intent)
         panel.show_combination(Combination(
             self._still_path(image_row),
             self._host.animated_preview(video_row) if video_row is not None else None,
@@ -507,6 +503,8 @@ class CombineController(QObject):
         if prompt_id:
             self._db.set_recipe_source(prompt_id, category=category,
                                        video_prompt_id=video_id)
+            if not category:
+                self._db.record_combine_video_use(intent, video_id, prompt_id)
             self._mark_for_sending(prompt_id, send)
             self._host.reveal_launch(key)
 
@@ -723,7 +721,8 @@ class CombineController(QObject):
             workflow, params = built
             image_row = self._db.get_generation(image_id)
             if image_row is not None:
-                self._open_prepared(workflow, params, image_row, None, category, None)
+                self._open_prepared(workflow, params, image_row, None, category, None,
+                                    intent)
             return
         self._resolve_category(
             image_id, category, intent,

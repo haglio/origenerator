@@ -127,6 +127,7 @@ from tests import gestures
 from tests.lit_switches import lit_in
 from tests.slideshow_hud_support import engine_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
+from tests.test_combine_panel import _listed_under_recent
 from tests.test_folder_tree import _shown
 from tests.test_osr2_driver import ACTIONS, FakeBroker, FakePlayer
 
@@ -240,6 +241,7 @@ class FakeDB:
         self._deletions = {}    # prompt_id -> the held-deletion record, newest last
         self._requests = {}     # prompt_id -> its spoken-request record, newest last
         self._seed_uses = []    # newest first
+        self._combine_video_uses = []  # newest first
         self._item_numbers = {}
 
     def list_generations(self):
@@ -253,6 +255,21 @@ class FakeDB:
 
     def list_seed_uses(self):
         return list(self._seed_uses)
+
+    def record_combine_video_use(self, intent, video_prompt_id, generation_prompt_id=None):
+        self._combine_video_uses.insert(0, {
+            "intent": intent, "video_prompt_id": video_prompt_id,
+            "generation_prompt_id": generation_prompt_id,
+            "created_at": f"9999-{len(self._combine_video_uses):08d}"})
+
+    def list_combine_video_uses(self):
+        return list(self._combine_video_uses)
+
+    def custom_combinations(self):
+        return [{"prompt_id": row["prompt_id"], "recipe_video_id": row["recipe_video_id"],
+                 "created_at": row.get("created_at") or ""}
+                for row in self._rows
+                if row.get("recipe_video_id") and not row.get("recipe_category")]
 
     def list_item_numbers(self):
         return dict(self._item_numbers)
@@ -11156,6 +11173,22 @@ def test_a_dropped_recipe_names_the_video_it_came_from(qtbot, tmp_path):
     assert row["recipe_category"] is None  # a dropped video is no dropdown choice
 
 
+def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, tmp_path):
+    # Nothing noted which lane those were for, so both lanes list them.
+    db = _combine_db(tmp_path)
+    db.insert_generation(prompt_id="made", workflow_name="wan22_i2v",
+                         workflow_version=_WAN_I2V.version, params_json="{}", workflow_json="{}")
+    db.set_recipe_source("made", video_prompt_id="vid")
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._combine.panel
+
+    assert _listed_under_recent(panel) == ["vid"]
+    panel.set_intent(recipe_match.GENAU)
+    assert _listed_under_recent(panel) == ["vid"]
+
+
 def test_a_picked_act_is_recorded_with_the_recipe_it_resolved_to(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -11190,7 +11223,7 @@ def test_open_in_generator_marks_the_tab_with_where_the_recipe_came_from(qtbot, 
 
     view._combine._open_combination("img", "vid", "dancing")
 
-    assert _front_panel(view).recipe_source() == ("dancing", "vid")
+    assert _front_panel(view).recipe_source() == ("dancing", "vid", recipe_match.VIDEO)
 
 
 def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_path, monkeypatch):
@@ -11211,6 +11244,20 @@ def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_
     assert row["recipe_video_id"] == "vid"
 
 
+def test_a_generate_from_an_opened_dropped_video_notes_the_lane_it_was_opened_under(
+        qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._combine._open_combination("img", "vid", intent=recipe_match.GENAU)
+
+    _front_panel(view)._on_generate()
+
+    noted = [(use["intent"], use["video_prompt_id"], use["generation_prompt_id"])
+             for use in view._db.list_combine_video_uses()]
+    assert noted == [(recipe_match.GENAU, "vid", _launched_row(view)["prompt_id"])]
+
+
 def test_a_tab_pointed_at_another_generation_drops_the_recipe_mark(qtbot, tmp_path):
     # The tab is about that row now; a launch from it is not the combination's.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
@@ -11221,7 +11268,7 @@ def test_a_tab_pointed_at_another_generation_drops_the_recipe_mark(qtbot, tmp_pa
 
     panel.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
 
-    assert panel.recipe_source() == ("", None)
+    assert panel.recipe_source() == ("", None, "")
 
 
 def test_a_tab_switched_to_another_workflow_drops_the_recipe_mark(qtbot, tmp_path):
@@ -11235,7 +11282,7 @@ def test_a_tab_switched_to_another_workflow_drops_the_recipe_mark(qtbot, tmp_pat
 
     panel.prefill("sdxl_t2i", _SDXL.default_params())
 
-    assert panel.recipe_source() == ("", None)
+    assert panel.recipe_source() == ("", None, "")
 
 
 def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_path):
@@ -12514,7 +12561,6 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": "img", "videos": {recipe_match.VIDEO: "vid"},
-        "recent_videos": {recipe_match.VIDEO: ["vid"]},
         "intent": recipe_match.VIDEO, "category": "",
     }
 
@@ -12528,7 +12574,7 @@ def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
     _pick_act(view._combine.panel, "beta")
 
     assert view.combine_selection() == {
-        "image": "img", "videos": {}, "recent_videos": {},
+        "image": "img", "videos": {},
         "intent": recipe_match.GENAU, "category": "beta",
     }
 
@@ -12621,7 +12667,7 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
     view.restore_combine_selection(["only-one"])  # malformed
 
     assert view.combine_selection() == {
-        "image": None, "videos": {}, "recent_videos": {},
+        "image": None, "videos": {},
         "intent": recipe_match.VIDEO, "category": "",
     }
 

@@ -42,16 +42,16 @@ class FakePanel:
             self.item = prompt_id
             self.changed.emit()
 
-    def __init__(self, image_lent_by, video_lent_by, preview):
+    def __init__(self, image_lent_by, video_lent_by, preview, history):
         self.image_lent_by = image_lent_by
         self.video_lent_by = video_lent_by
         self.preview = preview
+        self.history = history
         self.image_slot = self._Slot()
         self.video_slot = self._Slot()
         self.intent = recipe_match.VIDEO
         self.category = ""
         self.dropped = {}
-        self.recent = {}
         self.available = None
         self.visible = None
         self.lit_for = []
@@ -61,6 +61,7 @@ class FakePanel:
         self.animation_settings_requested = _Signal()
         self.intent_changed = _Signal()
         self.item_activated = _Signal()
+        self.video_used = _Signal()
 
     def selected_intent(self):
         return self.intent
@@ -81,12 +82,6 @@ class FakePanel:
         self.dropped = dict(videos)
         if not self.category:
             self.video_slot.set_item(self.dropped.get(self.intent))
-
-    def recent_videos(self):
-        return {lane: list(videos) for lane, videos in self.recent.items()}
-
-    def set_recent_videos(self, videos):
-        self.recent = {lane: list(held) for lane, held in videos.items()}
 
     def set_available_categories(self, categories):
         self.available = list(categories)
@@ -156,6 +151,8 @@ class FakeDB:
         self.recipe_sources = []
         self.requested = []
         self.exported = []
+        self.uses = []
+        self.combinations = []
 
     def get_generation(self, prompt_id):
         return self.rows.get(prompt_id)
@@ -165,6 +162,17 @@ class FakeDB:
 
     def set_recipe_source(self, prompt_id, *, category="", video_prompt_id=None):
         self.recipe_sources.append((prompt_id, category, video_prompt_id))
+
+    def record_combine_video_use(self, intent, video_prompt_id, generation_prompt_id=None):
+        self.uses.append((intent, video_prompt_id, generation_prompt_id))
+
+    def list_combine_video_uses(self):
+        return [{"intent": intent, "video_prompt_id": video,
+                 "generation_prompt_id": generation, "created_at": f"2026-10-02 00:00:{n:02}"}
+                for n, (intent, video, generation) in reversed(list(enumerate(self.uses)))]
+
+    def custom_combinations(self):
+        return list(self.combinations)
 
     def mark_genau_requested(self, prompt_id):
         self.requested.append(prompt_id)
@@ -197,8 +205,8 @@ class FakeConfigPanel:
         self.source = None
         self.combination = None
 
-    def set_recipe_source(self, category, video_id):
-        self.source = (category, video_id)
+    def set_recipe_source(self, category, video_id, intent):
+        self.source = (category, video_id, intent)
 
     def show_combination(self, combination):
         self.combination = combination
@@ -397,13 +405,11 @@ def test_the_session_keeps_the_picture_each_lanes_videos_the_lane_and_the_act(co
     controller, _host = combine()
     controller.panel.image_slot.set_item("img")
     controller.panel.set_dropped_videos({recipe_match.VIDEO: "clip"})
-    controller.panel.set_recent_videos({recipe_match.VIDEO: ["clip", "older"]})
     controller.panel.set_intent(recipe_match.GENAU)
     controller.panel.set_category("waving")
 
     assert controller.selection() == {
         "image": "img", "videos": {recipe_match.VIDEO: "clip"},
-        "recent_videos": {recipe_match.VIDEO: ["clip", "older"]},
         "intent": recipe_match.GENAU, "category": "waving"}
 
 
@@ -418,15 +424,25 @@ def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combin
     assert controller.panel.video_slot.item == "loop"
 
 
-def test_a_restore_hands_each_lane_back_its_recent_videos_that_still_fit(combine):
-    controller, _host = combine(db=FakeDB([_video("clip"), _video("older"), _video("loop")]))
+def test_a_video_put_in_the_slot_is_kept_in_the_library_under_its_lane(combine):
+    db = FakeDB()
+    controller, _host = combine(db=db)
 
-    controller.restore({"videos": {recipe_match.VIDEO: "clip"},
-                        "recent_videos": {recipe_match.VIDEO: ["clip", "gone", "older"],
-                                          recipe_match.GENAU: ["loop"]}})
+    controller.panel.video_used.emit(recipe_match.GENAU, "clip")
 
-    assert controller.panel.recent == {recipe_match.VIDEO: ["clip", "older"],
-                                       recipe_match.GENAU: ["loop"]}
+    assert db.uses == [(recipe_match.GENAU, "clip", None)]
+
+
+def test_recent_lists_each_lanes_videos_out_of_the_library(combine):
+    db = FakeDB()
+    db.combinations = [{"prompt_id": "made", "recipe_video_id": "older",
+                        "created_at": "2026-10-01 00:00:00"}]
+    controller, _host = combine(db=db)
+
+    controller.panel.video_used.emit(recipe_match.VIDEO, "clip")
+
+    assert controller.panel.history(recipe_match.VIDEO) == ["clip", "older"]
+    assert controller.panel.history(recipe_match.GENAU) == ["older"]
 
 
 def test_a_restore_puts_the_lane_in_before_the_act(combine):
@@ -513,6 +529,19 @@ def test_a_dropped_pair_runs_the_videos_recipe_on_the_picture(combine, monkeypat
 
     assert [name for _key, name, _params in jobs.prepared] == [VIDEO_WORKFLOW]
     assert host.revealed == ["folder-of-clip"]
+
+
+def test_a_dropped_pair_notes_the_lane_its_video_was_used_under(combine, monkeypatch):
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
+    db = FakeDB([_image("img"), _video("clip")])
+    controller, _host = combine(db=db)
+
+    controller._generate_combination("img", "clip", intent=recipe_match.GENAU)
+    controller._generate_combination("img", "clip", category="waving")
+
+    assert db.uses == [(recipe_match.GENAU, "clip", "new-run")]
 
 
 def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
@@ -634,7 +663,7 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
     controller._open_combination("img", "clip", "waving")
 
     assert tabs.opened == [(VIDEO_WORKFLOW, {"seed": 7})]
-    assert panel.source == ("waving", "clip")
+    assert panel.source == ("waving", "clip", recipe_match.VIDEO)
     assert panel.combination == Combination("img-thumb.png", "clip.webp")
 
 

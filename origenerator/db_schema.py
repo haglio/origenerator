@@ -210,6 +210,18 @@ CREATE TABLE IF NOT EXISTS seed_uses (
     thumbnail_path TEXT,
     created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+-- A video put in Combine's (custom) slot by hand, under the lane showing then,
+-- and a generation launched from one, by that generation's prompt_id. One made
+-- from the slot that no row here names was launched before anything was written
+-- here, so which lane it was for is not known.
+CREATE TABLE IF NOT EXISTS combine_video_uses (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    intent               TEXT    NOT NULL,
+    video_prompt_id      TEXT    NOT NULL,
+    generation_prompt_id TEXT,
+    created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 # Columns added to a table after it first shipped, and how the DDL above

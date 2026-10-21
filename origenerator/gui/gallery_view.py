@@ -1385,11 +1385,13 @@ class GalleryView(QWidget):
             # A tab Combine opened stamps its runs with where the recipe came
             # from, whether they were launched as opened or edited first — that
             # mark is the only thing telling the queue what act a video is of.
-            category, video_id = launching.recipe_source()
+            category, video_id, intent = launching.recipe_source()
             for prompt_id in launched:
                 if category or video_id:
                     self._db.set_recipe_source(prompt_id, category=category,
                                                video_prompt_id=video_id)
+                if video_id and not category:
+                    self._db.record_combine_video_use(intent, video_id, prompt_id)
                 launching.note_launched(prompt_id)
         self._stand_on_the_run_in(key, rebuild=True)
 

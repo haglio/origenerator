@@ -752,6 +752,17 @@ def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_recipe(tmp
     assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "sounded")
 
 
+def test_a_folded_copy_combines_slot_had_is_listed_as_the_video_that_stays(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    db.record_combine_video_use("genau", "copy")
+
+    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
+
+    assert [use["video_prompt_id"] for use in db.list_combine_video_uses()] == ["sounded"]
+
+
 def test_a_starred_folder_keyed_from_a_folded_copy_keeps_its_star(tmp_path):
     db = Database(tmp_path / "test.db")
     _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")

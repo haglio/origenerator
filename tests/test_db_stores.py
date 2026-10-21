@@ -23,6 +23,7 @@ import pytest
 
 import origenerator.db_generations
 from origenerator.db import Database
+from origenerator.db_combine_video_uses import CombineVideoUseStore
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
@@ -42,6 +43,7 @@ STORES = {
     "folder_meta": (FolderMetaStore, lambda s: s.folder_meta_full()),
     "custom_folders": (CustomFolderStore, lambda s: s.list_custom_folders()),
     "seed_uses": (SeedUseStore, lambda s: s.list_seed_uses()),
+    "combine_video_uses": (CombineVideoUseStore, lambda s: s.list_combine_video_uses()),
     "item_numbers": (ItemNumberStore, lambda s: s.list_item_numbers()),
 }
 

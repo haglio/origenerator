@@ -361,3 +361,12 @@ class GenerationStore(Store):
                 " workflow_name, created_at FROM generations ORDER BY id DESC"
             ).fetchall()
             return [dict(r) for r in rows]
+
+    def custom_combinations(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT prompt_id, recipe_video_id, created_at FROM generations"
+                " WHERE recipe_video_id IS NOT NULL AND recipe_category IS NULL"
+                " ORDER BY id DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]

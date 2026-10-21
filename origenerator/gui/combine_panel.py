@@ -99,16 +99,19 @@ class CombinePanel(QWidget):
     animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
     intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the acts
     item_activated = pyqtSignal(str)  # a slot's picture or clip was clicked (prompt_id)
+    video_used = pyqtSignal(str, str)  # (intent, prompt_id) a video put in the slot by hand
 
     def __init__(
         self,
         image_lent_by: Callable[[str], str | None],
         video_lent_by: Callable[[str], str | None],
         preview: Callable[[str], tuple[str | None, str | None]],
+        history: Callable[[str], list[str]],
         parent=None,
     ):
         super().__init__(parent)
         self._preview = preview
+        self._history = history
         self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, "Drop an image")
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
@@ -124,7 +127,6 @@ class CombinePanel(QWidget):
         self.video_slot.activated.connect(self.item_activated)
         self._dropped: dict[str, str] = {}
         self._folder_generating = False
-        self._recent: dict[str, list[str]] = {}
         self._recent_videos = RecentVideos(self._recent_rows)
         self._recent_videos.picked.connect(self.video_slot.set_item)
         _keep_its_room_when_hidden(self._recent_videos)
@@ -335,16 +337,18 @@ class CombinePanel(QWidget):
         video = self.video_slot.current_id()
         if video:
             lane = self.selected_intent()
-            self._dropped[lane] = video
-            self._recent[lane] = [video, *(held for held in self._recent.get(lane, ())
-                                           if held != video)]
+            if video != self._dropped.get(lane):
+                self._dropped[lane] = video
+                self.video_used.emit(lane, video)
             self._category.setCurrentIndex(0)
         self._sync()
 
     def _recent_rows(self) -> list[RecentVideo]:
+        held = self.video_slot.current_id()
+        listed = dict.fromkeys(video for video in (held, *self._history(self.selected_intent()))
+                               if video)
         return [RecentVideo(video, self._preview(video)[0])
-                for video in self._recent.get(self.selected_intent(), ())
-                if self.video_slot.accepts(video)]
+                for video in listed if self.video_slot.accepts(video)]
 
     def _show_dropped(self):
         lane = self.selected_intent()
@@ -366,12 +370,6 @@ class CombinePanel(QWidget):
         self._dropped = dict(videos)
         if not self.selected_category():
             self._show_dropped()
-
-    def recent_videos(self) -> dict[str, list[str]]:
-        return {lane: list(videos) for lane, videos in self._recent.items()}
-
-    def set_recent_videos(self, videos: dict[str, list[str]]):
-        self._recent = {lane: list(held) for lane, held in videos.items()}
 
     def _sync(self):
         image_id = self.image_slot.current_id()

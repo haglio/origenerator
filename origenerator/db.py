@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+from origenerator.db_combine_video_uses import CombineVideoUseStore
 from origenerator.db_connection import SqliteFile
 from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
@@ -48,6 +49,7 @@ class Database:
         self.deletions = DeletionStore(file)
         self.requests = RequestStore(file)
         self.seed_uses = SeedUseStore(file)
+        self.combine_video_uses = CombineVideoUseStore(file)
         self.folder_meta = FolderMetaStore(file)
         self.custom_folders = CustomFolderStore(file)
         self.item_numbers = ItemNumberStore(file)
@@ -137,6 +139,9 @@ class Database:
     def seed_history_rows(self) -> list[dict]:
         return self.generations.seed_history_rows()
 
+    def custom_combinations(self) -> list[dict]:
+        return self.generations.custom_combinations()
+
     def record_seed_use(self, *, kind: str, seed_key: str, seed: int,
                         width: int | None = None, height: int | None = None,
                         thumbnail_path: str | None = None) -> None:
@@ -146,6 +151,19 @@ class Database:
 
     def list_seed_uses(self) -> list[dict]:
         return self.seed_uses.list_seed_uses()
+
+    # --- what Combine's slot was given (see origenerator.db_combine_video_uses) -
+
+    def record_combine_video_use(self, intent: str, video_prompt_id: str,
+                                 generation_prompt_id: str | None = None) -> None:
+        return self.combine_video_uses.record_combine_video_use(
+            intent, video_prompt_id, generation_prompt_id)
+
+    def repoint_combine_video_uses(self, gone: str, stays: str) -> None:
+        return self.combine_video_uses.repoint_combine_video_uses(gone, stays)
+
+    def list_combine_video_uses(self) -> list[dict]:
+        return self.combine_video_uses.list_combine_video_uses()
 
     # --- the recovery bin (see origenerator.db_deletions) --------------------
 

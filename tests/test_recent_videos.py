@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from PIL import Image
-from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt
 from PyQt6.QtGui import QColor, QImage, QMovie
 from PyQt6.QtWidgets import QProxyStyle, QStyle, QStyleOptionViewItem
 
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
-from tests.pictured_rows import painted_row, square
+from tests.pictured_rows import looping_clip, painted_row, square
+from tests.pictured_rows import where_the_picture_is as _where_the_picture_is
 
 
 def _dropdown(qtbot, videos, looping_previews=None):
@@ -120,21 +120,6 @@ def _picture(tmp_path, width, height) -> str:
     return str(path)
 
 
-def _looping_clip(tmp_path) -> str:
-    path = tmp_path / "clip.webp"
-    frames = [Image.new("RGB", (160, 90), color) for color in ((255, 0, 0), (0, 255, 0))]
-    frames[0].save(path, format="WEBP", save_all=True, append_images=frames[1:],
-                   duration=100, loop=0)
-    return str(path)
-
-
-def _where_the_picture_is(row: QImage) -> QRect:
-    inked = [(x, y) for y in range(row.height()) for x in range(row.width())
-             if QColor(row.pixel(x, y)).lightness() > 40]
-    xs, ys = [x for x, _ in inked], [y for _, y in inked]
-    return QRect(QPoint(min(xs), min(ys)), QPoint(max(xs), max(ys)))
-
-
 def test_a_row_draws_its_picture_the_size_the_drop_box_does(qtbot, tmp_path):
     dropdown = _dropdown(qtbot, [RecentVideo("vid1", _picture(tmp_path, 300, 150))])
     dropdown.showPopup()
@@ -169,7 +154,7 @@ def test_a_rows_picture_sits_in_the_middle_of_the_row(qtbot, tmp_path):
 
 
 def test_a_videos_picture_plays_in_its_row(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": _looping_clip(tmp_path)})
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_clip(tmp_path)})
     dropdown.showPopup()
     first = painted_row(dropdown, 0)
     middle = _where_the_picture_is(first).center()
@@ -180,7 +165,7 @@ def test_a_videos_picture_plays_in_its_row(qtbot, tmp_path):
 
 
 def test_closing_the_list_stops_its_videos(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": _looping_clip(tmp_path)})
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_clip(tmp_path)})
     dropdown.showPopup()
     painted_row(dropdown, 0)
 
@@ -202,7 +187,7 @@ class _Redraws(QObject):
 
 
 def test_the_open_list_redraws_a_playing_video_by_itself(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": _looping_clip(tmp_path)})
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_clip(tmp_path)})
     dropdown.showPopup()
     painted_row(dropdown, 0)
     qtbot.wait(300)

@@ -17,7 +17,10 @@ class SeedUse:
     item: str | None = None
 
 
-SeedHistory = Callable[[str], list[SeedUse]]
+@dataclass(frozen=True)
+class SeedHistory:
+    uses: Callable[[str], list[SeedUse]]
+    looping_preview: Callable[[str], str | None]
 
 
 class SeedUseKind(StrEnum):
@@ -48,7 +51,8 @@ def _uses_in_rows(rows, key: str):
         if seed is None:
             continue
         if gallery.produced_output(row):
-            yield row.get("created_at") or "", SeedUse(int(seed), row.get("thumbnail_path"))
+            yield row.get("created_at") or "", SeedUse(int(seed), row.get("thumbnail_path"),
+                                                       item=row.get("prompt_id"))
         elif gallery.is_in_progress(row):
             size = output_size(row.get("workflow_name"),
                                gallery.parse_params(row.get("params_json")))

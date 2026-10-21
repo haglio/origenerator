@@ -44,6 +44,7 @@ from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import scale_to_total_pixels
+from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
 
 
 @pytest.fixture
@@ -555,6 +556,23 @@ def test_a_tabs_seed_dropdown_lists_only_the_seeds_of_the_kind_it_makes(panel):
     assert _seeds_listed(panel, "seed") == ["1"]
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     assert _seeds_listed(panel, "noise_seed") == ["30"]
+
+
+def test_a_video_tabs_seed_dropdown_plays_the_videos_it_lists(panel, qtbot, monkeypatch,
+                                                              tmp_path):
+    _video_row(panel._db, noise_seed=30)
+    clip = looping_clip(tmp_path)
+    monkeypatch.setattr(gcp_module, "animated_preview_path",
+                        lambda row, *_folders: clip if row["prompt_id"] == "vid1" else None)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    field = panel._param_form._widgets["noise_seed"]
+    field.showPopup()
+    first = painted_row(field, 0)
+    middle = where_the_picture_is(first).center()
+
+    qtbot.waitUntil(lambda: painted_row(field, 0).pixel(middle) != first.pixel(middle),
+                    timeout=3000)
+    field.hidePopup()
 
 
 def _seeds_listed(panel, key):

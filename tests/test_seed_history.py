@@ -61,6 +61,13 @@ def test_an_image_tab_lists_images_seeds_and_a_video_tab_videos_seeds():
     assert seed_history(rows, "audio_seed", makes=VIDEOS) == [SeedUse(33, "thumbs/v1.jpg")]
 
 
+def test_each_seed_names_the_item_it_made_so_its_list_can_play_it():
+    made = {**_video("v1", noise_seed=11), "prompt_id": "v1"}
+
+    assert seed_history([made], "noise_seed", makes=VIDEOS) == [
+        SeedUse(11, "thumbs/v1.jpg", item="v1")]
+
+
 def test_an_image_made_by_a_video_model_is_listed_with_the_images():
     still = {**_row("i1", noise_seed=7), "workflow_name": "wan22_t2i"}
 
@@ -127,8 +134,8 @@ def test_the_library_hands_over_every_generation_newest_first(tmp_path):
                              thumbnail_path=f"thumbs/{prompt_id}.jpg")
 
     assert seed_history(db.seed_history_rows(), "seed", makes=IMAGES) == [
-        SeedUse(20, "thumbs/gen-20.jpg"),
-        SeedUse(10, "thumbs/gen-10.jpg"),
+        SeedUse(20, "thumbs/gen-20.jpg", item="gen-20"),
+        SeedUse(10, "thumbs/gen-10.jpg", item="gen-10"),
     ]
 
 

@@ -85,6 +85,11 @@ siblings = ["app_support", "funestra", "shared_ui", "voice_core"]
 # Origenerator (app_support.production_update).
 [tool.haglio.production]
 
+# What a hotfix runs before production takes it (app_support.hotfix), beside the
+# tests its branch changed: every entry point still imports as its launcher starts it.
+[tool.haglio.hotfix]
+checks = ["tests/test_launch_smoke.py"]
+
 # What Origenerator's two launchers start: launch_origenerator.vbs, the file the
 # pinned shortcut runs, and launch_preview_branch.vbs, which runs a worktree's
 # code as a branch session on the primary checkout's venv. Both are rendered

@@ -46,8 +46,8 @@ and whoever owns the jobs re-lines the queue.
 from __future__ import annotations
 
 from PyQt6 import sip
-from PyQt6.QtCore import QMimeData, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPen, QPixmap
+from PyQt6.QtCore import QMimeData, QPoint, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QPainter, QPen, QPixmap, QPolygon
 from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
@@ -515,6 +515,23 @@ class QueueRow(OpensAFolder, QWidget):
                 self.set_dragging(False)
 
 
+class _Rules(QWidget):
+    """Lines drawn over the strip's parts: the app's style sheet grounds the
+    column the rows sit in, so a line painted beneath it would not show."""
+
+    def __init__(self, lines, parent):
+        super().__init__(parent)
+        self._lines = lines
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        for pen, points in self._lines():
+            painter.setPen(pen)
+            painter.drawPolyline(QPolygon(points))
+        painter.end()
+
+
 class GenerationQueue(QWidget):
     """The live preview and its bar on the left, the whole line on the right."""
 
@@ -577,6 +594,7 @@ class GenerationQueue(QWidget):
         self._rows_column.addStretch(1)
         self._scroll.setWidget(self._host)
         layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
+        self._rules = _Rules(self._drawn_rules, self)
 
         self.set_items([])
 
@@ -655,6 +673,24 @@ class GenerationQueue(QWidget):
         # height, stacking the rows on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
 
+    # --- the rules drawn over the strip -------------------------------------
+
+    def _drop_rule(self) -> list[QPoint]:
+        rows = self.rows()
+        if self._drop_at is None or not rows:
+            return []
+        row = rows[min(self._drop_at, len(rows) - 1)]
+        top_left = row.mapTo(self, row.rect().topLeft())
+        y = top_left.y() if self._drop_at < len(rows) else top_left.y() + row.height()
+        return [QPoint(top_left.x(), y), QPoint(top_left.x() + row.width(), y)]
+
+    def _drawn_rules(self):
+        return [(QPen(BLUE, 2), self._drop_rule())]
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._rules.resize(event.size())
+
     # --- moving a job up or down the line -----------------------------------
 
     def move_row(self, source: int, target: int):
@@ -691,7 +727,6 @@ class GenerationQueue(QWidget):
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event):
-        """Track where the dragged row would land, and mark it."""
         if self._carried_key(event) is None:
             return
         self._show_drop_mark(self._drop_index(event.position().toPoint()))
@@ -715,10 +750,9 @@ class GenerationQueue(QWidget):
         event.acceptProposedAction()
 
     def _show_drop_mark(self, index: int | None):
-        """Draw (or clear) the line showing where a drop would insert."""
         if index != self._drop_at:
             self._drop_at = index
-            self.update()
+            self._rules.update()
 
     def _drop_index(self, point) -> int:
         """Which slot a drop at ``point`` (in this widget's coordinates) lands in:
@@ -729,19 +763,3 @@ class GenerationQueue(QWidget):
             if point.y() < middle.y():
                 return max(first_movable(self._items), index)
         return len(self.rows())
-
-    def paintEvent(self, event):
-        """Paint the insertion mark over the line while a row is being dragged."""
-        super().paintEvent(event)
-        if self._drop_at is None:
-            return
-        rows = self.rows()
-        if not rows:
-            return
-        row = rows[min(self._drop_at, len(rows) - 1)]
-        top_left = row.mapTo(self, row.rect().topLeft())
-        y = top_left.y() if self._drop_at < len(rows) else top_left.y() + row.height()
-        painter = QPainter(self)
-        painter.setPen(QPen(QColor(BLUE), 2))
-        painter.drawLine(top_left.x(), y, top_left.x() + row.width(), y)
-        painter.end()

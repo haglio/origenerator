@@ -8153,14 +8153,9 @@ def _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch):
     return view, slideshow
 
 
-def _closed_then_the_slideshow_button(view, slideshow):
-    _press_escape(view)
+def _left_by_enter_then_the_slideshow_button(view, slideshow):
+    _press_enter(slideshow)
     view._bank.slideshow.click()
-
-
-def _closed_then_esc_again(view, slideshow):
-    _press_escape(view)
-    _press_escape(view)
 
 
 def _minimized_then_the_slideshow_button(view, slideshow):
@@ -8170,10 +8165,8 @@ def _minimized_then_the_slideshow_button(view, slideshow):
 
 _LEFT_AND_COME_BACK_TO = pytest.mark.parametrize(
     "come_back",
-    [_closed_then_the_slideshow_button, _closed_then_esc_again,
-     _minimized_then_the_slideshow_button],
-    ids=["closed_then_slideshow_button", "closed_then_esc_again",
-         "minimized_then_slideshow_button"])
+    [_left_by_enter_then_the_slideshow_button, _minimized_then_the_slideshow_button],
+    ids=["left_by_enter_then_slideshow_button", "minimized_then_slideshow_button"])
 
 
 @_LEFT_AND_COME_BACK_TO
@@ -8217,7 +8210,7 @@ def test_the_slideshow_button_on_another_folder_plays_that_folder_not_the_loop_l
     view, slideshow = _looping_actions_on_a_video(
         qtbot, monkeypatch, elsewhere=[_image("q1", "a dog", 50, 3)])
 
-    _press_escape(view)
+    _press_enter(slideshow)
     view._tree.setCurrentItem(view._leaf_by_id["q1"])
     view._bank.slideshow.click()
 
@@ -8233,11 +8226,11 @@ def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on
     # The Slideshow button plays the folder on screen, so leaving on one of the
     # picture's videos has to put that video's own folder on screen, picked --
     # not the folder of the picture the slideshow was started from.
-    view, _slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
+    view, slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
     folder_of_the_video = oriented_key(gallery.settings_folder_key(
         view._db.get_generation("v1"), view.image_config_index()), LANDSCAPE)
 
-    _press_escape(view)
+    _press_enter(slideshow)
 
     assert view.selected_folder_key() == folder_of_the_video
     assert view._browser.selected_ids == {"v1"}

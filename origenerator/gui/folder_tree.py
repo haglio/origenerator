@@ -119,6 +119,7 @@ class FolderTree(QTreeWidget):
         self._star_on = icons.star_icon(filled=True)  # a favorited leaf's filled star
         self._recent = icons.recent_mark_icon()  # a lately-worked-in row's dot
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
+        self._delete_on_picked_rows = True
         self.setItemDelegate(_CountBeforeName(self))
         self.setIconSize(QSize(_ICON, _ICON))  # each row's mark, the size of the star/delete
         # One indentation per level, no wider than the caret that sits in it. The
@@ -155,6 +156,14 @@ class FolderTree(QTreeWidget):
             return None
         return group
 
+    def offer_delete_on_picked_rows(self, offered: bool) -> None:
+        if offered != self._delete_on_picked_rows:
+            self._delete_on_picked_rows = offered
+            self.viewport().update()
+
+    def _offers_delete(self, index) -> bool:
+        return self._delete_on_picked_rows or not self.selectionModel().isSelected(index)
+
     def _set_hover(self, key):
         if key != self._hover_key:
             self._hover_key = key
@@ -190,7 +199,7 @@ class FolderTree(QTreeWidget):
             self._star_on.paint(painter, star_rect, Qt.AlignmentFlag.AlignCenter, mode)
         else:
             self._star.paint(painter, star_rect)
-        if hovered:
+        if hovered and self._offers_delete(index):
             self._delete.paint(painter, delete_rect)
 
     def mousePressEvent(self, event):
@@ -209,7 +218,7 @@ class FolderTree(QTreeWidget):
         group = self._group_with_actions(index)
         if group is not None:
             star_rect, delete_rect = _action_rects(self.visualRect(index))
-            if delete_rect.contains(event.pos()):
+            if delete_rect.contains(event.pos()) and self._offers_delete(index):
                 self.delete_clicked.emit(group.key)
                 return
             if star_rect.contains(event.pos()):

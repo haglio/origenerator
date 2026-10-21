@@ -293,6 +293,10 @@ class SplitFolderTree(QWidget):
     def selected_folder_keys(self) -> list[str]:
         return [key for tree in self._trees.values() for key in tree.selected_folder_keys()]
 
+    def offer_delete_on_picked_rows(self, offered: bool) -> None:
+        for tree in self._trees.values():
+            tree.offer_delete_on_picked_rows(offered)
+
     def selectedItems(self) -> list:
         return [item for tree in self._trees.values() for item in tree.selectedItems()]
 

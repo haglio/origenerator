@@ -215,6 +215,11 @@ def _names_of_the_picked_folders(selection_group) -> list[str]:
     return [group.label for group in gallery.child_groups(selection_group)]
 
 
+def _is_one_of_the_picked(selection_group, group) -> bool:
+    return (selection_group is not None and group is not None
+            and any(m.key == group.key for m in gallery.child_groups(selection_group)))
+
+
 def _is_deletable_folder(group) -> bool:
     """Whether a folder may be deleted: anything nested inside a workflow.
 
@@ -2827,7 +2832,8 @@ class GalleryView(QWidget):
 
     def _re_aim(self) -> None:
         """Re-aim everything that follows what is in front of the user: the whole
-        bank, the Enhance settings beside it, and each tab's "Go to folder".
+        bank, the Enhance settings beside it, each tab's "Go to folder", and the
+        trash cans on picked rows.
 
         One call rather than nine. Which buttons an event moves is not something
         a handler should have to know — that knowledge was what two bugs came out
@@ -2838,6 +2844,8 @@ class GalleryView(QWidget):
         self._bank.apply(self.bank_state(enhance))
         self._enhance.sync_panel(enhance)
         self._info_tabs.reread_folder_buttons()
+        self._tree.offer_delete_on_picked_rows(
+            self._selection_group is None or bool(self._current_deletable_folders()))
 
     def bank_state(self, enhance: Offer) -> BankState:
         """How the bank stands right now, gathered from the seams the buttons
@@ -3998,13 +4006,9 @@ class GalleryView(QWidget):
             return
         # Right-clicking inside a multi-selection offers what to do with the whole
         # set; right-clicking outside it is about the one row under the cursor.
-        if self._selection_group is not None:
-            group = item.data(0, _GROUP_ROLE)
-            if group is not None and any(
-                m.key == group.key for m in gallery.child_groups(self._selection_group)
-            ):
-                self._selection_context_menu(global_pos)
-                return
+        if _is_one_of_the_picked(self._selection_group, item.data(0, _GROUP_ROLE)):
+            self._selection_context_menu(global_pos)
+            return
         if item.data(0, _GROUP_ROLE) is not None:
             # The row under the cursor, not the folder it draws: the same folder
             # on the other side is a different row with its own menu.
@@ -4116,9 +4120,11 @@ class GalleryView(QWidget):
             self._browser.mark_folder_favorite(key, favorite)
 
     def _delete_folder_by_key(self, key: str):
-        """Delete the folder a hover-row trash click names."""
+        """Delete what a row's trash can names: its folder, or every picked folder."""
         group = self.group_for_key(key)
-        if group is not None:
+        if _is_one_of_the_picked(self._selection_group, group):
+            self._delete_folders(self._current_deletable_folders())
+        elif group is not None:
             self._delete_folders([group])
 
     # --- the selected generation drives a config tab -----------------------

@@ -20,9 +20,15 @@ def double_click(widget: QWidget, at: QPoint) -> None:
     QTest.mouseDClick(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
 
 
-def click(widget: QWidget, at: QPoint) -> None:
+def click(widget: QWidget, at: QPoint,
+          modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier) -> None:
     window, point = _where_the_mouse_lands(widget, at)
-    QTest.mouseClick(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+    QTest.mouseClick(window, Qt.MouseButton.LeftButton, modifiers, point)
+
+
+def move(widget: QWidget, at: QPoint) -> None:
+    window, point = _where_the_mouse_lands(widget, at)
+    QTest.mouseMove(window, point)
 
 
 def press_key(widget: QWidget, key: Qt.Key,

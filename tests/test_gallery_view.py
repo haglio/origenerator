@@ -14700,6 +14700,81 @@ def test_deleting_the_picked_folders_asks_first_then_takes_them_all(qtbot, monke
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
 
 
+def _pick_by_clicks(view, first, *others):
+    """Pick folder rows as a mouse does: a click on the first, a Ctrl-click on
+    each of the others."""
+    _tall_on_screen(view)
+    for key, modifiers in ((first, Qt.KeyboardModifier.NoModifier),
+                           *((key, Qt.KeyboardModifier.ControlModifier) for key in others)):
+        row = view._tree_item_for(key)
+        tree = row.treeWidget()
+        tree.scrollToItem(row)
+        gestures.click(tree.viewport(), tree.visualItemRect(row).center(), modifiers)
+
+
+def test_the_trash_can_takes_every_folder_picked_by_clicks_after_a_right_click(
+        qtbot, monkeypatch):
+    actions = FakeActions()
+    view, cat, dog = _two_leaf_view(qtbot, actions=actions)
+    _pick_by_clicks(view, cat, dog)
+    asked = []
+    view._confirm = lambda text: asked.append(text) or False
+    _answer_menu(monkeypatch, "Delete 2 folders…")
+    _tree_menu(view, dog)
+
+    tip = view._bank.delete.toolTip()
+    view._bank.delete.click()
+
+    assert (tip, asked) == ("Delete 2 folders", ["Delete 2 folders and their 2 items?"] * 2)
+
+
+def test_the_trash_can_on_a_picked_row_deletes_every_picked_folder(qtbot):
+    actions = FakeActions()
+    view, cat, dog = _two_leaf_view(qtbot, actions=actions)
+    _pick_by_clicks(view, cat, dog)
+    asked = []
+    view._confirm = lambda text: asked.append(text) or True
+
+    _click_beside_the_mark_of(qtbot, view, dog, which=1)
+
+    assert asked == ["Delete 2 folders and their 2 items?"]
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
+
+
+def test_the_trash_can_on_a_row_outside_the_picked_folders_deletes_only_its_own(qtbot):
+    actions = FakeActions()
+    view, cat, dog = _two_leaf_view(qtbot, actions=actions,
+                                    extra=[_image("i3", "a fish", 50, 1)])
+    fish = _key(_at(_image_workflow(view._tree), 0, 0, 2))
+    _pick_by_clicks(view, cat, dog)
+    view._confirm = lambda text: True
+
+    _click_beside_the_mark_of(qtbot, view, fish, which=1)
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i3"}
+
+
+def _trash_can_drawn_on(view, key) -> bool:
+    row = view._tree_item_for(key)
+    tree = row.treeWidget()
+    trash = _action_rects(tree.visualItemRect(row))[1]
+    gestures.move(tree.viewport(), trash.center())
+    image = tree.viewport().grab(trash).toImage()
+    return any((color := image.pixelColor(x, y)).red() > color.green() + 50
+               and color.red() > color.blue() + 50
+               for x in range(image.width()) for y in range(image.height()))
+
+
+def test_a_picked_row_drops_its_trash_can_once_a_folder_that_cannot_go_is_picked(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick_by_clicks(view, cat, dog)
+    assert _trash_can_drawn_on(view, cat)
+
+    _pick_by_clicks(view, cat, dog, _key(_image_workflow(view._tree)))
+
+    assert not _trash_can_drawn_on(view, cat)
+
+
 def test_picked_folders_offer_no_delete_when_one_of_them_cannot_be_deleted(
         qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)

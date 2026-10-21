@@ -78,6 +78,7 @@ from origenerator.workflows.detail_parts import (
     detector_folder,
     detector_for_part,
     fix_prompts_of,
+    part_named,
     part_table,
 )
 from origenerator.workflows.model_arch import SD15, SDXL
@@ -448,7 +449,7 @@ class EnhancePanel(QWidget):
         prompts_button = fill_square_with_mark(QToolButton(), size=BUTTON_SIZE_HUD)
         prompts_button.setText("✎")
         prompts_button.setToolTip(param_help("enhance_fix_prompts"))
-        prompts_button.clicked.connect(lambda _on=False, part=part: self._edit_fix_prompts(part))
+        prompts_button.clicked.connect(lambda _on=False, name=part.name: self.open_fix_prompts(name))
         if detector_for_part(part) is None:
             reason = _NO_DETECTOR_TOOLTIP.format(part.name, part.matches[0],
                                                  detector_folder(part))
@@ -473,8 +474,9 @@ class EnhancePanel(QWidget):
         self._show_fix_on(part.name)
         return column
 
-    def _edit_fix_prompts(self, part) -> None:
-        open_already = self._fix_prompt_windows.get(part.name)
+    def open_fix_prompts(self, name: str) -> None:
+        part = part_named(name)
+        open_already = self._fix_prompt_windows.get(name)
         if open_already is not None:
             open_already.raise_()
             open_already.activateWindow()
@@ -504,7 +506,7 @@ class EnhancePanel(QWidget):
             window.show_training(text)
 
     def use_fix_lora(self, name: str, lora: str) -> None:
-        part = next(part for part in part_table() if part.name == name)
+        part = part_named(name)
         self._keep_fix_prompts(name, dict(fix_prompts_of(part, self._fix_prompts.get(name)),
                                           lora=lora))
         window = self._fix_prompt_windows.get(name)

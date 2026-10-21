@@ -20,7 +20,7 @@ from functools import partial
 from origenerator import gallery, timing
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.generation_job import display_status
-from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.gui.inflight import InFlightItem, RunReading, first_movable
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 # The kinds whose start frame is what the run is *of*, rather than one input
 # among several: a video animating a picture, and an enhancement of one.
 SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
+TRAINING_KEY = "fix training"
 
 
 class InFlightItems:
@@ -186,6 +187,12 @@ class InFlightItems:
         place = {pid: i for i, pid in enumerate(self._jobs.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    not it.reading.rendering))
+        training = self._jobs.training
+        if training is not None:
+            items.insert(first_movable(items), InFlightItem(
+                key=TRAINING_KEY, caption=f"{training.name.capitalize()} fix LoRA",
+                reading=training.reading(), reveal=training.reveal, cancel=training.cancel,
+                job_kind=gallery.JobKind.TRAINING, sent=True))
         return items
 
     def _go_to_the_image_of(self, enhancement: dict) -> None:

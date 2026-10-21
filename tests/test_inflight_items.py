@@ -13,7 +13,10 @@ import json
 
 import pytest
 
-from origenerator.gui.inflight_items import InFlightItems
+from origenerator.gallery import JobKind
+from origenerator.gui.generation_job import JobState
+from origenerator.gui.inflight import RunReading
+from origenerator.gui.inflight_items import TRAINING_KEY, InFlightItems
 
 
 def _row(prompt_id, *, status="pending", workflow="sdxl_t2i", params=None, **extra):
@@ -59,9 +62,27 @@ class FakeJob:
 
 
 class FakeJobQueue:
-    def __init__(self, jobs_by_folder=None, order=()):
+    def __init__(self, jobs_by_folder=None, order=(), training=None):
         self.jobs_by_folder = jobs_by_folder or {}
         self.queue_order = list(order)
+        self.training = training
+
+
+class FakeTraining:
+    name = "hands"
+
+    def __init__(self):
+        self.canceled = self.revealed = 0
+        self.read = RunReading(status=JobState.RUNNING, progress=(30, 2000), stage="Training")
+
+    def reading(self):
+        return self.read
+
+    def cancel(self):
+        self.canceled += 1
+
+    def reveal(self):
+        self.revealed += 1
 
 
 class FakeAuto:
@@ -87,10 +108,10 @@ class FakeTree:
 def build():
     def make(rows=(), *, requests=(), jobs_by_folder=None, order=(),
              looping=(), image_rows=(), groups=None, cancelled=None, revealed=None,
-             went_to=None, shielded=None):
+             went_to=None, shielded=None, training=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
-            jobs=FakeJobQueue(jobs_by_folder, order),
+            jobs=FakeJobQueue(jobs_by_folder, order, training),
             auto=FakeAuto(looping),
             tree=FakeTree(groups),
             image_rows=lambda: list(image_rows),
@@ -173,6 +194,21 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(build):
     items = build([_row("g1"), _row("unadopted")], order=["g1"])
 
     assert [item.key for item in items] == ["g1", "unadopted"]
+
+
+def test_a_training_holding_the_line_waits_after_what_comfyui_holds_and_before_the_rest(build):
+    training = FakeTraining()
+
+    items = build([_row("g1", status="running"), _row("g2", status="pending")],
+                  order=["g1", "g2"], training=training)
+
+    assert [item.key for item in items] == ["g1", TRAINING_KEY, "g2"]
+    item = items[1]
+    assert (item.job_kind, item.sent, item.reading) == (JobKind.TRAINING, True, training.read)
+    assert "Hands" in item.caption
+    item.cancel()
+    item.reveal()
+    assert (training.canceled, training.revealed) == (1, 1)
 
 
 def test_a_looping_folders_run_offers_next_seed_rather_than_stop(build):

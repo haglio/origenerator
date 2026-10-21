@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import types
 from datetime import datetime
 from pathlib import Path
 
@@ -119,6 +120,28 @@ def test_the_python_that_crops_is_the_one_comfyuis_own_launcher_runs_comfyui_on(
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUIApp" / "ComfyUI")
 
     assert fix_training.comfyui_python() == Path("C:/envs/comfy/python.exe")
+
+
+def test_stopping_a_step_ends_it_and_everything_it_started_with_no_window(monkeypatch):
+    ran = []
+    monkeypatch.setattr(fix_training.subprocess, "run",
+                        lambda args, **options: ran.append((args, options)))
+
+    fix_training.stop(types.SimpleNamespace(pid=4321))
+
+    ((args, options),) = ran
+    assert args == ["taskkill", "/F", "/T", "/PID", "4321"]
+    assert options["creationflags"] & subprocess.CREATE_NO_WINDOW
+
+
+def test_how_long_trainings_take_is_kept_so_the_next_can_be_counted_down(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
+    assert fix_training.typical_seconds() is None
+
+    for seconds in (3000.0, 2400.0, 2600.0):
+        fix_training.note_duration(seconds)
+
+    assert fix_training.typical_seconds() == 2600.0
 
 
 def test_the_steps_the_app_runs_are_the_ones_the_trainer_has():

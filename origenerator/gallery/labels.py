@@ -134,6 +134,7 @@ class JobKind(StrEnum):
     IMAGE = "Image"
     VIDEO = "Video"
     ENHANCE = "Enhance"
+    TRAINING = "Training"
 
 
 def job_kind_label(workflow_name: str | None) -> str:

@@ -642,15 +642,18 @@ def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_is_let_go(qt
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    queue.hold_for_training(True)
+    training = object()
+    queue.hold_for_training(training)
 
     held = _launch_video(queue, "v1", seed=1)
     assert client.submit_job.call_count == 0
     assert not queue.making_something()
+    assert queue.training is training
 
-    queue.hold_for_training(False)
+    queue.hold_for_training(None)
     assert [call.args[1] for call in client.submit_job.call_args_list] == [held.prompt_id]
     assert queue.making_something()
+    assert queue.training is None
 
 
 def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):

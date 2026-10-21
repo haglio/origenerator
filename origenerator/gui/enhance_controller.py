@@ -37,7 +37,7 @@ from origenerator.gui.inflight import RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.detail_parts import detector_folder, name_parts, part_table
+from origenerator.workflows.detail_parts import detector_folder, name_parts, part_named
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ class EnhanceController:
     def _train_fix(self, name: str) -> None:
         if self._training is not None:
             return
-        part = next(part for part in part_table() if part.name == name)
+        part = part_named(name)
         folder = fix_training.photos_folder(part)
         folder.mkdir(parents=True, exist_ok=True)
         if not fix_training.photo_files(folder):
@@ -146,10 +146,12 @@ class EnhanceController:
             return
         job = fix_training.training_job(part, self._model_to_train_for(),
                                         datetime.now().astimezone())
-        self._training = FixTrainingRun(job, self._jobs)
+        self._training = FixTrainingRun(job, self._jobs,
+                                        reveal=lambda: self.panel.open_fix_prompts(name))
         self._training.progress.connect(lambda text: self.panel.show_fix_training(name, text))
         self._training.finished.connect(lambda lora: self._training_ended(name, lora))
         self._training.failed.connect(lambda why: self._training_ended(name, None, why))
+        self._training.canceled.connect(lambda: self._training_ended(name, None))
         self._training.begin()
 
     def _model_to_train_for(self) -> str:
@@ -163,7 +165,7 @@ class EnhanceController:
         self.panel.show_fix_training(name, None)
         if lora:
             self.panel.use_fix_lora(name, lora)
-        else:
+        elif why:
             QMessageBox.warning(self.panel, "Train", why)
 
     # --- what it runs at ------------------------------------------------------

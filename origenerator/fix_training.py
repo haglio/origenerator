@@ -9,13 +9,13 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from origenerator import comfyui_launcher, config
+from origenerator import comfyui_launcher, config, timing
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part
 
 TRAINER = Path(__file__).resolve().parents[1] / "tools" / "fix_lora_trainer.py"
 _PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
-_IN_THE_BACKGROUND = (getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                      | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+_IN_THE_BACKGROUND = _NO_WINDOW | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
 
 
 def photos_folder(part) -> Path:
@@ -68,6 +68,31 @@ def start(job: dict, step: str) -> subprocess.Popen:
         return subprocess.Popen([str(_PYTHONS[step]()), str(TRAINER), step, str(job_file)],
                                 stdout=log, stderr=subprocess.STDOUT,
                                 creationflags=_IN_THE_BACKGROUND)
+
+
+def _durations_file() -> Path:
+    return config.FIX_TRAINING_DIR / "durations.json"
+
+
+def _durations() -> list[float]:
+    try:
+        return json.loads(_durations_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def note_duration(seconds: float) -> None:
+    _durations_file().parent.mkdir(parents=True, exist_ok=True)
+    _durations_file().write_text(json.dumps((_durations() + [seconds])[-10:]), encoding="utf-8")
+
+
+def typical_seconds() -> float | None:
+    return timing.estimate_seconds(_durations())
+
+
+def stop(process: subprocess.Popen) -> None:
+    subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                   capture_output=True, creationflags=_NO_WINDOW)
 
 
 def read_status(job: dict) -> dict | None:

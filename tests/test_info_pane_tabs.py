@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtWidgets import QInputDialog, QMenu, QTabBar
+from PyQt6.QtWidgets import QApplication, QInputDialog, QMenu, QTabBar
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -16,6 +16,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs, parse_tabs_state
+from origenerator.item_names import ItemNames
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -207,19 +208,60 @@ def _loaded_tab(tabs):
     return tabs.current_config_panel()
 
 
-def test_the_tab_menu_offers_the_folder_this_tab_generates_into(tabs):
+def test_the_tab_menu_offers_the_folder_this_tab_generates_into_and_its_name(tabs):
     _loaded_tab(tabs)
-    assert [a.text() for a in tabs._tab_menu(0).actions()] == ["Go to folder"]
+    assert [a.text() for a in tabs._tab_menu(0).actions()] == ["Go to folder", "Copy name"]
 
 
 def test_go_to_folder_leads_the_menu_above_the_closes(tabs):
-    # The tab's own act first, the housekeeping after it, a line between.
+    # The tab's own acts first, the housekeeping after them, a line between.
     _loaded_tab(tabs)
     tabs._add_subtab()
 
     assert [a.text() for a in tabs._tab_menu(0).actions()] == [
-        "Go to folder", "", "Close others", "Close to the right", "Close all",
+        "Go to folder", "Copy name", "", "Close others", "Close to the right", "Close all",
     ]
+
+
+def _entry(menu, text):
+    (action,) = [action for action in menu.actions() if action.text() == text]
+    return action
+
+
+def test_copy_name_on_a_tab_copies_the_name_of_the_item_it_shows(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    row = _complete_gen(db, "g1", _sdxl_full(positive_prompt="a wizard", seed=1),
+                        "sdxl_g1.png")
+    names = ItemNames(db)
+    names.take([row], [], {})
+    tabs = InfoPaneTabs(ComfyUIClient(), db, names=names)
+    qtbot.addWidget(tabs)
+    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.load_selection(row, [row])
+    QApplication.clipboard().clear()
+
+    _entry(tabs._tab_menu(0), "Copy name").trigger()
+
+    assert QApplication.clipboard().text() == f"{folder_id(settings_folder_key(row))} 000"
+
+
+def test_copy_name_on_a_tab_showing_no_item_copies_the_folder_name_it_wears(tabs):
+    _pick_workflow(tabs.currentWidget())
+    QApplication.clipboard().clear()
+
+    _entry(tabs._tab_menu(0), "Copy name").trigger()
+
+    assert QApplication.clipboard().text() == tabs.tabText(0)
+
+
+def test_copy_name_on_a_request_tab_copies_the_folders_name_alone(tabs):
+    panel = tabs.open_folder_request("image/sdxl_t2i/abcdef123456", "AB12CD34", "sdxl_t2i",
+                                     _sdxl_full(positive_prompt="a wizard"), [])
+    QApplication.clipboard().clear()
+
+    _entry(tabs._tab_menu(tabs.indexOf(panel)), "Copy name").trigger()
+
+    assert QApplication.clipboard().text() == "AB12CD34"
 
 
 def test_go_to_folder_asks_for_the_tab_it_was_raised_over(tabs):
@@ -240,7 +282,7 @@ def test_a_tab_that_has_generated_nothing_is_offered_no_folder(tabs):
     tabs._add_subtab()
 
     assert [a.text() for a in tabs._tab_menu(0).actions()] == [
-        "Close others", "Close to the right", "Close all",
+        "Copy name", "", "Close others", "Close to the right", "Close all",
     ]
 
 

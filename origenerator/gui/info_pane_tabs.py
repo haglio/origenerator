@@ -31,6 +31,7 @@ from origenerator.gallery import (
     settings_signature,
 )
 from origenerator.generation_config import ConfigSnapshot
+from origenerator.gui.copy_names import offer_copy_names
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.how_many import HOW_MANY
@@ -300,7 +301,7 @@ class InfoPaneTabs(QTabWidget):
 
     def _tab_menu(self, index: int) -> QMenu:
         """The right-click menu for the tab at ``index``: where its settings
-        have been generating, then what to close.
+        have been generating and its name, then what to close.
 
         "Go to folder" is left off until they have made something, since until
         then the tree has no row to open
@@ -310,15 +311,16 @@ class InfoPaneTabs(QTabWidget):
         """
         menu = QMenu(self)
         panel = self.widget(index)
-        folder = (panel.settings_folder_key()
-                  if isinstance(panel, GenerateConfigPanel) else None)
-        if folder is not None:
-            menu.addAction("Go to folder").triggered.connect(
-                lambda: self.folder_requested.emit(folder)
-            )
+        if isinstance(panel, GenerateConfigPanel):
+            folder = panel.settings_folder_key()
+            if folder is not None:
+                menu.addAction("Go to folder").triggered.connect(
+                    lambda: self.folder_requested.emit(folder)
+                )
+            offer_copy_names(menu, [panel.name()])
         if self.count() > 1:
             if not menu.isEmpty():
-                menu.addSeparator()  # the act above the line, the closes below it
+                menu.addSeparator()  # the acts above the line, the closes below it
             menu.addAction("Close others").triggered.connect(
                 lambda: self._close_other_subtabs(index)
             )

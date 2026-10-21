@@ -25,14 +25,23 @@ GOOD_STEP_SPACING = {
 _PASSES = ("high", "low")
 
 
+def _shown(value) -> str:
+    return f"{value:g}" if isinstance(value, (int, float)) else str(value)
+
+
 class Advice(NamedTuple):
     text: str
+    value: object
     fix: object
-    shown: str = ""
+    shown: Callable[[object], str] = _shown
+
+    @property
+    def value_shown(self) -> str:
+        return self.shown(self.value)
 
     @property
     def fix_shown(self) -> str:
-        return self.shown or _shown(self.fix)
+        return self.shown(self.fix)
 
 
 def model_recommendations() -> dict:
@@ -62,13 +71,12 @@ def _model_page(params: dict) -> dict:
 class _Range(NamedTuple):
     said: str
     span: tuple
-    shown: Callable[[object], str] = lambda fix: ""
+    shown: Callable[[object], str] = _shown
 
     def advice(self, value) -> Advice | None:
         if not _outside(value, self.span):
             return None
-        fix = _nearest(value, self.span)
-        return Advice(self.said, fix, self.shown(fix))
+        return Advice(self.said, value, _nearest(value, self.span), self.shown)
 
 
 class _Choices(NamedTuple):
@@ -79,7 +87,7 @@ class _Choices(NamedTuple):
     def advice(self, value) -> Advice | None:
         if value in self.good:
             return None
-        return Advice(self.said, _nearest_choice(value, self.good, self.order))
+        return Advice(self.said, value, _nearest_choice(value, self.good, self.order))
 
 
 def setting_advice(params: dict, definitions=()) -> dict[str, Advice]:
@@ -93,14 +101,14 @@ def recommendations(params: dict) -> dict[str, str]:
 
 
 def _good_ranges(params: dict, definitions) -> dict[str, _Range]:
-    return {pd.key: _Range(good_range_text(pd), pd.good, lambda fix, pd=pd: _in_seconds(fix, pd))
+    return {pd.key: _Range(good_range_text(pd), pd.good, _shown_for(pd))
             for pd in definitions if pd.good and pd.key in params}
 
 
-def _in_seconds(frames, pd: ParamDef) -> str:
+def _shown_for(pd: ParamDef) -> Callable[[object], str]:
     if not pd.rate:
-        return ""
-    return f"{_shown(seconds_for_frames(frames, pd.rate, pd))} {pd.unit}"
+        return _shown
+    return lambda frames: f"{_shown(seconds_for_frames(frames, pd.rate, pd))} {pd.unit}"
 
 
 def _recommended(params: dict) -> dict:
@@ -192,10 +200,6 @@ def _nearest_choice(current, choices, order: list[str]) -> str:
 def _span(span) -> str:
     low, high = span
     return _shown(low) if low == high else f"{_shown(low)}–{_shown(high)}"
-
-
-def _shown(value) -> str:
-    return f"{value:g}" if isinstance(value, (int, float)) else str(value)
 
 
 def _either(names) -> str:

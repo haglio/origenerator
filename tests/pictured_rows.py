@@ -20,6 +20,7 @@ def painted_row(field, row, *, under_the_mouse=False):
     canvas.fill(QColor("black"))
     option = QStyleOptionViewItem()
     option.initFrom(view)
+    option.state &= ~QStyle.StateFlag.State_HasFocus  # the view gives it to its current row alone
     option.rect = QRect(QPoint(0, 0), size)
     option.widget = view
     option.displayAlignment = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter

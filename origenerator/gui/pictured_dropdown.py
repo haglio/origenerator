@@ -31,6 +31,8 @@ _ROW_INSET = QMargins(3, 3, 3, 3)
 _BRACE_GAP = 4
 _BRACE_WIDTH = 10
 _BRACE_COLUMN = 2 * _BRACE_GAP + _BRACE_WIDTH
+_LIT = (QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_MouseOver
+        | QStyle.StateFlag.State_HasFocus)
 
 
 @cache
@@ -118,8 +120,8 @@ class _PicturedRows(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         style = option.widget.style() if option.widget else QApplication.style()
-        style.drawPrimitive(QStyle.PrimitiveElement.PE_PanelItemViewItem, option, painter,
-                            option.widget)
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, _ground_of(option), painter,
+                          option.widget)
         filled = QStyleOptionViewItem(option)
         self.initStyleOption(filled, index)
         pictures = index.data(PICTURES_ROLE)
@@ -138,9 +140,17 @@ class _PicturedRows(QStyledItemDelegate):
             painter.restore()
         text = QStyleOptionViewItem(filled)
         text.features &= ~QStyleOptionViewItem.ViewItemFeature.HasDecoration
+        text.state &= ~_LIT
+        text.palette.setColor(QPalette.ColorRole.Text, _lettering_color(option))
         text.rect = option.rect.marginsRemoved(_ROW_INSET)
         text.rect.setLeft(round(span.right()) + _BRACE_GAP)
         style.drawControl(QStyle.ControlElement.CE_ItemViewItem, text, painter, option.widget)
+
+
+def _ground_of(option: QStyleOptionViewItem) -> QStyleOptionViewItem:
+    ground = QStyleOptionViewItem(option)
+    ground.showDecorationSelected = True
+    return ground
 
 
 def _picture_places(style, option: QStyleOptionViewItem, count: int) -> list[QRect]:

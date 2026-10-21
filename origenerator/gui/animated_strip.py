@@ -7,14 +7,13 @@ no animation is available), and clicking one navigates to that video. WebP +
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.looping_preview import play_in
-
-_TILE = 132
+from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 
 class _VideoTile(QLabel):
@@ -25,7 +24,7 @@ class _VideoTile(QLabel):
     def __init__(self, prompt_id: str, parent=None):
         super().__init__(parent)
         self._prompt_id = prompt_id
-        self.setFixedSize(_TILE, _TILE)
+        self.setFixedSize(THUMBNAIL_BOX)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -75,13 +74,9 @@ class AnimatedVideoStrip(QWidget):
         tile = _VideoTile(prompt_id)
         tile.clicked.connect(self.video_activated)
         if movie_path:
-            play_in(tile, movie_path, QSize(_TILE, _TILE))
+            play_in(tile, movie_path, THUMBNAIL_BOX)
         elif still_path:
             pixmap = QPixmap(str(still_path))
             if not pixmap.isNull():
-                tile.setPixmap(pixmap.scaled(
-                    _TILE, _TILE,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                ))
+                tile.setPixmap(fitted_in_the_box(pixmap))
         return tile

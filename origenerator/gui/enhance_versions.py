@@ -61,13 +61,13 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_block import label_column_width, meta_cells
+from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 # A dragged enhancement level carries the params that produced it under this
 # type; the Enhance subpanel reads it to absorb those settings.
 ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 
-_TILE = 96  # the thumbnail's side; the level's facts sit beside it
-_PLUS = _TILE * 2 // 3
+_PLUS = THUMBNAIL_BOX.width() * 2 // 3
 # The in-flight edge the Recents collection's cards wear, so work in progress reads
 # the same wherever it shows.
 _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
@@ -181,7 +181,7 @@ class _Row(QWidget):
         self._beside = row
         self._wrapped = False
         self._picture = QLabel()
-        self._picture.setFixedSize(_TILE, _TILE)
+        self._picture.setFixedSize(THUMBNAIL_BOX)
         self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._picture.setWordWrap(True)
         _pass_mouse_through(self._picture)
@@ -270,11 +270,7 @@ class _Row(QWidget):
                     self._resting_ink[widget] = widget.styleSheet()
 
     def _show_picture(self, pixmap: QPixmap) -> None:
-        self._picture.setPixmap(pixmap.scaled(
-            _TILE, _TILE,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        ))
+        self._picture.setPixmap(fitted_in_the_box(pixmap))
 
 
 class _LevelRow(_Row):

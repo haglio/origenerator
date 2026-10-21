@@ -20,9 +20,9 @@ from shared_ui.colors import BORDER_SUBTLE
 from origenerator.gui import grid_card
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 from origenerator.media import MediaType
 
-_THUMB = 120
 # What the tile says and draws when a showing names neither: a video's start
 # frame, which is what this slot was built for and still shows most often.
 _DEFAULT_HEADING = "From source image"
@@ -52,7 +52,7 @@ class SourceTile(QWidget):
         column.addWidget(self._heading, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self._thumb = QLabel()
-        self._thumb.setFixedSize(_THUMB, _THUMB)
+        self._thumb.setFixedSize(THUMBNAIL_BOX)
         self._thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._thumb.setStyleSheet(
             f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: 3px;"
@@ -63,7 +63,6 @@ class SourceTile(QWidget):
         self._badge = MediaBadge(_DEFAULT_MEDIA_TYPE, self._thumb)
 
         self._name = QLabel()
-        self._name.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
         self._name.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         grid_card.style_caption(self._name)
         column.addWidget(self._name, 0, Qt.AlignmentFlag.AlignHCenter)
@@ -99,11 +98,7 @@ class SourceTile(QWidget):
         pixmap = QPixmap(str(thumbnail_path)) if thumbnail_path else QPixmap()
         if pixmap.isNull():
             return QPixmap()
-        return pixmap.scaled(
-            _THUMB, _THUMB,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
+        return fitted_in_the_box(pixmap)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._prompt_id:

@@ -3,13 +3,8 @@
 An enhanced image is several files: the original, and each level made from it.
 Shift+Left/Right in a slideshow moves within that one image rather than along the
 set, because a version is not a neighbor — you compare two versions of a picture
-by texture, which is exactly what cannot be told apart from memory or from a
-thumbnail.
-
-Three fields on :class:`~origenerator.gui.slideshow_view.SlideshowView` carried
-this — the map of versions, which picture is being stepped, and where in its
-versions the slideshow is — read and written from five of its methods and shared with
-the thirty other fields around them. They are one object here, with no Qt in it.
+by texture, which is exactly what cannot be told apart from memory, from a
+thumbnail or over a picture that is moving.
 """
 
 from __future__ import annotations
@@ -25,6 +20,7 @@ class LevelStepper:
         # the one the set lists the image under the moment a level is showing.
         self._base: str | None = None
         self._index = 0
+        self._stepping = False
 
     def arm(self, levels_by_path) -> None:
         """Take the versions of every item that has more than itself.
@@ -43,8 +39,12 @@ class LevelStepper:
                               for key, versions in levels_by_path.items()})
 
     def restart(self) -> None:
-        """Back to the top version, for a new picture — or for one whose
-        versions have just gone a level deeper."""
+        """Back to the top version, for a new picture."""
+        self.back_to_the_top()
+        self._stepping = False
+
+    def back_to_the_top(self) -> None:
+        """For a picture whose versions have just gone a level deeper."""
         self._base = None
         self._index = 0
 
@@ -61,6 +61,7 @@ class LevelStepper:
         if len(versions) <= 1:
             return None
         self._base = base
+        self._stepping = True
         self._index = (self._index + delta) % len(versions)
         return versions[self._index]
 
@@ -70,7 +71,10 @@ class LevelStepper:
 
     @property
     def stepping(self) -> bool:
-        return self._base is not None
+        return self._stepping
+
+    def pace(self, dwell_s: int) -> int:
+        return 0 if self._stepping else dwell_s
 
     @property
     def index(self) -> int:

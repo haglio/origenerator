@@ -1577,6 +1577,98 @@ def test_shift_left_steps_back_the_way_shift_right_came(qtbot, tmp_path, arrows)
     assert _media_on_screen(view) == middle
 
 
+def _opened_still(view) -> bool:
+    """Whether the Funestra opened the file now up at a pace of nought: the
+    engine's standstill, with no move over a picture and nothing to end it."""
+    return _engine(view).opened_at_pace[-1] == 0
+
+
+def test_a_version_shift_stepped_to_comes_up_still_and_holds_the_slideshow(qtbot, tmp_path):
+    enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
+    view = _view(qtbot, [(enhanced, "image", "id-a"), ("b.png", "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+
+    _shift(view, Qt.Key.Key_Right)
+    _runs_out(view)
+
+    assert _opened_still(view)
+    assert _media_on_screen(view) == original
+
+
+@pytest.mark.parametrize("arrow", [Qt.Key.Key_Left, Qt.Key.Key_Right], ids=["Left", "Right"])
+def test_a_plain_arrow_after_comparing_versions_sets_the_slideshow_going_again(
+        qtbot, tmp_path, arrow):
+    enhanced, original, other = (_png(tmp_path / n) for n in ("e1.png", "src.png", "b.png"))
+    view = _view(qtbot, [(enhanced, "image", "id-a"), (other, "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    _shift(view, Qt.Key.Key_Right)
+
+    _press(view, arrow)
+
+    assert _media_on_screen(view) == other
+    assert _engine(view).opened_at_pace[-1] == 4
+    assert _will_move_on(view)
+
+
+def test_a_pace_set_while_versions_are_compared_waits_for_the_arrow_that_moves_on(
+        qtbot, tmp_path):
+    enhanced, original, other = (_png(tmp_path / n) for n in ("e1.png", "src.png", "b.png"))
+    view = _view(qtbot, [(enhanced, "image", "id-a"), (other, "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    _shift(view, Qt.Key.Key_Right)
+    opened = list(_engine(view).opened)
+
+    view.set_dwell_s(9)
+    held = (_engine(view).pace_s, list(_engine(view).opened))
+    _press(view, Qt.Key.Key_Right)
+
+    assert held == (0, opened)
+    assert _engine(view).opened_at_pace[-1] == 9
+
+
+def test_a_version_landing_while_versions_are_compared_keeps_the_slideshow_held(
+        qtbot, tmp_path):
+    a, a_base, better = (_png(tmp_path / n) for n in ("a.png", "a0.png", "a2.png"))
+    view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
+    _shift(view, Qt.Key.Key_Right)
+
+    view.note_enhanced("id-a", better)
+    _runs_out(view)
+
+    assert (_engine(view).pace_s, _media_on_screen(view)) == (0, better)
+
+
+def test_comparing_a_videos_versions_holds_the_slideshow_on_them_too(qtbot):
+    view = _view(qtbot, [("clip.mp4", "video", "id-a"), ("b.png", "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({"clip.mp4": [("clip_evolved.mp4", "video", "Evolved"),
+                                  ("clip.mp4", "video", "Original")]})
+
+    _shift(view, Qt.Key.Key_Left)
+    _runs_out(view)
+
+    assert _media_on_screen(view) == "clip.mp4"
+    assert _engine(view).loop_file is True
+
+
+def test_a_picture_being_enhanced_is_not_moved_on_early_while_its_versions_are_compared(
+        qtbot, tmp_path):
+    a, a_base = (_png(tmp_path / n) for n in ("a.png", "a0.png"))
+    view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")],
+                 image_dwell_ms=4000, enhancing={"id-a": "running"})
+    view.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
+    _shift(view, Qt.Key.Key_Right)
+
+    _time_passes(view, 3)
+
+    assert view._playlist.current()[2] == "id-a"
+
+
 def test_shift_arrows_do_nothing_for_an_image_with_one_version(qtbot, tmp_path):
     lone = _png(tmp_path / "only.png")
     view = _view(qtbot, [(lone, "image", "id-a")])
@@ -1585,8 +1677,9 @@ def test_shift_arrows_do_nothing_for_an_image_with_one_version(qtbot, tmp_path):
     _shift(view, Qt.Key.Key_Right)
 
     # Silently nothing, rather than stepping the set when the shift was the
-    # whole point of the press.
+    # whole point of the press -- or holding a picture with nothing to compare.
     assert _media_on_screen(view) == lone
+    assert _engine(view).pace_s == view.dwell_s
 
 
 def test_stepping_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_path):

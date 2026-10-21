@@ -10,6 +10,7 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
 from funestra.file_channel import consume_command_file
 from funestra.funestra_verbs import play_file
 from funestra.hud_title import LATEST_LABEL
@@ -149,7 +150,7 @@ def test_the_funestra_is_told_to_read_the_list_and_how_long_a_picture_holds(qtbo
     there, as it does for its own clips."""
     slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=6000)
 
-    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 6"]
+    assert _sent(slideshow) == ["SET_PACE 6", "RELOAD_PLAYLIST"]
 
 
 def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
@@ -378,7 +379,7 @@ def test_a_new_set_lands_the_funestra_on_its_slide_over_another_item_of_it(qtbot
 
     slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
 
-    assert _sent(slideshow) == ["PLAY_FILE three.png", "RELOAD_PLAYLIST", "SET_PACE 0"]
+    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE three.png", "RELOAD_PLAYLIST"]
 
 
 def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_path):
@@ -386,7 +387,7 @@ def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_pa
 
     slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
 
-    assert _sent(slideshow) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
+    assert _sent(slideshow) == ["SET_PACE 0", "RELOAD_PLAYLIST"]
 
 
 def test_the_slideshow_names_the_generation_the_funestra_says_it_is_locked_on(qtbot, tmp_path):
@@ -414,7 +415,8 @@ def test_a_side_reset_lands_the_funestra_on_the_top_of_its_base_set(qtbot, tmp_p
     slideshow.retune([("four.png", "image", "id-4"), ("five.png", "image", "id-5")])
 
     top = slideshow._set.playlist.current()
-    assert _sent(slideshow)[:2] == [f"PLAY_FILE {top.path}", "RELOAD_PLAYLIST"]
+    assert _sent(slideshow)[:3] == [f"SET_PACE {slideshow.dwell_s}", f"PLAY_FILE {top.path}",
+                                    "RELOAD_PLAYLIST"]
     assert slideshow.hud_prompt_id == top.prompt_id
 
 
@@ -433,7 +435,7 @@ def test_a_slideshow_picked_back_up_lands_the_funestra_where_the_last_one_left_o
 
     assert slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-3"))
 
-    assert _sent(slideshow)[0] == "PLAY_FILE three.png"
+    assert _sent(slideshow)[:2] == [f"SET_PACE {slideshow.dwell_s}", "PLAY_FILE three.png"]
 
 
 def test_a_slideshow_picked_back_up_locked_locks_the_funestra_on_its_slide(qtbot, tmp_path):
@@ -509,7 +511,7 @@ def test_a_slideshow_opened_on_a_slide_lands_the_funestra_on_it(qtbot, tmp_path)
 
     slideshow = _slideshow(qtbot, tmp_path, start=2)
 
-    assert _sent(slideshow)[0] == "PLAY_FILE three.png"
+    assert _sent(slideshow)[:2] == [f"SET_PACE {slideshow.dwell_s}", "PLAY_FILE three.png"]
     assert slideshow.hud_prompt_id == "id-3"
 
 
@@ -542,8 +544,8 @@ def test_a_reorder_lets_go_and_hands_the_funestra_the_new_list_from_its_top(qtbo
     slideshow.reorder([("five.png", "image", "id-5"), ("four.png", "image", "id-4")],
                       latest=True)
 
-    assert _sent(slideshow) == ["LOCK_OFF", "PLAY_FILE five.png", "RELOAD_PLAYLIST",
-                                f"SET_PACE {slideshow.dwell_s}"]
+    assert _sent(slideshow) == ["LOCK_OFF", f"SET_PACE {slideshow.dwell_s}",
+                                "PLAY_FILE five.png", "RELOAD_PLAYLIST"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["five.png", "four.png"]
     assert slideshow.hud_order_label == LATEST_LABEL
@@ -556,7 +558,7 @@ def test_a_reorder_keeping_the_slide_leaves_the_funestra_on_the_picture_it_has(q
     slideshow.reorder([("nine.png", "image", "id-9"), ("one.png", "image", "id-1")],
                       latest=True, keep_slide=True)
 
-    assert _sent(slideshow) == ["RELOAD_PLAYLIST", f"SET_PACE {slideshow.dwell_s}"]
+    assert _sent(slideshow) == [f"SET_PACE {slideshow.dwell_s}", "RELOAD_PLAYLIST"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["one.png", "nine.png"]
 
@@ -566,7 +568,8 @@ def test_a_reorder_of_a_slideshow_not_locked_sends_no_unlock(qtbot, tmp_path):
 
     slideshow.reorder(_ITEMS, latest=True)
 
-    assert _sent(slideshow)[:2] == ["PLAY_FILE one.png", "RELOAD_PLAYLIST"]
+    assert _sent(slideshow)[:3] == [f"SET_PACE {slideshow.dwell_s}", "PLAY_FILE one.png",
+                                    "RELOAD_PLAYLIST"]
 
 
 def test_a_hosted_reset_lets_go_of_the_lock_before_handing_over_the_base_set(qtbot, tmp_path):
@@ -585,18 +588,56 @@ _LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
 
 
 class TestVersions:
-    """Stepping an item's own copies on the Funestra, the axis the shifted keys
+    """Stepping an item's own versions on the Funestra, the axis the shifted keys
     and the band's versions button share with a slideshow in a window."""
 
-    def test_a_step_plays_the_other_copy_of_the_item_on_screen(self, qtbot, tmp_path):
+    def test_a_step_holds_the_funestra_and_opens_the_other_version_still(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_levels(_LEVELS)
 
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow) == ["PLAY_FILE one.png"]
+        assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one.png"]
 
-    def test_a_clips_other_copy_is_played_with_its_script(
+    @pytest.mark.parametrize(("move", "verb"), [
+        (lambda slideshow: slideshow.slideshow_step(1), "NEXT"),
+        (lambda slideshow: slideshow.slideshow_step(-1), "PREV"),
+        (lambda slideshow: slideshow.slideshow_cull(), "TRASH"),
+        (lambda slideshow: slideshow.show_item("three.png"), "PLAY_FILE three.png"),
+        (lambda slideshow: slideshow.reorder([("five.png", "image", "id-5")], latest=True),
+         "PLAY_FILE five.png"),
+        (lambda slideshow: slideshow.release_media(["one.png"]), "NEXT"),
+    ], ids=["next", "previous", "a cull", "a click on the map", "a new order",
+            "letting go of the file"])
+    def test_leaving_the_versions_hands_the_funestra_its_pace_before_it_opens_the_next(
+            self, qtbot, tmp_path, move, verb):
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+        slideshow.set_levels(_LEVELS)
+        slideshow.slideshow_step_version(1)
+        _sent(slideshow)
+
+        move(slideshow)
+
+        sent = _sent(slideshow)
+        assert sent.index(f"SET_PACE {slideshow.dwell_s}") < sent.index(verb)
+
+    def test_a_version_landing_while_they_are_compared_holds_the_funestra_on_the_new_one(
+            self, qtbot, tmp_path):
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+        slideshow.set_levels(_LEVELS)
+        slideshow.slideshow_step_version(1)
+        _sent(slideshow)
+
+        slideshow.note_enhanced("id-1", "one_better.png")
+        slideshow.add_levels({"one_better.png": [
+            ("one_better.png", "image", "Enhancement 2/2"),
+            ("one_enhanced.png", "image", "Enhancement 1/2"),
+            ("one.png", "image", "Original")]})
+
+        assert f"SET_PACE {slideshow.dwell_s}" not in _sent(slideshow)
+        assert _panel(slideshow).item_note == "Enhancement 2/2"
+
+    def test_a_videos_other_version_is_played_with_its_script(
             self, qtbot, tmp_path, monkeypatch):
         scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
         slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
@@ -608,9 +649,9 @@ class TestVersions:
 
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow) == [f"PLAY_FILE clip.mp4	{scripts['clip.mp4']}"]
+        assert _sent(slideshow)[-1] == f"PLAY_FILE clip.mp4	{scripts['clip.mp4']}"
 
-    def test_stepping_on_and_back_walks_the_copies_in_order(self, qtbot, tmp_path):
+    def test_stepping_on_and_back_walks_the_versions_in_order(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_levels(_LEVELS)
 
@@ -640,9 +681,9 @@ class TestVersions:
 
         assert slideshow.has_other_versions is True
 
-    def test_moving_to_another_item_starts_that_ones_copies_from_the_top(
+    def test_moving_to_another_item_starts_that_ones_versions_from_the_top(
             self, qtbot, tmp_path):
-        """A step on the new item must offer its own newest copy, not carry the
+        """A step on the new item must offer its own newest version, not carry the
         place the last item was stepped to."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_levels({**_LEVELS,
@@ -656,7 +697,7 @@ class TestVersions:
         _sent(slideshow)
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow) == ["PLAY_FILE two.png"]
+        assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE two.png"]
 
 
 # --- the map, and the loops along it ------------------------------------------
@@ -1263,7 +1304,7 @@ def test_a_picture_enhanced_during_the_slideshow_steps_its_versions_on_the_funes
                                                ("one.png", "image", "Original")]})
     slideshow.slideshow_step_version(1)
 
-    assert _sent(slideshow) == ["PLAY_FILE one.png"]
+    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one.png"]
 
 
 def test_a_run_being_made_joins_the_funestras_list_on_its_first_frame(qtbot, tmp_path):

@@ -19,10 +19,13 @@ jobs:
     with:
       siblings: ""
       python-version: "3.14"
-      # One pass of this suite has taken 24 minutes on a slow runner, and a run that
-      # hits its ceiling is evicted from the queue with no failing test to point at;
-      # 55 is as much as the queue's own 60-minute limit leaves room for.
-      timeout-minutes: 55
+      # One job outgrew the queue's 60-minute limit: in October 2026 one pass took
+      # 34 to 53 minutes, as fast or slow as the runner it landed on, and four were
+      # cancelled at their 55-minute ceiling with nothing failing. Four parts side
+      # by side took 4 to 7 minutes each, and a runner can be half as fast as the
+      # next, so each part's clock is 30 minutes.
+      parts: 4
+      timeout-minutes: 30
       qt-platform: offscreen
       # Fun Time, beside this checkout at its default branch: what it relies on of
       # this app (its tests/origenerator_expectations.json) is held to this app

@@ -20,12 +20,10 @@ from tests.children import say_where_it_hangs
 
 # isort: split
 from PyQt6 import sip
-from PyQt6.QtCore import QCoreApplication, QObject, QTimer
+from PyQt6.QtCore import QCoreApplication, QObject, QThread, QTimer
 from PyQt6.QtWidgets import QApplication
 
 from origenerator import app, config
-
-CLOSED_AFTER_MS = 200
 
 _the_application = None
 
@@ -58,9 +56,16 @@ def _built_then_closed(build):
         global _the_application
         window = build(*args, **kwargs)
         _the_application = weakref.ref(QApplication.instance(), _say_what_python_owns)
-        QTimer.singleShot(CLOSED_AFTER_MS, window.close)
+        _close_once_its_loop_runs(window)
         return window
     return build_then_close
+
+
+def _close_once_its_loop_runs(window) -> None:
+    if QThread.currentThread().loopLevel():
+        window.close()
+    else:
+        QTimer.singleShot(0, lambda: _close_once_its_loop_runs(window))
 
 
 def main() -> int:

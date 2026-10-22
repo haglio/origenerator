@@ -14719,6 +14719,38 @@ def _square_menu(view, key):
     gestures.right_click(square, square.rect().center())
 
 
+def _open_square(view, key):
+    """Click the square a folder is drawn as in the pane beside the list."""
+    _tall_on_screen(view)
+    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
+                 if tile.key == key]
+    view._scroll.ensureWidgetVisible(square)
+    gestures.click(square, square.rect().center())
+
+
+def test_a_folder_opened_from_inside_a_folder_of_your_own_opens_under_it_in_the_list(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Mine", [cat])
+    view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
+
+    _open_square(view, cat)
+
+    here = view._tree.currentItem()
+    assert (_key(here), here.parent()) == (cat, _top_level(view._tree)["Mine"])
+
+
+def test_a_folder_under_a_folder_of_your_own_in_the_list_can_be_taken_out_of_it(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Mine", [cat])
+    (under_mine,) = _subs(_top_level(view._tree)["Mine"])
+    _answer_menu(monkeypatch, "Remove from “Mine”")
+
+    _tree_menu(view, under_mine.data(0, TREE_KEY_ROLE))
+
+    assert view._db.list_custom_folders()[0]["folders"] == []
+
+
 def test_a_custom_folder_inside_another_can_be_taken_back_out_of_it(qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
     inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
@@ -14904,7 +14936,7 @@ def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
 
     # No star (a bookmark of a bookmark collection gathers nothing) and no delete —
     # removing one of these must never reach the generations it gathers.
-    assert labels == ["Copy name", "", "Remove folder…"]
+    assert labels == ["Copy name", "", "Remove folder…", "", "Collapse all", "Expand all"]
 
 
 def test_copy_name_on_a_folder_of_your_own_copies_the_name_you_gave_it(

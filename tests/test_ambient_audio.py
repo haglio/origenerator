@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
-import sys
 import textwrap
 import wave
 from pathlib import Path
@@ -14,8 +12,7 @@ from PyQt6.QtMultimedia import QMediaPlayer
 from origenerator.ambient_audio import AmbientRotation, find_clips
 from origenerator.ambient_audio_players import AmbientAudio
 from origenerator.config import ambient_audio_dir
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from tests.children import run_python
 
 
 def _clips(*names):
@@ -375,6 +372,8 @@ def test_a_bed_switched_on_in_a_frozen_room_waits_for_it_to_play(qtbot, tmp_path
 
 _STOP_A_VOICE_WHILE_PYTHON_IS_BUSY = textwrap.dedent("""
     import ctypes, os, sys, time
+    from tests.children import say_where_it_hangs
+    say_where_it_hangs()
     from PyQt6.QtCore import QEventLoop, QTimer, QUrl
     from PyQt6.QtMultimedia import QMediaPlayer
     from PyQt6.QtWidgets import QApplication
@@ -437,10 +436,8 @@ def test_a_voice_stopped_while_python_is_busy_leaves_no_qt_thread_waiting_to_ent
     # 2026-10-15 and 2026-10-17. Muted, and a silent clip: nothing is heard.
     clip = _silent_wav(tmp_path / "quiet.wav")
 
-    ran = subprocess.run(
-        [sys.executable, "-c", _STOP_A_VOICE_WHILE_PYTHON_IS_BUSY, str(clip)], cwd=REPO_ROOT,
-        timeout=120, env=os.environ | {"QT_QPA_PLATFORM": "offscreen"}, capture_output=True,
-        encoding="utf-8", errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    ran = run_python(["-c", _STOP_A_VOICE_WHILE_PYTHON_IS_BUSY, str(clip)],
+                     env=os.environ | {"QT_QPA_PLATFORM": "offscreen"})
 
     assert ran.stdout.splitlines() == [
         "sound track: True", "waiting to enter Python: 0"], ran.stdout + ran.stderr

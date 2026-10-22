@@ -13,8 +13,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -23,6 +21,7 @@ from shared_ui.preview import Preview
 from origenerator import fun_time_mode as contract
 from origenerator.win32 import this_process_creation_time
 from origenerator.workflows import detail_parts
+from tests.children import run_python
 from tests.test_main_window import _fun_time_session, _window
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -105,8 +104,7 @@ def test_no_other_window_here_wears_that_caption():
 
 
 def test_the_module_the_document_names_tells_a_session_what_to_hear_said_to_a_side():
-    done = subprocess.run([sys.executable, "-m", _document()["spoken_phrases_module"]],
-                          cwd=REPO_ROOT, capture_output=True, text=True, timeout=60, check=True)
+    done = run_python(["-m", _document()["spoken_phrases_module"]], timeout=60, check=True)
 
     assert "request" in json.loads(done.stdout)["phrases"]
 

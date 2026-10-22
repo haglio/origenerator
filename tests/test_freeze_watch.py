@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import io
 import logging
-import subprocess
-import sys
 import textwrap
 from pathlib import Path
 
 from origenerator.freeze_watch import FreezeWatch
+from tests.children import run_python
 
 
 class _Faulthandler:
@@ -125,8 +124,7 @@ def test_a_window_stuck_in_a_slot_leaves_that_slot_in_the_crash_log(tmp_path):
         QTimer.singleShot(100, the_slot_that_stalls)
         app.exec()
     """)
-    subprocess.run([sys.executable, "-c", child], capture_output=True, timeout=120,
-                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    run_python(["-c", child])
 
     written = crash_log.read_text(encoding="utf-8")
     assert "the_slot_that_stalls" in written
@@ -152,8 +150,7 @@ def _close_a_window_whose_teardown_takes(seconds, *, closed_within_s, crash_log)
         QTimer.singleShot(100, window.close)
         sys.exit(app.exec())
     """)
-    return subprocess.run([sys.executable, "-c", child], capture_output=True, timeout=30,
-                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return run_python(["-c", child], timeout=30)
 
 
 def test_a_close_stuck_in_its_teardown_still_ends_the_process_and_names_where_it_stuck(tmp_path):

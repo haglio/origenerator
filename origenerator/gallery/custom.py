@@ -90,6 +90,12 @@ def holds(folder, other) -> bool:
         holds(child, other) for child in child_groups(folder) if isinstance(child, CustomGroup))
 
 
+def outermost(folders: list) -> list:
+    held = {child.key for folder in folders for child in child_groups(folder)
+            if isinstance(child, CustomGroup)}
+    return [folder for folder in folders if folder.key not in held]
+
+
 def selection_group(groups: list) -> CustomGroup:
     """The unsaved custom folder a multi-selection stands for: the selected
     folders, labelled by how many there are."""

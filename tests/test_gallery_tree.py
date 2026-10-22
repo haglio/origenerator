@@ -272,19 +272,19 @@ def test_an_item_belongs_to_its_folder_in_its_own_place_not_to_a_copy_of_it(qtbo
 
 def _outer_holding_inner_holding_the_images(model):
     inner = _folder_of_your_own(2, "Inner", [model[0]])
-    return [_folder_of_your_own(1, "Outer", [inner]), inner]
+    return gallery.outermost([_folder_of_your_own(1, "Outer", [inner]), inner])
 
 
-def test_a_folder_of_your_own_inside_another_shows_under_it_as_it_shows_on_its_own(qtbot):
-    pane, _tree, _model = _gathered_tree(qtbot, [_image("i1", "a cat")],
-                                         _outer_holding_inner_holding_the_images)
+def test_a_folder_of_your_own_inside_another_shows_under_it_with_what_it_holds(qtbot):
+    pane, _tree, model = _gathered_tree(qtbot, [_image("i1", "a cat")],
+                                        _outer_holding_inner_holding_the_images)
     half = pane._trees[LANDSCAPE]
-    outer, inner = half.topLevelItem(0), half.topLevelItem(1)
-    (inner_inside_outer,) = _children(outer)
+    outer, all_row = (half.topLevelItem(i) for i in range(half.topLevelItemCount()))
+    (inner,) = _children(outer)
+    images = next(row for row in _children(all_row) if row.data(0, GROUP_ROLE) is model[0])
 
-    assert _drawn_down(inner_inside_outer) == _drawn_down(inner)
-    assert inner_inside_outer.data(0, DROP_KEY_ROLE) == inner.data(0, DROP_KEY_ROLE)
-    assert inner_inside_outer.toolTip(0) == inner.toolTip(0)
+    assert [_drawn_down(row) for row in _children(inner)] == [_drawn_down(images)]
+    assert inner.data(0, DROP_KEY_ROLE) == gallery.custom_folder_key(2)
 
 
 def test_a_folder_drawn_again_inside_a_folder_of_your_own_is_found_first_in_its_own_place(qtbot):

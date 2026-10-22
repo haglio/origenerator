@@ -1,11 +1,23 @@
-"""The child processes tests wait on: how one that hangs is reported."""
+"""The child processes tests wait on: how one that hangs is reported, and how one ends."""
 from __future__ import annotations
 
+import os
 import textwrap
 
 import pytest
 
 from tests.children import run_python
+
+_MAKES_A_SOUND_OUTPUT_THEN_ENDS = textwrap.dedent("""
+    import sys
+    from PyQt6.QtMultimedia import QAudioOutput
+    from PyQt6.QtWidgets import QApplication
+    from tests.children import end_outright
+    app = QApplication(sys.argv[:1])
+    output = QAudioOutput()
+    print("made", flush=True)
+    end_outright()
+""")
 
 _SAYS_AND_LOGS_SOMETHING_THEN_HANGS = textwrap.dedent("""
     import sys, time
@@ -34,3 +46,9 @@ def test_a_child_still_running_at_its_timeout_fails_with_what_it_said_where_it_w
     assert "in waits_forever" in reported
     assert "the line it logged" in reported
 
+
+def test_a_child_ended_outright_while_qt_still_probes_the_sound_devices_ends_at_once():
+    ran = run_python(["-c", _MAKES_A_SOUND_OUTPUT_THEN_ENDS], timeout=30,
+                     env=os.environ | {"QT_QPA_PLATFORM": "offscreen"})
+
+    assert ran.stdout.splitlines() == ["made"]

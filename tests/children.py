@@ -1,7 +1,10 @@
-"""A child process a test waits on: how it runs, and what the test says when one hangs."""
+"""A child process a test waits on: how it runs, how it ends, and what the test
+says when one hangs."""
 from __future__ import annotations
 
 import faulthandler
+import os
+import signal
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -29,6 +32,10 @@ def run_python(args: list[str], *, timeout: float = HANG_AFTER_S, logs: Iterable
 
 def say_where_it_hangs(*, after_s: float = HANG_AFTER_S - 10) -> None:
     faulthandler.dump_traceback_later(after_s)
+
+
+def end_outright() -> None:
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 def _text(output: str | bytes | None) -> str:

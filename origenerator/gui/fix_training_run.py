@@ -9,7 +9,6 @@ an earlier launch left running and holds the line for it (:meth:`adopt`)."""
 from __future__ import annotations
 
 import logging
-import time
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
@@ -37,7 +36,6 @@ class FixTrainingRun(QObject):
         self.reveal = reveal
         self._trainer = None
         self._status: dict = {}
-        self._began = None
         self._typical = None
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._look)
@@ -59,7 +57,7 @@ class FixTrainingRun(QObject):
                           progress=counted if training else None,
                           pass_progress=None if training else counted,
                           stage="Training" if training else "Cropping photos",
-                          started_at=self._began, typical_seconds=self._typical)
+                          started_at=self._trainer.began, typical_seconds=self._typical)
 
     def begin(self) -> None:
         self._hold_the_line()
@@ -68,7 +66,6 @@ class FixTrainingRun(QObject):
 
     def adopt(self, trainer) -> None:
         self._trainer = trainer
-        self._began = trainer.began
         self._hold_the_line()
         self.progress.emit("Training")
 
@@ -88,9 +85,7 @@ class FixTrainingRun(QObject):
         if not alive:
             logger.info("Fix training %s: its program ended, saying %s", self.name, status)
         if status.get("state") == "done":
-            outcome = self._outcome(ok=True)
-            fix_training.note_duration(outcome.seconds)
-            self._end(outcome)
+            self._end(self._outcome(ok=True))
             self.finished.emit(fix_training.lora_of(status))
         elif status.get("state") == "failed":
             self._fail(status["message"])
@@ -109,7 +104,6 @@ class FixTrainingRun(QObject):
             logger.exception("Fix training %s could not be started", self.name)
             self._fail(f"The training couldn't be started: {error}")
             return
-        self._began = self._trainer.began
         self.progress.emit("Cropping")
 
     def cancel(self) -> None:
@@ -121,7 +115,8 @@ class FixTrainingRun(QObject):
 
     def _outcome(self, *, ok: bool) -> RunOutcome:
         return fix_training.outcome_of(
-            self._job, ok=ok, seconds=None if self._began is None else time.time() - self._began)
+            self._job, ok=ok,
+            seconds=None if self._trainer is None else fix_training.time_taken(self._job, self._trainer))
 
     def _fail(self, why: str) -> None:
         self._end(self._outcome(ok=False))

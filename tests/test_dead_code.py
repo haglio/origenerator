@@ -375,7 +375,8 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # zones' style came from one definition, taken down to what the tree measured:
 # the relays that carried a drag to Combine went, the slot's own light switch,
 # and the Enhance panel's own way of taking a drop.
-MAX_PROSE_LINES = 17398
+# 17395 when a folder of your own came to show its folders under it in the TOC.
+MAX_PROSE_LINES = 17395
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

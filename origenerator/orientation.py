@@ -43,6 +43,7 @@ from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 _SEPARATOR = "::"
+_INSIDE = ">"
 
 # How many measured shapes are kept at once. Comfortably above one library's
 # worth, because a rebuild measures every row: a cap under that would evict the
@@ -65,9 +66,10 @@ _MEASURED_LIMIT = 20_000
 _measured: OrderedDict[str, str] = OrderedDict()
 
 
-def oriented_key(base_key: str, side: str) -> str:
-    """The tree key of *base_key*'s row on *side*."""
-    return f"{base_key}{_SEPARATOR}{side}"
+def oriented_key(base_key: str, side: str, inside: tuple[str, ...] = ()) -> str:
+    """The tree key of *base_key*'s row on *side*: in its own place, or drawn
+    again inside the folder of your own that *inside* leads down from."""
+    return f"{base_key}{_SEPARATOR}{side}" + "".join(_INSIDE + key for key in inside)
 
 
 def key_holds(outer: str, inner: str) -> bool:
@@ -83,7 +85,8 @@ def split_key(key: str | None) -> tuple[str | None, str | None]:
     """``(base_key, side)`` — side ``None`` for a plain key."""
     if not key:
         return key, None
-    base, _, side = key.partition(_SEPARATOR)
+    base, _, placed = key.partition(_SEPARATOR)
+    side = placed.partition(_INSIDE)[0]
     return (base, side) if side in SIDES else (key, None)
 
 

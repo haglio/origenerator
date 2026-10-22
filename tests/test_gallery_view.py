@@ -14282,7 +14282,7 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     row = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(row)
 
-    assert row.childCount() == 0  # flat like a collection: its items live elsewhere
+    assert [_key(child) for child in _subs(row)] == [cat]
     assert view._browser._visible_keys == [cat]
     assert {r["prompt_id"] for r in view.rows_to_play()} == {"i1"}
 

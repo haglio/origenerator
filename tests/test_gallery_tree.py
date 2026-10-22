@@ -10,8 +10,10 @@ from shared_ui.icons import glyph_pixmap
 
 from origenerator import gallery
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gui.folder_tree import DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.gui.gallery_tree import GROUP_ROLE, GalleryTree, SideModel
 from origenerator.gui.split_folder_tree import SplitFolderTree
+from origenerator.orientation import base_of, side_of
 
 
 def _row(prompt_id, workflow_name, params, filename):
@@ -40,21 +42,30 @@ def _video(prompt_id, lora):
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
-def _folder_of_your_own(folder_id, name):
-    return gallery.CustomGroup(gallery.custom_folder_key(folder_id), name, [],
+def _folder_of_your_own(folder_id, name, holding=()):
+    return gallery.CustomGroup(gallery.custom_folder_key(folder_id), name, list(holding),
                                folder_id=folder_id)
 
 
 def _gallery_tree(qtbot, rows, folders_of_your_own=(), folder_meta=None):
+    pane, tree, _model = _gathered_tree(qtbot, rows, lambda _model: folders_of_your_own,
+                                        folder_meta)
+    return pane, tree
+
+
+def _gathered_tree(qtbot, rows, folders_of_your_own, folder_meta=None, recently_worked=()):
+    """The list built from ``rows``, with the folders of your own that
+    ``folders_of_your_own`` makes out of the Landscape side's folders."""
+    model = gallery.build_gallery_tree(rows, folder_meta)
     pane = SplitFolderTree(GROUP_ROLE)
     qtbot.addWidget(pane)
     tree = GalleryTree(pane)
     tree.populate(
-        [SideModel(LANDSCAPE, gallery.build_gallery_tree(rows, folder_meta),
-                   custom_folders=list(folders_of_your_own), show_recents=True),
+        [SideModel(LANDSCAPE, model, custom_folders=list(folders_of_your_own(model)),
+                   show_recents=True),
          SideModel(PORTRAIT, [])],
-        folder_meta=folder_meta)
-    return pane, tree
+        folder_meta=folder_meta, recently_worked=recently_worked)
+    return pane, tree, model
 
 
 def _table_of_contents(qtbot, rows, folders_of_your_own=(), folder_meta=None):
@@ -195,9 +206,9 @@ def _first_frame(prompt_id):
 
 
 def test_every_row_is_found_again_by_the_path_it_shows(qtbot):
-    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat"), _video("v1", "style_a"),
-                                        _first_frame("f1")],
-                                [_folder_of_your_own(1, "Keepers")])
+    _pane, tree, _model = _gathered_tree(
+        qtbot, [_image("i1", "a cat"), _video("v1", "style_a"), _first_frame("f1")],
+        _keepers_holding_the_images)
     rows = tree.item_by_key
 
     assert len({tree.breadcrumb(row) for row in rows.values()}) == len(rows) > 30
@@ -219,3 +230,78 @@ def test_a_path_no_row_has_finds_nothing(qtbot):
     for path in ("", "Landscape", "Landscape  ›  All  ›  Nowhere",
                  "Sideways  ›  All", "All  ›  Latest", "Landscape  ›  Latest"):
         assert tree.key_at_path(path) is None, path
+
+
+def _drawn_down(row):
+    return [row.text(0), [_drawn_down(child) for child in _children(row)]]
+
+
+def _keepers_holding_the_images(model):
+    return [_folder_of_your_own(1, "Keepers", [model[0]])]
+
+
+def test_a_folder_of_your_own_shows_the_folders_it_holds_as_they_show_in_their_own_place(qtbot):
+    pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat"), _image("i2", "a dog")],
+                                       _keepers_holding_the_images)
+    keepers = pane._trees[LANDSCAPE].topLevelItem(0)
+    all_row = pane._trees[LANDSCAPE].topLevelItem(1)
+    images = next(row for row in _children(all_row) if row.data(0, GROUP_ROLE) is model[0])
+
+    assert [_drawn_down(row) for row in _children(keepers)] == [_drawn_down(images)]
+
+
+def test_every_row_inside_a_folder_of_your_own_has_a_key_of_its_own_naming_its_folder(qtbot):
+    pane, tree, _model = _gathered_tree(qtbot, [_image("i1", "a cat"), _image("i2", "a dog")],
+                                        _keepers_holding_the_images)
+    rows = [row for _depth, row in _rows_by_depth(pane._trees[LANDSCAPE])]
+    keys = [row.data(0, TREE_KEY_ROLE) for row in rows]
+
+    assert len(set(keys)) == len(keys)
+    assert all(tree.item_by_key[key] is row for key, row in zip(keys, rows))
+    assert all(side_of(key) == LANDSCAPE for key in keys)
+    assert all(base_of(key) == row.data(0, GROUP_ROLE).key
+               for key, row in zip(keys, rows) if row.data(0, GROUP_ROLE) is not None)
+
+
+def test_an_item_belongs_to_its_folder_in_its_own_place_not_to_a_copy_of_it(qtbot):
+    _pane, tree, _model = _gathered_tree(qtbot, [_image("i1", "a cat")],
+                                         _keepers_holding_the_images)
+
+    assert tree.breadcrumb(tree.leaf_by_id["i1"]).startswith("Landscape  ›  All  ›  ")
+
+
+def _outer_holding_inner_holding_the_images(model):
+    inner = _folder_of_your_own(2, "Inner", [model[0]])
+    return [_folder_of_your_own(1, "Outer", [inner]), inner]
+
+
+def test_a_folder_of_your_own_inside_another_shows_under_it_as_it_shows_on_its_own(qtbot):
+    pane, _tree, _model = _gathered_tree(qtbot, [_image("i1", "a cat")],
+                                         _outer_holding_inner_holding_the_images)
+    half = pane._trees[LANDSCAPE]
+    outer, inner = half.topLevelItem(0), half.topLevelItem(1)
+    (inner_inside_outer,) = _children(outer)
+
+    assert _drawn_down(inner_inside_outer) == _drawn_down(inner)
+    assert inner_inside_outer.data(0, DROP_KEY_ROLE) == inner.data(0, DROP_KEY_ROLE)
+    assert inner_inside_outer.toolTip(0) == inner.toolTip(0)
+
+
+def test_a_folder_drawn_again_inside_a_folder_of_your_own_is_found_first_in_its_own_place(qtbot):
+    _pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat")],
+                                        _keepers_holding_the_images)
+    own, again = tree.keys_for_folder(model[0].key)
+
+    assert tree.breadcrumb(tree.item_by_key[own]) == "Landscape  ›  All  ›  Images"
+    assert tree.breadcrumb(tree.item_by_key[again]) == "Landscape  ›  Keepers  ›  Images"
+
+
+def test_a_folder_worked_in_lately_wears_its_mark_inside_a_folder_of_your_own_too(qtbot):
+    rows = [_image("i1", "a cat")]
+    leaf_key = gallery.settings_folder_key(rows[0], {})
+    _pane, tree, _model = _gathered_tree(qtbot, rows, _keepers_holding_the_images,
+                                         recently_worked=[(LANDSCAPE, leaf_key)])
+
+    marked = [tree.breadcrumb(row) for row in tree.item_by_key.values()
+              if row.data(0, RECENT_ROLE)]
+    assert [path.split("  ›  ")[1] for path in marked] == ["All", "Keepers"]

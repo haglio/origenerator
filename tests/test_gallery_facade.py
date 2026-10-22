@@ -51,7 +51,7 @@ PUBLISHED = {
     "lora_signature", "match_command",
     "media_type_of_row", "model_label", "model_signature",
     "new_work_opens_a_section", "original_files_of",
-    "output_disk_files",
+    "outermost", "output_disk_files",
     "output_file_path", "output_file_reference", "parse_params",
     "produced_output", "prompts_differ_from", "recent_generations", "recently_worked_folders", "recognized_spelling",
     "remove_enhance_levels", "requested_generations", "rerollable", "resolve_preview",

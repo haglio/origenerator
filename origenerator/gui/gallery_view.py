@@ -1783,7 +1783,7 @@ class GalleryView(QWidget):
         return [SideModel(
             side=side,
             tree_model=trees[side],
-            custom_folders=self._custom_folders_by_side[side],
+            custom_folders=gallery.outermost(self._custom_folders_by_side[side]),
             show_recents=bool(trees[side]),
             collection_counts=self._browser.collection_counts(side),
         ) for side in self._tree.sides]
@@ -2376,10 +2376,11 @@ class GalleryView(QWidget):
         item = self._item_by_key.get(key)
         if item is not None:
             return item
-        if _side_of(key) in self._tree.sides:
-            return None
         folder = _base_of(key)
         drawn = self._tree_view.keys_for_folder(folder)
+        if _side_of(key) in self._tree.sides:
+            return next((self._item_by_key[row] for row in drawn
+                         if _side_of(row) == _side_of(key)), None)
         if not drawn:
             return None
         here = oriented_key(folder, self.side_in_view())

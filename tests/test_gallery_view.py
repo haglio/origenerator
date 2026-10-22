@@ -14453,7 +14453,7 @@ def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
     assert outer["folders"] == [cat, inner]
     assert _shown(_top_level(view._tree)["Outer"]) == "(2) Outer"
     assert view._browser._visible_keys == [cat, inner]  # landed on it
-    assert "Inner" in _top_level(view._tree)  # still a folder of its own in the TOC
+    assert "Inner" not in _top_level(view._tree)
 
 
 def test_a_custom_folder_cannot_go_inside_one_it_holds(qtbot):
@@ -14463,8 +14463,11 @@ def test_a_custom_folder_cannot_go_inside_one_it_holds(qtbot):
     view.show()
     qtbot.waitExposed(view)
     mime = _folder_drag(view, outer)
+    outer_row = _top_level(view._tree)["Outer"]
+    outer_row.setExpanded(True)
+    (inner_row,) = _subs(outer_row)
 
-    assert not _drop_on(_top_level(view._tree)["Inner"], mime)
+    assert not _drop_on(inner_row, mime)
 
     inner_record = next(r for r in view._db.list_custom_folders() if r["name"] == "Inner")
     assert inner_record["folders"] == [cat]
@@ -14749,6 +14752,45 @@ def test_a_folder_under_a_folder_of_your_own_in_the_list_can_be_taken_out_of_it(
     _tree_menu(view, under_mine.data(0, TREE_KEY_ROLE))
 
     assert view._db.list_custom_folders()[0]["folders"] == []
+
+
+def test_a_folder_of_your_own_put_inside_another_leaves_the_top_of_the_list(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
+
+    _make_folder(view, "Outer", [inner])
+
+    assert "Inner" not in _top_level(view._tree)
+    assert [_key(row) for row in _subs(_top_level(view._tree)["Outer"])] == [inner]
+
+
+def test_standing_on_a_folder_of_your_own_as_it_goes_inside_another_stays_on_it(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    inner_id = _make_folder(view, "Inner", [cat])
+    view._tree.setCurrentItem(_top_level(view._tree)["Inner"])
+
+    _make_folder(view, "Outer", [gallery.custom_folder_key(inner_id)])
+
+    here = view._tree.currentItem()
+    assert (_key(here), here.parent()) == (gallery.custom_folder_key(inner_id),
+                                           _top_level(view._tree)["Outer"])
+
+
+def test_an_item_dropped_on_a_folder_of_your_own_inside_another_opens_it_there(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
+    _make_folder(view, "Outer", [inner])
+    view.show()
+    qtbot.waitExposed(view)
+    outer_row = _top_level(view._tree)["Outer"]
+    outer_row.setExpanded(True)
+    (inner_row,) = _subs(outer_row)
+    mime = generation_mime("i2")
+
+    assert _drop_on(inner_row, mime)
+
+    here = view._tree.currentItem()
+    assert (_key(here), here.parent()) == (inner, _top_level(view._tree)["Outer"])
 
 
 def test_a_custom_folder_inside_another_can_be_taken_back_out_of_it(qtbot, monkeypatch):

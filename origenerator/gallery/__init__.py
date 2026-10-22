@@ -45,6 +45,7 @@ from origenerator.gallery.custom import (
     custom_folder_id,
     custom_folder_key,
     holds,
+    outermost,
     selection_group,
 )
 from origenerator.gallery.enhance import (
@@ -257,6 +258,7 @@ __all__ = [
     "model_signature",
     "new_work_opens_a_section",
     "original_files_of",
+    "outermost",
     "output_disk_files",
     "output_file_path",
     "output_file_reference",

@@ -376,7 +376,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the relays that carried a drag to Combine went, the slot's own light switch,
 # and the Enhance panel's own way of taking a drop.
 # 17395 when a folder of your own came to show its folders under it in the TOC.
-MAX_PROSE_LINES = 17395
+# 17393 when a settings folder came to be keyed by the model its run recorded, and
+# the settings folders' builder lost a tooltip detail it no longer makes.
+MAX_PROSE_LINES = 17393
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

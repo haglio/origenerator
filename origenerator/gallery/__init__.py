@@ -119,6 +119,7 @@ from origenerator.gallery.output import (
 )
 from origenerator.gallery.signatures import (
     GENERATION_SEED_KEYS,
+    folder_signature,
     generation_seed,
     is_image_conditioned,
     lora_signature,
@@ -230,6 +231,7 @@ __all__ = [
     "folder_key_at_level",
     "folder_level",
     "folder_names_by_row",
+    "folder_signature",
     "generation_of_file",
     "generation_seed",
     "group_level",

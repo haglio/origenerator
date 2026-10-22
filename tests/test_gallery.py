@@ -610,9 +610,12 @@ def test_a_video_reroll_on_the_same_frame_stays_in_its_folder():
     frame = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
     index = build_image_config_index([frame])
 
+    model_and_loras = {key: wf.default_params()[key]
+                       for key in ("unet_high", "unet_low", "lora_high", "lora_low")}
     sparse = _row(
         workflow_name="wan22_i2v",
-        params_json=json.dumps({"positive_prompt": "a wave", "input_image": "sdxl_t2i_fa.png"}),
+        params_json=json.dumps({"positive_prompt": "a wave", "input_image": "sdxl_t2i_fa.png",
+                                **model_and_loras}),
         output_files=json.dumps([{"filename": "wan22_i2v_a.mp4"}]),
     )
     reroll_params = prepared_params(sparse, wf)  # exactly what the gallery re-roll runs
@@ -664,6 +667,28 @@ def test_i2v_import_with_derived_size_shares_a_folder_with_a_generation():
         output_files=json.dumps([{"filename": "wan22_i2v_i.mp4"}]),
     )
     assert settings_folder_key(imported) == settings_folder_key(generated)
+
+
+def _settings_folders(groups):
+    for group in groups:
+        if isinstance(group, SettingsGroup):
+            yield group
+        yield from _settings_folders(child_groups(group))
+
+
+def test_a_run_that_recorded_no_model_never_shares_a_folder_key_with_the_default_models_run():
+    named = dict(WORKFLOW_REGISTRY["wan22_t2i"].default_params(), positive_prompt="a lighthouse")
+    rows = [
+        _row(prompt_id="named", workflow_name="wan22_t2i", params_json=json.dumps(named),
+             output_files=json.dumps([{"filename": "wan22_t2i_named.png"}])),
+        _row(prompt_id="unrecorded", workflow_name="wan22_t2i",
+             params_json=json.dumps({"positive_prompt": "a lighthouse"}),
+             output_files=json.dumps([{"filename": "wan22_t2i_unrecorded.png"}])),
+    ]
+
+    folders = list(_settings_folders(build_gallery_tree(rows, {})))
+
+    assert len({folder.key for folder in folders}) == len(folders) == 2
 
 
 def test_a_recipes_model_and_lora_are_read_once_however_often_they_are_asked(monkeypatch):

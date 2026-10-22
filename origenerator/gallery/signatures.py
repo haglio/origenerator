@@ -330,7 +330,7 @@ def settings_signature(
     image_index: dict | None = None,
     workflow_version: str | None = None,
 ) -> str:
-    """Canonical grouping key: a row's normalized settings (see
+    """The settings a form would remake a row with: normalized (see
     :func:`canonical_settings`), order-independent — the enhancement layer
     excluded, so an enhanced render keys the same as its unenhanced twin.
 
@@ -347,11 +347,35 @@ def settings_signature(
     stored row passes its ``workflow_version`` column; ``None`` (a live form's
     prospective settings) means the current version.
     """
-    frame = None
-    if is_image_conditioned(workflow_name):
-        frame = _input_image_config(_input_image_of(params_json), image_index,
-                                    identify=_outputs_video(workflow_name))
-    return _signature_of(workflow_name, params_json, workflow_version, frame)
+    return _signature_of(workflow_name, params_json, workflow_version,
+                         _frame_of(workflow_name, params_json, image_index), filed=False)
+
+
+def folder_signature(
+    workflow_name: str | None,
+    params_json: str | None,
+    image_index: dict | None = None,
+    workflow_version: str | None = None,
+) -> str:
+    """:func:`settings_signature` as a settings folder is keyed by it: a model or
+    LoRA the row never recorded reads as none, as the folders above it read one."""
+    return _signature_of(workflow_name, params_json, workflow_version,
+                         _frame_of(workflow_name, params_json, image_index), filed=True)
+
+
+def _frame_of(workflow_name: str | None, params_json: str | None,
+              image_index: dict | None) -> str | None:
+    if not is_image_conditioned(workflow_name):
+        return None
+    return _input_image_config(_input_image_of(params_json), image_index,
+                               identify=_outputs_video(workflow_name))
+
+
+def _unrecorded_choices(workflow_name: str | None, params: dict, settings: dict) -> dict:
+    loras = workflow_lora_keys(workflow_name)
+    return {key: None for key in (*workflow_model_keys(workflow_name), *loras)
+            if key in settings and key not in params
+            and not (key in loras and is_no_lora(settings[key]))}
 
 
 @lru_cache(maxsize=READINGS_KEPT)
@@ -361,9 +385,12 @@ def _input_image_of(params_json: str | None):
 
 @lru_cache(maxsize=READINGS_KEPT)
 def _signature_of(workflow_name: str | None, params_json: str | None,
-                  workflow_version: str | None, frame: str | None) -> str:
+                  workflow_version: str | None, frame: str | None, *, filed: bool) -> str:
+    params = parse_params(params_json)
+    settings = canonical_settings(workflow_name, params)
     settings = {
-        **canonical_settings(workflow_name, parse_params(params_json)),
+        **settings,
+        **(_unrecorded_choices(workflow_name, params, settings) if filed else {}),
         "workflow_version": _grouping_version(workflow_name, workflow_version),
     }
     if frame is not None:

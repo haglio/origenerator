@@ -71,12 +71,12 @@ from origenerator.gallery.signatures import (
     _input_image_config,
     canonical_settings,
     enhance_settings,
+    folder_signature,
     is_image_conditioned,
     lora_signature,
     model_signature,
     parse_params,
     settings_only,
-    settings_signature,
 )
 from origenerator.gallery.source_image import build_image_config_index
 from origenerator.generation_state import GenerationSource, source_of
@@ -94,7 +94,7 @@ def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
     """The key of the settings-folder leaf a row belongs to in the gallery tree.
 
     Mirrors how :func:`build_gallery_tree` keys that leaf — media type, workflow
-    name, settings signature — so an in-flight row (which has no output yet and so
+    name, folder signature — so an in-flight row (which has no output yet and so
     never appears in the tree itself) can still be matched to the folder it joins.
     ``image_index`` must be the same one the tree was built with (see
     :func:`build_image_config_index`) so an image-conditioned row keys to the same
@@ -104,8 +104,8 @@ def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
     workflow_name = row.get("workflow_name") or "unknown"
     return settings_key(
         media_type, workflow_name,
-        settings_signature(workflow_name, row.get("params_json"), image_index,
-                           workflow_version=row.get("workflow_version")),
+        folder_signature(workflow_name, row.get("params_json"), image_index,
+                         workflow_version=row.get("workflow_version")),
     )
 
 
@@ -500,19 +500,15 @@ class _Tier:
 def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]:
     """The settings-group leaves under one model, LoRA, or source-image folder.
 
-    Rows collapse by settings signature (all non-instance params, plus an i2v's
+    Rows collapse by folder signature (all non-instance params, plus an i2v's
     start-frame configuration). A leaf is *named* by its key (see
-    :func:`~origenerator.gallery.keys.folder_id`) — the prompt it ran is a
-    paragraph, and a folder name is a line — and what the prompt said rides its
-    ``detail`` instead, for the tooltip. That detail is disambiguated only
-    against its siblings under the same parent, so a value the folder above
-    already pins (the model, the LoRA, and for an i2v the source image) is
-    constant here and never re-appears in it.
+    :func:`~origenerator.gallery.keys.folder_id`): the prompt it ran is a
+    paragraph, and a folder name is a line.
     """
     grouped = _group_by_creation(
-        rows, lambda r: settings_signature(tier.workflow_name, r.get("params_json"),
-                                           tier.image_index,
-                                           workflow_version=r.get("workflow_version"))
+        rows, lambda r: folder_signature(tier.workflow_name, r.get("params_json"),
+                                         tier.image_index,
+                                         workflow_version=r.get("workflow_version"))
     )
     groups = []
     for sig, sig_rows in grouped:

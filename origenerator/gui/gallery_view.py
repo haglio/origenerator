@@ -219,6 +219,18 @@ def _offer_taking_out(menu: QMenu, open_custom, group):
     return None
 
 
+def _row_under(row, folder_key: str):
+    if row is None or _side_of(folder_key) is not None:
+        return None
+    return next((child for child in (row.child(i) for i in range(row.childCount()))
+                 if _base_of(child.data(0, _TREE_KEY_ROLE)) == folder_key), None)
+
+
+def _folder_of_your_own_above(rows):
+    parent = rows[0].parent()
+    return _saved_custom_folder(parent.data(0, _GROUP_ROLE)) if parent is not None else None
+
+
 def _saved_custom_folder(group):
     return group if isinstance(group, gallery.CustomGroup) and group.folder_id is not None else None
 
@@ -2090,7 +2102,7 @@ class GalleryView(QWidget):
         open; without it the field would still be full while the pane shows the
         folder it drilled into.
         """
-        item = self._tree_item_for(key)
+        item = _row_under(self._tree.currentItem(), key) or self._tree_item_for(key)
         if item is not None:
             self._search.leave()
             self._tree.setCurrentItem(item)
@@ -4091,14 +4103,15 @@ class GalleryView(QWidget):
         group = self.group_for_key(key)
         if group is None:
             return
+        holder = (_folder_of_your_own_above(toc_rows) if toc_rows
+                  else _saved_custom_folder(self.current_group()))
         if isinstance(group, gallery.CustomGroup):
-            self._custom_folder_context_menu(group, global_pos)
+            self._custom_folder_context_menu(group, global_pos, holder, toc_rows)
             return
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
         favorite_action = menu.addAction("Unfavorite" if group.favorite else "Favorite")
-        open_custom = _saved_custom_folder(self.current_group())
-        remove_action = _offer_taking_out(menu, open_custom, group)
+        remove_action = _offer_taking_out(menu, holder, group)
         add_menu = self._add_to_folder_menu(menu, key)
         delete_action = None
         if _is_deletable_folder(group):
@@ -4109,7 +4122,7 @@ class GalleryView(QWidget):
         if chosen == favorite_action:
             self._toggle_favorite(key)
         elif remove_action is not None and chosen == remove_action:
-            self._remove_from_custom_folder(open_custom, [group.key])
+            self._remove_from_custom_folder(holder, [group.key])
         elif chosen in add_menu:
             self._on_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
@@ -4130,17 +4143,19 @@ class GalleryView(QWidget):
         submenu = menu.addMenu("Add to folder")
         return {submenu.addAction(folder.label): folder.key for folder in targets}
 
-    def _custom_folder_context_menu(self, group, global_pos: QPoint):
+    def _custom_folder_context_menu(self, group, global_pos: QPoint, holder, toc_rows):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
-        open_custom = _saved_custom_folder(self.current_group())
-        take_out_action = _offer_taking_out(menu, open_custom, group)
+        take_out_action = _offer_taking_out(menu, holder, group)
         remove_action = menu.addAction("Remove folder…")
+        collapse_and_expand = offer_collapse_and_expand(menu, toc_rows)
         chosen = menu.exec(global_pos)
         if take_out_action is not None and chosen == take_out_action:
-            self._remove_from_custom_folder(open_custom, [group.key])
+            self._remove_from_custom_folder(holder, [group.key])
         elif chosen == remove_action:
             self._remove_custom_folder(group)
+        elif chosen in collapse_and_expand:
+            collapse_and_expand[chosen]()
 
     def _toggle_favorite(self, key: str):
         # A star is the folder's, not the row's: both sides draw the same folder,

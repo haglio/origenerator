@@ -305,3 +305,16 @@ def test_a_folder_worked_in_lately_wears_its_mark_inside_a_folder_of_your_own_to
     marked = [tree.breadcrumb(row) for row in tree.item_by_key.values()
               if row.data(0, RECENT_ROLE)]
     assert [path.split("  ›  ")[1] for path in marked] == ["All", "Keepers"]
+
+
+def test_a_folder_left_open_inside_a_folder_of_your_own_is_open_again_after_a_rebuild(qtbot):
+    pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat")],
+                                       _keepers_holding_the_images)
+    own, again = tree.keys_for_folder(model[0].key)
+    tree.item_by_key[again].setExpanded(True)
+
+    tree.populate([SideModel(LANDSCAPE, model, custom_folders=_keepers_holding_the_images(model)),
+                   SideModel(PORTRAIT, [])])
+
+    assert tree.item_by_key[again].isExpanded()
+    assert not tree.item_by_key[own].isExpanded()

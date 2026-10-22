@@ -371,8 +371,8 @@ def test_a_bed_switched_on_in_a_frozen_room_waits_for_it_to_play(qtbot, tmp_path
 # --- a voice's own player ----------------------------------------------------
 
 _STOP_A_VOICE_WHILE_PYTHON_IS_BUSY = textwrap.dedent("""
-    import ctypes, os, sys, time
-    from tests.children import say_where_it_hangs
+    import ctypes, sys, time
+    from tests.children import end_outright, say_where_it_hangs
     say_where_it_hangs()
     from PyQt6.QtCore import QEventLoop, QTimer, QUrl
     from PyQt6.QtMultimedia import QMediaPlayer
@@ -416,7 +416,7 @@ _STOP_A_VOICE_WHILE_PYTHON_IS_BUSY = textwrap.dedent("""
     while time.perf_counter() < held_until:
         pass
     print("waiting to enter Python:", threads_waiting_to_enter_python(), flush=True)
-    os._exit(0)
+    end_outright()
 """)
 
 

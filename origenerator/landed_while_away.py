@@ -75,7 +75,7 @@ def _training_ended(job: dict, announce) -> bool:
     status = fix_training.read_status(job) or {}
     notice = notice_for(fix_training.outcome_of(
         job, ok=status.get("state") == "done",
-        seconds=None if trainer is None else time.time() - trainer.began))
+        seconds=None if trainer is None else fix_training.time_taken(job, trainer)))
     if notice is not None:
         announce(notice)
     return True

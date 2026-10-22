@@ -4,6 +4,8 @@ import json
 import time
 from pathlib import Path
 
+import pytest
+
 from origenerator import config, fix_training
 from origenerator.gui import fix_training_run
 from origenerator.gui.fix_training_run import FixTrainingRun
@@ -32,7 +34,7 @@ class _Trainer:
     def __init__(self):
         self.alive = True
         self.stopped = 0
-        self.began = time.time()
+        self.began = time.time() - 30
 
     def running(self) -> bool:
         return self.alive
@@ -108,22 +110,28 @@ def test_a_training_reads_how_far_its_cropping_and_then_its_steps_have_got(
     qtbot.waitUntil(lambda: run.reading().progress == (30, 2000))
 
 
-def test_a_training_counts_down_from_how_long_the_last_ones_took_and_adds_its_own(
+def test_a_training_counts_down_from_how_long_the_last_ones_took(qtbot, monkeypatch, tmp_path):
+    run, _queue, started = _run(qtbot, monkeypatch, tmp_path)
+    monkeypatch.setattr(fix_training, "typical_seconds", lambda: 2500.0)
+    run.begin()
+    qtbot.waitUntil(lambda: bool(started))
+
+    assert run.reading().typical_seconds == 2500.0
+
+
+def test_a_finished_trainings_time_is_noted_where_its_lora_is_taken_not_by_the_run(
         qtbot, monkeypatch, tmp_path):
     noted = []
     run, _queue, started = _run(qtbot, monkeypatch, tmp_path)
-    monkeypatch.setattr(fix_training, "typical_seconds", lambda: 2500.0)
     monkeypatch.setattr(fix_training, "note_duration", noted.append)
     run.begin()
     qtbot.waitUntil(lambda: bool(started))
-    assert run.reading().typical_seconds == 2500.0
 
     with qtbot.waitSignal(run.finished):
         _say(tmp_path, state="done", lora="hands 2026-10-21 1500.safetensors")
         started[0].alive = False
 
-    (seconds,) = noted
-    assert 0 <= seconds < 60
+    assert noted == []
 
 
 def test_a_finished_training_lets_the_queue_go_and_names_the_lora_it_made(
@@ -139,7 +147,7 @@ def test_a_finished_training_lets_the_queue_go_and_names_the_lora_it_made(
     assert made.args == [fix_training.lora_of({"lora": "hands 2026-10-19 0130.safetensors"})]
     (outcome,) = queue.ended
     assert (outcome.kind, outcome.recipe, outcome.ok) == ("Training", "Hands fix", True)
-    assert 0 <= outcome.seconds < 60
+    assert outcome.seconds == pytest.approx(30, abs=10)
     assert not run.running
 
 

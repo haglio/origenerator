@@ -109,6 +109,14 @@ def _durations() -> list[float]:
         return []
 
 
+def time_taken(job: dict, trainer: Trainer) -> float:
+    try:
+        ended = Path(job["status"]).stat().st_mtime
+    except OSError:
+        ended = time.time()
+    return ended - trainer.began
+
+
 def note_duration(seconds: float) -> None:
     _durations_file().parent.mkdir(parents=True, exist_ok=True)
     _durations_file().write_text(json.dumps((_durations() + [seconds])[-10:]), encoding="utf-8")

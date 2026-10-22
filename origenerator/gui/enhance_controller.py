@@ -185,6 +185,9 @@ class EnhanceController:
 
     def _take(self, job: dict, lora: str) -> None:
         self.panel.use_fix_lora(job["part"], lora)
+        trainer = fix_training.trainer_of(job)
+        if trainer is not None:
+            fix_training.note_duration(fix_training.time_taken(job, trainer))
         fix_training.mark_taken(job)
 
     # --- what it runs at ------------------------------------------------------

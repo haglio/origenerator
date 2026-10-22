@@ -8,20 +8,15 @@ play (see :mod:`origenerator.orientation`).
 
 A row's key in the tree is therefore its folder's own key with the side
 appended, and the two maps kept here — key→item and prompt-id→item — are keyed
-that way. The folder's own key is what a star, a name and a place in a custom
+that way; a folder drawn again under a folder of your own adds the folders it is
+drawn inside. The folder's own key is what a star, a name and a place in a custom
 folder hang off, and it is untouched: ``keys_by_folder`` maps one back to
-the rows drawing it, which is how a navigation that knows only a folder key
-(a re-roll, a combine, a folder tile) finds a row to select.
+the rows drawing it, its own place first, which is how a navigation that knows
+only a folder key (a re-roll, a combine, a folder tile) finds a row to select.
 
 Pure rendering and lookups over the pane the GalleryView owns and lays out; it
 has no database or refresh concerns — folder star/delete live in the view,
 which rebuilds every side through :meth:`populate`.
-
-The folders the user composed by hand are drawn flat: a custom folder's items
-can sit anywhere in the hierarchy, so nesting them under it would draw the same
-folder twice and put two rows in ``item_by_key`` for one key. Its contents show
-as tiles in the browser pane instead, exactly as a Favorites collection shows its
-bookmarked folders.
 """
 from __future__ import annotations
 
@@ -86,6 +81,10 @@ def _tooltip_of(group, badge) -> str:
     if badge is None or isinstance(group, gallery.SettingsGroup) or badge[1] == group.label:
         return group.label
     return f"{group.label} · {badge[1]}"
+
+
+def _inside(group, inside: tuple) -> tuple:
+    return (*inside, group.key) if inside else ()
 
 
 def _shown_collections(side) -> list[str]:
@@ -163,12 +162,14 @@ class GalleryTree:
         for is still somewhere you can stand and somewhere its first generation
         can appear.
         """
-        for custom in side.custom_folders:
-            self._add_custom_folder(root, custom, side.side)
+        customs = [(custom, self._add_custom_folder(custom, root, side))
+                   for custom in side.custom_folders]
         all_row = self._add_node(gallery.all_group(side.tree_model, folder_meta), root, side)
         all_row.setIcon(0, icons.all_icon())
+        for custom, row in customs:
+            self._add_children(custom, row, side, (custom.key,))
 
-    def _add_collections(self, folder_item, side, folder_key: str) -> None:
+    def _add_collections(self, folder_item, side, folder_key: str, inside=()) -> None:
         for collection in _shown_collections(side):
             key = FolderCollection(collection, folder_key).key
             item = QTreeWidgetItem([COLLECTION_LABELS[collection]])
@@ -177,7 +178,7 @@ class GalleryTree:
             item.setToolTip(0, _COLLECTION_TIPS[collection])
             if collection == FAVORITES_KEY:
                 item.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
-            self._register(item, oriented_key(key, side.side), folder_item,
+            self._register(item, oriented_key(key, side.side, inside), folder_item,
                            folder_key=key)
 
     def _register(self, item, key: str, parent_item,
@@ -193,7 +194,7 @@ class GalleryTree:
         tier, so every kind of row answers to the one rule; the tooltip says
         what the mark means, since a dot nothing explains is a riddle."""
         item.setData(0, TREE_KEY_ROLE, key)
-        if key in self._recently_worked:
+        if oriented_key(*split_key(key)) in self._recently_worked:
             item.setData(0, RECENT_ROLE, True)
             item.setToolTip(0, f"{item.toolTip(0)} · worked in recently")
         parent_item.addChild(item)
@@ -215,7 +216,7 @@ class GalleryTree:
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
 
-    def _add_custom_folder(self, side_item, group, side) -> QTreeWidgetItem:
+    def _add_custom_folder(self, group, parent_item, side, inside=()) -> QTreeWidgetItem:
         """Add a row for one of the user's own folders: a collection-shaped row carrying
         its group (so the view's folder machinery — breadcrumb, tiles, slideshow —
         treats it like any other folder), and collecting the folders dropped onto
@@ -228,10 +229,21 @@ class GalleryTree:
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, count)
         item.setData(0, DROP_KEY_ROLE, group.key)  # the folder gathers, not the side
-        return self._register(item, oriented_key(group.key, side), side_item,
+        return self._register(item, oriented_key(group.key, side.side, inside), parent_item,
                               folder_key=group.key)
 
-    def _add_node(self, group, parent_item, side) -> QTreeWidgetItem:
+    def _add_node(self, group, parent_item, side, inside=()) -> QTreeWidgetItem:
+        if isinstance(group, gallery.CustomGroup):
+            item = self._add_custom_folder(group, parent_item, side, inside)
+        else:
+            item = self._add_folder(group, parent_item, side, inside)
+        self._add_children(group, item, side, _inside(group, inside))
+        if isinstance(group, gallery.SettingsGroup) and not inside:
+            for row in group.rows:
+                self.leaf_by_id[row["prompt_id"]] = item
+        return item
+
+    def _add_folder(self, group, parent_item, side, inside) -> QTreeWidgetItem:
         item = QTreeWidgetItem([group.label])
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
@@ -239,16 +251,15 @@ class GalleryTree:
         if badge is not None:
             item.setIcon(0, badge[0])
         item.setToolTip(0, _tooltip_of(group, badge))
-        self._register(item, oriented_key(group.key, side.side), parent_item,
+        self._register(item, oriented_key(group.key, side.side, inside), parent_item,
                        folder_key=group.key)
         if not isinstance(group, gallery.SettingsGroup):
-            self._add_collections(item, side, group.key)
-        for child in gallery.child_groups(group):
-            self._add_node(child, item, side)
-        if isinstance(group, gallery.SettingsGroup):
-            for row in group.rows:
-                self.leaf_by_id[row["prompt_id"]] = item
+            self._add_collections(item, side, group.key, _inside(group, inside))
         return item
+
+    def _add_children(self, group, item, side, inside) -> None:
+        for child in gallery.child_groups(group):
+            self._add_node(child, item, side, inside)
 
     def collections_in(self, item) -> list[str]:
         return [child.data(0, TREE_KEY_ROLE) for child in _children(item)

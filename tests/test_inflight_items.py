@@ -211,6 +211,12 @@ def test_a_training_holding_the_line_waits_after_what_comfyui_holds_and_before_t
     assert (training.canceled, training.revealed) == (1, 1)
 
 
+def test_a_trainings_row_offers_no_shield_since_nothing_is_sent_while_it_runs(build):
+    items = build([], training=FakeTraining())
+
+    assert (items[0].shield, items[0].shielded) == (None, False)
+
+
 def test_a_looping_folders_run_offers_next_seed_rather_than_stop(build):
     key = "image/sdxl_t2i/aaa"
     items = build([_row("g1", status="running")],

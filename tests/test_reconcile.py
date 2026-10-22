@@ -197,8 +197,8 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
     # Simulate a *future* settings-key formula change: the folder's key shifts.
     # Patch where the tree builder looks the signature up (settings_folder_key and
     # build_gallery_tree both resolve it in gallery.tree), not the facade re-export.
-    original = gallery.settings_signature
-    monkeypatch.setattr(gallery.tree, "settings_signature",
+    original = gallery.folder_signature
+    monkeypatch.setattr(gallery.tree, "folder_signature",
                         lambda *a, **kw: original(*a, **kw) + "X")
     new_key = gallery.settings_folder_key(row)
     assert new_key != key
@@ -414,8 +414,8 @@ def test_reconcile_remaps_a_gathered_folder_through_its_stored_identity(tmp_path
     _folder_holding(db, (key, "settings", "p1"))  # as a prior reconcile left it
 
     # Simulate a *future* settings-key formula change (see the star test above).
-    original = gallery.settings_signature
-    monkeypatch.setattr(gallery.tree, "settings_signature",
+    original = gallery.folder_signature
+    monkeypatch.setattr(gallery.tree, "folder_signature",
                         lambda *a, **kw: original(*a, **kw) + "X")
     new_key = gallery.settings_folder_key(row)
     assert new_key != key

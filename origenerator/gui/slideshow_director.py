@@ -853,9 +853,9 @@ class SlideshowDirector:
         workflow_name = row.get("workflow_name") or ""
         return gallery.config_folder_name(
             workflow_name,
-            gallery.settings_signature(workflow_name, row.get("params_json"),
-                                       self._host.image_config_index(),
-                                       workflow_version=row.get("workflow_version")),
+            gallery.folder_signature(workflow_name, row.get("params_json"),
+                                     self._host.image_config_index(),
+                                     workflow_version=row.get("workflow_version")),
             self._db.folder_meta_map(),
         )
 

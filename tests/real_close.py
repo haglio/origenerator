@@ -16,6 +16,7 @@ import weakref
 from pathlib import Path
 
 import tests.conftest as suite
+from tests.children import say_where_it_hangs
 
 # isort: split
 from PyQt6 import sip
@@ -63,6 +64,7 @@ def _built_then_closed(build):
 
 
 def main() -> int:
+    say_where_it_hangs()
     for keep_off in (suite.keep_the_microphone_shut, suite.refuse_the_comfyui_on_this_machine,
                      suite.keep_off_the_device, suite.keep_out_of_windows, suite.keep_silent,
                      suite.refuse_the_dialogs_nobody_can_answer):

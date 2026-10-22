@@ -3,15 +3,12 @@ from __future__ import annotations
 
 import os
 import stat
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
+from tests.children import run_python
 from tests.scratch import remove_scratch
-
-_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 _A_SUITE_THAT_LOGS_INTO_ITS_STATE_DIR = """
 import logging, sys
@@ -69,7 +66,6 @@ def test_the_suite_state_dir_goes_at_exit_with_the_apps_log_still_open_in_it(tmp
     standing in the system temp dir, each holding its origenerator.log."""
     state = _scratch_in(tmp_path)
 
-    subprocess.run([sys.executable, "-c", _A_SUITE_THAT_LOGS_INTO_ITS_STATE_DIR, str(state)],
-                   cwd=_REPO_ROOT, capture_output=True, text=True, check=True)
+    run_python(["-c", _A_SUITE_THAT_LOGS_INTO_ITS_STATE_DIR, str(state)], check=True)
 
     assert not state.exists()

@@ -49,6 +49,7 @@ from origenerator.fun_time_mode import OFFER_NAME
 from origenerator.gui.export_lane import GENAU
 from origenerator.gui.loading_screen import LoadingCanceled, loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
+from tests.children import run_python
 from tests.hosted_launch import hosted_launch
 from tests.loading_screens import opened_here
 from tests.media_files import write_mp4_with_a_comment_tag
@@ -89,10 +90,7 @@ def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
         app.exec()
         print("still running", flush=True)
     """)
-    ran = subprocess.run([sys.executable, "-c", child], cwd=REPO_ROOT, timeout=120,
-                         env=os.environ | {"QT_QPA_PLATFORM": "offscreen"},
-                         capture_output=True, encoding="utf-8", errors="replace",
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    ran = run_python(["-c", child], env=os.environ | {"QT_QPA_PLATFORM": "offscreen"})
 
     assert "still running" in ran.stdout, ran.stdout + ran.stderr
     logged = (state / "origenerator.log").read_text(encoding="utf-8")
@@ -109,12 +107,11 @@ def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
     what makes it impossible -- nothing left for the walk -- in a real launch and a
     real close, which only a process of its own can show."""
     said = tmp_path / "owned when the application went.json"
-    ran = subprocess.run([sys.executable, "-m", "tests.real_close", str(said)],
-                         cwd=REPO_ROOT, timeout=240,
-                         env=os.environ | {"QT_QPA_PLATFORM": "offscreen",
-                                           "ORIGENERATOR_STATE_DIR": str(tmp_path / "state")},
-                         capture_output=True, encoding="utf-8", errors="replace",
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    state = tmp_path / "state"
+    ran = run_python(["-m", "tests.real_close", str(said)],
+                     env=os.environ | {"QT_QPA_PLATFORM": "offscreen",
+                                       "ORIGENERATOR_STATE_DIR": str(state)},
+                     logs=[state / "origenerator.log", state / "origenerator_crash.log"])
 
     assert ran.returncode == 0, ran.stdout + ran.stderr
     assert json.loads(said.read_text(encoding="utf-8")) == {}
@@ -148,9 +145,7 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
     rules_of_its_own = {"QT_LOGGING_RULES", "QT_LOGGING_CONF", "QT_FFMPEG_DEBUG"}
     env = {k: v for k, v in os.environ.items() if k not in rules_of_its_own} | {
         "QT_QPA_PLATFORM": "offscreen", "QT_MEDIA_BACKEND": "ffmpeg"}
-    ran = subprocess.run([sys.executable, "-c", child], cwd=REPO_ROOT, env=env, timeout=120,
-                         capture_output=True, encoding="utf-8", errors="replace",
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    ran = run_python(["-c", child], env=env)
 
     assert "finished with LoadedMedia" in ran.stdout, ran.stdout + ran.stderr
     written = ran.stdout + ran.stderr + (state / "origenerator.log").read_text(encoding="utf-8")
@@ -590,10 +585,7 @@ def test_the_loop_run_only_to_quit_lets_go_of_everything_that_waits_on_a_quit():
         _run_the_loop_only_to_quit(app)
         print("the loop returned", flush=True)
     """)
-    ran = subprocess.run([sys.executable, "-c", child], cwd=REPO_ROOT, timeout=120,
-                         env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
-                         capture_output=True, encoding="utf-8", errors="replace",
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    ran = run_python(["-c", child], env={**os.environ, "QT_QPA_PLATFORM": "offscreen"})
 
     assert ran.stdout.splitlines() == ["the Funestra let go", "the loop returned"], ran.stderr
 
@@ -679,7 +671,7 @@ def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
             faulthandler._sigsegv()
         the_frame_that_died()
     """)
-    subprocess.run([sys.executable, "-c", child], capture_output=True, timeout=120)
+    run_python(["-c", child])
 
     written = (state / "origenerator_crash.log").read_text(encoding="utf-8")
     assert "launched" in written                  # the run stamped itself first

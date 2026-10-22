@@ -1,8 +1,7 @@
 """The spoken vocabulary is text matching, and costs no widgets to import."""
 from __future__ import annotations
 
-import subprocess
-import sys
+from tests.children import run_python
 
 
 def _modules_loaded_by(module: str) -> set[str]:
@@ -12,8 +11,7 @@ def _modules_loaded_by(module: str) -> set[str]:
         f"import importlib, sys; importlib.import_module({module!r}); "
         "print(' '.join(sorted(sys.modules)))"
     )
-    done = subprocess.run([sys.executable, "-c", probe], capture_output=True,
-                          text=True, check=True)
+    done = run_python(["-c", probe], check=True)
     return set(done.stdout.split())
 
 

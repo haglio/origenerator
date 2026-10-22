@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import os
-import subprocess
-import sys
 from pathlib import Path
 
 from origenerator import config
-
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+from tests.children import run_python
 
 _PROBE = (
     "from origenerator import config; "
@@ -27,8 +24,7 @@ def _paths(state_dir: str | None, *, branch_session: bool = False) -> list[Path]
         env["ORIGENERATOR_STATE_DIR"] = state_dir
     if branch_session:
         env["ORIGENERATOR_BRANCH_SESSION"] = "1"
-    result = subprocess.run([sys.executable, "-c", _PROBE], cwd=_REPO_ROOT, env=env,
-                            capture_output=True, text=True, check=True)
+    result = run_python(["-c", _PROBE], env=env, check=True)
     return [Path(line) for line in result.stdout.splitlines()]
 
 

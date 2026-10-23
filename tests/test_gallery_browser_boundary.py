@@ -248,8 +248,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     methods that opened the path for typing and went where a typed path led went.
     281 -> 280: the Requests collection left the folder list, and with it the
     listing a tab read its request off; the tab reads the request itself. And the
-    pane 84 -> 82: the collection's drawing and its empty-state words went with it.)"""
+    pane 84 -> 82: the collection's drawing and its empty-state words went with it.
+    280 -> 279: a tab's links ask the library for a picture's requests themselves,
+    both ways, so the gallery no longer looks one up to hand them.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 280
+               for x in _class_def(VIEW, "GalleryView").body) == 279
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 82

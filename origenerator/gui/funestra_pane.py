@@ -44,10 +44,14 @@ WHEEL_NOTCH = 120
 
 
 class FunestraPane(QWidget):
-    def __init__(self, parent=None, *, user, panel, on_open=None, engine_for=None):
+    def __init__(self, parent=None, *, user, panel, on_open=None, engine_for=None,
+                 radio=None, volume=None, on_volume_moved=None):
         super().__init__(parent)
         self._user = user
         self._panel = panel
+        self._radio = radio
+        self._volume = volume
+        self._on_volume_moved = on_volume_moved
         self._on_open = on_open
         self._engine_for = engine_for
         self._engine = None
@@ -121,8 +125,12 @@ class FunestraPane(QWidget):
         self._engine = engine
         self._funestra = Funestra(
             engine, channels=Channels(), playlist=items, audible=True, muted=self._muted,
-            users={"slideshow": self._user}, panel=self._panel)
+            users={"slideshow": self._user}, panel=self._panel,
+            radio=None if self._radio is None else self._radio.held_by_a_slideshow(),
+            on_volume_moved=self._on_volume_moved)
         self._funestra.set_muted(self._muted)
+        if self._volume is not None:
+            self._funestra.set_volume(self._volume)
         if land is not None and self._funestra.playback.current_video != land:
             self.hand_over(items, land=land)
         self._stack.setCurrentWidget(self._window)

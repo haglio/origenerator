@@ -31,7 +31,13 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
-from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names, open_both_sides
+from tests.slideshow_hud_support import (
+    engine_of,
+    funestra_of,
+    hud_button_names,
+    open_both_sides,
+    speaker_on_screen,
+)
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
@@ -339,6 +345,34 @@ def test_a_region_slideshow_is_muted_like_every_satellite(qtbot, tmp_path):
 
     qtbot.addWidget(slideshow)
     assert engine_of(slideshow).muted is True
+
+
+def _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path):
+    radio = _FakeRadio()
+    view = GalleryView(FakeDB([]), fun_time=_session(), radio=radio)
+    qtbot.addWidget(view)
+    wide = tmp_path / "wide.png"
+    Image.new("RGB", (200, 100)).save(wide)
+    slideshow = view._slideshows.open_on_preview((str(wide), "image"), None, None)
+    qtbot.addWidget(slideshow)
+    engine_of(slideshow)
+    slideshow._pane.tick()
+    return view, slideshow, radio
+
+
+def test_a_region_slideshow_plays_none_of_the_gallerys_radio(qtbot, tmp_path):
+    # Hosted, each Satellite Funestra plays the stations the session deals it.
+    _view, _slideshow, radio = _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path)
+
+    assert radio.held == []
+
+
+def test_a_region_slideshows_volume_is_not_what_a_standing_one_opens_at(qtbot, tmp_path):
+    view, slideshow, _radio = _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path)
+
+    slideshow._pane.press(QPointF(speaker_on_screen(slideshow._pane)))
+
+    assert view._slideshows.remembered()["volume"] is None
 
 
 def test_a_presented_slideshow_takes_the_keyboard(qtbot):

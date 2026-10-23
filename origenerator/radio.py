@@ -15,7 +15,7 @@ import random
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
-from funestra.radio import Radio, radio_file_for, write_radio
+from funestra.radio import Radio, Tuner, radio_file_for, write_radio
 
 from origenerator.config import RADIO_DIR, RADIO_STATIONS
 from origenerator.media import VIDEO_EXTS
@@ -83,6 +83,7 @@ class OrigeneratorRadio:
         self._stations = Radio(open_station, together=True)
         self._on = False
         self._frozen = False
+        self._held_by: _HeldByASlideshow | None = None
 
     def start(self) -> None:
         """Tune every station in.  A no-op when already on, and silent -- with
@@ -108,8 +109,36 @@ class OrigeneratorRadio:
         self._frozen = frozen
         self._tune()
 
+    def held_by_a_slideshow(self) -> Tuner:
+        """The radio as the Standalone Slideshow's Funestra plays it, heard
+        while its picture is up at its volume, until that Funestra lets it go."""
+        self._held_by = _HeldByASlideshow(self)
+        return self._held_by
+
+    def _heard_through(self, holder: _HeldByASlideshow, *, picture: bool | None,
+                       level: int | None, paused: bool) -> None:
+        if holder is self._held_by:
+            self._stations.tick(picture=picture, level=level, paused=paused or self._frozen)
+
+    def _let_go_by(self, holder: _HeldByASlideshow) -> None:
+        if holder is self._held_by:
+            self._held_by = None
+            self._tune()
+
     def _tune(self) -> None:
-        self._stations.tick(picture=True, level=FULL_LEVEL, paused=self._frozen)
+        if self._held_by is None:
+            self._stations.tick(picture=True, level=FULL_LEVEL, paused=self._frozen)
+
+
+class _HeldByASlideshow:
+    def __init__(self, radio: OrigeneratorRadio) -> None:
+        self._radio = radio
+
+    def tick(self, *, picture: bool | None, level: int | None, paused: bool) -> None:
+        self._radio._heard_through(self, picture=picture, level=level, paused=paused)
+
+    def close(self) -> None:
+        self._radio._let_go_by(self)
 
 
 def deal_to_the_funestras(playlists: Mapping[str, Path], *, clips_dir=RADIO_DIR,

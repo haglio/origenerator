@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from funestra.hud_overlay import HUD_OVERLAY_ID
+from funestra.timeline import TIMELINE_HEIGHT
+from funestra.volume import CHIP_H, chip_xy
 from PyQt6.QtCore import QPoint
 
 from origenerator.fun_time_mode import SIDES
@@ -56,3 +58,13 @@ def button_on_screen(slideshow, command) -> QPoint:
 def thumbnail_on_screen(slideshow, path) -> QPoint:
     rect, = [rect for rect, target in panel_targets(slideshow).click if target == path]
     return _on_screen(slideshow, rect)
+
+
+def speaker_on_screen(pane) -> QPoint:
+    """The speaker on the panel a pane's Funestra drew, in its window's own pixels."""
+    left, top, _pixels = pane._engine.overlays[HUD_OVERLAY_ID]
+    x, y, width, height = pane._funestra._panel.row.rect
+    cx, cy = chip_xy(win_w=width, win_h=height, timeline_h=TIMELINE_HEIGHT)
+    scale = pane._window.devicePixelRatioF()
+    return QPoint(round((left + x + cx + 4) / scale),
+                  round((top + y + cy + CHIP_H // 2) / scale))

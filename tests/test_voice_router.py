@@ -710,7 +710,15 @@ def test_an_opening_request_pauses_the_slideshow_and_says_so(router):
 
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
-    assert slideshow.pauses == [(True, "🎤 Request: no hat…")]
+    assert slideshow.pauses == [(True, "🎤 Request: no hat… — say “over” to submit")]
+
+
+def test_an_open_request_reminds_the_speaker_that_over_submits_it(router):
+    voice, _host, _slideshows = router()
+
+    voice.on_spoken_request(Spoken("no hat", listening=True))
+
+    assert voice.status.text().endswith("say “over” to submit")
 
 
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):
@@ -730,6 +738,23 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
 
     assert begun == ["g1"]
     assert voice._request_target is None
+
+
+def test_a_fix_asked_for_in_a_request_runs_as_the_fix_on_what_it_was_about(router):
+    slideshow = FakeSlideshow(target="g1")
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
+                                      db=FakeDB([_row("g1")]))
+    begun = []
+    voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
+    voice.on_spoken_request(Spoken("fix hands", listening=True))
+    slideshow.target = "g2"
+
+    voice.on_spoken_request(Spoken("fix hands", heard="Request, fix hands, over."))
+
+    assert [(prompt_id, [part.name for part in parts]) for prompt_id, parts in host.fixed] == [
+        ("g1", ["hands"])]
+    assert begun == []  # not a change to the prompt
+    assert slideshow.runs == [("g1", "🎤 fixing hands…", NOTICE)]
 
 
 def test_a_request_with_no_slideshow_up_is_about_the_picked_generation(router):
@@ -836,12 +861,22 @@ def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
     assert slideshows.answers == ["🎤 Latest"]
 
 
+def test_the_sessions_words_go_to_an_open_request_before_any_command(router):
+    voice, _host, slideshows = router()
+    voice.listener.bare = AppCommand.RECENTS
+    voice.listener.dictated = Spoken("recents", listening=True)
+
+    assert voice.run_spoken_command("portrait recents") is True
+    assert slideshows.answers == []
+    assert voice.status.text() == "🎤 Request: recents… — say “over” to submit"
+
+
 def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
     voice, _host, _slideshows = router()
     voice.listener.dictated = Spoken("no hat", listening=True)
 
     assert voice.run_spoken_command("portrait request no hat") is True
-    assert voice.status.text() == "🎤 Request: no hat…"
+    assert voice.status.text() == "🎤 Request: no hat… — say “over” to submit"
 
 
 def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(

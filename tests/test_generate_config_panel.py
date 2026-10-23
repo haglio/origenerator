@@ -9,14 +9,14 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtGui import QColor, QPixmap, QTextCursor
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
 from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
-from origenerator import evolver_export, gallery, osr2_driver
+from origenerator import evolver_export, gallery, osr2_driver, prompt_edit
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
@@ -30,9 +30,9 @@ from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls, icons
+from origenerator.gui import corner_controls, diff_text, icons
 from origenerator.gui import export_lane as export_lane_module
-from origenerator.gui import folder_request as folder_request_module
+from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
@@ -46,6 +46,7 @@ from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 from origenerator.recipe_match import CATEGORIES
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
+from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
 
@@ -2369,6 +2370,68 @@ def test_a_video_made_with_two_models_that_are_not_installed_names_both(installe
                             "installed ones are picked in their place.")
 
 
+def _struck_and_lit(field) -> tuple[str, str]:
+    """What a prompt field shows struck through, and what it shows lit."""
+    cursor = QTextCursor(field.document())
+    struck = lit = ""
+    for position in range(len(field.toPlainText())):
+        cursor.setPosition(position)
+        cursor.setPosition(position + 1, QTextCursor.MoveMode.KeepAnchor)
+        fmt = cursor.charFormat()
+        if fmt.fontStrikeOut():
+            struck += cursor.selectedText()
+        elif fmt.background().style() != Qt.BrushStyle.NoBrush:
+            lit += cursor.selectedText()
+    return struck.strip(), lit.strip()
+
+
+def test_editing_a_shown_picture_s_prompt_marks_how_it_now_differs(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+    field = panel._param_form._widgets["positive_prompt"]
+
+    field.setPlainText("a dog on a couch")
+
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+    field = panel._param_form._widgets["positive_prompt"]
+    field.moveCursor(QTextCursor.MoveOperation.End)
+    qtbot.keyClicks(field, "s")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("couch", "couchs"), timeout=5000)
+
+    qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    qtbot.waitUntil(lambda: diff_text.live_text(field) == "a cat on a couch", timeout=5000)
+    assert _notice(panel) == ""
+
+
+def test_showing_the_next_picture_never_reaches_the_marks_as_typing(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    first = _image_row(db, "img1", prompt="a cat on a couch")
+    second = _image_row(db, "img2", prompt="a dog in a park", filename="sdxl_img2.png")
+    typed = []
+    follow = _Tracker._on_contents_change
+
+    def following(tracker, *change):
+        if not tracker._writing:
+            typed.append(change)
+        follow(tracker, *change)
+
+    monkeypatch.setattr(_Tracker, "_on_contents_change", following)
+    panel.show_saved_generation(first, [first])
+
+    panel.show_saved_generation(second, [second])
+
+    assert typed == []
+
+
 def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
     # The field already shows the next run's seed, so what just finished is not
     # what Generate would make now.
@@ -2520,6 +2583,153 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
     assert _notice(panel) == ""
 
 
+# --- the Request section: words the picture on display is asked to change by --
+
+
+def _request_made(db, prompt_id, source="src", asked="no hat"):
+    """Record that a spoken request made ``prompt_id`` out of a picture whose
+    prompts were "a cat, a hat" and "blurry"."""
+    db.record_request(prompt_id=prompt_id, source_prompt_id=source,
+                      heard=f"Request, {asked}, over.", asked=asked,
+                      old_positive="a cat, a hat", old_negative="blurry",
+                      new_positive="a cat", new_negative="blurry, hat")
+
+
+def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
+    """Stand a rewrite in for the local LLM, answering ``answer`` and keeping
+    every prompt pair and words it was asked about."""
+    calls = []
+
+    def rewrite(positive, negative, words, **_settings):
+        calls.append((positive, negative, words))
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(prompt_edit, "rewrite_prompt", rewrite)
+    return calls
+
+
+def _ask(panel, qtbot, words):
+    field = panel._param_form.request_field()
+    field._words.clear()
+    qtbot.keyClicks(field._words, words)
+    return field
+
+
+def _positive(panel):
+    return diff_text.live_text(panel._param_form._widgets["positive_prompt"])
+
+
+def test_a_picture_a_request_made_shows_its_words_in_the_request_section(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+
+    panel.show_saved_generation(image, [image])
+
+    field = panel._param_form.request_field()
+    assert field._words.text() == "no hat"
+    assert field._words.isEnabled()
+
+
+def test_any_picture_on_display_can_be_asked_a_change_of(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+
+    panel.show_saved_generation(image, [image])
+
+    field = panel._param_form.request_field()
+    assert field._words.text() == ""
+    assert field._words.isEnabled()
+
+
+def test_a_tab_showing_nothing_has_nothing_to_ask_a_change_of(panel):
+    assert not panel._param_form.request_field()._words.isEnabled()
+
+
+def test_asking_rewrites_the_prompts_of_the_picture_on_display(saved_panel, qtbot, monkeypatch):
+    calls = _rewriting(monkeypatch)
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    panel.show_saved_generation(image, [image])
+
+    field = _ask(panel, qtbot, "two women")
+
+    qtbot.waitUntil(lambda: _positive(panel) == "two women on a couch", timeout=5000)
+    assert [(positive, words) for positive, _negative, words in calls] == [
+        ("a woman on a couch", "two women")]
+    assert field._status.isHidden()
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_new_words_for_a_requested_picture_redo_the_request_on_what_it_was_asked_of(
+        saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch)
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+    panel.show_saved_generation(image, [image])
+
+    _ask(panel, qtbot, "no cap")
+
+    # Asked of "a cat, a hat" / "blurry", the picture the hat was taken off.
+    qtbot.waitUntil(lambda: _positive(panel) == "a cat, a hat", timeout=5000)
+
+
+def test_the_words_that_made_the_picture_put_its_own_prompts_back(
+        saved_panel, qtbot, monkeypatch):
+    calls = _rewriting(monkeypatch, answer=("a cat in a cap", "blurry"))
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+    panel.show_saved_generation(image, [image])
+    _ask(panel, qtbot, "a cap")
+    qtbot.waitUntil(lambda: _positive(panel) == "a cat in a cap", timeout=5000)
+
+    _ask(panel, qtbot, "no hat")
+
+    qtbot.waitUntil(lambda: _positive(panel) == "a cat", timeout=5000)
+    assert len(calls) == 1
+
+
+def test_words_that_ask_for_nothing_say_so_beside_them(saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch)
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+
+    field = _ask(panel, qtbot, "please")
+
+    qtbot.waitUntil(lambda: "couldn't" in field._status.text(), timeout=5000)
+    assert _positive(panel) == "a cat"
+
+
+def test_an_answer_to_words_since_changed_is_dropped(saved_panel, monkeypatch):
+    _rewriting(monkeypatch)
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+
+    panel._on_rewritten((panel._asked + 1, "img1"), ("an old answer", ""))
+
+    assert _positive(panel) == "a cat"
+
+
+def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=RuntimeError("no model here"))
+    panel, db = saved_panel
+    video = _video_row(db, positive_prompt=story_of(["a dog running", "a dog asleep"]),
+                       scene_frames=[81, 81], frame_count=161)
+    panel.show_saved_generation(video, [])
+
+    _ask(panel, qtbot, "more grass")
+
+    scenes = panel._param_form._widgets["positive_prompt"]
+    qtbot.waitUntil(lambda: [diff_text.live_text(field) for field in scenes.fields("positive_prompt")]
+                    == ["a dog running, grass", "a dog asleep, grass"], timeout=5000)
+
+
 # --- Generate says when it will draw a fresh seed ---------------------------
 
 def _completed_generation(db, workflow_name, params):
@@ -2630,7 +2840,7 @@ def test_a_run_that_lands_after_its_tab_was_changed_leaves_generate_on_the_shown
     assert _notice(panel) == "(not yet generated with modifications)"
 
 
-# --- asking for changes to a whole folder ------------------------------------
+# --- Modify (all seeds): a whole folder's prompt, rewritten ------------------
 
 _FOLDER_KEY = "image/sdxl_t2i/abcdef123456"
 _FOLDER_LABEL = "AB12CD34"
@@ -2651,9 +2861,9 @@ def _images(tmp_path, count):
 
 
 @pytest.fixture
-def requesting(blank_panel, tmp_path):
+def modifying(blank_panel, tmp_path):
     """A tab opened on a three-image folder's prompt, ready to be rewritten."""
-    blank_panel.open_folder_request(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+    blank_panel.open_folder_modify(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
                                     _folder_params(), _images(tmp_path, 3))
     return blank_panel
 
@@ -2662,12 +2872,12 @@ def _positive_field(panel):
     return panel._param_form._widgets["positive_prompt"]
 
 
-def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(requesting):
-    assert requesting._how_many.isHidden()
+def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(modifying):
+    assert modifying._how_many.isHidden()
 
-    requesting.prefill("sdxl_t2i", _folder_params())
+    modifying.prefill("sdxl_t2i", _folder_params())
 
-    assert not requesting._how_many.isHidden()
+    assert not modifying._how_many.isHidden()
 
 
 def _top_right_corner(widget):
@@ -2675,90 +2885,90 @@ def _top_right_corner(widget):
     return widget.window().grab().toImage().pixelColor(corner.x(), corner.y())
 
 
-def test_generate_keeps_rounded_corners_with_its_dropdown_and_without(requesting, app_chrome):
-    requesting.show()
+def test_generate_keeps_rounded_corners_with_its_dropdown_and_without(modifying, app_chrome):
+    modifying.show()
     QApplication.processEvents()
-    pair = requesting._generate_btn.parentWidget()
+    pair = modifying._generate_btn.parentWidget()
     assert _top_right_corner(pair) == BG_PRIMARY
 
-    requesting.prefill("sdxl_t2i", _folder_params())
+    modifying.prefill("sdxl_t2i", _folder_params())
     QApplication.processEvents()
 
     assert _top_right_corner(pair) == BG_PRIMARY
 
 
-def _request(count=3, label=_FOLDER_LABEL, opened_on=None):
-    return folder_request_module.FolderRequest(
+def _modify(count=3, label=_FOLDER_LABEL, opened_on=None):
+    return folder_modify_module.FolderModify(
         folder_key=_FOLDER_KEY, label=label, count=count,
         opened_on=opened_on or ConfigSnapshot("sdxl_t2i", _folder_params(), False))
 
 
-def test_a_request_names_itself_after_the_folder_it_asks_about():
-    assert _request().title() == f"Request {_FOLDER_LABEL}"
+def test_a_modify_names_itself_after_the_folder_it_asks_about():
+    assert _modify().title() == f"Modify {_FOLDER_LABEL}"
 
 
-def test_a_request_counts_its_runs_in_the_hover_rather_than_on_the_button():
+def test_a_modify_counts_its_runs_in_the_hover_rather_than_on_the_button():
     # The button asks for one thing — this folder, said the way it now reads —
     # so how many runs that costs is a hover away.
-    assert _request(count=3).caption() == "Request changes"
-    assert "all 3 images" in _request(count=3).tooltip()
+    assert _modify(count=3).caption() == "Modify (all seeds)"
+    assert "all 3 images" in _modify(count=3).tooltip()
 
 
 def test_a_one_image_folder_gets_wording_of_its_own():
     # Not the plural switched off, which read "Run all 1 image ... each with its
     # own seed" on a folder holding one.
-    tooltip = _request(count=1).tooltip()
+    tooltip = _modify(count=1).tooltip()
     assert "one image" in tooltip
     assert "1 image" not in tooltip
 
 
-def test_a_request_knows_whether_anything_has_actually_been_rewritten():
+def test_a_modify_knows_whether_anything_has_actually_been_rewritten():
     # Unchanged, the press would run every seed in the folder to re-create the
     # folder, which is the one thing the tab must never do by accident.
     opened_on = ConfigSnapshot("sdxl_t2i", _folder_params(), False)
-    request = _request(opened_on=opened_on)
+    request = _modify(opened_on=opened_on)
 
     assert request.is_unchanged(ConfigSnapshot("sdxl_t2i", _folder_params(), False))
     assert not request.is_unchanged(
         ConfigSnapshot("sdxl_t2i", _folder_params(prompt="a dog on a couch"), False))
 
 
-def test_a_request_cannot_be_edited_after_the_tab_opens_on_it():
+def test_a_modify_cannot_be_edited_after_the_tab_opens_on_it():
     # What the tab opened on is how a press tells a rewrite from a re-run; a
     # request that could be edited could quietly agree with whatever was typed.
 
     with pytest.raises(FrozenInstanceError):
-        _request().count = 9
+        _modify().count = 9
 
 
-def test_a_request_tab_shows_the_whole_folder_in_its_preview(requesting):
+def test_a_modify_tab_shows_the_whole_folder_in_its_preview(modifying):
     # Every image the press will re-run, tiled — not the newest one of them,
     # which would say the edit was about that image.
-    preview = requesting._preview
+    preview = modifying._preview
     assert preview._stack.currentWidget() is preview._sheet
     assert preview._sheet.count() == 3
 
 
-def test_the_press_asks_for_changes_and_counts_them_in_the_hover(requesting):
+def test_the_press_asks_for_changes_and_counts_them_in_the_hover(modifying):
     # The button asks for one thing — this folder, said the way it now reads —
     # so how many runs that costs is a hover away rather than on its face.
-    assert requesting._generate_btn.text() == "Request changes"
-    assert "all 3 images" in requesting._generate_btn.toolTip()
+    assert modifying._generate_btn.text() == "Modify (all seeds)"
+    assert "all 3 images" in modifying._generate_btn.toolTip()
 
 
-def test_every_prompt_is_marked_against_what_it_says_now(requesting):
-    fields = requesting._param_form.text_fields()
+def test_every_prompt_is_marked_against_what_it_says_now(modifying):
+    fields = modifying._param_form.text_fields()
     # Every one of them carries a tracker, each rewriting from its own text --
     # a prompt is not a change to itself, so nothing is marked until one is typed in.
     assert all(w.findChildren(_Tracker) for w in fields)
     assert {w.toPlainText() for w in fields} == {"a cat on a couch", "blurry"}
 
 
-def test_the_tab_is_named_after_the_folder_it_asks_about(requesting):
-    assert requesting.title() == f"Request {_FOLDER_LABEL}"
+def test_the_tab_is_named_after_the_folder_it_asks_about(modifying):
+    assert modifying.title() == f"Modify {_FOLDER_LABEL}"
 
 
-def test_a_request_tab_offers_no_corners_over_its_wall_of_pictures(
+def test_a_modify_tab_offers_no_corners_over_its_wall_of_pictures(
         saved_panel, tmp_path, monkeypatch):
     # Audit §3 bug 15, signed off and fixed 2026-08-31: the wall used to keep
     # the corners of whichever generation the tab had been showing, so trash
@@ -2772,7 +2982,7 @@ def test_a_request_tab_offers_no_corners_over_its_wall_of_pictures(
     fired = []
     panel.item_action_requested.connect(lambda pid, action: fired.append(pid))
 
-    panel.open_folder_request(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+    panel.open_folder_modify(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
                               _folder_params(), _images(tmp_path, 3))
 
     assert panel._preview._actions_id is None
@@ -2780,13 +2990,13 @@ def test_a_request_tab_offers_no_corners_over_its_wall_of_pictures(
     assert fired == []
 
 
-def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(requesting):
+def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(modifying):
     # The corners are re-armed after every change to the picture, and the
     # gallery pushes enhance settings on a poll — so the fix has to hold past
     # the next one rather than only at the moment the wall goes up.
-    requesting.set_enhance_settings(gallery.EnhanceSettings(auto=True))
+    modifying.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
-    assert requesting._preview._actions_id is None
+    assert modifying._preview._actions_id is None
 
 
 def test_a_settings_push_does_not_arm_corners_over_a_followed_runs_frames(
@@ -2812,18 +3022,18 @@ def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
     assert panel._preview.actions_id() == "img1"
 
 
-def test_a_request_tab_holds_no_generation_of_its_own(requesting):
+def test_a_modify_tab_holds_no_generation_of_its_own(modifying):
     # It is about a folder, so there is no file on display and nothing for the
     # "not yet generated with modifications" notice to be measured against.
-    assert requesting.displayed_row() is None
-    assert requesting._displayed_config is None
+    assert modifying.displayed_row() is None
+    assert modifying._displayed_config is None
 
 
-def test_generate_asks_for_the_folder_rather_than_these_settings(requesting, qtbot):
-    _positive_field(requesting).setPlainText("a dog on a couch")
+def test_generate_asks_for_the_folder_rather_than_these_settings(modifying, qtbot):
+    _positive_field(modifying).setPlainText("a dog on a couch")
 
-    with qtbot.waitSignal(requesting.changes_requested) as caught:
-        requesting._generate_btn.click()
+    with qtbot.waitSignal(modifying.modify_requested) as caught:
+        modifying._generate_btn.click()
 
     folder_key, workflow_name, params = caught.args
     assert folder_key == _FOLDER_KEY
@@ -2831,56 +3041,55 @@ def test_generate_asks_for_the_folder_rather_than_these_settings(requesting, qtb
     assert params["positive_prompt"] == "a dog on a couch"
 
 
-def test_a_request_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(
-        requesting, qtbot):
+def test_a_modify_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(
+        modifying, qtbot):
     # Unchanged, the press would run every seed in the folder to re-create the
     # folder — so it asks for the rewrite instead of filling the queue.
     fired = []
-    requesting.changes_requested.connect(lambda *a: fired.append(a))
+    modifying.modify_requested.connect(lambda *a: fired.append(a))
 
-    requesting._generate_btn.click()
+    modifying._generate_btn.click()
 
     assert fired == []
-    assert requesting._generate_btn.text() == "Rewrite the prompt first"
+    assert modifying._generate_btn.text() == "Rewrite the prompt first"
 
 
-def test_showing_a_generation_ends_the_request(requesting, tmp_path):
+def test_showing_a_generation_ends_the_modify(modifying, tmp_path):
     row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
            "params_json": json.dumps(_folder_params()), "output_files": "[]"}
 
-    requesting.show_saved_generation(row, [])
+    modifying.show_saved_generation(row, [])
 
-    assert not any(w.findChildren(_Tracker)
-                   for w in requesting._param_form.text_fields())
-    assert requesting._generate_btn.text() == "Generate"
+    assert modifying._folder_modify is None
+    assert modifying._generate_btn.text() == "Generate"
 
 
-def test_ending_the_request_gives_the_prompts_their_undo_back(requesting):
+def test_ending_the_modify_gives_the_prompts_their_undo_back(modifying):
     # Undo is off while a field is tracked, since the document is rewritten under
     # the typist; a field left over must not keep that.
-    assert not _positive_field(requesting).isUndoRedoEnabled()
+    assert not _positive_field(modifying).isUndoRedoEnabled()
 
-    requesting._end_folder_request()
+    modifying._end_folder_modify()
 
-    assert _positive_field(requesting).isUndoRedoEnabled()
-
-
-def test_picking_another_workflow_ends_the_request(requesting):
-    requesting._workflow_combo.setCurrentIndex(_combo_index(requesting, "flux_t2i_upscaled"))
-
-    assert requesting._generate_btn.text() == "Generate"
+    assert _positive_field(modifying).isUndoRedoEnabled()
 
 
-def test_a_landed_run_does_not_take_the_wall_of_images_away(requesting):
+def test_picking_another_workflow_ends_the_modify(modifying):
+    modifying._workflow_combo.setCurrentIndex(_combo_index(modifying, "flux_t2i_upscaled"))
+
+    assert modifying._generate_btn.text() == "Generate"
+
+
+def test_a_landed_run_does_not_take_the_wall_of_images_away(modifying):
     # The batch lands an image at a time; each one would otherwise swap the
     # folder for whichever finished last.
     row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
            "params_json": json.dumps(_folder_params()), "output_files": "[]"}
 
-    requesting.show_completed_result(row, [])
+    modifying.show_completed_result(row, [])
 
-    assert requesting.displayed_row() is None
-    assert requesting._preview._stack.currentWidget() is requesting._preview._sheet
+    assert modifying.displayed_row() is None
+    assert modifying._preview._stack.currentWidget() is modifying._preview._sheet
 
 
 # --- the two export lanes as one errand with a table of differences ----------

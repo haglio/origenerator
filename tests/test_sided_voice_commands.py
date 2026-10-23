@@ -17,7 +17,6 @@ import pytest
 from origenerator.gallery.collection import (
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
 )
 from origenerator.voice.commands import (
@@ -51,7 +50,6 @@ def test_a_fix_can_name_the_side_it_means(text, side):
     ("landscape favorites", FAVORITES_KEY, "landscape"),
     ("portrait latest", RECENTS_KEY, "portrait"),
     ("trash", TRASH_KEY, None),
-    ("requests", REQUESTS_KEY, None),
 ])
 def test_a_collection_name_is_an_order_to_play_it(text, key, side):
     command = match_voice_command(text)

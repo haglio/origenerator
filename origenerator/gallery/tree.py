@@ -441,33 +441,6 @@ def favorite_generations(rows: list[dict]) -> list[dict]:
     return [row for row in rows if row.get("starred") and produced_output(row)]
 
 
-def requested_generations(records: list[dict], rows: list[dict]) -> list[dict]:
-    """Each request paired with what it made, newest first — the Requests collection's
-    list. Spoken, or typed as one picture of a folder-wide rewrite: both leave
-    the same record, and both belong in the collection of things you asked for.
-
-    ``records`` are the rows :meth:`Database.list_requests` returns; each gains
-    a ``"row"`` (the generation the request queued) and a ``"source_row"`` (the
-    item it was made about, or ``None`` when that has since gone). An in-flight
-    generation is kept, unlike the other collections' listings — a request you have
-    just spoken should appear at once, and the whole of what this collection shows
-    about it (what was heard, what changed in the prompt) is readable before
-    there is a picture to look at.
-
-    A record whose generation is gone is skipped rather than dropped from the
-    table: a delete here is undoable, so the request has to be waiting if the
-    item comes back.
-    """
-    by_id = {row["prompt_id"]: row for row in rows}
-    listed = []
-    for record in records:
-        row = by_id.get(record["prompt_id"])
-        if row is not None:
-            listed.append({**record, "row": row,
-                           "source_row": by_id.get(record["source_prompt_id"])})
-    return listed
-
-
 def unreviewed_experiments(rows: list[dict]) -> list[dict]:
     """The finished experiments awaiting the user's verdict, newest first — the
     Experiments collection's review queue. Only completed results qualify: a failed

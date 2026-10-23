@@ -1,7 +1,7 @@
 """The shape every card in a folder's grid shares — pictures and offers alike.
 
 A settings folder's grid holds finished thumbnails, live in-flight cards, and the
-two cards that aren't generations at all: the re-roll "+" and the request card
+two cards that aren't generations at all: the re-roll "+" and the Modify card
 beside it. They stand shoulder to shoulder in one flow, so they are one size and
 their captions are set one way. Kept here rather than in any one of them so the
 family cannot drift apart the next time one is touched.

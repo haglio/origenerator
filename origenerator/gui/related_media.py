@@ -37,6 +37,7 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
+from origenerator.voice.dictation import words_of
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +178,8 @@ class RelatedMedia(QWidget):
             return frame, None, MediaType.IMAGE
         if request is not None and request.get("source_row"):
             asked_about = request["source_row"]
-            return asked_about, "Requested from", media_type_of_row(asked_about)
+            heading = "Requested from" if words_of(request) else "Modified from"
+            return asked_about, heading, media_type_of_row(asked_about)
         return None, None, None
 
     def _animated_items(self, row: dict) -> list[tuple]:

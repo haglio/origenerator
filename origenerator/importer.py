@@ -599,6 +599,9 @@ _GRAPH_SIGNATURES = (
     # FluxGuidance node — none of which the other workflows use.
     ("flux_t2i_upscaled", (frozenset({"FluxGuidance"}),
                            frozenset({"UnetLoaderGGUF", "DualCLIPLoader"}))),
+    # A lone CLIPLoader over a plain empty latent: the WAN graphs above pair
+    # theirs with a video latent, and SDXL's reader comes inside its checkpoint.
+    ("krea2_t2i", (frozenset({"CLIPLoader", "EmptyLatentImage"}),)),
     ("sdxl_t2i", (frozenset({"CheckpointLoaderSimple"}),)),
 )
 

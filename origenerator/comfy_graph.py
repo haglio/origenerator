@@ -77,10 +77,10 @@ def _number(value) -> float | None:
     return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
-def _base_sampler_lora(graph: dict) -> dict:
+def _base_sampler_models(graph: dict) -> dict:
     sampler = next((n for n in graph.values() if n.get("class_type") == "KSampler"), {})
     chain = _model_chain(graph, sampler.get("inputs", {}).get("model"))
-    return {key: value for key, value in (("lora", chain.lora),
+    return {key: value for key, value in (("unet", chain.unet), ("lora", chain.lora),
                                           ("lora_strength", chain.lora_strength))
             if value is not None}
 
@@ -122,8 +122,8 @@ def graph_model_params(graph: dict) -> dict:
     every workflow's model nests into the gallery's folders the same way:
 
     * ``checkpoint`` — SDXL's ``CheckpointLoaderSimple``.
-    * ``unet`` — Flux's ``UnetLoaderGGUF`` (the quantized diffusion model), and
-      ``lora``/``lora_strength`` from any LoRA on its sampler's model.
+    * ``unet`` — Flux's ``UnetLoaderGGUF``, or the lone ``UNETLoader`` a
+      ``KSampler``'s model chain leads back to (Krea 2), with any LoRA on the way.
     * ``unet_high``/``unet_low`` (and any ``lora_high``/``lora_low``) — WAN's
       dual-noise samplers, paired to their stage by :func:`dual_sampler_model_files`.
 
@@ -137,7 +137,7 @@ def graph_model_params(graph: dict) -> dict:
             params["checkpoint"] = inputs["ckpt_name"]
         elif class_type == "UnetLoaderGGUF" and isinstance(inputs.get("unet_name"), str):
             params["unet"] = inputs["unet_name"]
-    params.update(_base_sampler_lora(graph))
+    params.update(_base_sampler_models(graph))
     params.update(dual_sampler_model_files(graph))
     return params
 

@@ -34,6 +34,7 @@ from origenerator.workflows.frame_rate import (
     playback_rate,
 )
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
+from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
 from origenerator.workflows.model_files import NO_LORA
 from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
@@ -311,7 +312,7 @@ def test_sdxl_t2i_build_api_payload_structure():
     assert payload["7"]["class_type"] == "SaveImage"
 
 
-@pytest.mark.parametrize("name", ["sdxl_t2i", "sdxl_pose_transfer"])
+@pytest.mark.parametrize("name", ["sdxl_t2i", "sdxl_pose_transfer", "krea2_t2i"])
 def test_a_picture_drawn_from_nothing_is_always_drawn_fully(name):
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), input_image="x.png", denoise=0.4))
@@ -343,7 +344,7 @@ def test_sdxl_t2i_extract_output_info():
 
 # Every image-producing workflow carries the enhance toggle; these are they.
 _ENHANCE_TOGGLE_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer",
-                             "flux_t2i_upscaled", "wan22_t2i")
+                             "flux_t2i_upscaled", "wan22_t2i", "krea2_t2i")
 
 
 def test_image_workflows_carry_the_enhance_toggle_off_by_default():
@@ -493,6 +494,86 @@ def test_flux_with_no_lora_builds_the_graph_it_always_has():
 
 
 # ---- Image Enhance (the standalone form of the tail) ----
+
+def test_krea2_builds_the_turbo_graph_on_the_official_recipe():
+    # Krea 2 Turbo is step-distilled: eight euler steps on the simple schedule at
+    # cfg 1, the prompt read by its Qwen3-VL reader through a CLIPLoader of type
+    # krea2, the negative the positive zeroed out, and Qwen-Image's VAE decoding.
+    wf = Krea2T2iWorkflow()
+    params = dict(wf.default_params(), positive_prompt="a lighthouse at dusk", seed=7)
+    payload = wf.build_api_payload(params)
+
+    assert _find_node(payload, "UNETLoader")["inputs"] == {
+        "unet_name": params["unet"], "weight_dtype": "default"}
+    assert _find_node(payload, "CLIPLoader")["inputs"] == {
+        "clip_name": params["clip_name"], "type": "krea2", "device": "default"}
+    assert _find_node(payload, "VAELoader")["inputs"] == {"vae_name": params["vae"]}
+    assert _find_node(payload, "CLIPTextEncode")["inputs"] == {
+        "clip": [_node_id(payload, "CLIPLoader"), 0], "text": "a lighthouse at dusk"}
+    assert _find_node(payload, "ConditioningZeroOut")["inputs"] == {
+        "conditioning": [_node_id(payload, "CLIPTextEncode"), 0]}
+    assert _find_node(payload, "EmptyLatentImage")["inputs"] == {
+        "width": params["width"], "height": params["height"], "batch_size": 1}
+    assert _find_node(payload, "KSampler")["inputs"] == {
+        "model": [_node_id(payload, "UNETLoader"), 0],
+        "positive": [_node_id(payload, "CLIPTextEncode"), 0],
+        "negative": [_node_id(payload, "ConditioningZeroOut"), 0],
+        "latent_image": [_node_id(payload, "EmptyLatentImage"), 0],
+        "seed": 7, "steps": 8, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
+        "denoise": 1.0,
+    }
+    assert _find_node(payload, "VAEDecode")["inputs"] == {
+        "samples": [_node_id(payload, "KSampler"), 0], "vae": [_node_id(payload, "VAELoader"), 0]}
+    assert _find_node(payload, "SaveImage")["inputs"] == {
+        "images": [_node_id(payload, "VAEDecode"), 0], "filename_prefix": "image/krea2_t2i"}
+
+
+def test_krea2_runs_its_lora_on_the_model_alone():
+    # A Krea 2 LoRA trains the diffusion model; its prompt reader is left as it
+    # is, and a picker set to "None" builds the graph with no LoRA node at all.
+    wf = Krea2T2iWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), lora="a_lora.safetensors",
+                                        lora_strength=0.8))
+
+    assert _find_node(payload, "LoraLoaderModelOnly")["inputs"] == {
+        "model": [_node_id(payload, "UNETLoader"), 0],
+        "lora_name": "a_lora.safetensors", "strength_model": 0.8}
+    assert _find_node(payload, "KSampler")["inputs"]["model"] == [
+        _node_id(payload, "LoraLoaderModelOnly"), 0]
+    assert _find_node(payload, "CLIPTextEncode")["inputs"]["clip"] == [
+        _node_id(payload, "CLIPLoader"), 0]
+    assert wf.lora_keys == ("lora",)
+
+    bare = wf.build_api_payload(dict(wf.default_params(), lora=NO_LORA))
+    assert _find_node(bare, "LoraLoaderModelOnly") is None
+    assert _find_node(bare, "KSampler")["inputs"]["model"] == [_node_id(bare, "UNETLoader"), 0]
+
+
+def test_krea2_offers_only_what_a_krea2_graph_can_run(installed_models):
+    # diffusion_models and loras hold every family at once; Krea 2's pickers
+    # keep its own files and the ones nobody could read, and drop the rest.
+    for family in ("krea2", "flux", "wan"):
+        installed_models.add("diffusion_models", f"fam_{family}.safetensors", arch=family)
+        installed_models.add("loras", f"fam_{family}.safetensors", arch=family, lora=True)
+    installed_models.add("diffusion_models", "unreadable.safetensors")
+
+    offered = {pd.key: pd.options for pd in Krea2T2iWorkflow().param_definitions()}
+
+    assert offered["unet"] == ["fam_krea2.safetensors", "unreadable.safetensors"]
+    assert offered["lora"] == [NO_LORA, "fam_krea2.safetensors"]
+
+
+def test_krea2_loads_a_gguf_model_through_the_gguf_loader():
+    # The quantized builds come as GGUF, which ComfyUI's own UNETLoader cannot
+    # read; those go through the same loader Flux's GGUF models do.
+    wf = Krea2T2iWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), unet="krea2_turbo-Q6_K.gguf"))
+
+    assert _find_node(payload, "UNETLoader") is None
+    assert _find_node(payload, "UnetLoaderGGUF")["inputs"] == {"unet_name": "krea2_turbo-Q6_K.gguf"}
+    assert _find_node(payload, "KSampler")["inputs"]["model"] == [
+        _node_id(payload, "UnetLoaderGGUF"), 0]
+
 
 def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, monkeypatch):
     wf = WORKFLOW_REGISTRY["image_enhance"]
@@ -892,7 +973,7 @@ def test_enhance_keys_cover_every_param_only_the_tail_reads():
     # The gallery drops these from a row's identity, so an enhanced render shares
     # its unenhanced twin's folder. A tail param left off the list would silently
     # split that folder again, so every workflow's list must cover its whole tail.
-    for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i"):
+    for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i", "krea2_t2i"):
         wf = WORKFLOW_REGISTRY[name]
         assert set(wf.enhance_keys()) == {
             "enhance", "upscale_model", "enhance_scale", "enhance_steps", "enhance_denoise",
@@ -1857,6 +1938,7 @@ def test_a_workflow_with_the_tail_off_saves_only_its_own_render():
 READS_AS = {
     "sdxl_t2i": "sdxl_t2i",
     "flux_t2i_upscaled": "flux_t2i_upscaled",
+    "krea2_t2i": "krea2_t2i",
     "wan22_t2i": "wan22_t2i",
     "wan22_flf2v_loop": "wan22_flf2v_loop",
     "wan22_i2v": "wan22_i2v",

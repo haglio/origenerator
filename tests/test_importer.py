@@ -1005,6 +1005,23 @@ def test_extract_metadata_identifies_flux_t2i_upscaled_from_graph(tmp_path):
     assert meta["params"]["unet"] == "ultrarealFineTune_v4_fp16.gguf"
 
 
+def test_a_krea2_pictures_own_graph_re_imports_as_krea2(tmp_path):
+    # Dropped back in under a name that says nothing, a Krea 2 picture is named
+    # by its graph alone, and its model is read off the loader so the gallery
+    # files it under the checkpoint that made it.
+    wf = WORKFLOW_REGISTRY["krea2_t2i"]
+    graph = wf.build_api_payload(dict(wf.default_params(), positive_prompt="a harbor at dawn",
+                                      seed=4242, unet="a_krea2_model.safetensors"))
+    _make_png_with_metadata(tmp_path / "renamed.png", graph)
+
+    meta = imp._extract_metadata(tmp_path / "renamed.png", ".png")
+
+    assert meta["workflow_name"] == "krea2_t2i"
+    assert meta["positive_prompt"] == "a harbor at dawn"
+    assert meta["seed"] == 4242
+    assert meta["params"]["unet"] == "a_krea2_model.safetensors"
+
+
 def test_backfill_relabels_unknown_flux_import_by_filename(tmp_path):
     # The Flux imports that predate this workflow landed as "unknown"; once it's
     # registered, the flux_t2i_upscaled_* filename prefix identifies them.

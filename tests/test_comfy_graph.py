@@ -116,6 +116,23 @@ def test_graph_model_params_reads_flux_gguf_unet():
     assert graph_model_params(graph) == {"unet": "ultrarealFineTune_v4_fp16.gguf"}
 
 
+def test_graph_model_params_reads_a_lone_unet_loader_through_its_sampler():
+    # Krea 2 loads its diffusion model via UNETLoader, the loader WAN's expert
+    # pair also uses, so one that is no half of a pair is read off the
+    # KSampler's own model chain, LoRA and all.
+    graph = {
+        "1": {"class_type": "UNETLoader",
+              "inputs": {"unet_name": "krea2_turbo_fp8_scaled.safetensors", "weight_dtype": "default"}},
+        "4": {"class_type": "LoraLoaderModelOnly",
+              "inputs": {"model": ["1", 0], "lora_name": "a_lora.safetensors", "strength_model": 0.8}},
+        "8": {"class_type": "KSampler", "inputs": {"model": ["4", 0]}},
+    }
+    assert graph_model_params(graph) == {
+        "unet": "krea2_turbo_fp8_scaled.safetensors",
+        "lora": "a_lora.safetensors", "lora_strength": 0.8,
+    }
+
+
 def test_graph_model_params_reads_wan_dual_sampler_unets():
     graph = {
         "3": {"class_type": "UNETLoader", "inputs": {"unet_name": "t2v_high.safetensors"}},

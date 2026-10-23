@@ -61,10 +61,8 @@ _SHARD = re.compile(r"-\d+-of-\d+\.[^.]+$")
 _EXPERT_CAMEL = re.compile(r"(?<=[a-z0-9])(High|Low)")
 _EXPERT_BOUNDED = re.compile(r"(?:^|[^A-Za-z])(high|low)", re.IGNORECASE)
 
-# What a Krea 2 block holds that a WAN block never does: wq/wk/wv/wo attention
-# projections and a gated MLP. Both families say `blocks.N`, so a Krea 2 LoRA
-# trained on the blocks alone is told from a WAN one by this, in its dotted
-# form and in the flattened lycoris one (`lycoris_blocks_0_attn_wq`).
+# What a Krea 2 block holds and a WAN block never does -- wq/wk/wv/wo and a gated
+# MLP -- dotted, or flattened as lycoris spells it (`lycoris_blocks_0_attn_wq`).
 _KREA2_BLOCK = re.compile(r"blocks[._]\d+[._](?:attn[._]w[qkvo]|mlp[._](?:gate|up|down))")
 
 

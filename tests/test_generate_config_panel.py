@@ -2683,6 +2683,35 @@ def test_a_picture_a_request_made_shows_its_words_in_the_request_section(saved_p
     assert field._words.isEnabled()
 
 
+def test_a_picture_a_request_made_is_marked_against_the_one_it_was_asked_of(
+        saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+
+    panel.show_saved_generation(image, [image])
+
+    positive = panel._param_form._widgets["positive_prompt"]
+    qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
+    assert _positive(panel) == "a cat"
+    assert _notice(panel) == ""
+
+
+def test_each_scene_of_a_requested_video_is_marked_against_the_scene_it_was_asked_of(
+        saved_panel, qtbot):
+    panel, db = saved_panel
+    video = _video_row(db, positive_prompt=story_of(["a dog running, grass", "a dog asleep, grass"]),
+                       scene_frames=[81, 81], frame_count=161)
+    db.record_request(prompt_id="vid1", source_prompt_id="src", heard="", asked="more grass",
+                      old_positive=story_of(["a dog running", "a dog asleep"]), old_negative="")
+
+    panel.show_saved_generation(video, [])
+
+    scenes = panel._param_form._widgets["positive_prompt"].fields("positive_prompt")
+    qtbot.waitUntil(lambda: all("grass" in _struck_and_lit(field)[1] for field in scenes),
+                    timeout=5000)
+
+
 def test_any_picture_on_display_can_be_asked_a_change_of(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")

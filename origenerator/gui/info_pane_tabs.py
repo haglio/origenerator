@@ -498,7 +498,7 @@ class InfoPaneTabs(QTabWidget):
 
     # --- loading the browser selection into a tab --------------------------
 
-    def load_selection(self, row: dict, image_rows: list[dict], request=None):
+    def load_selection(self, row: dict, image_rows: list[dict]):
         """Show a single-clicked generation in a tab, without leaving a trail of
         them.
 
@@ -506,8 +506,6 @@ class InfoPaneTabs(QTabWidget):
         folder already, pinned or not; anything else lands where an open lands
         (:meth:`_landing_panel`). So a browse through a folder's items reuses one
         italic tab however many are clicked.
-
-        ``request`` is the spoken request that made this row, when one did.
         """
         image_index = build_image_config_index(
             [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
@@ -518,7 +516,7 @@ class InfoPaneTabs(QTabWidget):
             target = cur  # already this generation's own tab, pinned or not
         else:
             target = self._landing_panel()
-        target.show_saved_generation(row, image_rows, request)
+        target.show_saved_generation(row, image_rows)
         self.setCurrentWidget(target)
 
     def panel_that_launched(self, origin: str | None):

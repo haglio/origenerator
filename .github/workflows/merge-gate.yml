@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   full-suite:
-    uses: haglio/.github/.github/workflows/merge-gate.yml@main
+    uses: haglio/.github/.github/workflows/merge-gate.yml@claude/repeats-in-every-part-trial
     with:
       siblings: ""
       python-version: "3.14"

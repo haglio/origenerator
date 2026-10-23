@@ -16604,6 +16604,21 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
         ("Requested from", "orig")]
 
 
+def test_a_request_landing_takes_the_place_of_its_image_on_a_slideshow_locked_on_it(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    _speak_request(view, qtbot, "Request, no hat, over.")
+    slideshow = view._slideshows.showing
+    slideshow.show_item("orig.png", lock=True)  # the double-click on the map
+    (job,) = view._live_jobs.values()
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+
+    _finish_reroll(view, job)
+
+    assert (slideshow.voice_target(), slideshow.locked) == (job.prompt_id, True)
+
+
 def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)

@@ -88,6 +88,7 @@ from origenerator.slideshow import (
 )
 from origenerator.slideshow_buttons import PANEL_CORNER
 from origenerator.voice.app_commands import AppCommand
+from origenerator.voice.dictation import words_of
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from origenerator.win32 import place_window_in_device_pixels
 from origenerator.workflows.detail_parts import parts_framed_together
@@ -1266,6 +1267,17 @@ class SlideshowDirector:
         for slideshow, location in list(self._live_slideshows):
             if any(r["prompt_id"] == row["prompt_id"] for r in self.rows_at(location)):
                 self._hand_the_file_to(slideshow, row)
+        self._show_where_it_was_asked_for(row)
+
+    def _show_where_it_was_asked_for(self, row: dict) -> None:
+        request = self._db.get_request(row["prompt_id"])
+        if not words_of(request):
+            return
+        for surface in self.surfaces():
+            if surface.is_showing() and surface.locked_on == request["source_prompt_id"]:
+                self._hand_the_file_to(surface, row)
+                for path, *_rest in self.items_of([row]):
+                    surface.show_locked(path)
 
     def note_landed(self, row: dict | None):
         """A run landed: every slideshow playing its frames plays its file in their

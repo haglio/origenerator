@@ -1,25 +1,6 @@
 """Read what a model file *is* off its own header, so a picker can offer only
-the files the graph under it can actually run.
-
-``ComfyUI/models/<category>`` is a folder, not a catalogue: ``checkpoints`` holds
-SDXL and SD1.5 checkpoints beside WAN and LTX video models, ``diffusion_models``
-holds WAN, Flux, Qwen and bare SDXL UNets together, and ``loras`` holds LoRAs
-trained against every one of those. Listing a folder verbatim therefore offers
-runs that can only error — and, worse, presents them as choices the user is
-being asked to make.
-
-Nothing about a file's *name* is dependable here (``gonzalomoXLFluxPony`` is an
-SDXL checkpoint), so the architecture is read from the tensor names instead. Both
-container formats put those in a header at the front of the file: safetensors
-after a u64 length prefix, GGUF after its metadata block. Neither needs the
-weights, which is what makes this cheap enough to run on every form build —
-measured at a few milliseconds for the whole installed set — rather than caching
-a scan that would go stale the moment a model is downloaded.
-
-Unrecognized is not the same as unwanted: an arch of ``None`` means "we could not
-tell", and every caller keeps those. Leaving in an option that turns out not to
-work costs a failed submit; dropping a model that works hides it with no way for
-the user to know why.
+the files the graph under it can actually run -- never off its name, and never
+guessing: an unrecognized file reads as ``None``, which every picker keeps.
 """
 from __future__ import annotations
 
@@ -42,6 +23,7 @@ WAN = "wan"
 # not offer the i2v experts, which have no ear.
 WAN_S2V = "wan_s2v"
 LTX = "ltx"
+KREA2 = "krea2"
 
 # No real header comes near this (the largest installed is under 500 KB). A
 # length past it means a corrupt or misidentified file, and honoring it would
@@ -78,6 +60,12 @@ _SHARD = re.compile(r"-\d+-of-\d+\.[^.]+$")
 # so an unanchored search would file each of those under low-noise.
 _EXPERT_CAMEL = re.compile(r"(?<=[a-z0-9])(High|Low)")
 _EXPERT_BOUNDED = re.compile(r"(?:^|[^A-Za-z])(high|low)", re.IGNORECASE)
+
+# What a Krea 2 block holds that a WAN block never does: wq/wk/wv/wo attention
+# projections and a gated MLP. Both families say `blocks.N`, so a Krea 2 LoRA
+# trained on the blocks alone is told from a WAN one by this, in its dotted
+# form and in the flattened lycoris one (`lycoris_blocks_0_attn_wq`).
+_KREA2_BLOCK = re.compile(r"blocks[._]\d+[._](?:attn[._]w[qkvo]|mlp[._](?:gate|up|down))")
 
 
 @dataclass(frozen=True)
@@ -157,7 +145,7 @@ def _describe(path: Path) -> ModelFile:
     if keys is None:
         return ModelFile(arch=None, is_lora=False, expert=expert, is_shard=False)
     return ModelFile(
-        arch=_arch_from(_components(keys)),
+        arch=_arch_from(keys),
         is_lora=any(marker in key for key in keys for marker in _LORA_MARKERS),
         expert=expert,
         is_shard=False,
@@ -195,13 +183,15 @@ def _components(keys: list[str]) -> set[str]:
     return out
 
 
-def _arch_from(components: set[str]) -> str | None:
+def _arch_from(keys: list[str]) -> str | None:
     """The architecture these tensor names belong to, or ``None`` if unrecognized.
 
     Order is load-bearing: several families share a component name and are told
     apart only by a marker one of them also has, so the more specific signature
     has to be asked first. Each rule below says which collision it settles.
     """
+    components = _components(keys)
+
     def has(*names: str) -> bool:
         return any(name in components for name in names)
 
@@ -226,6 +216,11 @@ def _arch_from(components: set[str]) -> str | None:
         return LTX
     if has("transformer_blocks"):
         return QWEN
+    # Krea 2 before WAN: its single-stream `blocks.N` would read as WAN's. The
+    # text-fusion adapter beside them is what only it has, and a LoRA trained
+    # on the blocks alone shows what only its blocks hold.
+    if has("txtfusion") or any(_KREA2_BLOCK.search(key) for key in keys):
+        return KREA2
     # WAN S2V before WAN: it is WAN's `blocks.N` with the audio injector beside
     # them, and the injector is what only it has.
     if has("audio_injector"):

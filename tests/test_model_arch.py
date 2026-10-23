@@ -6,7 +6,7 @@ import struct
 import pytest
 
 from origenerator.workflows import model_arch
-from origenerator.workflows.model_arch import FLUX, LTX, QWEN, SD15, SDXL, WAN, WAN_S2V
+from origenerator.workflows.model_arch import FLUX, KREA2, LTX, QWEN, SD15, SDXL, WAN, WAN_S2V
 
 
 def _write(path, tensor_names):
@@ -56,6 +56,18 @@ ARCH_CASES = [
     # what makes it its own family rather than one more WAN expert.
     (WAN_S2V, ["audio_injector.injector.0.k.weight", "blocks.0.self_attn.q.weight",
                "patch_embedding.weight", "time_projection.1.weight"]),
+    # Krea 2: its own single-stream blocks, with the text-fusion adapter beside
+    # them that nothing else has.
+    (KREA2, ["first.weight", "blocks.0.attn.wq.weight", "txtfusion.projector.weight"]),
+    # A Krea 2 LoRA trained on the blocks alone, in ComfyUI's own naming: no
+    # adapter to go on, only a `blocks.N` WAN would otherwise claim -- told
+    # apart by what sits inside the block, wq/wk/wv/wo and a gated MLP.
+    (KREA2, ["diffusion_model.blocks.0.attn.wq.lora_A.weight",
+             "diffusion_model.blocks.0.mlp.gate.lora_A.weight"]),
+    (KREA2, ["lycoris_blocks_0_attn_wq.lora_down.weight"]),
+    # ...and one trained on the adapter alone, which is how the LoRA that stops
+    # the prompt reader refusing an explicit prompt is made.
+    (KREA2, ["diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lora_A.weight"]),
 ]
 
 

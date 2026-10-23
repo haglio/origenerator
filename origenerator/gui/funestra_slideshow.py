@@ -113,6 +113,8 @@ class FunestraSlideshow(QObject):
         self._showing = ""
         self._locked = False
         self._published = ""
+        self._refusal_checked = False
+        self._loads_seen: str | None = None
         self._levels = LevelStepper()
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
@@ -234,7 +236,8 @@ class FunestraSlideshow(QObject):
 
     def tick(self) -> None:
         """Read the Funestra's status, follow it, and publish the panel."""
-        status = self._funestra_status()
+        fields = self.channel.status()
+        status = parse_status(fields)
         self._locked = status.locked
         if status.video and status.video != self._showing:
             self._showing = status.video
@@ -242,6 +245,7 @@ class FunestraSlideshow(QObject):
             self._hold_what_is_being_made_for_half()
             self._frame_on_funestra = None
             self._show_what_is_being_made()
+        self._step_past_a_file_that_would_not_open(fields, status)
         self._keep_the_pace()
         self._publish()
 
@@ -252,6 +256,16 @@ class FunestraSlideshow(QObject):
         current, pace = self._set.playlist.current(), self._funestra_pace()
         if current is not None and pace and self._set.being_made(current):
             self._send(f"{HOLD_PICTURE} {self._set.pace_for(current, pace):g}")
+
+    def _step_past_a_file_that_would_not_open(self, fields: dict, status) -> None:
+        if fields.get("loads") != self._loads_seen:
+            self._loads_seen, self._refusal_checked = fields.get("loads"), False
+        if self._refusal_checked or fields.get("idle") != "1" or status.paused:
+            return
+        self._refusal_checked = True
+        logger.warning("The %s Funestra would not open a file; stepping past it", self._side)
+        self._unlock()
+        self._send(NEXT)
 
     def _show_what_is_being_made(self) -> None:
         current = self._set.playlist.current()

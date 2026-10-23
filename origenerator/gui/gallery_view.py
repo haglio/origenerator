@@ -959,8 +959,7 @@ class GalleryView(QWidget):
         its preview opens the folder under it as a slideshow standing on it,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
-        panel.source_activated.connect(self.follow_link)
-        panel.animated_activated.connect(self.follow_link)
+        panel.link_clicked.connect(self.follow_link)
         panel.go_to_folder_requested.connect(self.follow_link)
         panel.set_folder_check(self._can_open_containing_folder)
         panel.set_making_one_check(
@@ -4075,14 +4074,6 @@ class GalleryView(QWidget):
             return row
         return next((r for r in self._held_rows if r["prompt_id"] == prompt_id), None)
 
-    def _request_for(self, prompt_id: str) -> dict | None:
-        """The request that made this generation, with the item it was asked
-        about as its ``source_row`` — or ``None`` when nothing asked for it."""
-        record = self._db.get_request(prompt_id)
-        if record is None:
-            return None
-        return {**record, "source_row": self._db.get_generation(record["source_prompt_id"])}
-
     def _on_thumbnail_clicked(self, prompt_id: str):
         """A generation was picked, wherever it was picked — in a folder, on a
         collection, among a search's hits, through a followed link, by a step Back.
@@ -4113,8 +4104,7 @@ class GalleryView(QWidget):
         if not row:
             return False
         self._select_saved_generation(row)
-        self._info_tabs.load_selection(row, self._image_rows,
-                                       request=self._request_for(prompt_id))
+        self._info_tabs.load_selection(row, self._image_rows)
         return True
 
     def _select_saved_generation(self, row: dict):

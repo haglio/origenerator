@@ -425,7 +425,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # everywhere, and the account of why it once said "Next seed" went.
 # 16148 when a row's Cancel and shield came to gray out where its job cannot
 # take them, and the note tying the gallery's menu to a hidden Cancel went.
-MAX_PROSE_LINES = 16148
+# 16081 when an image's requests and Modifies came to link both ways, each in
+# a section of its own, taken down to what the tree measured.
+MAX_PROSE_LINES = 16081
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -250,6 +250,9 @@ class Database:
     def list_requests(self) -> list[dict]:
         return self.requests.list_requests()
 
+    def requests_about(self, source_prompt_id: str) -> list[dict]:
+        return self.requests.requests_about(source_prompt_id)
+
     def get_request(self, prompt_id: str) -> dict | None:
         return self.requests.get_request(prompt_id)
 

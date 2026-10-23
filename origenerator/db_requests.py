@@ -20,7 +20,7 @@ from origenerator.db_connection import Store
 
 
 class RequestStore(Store):
-    """The three queries over the `requests` table."""
+    """The four queries over the `requests` table."""
 
     def record_request(self, *, prompt_id: str, source_prompt_id: str, heard: str,
                        term: str | None = None, polarity: str | None = None,
@@ -50,6 +50,15 @@ class RequestStore(Store):
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM requests ORDER BY created_at DESC, rowid DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def requests_about(self, source_prompt_id: str) -> list[dict]:
+        """Every request made of this generation, newest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM requests WHERE source_prompt_id = ?"
+                " ORDER BY created_at DESC, rowid DESC", (source_prompt_id,)
             ).fetchall()
             return [dict(r) for r in rows]
 

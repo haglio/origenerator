@@ -597,7 +597,7 @@ class GenerationJob(QObject):
         # failure in either yields None rather than stranding a real completion.
         files, thumb, duration = extract_completion(
             self.workflow, history_data, self._places, self._thumb_dir,
-            self.prompt_id,
+            self.prompt_id, params=self.params,
         )
         if not files:
             self._state = JobState.FAILED

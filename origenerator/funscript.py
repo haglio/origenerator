@@ -21,11 +21,12 @@ import logging
 from pathlib import Path
 
 from app_support.funscript import document, read_actions, write
+from app_support.mirrored_tree import mirrored_path
 from funestra.funscript import Funscript
 from funestra.heatmap import build_heatmap
 
 from origenerator.evolver_upscales import original_stem
-from origenerator.media import VIDEO_EXTS
+from origenerator.media import VIDEO_EXTS, video_header
 from origenerator.output_places import OutputPlaces
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,18 @@ def funscript_of(video_path, *, places: OutputPlaces) -> Path | None:
     return _first_file([funscript_path_for(video_path, places=places),
                         _filed_under(Path(video_path).stem, places),
                         _beside(video_path)])
+
+
+def library_funscript_of(video_path, *, videos_dir, scripts_dir) -> Path | None:
+    """The script a video of the library HAS, or ``None``: filed in the scripts
+    tree at the video's own place under the videos tree (the family's rule,
+    :mod:`app_support.mirrored_tree`), or left beside the video."""
+    if not video_path:
+        return None
+    video = Path(video_path)
+    filed = mirrored_path(video, roots=[Path(videos_dir)], mirror_root=Path(scripts_dir),
+                          suffix=".funscript")
+    return _first_file([*([filed] if filed is not None else []), _beside(video)])
 
 
 def _first_file(paths) -> Path | None:
@@ -117,25 +130,8 @@ def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, in
 
 
 def video_duration_seconds(video_path) -> float | None:
-    """Read a video's duration via OpenCV (frame count / fps), or ``None``.
-
-    OpenCV is already a dependency (see ``thumbnail.py``) and reads the container
-    header without spawning a console process, so it costs nothing at import time
-    when kept lazy here.
-    """
-    import cv2  # noqa: PLC0415 (heavy; the pure helpers must not pull it in)
-
-    cap = cv2.VideoCapture(str(video_path))
-    try:
-        if not cap.isOpened():
-            return None
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    finally:
-        cap.release()
-    if fps and fps > 0 and frames and frames > 0:
-        return frames / fps
-    return None
+    header = video_header(video_path)
+    return header.seconds if header else None
 
 
 def synthesize_funscript(video_path, *, hz: float, places: OutputPlaces,

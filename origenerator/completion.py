@@ -14,7 +14,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from origenerator.config import MOTION_DEFAULT_HZ
-from origenerator.funscript import synthesize_funscript
+from origenerator.funscript import (
+    funscript_path_for,
+    synthesize_funscript,
+    write_funscript,
+)
 from origenerator.gallery.output import output_file_path
 from origenerator.generation_state import GenerationStatus
 from origenerator.library_filing import file_into_library
@@ -26,18 +30,20 @@ from origenerator.timing import execution_duration_seconds
 logger = logging.getLogger(__name__)
 
 
-def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: Path, prompt_id):
+def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: Path, prompt_id,
+                       params: dict | None = None):
     """Return ``(output_files, thumbnail_path | None, duration | None)`` for a run.
 
     ``output_files`` come from the workflow's own output node, filed into the
     library; the thumbnail is drawn from the first file on disk, named by the
     run's id; ``duration`` is parsed from the history's timestamps. The thumbnail
     and duration are best-effort: a failure in either yields ``None`` rather than
-    stranding an otherwise-finished run.
+    stranding an otherwise-finished run. ``params``, the run's settings, is where
+    a workflow reads its video's script.
     """
     files = file_into_library(workflow.extract_output_info(history_data), places, prompt_id)
     thumb = _make_thumbnail(workflow, files, places, thumb_dir, prompt_id)
-    _write_video_funscript(workflow, files, places)
+    _write_video_funscript(workflow, files, places, params)
     try:
         duration = execution_duration_seconds(history_data)
     except Exception as e:
@@ -55,7 +61,7 @@ def _first_output_file(files, places: OutputPlaces) -> Path | None:
     return source if source.exists() else None
 
 
-def _write_video_funscript(workflow, files, places: OutputPlaces):
+def _write_video_funscript(workflow, files, places: OutputPlaces, params: dict | None):
     """ComfyUI gives a deleted video's filename to the next video it saves, and
     the deleted one's script is still where the new one's goes, so the finished
     video's own script is written over it."""
@@ -65,7 +71,11 @@ def _write_video_funscript(workflow, files, places: OutputPlaces):
     if source is None:
         return
     try:
-        synthesize_funscript(source, hz=MOTION_DEFAULT_HZ, places=places)
+        authored = workflow.authored_actions(params) if params else None
+        if authored:
+            write_funscript(funscript_path_for(source, places=places), authored)
+        else:
+            synthesize_funscript(source, hz=MOTION_DEFAULT_HZ, places=places)
     except Exception as e:
         logger.warning("Funscript generation failed for %s: %s", source, e)
 

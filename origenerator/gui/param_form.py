@@ -140,6 +140,7 @@ class ParamForm(QWidget):
         parent=None,
         *,
         size_deriver: Callable[[dict], tuple[int, int] | None] | None = None,
+        size_source: str = "input_image",
         hidden_keys: tuple[str, ...] = (),
         pins_reused_seed: bool = True,
         heights=None,
@@ -165,6 +166,8 @@ class ParamForm(QWidget):
         # manual-size or size-less workflow, leaving the Dimensions section to the
         # workflow's own width/height params (if any).
         self._size_deriver = size_deriver
+        # The field the size is derived from: its edits refresh the pair.
+        self._size_source_key = size_source
         # The unlock toggle and hint for the derived-size pair, built only in
         # derived mode. ``None`` otherwise. The toggle floats between the width and
         # height rows like the swap button, so it links the pair without shrinking
@@ -308,7 +311,7 @@ class ParamForm(QWidget):
             if widget is self._scenes:
                 continue
             edited = self._kind(pd).change_signal(widget)
-            if pd.key == "input_image":
+            if pd.key == self._size_source_key:
                 edited.connect(self._update_derived_display)
             edited.connect(self.changed)
 
@@ -697,8 +700,8 @@ class ParamForm(QWidget):
         return self._unlock_btn is not None and self._unlock_btn.isChecked()
 
     def _size_source(self) -> str:
-        image = self._defs.get("input_image")
-        return image.label.lower() if image is not None else "image"
+        source = self._defs.get(self._size_source_key)
+        return source.label.lower() if source is not None else "image"
 
     def _unlock_tip(self, unlocked: bool) -> str:
         if unlocked:

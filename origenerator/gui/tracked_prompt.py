@@ -1,8 +1,8 @@
 """A prompt field that shows what you are changing to it, while you change it.
 
 Every prompt on a tab showing an image is marked against the prompt that made
-the image, and a folder's Modify against the folder's own, so a glance shows
-how far the words have come from what is on screen. The marks keep up with the
+the image, or that a request was asked of, and a folder's Modify against the
+folder's own, so a glance shows how far the words have come. The marks keep up with the
 typing: type over a word and the word you replaced is struck through beside what
 replaced it, right there, without waiting for you to click somewhere else.
 

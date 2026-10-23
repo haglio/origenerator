@@ -1629,13 +1629,21 @@ class GenerateConfigPanel(DropZone):
             self._item_config(made_with) if self._displayed_row is not None else None
         )
         if self._param_form is not None:
+            self._aim_the_request()
             with self._loading():  # marking the fields is no edit of them
                 if self._displayed_config is None:
                     self._param_form.clear_prompt_rewrites()
                 else:
-                    self._param_form.track_prompt_rewrites(self._displayed_config.params)
-            self._aim_the_request()
+                    self._param_form.track_prompt_rewrites(self._marked_against())
         self.refresh_modified_notice()
+
+    def _marked_against(self) -> dict:
+        params = self._displayed_config.params
+        aim = self._request_aim
+        if aim is None or not aim.words:
+            return params
+        return {**params, "positive_prompt": aim.asked_of[0],
+                "negative_prompt": aim.asked_of[1]}
 
     # --- the Request section: words the image on display is asked to change by
 
@@ -1645,6 +1653,7 @@ class GenerateConfigPanel(DropZone):
         for -- and nothing to ask of at all with no image up."""
         field = self._param_form.request_field()
         if field is None:
+            self._request_aim = None
             return
         row, config = self._displayed_row, self._displayed_config
         if row is None or config is None:

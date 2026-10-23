@@ -119,6 +119,7 @@ class FakeSlideshow:
         self.levels_added = []
         self.hud_order_label = ""
         self.locked_on = None
+        self.shown_locked = []
 
     # what a slideshow is, and what it holds
     def holds(self, prompt_id):
@@ -238,6 +239,9 @@ class FakeSlideshow:
 
     def set_locked(self, locked):
         return locked
+
+    def show_locked(self, path):
+        self.shown_locked.append(path)
 
     def close(self):
         self.closes += 1
@@ -391,8 +395,12 @@ class FakeBrowser:
 
 
 class FakeDB:
-    def __init__(self, rows=()):
+    def __init__(self, rows=(), requests=()):
         self.rows = {row["prompt_id"]: row for row in rows}
+        self.requests = {record["prompt_id"]: record for record in requests}
+
+    def get_request(self, prompt_id):
+        return self.requests.get(prompt_id)
 
     def list_generations(self):
         return list(self.rows.values())
@@ -650,6 +658,48 @@ def test_a_slideshow_put_back_goes_on_taking_in_what_lands_where_it_plays(slides
 
     assert again is not made[0]
     assert again.added == [("g2", False, False)]
+
+
+def _request(prompt_id, asked_of, asked="two dogs"):
+    return {"prompt_id": prompt_id, "source_prompt_id": asked_of, "heard": "", "asked": asked}
+
+
+def test_a_request_landing_shows_on_a_slideshow_still_locked_on_what_it_was_asked_of(
+        slideshows):
+    asked_for = _row("g2")
+    director, _host, made = slideshows(
+        db=FakeDB([_row("g1"), asked_for], requests=[_request("g2", "g1")]))
+    director.open([("g1.png", "image", "g1", None)], location="collection/a")
+    made[0].locked_on = "g1"
+
+    director.note_finished(asked_for)
+
+    assert made[0].shown_locked == ["g2.png"]
+
+
+def test_a_request_landing_leaves_a_slideshow_that_moved_off_what_it_was_asked_of(
+        slideshows):
+    asked_for = _row("g2")
+    director, _host, made = slideshows(
+        db=FakeDB([_row("g1"), asked_for], requests=[_request("g2", "g1")]))
+    director.open([("g1.png", "image", "g1", None)], location="collection/a")
+    made[0].locked_on = None
+
+    director.note_finished(asked_for)
+
+    assert made[0].shown_locked == []
+
+
+def test_a_folder_s_modify_landing_leaves_a_slideshow_locked_on_its_original(slideshows):
+    modified = _row("g2")
+    director, _host, made = slideshows(
+        db=FakeDB([_row("g1"), modified], requests=[_request("g2", "g1", asked="")]))
+    director.open([("g1.png", "image", "g1", None)], location="collection/a")
+    made[0].locked_on = "g1"
+
+    director.note_finished(modified)
+
+    assert made[0].shown_locked == []
 
 
 def test_a_double_click_on_an_item_no_folder_lists_still_names_its_generation(slideshows):

@@ -25,7 +25,7 @@ import logging
 from dataclasses import replace
 from pathlib import Path
 
-from funestra.file_channel import append_command, publish_whole
+from funestra.file_channel import publish_whole
 from funestra.funestra_verbs import (
     CLEAR_FRAME,
     HOLD_PICTURE,
@@ -39,7 +39,7 @@ from funestra.funestra_verbs import (
     TRASH,
     play_file,
 )
-from funestra.playlist import PlaylistItem, write_playlist
+from funestra.playlist import PlaylistItem
 from funestra.satellite_hud import hud_text
 from funestra.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
@@ -149,8 +149,7 @@ class FunestraSlideshow(QObject):
         reload keeps the item a Funestra is on wherever that item survived."""
         current = self._set.playlist.current()
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)
-        write_playlist(self.channel.playlist,
-                       [self._funestra_item(item) for item in rotated])
+        self.channel.write_playlist([self._funestra_item(item) for item in rotated])
         lands = land and current is not None and self._file_of(current) != self._showing
         if lands:
             self._levels.restart()
@@ -187,7 +186,7 @@ class FunestraSlideshow(QObject):
         return slide_item(slide, self._levels.points_of_interest(self._file_of(slide)))
 
     def _send(self, verb: str) -> None:
-        if not append_command(self.channel.command_file, verb):
+        if not self.channel.send(verb):
             logger.warning("Dropped %s for the %s Funestra (command file locked)",
                            verb, self._side)
 
@@ -266,7 +265,7 @@ class FunestraSlideshow(QObject):
         self._send(CLEAR_FRAME if path is None else f"{SHOW_FRAME} {path}")
 
     def _funestra_status(self):
-        return parse_status(_read_fields(self.channel.status_file))
+        return parse_status(self.channel.status())
 
     def set_levels(self, levels_by_path: dict) -> None:
         """Arm the versions button and the shifted step keys for this set.
@@ -908,17 +907,3 @@ class FunestraSlideshow(QObject):
         if slide is not None:
             self.open_requested.emit(slide[2])
 
-
-def _read_fields(path: Path) -> dict[str, str]:
-    """A Funestra's status file as its ``key=value`` pairs — empty while it has
-    published none, or while a read loses the race with its own rewrite."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return {}
-    fields = {}
-    for line in text.splitlines():
-        key, marker, value = line.partition("=")
-        if marker:
-            fields[key.strip()] = value.strip()
-    return fields

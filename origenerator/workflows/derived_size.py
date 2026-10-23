@@ -1,19 +1,7 @@
-"""Deriving an input-image workflow's output size from that image.
-
-Every workflow that takes an ``input_image`` keeps the image's aspect ratio at
-a fixed pixel budget rather than a hardcoded resolution — 0.4 MP for the video
-workflows, the SDXL budget for the pose-transfer still. The WAN 2.2 pair and
-the pose transfer do this in-graph (``ImageScaleToTotalPixels`` on a /16
-stride, then ``GetImageSize``). This module is the app-side twin of that
-in-graph scaling: it replicates ``ImageScaleToTotalPixels`` exactly, so the
-size it computes for an image equals what the in-graph path produces for the
-same image, and the Generate form shows every deriving workflow's size in a
-locked Dimensions field (measuring the picked image here rather than waiting
-for ComfyUI to do it in-graph).
-
-Kept free of any workflow/Qt import so the form and the workflows share one
-implementation.
-"""
+"""Deriving an input-image workflow's output size from that image: the
+app-side twin of the in-graph ``ImageScaleToTotalPixels`` scaling, replicated
+exactly so the size the form shows is the size the graph produces. Kept free
+of any workflow/Qt import."""
 from __future__ import annotations
 
 import math
@@ -32,10 +20,12 @@ RESOLUTION_STEPS = 16
 
 def scale_to_total_pixels(
     src_width: int, src_height: int, megapixels: float = TARGET_MEGAPIXELS,
+    stride: int = RESOLUTION_STEPS,
 ) -> tuple[int, int]:
     """The output size for a ``src_width``×``src_height`` image, replicating
-    ComfyUI's ``ImageScaleToTotalPixels`` (``megapixels``, /16 stride) exactly
-    so the size matches what the in-graph derivation produces for the same image.
+    ComfyUI's ``ImageScaleToTotalPixels`` (``megapixels``, on a ``stride``)
+    exactly so the size matches what the in-graph derivation produces for the
+    same image.
 
     Mirrors the node's ``round(dim * sqrt(total / area) / steps) * steps`` (with
     Python's banker's rounding, as ComfyUI uses). The only addition is a floor at
@@ -44,9 +34,9 @@ def scale_to_total_pixels(
     """
     total = megapixels * 1024 * 1024
     scale = math.sqrt(total / (src_width * src_height))
-    width = round(src_width * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
-    height = round(src_height * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
-    return max(RESOLUTION_STEPS, width), max(RESOLUTION_STEPS, height)
+    width = round(src_width * scale / stride) * stride
+    height = round(src_height * scale / stride) * stride
+    return max(stride, width), max(stride, height)
 
 
 def resolve_input_image_path(input_image: str | None) -> Path | None:
@@ -102,6 +92,7 @@ def measure_image_size(input_image: str | None) -> tuple[int, int] | None:
 
 def measure_derived_size(
     input_image: str | None, megapixels: float = TARGET_MEGAPIXELS,
+    stride: int = RESOLUTION_STEPS,
 ) -> tuple[int, int] | None:
     """The output size derived from ``input_image``: its file measured and scaled
     to the ``megapixels`` budget (:func:`scale_to_total_pixels`), or ``None``
@@ -113,6 +104,6 @@ def measure_derived_size(
         return None
     try:
         with Image.open(path) as img:
-            return scale_to_total_pixels(*img.size, megapixels=megapixels)
+            return scale_to_total_pixels(*img.size, megapixels=megapixels, stride=stride)
     except (OSError, ValueError):
         return None

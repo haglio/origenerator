@@ -9,7 +9,12 @@ from typing import Any
 
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
-from origenerator.workflows.derived_size import measure_derived_size, override_size
+from origenerator.workflows.derived_size import (
+    RESOLUTION_STEPS,
+    TARGET_MEGAPIXELS,
+    measure_derived_size,
+    override_size,
+)
 from origenerator.workflows.detail_parts import detail_fix_passes, finder_of, fix_prompts
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
@@ -228,6 +233,11 @@ class WorkflowTemplate(ABC):
     # out of ``default_params`` (the size isn't a stored recipe setting), so an
     # override never splits a gallery folder from an otherwise identical run.
     derives_size_from_input: bool = False
+    # The pixel budget a derived size is scaled to, and the multiple each side
+    # lands on (WAN 16, MiniMax H3 32); the rate the model paces its motion at.
+    size_megapixels: float = TARGET_MEGAPIXELS
+    size_stride: int = RESOLUTION_STEPS
+    native_fps: float = NATIVE_FPS
     # False for machinery workflows the user never picks by hand (the standalone
     # image enhancer, launched by the gallery's enhance buttons): they stay out
     # of the Generate tab's workflow dropdown but remain registered — payloads
@@ -276,7 +286,8 @@ class WorkflowTemplate(ABC):
         """
         if not self.derives_size_from_input:
             return None
-        return measure_derived_size(params.get("input_image", ""))
+        return measure_derived_size(params.get("input_image", ""), self.size_megapixels,
+                                    self.size_stride)
 
     def seed_keys(self) -> tuple[str, ...]:
         """Param keys whose type is ``seed`` — the seed(s) a variation re-rolls.
@@ -492,17 +503,18 @@ class WorkflowTemplate(ABC):
             joined, previous, previous_length = [prefix + "join", 0], frames, length
         return nodes, joined, cls.clip_frames(plan)
 
-    @staticmethod
-    def image_size_nodes(image_ref, params: dict, megapixels: float = 0.4) -> SizedInput:
+    def image_size_nodes(self, image_ref, params: dict,
+                         megapixels: float | None = None) -> SizedInput:
         """The subgraph that sizes a run off its input image, and the refs the
         downstream nodes read for the scaled image and its width/height.
 
-        By default the image is scaled to ``megapixels`` in-graph
-        (``ImageScaleToTotalPixels`` on a /16 stride — 0.4 MP is the video
-        budget; the SDXL still workflow passes its own) and the size read back
-        off it (``GetImageSize``), so a portrait or widescreen yields a
-        proportional output without a hardcoded WxH. When the user has unlocked
-        the derived size and set an explicit ``width``/``height`` (see
+        By default the image is scaled to the workflow's pixel budget in-graph
+        (``ImageScaleToTotalPixels`` on its stride — 0.4 MP on a /16 stride is
+        the WAN video budget; the SDXL still workflow passes ``megapixels`` of
+        its own) and the size read back off it (``GetImageSize``), so a portrait
+        or widescreen yields a proportional output without a hardcoded WxH. When
+        the user has unlocked the derived size and set an explicit
+        ``width``/``height`` (see
         :func:`~origenerator.workflows.derived_size.override_size`), the image is
         instead scaled to that exact size (``ImageScale``) and the literal
         width/height drive the consumer, with no second node to read them off.
@@ -529,8 +541,8 @@ class WorkflowTemplate(ABC):
                 "inputs": {
                     "image": image_ref,
                     "upscale_method": "lanczos",
-                    "megapixels": megapixels,
-                    "resolution_steps": 16,
+                    "megapixels": self.size_megapixels if megapixels is None else megapixels,
+                    "resolution_steps": self.size_stride,
                 },
             },
             _SIZE_GET: {

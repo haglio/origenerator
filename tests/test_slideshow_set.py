@@ -12,9 +12,10 @@ import random
 import pytest
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 
+from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
-from origenerator.slideshow import LIVE, SlideshowFilters, in_order
+from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
 from tests.slideshow_support import slides_named
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
@@ -284,9 +285,6 @@ def test_the_note_on_a_run_still_streaming_its_frames_says_it_is_being_generated
 
 # --- the map around the slide on screen, and the loops along it -------------
 
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow  # noqa: E402
-from origenerator.slideshow import Slide  # noqa: E402
-
 _SEEDS = {"id-1": (Slide("one-b.png", "image", "id-1b"), Slide("one-c.png", "image", "id-1c"))}
 _ACTIONS = {"id-1": (Slide("one-x.png", "image", "id-1x"),),
             "id-1b": (Slide("one-bx.png", "image", "id-1bx"),)}
@@ -471,6 +469,16 @@ def test_a_map_cell_the_pass_never_held_is_spliced_in_and_jumped_to():
     assert slideshow_set.current_prompt_id() == "id-1x"
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-2", "id-3", "id-1x"]
     assert slideshow_set.map().corner.prompt_id == "id-1x"    # the map re-homed
+
+
+def test_a_slide_the_set_took_in_past_its_switches_is_still_found_by_its_file():
+    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1", "id-2", "id-3"}))
+    slideshow_set.set_filters(SlideshowFilters(favorites=True))
+    slideshow_set.remember(Slide("four.png", "image", "id-4"))
+
+    found = slideshow_set.slide_for_path("four.png")
+
+    assert found is not None and found.prompt_id == "id-4"
 
 
 def test_a_jump_off_a_loops_axis_ends_the_loop():

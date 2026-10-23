@@ -5,6 +5,7 @@ so the importer and the gallery model classify outputs identically.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
@@ -39,3 +40,45 @@ def sibling_of_type(path: Path, media: MediaType) -> Path | None:
         if sibling != path and sibling.exists():
             return sibling
     return None
+
+
+@dataclass(frozen=True)
+class VideoHeader:
+    """What a video's container says without a frame being decoded."""
+
+    width: int
+    height: int
+    fps: float
+    frames: float
+
+    @property
+    def seconds(self) -> float:
+        return self.frames / self.fps
+
+
+def video_header(video_path) -> VideoHeader | None:
+    """The header of the video at ``video_path``, or ``None`` for anything else."""
+    import cv2  # noqa: PLC0415 (heavy; the pure helpers must not pull it in)
+
+    if not video_path:
+        return None
+    cap = cv2.VideoCapture(str(video_path))
+    try:
+        if not cap.isOpened():
+            return None
+        header = VideoHeader(
+            width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            fps=cap.get(cv2.CAP_PROP_FPS),
+            frames=cap.get(cv2.CAP_PROP_FRAME_COUNT),
+        )
+    finally:
+        cap.release()
+    if header.width <= 0 or header.height <= 0 or not header.fps or header.fps <= 0             or not header.frames or header.frames <= 0:
+        return None
+    return header
+
+
+def video_frame_size(video_path) -> tuple[int, int] | None:
+    header = video_header(video_path)
+    return (header.width, header.height) if header else None

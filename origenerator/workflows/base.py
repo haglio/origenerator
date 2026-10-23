@@ -164,6 +164,7 @@ class ParamType(StrEnum):
     COMBO = "combo"
     IMAGE = "image"
     AUDIO = "audio"
+    VIDEO = "video"
     BOOL = "bool"
     SCENES = "scenes"
     LINES = "lines"
@@ -227,6 +228,8 @@ class WorkflowTemplate(ABC):
     # out of ``default_params`` (the size isn't a stored recipe setting), so an
     # override never splits a gallery folder from an otherwise identical run.
     derives_size_from_input: bool = False
+    # Which input a size-deriving workflow takes its shape from.
+    derived_size_source: str = "input_image"
     # False for machinery workflows the user never picks by hand (the standalone
     # image enhancer, launched by the gallery's enhance buttons): they stay out
     # of the Generate tab's workflow dropdown but remain registered — payloads
@@ -290,35 +293,24 @@ class WorkflowTemplate(ABC):
     def _seed_keys(self) -> tuple[str, ...]:
         return tuple(pd.key for pd in self.param_definitions() if pd.type == ParamType.SEED)
 
-    def missing_images(self, params: dict) -> list[str]:
-        return [label for key, label in self._image_params
+    def missing_inputs(self, params: dict) -> list[str]:
+        """The labels of the pictures and videos ``params`` leave unpicked."""
+        return [label for key, label in self._input_params
                 if not str(params.get(key) or "").strip()]
 
     @cached_property
-    def _image_params(self) -> tuple[tuple[str, str], ...]:
+    def _input_params(self) -> tuple[tuple[str, str], ...]:
         return tuple((pd.key, pd.label) for pd in self.param_definitions()
-                     if pd.type == ParamType.IMAGE)
+                     if pd.type in (ParamType.IMAGE, ParamType.VIDEO))
 
     def starts_from_a_picture(self) -> bool:
         return "input_image" in self.default_params()
 
     def pins_reused_seed(self) -> bool:
-        """Whether loading a past generation's settings into a config tab pins its
-        seed(s) — clearing their Random ticks — so the next Generate re-creates
-        that exact output rather than drawing a fresh one.
-
-        True for an image: a still's seed is its composition, and "the same
-        picture, said differently" is most of what editing one is for. False for
-        a video, where the seed is the motion and each run of it is one sample
-        of many. A pinned video seed is quiet and it spreads: a tab picks it up
-        from whatever clip was clicked, keeps it through every prompt edit, and
-        carries it into the next workflow, so a whole lineage of videos comes
-        out on the one seed that clip happened to draw — and nothing about a
-        run's motion can be learned from a seed that never varies.
-
-        The value still fills the field either way, so locking a video's seed is
-        one click of Random rather than a number to go and find.
-        """
+        """Whether loading a past generation's settings pins its seed(s): true
+        for a still, whose seed is its composition, false for a video, whose
+        seed is one sample of its motion (test_only_the_video_workflows_go_on_
+        drawing_seeds_once_one_is_reused says why)."""
         return self.output_type != MediaType.VIDEO
 
     def enhance_keys(self) -> tuple[str, ...]:
@@ -341,6 +333,10 @@ class WorkflowTemplate(ABC):
     @abstractmethod
     def build_api_payload(self, params: dict) -> dict:
         """Build the ComfyUI API-format prompt dict from user params."""
+
+    def authored_actions(self, params: dict) -> list[dict] | None:
+        """The script this clip's movements follow, or ``None`` to take the metronome."""
+        return None
 
     @staticmethod
     def lora_model_input(node_id: str, model_ref, lora_name, strength):

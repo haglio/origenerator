@@ -69,6 +69,10 @@ def _node_id(payload: dict, class_type: str) -> str | None:
 _VIDEO_WORKFLOWS = [
     n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
 ]
+# The video workflows that score their own soundtrack, not a library video's.
+_SCORED_VIDEO_WORKFLOWS = [
+    n for n in _VIDEO_WORKFLOWS if "audio_prompt" in WORKFLOW_REGISTRY[n].default_params()
+]
 
 
 def test_workflows_declare_the_params_that_identify_their_model():
@@ -249,7 +253,7 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # covered the day it is registered.
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop"}
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate"}
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
     # ...and the split is the media, not a list anyone has to remember to add to.
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
@@ -1023,7 +1027,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         assert denoise.default == 0.15
 
 
-_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "ltx", "krea2")
+_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_animate", "ltx", "krea2")
 # The categories that hold more than one architecture. upscale_models is left
 # out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
 # over them is meant to list everything.
@@ -2082,6 +2086,7 @@ READS_AS = {
     # output re-importing as itself).
     "sdxl_pose_transfer": "sdxl_t2i",
     "image_enhance": "sdxl_t2i",
+    "wan22_animate": "wan22_animate",
 }
 
 
@@ -2432,7 +2437,8 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
     for rate in (16.0, 32.0, 128.0):
         payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=rate))
         conditioning = (_find_node(payload, "WanImageToVideo")
-                        or _find_node(payload, "WanFirstLastFrameToVideo"))
+                        or _find_node(payload, "WanFirstLastFrameToVideo")
+                        or _find_node(payload, "WanAnimateToVideo"))
         lengths.add(conditioning["inputs"]["length"])
     assert lengths == {wf.default_params()["frame_count"]}
 
@@ -2461,7 +2467,7 @@ def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
         assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 7
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _SCORED_VIDEO_WORKFLOWS)
 def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
     # Foley scores the DECODED frames — the motion the model actually authored,
     # at the rate it authored them in — so the track is the clip's real seconds

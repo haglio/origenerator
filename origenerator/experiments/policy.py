@@ -108,7 +108,7 @@ class ExperimentPolicy:
                 continue
             if row.get("source") == GenerationSource.EXPERIMENT and row.get("experiment_verdict") != "up":
                 continue
-            if workflow.missing_images(parse_params(row.get("params_json"))):
+            if workflow.missing_inputs(parse_params(row.get("params_json"))):
                 continue
             out.append((row, workflow))
         return out

@@ -142,8 +142,8 @@ _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 _MADE_ELSEWHERE_TIP = "Another site made this — Origenerator can't remake it"
 
 
-def _nothing_to_start_from(missing_images: list[str]) -> str:
-    named = spoken_list(missing_images, "and")
+def _nothing_to_start_from(missing_inputs: list[str]) -> str:
+    named = spoken_list(missing_inputs, "and")
     article = "an" if named[:1].lower() in "aeiou" else "a"
     return f"Nothing to start from — pick {article} {named} first"
 
@@ -621,7 +621,7 @@ class GenerateConfigPanel(QWidget):
         if lost is not None:
             return _select_a_workflow_first(lost)
         models = list(self._models_not_installed().values())
-        images = self._missing_images()
+        images = self._missing_inputs()
         return ((_pick_installed_ones_first(models) if models else None)
                 or (_nothing_to_start_from(images) if images else None)
                 or (ALREADY_MAKING_ONE_TIP if self._folder_is_making_one() else None))
@@ -663,11 +663,11 @@ class GenerateConfigPanel(QWidget):
     def _folder_is_making_one(self) -> bool:
         return self._making_one is not None and self._making_one(self.current_config())
 
-    def _missing_images(self) -> list[str]:
+    def _missing_inputs(self) -> list[str]:
         wf = workflow_named(self._workflow_combo.currentData())
         if wf is None or self._param_form is None:
             return []
-        return wf.missing_images(self._param_form.get_values())
+        return wf.missing_inputs(self._param_form.get_values())
 
     def _on_workflow_changed(self):
         # A different workflow is a different recipe: whatever Combine opened
@@ -696,6 +696,7 @@ class GenerateConfigPanel(QWidget):
             # doesn't — the browser pane's Enhance subpanel owns it per folder.
             # They still round-trip, so reusing an old run reproduces it exactly.
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
+                                         size_source=wf.derived_size_source,
                                          hidden_keys=wf.enhance_keys(),
                                          pins_reused_seed=wf.pins_reused_seed(),
                                          heights=self._heights,

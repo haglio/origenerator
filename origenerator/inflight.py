@@ -30,6 +30,7 @@ from pathlib import Path
 
 from origenerator.completion import extract_completion
 from origenerator.gallery.output import is_in_progress
+from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationStatus
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -103,7 +104,9 @@ def _reconcile_row(db, client, row, queued, places: OutputPlaces, thumb_dir: Pat
     history = _safe_history(client, prompt_id)
     if workflow is not None and history:
         files, thumb, duration = extract_completion(
-            workflow, history, places, thumb_dir, prompt_id)
+            workflow, history, places, thumb_dir, prompt_id,
+            params=parse_params(row.get("params_json")),
+        )
         if files:
             fields = dict(
                 status=GenerationStatus.COMPLETED,

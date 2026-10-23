@@ -503,6 +503,20 @@ def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made
     assert abs(picture.height() - 2 * picture.width()) <= 1
 
 
+def test_the_derived_size_follows_the_field_the_workflow_sizes_itself_off(qtbot):
+    form = ParamForm([ParamDef("input_image", "Picture", "image", ""),
+                      ParamDef("video", "Video to Perform", "video", "")],
+                     size_deriver=lambda values: (864, 480) if values.get("video") else None,
+                     size_source="video")
+    qtbot.addWidget(form)
+    assert form._dim_value_labels["width"].text() == "—"
+
+    form._widgets["video"].setText("C:/library/videos/videos/scene one.mp4")
+
+    assert (form._dim_value_labels["width"].text(), form._dim_value_labels["height"].text()) == ("864", "480")
+    assert form._unlock_btn.toolTip() == "Unlock to override the size derived from the video to perform"
+
+
 def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qtbot):
     form = ParamForm([ParamDef("input_image", "Start Image", "image", ""),
                       ParamDef("seed", "Seed", "seed", 0)],
@@ -1032,6 +1046,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     (ParamDef("sampler", "Sampler", "combo", "euler", options=["euler", "dpm"]), "dpm", "dpm"),
     (ParamDef("input_image", "Input Image", "image", ""), "  frame.png ", "frame.png"),
     (ParamDef("voice_sample", "Voice Sample", "audio", ""), " sample.wav ", "sample.wav"),
+    (ParamDef("video", "Video to Perform", "video", ""), " scene one.mp4 ", "scene one.mp4"),
     (ParamDef("width", "Width", "int", 512, min_val=64, max_val=2048, step=64,
               options=[512, 768]), 768.0, 768),
     (ParamDef("frame_rate", "Frame Rate", "float", 24.0, min_val=1.0, max_val=120.0,

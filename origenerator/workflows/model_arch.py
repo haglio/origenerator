@@ -23,6 +23,8 @@ WAN = "wan"
 # that took it would run without the audio it needs, and the speech slot must
 # not offer the i2v experts, which have no ear.
 WAN_S2V = "wan_s2v"
+# WAN 2.2 Animate: WAN with the pose embedding that follows a video's person.
+WAN_ANIMATE = "wan_animate"
 LTX = "ltx"
 KREA2 = "krea2"
 
@@ -232,10 +234,12 @@ def _arch_from(keys: list[str]) -> str | None:
     # on the blocks alone shows what only its blocks hold.
     if has("txtfusion") or any(_KREA2_BLOCK.search(key) for key in keys):
         return KREA2
-    # WAN S2V before WAN: it is WAN's `blocks.N` with the audio injector beside
-    # them, and the injector is what only it has.
+    # WAN S2V and WAN Animate before WAN: each is WAN's `blocks.N` with one
+    # thing beside them only it has -- the audio injector, the pose embedding.
     if has("audio_injector"):
         return WAN_S2V
+    if has("pose_patch_embedding", "face_adapter"):
+        return WAN_ANIMATE
     # WAN: bare `blocks.N` (never `input_blocks`/`double_blocks`, which is why
     # this is safe after the families above), the patch/text/time embeddings
     # around them, VACE's parallel stack, or a kohya LoRA's flattened form.

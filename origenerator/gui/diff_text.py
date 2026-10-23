@@ -20,9 +20,9 @@ widget would hold every form the app ever built.
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QObject
-from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PyQt6.QtGui import QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QPlainTextEdit
-from shared_ui.colors import RED
+from shared_ui.colors import GREEN, RED, TEXT_PRIMARY
 
 from origenerator.prompt_diff import ADDED, REMOVED, diff_spans
 
@@ -30,8 +30,8 @@ from origenerator.prompt_diff import ADDED, REMOVED, diff_spans
 # dimmed gray: the words are still in the field, and a reader skimming a long
 # prompt has to be able to tell at a glance which of it is no longer asked for.
 _REMOVED_COLOR = RED
-_ADDED_BG = QColor("#1f4d2a")
-_ADDED_COLOR = QColor("#d8f5de")
+_ADDED_BG = GREEN
+_ADDED_COLOR = TEXT_PRIMARY
 
 # The field's real value while a diff is up: the prompt that would generate, as
 # opposed to the document, which also holds what the edit took out.

@@ -17,22 +17,26 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.icons import draw_glyph
 
 from origenerator.gui.eliding import ElidingButton
 from origenerator.gui.warning_mark import WarningMark
 
-# Prefixed to the header title so the fold state reads at a glance: a down
-# triangle when open, a right-pointing one when shut.
-_ARROW_OPEN = "▾"   # ▾
-_ARROW_SHUT = "▸"   # ▸
+# Drawn before the header title so the fold state reads at a glance.
+FOLD = {False: "chevron_down", True: "chevron_right"}
 _MARK_GAP = 6
 
 
-class _Header(ElidingButton):
-    def __init__(self):
+class FoldHeader(ElidingButton):
+    def __init__(self, *, warns: bool = True):
         super().__init__()
         self._mark: QPixmap | None = None
-        self.warning = WarningMark(self)
+        self.fold = FOLD[False]
+        self.warning = WarningMark(self) if warns else None
+
+    def set_fold(self, fold: str) -> None:
+        self.fold = fold
+        self.update()
 
     def set_mark(self, mark: QPixmap | None, tip: str) -> None:
         self._mark = mark
@@ -47,11 +51,17 @@ class _Header(ElidingButton):
         return self._with_room_for_the_marks(super().minimumSizeHint())
 
     def _with_room_for_the_marks(self, hint: QSize) -> QSize:
-        hint.setWidth(hint.width() + self._warning_room() + self._mark_room())
+        hint.setWidth(hint.width() + self._warning_room() + self._fold_room() + self._mark_room())
         return hint
 
     def _warning_room(self) -> int:
-        return self.warning.sizeHint().width() + _MARK_GAP
+        return 0 if self.warning is None else self.warning.sizeHint().width() + _MARK_GAP
+
+    def _fold_side(self) -> int:
+        return self.fontMetrics().height()
+
+    def _fold_room(self) -> int:
+        return self._fold_side() + _MARK_GAP
 
     def _mark_room(self) -> int:
         return 0 if self._mark is None else _MARK_GAP + self._mark_size().width()
@@ -60,10 +70,13 @@ class _Header(ElidingButton):
         return self._mark.deviceIndependentSize().toSize()
 
     def _text_room(self, opt: QStyleOptionButton) -> int:
-        return super()._text_room(opt) - self._warning_room() - self._mark_room()
+        return (super()._text_room(opt) - self._warning_room() - self._fold_room()
+                - self._mark_room())
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if self.warning is None:
+            return
         size = self.warning.sizeHint()
         self.warning.setGeometry(QRect(QPoint(0, (self.height() - size.height()) // 2), size))
 
@@ -73,13 +86,24 @@ class _Header(ElidingButton):
         painter.drawControl(QStyle.ControlElement.CE_PushButtonBevel, opt)
         opt.rect = self._title_rect(opt)
         painter.drawControl(QStyle.ControlElement.CE_PushButtonLabel, opt)
+        fold = self.fold_rect()
+        draw_glyph(painter, self.fold, self.palette().buttonText().color(),
+                   size=fold.width(), x=fold.left(), y=fold.top())
         if self._mark is not None:
             painter.drawPixmap(self._mark_rect(), self._mark)
 
     def _title_rect(self, opt: QStyleOptionButton) -> QRect:
         contents = self.style().subElementRect(
             QStyle.SubElement.SE_PushButtonContents, opt, self)
-        return contents.adjusted(self._warning_room(), 0, 0, 0)
+        return contents.adjusted(self._warning_room() + self._fold_room(), 0, 0, 0)
+
+    def fold_rect(self) -> QRect:
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        title_rect = self._title_rect(opt)
+        side = self._fold_side()
+        return QRect(title_rect.left() - self._fold_room(),
+                     title_rect.top() + (title_rect.height() - side) // 2, side, side)
 
     def _mark_rect(self) -> QRect:
         opt = QStyleOptionButton()
@@ -114,7 +138,7 @@ class CollapsibleSection(QWidget):
 
         # Elides its title rather than propping the whole form open at the
         # title's own width; it also handles the "&" in "Models & LoRAs".
-        self._header = _Header()
+        self._header = FoldHeader()
         self._header.setObjectName("foldingSectionHeader")
         self._header.setFlat(True)
         self._header.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -155,8 +179,8 @@ class CollapsibleSection(QWidget):
 
     def _apply_state(self):
         self._content.setVisible(not self._collapsed)
-        arrow = _ARROW_SHUT if self._collapsed else _ARROW_OPEN
-        self._header.setText(f"{arrow}  {self._title}")
+        self._header.set_fold(FOLD[self._collapsed])
+        self._header.setText(self._title)
 
     # --- content -------------------------------------------------------------
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPixmap
-from PyQt6.QtWidgets import QFormLayout, QLineEdit
+from PyQt6.QtWidgets import QFormLayout, QLineEdit, QStyleOptionButton
 
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.stylesheet import build_stylesheet
@@ -28,6 +28,31 @@ def test_header_shows_the_title(qtbot):
     section = CollapsibleSection("Calibration", collapsed=True)
     qtbot.addWidget(section)
     assert "Calibration" in section._header.text()
+
+
+def test_the_header_wears_the_familys_chevron_for_whether_it_is_open(qtbot):
+    section = CollapsibleSection("Sampling", collapsed=True)
+    qtbot.addWidget(section)
+    shut = section._header.fold
+
+    section._header.click()
+
+    assert (shut, section._header.fold) == ("chevron_right", "chevron_down")
+    assert section._header.text() == "Sampling"
+
+
+def test_the_headers_chevron_is_drawn_before_its_title(qtbot):
+    section = _shown_section(qtbot, "Sampling", 300)
+    header = section._header
+    opt = QStyleOptionButton()
+    header.initStyleOption(opt)
+    chevron = header.fold_rect()
+
+    assert chevron.right() < header._title_rect(opt).left()
+    image = header.grab().toImage()
+    assert any(image.pixelColor(x, y).lightness() > 150
+               for y in range(chevron.top(), chevron.bottom())
+               for x in range(chevron.left(), chevron.right()))
 
 
 def test_header_escapes_an_ampersand_instead_of_making_it_a_mnemonic(qtbot):

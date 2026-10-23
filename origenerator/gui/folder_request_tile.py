@@ -22,10 +22,8 @@ from origenerator.gui import grid_card
 _IDLE_FRAME_CSS = grid_card.idle_css("folderRequestTile")
 
 # A pencil rather than a plus: the card next door makes another one of these, and
-# this one writes on them. Smaller than the plus, which is a bare line — a
-# glyph with detail in it needs the room to show the detail.
-_GLYPH = "✎"
-_GLYPH_PT = 48
+# this one writes on them.
+_MARK_PX = 48
 
 _CAPTION = "Request (same seeds)"
 _TOOLTIP = (
@@ -51,10 +49,7 @@ class FolderRequestTile(QFrame):
         layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
         layout.setSpacing(grid_card.CARD_SPACING)
 
-        self._glyph = QLabel(_GLYPH)
-        self._glyph.setFixedSize(*grid_card.PICTURE_SIZE)
-        self._glyph.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._glyph.setStyleSheet(grid_card.glyph_css(_GLYPH_PT))
+        self._glyph = grid_card.MarkPlate("pencil", side=_MARK_PX)
         layout.addWidget(self._glyph)
 
         self._caption = QLabel(_CAPTION)

@@ -12,7 +12,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 def test_the_tile_offers_a_new_random_seed(qtbot):
     tile = RerollTile()
     qtbot.addWidget(tile)
-    assert tile._glyph.text() == "+"
+    assert tile._glyph.mark == "plus"
     assert tile._caption.text() == "New (random seed)"
     assert tile.isEnabled()
 

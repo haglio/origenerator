@@ -37,6 +37,7 @@ from funestra.drive_readout import (
     DriveHud,
 )
 from funestra.hud_button import Button
+from funestra.hud_marks import shared_mark
 from funestra.modes import MainMode, Osr2State
 from funestra.robot_hand import POSITION_MAX, control_limits
 
@@ -188,9 +189,9 @@ def panel_room(motion) -> tuple[int, int]:
 def pace_row(pace_s: int) -> tuple[Button, ...]:
     return (
         Button("", "Clip seconds", "", width=ROW_LABEL_W),
-        Button("genau_clip_seconds_down", "−", "Move on sooner", group_break=True),
+        Button("genau_clip_seconds_down", shared_mark("minus"), "Move on sooner", group_break=True),
         Button("", f"{pace_s}s", "", width=VALUE_W),
-        Button("genau_clip_seconds_up", "+", "Leave each clip longer"),
+        Button("genau_clip_seconds_up", shared_mark("plus"), "Leave each clip longer"),
     )
 
 

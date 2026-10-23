@@ -19,7 +19,7 @@ from collections.abc import Callable
 from typing import Any
 
 from funestra.hud_button import FIT_THE_WORD, Button
-from funestra.hud_marks import FMODE_ICON, shared_mark
+from funestra.hud_marks import FMODE_ICON, LOCK_ICON, NEXT_ICON, PREVIOUS_ICON, shared_mark
 from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.console_commands import FILTER, spelled_for
@@ -57,7 +57,7 @@ MODE_TOOLTIPS = {
 }
 
 CONTROL_FACES = {
-    "prev": "⏮", "next": "⏭", "lock": "🔒",
+    "prev": PREVIOUS_ICON, "next": NEXT_ICON, "lock": LOCK_ICON,
     "trash": shared_mark("trash"), "fmode": FMODE_ICON,
     "enhanced": shared_mark("enhance_filter"), "reset": shared_mark("reset"),
     "shuffle": shared_mark("shuffle"), "latest": shared_mark("latest"),

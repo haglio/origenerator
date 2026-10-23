@@ -27,6 +27,13 @@ def test_the_card_says_what_it_keeps_and_what_it_changes(qtbot):
     assert "seed" in tile.toolTip()
 
 
+def test_the_card_wears_the_familys_pencil(qtbot):
+    tile = FolderRequestTile()
+    qtbot.addWidget(tile)
+
+    assert tile._glyph.mark == "pencil"
+
+
 def test_clicking_the_card_asks_for_the_rewrite(qtbot):
     tile = FolderRequestTile()
     qtbot.addWidget(tile)

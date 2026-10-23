@@ -59,8 +59,9 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QWidget,
 )
-from shared_ui.colors import AMBER
+from shared_ui.colors import AMBER, TEXT_PRIMARY
 from shared_ui.folder_path import FolderPath
+from shared_ui.icons import marked_text
 from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
@@ -1570,7 +1571,7 @@ def test_a_recipe_band_folds_shut_on_its_heading(qtbot):
     header.click()
 
     assert band.isHidden()
-    assert header.text().startswith("▸")   # and the arrow says so
+    assert header.fold == "chevron_right"   # and the chevron says so
 
 
 def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
@@ -1590,9 +1591,9 @@ def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
     view.refresh()
 
     redrawn = next(h for h in _section_headers(view) if "styleA" in h.text())
-    assert redrawn.text().startswith("▸")   # still shut
+    assert redrawn.fold == "chevron_right"   # still shut
     assert next(h for h in _section_headers(view)
-                if "styleB" in h.text()).text().startswith("▾")  # the other still open
+                if "styleB" in h.text()).fold == "chevron_down"  # the other still open
 
 
 def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
@@ -1971,8 +1972,9 @@ def test_clicking_the_star_beside_a_folder_stars_its_square_in_the_pane_beside_i
 
     _click_beside_the_mark_of(qtbot, view, dog, which=0)
 
-    assert "★ " + view.group_for_key(dog).label in _square_texts(view, dog)
-    assert view.group_for_key(cat).label in _square_texts(view, cat)  # and only that one
+    assert any(text.startswith("<img") and text.endswith(view.group_for_key(dog).label)
+               for text in _square_texts(view, dog))
+    assert not any(text.startswith("<img") for text in _square_texts(view, cat))  # and only that one
 
 
 def test_a_folder_the_user_made_takes_no_favorite(qtbot):
@@ -4050,8 +4052,11 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
 
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
+    path = view._folder_path.findChild(FolderPath)
     assert list(_path_links(view)) == ["All"]
-    assert view._folder_path.display_text() == f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  ★ Favorites"
+    assert marked_text("star", "Favorites", color=TEXT_PRIMARY,
+                       size=path.fontMetrics().height()) in path.text()
+    assert view._folder_path.display_text() == f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Favorites"
 
 
 def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtbot):

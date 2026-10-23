@@ -7,7 +7,6 @@ from pathlib import Path
 from PyQt6.QtCore import QMargins, QPoint, QPointF, QRect, QRectF, QSize, Qt
 from PyQt6.QtGui import (
     QColor,
-    QFont,
     QImageReader,
     QMovie,
     QPainter,
@@ -15,7 +14,6 @@ from PyQt6.QtGui import (
     QPalette,
     QPen,
     QPixmap,
-    QTransform,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -25,6 +23,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionViewItem,
 )
 from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED
+from shared_ui.icons import draw_glyph_filling
 
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.looping_preview import looping_movie
@@ -51,26 +50,11 @@ def unmade_picture(side: int, size: tuple[int, int] | None) -> QPixmap:
     painter = QPainter(picture)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.fillRect(shape, QColor(BORDER_DEFAULT))
-    painter.fillPath(_question_mark_filling(QRectF(shape)), QColor(TEXT_MUTED))
+    inset = min(shape.width(), shape.height()) * 0.1
+    draw_glyph_filling(painter, "question", QColor(TEXT_MUTED),
+                       QRectF(shape).adjusted(inset, inset, -inset, -inset))
     painter.end()
     return picture
-
-
-def _question_mark_filling(blank: QRectF) -> QPainterPath:
-    font = QFont()
-    font.setBold(True)
-    font.setPixelSize(100)
-    mark = QPainterPath()
-    mark.addText(0, 0, font, "?")
-    ink = mark.boundingRect()
-    inset = min(blank.width(), blank.height()) * 0.1
-    room = blank.adjusted(inset, inset, -inset, -inset)
-    scale = min(room.width() / ink.width(), room.height() / ink.height())
-    fitted = QTransform()
-    fitted.translate(blank.center().x(), blank.center().y())
-    fitted.scale(scale, scale)
-    fitted.translate(-ink.center().x(), -ink.center().y())
-    return fitted.map(mark)
 
 
 def _height_of(margins: QMargins) -> int:

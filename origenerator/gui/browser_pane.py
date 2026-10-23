@@ -29,7 +29,6 @@ from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,
     QMenu,
-    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -48,7 +47,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.placement import Placement
 from origenerator.gui import icons
-from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
+from origenerator.gui.collapsible_section import FOLD, FoldHeader
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.deferred import defer
 from origenerator.gui.flow_layout import FlowLayout
@@ -655,23 +654,22 @@ class BrowserPane(QObject):
 
     @staticmethod
     def _section_header(heading: str, count: int, band: QWidget, shut: bool,
-                        on_toggled) -> QPushButton:
-        """The band's foldable header: an arrow, the recipe, and how many are in it.
+                        on_toggled) -> FoldHeader:
+        """The band's foldable header: the family's chevron, the recipe, and how
+        many are in it.
 
         A flat, full-width button rather than a label — the whole strip is the
         target, which is what a fold control has to be when the bands are tall
         enough that you are aiming at it after a scroll.
         """
-        button = QPushButton()
+        button = FoldHeader(warns=False)
         button.setObjectName("tileGroupHeading")
         button.setFlat(True)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Doubled "&" so Qt renders it literally instead of swallowing it as a
-        # keyboard-accelerator marker, as CollapsibleSection's header does.
-        title = f"{heading}   ({count})".replace("&", "&&")
+        button.setText(f"{heading}   ({count})")
 
         def paint(collapsed: bool):
-            button.setText(f"{_ARROW_SHUT if collapsed else _ARROW_OPEN}  {title}")
+            button.set_fold(FOLD[collapsed])
 
         # The fold state is carried here rather than read back off the band: a
         # widget whose window hasn't been shown yet reports isVisible() false

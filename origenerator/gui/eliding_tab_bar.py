@@ -190,7 +190,7 @@ class ElidingTabBar(QTabBar):
         mark = self.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
         button = QToolButton(self)
         button.setObjectName("tabCloseButton")
-        button.setIcon(tab_close_icon(self))
+        button.setIcon(tab_close_icon())
         button.setIconSize(QSize(mark, mark))
         button.setFixedSize(mark + _CLOSE_PADDING, mark)
         button.setCursor(Qt.CursorShape.PointingHandCursor)

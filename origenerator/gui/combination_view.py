@@ -28,6 +28,8 @@ from pathlib import Path
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QMovie, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from shared_ui.colors import TEXT_MUTED
+from shared_ui.icons import glyph_pixmap
 
 from origenerator.gui.combination import (
     Combination,
@@ -36,7 +38,6 @@ from origenerator.gui.combination import (
     pair_side,
     paren_font,
     paren_width,
-    plus_font,
     plus_width,
 )
 from origenerator.gui.grayscale import play_grayscale
@@ -115,7 +116,7 @@ class CombinationView(QWidget):
         layout.setSpacing(0)
         layout.addStretch(1)
         self.image_label = QLabel()
-        self.plus_label = QLabel("+")
+        self.plus_label = QLabel()
         self.open_paren_label = QLabel("(")
         self.video_label = QLabel()
         self.close_paren_label = QLabel(")")
@@ -205,7 +206,7 @@ class CombinationView(QWidget):
                 self._movie.setScaledSize(target)
         for picture in (self.image_label, self.video_label):
             picture.setFixedWidth(side)
-        self.plus_label.setFont(plus_font(self.plus_label.font(), side))
+        self.plus_label.setPixmap(glyph_pixmap("plus", plus_width(side), TEXT_MUTED))
         self.plus_label.setFixedWidth(plus_width(side))
         for paren in self._parens:
             paren.setFont(paren_font(paren.font(), side))

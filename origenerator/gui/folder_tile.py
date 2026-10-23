@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import html
+
 from PyQt6.QtCore import QPoint, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QFontMetrics, QPixmap
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -10,6 +12,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import TEXT_PRIMARY
+from shared_ui.icons import marked_text
+from shared_ui.palette import TEXT_MUTED, as_hex
 
 from origenerator.gui import grid_card, palette
 
@@ -61,7 +66,7 @@ class FolderTile(QFrame):
             # same-named one elsewhere. Elided from the left to keep the tail — the
             # folder's own parent — visible; the whole path sits in the tooltip.
             crumb = QLabel()
-            crumb.setStyleSheet("color: #7a7a7a; font-size: 10px;")
+            crumb.setStyleSheet(f"color: {as_hex(TEXT_MUTED)}; font-size: 10px;")
             crumb.setFixedHeight(grid_card.BREADCRUMB_HEIGHT)
             crumb.setText(crumb.fontMetrics().elidedText(
                 context, Qt.TextElideMode.ElideLeft, _INNER_WIDTH))
@@ -74,7 +79,9 @@ class FolderTile(QFrame):
         if badge is not None:
             caption_row.addWidget(self._badge(*badge), 0, Qt.AlignmentFlag.AlignTop)
         self._text = text
-        self._caption = caption = QLabel(self._captioned(favorite))
+        self._caption = caption = QLabel()
+        caption.setTextFormat(Qt.TextFormat.RichText)
+        caption.setText(self._captioned(favorite))
         caption.setWordWrap(True)
         grid_card.style_caption(caption)  # the grid's shared caption size
         # A settings folder is named by a code, so what it holds — the prompt and
@@ -85,7 +92,7 @@ class FolderTile(QFrame):
         layout.addLayout(caption_row)
 
         count_label = QLabel(f"{count} item{'s' if count != 1 else ''}")
-        count_label.setStyleSheet("color: #9a9a9a; font-size: 10px;")
+        count_label.setStyleSheet(f"color: {as_hex(TEXT_MUTED)}; font-size: 10px;")
         count_label.setFixedHeight(grid_card.COUNT_HEIGHT)
         layout.addWidget(count_label)
 
@@ -107,7 +114,13 @@ class FolderTile(QFrame):
                            else grid_card.idle_css("folderTile"))
 
     def _captioned(self, favorite: bool) -> str:
-        return ("★ " if favorite else "") + self._text
+        if not favorite:
+            return html.escape(self._text, quote=False)
+        return marked_text("star", self._text, color=TEXT_PRIMARY,
+                           size=self._caption_mark_side())
+
+    def _caption_mark_side(self) -> int:
+        return QFontMetrics(grid_card.caption_font()).height()
 
     def _badge(self, icon, name: str) -> QLabel:
         badge = QLabel()
@@ -128,7 +141,7 @@ class FolderTile(QFrame):
             placeholder = QLabel("empty")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setStyleSheet(
-                f"color: #6a6a6a; background: {palette.EMPTY_PLATE}; border-radius: 2px;")
+                f"color: {as_hex(TEXT_MUTED)}; background: {palette.EMPTY_PLATE}; border-radius: 2px;")
             placeholder.setFixedSize(grid_card.picture_size())
             grid.addWidget(placeholder, 0, 0)
             return collage

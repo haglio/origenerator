@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from origenerator.gui import grid_card
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 
+_MARK_PX = 56
+
 
 class RerollTile(QFrame):
     add_requested = pyqtSignal()
@@ -27,10 +29,7 @@ class RerollTile(QFrame):
         layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
         layout.setSpacing(grid_card.CARD_SPACING)
 
-        self._glyph = QLabel("+")
-        self._glyph.setFixedSize(*grid_card.PICTURE_SIZE)
-        self._glyph.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._glyph.setStyleSheet(grid_card.glyph_css())
+        self._glyph = grid_card.MarkPlate("plus", side=_MARK_PX)
         layout.addWidget(self._glyph)
 
         self._caption = QLabel("New (random seed)")

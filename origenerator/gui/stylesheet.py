@@ -112,7 +112,7 @@ def build_stylesheet() -> str:
     QLabel#dimensionsHint {{
         color: {_h(TEXT_MUTED)};
     }}
-    QLabel#warningMark, QLabel#cannotRemakeNote {{
+    QLabel#cannotRemakeNote {{
         color: {_h(AMBER)};
     }}
 {field_rules()}
@@ -304,11 +304,11 @@ def build_stylesheet() -> str:
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
         /* The horizontal padding is where a tab's contents begin, so it is what
-           sets the gap in front of its mark. It matches the one the ✕ leaves at
+           sets the gap in front of its mark. It matches the one the cross leaves at
            the other end (eliding_tab_bar.EDGE), or a tab reads as two separate
            decisions rather than one row. */
         padding: 8px 10px;
-        /* A hairline between tabs, so it reads which ✕ belongs to which, over a
+        /* A hairline between tabs, so it reads which cross belongs to which, over a
            rule the selected tab alone colors in. One declaration each way round,
            since the two edges differ in width and in color: top, right, low,
            left. */
@@ -324,7 +324,7 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_PRIMARY)};
     }}
     /* A tab's close button, and a scene card's remove. Flat and bare, because
-       all it is is the style's own ✕ sitting on the tab: the default QToolButton
+       all it is is the family's cross sitting on the tab: the default QToolButton
        look would wrap it in a raised, rounded, bordered frame that looks nothing
        like a tab's mark. */
     QToolButton#tabCloseButton, QToolButton#sceneRemove {{

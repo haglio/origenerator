@@ -138,7 +138,7 @@ def is_image_conditioned(workflow_name: str | None) -> bool:
 
 def rerollable(row: dict) -> bool:
     wf = _registered(row.get("workflow_name"))
-    return wf is not None and not wf.missing_images(parse_params(row.get("params_json")))
+    return wf is not None and not wf.missing_inputs(parse_params(row.get("params_json")))
 
 
 def canonical_settings(workflow_name: str | None, params: dict) -> dict:

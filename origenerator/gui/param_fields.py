@@ -104,6 +104,13 @@ class _AudioPath(_Line):
         return widget.text().strip()
 
 
+class _VideoPath(_Line):
+    browse_filter = "Videos (*.mp4 *.webm *.mkv *.mov);;All Files (*)"
+
+    def read(self, pd, widget):
+        return widget.text().strip()
+
+
 class _Prompt(FieldKind):
     copyable = True
 
@@ -232,6 +239,7 @@ _KINDS: dict[ParamType, FieldKind] = {
     ParamType.COMBO: _Choice(),
     ParamType.IMAGE: _ImagePath(),
     ParamType.AUDIO: _AudioPath(),
+    ParamType.VIDEO: _VideoPath(),
 }
 _PROMPT = _Prompt()
 _PRESETS = _Presets()

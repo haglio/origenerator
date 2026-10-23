@@ -136,8 +136,8 @@ _REQUEST_GUARD = "Rewrite the prompt first"
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 
 
-def _nothing_to_start_from(missing_images: list[str]) -> str:
-    named = spoken_list(missing_images, "and")
+def _nothing_to_start_from(missing_inputs: list[str]) -> str:
+    named = spoken_list(missing_inputs, "and")
     article = "an" if named[:1].lower() in "aeiou" else "a"
     return f"Nothing to start from — pick {article} {named} first"
 
@@ -613,7 +613,7 @@ class GenerateConfigPanel(QWidget):
         if lost is not None:
             return _select_a_workflow_first(lost)
         models = list(self._models_not_installed().values())
-        images = self._missing_images()
+        images = self._missing_inputs()
         return ((_pick_installed_ones_first(models) if models else None)
                 or (_nothing_to_start_from(images) if images else None))
 
@@ -649,11 +649,11 @@ class GenerateConfigPanel(QWidget):
         self._sync_generate()
         self.refresh_generate_caption()
 
-    def _missing_images(self) -> list[str]:
+    def _missing_inputs(self) -> list[str]:
         wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData() or "")
         if wf is None or self._param_form is None:
             return []
-        return wf.missing_images(self._param_form.get_values())
+        return wf.missing_inputs(self._param_form.get_values())
 
     def _on_workflow_changed(self):
         # A different workflow is a different recipe: whatever Combine opened
@@ -681,6 +681,7 @@ class GenerateConfigPanel(QWidget):
             # doesn't — the browser pane's Enhance subpanel owns it per folder.
             # They still round-trip, so reusing an old run reproduces it exactly.
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
+                                         size_source=wf.derived_size_source,
                                          hidden_keys=wf.enhance_keys(),
                                          pins_reused_seed=wf.pins_reused_seed(),
                                          heights=self._heights,

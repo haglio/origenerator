@@ -1,18 +1,9 @@
 """Synthesize the funscript that rides alongside a generated video, and find it.
 
-What a ``.funscript`` document is -- its keys, the metadata block an outside
-player reads, what a document listing no actions answers -- belongs to every app
-in this family that reads or writes one and lives in
-:mod:`app_support.funscript`. Origenerator's videos carry no explicit
-motion track — the diffusion model's motion lives only in the pixels — so rather than
-measuring the finished video, this authors a motion *with* it from what the generation
-already knows: the video's duration. The result is a rhythm, not a
-pixel-accurate script; the whole generator is one function so a later swap to a
-measured (FunGen) source touches nothing else.
-
-The scripts have a folder of their own -- ``<output dir>/funscript`` -- laid out
-like the output folder around it, each script named for its video's whole
-filename, so no two videos share one.
+What a ``.funscript`` document is lives in :mod:`app_support.funscript`. A
+video with no authored motion gets a rhythm from its duration; the scripts
+have a folder of their own, ``<output dir>/funscript``, laid out like the
+output folder, each named for its video's whole filename.
 """
 
 from __future__ import annotations
@@ -21,9 +12,10 @@ import logging
 from pathlib import Path
 
 from app_support.funscript import document, read_actions, write
+from app_support.mirrored_tree import mirrored_path
 
 from origenerator.evolver_upscales import original_stem
-from origenerator.media import VIDEO_EXTS
+from origenerator.media import VIDEO_EXTS, video_header
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +59,18 @@ def funscript_of(video_path, *, output_dir) -> Path | None:
     return _first_file([funscript_path_for(video_path, output_dir=output_dir),
                         _filed_under(Path(video_path).stem, output_dir),
                         _beside(video_path)])
+
+
+def library_funscript_of(video_path, *, videos_dir, scripts_dir) -> Path | None:
+    """The script a video of the library HAS, or ``None``: filed in the scripts
+    tree at the video's own place under the videos tree (the family's rule,
+    :mod:`app_support.mirrored_tree`), or left beside the video."""
+    if not video_path:
+        return None
+    video = Path(video_path)
+    filed = mirrored_path(video, roots=[Path(videos_dir)], mirror_root=Path(scripts_dir),
+                          suffix=".funscript")
+    return _first_file([*([filed] if filed is not None else []), _beside(video)])
 
 
 def _first_file(paths) -> Path | None:
@@ -170,25 +174,8 @@ def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, in
 
 
 def video_duration_seconds(video_path) -> float | None:
-    """Read a video's duration via OpenCV (frame count / fps), or ``None``.
-
-    OpenCV is already a dependency (see ``thumbnail.py``) and reads the container
-    header without spawning a console process, so it costs nothing at import time
-    when kept lazy here.
-    """
-    import cv2  # noqa: PLC0415 (heavy; the pure helpers must not pull it in)
-
-    cap = cv2.VideoCapture(str(video_path))
-    try:
-        if not cap.isOpened():
-            return None
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    finally:
-        cap.release()
-    if fps and fps > 0 and frames and frames > 0:
-        return frames / fps
-    return None
+    header = video_header(video_path)
+    return header.seconds if header else None
 
 
 def synthesize_funscript(video_path, *, hz: float, output_dir,

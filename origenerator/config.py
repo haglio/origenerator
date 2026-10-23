@@ -143,7 +143,10 @@ COMFYUI_PORT = 8188
 # in `evolver_contract.json` at the checkout `project_dir("evolver")` resolves, and
 # tests/test_evolver_pipeline_contract.py holds these to that document -- the
 # only place the two can be compared, since neither repo's gate clones the other.
-_EVOLVER_AI_DIR = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
+# The library's videos, and their scripts filed at each video's own place.
+LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
+LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
+_EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
 EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"

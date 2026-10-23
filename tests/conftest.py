@@ -119,6 +119,8 @@ ARCH_TENSOR_NAMES = {
     "wan": ["blocks.0.self_attn.q.weight", "patch_embedding.weight"],
     "wan_s2v": ["audio_injector.injector.0.k.weight", "blocks.0.self_attn.q.weight",
                 "patch_embedding.weight"],
+    "wan_animate": ["blocks.0.self_attn.q.weight", "pose_patch_embedding.weight",
+                    "patch_embedding.weight"],
     "ltx": ["patchify_proj.weight", "transformer_blocks.0.attn1.to_q.weight"],
     "krea2": ["first.weight", "blocks.0.attn.wq.weight", "txtfusion.projector.weight"],
 }

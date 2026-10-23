@@ -593,6 +593,8 @@ def _scalars(inputs: dict) -> dict:
 _GRAPH_SIGNATURES = (
     ("wan22_flf2v_loop", (frozenset({"WanFirstLastFrameToVideo"}),)),
     ("wan22_i2v", (frozenset({"WanImageToVideo"}),)),
+    ("minimax_h3_i2v", (frozenset({"MiniMaxH3ImageToVideo"}),)),
+    ("minimax_h3_ref2v", (frozenset({"MiniMaxH3ReferenceToVideo"}),)),
     # A Wan/Hunyuan video latent saved as a still image: text-to-image.
     ("wan22_t2i", (frozenset({"EmptyHunyuanLatentVideo", "SaveImage"}),)),
     # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders and a

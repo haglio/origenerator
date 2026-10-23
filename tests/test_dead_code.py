@@ -380,7 +380,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the settings folders' builder lost a tooltip detail it no longer makes.
 # 17181 when the motion-tracked video workflow left the app, taken down
 # to what the tree measured.
-MAX_PROSE_LINES = 17175
+MAX_PROSE_LINES = 17174
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -48,7 +48,7 @@ SECTIONS: tuple[Section, ...] = (
         "upscale_model",
     ), collapsed=True),
     Section("Calibration", (
-        "steps", "split_step", "cfg", "cfg_high", "cfg_low",
+        "steps", "turbo", "split_step", "cfg", "cfg_high", "cfg_low",
         "guidance", "sampler_name", "scheduler",
         "shift_high",
     ), collapsed=True),

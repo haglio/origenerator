@@ -60,6 +60,13 @@ def _node_id(payload: dict, class_type: str) -> str | None:
 _VIDEO_WORKFLOWS = [
     n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
 ]
+# The WAN videos: paced at 16 frames a second, scored by the foley pass, and
+# smoothed to a higher rate by the interpolator. MiniMax H3 paces at 24, makes
+# its own sound and writes its frames as made; tests/test_minimax_h3.py holds
+# its graph to that.
+_WAN_VIDEO_WORKFLOWS = [
+    n for n in _VIDEO_WORKFLOWS if WORKFLOW_REGISTRY[n].native_fps == NATIVE_FPS
+]
 
 
 def test_workflows_declare_the_params_that_identify_their_model():
@@ -240,7 +247,7 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # covered the day it is registered.
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop"}
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "minimax_h3_i2v", "minimax_h3_ref2v"}
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
     # ...and the split is the media, not a list anyone has to remember to add to.
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
@@ -910,7 +917,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         assert denoise.default == 0.15
 
 
-_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "ltx", "krea2")
+_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "ltx", "krea2", "minimax_h3")
 # The categories that hold more than one architecture. upscale_models is left
 # out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
 # over them is meant to list everything.
@@ -1942,6 +1949,8 @@ READS_AS = {
     "wan22_t2i": "wan22_t2i",
     "wan22_flf2v_loop": "wan22_flf2v_loop",
     "wan22_i2v": "wan22_i2v",
+    "minimax_h3_i2v": "minimax_h3_i2v",
+    "minimax_h3_ref2v": "minimax_h3_ref2v",
     # Both build an SDXL checkpoint graph, so the chain's last branch claims
     # them; the graph cannot tell them from sdxl_t2i.  Which is why the graph
     # no longer overrules a filename naming a workflow whose own graph reads
@@ -1976,7 +1985,7 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 # ---- video length and rate, as the form offers them ----
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _WAN_VIDEO_WORKFLOWS)
 def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates(name):
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
@@ -2258,19 +2267,20 @@ def test_every_video_is_saved_as_h264_at_one_high_quality(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_clip_played_at_the_native_rate_carries_no_interpolation_at_all(name):
-    # At 16 fps every frame the file needs already exists, so the graph is the
-    # one it always was: the decode feeds the writer directly, and no second
-    # model is loaded to synthesize frames nobody asked for.
+    # At the rate the model made its frames every frame the file needs already
+    # exists, so the graph is the one it always was: the decode feeds the
+    # writer directly, and no second model is loaded to synthesize frames
+    # nobody asked for.
     wf = WORKFLOW_REGISTRY[name]
-    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=NATIVE_FPS))
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=wf.native_fps))
 
     assert _find_node(payload, "RIFE VFI") is None
     writer = payload[wf.output_node_id]["inputs"]
     assert writer["images"] == [_node_id(payload, "VAEDecode"), 0]
-    assert writer["frame_rate"] == 16.0
+    assert writer["frame_rate"] == wf.native_fps
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _WAN_VIDEO_WORKFLOWS)
 def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(name):
     # 48 fps is three frames out of each generated one. The interpolator sits
     # between the decode and the writer, and the writer's rate is that same
@@ -2289,7 +2299,7 @@ def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(n
     assert writer["frame_rate"] == 48.0
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _WAN_VIDEO_WORKFLOWS)
 def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
     # The whole point: the model authors the same seconds of motion whatever the
     # rate, and the rate only decides how many frames a second of it is shown
@@ -2304,7 +2314,7 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
     assert lengths == {wf.default_params()["frame_count"]}
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _WAN_VIDEO_WORKFLOWS)
 def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
     # A rate typed by hand — or carried in by a recipe saved before the rates
     # were multiples — doesn't get to skew the tempo: the graph interpolates to
@@ -2317,7 +2327,7 @@ def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
     assert payload[wf.output_node_id]["inputs"]["frame_rate"] == 64.0
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _WAN_VIDEO_WORKFLOWS)
 def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
     # A stored recipe carrying a rate from before this ceiling, or a number
     # typed past the field's own range, is written at the ceiling.
@@ -2328,7 +2338,7 @@ def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
         assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 7
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _WAN_VIDEO_WORKFLOWS)
 def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
     # Foley scores the DECODED frames — the motion the model actually authored,
     # at the rate it authored them in — so the track is the clip's real seconds
@@ -2363,7 +2373,7 @@ def test_a_loops_two_matched_ends_survive_the_frames_added_between_them():
     assert interpolated_span == pytest.approx((81 - 1) / NATIVE_FPS)
 
 
-@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+@pytest.mark.parametrize("name", _WAN_VIDEO_WORKFLOWS)
 def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
     """The form snaps a typed rate onto the Frame Rate field's grid; the payload
     picks its multiplier straight from the number. Those are two roundings of

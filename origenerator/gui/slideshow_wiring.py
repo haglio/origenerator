@@ -20,6 +20,7 @@ from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 
 from funestra.hud_title import SHUFFLE_LABEL
+from funestra.volume import VolumeHud
 
 from origenerator.slideshow import SlideshowFilters
 
@@ -58,6 +59,10 @@ class SlideshowActions:
     prompt_ids and answers what each one's map row is named for, which is
     what an act filter matches it on, and ``slides`` the slides they play as,
     which a loop picked back up plays whatever set it reopened on.
+
+    ``volume_moved`` takes the volume the viewer moved the slideshow's
+    Funestra to.  Standing on its own, that is Origenerator Radio's volume
+    too, so a move of it turns the Radio on, and the next slideshow opens at it.
     """
 
     delete: Callable[[str], None] | None = None
@@ -83,6 +88,7 @@ class SlideshowActions:
     acts: Callable[[list], dict] | None = None
     slides: Callable[[tuple], tuple] | None = None
     filters_changed: Callable[[SlideshowFilters], None] | None = None
+    volume_moved: Callable[[VolumeHud], None] | None = None
 
 
 @dataclass(frozen=True)

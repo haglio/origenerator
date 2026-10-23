@@ -266,6 +266,10 @@ class ToolbarBank(QWidget):
         self.radio, self.mic = self._room_switches
         self._show_the_room_switches(True)
 
+    def turn_the_radio_on(self) -> None:
+        if self.radio is not None:
+            self.radio.setChecked(True)
+
     def _show_the_room_switches(self, shown: bool) -> None:
         for switch in self._room_switches:
             if switch is not None:

@@ -15,6 +15,7 @@ from funestra.console import (
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
+from funestra.volume import VolumeHud
 from PIL import Image
 from PIL import Image as _Image
 from PyQt6 import sip
@@ -13448,6 +13449,18 @@ def test_a_session_saved_under_retracted_or_control_off_reopens_parked(qtbot):
         assert view.osr2_state() == OSR2_PARKED, saved
 
 
+class _HeldRadio:
+    def __init__(self):
+        self.ticked = None
+        self.closed = False
+
+    def tick(self, *, picture, level, paused):
+        self.ticked = (picture, level, paused)
+
+    def close(self):
+        self.closed = True
+
+
 class _FakeRadio:
     """Stands in for Origenerator Radio so a gallery test never opens an engine."""
 
@@ -13455,6 +13468,11 @@ class _FakeRadio:
         self.starts = 0
         self.stops = 0
         self.frozen = False
+        self.held: list[_HeldRadio] = []
+
+    def held_by_a_slideshow(self):
+        self.held.append(_HeldRadio())
+        return self.held[-1]
 
     def start(self):
         self.starts += 1
@@ -13778,6 +13796,56 @@ def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
     return view, slideshow
+
+
+def test_a_slideshow_standing_on_its_own_plays_the_radio_while_its_picture_is_up(
+        qtbot, monkeypatch):
+    radio = _FakeRadio()
+    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio)
+    engine_of(slideshow).showing_picture = True
+
+    slideshow._pane.tick()
+
+    assert radio.held[-1].ticked == (True, 100, False)
+
+
+def test_a_move_of_a_standing_slideshows_volume_turns_the_radio_on(qtbot, monkeypatch):
+    radio = _FakeRadio()
+    view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio)
+
+    slideshow._actions.volume_moved(VolumeHud(volume=40, muted=False))
+
+    assert view._bank.radio.isChecked() and radio.starts == 1
+
+
+def test_the_next_standing_slideshow_opens_at_the_volume_the_last_was_left_at(
+        qtbot, monkeypatch):
+    view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=_FakeRadio())
+    slideshow._actions.volume_moved(VolumeHud(volume=40, muted=False))
+    slideshow.close()
+
+    view._slideshows.start()
+
+    engine = engine_of(view._slideshows.showing)
+    assert (engine.volume, engine.muted) == (40, False)
+
+
+def test_a_standing_slideshows_volume_comes_back_after_a_restart(qtbot, monkeypatch):
+    first, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=_FakeRadio())
+    slideshow._actions.volume_moved(VolumeHud(volume=40, muted=True))
+    saved = first.remembered_slideshows()
+
+    second = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
+                         client=ComfyUIClient(), radio=_FakeRadio())
+    qtbot.addWidget(second)
+    second.remember_slideshows(saved)
+    second.refresh()
+    _open_leaf(second)
+    second._slideshows.start()
+    qtbot.addWidget(second._slideshows.showing)
+
+    engine = engine_of(second._slideshows.showing)
+    assert (engine.volume, engine.muted) == (40, True)
 
 
 def _click_the_picture(slideshow):

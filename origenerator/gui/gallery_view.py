@@ -537,7 +537,8 @@ class GalleryView(QWidget):
         self._slideshows = SlideshowDirector(
             self, db=db, browser=self._browser, jobs=self._jobs,
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
-            names=self._item_names)
+            names=self._item_names, radio=self._radio,
+            turn_the_radio_on=lambda: self._bank.turn_the_radio_on())
         # Combine: a video's recipe run again on a dropped picture, and the
         # spoken "animate as" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,

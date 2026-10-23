@@ -122,7 +122,8 @@ class SlideshowView(QWidget):
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
                  shuffle=None, actions=None, hud=None, engine=None, motion=None,
-                 pace=None, frames=None, clock=time.monotonic, parent=None):
+                 pace=None, frames=None, radio=None, volume=None,
+                 clock=time.monotonic, parent=None):
         super().__init__(parent)
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
@@ -177,7 +178,8 @@ class SlideshowView(QWidget):
         self._pane = FunestraPane(
             self, user=self._as_the_funestra_sees_it, panel=self._hud_model,
             on_open=self._the_funestra_opened,
-            engine_for=None if engine is None else (lambda _window_id: engine))
+            engine_for=None if engine is None else (lambda _window_id: engine),
+            radio=radio, volume=volume, on_volume_moved=self._volume_moved)
         layout.addWidget(self._pane, 1)
 
         # A note about the item on screen: which of its versions this is, that an
@@ -1107,6 +1109,10 @@ class SlideshowView(QWidget):
         return (post_device_action(action, motion=self._motion,
                                    control=self._actions.osr2_control)
                 or post_pace_action(action, self))
+
+    def _volume_moved(self, volume) -> None:
+        if self._actions.volume_moved is not None:
+            self._actions.volume_moved(volume)
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this slideshow outright — what a hosting session does

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from funestra.volume import VolumeHud
 from PIL import Image
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QIcon, QKeyEvent
@@ -35,7 +36,7 @@ from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE, Slide, Slidesho
 from tests import gestures
 from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
-from tests.slideshow_hud_support import button_on_screen, thumbnail_on_screen
+from tests.slideshow_hud_support import button_on_screen, speaker_on_screen, thumbnail_on_screen
 from tests.slideshow_support import ahead, slides_named
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -1205,6 +1206,15 @@ def _on_screen_wearing_its_panel(qtbot, view):
     view.wear_the_hud("portrait")
     view._pane.tick()
     return view
+
+
+def test_a_move_of_its_volume_is_told_to_the_gallery(qtbot):
+    moved = []
+    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot, on_volume_moved=moved.append))
+
+    gestures.click(view._pane._window, speaker_on_screen(view._pane))
+
+    assert moved == [VolumeHud(volume=100, muted=True)]
 
 
 def _on_the_picture(view) -> QPoint:

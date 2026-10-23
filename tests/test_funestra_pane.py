@@ -11,6 +11,7 @@ from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.playlist import PlaylistItem
 from funestra.pointer import OMNIPAUSE_TOGGLE
 from funestra.satellite_hud import HudModel
+from funestra.volume import VolumeHud
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QApplication
@@ -20,6 +21,7 @@ from origenerator.gui.funestra_pane import FunestraPane
 from tests import gestures
 from tests.funestra_fakes import FakeEngine
 from tests.running_ahead_support import record_the_app_running_ahead
+from tests.slideshow_hud_support import speaker_on_screen
 
 
 class _Running:
@@ -270,6 +272,68 @@ def test_the_sound_can_be_set_once_it_is_open(qtbot, tmp_path):
     pane.set_audio_muted(True)
 
     assert engine.muted is True
+
+
+class _HeldRadio:
+    def __init__(self) -> None:
+        self.ticked: tuple | None = None
+        self.closed = False
+
+    def tick(self, *, picture, level, paused) -> None:
+        self.ticked = (picture, level, paused)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _ARadio:
+    def __init__(self) -> None:
+        self.held = _HeldRadio()
+
+    def held_by_a_slideshow(self) -> _HeldRadio:
+        return self.held
+
+
+def test_the_funestra_plays_the_radio_its_slideshow_holds_at_its_own_volume(qtbot, tmp_path):
+    radio = _ARadio()
+    pane, engine, _running = _pane(qtbot, radio=radio)
+    pane.hand_over(_items(tmp_path, "one"))
+    engine.showing_picture = True
+
+    pane.tick()
+
+    assert radio.held.ticked == (True, 100, False)
+
+
+def test_closing_the_pane_lets_its_slideshows_hold_on_the_radio_go(qtbot, tmp_path):
+    radio = _ARadio()
+    pane, _engine, _running = _pane(qtbot, radio=radio)
+    pane.hand_over(_items(tmp_path, "one"))
+
+    pane.close_engine()
+
+    assert radio.held.closed is True
+
+
+def test_a_press_on_the_panels_speaker_tells_the_slideshow_the_volume_it_moved_to(
+        qtbot, tmp_path):
+    moved = []
+    pane, _engine, _running = _pane(qtbot, panel=lambda: HudModel(funestra="portrait"),
+                                    on_volume_moved=moved.append)
+    pane.hand_over(_items(tmp_path, "one"))
+    pane.tick()
+
+    pane.press(QPointF(speaker_on_screen(pane)))
+
+    assert moved == [VolumeHud(volume=100, muted=True)]
+
+
+def test_the_funestra_opens_at_the_volume_its_slideshow_was_left_at(qtbot, tmp_path):
+    pane, engine, _running = _pane(qtbot, volume=VolumeHud(volume=40, muted=False))
+
+    pane.hand_over(_items(tmp_path, "one"))
+
+    assert (engine.volume, engine.muted) == (40, False)
 
 
 def test_the_drive_is_told_where_the_clip_has_got_to(qtbot, tmp_path):

@@ -27,6 +27,7 @@ from typing import Protocol
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.modes import read_mode
+from funestra.volume import VolumeHud
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget
 
@@ -186,8 +187,11 @@ class SlideshowDirector:
     """Every fullscreen slideshow this window has open, and the words about them."""
 
     def __init__(self, host: SlideshowHost, *, db, browser, jobs, pace, motion,
-                 fun_time, names: ItemNames):
+                 fun_time, names: ItemNames, radio=None, turn_the_radio_on=None):
         self._host = host
+        self._radio = radio
+        self._turn_the_radio_on = turn_the_radio_on
+        self._volume_left_at: VolumeHud | None = None
         self._db = db
         self._names = names
         self._browser = browser
@@ -520,7 +524,19 @@ class SlideshowDirector:
             slides=self.slides_for,
             move_hud=partial(self.move_the_hud, side=side),
             filters_changed=self._note_filters,
+            volume_moved=self._volume_moved if self._fun_time is None else None,
         )
+
+    def _the_sound_standing_on_its_own(self) -> dict:
+        if self._fun_time is not None:
+            return {}
+        return {"radio": self._radio, "volume": self._volume_left_at}
+
+    def _volume_moved(self, volume: VolumeHud) -> None:
+        self._volume_left_at = volume
+        if self._turn_the_radio_on is not None:
+            self._turn_the_radio_on()
+
 
     def _note_filters(self, filters: SlideshowFilters) -> None:
         if self._fun_time is None:
@@ -587,7 +603,7 @@ class SlideshowDirector:
         if built:
             view = SlideshowView(items, actions=actions,
                                  pace=self._pace, motion=self._motion, hud=hud,
-                                 **kwargs)
+                                 **self._the_sound_standing_on_its_own(), **kwargs)
         else:
             view.play(items, actions=actions, hud=hud, **kwargs)
         if folder_items and view.is_live():
@@ -911,8 +927,10 @@ class SlideshowDirector:
         for side in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
             corner, minimized = self.hud_place(side)
             panels[side] = {"corner": corner, "minimized": minimized}
+        volume = self._volume_left_at
         return {"last_show": state.saved(), "filters": asdict(self._filters),
-                "panels": panels, "pace": self._pace.seconds}
+                "panels": panels, "pace": self._pace.seconds,
+                "volume": None if volume is None else asdict(volume)}
 
     def remember(self, saved) -> None:
         if not isinstance(saved, dict):
@@ -921,6 +939,7 @@ class SlideshowDirector:
         self._filters = SlideshowFilters.restored(saved.get("filters"))
         if type(saved.get("pace")) is int:
             self._pace.set_seconds(saved["pace"])
+        self._volume_left_at = _volume_saved_as(saved.get("volume"))
         panels = saved.get("panels")
         for side, place in (panels.items() if isinstance(panels, dict) else ()):
             if isinstance(place, dict):
@@ -1531,3 +1550,10 @@ class SlideshowDirector:
         """Which of *rows* carry an enhancement, for the switch beside F-mode
         on a slideshow's HUD — the question the thumbnails' yellow plus answers."""
         return {row["prompt_id"] for row in rows if gallery.is_enhanced_row(row)}
+
+
+def _volume_saved_as(saved) -> VolumeHud | None:
+    if (not isinstance(saved, dict) or type(saved.get("volume")) is not int
+            or type(saved.get("muted")) is not bool):
+        return None
+    return VolumeHud(volume=saved["volume"], muted=saved["muted"])

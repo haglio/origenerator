@@ -282,6 +282,12 @@ def _reweighted(prompt: str, index: int, delta: float) -> str:
     return _tidy(",".join(segments))
 
 
+def _without_nothing_weighted(prompt: str) -> str:
+    segments = _segments(prompt)
+    kept = [segment for segment in segments if _unwrap(segment)[1] > 0]
+    return prompt if len(kept) == len(segments) else _tidy(",".join(kept))
+
+
 def _plus(prompt: str, term: str) -> str:
     """``prompt`` with ``term`` appended as a new segment."""
     kept = _tidy(prompt)
@@ -368,7 +374,8 @@ def _revised(positive: str, negative: str, request: str, parsed: tuple,
         if rewrite is None:
             return None
         try:
-            new_positive, new_negative = rewrite(positive, negative, request)
+            new_positive, new_negative = map(_without_nothing_weighted,
+                                             rewrite(positive, negative, request))
         except Exception as exc:  # model down / unreadable: the rules' own edit stands
             logger.warning("prompt_edit: could not rewrite the prompts for a request (%s)",
                            type(exc).__name__)

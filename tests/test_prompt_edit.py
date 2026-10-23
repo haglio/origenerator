@@ -164,6 +164,14 @@ def test_a_rewrite_that_changes_nothing_leaves_the_rules_own_edit():
     assert revision.action == DROPPED
 
 
+def test_a_term_the_rewrite_weights_at_nothing_is_taken_out():
+    revision = apply_request("a woman, natural makeup, beach", "blurry", "no makeup",
+                             rewrite=lambda positive, negative, words: (
+                                 "a woman, (makeup:0.0), beach", "blurry, (glare:0)"))
+
+    assert (revision.positive, revision.negative) == ("a woman, beach", "blurry")
+
+
 def test_a_phrase_that_is_the_whole_term_is_dropped_by_the_rules_alone():
     def rewrite(positive, negative, words):
         raise AssertionError("not asked")

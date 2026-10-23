@@ -505,17 +505,19 @@ class ParamForm(QWidget):
 
     def track_prompt_rewrites(self, made_with: dict | None = None) -> None:
         """Mark every prompt on the form as a rewrite of ``made_with``'s text for
-        it, or of what it says right now where that holds none — arriving words
-        lit as they are typed, departing ones struck through once the typing
-        stops (:mod:`origenerator.gui.tracked_prompt`).
+        it, a scene's of its own part of the story, or of what it says right now
+        where that holds none (:mod:`origenerator.gui.tracked_prompt`).
 
         Every prompt rather than a named pair: a workflow that grows another one
         (the Foley audio prompts did) is marked the day it lands, for the same
         reason :meth:`text_fields` asks the widgets what they are.
         """
-        key_of = {id(widget): key for key, widget in self._widgets.items()}
-        for widget in self.text_fields():
-            was = (made_with or {}).get(key_of.get(id(widget)))
+        made_with = made_with or {}
+        scenes = (self._scenes.fields_beside_their_texts(made_with)
+                  if self._scenes is not None else [])
+        others = [(widget, made_with.get(key)) for key, widget in self._widgets.items()
+                  if isinstance(widget, QPlainTextEdit)]
+        for widget, was in scenes + others:
             tracked_prompt.track(
                 widget, was if isinstance(was, str) else diff_text.live_text(widget))
 

@@ -27,16 +27,13 @@ ENHANCED_KEY = "__enhanced__"   # synthetic node: every enhanced image under its
 ENHANCED_LABEL = "Enhanced"
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
 EXPERIMENTS_LABEL = "Experiments"
-REQUESTS_KEY = "__requests__"  # synthetic node: what spoken requests have queued
-REQUESTS_LABEL = "Requests"
 TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
 TRASH_LABEL = "Trash"
 
-COLLECTIONS = (RECENTS_KEY, FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, REQUESTS_KEY,
-               TRASH_KEY)
+COLLECTIONS = (RECENTS_KEY, FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)
 COLLECTION_LABELS = {RECENTS_KEY: RECENTS_LABEL, FAVORITES_KEY: FAVORITES_LABEL,
                      ENHANCED_KEY: ENHANCED_LABEL, EXPERIMENTS_KEY: EXPERIMENTS_LABEL,
-                     REQUESTS_KEY: REQUESTS_LABEL, TRASH_KEY: TRASH_LABEL}
+                     TRASH_KEY: TRASH_LABEL}
 _IN_FOLDER = "@"
 
 

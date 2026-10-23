@@ -25,7 +25,6 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
     TRASH_LABEL,
 )
@@ -211,8 +210,8 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     # Each half carries the whole table of contents, not a slice of it.
     for side in ("portrait", "landscape"):
         assert _rows(view._tree, side) == ["All"]
-        assert _under_all(view._tree, side)[:6] == [
-            "Latest", "Favorites", "Enhanced", "Experiments", "Requests", "Trash",
+        assert _under_all(view._tree, side)[:5] == [
+            "Latest", "Favorites", "Enhanced", "Experiments", "Trash",
         ]
 
 
@@ -608,7 +607,7 @@ def test_both_shapes_are_drawn_even_for_one_with_nothing_in_it(qtbot, tmp_path):
     # No folders of that shape yet, so no Favorites and no library — but the
     # collections a first generation would land on are all there.
     assert _rows(view._tree, "portrait") == ["All"]
-    assert _under_all(view._tree, "portrait") == ["Experiments", "Requests", "Trash"]
+    assert _under_all(view._tree, "portrait") == ["Experiments", "Trash"]
     assert "Favorites" in _under_all(view._tree, "landscape")
 
 
@@ -677,9 +676,9 @@ def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["w1"]
 
 
-def test_the_trash_and_requests_collections_split_too(qtbot, tmp_path):
-    """The half-measure this replaces left Requests, Trash and All whole; the
-    whole table of contents means the whole of it."""
+def test_the_trash_collection_splits_too(qtbot, tmp_path):
+    """The half-measure this replaces left Trash and All whole; the whole table
+    of contents means the whole of it."""
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
@@ -696,8 +695,6 @@ def test_the_trash_and_requests_collections_split_too(qtbot, tmp_path):
     view._tree.setCurrentItem(view._item_by_key[oriented_key(TRASH_KEY, "portrait")])
     assert view._current_collection_key() == oriented_key(TRASH_KEY, "portrait")
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
-
-    assert view._browser.rows_for_collection(oriented_key(REQUESTS_KEY, "portrait")) == []
 
 
 def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):

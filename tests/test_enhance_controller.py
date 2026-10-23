@@ -738,6 +738,17 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
     assert kind == NOTICE
 
 
+def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
+    monkeypatch.setattr(module.gallery, "fix_params_for",
+                        lambda row, parts, settings: {"enhance_detail_fixes": {"hands": 1.0}})
+    monkeypatch.setattr(module.gallery, "level_matching_params", lambda row, params: 0)
+    controller, _host = enhance(db=FakeDB([_image("i1")]))
+
+    assert controller.fix_parts("i1", [DetailPart("hands", ("hands",), ("hands",))]) == (
+        None, "hands already fixed as hard as a fix goes", WARNING)
+
+
 @pytest.mark.parametrize("part, folder", [
     (DetailPart("teeth", ("teeth",), ("teeth",)), "bbox"),
     (DetailPart("skin", ("skin",), ("skin",), outline=True), "segm"),

@@ -35,7 +35,6 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
     FolderCollection,
     folder_collection,
@@ -60,7 +59,6 @@ _COLLECTION_TIPS = {
     FAVORITES_KEY: "Your favorite folders and items — drop a folder here to add it",
     ENHANCED_KEY: "Your enhanced images",
     EXPERIMENTS_KEY: "Background experiments awaiting your review",
-    REQUESTS_KEY: "What you asked for out loud — “Request … over”",
     TRASH_KEY: "Deleted items — restorable here until you delete them for good",
 }
 

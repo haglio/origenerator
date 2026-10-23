@@ -13,6 +13,8 @@ from origenerator.voice.dictation import (
     RequestDictation,
     RequestState,
     request_bias,
+    request_words,
+    words_of,
 )
 
 
@@ -133,6 +135,18 @@ def test_a_request_with_nothing_between_the_markers_still_completes():
 
     assert spoken.state == COMPLETED
     assert spoken.text == ""
+
+
+def test_what_was_heard_reads_back_as_the_request_alone():
+    assert request_words("Request, no silver earrings, over.") == "no silver earrings"
+    assert request_words("Request. a red coat. Over.") == "a red coat"
+
+
+def test_a_record_s_words_are_its_own_else_what_was_heard_between_the_markers():
+    assert words_of({"asked": "two women", "heard": ""}) == "two women"
+    assert words_of({"asked": None, "heard": "Request, no hat, over."}) == "no hat"
+    assert words_of({"asked": None, "heard": ""}) == ""  # a folder's Modify
+    assert words_of(None) == ""
 
 
 def test_the_bias_names_both_markers():

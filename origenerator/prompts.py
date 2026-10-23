@@ -1,4 +1,4 @@
-"""The two system prompts the local LLM is given.
+"""The three system prompts the local LLM is given.
 
 Behavior, not configuration: every one of these is tuned by reading what the
 model does with it, and each changes for reasons that have nothing to do with
@@ -7,12 +7,45 @@ they share neither a file nor a blame history with those.
 
 All local: the prompts and everything sent under them go to an
 OpenAI-compatible chat server on this machine (``config.LOCAL_LLM_BASE_URL``),
-and nothing leaves it. Uncensored models throughout -- a censored one refuses to
-match explicit words and refuses to widen a search with the library's own
-vocabulary -- so each prompt says outright that explicit content is expected and
-is to be handled literally rather than softened.
+and nothing leaves it. Uncensored models throughout -- a censored one refuses
+explicit edits, refuses to match explicit words and refuses to widen a search
+with the library's own vocabulary -- so each prompt says outright that explicit
+content is expected and is to be handled literally rather than softened.
 """
 from __future__ import annotations
+
+REQUEST_REWRITE_SYSTEM_PROMPT = (
+    "You edit Stable Diffusion image-generation prompts from short spoken "
+    "instructions. You get the current POSITIVE prompt (what to include) and "
+    "NEGATIVE prompt (what to keep out), plus one instruction. Apply it and return "
+    "BOTH prompts as JSON.\n"
+    "Rules:\n"
+    "- Positive prompts cannot negate. To exclude something (\"no X\", \"without "
+    "X\", \"remove X\"), put the bare term in the NEGATIVE prompt (e.g. \"tan "
+    "lines\") and delete it from the positive if it's there. Never write \"no X\" "
+    "or \"without X\" in the positive prompt.\n"
+    "- Emphasis uses (term:weight). If asked for MORE of something already present, "
+    "raise its weight (big -> (big:1.3); (big:1.2) -> (big:1.4)). If asked for LESS "
+    "of something present, lower it ((big:0.8)) or drop it if already low.\n"
+    "- To add something wanted, place it among related terms (a subject with its "
+    "attributes; style/quality words later), not just tacked on the end.\n"
+    "- Change every term the instruction contradicts, so the prompt says what was "
+    "asked as a whole (asked for two women, a prompt describing one woman comes "
+    "to describe two), and keep everything else exactly as it is.\n"
+    "- Reply with ONLY JSON: {\"positive\": \"<full positive>\", \"negative\": "
+    "\"<full negative>\"}. Always include both fields, echoing one unchanged if the "
+    "instruction didn't touch it.\n"
+    "Examples (instruction, then the prompts before -> after):\n"
+    "- \"no hat\": {\"positive\": \"a man in a blue hat, beach\", \"negative\": "
+    "\"blurry\"} -> {\"positive\": \"a man, beach\", \"negative\": \"blurry, hat\"}\n"
+    "- \"more grass\": {\"positive\": \"a dog, grass\", \"negative\": \"blurry\"} -> "
+    "{\"positive\": \"a dog, (grass:1.2)\", \"negative\": \"blurry\"}\n"
+    "- \"three dogs\": {\"positive\": \"a dog running, park\", \"negative\": "
+    "\"blurry\"} -> {\"positive\": \"three dogs running, park\", \"negative\": "
+    "\"blurry\"}\n"
+    "- \"at night\": {\"positive\": \"a street, sunny afternoon\", \"negative\": "
+    "\"blurry\"} -> {\"positive\": \"a street, at night\", \"negative\": \"blurry\"}"
+)
 
 # --- Gallery search → widened vocabulary ----------------------------------
 # The gallery search matches on meaning, not letters. A built-in synonym table

@@ -301,19 +301,23 @@ def _no_real_mic(monkeypatch):
 
 
 def refuse_the_comfyui_on_this_machine(setattr) -> None:
-    """Refuse every call to the real ComfyUI address, as a machine without one would.
+    """Refuse every call to the real ComfyUI and local LLM addresses, as a
+    machine without either would.
 
     Whatever reaches the ComfyUI running here is rendered into the folder the
-    app imports new images from at launch -- into the user's own gallery.
+    app imports new images from at launch -- into the user's own gallery; and
+    a test answered by whatever model happens to be running here passes on this
+    machine alone.
     """
     real_urlopen = urllib.request.urlopen
-    comfyui = (config.COMFYUI_HOST, config.COMFYUI_PORT)
+    llm = urllib.parse.urlsplit(config.LOCAL_LLM_BASE_URL)
+    refused = {(config.COMFYUI_HOST, config.COMFYUI_PORT), (llm.hostname, llm.port)}
 
     def urlopen(url, *args, **kwargs):
         target = urllib.parse.urlsplit(getattr(url, "full_url", url))
-        if (target.hostname, target.port) == comfyui:
+        if (target.hostname, target.port) in refused:
             raise urllib.error.URLError(ConnectionRefusedError(
-                errno.ECONNREFUSED, "the suite never reaches the ComfyUI on this machine"))
+                errno.ECONNREFUSED, "the suite never reaches a service on this machine"))
         return real_urlopen(url, *args, **kwargs)
 
     setattr(urllib.request, "urlopen", urlopen)

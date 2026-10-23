@@ -2,7 +2,7 @@
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
 settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Favorites /
-Enhanced / Experiments / Requests / Trash collection overviews. Owns the thumbnail multi-selection
+Enhanced / Experiments / Trash collection overviews. Owns the thumbnail multi-selection
 and the live in-flight cards.
 
 One thing it renders comes from no tree row at all: the gallery search's results,
@@ -44,7 +44,6 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
-    REQUESTS_KEY,
     TRASH_KEY,
     FolderCollection,
     folder_collection,
@@ -310,7 +309,7 @@ def _between_headings(flow, rows, headings, draw) -> list[_Entry]:
 @dataclass(frozen=True)
 class LeadTiles:
     reroll: QWidget | None = None
-    request: QWidget | None = None
+    modify: QWidget | None = None
     generating: QWidget | None = None
 
 
@@ -441,9 +440,6 @@ class BrowserPane(QObject):
             EXPERIMENTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._experiment_rows, side, folder),
                 render=self._render_experiments),
-            REQUESTS_KEY: PaneCollection(
-                rows=lambda side, folder: self._in_folder(self._requested_rows, side, folder),
-                render=self._render_requests),
             TRASH_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._trash_rows, side, folder),
                 render=self._render_trash),
@@ -467,7 +463,6 @@ class BrowserPane(QObject):
         self._trash_rows = _Listing()       # held deletions, newest first
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
         self._showing_search = False        # a query owns the pane, whatever the tree says
-        self._requested_rows = _Listing()   # what spoken requests made
         self._collection_side: str | None = None
         self._collection_folder = gallery.ALL_KEY
         self._placements: dict[str | None, Placement] = {}
@@ -480,7 +475,7 @@ class BrowserPane(QObject):
         return self._models_taken
 
     def set_model(self, recent_rows, side_trees, listed_rows, experiment_rows,
-                  trash_rows, request_items=(), image_index=None):
+                  trash_rows, image_index=None):
         """Take the newly rebuilt gallery model the collections render from.
 
         ``side_trees`` is per side (``{side: [folders]}``): a folder is
@@ -493,7 +488,6 @@ class BrowserPane(QObject):
         self._enhanced_rows = _Listing(gallery.enhanced_generations(listed_rows))
         self._experiment_rows = _Listing(experiment_rows)
         self._trash_rows = _Listing(trash_rows)
-        self._requested_rows = _Listing(item["row"] for item in request_items)
         self._image_index = image_index or {}
         self._placements = {side: Placement(gallery.all_group(tree), self._image_index)
                             for side, tree in side_trees.items()}
@@ -797,7 +791,7 @@ class BrowserPane(QObject):
         selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
 
-    # --- the collections: Recents / Favorites / Enhanced / Experiments / Requests / Trash ---
+    # --- the collections: Recents / Favorites / Enhanced / Experiments / Trash ---
 
     def show_collection(self, key: str, side: str | None = None):
         collection = folder_collection(key)
@@ -1071,51 +1065,6 @@ class BrowserPane(QObject):
                 "models. Results collect here; your keep/reject verdicts steer "
                 "what gets tried next.")
 
-    # --- the Requests collection: what you asked for out loud ----------------
-
-    def _render_requests(self):
-        """The Requests collection: what your spoken requests made, newest first —
-        ordinary tiles, since what a request produced is an ordinary generation
-        that happens to have been asked for out loud. What was heard and what it
-        changed in the prompt show where the prompt does, in the config tab a
-        click loads.
-
-        One still generating shows as the live card the Recents collection gives
-        in-flight work, so a request you have just spoken is visibly under way
-        rather than absent until it lands."""
-        container, flow = self._new_tile_pane()
-        in_flight = {item.key: item for item in self.inflight_items()}
-        rows = self._open_collection_rows(REQUESTS_KEY)
-        if not rows:
-            self.show_widget(self._empty_state(self._requests_empty_hint()))
-            return
-        drawn = [row for row in rows
-                 if row["prompt_id"] in in_flight or gallery.produced_output(row)]
-
-        def draw(row):
-            live = in_flight.get(row["prompt_id"])
-            if live is None:
-                self._add_collection_thumbnail(flow, row)
-            else:
-                self._add_inflight_card(flow, live)
-
-        headings = gallery.section_headings(drawn)
-        _open_sections(flow, headings)
-        self._show_paged(container, [
-            entry._replace(item=None) if entry.item in in_flight else entry
-            for entry in _between_headings(flow, drawn, headings, draw)])
-
-
-    @staticmethod
-    def _requests_empty_hint() -> str:
-        return ("Nothing requested yet.\n\nWith an image on screen, say "
-                "“Request”, then what you want changed, then “over” — "
-                "“Request… no hat… over”. The revision is queued straight away "
-                "and lands here; open one and its prompt shows what moved.\n\n"
-                "A folder's Request card lands here too — it asks the same "
-                "thing of every image in that folder at once, typed rather "
-                "than spoken.")
-
     # --- the Trash collection: deleted items, still recoverable --------------
 
     def _render_trash(self):
@@ -1229,10 +1178,9 @@ class BrowserPane(QObject):
         The slideshow plays these, so they have to match the tiles: Recents is its
         listed items, Favorites is its favorited items plus everything under each
         bookmarked folder, since a folder tile there stands for its whole folder,
-        Enhanced is its enhanced images, Experiments is its unreviewed queue,
-        Requests is what your spoken requests made, and Trash is what the
-        bin is holding — deleted is not unwatchable, and a collection of items you are
-        deciding whether to keep is exactly one you want to sit and look through.
+        Enhanced is its enhanced images, Experiments is its unreviewed queue, and
+        Trash is what the bin is holding — deleted is not unwatchable, and items you
+        are deciding whether to keep are ones to sit and look through.
         A favorited item inside a favorited folder is one item, so repeats drop out.
         A running search gathers too — its hits are gathered exactly as a
         collection's are, and sitting through what a search turned up is
@@ -1246,7 +1194,7 @@ class BrowserPane(QObject):
         placement = self._placement(side)
         tallies = {collection: placement.tally(
                        self._collections[collection].rows(side, gallery.ALL_KEY))
-                   for collection in (ENHANCED_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
+                   for collection in (ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)}
         tallies[FAVORITES_KEY] = placement.tally_favorites(self._listed.on(side))
         return {FolderCollection(collection, folder).key: count
                 for collection, tally in tallies.items() for folder, count in tally.items()}
@@ -1323,12 +1271,12 @@ class BrowserPane(QObject):
         opens_now = ((lead.reroll is not None or bool(cards))
                      and gallery.new_work_opens_a_section(finished))
         sections = opens_now + sum(1 for heading in headings if heading)
-        request_above = lead.request is not None and sections > 1
-        if request_above:
-            flow.addWidget(lead.request)
+        modify_above = lead.modify is not None and sections > 1
+        if modify_above:
+            flow.addWidget(lead.modify)
 
         def draw_leading():
-            for tile in (lead.reroll, None if request_above else lead.request):
+            for tile in (lead.reroll, None if modify_above else lead.modify):
                 if tile is not None:
                     flow.addWidget(tile)
             for item in cards:

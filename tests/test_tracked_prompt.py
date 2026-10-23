@@ -163,6 +163,20 @@ def test_typing_over_a_word_strikes_it_through_without_leaving_the_field(pair, q
     assert diff_text.live_text(pair.edit) == "a dog on a couch"
 
 
+def test_what_went_is_struck_through_in_red(pair, qtbot):
+    # The words are still in the field, so a reader skimming a long prompt has
+    # to be able to tell at a glance which of it is no longer asked for.
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    _type_over(pair.edit, "cat", "dog")
+    _settle(qtbot, pair.edit)
+
+    cursor = QTextCursor(pair.edit.document())
+    cursor.setPosition(pair.edit.toPlainText().index("cat") + 1)
+    color = cursor.charFormat().foreground().color()
+    assert color.red() > 200 and color.green() < 100
+
+
 def test_the_caret_stays_where_it_was_typed_when_the_strike_arrives(pair, qtbot):
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
@@ -202,6 +216,21 @@ def test_a_word_typed_and_taken_back_out_stops_being_marked(pair, qtbot):
 
     assert _marks(pair.edit) == [("a cat on a couch", "plain")]
     assert diff_text.live_text(pair.edit) == "a cat on a couch"
+
+
+def test_undo_takes_back_the_last_burst_of_typing_and_redo_puts_it_back(pair, qtbot):
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    _type_over(pair.edit, "cat", "dog")
+    _settle(qtbot, pair.edit)
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+    assert diff_text.live_text(pair.edit) == "a cat on a couch"
+    assert _marks(pair.edit) == [("a cat on a couch", "plain")]
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
+    assert diff_text.live_text(pair.edit) == "a dog on a couch"
+    assert _marked(pair.edit, "struck") == "cat"
 
 
 def test_leaving_the_field_settles_it_without_waiting_out_the_clock(pair):

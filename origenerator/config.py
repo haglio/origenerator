@@ -183,7 +183,7 @@ MOTION_DEFAULT_HZ = bpm_for_speed(MOTION_DEFAULT_SPEED) / 60
 
 # --- Voice, and the local LLM ----------------------------------------------
 # What is said is heard locally (voice_core: vosk and faster-whisper, CPU), and a
-# local LLM matches a spoken request's words to its prompt's and widens a search.
+# local LLM works a request into its prompts and widens a search.
 # All local — no audio or prompt text leaves the machine. Point LOCAL_LLM_* at your
 # own OpenAI-compatible chat server (Ollama's /v1, LM Studio, llama.cpp, …). What
 # the LLM is *told* is behavior rather than configuration and lives in

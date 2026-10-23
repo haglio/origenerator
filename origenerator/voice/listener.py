@@ -9,14 +9,6 @@ refusal on every transcription, so "Request … over" can be said wherever it is
 heard. While one is open it swallows what it hears -- which keeps the words of a
 request from matching a command -- and each step of it is re-emitted as
 :attr:`CommandAndRequestListener.request`.
-
-One thing outranks even that, and only while no request is open: an injected
-``bare_matcher``, the strict whole-utterance vocabulary
-(:mod:`origenerator.voice.app_commands`). A word that IS a command, whole and
-alone, is a command -- which is what lets "requests" reach the Requests collection
-though "request" is the word a dictation opens on. Once one is open the
-dictation is back in front, because a command word said mid-sentence belongs to
-the sentence.
 """
 from __future__ import annotations
 
@@ -65,15 +57,14 @@ class CommandAndRequestListener(QObject):
         self.drop_the_request()
 
     def bare_command(self, text: str):
-        """The whole-utterance command *text* is, or ``None`` -- asked first, and
-        only while no request is being said, of what this app's own mic heard
-        and of what the HOSTING session heard alike. Without it the session's
-        "enhanced only" reached the looser image matcher, which reads it as
-        "enhance" with a word after it and spends a generation on it.
+        """The whole-utterance command *text* is, or ``None`` -- asked once the
+        request has passed on it and before the looser matcher, of what this
+        app's own mic heard and of what the HOSTING session heard alike. Without
+        it the session's "enhanced only" reached the looser image matcher,
+        which reads it as "enhance" with a word after it and spends a generation
+        on it.
         """
-        if self._bare_matcher is None or self.taking_a_request:
-            return None
-        return self._bare_matcher(text)
+        return self._bare_matcher(text) if self._bare_matcher is not None else None
 
     def push_dictation(self, text: str):
         """Feed the open request one transcription, and answer what it meant
@@ -115,14 +106,14 @@ class CommandAndRequestListener(QObject):
     def _meaning(self, text: str):
         """What one transcription meant, or ``None`` for nothing at all.
 
-        A whole-utterance command first, then the dictation, which has first
-        refusal over everything else because it is collecting a sentence, then
-        the general command matcher.
+        The dictation first, which has first refusal because it is collecting a
+        sentence, then the whole-utterance vocabulary and after it the general
+        command matcher.
         """
-        bare = self.bare_command(text)
-        if bare is not None:
-            return bare
         spoken = self.push_dictation(text)
         if spoken is not None:
             return spoken
+        bare = self.bare_command(text)
+        if bare is not None:
+            return bare
         return self._matcher(text) if self._matcher is not None else None

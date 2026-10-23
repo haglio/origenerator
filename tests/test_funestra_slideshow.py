@@ -75,8 +75,10 @@ def _says(slideshow: FunestraSlideshow, **fields) -> None:
     _funestra_says(slideshow.channel, **fields)
 
 
-def _funestra_says(channel: FunestraChannel, **fields) -> None:
-    lines = status_fields(FunestraStatus(**fields))
+def _funestra_says(channel: FunestraChannel, *, loads: int = 1, idle: bool = False,
+                   **fields) -> None:
+    lines = {**status_fields(FunestraStatus(**fields)), "loads": str(loads),
+             "idle": "1" if idle else "0"}
     channel.status_file.write_text(
         "".join(f"{key}={value}\n" for key, value in lines.items()), encoding="utf-8")
 
@@ -105,6 +107,55 @@ def test_a_slideshow_on_a_funestra_answers_whatever_a_window_slideshow_is_asked_
              if not name.startswith("_") and not name.endswith("Event")}
 
     assert asked - set(dir(FunestraSlideshow)) == ONLY_A_WINDOW
+
+
+def test_a_file_the_funestra_would_not_open_is_stepped_past(qtbot, tmp_path):
+    """A clip carries no pace of its own -- its length is its pace -- so a file the
+    Funestra cannot open would be a black screen for the rest of the slideshow."""
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+
+    _says(slideshow, video="one.png", idle=True)
+    slideshow.tick()
+
+    assert _sent(slideshow) == ["NEXT"]
+
+
+def test_each_file_that_would_not_open_is_stepped_past_once(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    _says(slideshow, video="one.png", idle=True)
+    slideshow.tick()
+    slideshow.tick()
+
+    _says(slideshow, video="two.png", loads=2, idle=True)
+    slideshow.tick()
+
+    assert _sent(slideshow) == ["NEXT", "NEXT"]
+
+
+def test_a_file_that_would_not_open_is_stepped_past_even_while_locked(qtbot, tmp_path):
+    """A lock replays what it holds, so a locked file that cannot play would hold
+    the black screen for good; the item stays in the set, the lock comes off."""
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+
+    _says(slideshow, video="one.png", locked=True, idle=True)
+    slideshow.tick()
+
+    assert _sent(slideshow) == ["LOCK_OFF", "NEXT"]
+
+
+def test_a_file_that_would_not_open_waits_out_a_paused_room_before_it_is_stepped_past(
+        qtbot, tmp_path):
+    """A slideshow hunting through its set for something it can play is the room
+    moving while it is held, so the black screen waits for the room to play on."""
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    _says(slideshow, video="one.png", paused=True, idle=True)
+    slideshow.tick()
+    held = _sent(slideshow)
+
+    _says(slideshow, video="one.png", idle=True)
+    slideshow.tick()
+
+    assert (held, _sent(slideshow)) == ([], ["NEXT"])
 
 
 def test_a_slideshow_hands_the_funestra_the_pass_it_is_to_play(qtbot, tmp_path):

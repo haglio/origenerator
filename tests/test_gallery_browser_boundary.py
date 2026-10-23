@@ -259,8 +259,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the one pager any listing can take, so the three steps that drew, forgot and
     revealed Latest's own pages are the one that hands a listing to it. 271 -> 272:
     Cancel All asks before it cancels every job, from the job queue or a
-    slideshow's, so it is one method beside Start now's.)"""
+    slideshow's, so it is one method beside Start now's. 272 -> 271: the Requests
+    collection left the folder list, and with it the listing a tab read its
+    request off; the tab reads the request itself. And the pane 81 -> 79: the
+    collection's drawing and its empty-state words went with it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 272
+               for x in _class_def(VIEW, "GalleryView").body) == 271
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 81
+               for x in _class_def(PANE, "BrowserPane").body) == 79

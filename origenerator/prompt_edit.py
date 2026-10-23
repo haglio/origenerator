@@ -11,11 +11,14 @@ freckles" — and what it means for the prompt pair follows a fixed policy:
   neither.
 
 Each is the smallest change that answers the request, which is why the mirror is
-"stop excluding it" rather than "stop excluding it and also add it": ask twice
-and the second pass, finding it in neither prompt, adds it.
+"take it out of the negative prompt" rather than "take it out and also add it":
+ask twice and the second pass, finding it in neither prompt, adds it.
 
-The policy is deterministic — no model decides what happens to a term. What a
-model *is* needed for is finding the term at all: "no earrings" is about a
+The policy is deterministic for every term a prompt already holds. A term in
+neither prompt is the one thing it can only append, and the prompt may say the
+opposite ("two women" over a prompt describing one), so that is handed to the
+local LLM to work into the whole pair (``rewrite``). The other thing a model is
+needed for is finding the term at all: "no earrings" is about a
 prompt that says "silver ear studs", and no amount of string matching gets from
 one to the other. So the two are split. :func:`literal_match` reads a prompt for
 the words themselves and is what runs by default; :func:`smart_match` asks the
@@ -24,8 +27,8 @@ a caller that wants synonyms caught. Either way the rules above then apply
 unchanged, and a request whose wording can't be read at all comes back as
 ``None`` for the caller to say so rather than being guessed at.
 
-Everything but that one function is pure and Qt-free, so the whole policy
-unit-tests without a model or a server.
+Everything but :func:`smart_match` and :func:`rewrite_prompt` is pure and Qt-free,
+so the whole policy unit-tests without a model or a server.
 """
 from __future__ import annotations
 
@@ -34,6 +37,11 @@ import logging
 import re
 import urllib.request
 from dataclasses import dataclass
+from functools import partial
+
+from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
+from origenerator.prompts import REQUEST_REWRITE_SYSTEM_PROMPT, VOICE_REQUEST_MATCH_SYSTEM_PROMPT
+from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +61,7 @@ EXCLUDED = "excluded"    # added to the negative prompt
 RAISED = "raised"        # already wanted, now wanted harder
 ADDED = "added"          # added to the positive prompt
 ALLOWED = "allowed"      # taken out of the negative prompt
+REWRITTEN = "rewritten"  # in neither prompt, so worked into the whole of it
 
 def _both_spellings(words: set) -> frozenset:
     """``words`` plus the same words with their apostrophes dropped.
@@ -259,17 +268,17 @@ def _format_weight(weight: float) -> str:
     return f"{round(weight, 2):g}"
 
 
-def _reweighted(prompt: str, index: int, delta: float) -> tuple:
-    """``prompt`` with segment ``index`` re-weighted by ``delta``, and the weight
-    it now carries. The segment is rewritten in the explicit ``(term:weight)``
-    form whatever it was in before, so the number it ends on is readable."""
+def _reweighted(prompt: str, index: int, delta: float) -> str:
+    """``prompt`` with segment ``index`` re-weighted by ``delta``. The segment
+    is rewritten in the explicit ``(term:weight)`` form whatever it was in
+    before, so the number it ends on is readable."""
     segments = _segments(prompt)
     segment = segments[index]
     term, weight = _unwrap(segment)
     weight = round(weight + delta, 2)
     lead = segment[:len(segment) - len(segment.lstrip())]
     segments[index] = f"{lead}({term}:{_format_weight(weight)})"
-    return _tidy(",".join(segments)), weight
+    return _tidy(",".join(segments))
 
 
 def _plus(prompt: str, term: str) -> str:
@@ -290,7 +299,6 @@ class PromptRevision:
     term: str
     polarity: str
     action: str
-    weight: float | None = None  # what a re-weighting landed on, else None
 
     @property
     def changed(self) -> bool:
@@ -299,29 +307,22 @@ class PromptRevision:
         return (self.positive != self.old_positive
                 or self.negative != self.old_negative)
 
-    def describe(self) -> str:
-        """What was done, as a line to say back to the speaker."""
-        quoted = f"“{self.term}”"
-        if self.action == DROPPED:
-            return f"dropped {quoted}"
-        if self.action == PUSHED:
-            return f"{quoted} pushed further out ({_format_weight(self.weight)})"
-        if self.action == EXCLUDED:
-            return f"{quoted} added to the negative prompt"
-        if self.action == RAISED:
-            return f"{quoted} raised to {_format_weight(self.weight)}"
-        if self.action == ALLOWED:
-            return f"stopped excluding {quoted}"
-        return f"{quoted} added to the prompt"
-
 
 def apply_request(positive: str, negative: str, request: str,
-                  match=None) -> PromptRevision | None:
-    """Apply a spoken ``request`` to a prompt pair, by the policy up top.
+                  match=None, rewrite=None) -> PromptRevision | None:
+    """Apply a ``request`` to a prompt pair, by the policy up top.
 
-    ``match(terms, term)`` is how a prompt that doesn't say the words the
-    speaker said is still searched — see :func:`smart_match`. Without one, only
-    the words themselves are looked for.
+    ``match(terms, term)`` is how a positive prompt that doesn't say the words
+    a request against something said is still searched — see
+    :func:`smart_match`. Every other lookup reads the words themselves only: a
+    model asked which of "blurry" meant "two women" answered blurry.
+
+    ``rewrite(positive, negative, request)`` answers what the policy can only
+    do bluntly: something in neither prompt, which the prompt may contradict
+    ("two women" over a prompt describing one), and something to take out of a
+    phrase that says more than it ("a woman wearing a straw hat"), so the local
+    model reworks the whole pair. A rewrite that fails leaves the policy's own
+    edit standing.
 
     ``None`` when the request names nothing to act on ("request … over" with
     only filler between the markers), so the caller can say it didn't catch a
@@ -330,33 +331,83 @@ def apply_request(positive: str, negative: str, request: str,
     parsed = parse_request(request)
     if parsed is None:
         return None
-    polarity, term = parsed
     positive, negative = positive or "", negative or ""
+    scenes, negatives = scene_prompts(positive), scene_prompts(negative)
+    if len(scenes) == 1:
+        return _revised(positive, negative, request, parsed, match, rewrite)
+    each_negative = [scene_text(negatives, index) for index in range(len(scenes))]
+    revisions = [_revised(scene, scene_negative, request, parsed, match, rewrite)
+                 for scene, scene_negative in zip(scenes, each_negative)]
+    polarity, term = parsed
+    return PromptRevision(positive, negative,
+                          story_of([revision.positive for revision in revisions]),
+                          _negative_story(negative, each_negative,
+                                          [revision.negative for revision in revisions]),
+                          term, polarity,
+                          ", ".join(dict.fromkeys(revision.action for revision in revisions)))
 
-    def made(new_positive, new_negative, action, weight=None) -> PromptRevision:
+
+def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
+    if after == before:
+        return negative
+    if len(set(after)) == 1:
+        return after[0]
+    return story_of(after)
+
+
+def _revised(positive: str, negative: str, request: str, parsed: tuple,
+             match, rewrite) -> PromptRevision:
+    polarity, term = parsed
+
+    def made(new_positive, new_negative, action) -> PromptRevision:
         return PromptRevision(positive, negative, new_positive, new_negative,
-                              term, polarity, action, weight)
+                              term, polarity, action)
+
+    def rewritten() -> PromptRevision | None:
+        if rewrite is None:
+            return None
+        try:
+            new_positive, new_negative = rewrite(positive, negative, request)
+        except Exception as exc:  # model down / unreadable: the rules' own edit stands
+            logger.warning("prompt_edit: could not rewrite the prompts for a request (%s)",
+                           type(exc).__name__)
+            return None
+        if (new_positive, new_negative) == (positive, negative):
+            return None  # it did nothing, which is no answer to a request
+        return made(new_positive, new_negative, REWRITTEN)
 
     if polarity == REMOVE:
         index = _index_of(positive, term, match)
         if index is not None:
-            return made(_without(positive, index), negative, DROPPED)
-        index = _index_of(negative, term, match)
+            within = bare_terms(positive)[index].lower() != term.lower()
+            return ((within and rewritten())
+                    or made(_without(positive, index), negative, DROPPED))
+        index = _index_of(negative, term, None)
         if index is not None:
-            revised, weight = _reweighted(negative, index, WEIGHT_STEP)
-            return made(positive, revised, PUSHED, weight)
+            return made(positive, _reweighted(negative, index, WEIGHT_STEP), PUSHED)
         return made(positive, _plus(negative, term), EXCLUDED)
-    index = _index_of(negative, term, match)
+    index = _index_of(negative, term, None)
     if index is not None:
         return made(positive, _without(negative, index), ALLOWED)
-    index = _index_of(positive, term, match)
+    index = _index_of(positive, term, None)
     if index is not None:
-        revised, weight = _reweighted(positive, index, WEIGHT_STEP)
-        return made(revised, negative, RAISED, weight)
-    return made(_plus(positive, term), negative, ADDED)
+        return made(_reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
+    return rewritten() or made(_plus(positive, term), negative, ADDED)
 
 
-# --- the one I/O boundary: which of a prompt's terms the request means -------
+def work_out(positive: str, negative: str, request: str) -> PromptRevision | None:
+    """``request`` applied as every request is, spoken or typed: the local LLM
+    finding a term the prompt names in its own words, and rewriting the pair for
+    one in neither prompt."""
+    return apply_request(
+        positive, negative, request,
+        match=partial(smart_match, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+                      system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
+        rewrite=partial(rewrite_prompt, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+                        system_prompt=REQUEST_REWRITE_SYSTEM_PROMPT))
+
+
+# --- the I/O boundary: which of a prompt's terms the request means ----------
 
 
 def build_match_messages(terms: list[str], term: str, system_prompt: str) -> list[dict]:
@@ -434,3 +485,58 @@ def smart_match(terms: list[str], term: str, *, base_url: str, model: str,
         logger.info("prompt_edit: the request matched index %d of the prompt's %d terms",
                     chosen, len(terms))
     return chosen
+
+
+# --- and the pair rewritten for a term in neither prompt ---------------------
+
+
+def build_rewrite_messages(positive: str, negative: str, instruction: str,
+                           system_prompt: str) -> list[dict]:
+    """The chat messages for one rewrite: the editing rules, then the current
+    prompt pair and the spoken change as the user turn."""
+    user = (
+        f"Positive prompt:\n{positive}\n\n"
+        f"Negative prompt:\n{negative}\n\n"
+        f"Spoken instruction:\n{instruction}\n\n"
+        'Reply with only JSON: {"positive": "...", "negative": "..."}'
+    )
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user},
+    ]
+
+
+def parse_rewrite(data: dict) -> dict:
+    """The JSON object the model returned (its positive/negative prompt fields)."""
+    content = data["choices"][0]["message"]["content"]
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        start, end = content.find("{"), content.rfind("}")  # tolerate fences/preamble
+        if start != -1 and end > start:
+            return json.loads(content[start:end + 1])
+        raise
+
+
+def rewrite_prompt(positive: str, negative: str, instruction: str, *, base_url: str,
+                   model: str, system_prompt: str, timeout: float = 30.0):
+    """Apply ``instruction`` to the (positive, negative) prompt pair via the local
+    LLM and return the revised pair. A field the model omits is left unchanged.
+    Raises on transport/decode errors so the caller can surface them."""
+    url = base_url.rstrip("/") + "/chat/completions"
+    payload = {
+        "model": model,
+        "messages": build_rewrite_messages(positive, negative, instruction, system_prompt),
+        "temperature": 0.4,  # editing, not brainstorming — keep it close to the source
+        "stream": False,
+        "response_format": {"type": "json_object"},
+    }
+    request = urllib.request.Request(
+        url, data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        obj = parse_rewrite(json.loads(response.read()))
+    new_positive = str(obj["positive"]).strip() if "positive" in obj else positive
+    new_negative = str(obj["negative"]).strip() if "negative" in obj else negative
+    return new_positive, new_negative

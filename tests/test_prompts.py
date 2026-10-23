@@ -21,13 +21,14 @@ import pytest
 
 PACKAGE = Path(__file__).resolve().parents[1] / "origenerator"
 
-# The two, by name.
+# The three, by name.
 SYSTEM_PROMPTS = (
+    "REQUEST_REWRITE_SYSTEM_PROMPT",
     "SEARCH_EXPANSION_SYSTEM_PROMPT",
     "VOICE_REQUEST_MATCH_SYSTEM_PROMPT",
 )
 
-# Longer than any setting has cause to be. The shorter of the two prompts is
+# Longer than any setting has cause to be. The shortest of the three prompts is
 # hundreds of characters; the longest thing config.py legitimately holds is a
 # localhost URL.
 _PROSE = 200
@@ -37,7 +38,7 @@ def _assigned_strings(module: str) -> dict[str, str]:
     """Module-level ``NAME = "..."`` assignments, by name.
 
     Implicit concatenation inside parentheses is folded by the parser into one
-    constant, which is exactly how both prompts are written.
+    constant, which is exactly how all three prompts are written.
     """
     tree = ast.parse((PACKAGE / module).read_text(encoding="utf-8"))
     return {

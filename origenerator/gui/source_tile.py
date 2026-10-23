@@ -20,6 +20,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
 from origenerator.gui import grid_card
 from origenerator.gui.grayscale import grayscale_pixmap
+from origenerator.gui.link_heading import link_heading
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 from origenerator.media import MediaType
@@ -48,8 +49,7 @@ class SourceTile(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_SMALL)
-        self._heading = QLabel(_DEFAULT_HEADING)
-        self._heading.setStyleSheet("font-weight: bold;")
+        self._heading = link_heading(_DEFAULT_HEADING)
         column.addWidget(self._heading, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self._thumb = QLabel()

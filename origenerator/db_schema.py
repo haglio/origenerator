@@ -175,17 +175,15 @@ CREATE TABLE IF NOT EXISTS custom_folder_generations (
 
 -- A request and the generation it queued: the item it was made about, what was
 -- heard, and the prompt pair before the edit (the pair after it is the queued
--- generation's own params). What the Requests collection lists, and the only record
--- of why that generation differs from the one it came from. Kept even when its
--- generation goes: a delete here is undoable, and a restored item should come
--- back with the request that made it, so the collection skips a record it can't
--- resolve rather than the record being dropped.
+-- generation's own params). The only record of why that generation differs from
+-- the one it came from. Kept even when its generation goes: a delete here is
+-- undoable, and a restored item should come back with the request that made it.
 --
--- Spoken ("Request … over") or typed: a folder rewrite asks the same thing of
--- every image in a folder at once and records one of these per image, which
--- is what links each result to the one it was rewritten from. Such a record has
--- nothing heard and no single term — it says what it wanted by rewriting the
--- prompt, which the old/new pair holds — so `heard` is empty there and
+-- A request records one, and so does a folder's Modify (all seeds), which
+-- rewrites every image in a folder at once and records one per image,
+-- linking each result to the one it was rewritten from. A Modify has nothing
+-- heard and no single term — it says what it wanted by rewriting the prompt,
+-- which the old/new pair holds — so `heard` is empty there and
 -- `term`/`polarity`/`action` are unset.
 CREATE TABLE IF NOT EXISTS requests (
     prompt_id        TEXT PRIMARY KEY,
@@ -198,7 +196,11 @@ CREATE TABLE IF NOT EXISTS requests (
     old_negative     TEXT,
     new_positive     TEXT,
     new_negative     TEXT,
-    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    -- The request's own words: what was said between "Request" and "over", or
+    -- what was typed into a tab's Request section. NULL on a record from before
+    -- the column, whose words are read back out of `heard`.
+    asked            TEXT
 );
 
 -- A deleted generation the recovery bin is still holding: the whole row the
@@ -285,6 +287,9 @@ ADDED_COLUMNS = {
     },
     "seed_uses": {
         "media_type": "TEXT",
+    },
+    "requests": {
+        "asked": "TEXT",
     },
 }
 

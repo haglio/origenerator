@@ -173,12 +173,12 @@ def test_closing_the_mic_drops_a_half_said_request(qtbot):
     assert not listener.taking_a_request
 
 
-# --- the bare vocabulary, which outranks an opening request ------------------
+# --- the bare vocabulary, asked once the request has passed -------------------
 
 
 def _bare_listener(says):
     """A listener wired as the gallery wires it: a dictation, a loose matcher,
-    and a strict whole-utterance one that gets its say before a request can open."""
+    and a strict whole-utterance one."""
     hearing = FakeHearing(says)
     listener = CommandAndRequestListener(
         hearing=hearing, dictation=RequestDictation(),
@@ -190,9 +190,7 @@ def _bare_listener(says):
     return listener, hearing
 
 
-def test_a_bare_command_word_beats_an_opening_request(qtbot):
-    # "requests" is a collection and "request" opens a dictation; whole and alone,
-    # the word is the command — otherwise the collection would be unreachable.
+def test_a_word_a_request_opens_on_opens_one_whatever_else_it_matches(qtbot):
     listener, hearing = _bare_listener("requests")
     ran, spoken = [], []
     listener.request.connect(spoken.append)
@@ -200,9 +198,21 @@ def test_a_bare_command_word_beats_an_opening_request(qtbot):
 
     hearing.hear()
 
-    assert ran == ["requests"]
+    assert ran == []
+    assert len(spoken) == 1
+    assert listener.taking_a_request
+
+
+def test_a_bare_command_word_is_the_command(qtbot):
+    listener, hearing = _bare_listener("weird")
+    ran, spoken = [], []
+    listener.request.connect(spoken.append)
+    listener.start_commands(ran.append)
+
+    hearing.hear()
+
+    assert ran == ["weird"]
     assert spoken == []
-    assert not listener.taking_a_request
 
 
 def test_an_open_request_takes_the_word_back(qtbot):

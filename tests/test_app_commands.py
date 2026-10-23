@@ -22,7 +22,6 @@ from origenerator.voice.commands import CollectionCommand, match_voice_command
 
 @pytest.mark.parametrize("said, wanted", [
     ("experiments", AppCommand.EXPERIMENTS),
-    ("requests", AppCommand.REQUESTS),
     ("recents", AppCommand.RECENTS),
     ("trash", AppCommand.TRASH),
 ])
@@ -34,14 +33,6 @@ def test_a_collection_answers_to_its_own_bare_name(said, wanted):
                                   "show experiments", "experiments collection"])
 def test_a_collection_also_answers_to_a_sentence_shaped_ask(said):
     assert match_app_command(said) is AppCommand.EXPERIMENTS
-
-
-def test_the_requests_collection_answers_only_to_the_plural():
-    # "request" is what opens a spoken request, and one word cannot both open a
-    # sentence and navigate away from it. The plural is what the row is
-    # labeled, so it is the plural that reaches the collection.
-    assert match_app_command("requests") is AppCommand.REQUESTS
-    assert match_app_command("request") is None
 
 
 # --- Fun Time's own words over a slideshow ----------------------------------

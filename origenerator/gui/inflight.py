@@ -56,11 +56,13 @@ class InFlightItem:
     # template for. The workflow's display name is in :attr:`caption` and answers
     # a different question: which settings, not what it costs to ask for.
     job_kind: str = ""
-    # A spoken "Request … over" queued this one, rather than a press of Generate
-    # or Auto-Generate. Worth its own mark: it is the one kind of job the
+    # A request queued this one, rather than a press of Generate or
+    # Auto-Generate. Worth its own mark: it is the one kind of job the
     # user launched without looking at a form, and so the one they are most
     # likely to find in the line without recognizing it.
     requested: bool = False
+    # Its folder's Modify (all seeds) queued this one, one run per image.
+    modified: bool = False
     # The start frame this run is built from, as its ``LoadImage`` reference —
     # what an i2v (and an enhance) is *of*. Its thumbnail is the fastest way to
     # tell two queued videos apart, their captions being their shared workflow.
@@ -117,7 +119,7 @@ def queue_lead_text(item: InFlightItem) -> str:
 
     The two marks at the end are only ever *added*: a job nobody typed a prompt
     for is the kind that piles up unnoticed (Auto-Generate makes one
-    every few seconds, a folder-wide request a run per image at once), and a
+    every few seconds, a folder's Modify a run per image at once), and a
     request is the kind that is easy not to recognize later. A hand-launched job
     says neither, and needs to say neither.
     """
@@ -130,6 +132,8 @@ def queue_lead_text(item: InFlightItem) -> str:
         parts.append("Auto")
     if item.requested:
         parts.append("Request")
+    if item.modified:
+        parts.append("Modify")
     return " · ".join(parts)
 
 
@@ -153,8 +157,9 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     if item.auto_generating:
         lines.append("Queued by its folder's Auto-Generate")
     if item.requested:
-        lines.append("Queued by a request — spoken, or one image of a "
-                     "request made of a whole folder")
+        lines.append("Queued by a request")
+    if item.modified:
+        lines.append("Queued by its folder's Modify (all seeds)")
     return "\n".join(lines)
 
 

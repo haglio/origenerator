@@ -1,11 +1,10 @@
 """A prompt field that shows what you are changing to it, while you change it.
 
-A spoken request rewrites a prompt and the field shows the change afterwards
-(:mod:`origenerator.gui.diff_text`). A folder-wide request is that same change
-made by hand, so it wants the same marks — but typed rather than heard, they
-have to keep up with the typing. Type over a word and the word you replaced is
-struck through beside what replaced it, right there, without waiting for you to
-click somewhere else.
+Every prompt on a tab showing an image is marked against the prompt that made
+the image, and a folder's Modify against the folder's own, so a glance shows
+how far the words have come from what is on screen. The marks keep up with the
+typing: type over a word and the word you replaced is struck through beside what
+replaced it, right there, without waiting for you to click somewhere else.
 
 Which means the document holds more than the prompt: the words that survived,
 the words that arrived, and the words that left. So the field is worth what
@@ -29,16 +28,17 @@ Two states, and the field moves between them on its own:
   in, struck through. The next keystroke takes them out again and the clock
   restarts, so the strikes are never in the way of the typing they describe.
 
-Undo is off while a field is tracked. The document is rewritten under the typist
-on every settle, so an undo would step back through renders rather than through
-edits, and land the field on text the prompt no longer matches.
+The document's own undo is off while a field is tracked: it is rewritten under
+the typist on every settle, so its undo would step back through renders rather
+than through edits. The tracker keeps its own instead, one step per burst of
+typing, over the prompt rather than the document.
 """
 from __future__ import annotations
 
 from contextlib import contextmanager
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
-from PyQt6.QtGui import QBrush, QPalette, QTextCharFormat, QTextCursor
+from PyQt6.QtGui import QBrush, QKeySequence, QPalette, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QPlainTextEdit
 
 from origenerator.gui import diff_text
@@ -89,6 +89,8 @@ class _Tracker(QObject):
         # rests on.
         self._layout: list = [(SAME, self._value)] if self._value else []
         self._writing = False  # our own rewrites, which must not re-enter
+        self._undone: list[str] = []  # the prompt before each burst of typing
+        self._redone: list[str] = []
         self._settle = QTimer(self)
         self._settle.setSingleShot(True)
         self._settle.setInterval(SETTLE_MS)
@@ -152,6 +154,9 @@ class _Tracker(QObject):
         self._layout = spans
         text = "".join(piece for _kind, piece in spans)
         with self._own_write():
+            # What the field is worth, whenever that is no longer what it says.
+            diff_text.hold_value(self._edit,
+                                 None if text == self._value else self._value)
             self._edit.setPlainText(text)
             _unmark(self._edit)
             cursor = QTextCursor(self._edit.document())
@@ -163,9 +168,6 @@ class _Tracker(QObject):
                     cursor.mergeCharFormat(diff_text.added_format() if kind == ADDED
                                            else diff_text.removed_format())
                 cursor.setPosition(end)
-            # What the field is worth, whenever that is no longer what it says.
-            diff_text.hold_value(self._edit,
-                                 None if text == self._value else self._value)
             place = QTextCursor(self._edit.document())
             place.setPosition(min(self._document_offset(caret), len(text)))
             self._edit.setTextCursor(place)
@@ -225,16 +227,38 @@ class _Tracker(QObject):
         if self._writing:
             return
         inserted = self._edit.toPlainText()[position:position + added]
+        if not self._settle.isActive():  # the first keystroke of a burst
+            self._undone.append(self._value)
+            self._redone.clear()
         start = self._prompt_offset(position)
         end = self._prompt_offset(position + removed)
         self._value = self._value[:start] + inserted + self._value[end:]
         self._show_prompt_only(start + len(inserted))
         self._settle.start()  # ...and the strikes come back once the typing stops
 
+    def _step(self, back: list[str], forth: list[str]) -> None:
+        """Undo or redo one burst of typing: the prompt it left goes on ``forth``
+        and the one off ``back`` takes its place."""
+        if not back:
+            return
+        forth.append(self._value)
+        self._value = back.pop()
+        self._settle.stop()
+        self._paint(diff_spans(self._baseline, self._value), len(self._value))
+
     def eventFilter(self, obj, event):
         # Leaving the field ends the typing, whatever the clock still says.
         if event.type() == QEvent.Type.FocusOut:
             self.show_whole_change()
+        elif event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress):
+            undo = event.matches(QKeySequence.StandardKey.Undo)
+            redo = event.matches(QKeySequence.StandardKey.Redo)
+            if undo or redo:
+                event.accept()  # the field's, not the window's own Undo
+                if event.type() == QEvent.Type.KeyPress:
+                    self._step(*((self._undone, self._redone) if undo
+                                 else (self._redone, self._undone)))
+                return True
         return False
 
 

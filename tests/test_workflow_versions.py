@@ -192,7 +192,7 @@ _INSTALLED_OUTLINE_DETECTORS = ("skin_detector.pt", "hair_detector.pt")
 # graph changing: re-record every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "25f811aa4de86d7b",
-    ("image_enhance", "v004"): "a4009a11a944a1ca",
+    ("image_enhance", "v005"): "8d74869dce5e3d09",
     ("krea2_t2i", "v002"): "23018f6560f54e2a",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",

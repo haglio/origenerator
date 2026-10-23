@@ -7,6 +7,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
+from origenerator import points_of_interest
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
@@ -681,6 +682,7 @@ class WorkflowTemplate(ABC):
         """
         nodes: dict = {}
         prompts = fix_prompts(params)
+        picture = image_ref
         for index, fix in enumerate(detail_fix_passes(params)):
             provider_id, segs_id, detailer_id = (
                 f"fix{index}_{role}" for role in ("detector", "segs", "detailer"))
@@ -752,6 +754,7 @@ class WorkflowTemplate(ABC):
                     "cycle": 1,
                 },
             }
+            nodes.update(points_of_interest.report_nodes(index, [segs_id, 0], picture))
             image_ref = [detailer_id, 0]
         return nodes, image_ref
 
@@ -936,6 +939,9 @@ class WorkflowTemplate(ABC):
         """
         outputs = history_data.get("outputs", {})
         files = _listed_files(outputs.get(self.output_node_id, {}))
+        places = points_of_interest.reported(outputs)
+        if files and places:
+            files[0] = {**files[0], points_of_interest.FILE_KEY: places}
         files += soundless_copies_of(files)
         if self.base_output_node_id is None:
             return files

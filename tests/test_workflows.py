@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
@@ -775,6 +776,64 @@ def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
     second = next(nid for nid in detailers if nid != first)
     assert detailers[second]["inputs"]["image"] == [first, 0]
     assert payload[_node_id(payload, "SaveImage")]["inputs"]["images"] == [second, 0]
+
+
+def _linked(payload: dict, ref) -> dict:
+    return payload[ref[0]]
+
+
+def test_each_pass_reports_the_regions_its_detector_found_then_the_whole_picture():
+    payload = _enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.6})
+
+    reports = _nodes_of(payload, "PreviewAny")
+
+    assert len(reports) == 2
+    joined = []
+    for report in reports:
+        assert report["inputs"]["source"][1] == 3  # From_SEG_ELT's crop region
+        each = _linked(payload, _linked(payload, report["inputs"]["source"])["inputs"]["seg_elt"])
+        joined.append(_linked(payload, each["inputs"]["segs"]))
+    assert {tuple(concat["inputs"]["segs1"]) for concat in joined} == {
+        tuple(detailer["inputs"]["segs"]) for detailer in _nodes_of(payload, "DetailerForEach")}
+    assert {_linked(payload, concat["inputs"]["segs2"])["class_type"] for concat in joined} == {"MaskToSEGS"}
+    assert _find_node(payload, "GetImageSize")["inputs"]["image"] == [_node_id(payload, "VAEDecode"), 0]
+
+
+def _region(*edges) -> str:
+    return json.dumps(list(edges), indent=4)
+
+
+WHOLE_PICTURE = _region(0, 0, 2000, 1000)
+FACE_PLACE = {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.5}
+HAND_PLACE = {"left": 0.6, "top": 0.5, "right": 0.9, "bottom": 0.9}
+ENHANCED = {"filename": "image_enhance_00007_.png", "subfolder": "image", "type": "output"}
+
+
+def test_the_places_the_fixes_found_ride_with_the_picture_they_were_found_in_in_the_order_they_ran():
+    history = {"outputs": {
+        "12": {"images": [ENHANCED]},
+        "fix1_points": {"text": [_region(1200, 500, 1800, 900), WHOLE_PICTURE]},
+        "fix0_points": {"text": [_region(200, 100, 600, 500), WHOLE_PICTURE]},
+    }}
+
+    files = WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history)
+
+    assert files == [{**ENHANCED, "points_of_interest": [FACE_PLACE, HAND_PLACE]}]
+
+
+def test_an_enhancement_whose_fixes_found_nothing_carries_no_places():
+    history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {"text": [WHOLE_PICTURE]}}}
+
+    assert WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history) == [ENHANCED]
+
+
+def test_a_region_reported_in_a_shape_no_fix_writes_is_passed_over():
+    history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {
+        "text": ["a corner", _region(200, 100, 600, 500), _region(1, 2), WHOLE_PICTURE]}}}
+
+    files = WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history)
+
+    assert files[0]["points_of_interest"] == [FACE_PLACE]
 
 
 def test_a_third_part_is_a_third_pass_on_the_chain():

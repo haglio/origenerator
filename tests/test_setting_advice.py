@@ -5,6 +5,8 @@ import pytest
 import origenerator.setting_advice as advice_module
 from origenerator.setting_advice import (
     fresh_settings,
+    not_installed,
+    not_installed_advice,
     recommendations,
     recommended_choices,
     setting_advice,
@@ -220,3 +222,48 @@ def test_an_advice_says_the_value_it_advises_against_the_way_it_says_its_fix():
                             [_DURATION])
     assert {key: found.value_shown for key, found in advice.items()} == {
         "sampler_name": "heun", "steps": "50", "cfg": "7.5", "frame_count": "12.6 s"}
+
+
+_PICKERS = [
+    ParamDef("checkpoint", "Model", ParamType.COMBO, "installed_a.safetensors",
+             options=["installed_a.safetensors", "installed_b.safetensors"]),
+    ParamDef("lora_high", "LoRA", ParamType.COMBO, "None",
+             options=["None", "installed_lora.safetensors"]),
+    ParamDef("vae", "VAE", ParamType.STR, ""),
+]
+_FILE_KEYS = ("checkpoint", "lora_high", "vae")
+
+
+def test_a_chosen_model_its_dropdown_does_not_offer_is_not_installed():
+    params = {"checkpoint": "gone.safetensors", "lora_high": "None", "vae": "any.safetensors"}
+
+    assert not_installed(params, _PICKERS, _FILE_KEYS) == {"checkpoint": "gone.safetensors"}
+
+
+def test_a_lora_left_on_none_is_never_called_not_installed():
+    params = {"checkpoint": "installed_a.safetensors", "lora_high": "None"}
+
+    assert not_installed(params, _PICKERS, _FILE_KEYS) == {}
+
+
+def test_a_key_not_asked_about_is_never_called_not_installed():
+    params = {"checkpoint": "gone.safetensors", "lora_high": "gone_lora.safetensors"}
+
+    assert not_installed(params, _PICKERS, ("lora_high",)) == {"lora_high": "gone_lora.safetensors"}
+
+
+def test_a_missing_model_is_answered_with_the_workflows_own_default():
+    found = not_installed_advice({"checkpoint": "gone.safetensors"}, _PICKERS,
+                                 {"checkpoint": "installed_b.safetensors"})
+
+    assert found["checkpoint"].fix == "installed_b.safetensors"
+    assert found["checkpoint"].text == "Not installed anymore, so nothing can be made with it."
+    assert (found["checkpoint"].value_shown, found["checkpoint"].fix_shown) == (
+        "gone", "installed_b")
+
+
+def test_a_missing_model_whose_default_is_gone_too_is_answered_with_the_first_installed_one():
+    found = not_installed_advice({"checkpoint": "gone.safetensors"}, _PICKERS,
+                                 {"checkpoint": "also_gone.safetensors"})
+
+    assert found["checkpoint"].fix == "installed_a.safetensors"

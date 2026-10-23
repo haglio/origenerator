@@ -1265,7 +1265,7 @@ def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
     # path so a value that looks right actually is.
     form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
     qtbot.addWidget(form)
-    zwsp = chr(0x200B)  # the zero-width space _wrappable() inserts after / _ - . \
+    zwsp = chr(0x200B)  # the zero-width space wrappable() inserts after / _ - . \
     wrapped = f"image/{zwsp}sdxl_{zwsp}t2i_{zwsp}00792_{zwsp}.{zwsp}png  "
     form.set_values({"input_image": wrapped})
 

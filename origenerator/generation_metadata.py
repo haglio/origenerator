@@ -29,6 +29,7 @@ from pathlib import Path
 
 from origenerator import config, gallery
 from origenerator.provenance import BASIS, FILE_DATE
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 @dataclass
@@ -134,7 +135,7 @@ def basic_section(row: dict, upscale: Path | None = None, *,
         held = row.get("days_in_trash")
         items += [file_item(f, held_days=held) for f in files]
         items.append(MetaItem("Created", str(row.get("created_at", ""))))
-    if row.get("provenance"):
+    if row.get("provenance") and row.get("workflow_name") in WORKFLOW_REGISTRY:
         items.append(_version_line(json.loads(row["provenance"])))
     return MetaSection(BASIC_TITLE, items) if items else None
 

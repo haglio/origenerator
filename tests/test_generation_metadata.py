@@ -168,6 +168,12 @@ def test_a_build_that_carried_uncommitted_edits_says_so():
         "v007 (app build 1a2b3c4, plus uncommitted edits)")
 
 
+def test_an_item_from_a_workflow_the_app_no_longer_has_names_no_workflow_version():
+    row = _row(workflow_name="wan21_ati_i2v", provenance=_stamped(recipe="wan21_ati_i2v"))
+
+    assert [item.label for item in basic_section(row).items] == ["File", "Created"]
+
+
 def test_a_passthrough_param_does_not_grow_a_second_block():
     # Params — editable or read-only passthrough — now live in the form itself, so
     # this block stays the output file and its date whatever a row carries.

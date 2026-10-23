@@ -112,7 +112,7 @@ def build_stylesheet() -> str:
     QLabel#dimensionsHint {{
         color: {_h(TEXT_MUTED)};
     }}
-    QLabel#warningMark {{
+    QLabel#warningMark, QLabel#cannotRemakeNote {{
         color: {_h(AMBER)};
     }}
 {field_rules()}

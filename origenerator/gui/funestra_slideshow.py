@@ -531,6 +531,9 @@ class FunestraSlideshow(QObject):
         self._jump_to(slide)
         self._lock(lock)
 
+    def show_locked(self, path) -> None:
+        self.show_item(path, lock=True)
+
     def _jump_to(self, slide) -> None:
         """Stand the pass on *slide* and send the Funestra there.
 

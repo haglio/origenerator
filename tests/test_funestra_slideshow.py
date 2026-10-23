@@ -428,6 +428,18 @@ def test_a_map_click_plays_that_item_and_a_double_click_locks_it(qtbot, tmp_path
     assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON"]
 
 
+def test_a_slide_shown_locked_plays_and_locks_and_neither_stars_nor_enhances(qtbot, tmp_path):
+    favorited, asked = [], []
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(
+        favorite=favorited.append, enhance=lambda prompt_id: asked.append(prompt_id) or True))
+    _sent(slideshow)
+
+    slideshow.show_locked("three.png")
+
+    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON"]
+    assert (favorited, asked) == ([], [])
+
+
 def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
     """The pace is the Funestra's to keep — it holds a picture that long and then
     ends the file, which is how a slide moves on at all."""

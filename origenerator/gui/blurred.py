@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QColor, QPainter, QPixmap
+from shared_ui.palette import BLACK
 
 _BLUR_DIVISOR = 16
 _DIM = 0.55
@@ -28,7 +29,7 @@ def blurred_and_dimmed(picture: QPixmap, size: QSize) -> QPixmap:
     blurred = small.scaled(size, Qt.AspectRatioMode.IgnoreAspectRatio,
                            Qt.TransformationMode.SmoothTransformation)
     painter = QPainter(blurred)
-    painter.fillRect(blurred.rect(), QColor(0, 0, 0, int(255 * _DIM)))
+    painter.fillRect(blurred.rect(), QColor(*BLACK, int(255 * _DIM)))
     painter.end()
     return blurred
 

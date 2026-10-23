@@ -13,6 +13,7 @@ import pytest
 from PyQt6.QtCore import QPoint, QRect, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolButton
+from shared_ui.colors import BG_PRIMARY
 from shared_ui.spacing import BUTTON_MARK_INSET, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
@@ -99,6 +100,19 @@ def test_the_radio_switch_turned_on_in_a_paused_room_is_lit_yellow_at_once(bank)
     switch.setChecked(True)
 
     assert lit_in(switch) == "yellow"
+
+
+def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_amber(bank):
+    """The family's amber is light, so a mark on it takes the dark ink a lit amber
+    control on a HUD does."""
+    switch = bank().radio
+    omnipause.freeze(True)
+
+    lit = switch.icon().pixmap(QSize(48, 48), QIcon.Mode.Normal, QIcon.State.On).toImage()
+    inked = [lit.pixelColor(x, y) for y in range(lit.height()) for x in range(lit.width())
+             if lit.pixelColor(x, y).alpha() == 255]
+
+    assert inked and all(color == BG_PRIMARY for color in inked)
 
 
 def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_one(bank):

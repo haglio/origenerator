@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import WHITE
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
 # Sized so every action fits down one side of this screen without scrolling.
@@ -54,7 +55,7 @@ def one_scale_for_all(drawings, side: int) -> float:
 
 def on_a_white_square(source: QPixmap, side: int, scale: float) -> QPixmap:
     canvas = QPixmap(side, side)
-    canvas.fill(Qt.GlobalColor.white)
+    canvas.fill(WHITE)
     if source.isNull():
         return canvas
     drawn = source.scaled(max(1, round(source.width() * scale)),

@@ -4,6 +4,7 @@ from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
+from shared_ui.palette import BG_BUTTON
 
 from origenerator.media import MediaType
 
@@ -21,7 +22,7 @@ def generate_thumbnail(
     collapse onto one thumbnail, leaving one row showing the other's frame.
     """
     if output_type == MediaType.VIDEO:
-        img = first_frame_of(source_path) or Image.new("RGB", (_THUMB_MAX, _THUMB_MAX), (64, 64, 64))
+        img = first_frame_of(source_path) or Image.new("RGB", (_THUMB_MAX, _THUMB_MAX), BG_BUTTON)
     else:
         img = Image.open(source_path)
     return _saved_thumbnail(img, thumb_dir, name)

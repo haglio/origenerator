@@ -494,7 +494,7 @@ class EnhanceController:
             folders = " or ".join(sorted({detector_folder(part) for part in parts}))
             return None, f"no {asked} detector installed (ComfyUI {folders})", WARNING
         if gallery.level_matching_params(row, params) is not None:
-            return None, f"already has this {asked} fix", WARNING
+            return None, f"{asked} already fixed as hard as a fix goes", WARNING
         fixing = name_parts(
             [part for part in parts if part.name in params["enhance_detail_fixes"]])
         return self._launch_spoken(row, params, f"{fixing} fix", f"fixing {fixing}…")

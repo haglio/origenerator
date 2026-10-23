@@ -252,8 +252,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     is closed is started by Evolver, so the two batches the closing gallery queued,
     and their two launch adapters, went to origenerator.downtime. 276 -> 274: a run
     ComfyUI refuses as the app closes waits for the next launch to send it, so the
-    pair that kept its message for then went.)"""
+    pair that kept its message for then went. 274 -> 273: the Requests collection
+    left the folder list, and with it the listing a tab read its request off; the
+    tab reads the request itself. And the pane 84 -> 82: the collection's drawing
+    and its empty-state words went with it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 274
+               for x in _class_def(VIEW, "GalleryView").body) == 273
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 84
+               for x in _class_def(PANE, "BrowserPane").body) == 82

@@ -59,6 +59,7 @@ def test_the_two_marks_at_the_end_are_only_ever_added():
     assert queue_lead_text(_item(job_kind="Image", requested=True)) == plain + " · Request"
     assert queue_lead_text(_item(job_kind="Image", auto_generating=True, requested=True)) == (
         plain + " · Auto · Request")
+    assert queue_lead_text(_item(job_kind="Image", modified=True)) == plain + " · Modify"
 
 
 # --- and the hover that spells it out ----------------------------------------
@@ -98,8 +99,13 @@ def test_the_hover_names_who_asked_when_it_was_not_a_press_of_generate():
     assert lines[1:] == [
         "The “beta” act, picked in Combine",
         "Queued by its folder's auto-generate loop",
-        "Queued by a request — spoken, or one image of a request made of a whole folder",
+        "Queued by a request",
     ]
+
+
+def test_the_hover_says_a_run_came_from_its_folders_modify():
+    lines = queue_lead_tooltip(_item(modified=True)).splitlines()
+    assert lines[1:] == ["Queued by its folder's Modify (all seeds)"]
 
 
 # --- how the run itself is going ---------------------------------------------

@@ -46,6 +46,30 @@ from origenerator.workflows.model_files import NO_LORA
 from tests.pictured_rows import painted_row, square
 
 
+def _section_titles(form) -> list[str]:
+    """The form's sections from the top down."""
+    layout = form.layout()
+    widgets = (layout.itemAt(i).widget() for i in range(layout.count()))
+    return [w._title for w in widgets if isinstance(w, CollapsibleSection)]
+
+
+def test_a_form_with_a_prompt_has_a_request_section_right_after_its_prompts(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+
+    titles = _section_titles(form)
+    assert titles[titles.index("Prompts") + 1] == "Request"
+    assert form.request_field() is not None
+
+
+def test_a_form_with_no_prompt_has_no_request_to_make(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+
+    assert "Request" not in _section_titles(form)
+    assert form.request_field() is None
+
+
 def test_field_labels_fit_the_heading_font(qtbot):
     """A long label must not have its first characters lopped off.
 

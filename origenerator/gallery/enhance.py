@@ -61,6 +61,8 @@ from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
+    FIX_MAX,
+    FIX_STEP,
     detail_fixes_of,
     fixable_parts,
 )
@@ -557,9 +559,9 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
     What the picture already carries does ride along: a "fix eyes" after a "fix
     teeth" redraws both rather than trading the mended teeth away — every
     enhance re-derives from the original, so a pass left out is a fix undone on
-    screen. Asking for a part again replaces its earlier pass instead of
-    doubling it (which is also what lets the duplicate check read a repeat as a
-    repeat).
+    screen. Asking for a part again replaces its earlier pass with one
+    :data:`~origenerator.workflows.detail_parts.FIX_STEP` harder, up to the
+    hardest a fix goes, where the duplicate check reads a repeat as a repeat.
 
     ``None`` when nothing installed can find any part asked for
     (:func:`~origenerator.workflows.detail_parts.fixable_parts`), or the row has
@@ -576,11 +578,11 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
         return None
     configured = detail_fixes_of(settings.params if settings else {})
     already = detail_fixes_of(newest.params) if newest is not None else {}
-    params["enhance_detail_fixes"] = dict(
-        already,
-        **{part.name: configured.get(part.name, DEFAULT_FIX_DENOISE)
-           for part in wanted},
-    )
+    params["enhance_detail_fixes"] = dict(already, **{
+        part.name: (min(round(already[part.name] + FIX_STEP, 2), FIX_MAX)
+                    if part.name in already
+                    else configured.get(part.name, DEFAULT_FIX_DENOISE))
+        for part in wanted})
     asked = {part.name for part in wanted}
     carried = (newest.params.get("enhance_fix_prompts") if newest is not None else None) or {}
     given = (settings.params.get("enhance_fix_prompts") if settings else None) or {}

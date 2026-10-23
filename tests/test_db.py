@@ -875,7 +875,7 @@ def test_a_file_gone_from_the_trash_is_not_found_there(tmp_path):
     assert db.trashed_file(original) is None
 
 
-# --- spoken requests (what the Requests collection lists) --------------------
+# --- spoken requests, and the folder-wide one typed on a tab -----------------
 
 
 def _record(db, prompt_id, source="src-1", heard="Request, no hat, over."):
@@ -898,6 +898,14 @@ def test_a_recorded_request_comes_back_whole(tmp_path):
     assert record["term"] == "hat"
     assert record["old_positive"] == "a woman, a hat"
     assert record["new_positive"] == "a woman"
+
+
+def test_a_request_keeps_its_own_words_beside_what_was_heard(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.record_request(prompt_id="gen-1", source_prompt_id="src-1", heard="",
+                      asked="two women")
+
+    assert db.get_request("gen-1")["asked"] == "two women"
 
 
 def test_requests_list_newest_first(tmp_path):

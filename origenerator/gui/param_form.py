@@ -4,7 +4,7 @@ import random
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from PyQt6.QtCore import QEvent, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -17,7 +17,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.icons import glyph_icon
 from shared_ui.orientation import orientation_of_size
+from shared_ui.spacing import BUTTON_ICON
 from shared_ui.tick_control import TickControl
 
 from origenerator.config import COMFYUI_INPUT_DIR
@@ -99,11 +101,7 @@ _DIMENSION_MAX = 8192
 _DIMENSION_STEP = 16
 # The unlock toggle's face: a closed padlock while the derived size is locked, an
 # open one once the user has unlocked it to override.
-_LOCK_CLOSED = "🔒"
-_LOCK_OPEN = "🔓"
-# The padlock renders at this point size regardless of the form's (larger) font,
-# so it stays a compact icon toggle and its width is predictable.
-_UNLOCK_FONT_PT = 11
+_PADLOCK = {False: "lock", True: "unlock"}
 
 class ParamForm(QWidget):
     """The editable settings for one workflow, grouped into collapsible sections.
@@ -554,7 +552,8 @@ class ParamForm(QWidget):
         if not (self._has_param("width") and self._has_param("height")):
             return
         content = self._sections["Size"].content()
-        btn = QPushButton("⇅", content)  # ⇅ up/down arrows: swap the stacked pair
+        btn = QPushButton(content)
+        btn.setIcon(glyph_icon("flip_ends"))
         btn.setToolTip("Swap width and height")
         btn.clicked.connect(self.swap_dimensions)
         btn.adjustSize()
@@ -675,13 +674,9 @@ class ParamForm(QWidget):
         btn.setObjectName("dimensionUnlock")
         btn.setProperty(CHOSEN, True)
         btn.setCheckable(True)
-        btn.setText(_LOCK_CLOSED)
+        btn.setIcon(glyph_icon(_PADLOCK[False]))
+        btn.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
         btn.setToolTip(self._unlock_tip(unlocked=False))
-        # Pin a compact font so the padlock stays a small icon under the form's
-        # larger heading font, keeping its width predictable for the gutter.
-        lock_font = btn.font()
-        lock_font.setPointSize(_UNLOCK_FONT_PT)
-        btn.setFont(lock_font)
         btn.toggled.connect(self._on_dimensions_unlock_toggled)
         btn.adjustSize()
         self._unlock_btn = btn
@@ -714,7 +709,7 @@ class ParamForm(QWidget):
         """Flip the padlock and swap each dimension between its plain locked value
         and its editable spinner, re-locking back onto the derived size. Announces
         the change so the panel refreshes with it."""
-        self._unlock_btn.setText(_LOCK_OPEN if unlocked else _LOCK_CLOSED)
+        self._unlock_btn.setIcon(glyph_icon(_PADLOCK[unlocked]))
         self._unlock_btn.setToolTip(self._unlock_tip(unlocked))
         for stack in self._dim_stacks.values():
             stack.setCurrentIndex(1 if unlocked else 0)

@@ -4,12 +4,11 @@ import ast
 from collections import Counter
 from pathlib import Path
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
-from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
+from PyQt6.QtCore import QSize
+from PyQt6.QtGui import QColor, QIcon
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.icon_geometry import glyph_names
-from shared_ui.icons import glyph_pixmap
+from shared_ui.icons import glyph_icon, glyph_pixmap
 from shared_ui.spacing import BUTTON_MARK
 
 import origenerator
@@ -17,21 +16,6 @@ from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
 from origenerator.media import MediaType
-
-
-def _style_tab_close_pixmap():
-    """The close mark the live style paints on a tab, drawn here independently."""
-    style = QApplication.style()
-    size = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    option = QStyleOption()
-    option.rect = QRect(0, 0, size, size)
-    option.state = QStyle.StateFlag.State_Enabled
-    style.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorTabClose, option, painter)
-    painter.end()
-    return pixmap
 
 
 def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
@@ -47,14 +31,11 @@ def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, mo
     assert drawn == [("flask",)]
 
 
-def test_tab_close_icon_is_the_mark_the_style_paints_on_a_tab(qtbot):
-    # The corner's close-all must wear a tab's own ✕, not a lookalike: the mark
-    # comes from the style primitive QTabBar draws, at the size it draws it, so
-    # the two controls read as one spelling of "close" rather than two.
-    expected = _style_tab_close_pixmap()
-    rendered = icons.tab_close_icon().pixmap(expected.size())
-    assert not rendered.isNull()
-    assert rendered.toImage() == expected.toImage()
+def test_tab_close_icon_is_the_familys_cross(qtbot):
+    # The corner's close-all must wear a tab's own cross, not a lookalike, so the
+    # two controls read as one spelling of "close" rather than two.
+    assert (icons.tab_close_icon().pixmap(16).toImage()
+            == glyph_icon("cross").pixmap(16).toImage())
 
 
 def test_level_badge_icons_render_for_each_level(qtbot):

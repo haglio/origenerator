@@ -29,6 +29,7 @@ from funestra.hud_panel import (
 )
 from funestra.satellite_hud import BLOCK_GAP, CTRL_BTN, MAP_THUMB_H
 from PIL import Image, ImageDraw
+from shared_ui.icons_pil import paste_glyph
 from shared_ui.palette import (
     BLUE,
     BLUE_LIGHT,
@@ -95,8 +96,7 @@ _FRAME = MAP_THUMB_H
 _PLUS_W = 10            # the operator between a start frame and its recipe
 _PAREN_W = 5            # the marks around a recipe whose prompt was edited
 _MARK_H = 8             # the slot the "…" takes when the line runs on past the rows
-_MARK_DOT = 1
-_MARK_GAP = 4
+_MARK_SIDE = 12         # the frame the family's three dots are drawn in, as on the satellite's map
 _DROP_W = 2             # the mark showing where a dragged row would land
 # The widest the block asks the panel to be. Past this the texts elide instead:
 # the panel is anchored in a corner of the screen, and a line of queued work is
@@ -244,11 +244,11 @@ class QueueSection:
             top += head + BLOCK_GAP
         if self.drawn:
             if self.windowed:
-                self._paint_mark(draw, x, top, width, self.first > 0)
+                self._paint_mark(image, x, top, width, self.first > 0)
                 top += _MARK_H
             self._paint_rows(image, draw, x, top, width, pointer, targets)
             if self.windowed:
-                self._paint_mark(draw, x, top + len(self.drawn) * _ROW_H, width,
+                self._paint_mark(image, x, top + len(self.drawn) * _ROW_H, width,
                                  self.first + ROWS < len(self.lines))
         if self.pointer is not None:
             self.pointer.painted(targets, (x, y))
@@ -365,17 +365,14 @@ class QueueSection:
         top = y + slot * _ROW_H - _DROP_W // 2
         draw.rectangle([x, top, x + width - 1, top + _DROP_W - 1], fill=(*BLUE, 255))
 
-    def _paint_mark(self, draw, x, y, width, more: bool) -> None:
-        """Three dots saying the line runs on past the rows drawn, as the map's
-        own axes say it."""
+    def _paint_mark(self, image, x, y, width, more: bool) -> None:
+        """The family's three dots saying the line runs on past the rows drawn, as
+        the map's own axes say it."""
         if not more:
             return
         middle_x, middle_y = x + width / 2, y + _MARK_H / 2
-        for step in (-1, 0, 1):
-            dot_x = middle_x + step * _MARK_GAP
-            draw.ellipse([dot_x - _MARK_DOT, middle_y - _MARK_DOT,
-                          dot_x + _MARK_DOT, middle_y + _MARK_DOT],
-                         fill=(*TEXT_PRIMARY, 255))
+        paste_glyph(image, "more", (round(middle_x - _MARK_SIDE / 2), round(middle_y - _MARK_SIDE / 2),
+                                    _MARK_SIDE, _MARK_SIDE), TEXT_PRIMARY)
 
 
 def _paint_button(image, draw, rect, button, pointer, targets) -> None:

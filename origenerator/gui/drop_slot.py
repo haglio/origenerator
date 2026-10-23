@@ -19,6 +19,8 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from shared_ui.colors import TEXT_PRIMARY
+from shared_ui.icons import glyph_pixmap
 
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT, light
@@ -173,7 +175,9 @@ class DropSlot(DropZone):
             picture = fitted_in_the_box(QPixmap(str(thumb_path)))
             self._label.setPixmap(grayscale_pixmap(picture) if self._grayscale else picture)
         else:
-            self._label.setText("✓")  # held, but no thumbnail to show
+            self._label.setText("")  # held, but no thumbnail to show
+            self._label.setPixmap(glyph_pixmap("check", 2 * self._label.fontMetrics().height(),
+                                               TEXT_PRIMARY))
         self._badge.setVisible(True)
         self._badge.raise_()  # keep the kind chip above the preview
         self.setToolTip(self._go_to_tip)

@@ -21,7 +21,8 @@ from pathlib import Path
 from app_support.win32 import seconds_since_input
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtGui import QGuiApplication, QIcon
-from PyQt6.QtWidgets import QApplication, QStyle, QSystemTrayIcon
+from PyQt6.QtWidgets import QSystemTrayIcon
+from shared_ui.alert import Level, mark_pixmap
 from shared_ui.preview import Preview, taskbar_identity, window_title
 from shared_ui.preview_icon_pil import in_preview_ink
 
@@ -46,11 +47,11 @@ APP_NAME = "Origenerator"
 # scales it down to whatever the notification draws rather than up.
 _MARK_PX = 256
 
-# The glyph beside a notice, by whether the run landed: Windows' own two, which
-# are what the tray icon's balloons drew for the same two answers.
-_GLYPHS = {
-    True: ("notice-ready.png", QStyle.StandardPixmap.SP_MessageBoxInformation),
-    False: ("notice-failed.png", QStyle.StandardPixmap.SP_MessageBoxWarning),
+# The mark beside a notice, by whether the run landed: the family's information
+# and warning marks, which its alert dialogs wear for the same two answers.
+_NOTICE_MARKS = {
+    True: ("notice-ready.png", Level.INFO),
+    False: ("notice-failed.png", Level.WARNING),
 }
 
 AWAY_AFTER_S = 120.0
@@ -87,15 +88,15 @@ def _the_apps_mark(shown_as: Preview | None) -> Path:
 
 
 def _the_marks_beside_a_notice() -> dict[bool, Path | None]:
-    """Windows' information and warning glyphs, written out where a toast can
+    """The family's information and warning marks, written out where a toast can
     name them. ``None`` for one that could not be written: a notice with no
     glyph beside it still says what happened, which is what it is for."""
     marks: dict[bool, Path | None] = {}
-    for landed, (name, glyph) in _GLYPHS.items():
+    for landed, (name, level) in _NOTICE_MARKS.items():
         mark = _where_marks_live() / name
         try:
             mark.parent.mkdir(parents=True, exist_ok=True)
-            drawn = QApplication.style().standardIcon(glyph).pixmap(_MARK_PX, _MARK_PX)
+            drawn = mark_pixmap(level, _MARK_PX)
             marks[landed] = mark if drawn.save(str(mark)) else None
         except Exception as e:
             # Broad on purpose, as for the identity below: a notice with no

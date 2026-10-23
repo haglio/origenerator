@@ -2078,18 +2078,14 @@ class GalleryView(QWidget):
     def _open_collection(self, collection: FolderCollection, side: str | None, item):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
-        self._folder_path.show_folder(self._collection_steps(collection, item))
+        self._folder_path.show_folder(self._tree_view.path_steps(item),
+                                      mark="star" if collection.which == _FAVORITES_KEY else "")
         self._avg_label.setText("")
         self._clear_metadata()
         self._browser.show_collection(collection.key, side)
         if collection.which == _REQUESTS_KEY:
             self._re_aim()
         self._navigation.record()
-
-    def _collection_steps(self, collection: FolderCollection, item) -> list[PathStep]:
-        *above, here = self._tree_view.path_steps(item)
-        star = "★ " if collection.which == _FAVORITES_KEY else ""
-        return [*above, here._replace(name=f"{star}{here.name}")]
 
     def _show_group_contents(self, group, item):
         if isinstance(group, gallery.SettingsGroup):

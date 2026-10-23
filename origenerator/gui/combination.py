@@ -5,6 +5,7 @@ from typing import NamedTuple
 from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QFont, QPainter, QPixmap
 from shared_ui.colors import TEXT_MUTED
+from shared_ui.icons import draw_glyph
 
 # The plus, as a fraction of a picture's side — big enough to read as the operator
 # joining them rather than as a mark on one of the pictures.
@@ -29,12 +30,6 @@ def plus_width(side: int) -> int:
     return max(_MIN_PLUS_PT, int(side * _PLUS_SHARE))
 
 
-def plus_font(font: QFont, side: int) -> QFont:
-    sized = QFont(font)
-    sized.setPointSize(max(_MIN_PLUS_PT, int(side * _PLUS_SHARE)))
-    return sized
-
-
 def paren_width(side: int) -> int:
     return max(1, int(side * _PAREN_SHARE))
 
@@ -47,9 +42,8 @@ def paren_font(font: QFont, side: int) -> QFont:
 
 
 def draw_plus(painter: QPainter, x: int, side: int) -> None:
-    painter.setFont(plus_font(painter.font(), side))
-    painter.setPen(TEXT_MUTED)
-    painter.drawText(QRect(x, 0, plus_width(side), side), Qt.AlignmentFlag.AlignCenter, "+")
+    width = plus_width(side)
+    draw_glyph(painter, "plus", TEXT_MUTED, size=width, x=x, y=(side - width) / 2)
 
 
 def draw_recipe(painter: QPainter, x: int, recipe: QPixmap, prompt_edited: bool) -> None:

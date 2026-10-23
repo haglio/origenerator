@@ -17,8 +17,8 @@ from __future__ import annotations
 from functools import cache
 
 from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QFont, QFontMetrics
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QFont, QFontMetrics, QPainter
+from PyQt6.QtWidgets import QApplication, QLabel
 
 # The picture a card gives to its content, and the frame around it. The picture
 # is what the grid is for, so the card's height is what gives when the caption
@@ -100,7 +100,9 @@ def style_caption(label) -> None:
     label.setMaximumHeight(caption_height())
 
 
-from shared_ui.palette import TEXT_MUTED, as_hex
+from shared_ui import colors
+from shared_ui.icons import draw_glyph
+from shared_ui.palette import BORDER_SUBTLE, TEXT_MUTED, as_hex
 
 from origenerator.gui.palette import (
     CARD_HOVER_BORDER,
@@ -112,18 +114,15 @@ from origenerator.gui.palette import (
 # The resting dashed outline, versus the blue and white marking the card as the item
 # driving the info pane — the same marks a selected thumbnail wears.
 IDLE_FRAME_CSS = (
-    "#{name} {{ border: 1px dashed #4a4a4a; border-radius: 4px; }}"
+    "#{name} {{ border: 1px dashed " + as_hex(BORDER_SUBTLE) + "; border-radius: 4px; }}"
     "#{name}:hover {{ border-color: " + CARD_HOVER_BORDER + "; }}"
-    "#{name}:disabled {{ border-color: #4a4a4a; }}"
+    "#{name}:disabled {{ border-color: " + as_hex(BORDER_SUBTLE) + "; }}"
     "#{name} QLabel:disabled {{ color: " + as_hex(TEXT_MUTED) + "; }}"
 )
 SELECTED_FRAME_CSS = ("#{name} {{ border: 2px solid " + SELECTED_BORDER
                       + "; background-color: " + SELECTED_FILL + "; border-radius: 4px; }}")
 
-# How a glyph itself is drawn: a large muted character on the same plate a
-# thumbnail's picture would occupy.
-GLYPH_CSS = ("QLabel {{ color: #6f6f6f; font-size: {size}px; background: " + EMPTY_PLATE
-             + "; border-radius: 3px; }} QLabel:disabled {{ color: #4a4a4a; }}")
+_PLATE_CSS = f"QLabel {{ background: {EMPTY_PLATE}; border-radius: 3px; }}"
 
 
 def idle_css(name: str) -> str:
@@ -134,5 +133,20 @@ def selected_css(name: str) -> str:
     return SELECTED_FRAME_CSS.format(name=name)
 
 
-def glyph_css(size: int = 56) -> str:
-    return GLYPH_CSS.format(size=size)
+class MarkPlate(QLabel):
+    """One of the family's marks, large and muted, on the plate a thumbnail's
+    picture would occupy."""
+
+    def __init__(self, mark: str, *, side: int):
+        super().__init__()
+        self.mark = mark
+        self._side = side
+        self.setFixedSize(*PICTURE_SIZE)
+        self.setStyleSheet(_PLATE_CSS)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        draw_glyph(painter, self.mark, colors.TEXT_MUTED if self.isEnabled() else colors.BORDER_SUBTLE,
+                   size=self._side, x=(self.width() - self._side) / 2,
+                   y=(self.height() - self._side) / 2)

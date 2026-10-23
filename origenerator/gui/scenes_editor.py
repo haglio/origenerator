@@ -106,7 +106,7 @@ class _Scene(QFrame):
         self.remove = QToolButton()
         self.remove.setObjectName("sceneRemove")
         mark = self.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
-        self.remove.setIcon(tab_close_icon(self))
+        self.remove.setIcon(tab_close_icon())
         self.remove.setIconSize(QSize(mark, mark))
         self.remove.setCursor(Qt.CursorShape.PointingHandCursor)
         self.remove.clicked.connect(lambda: self.remove_requested.emit(self))

@@ -245,8 +245,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     reaches every place it could drop by itself, so the pane's relay of its
     tiles' drags to Combine went. 283 -> 281: each step of the path over the
     pictures opens its folder and a copy button copies the path, so the two
-    methods that opened the path for typing and went where a typed path led went.)"""
+    methods that opened the path for typing and went where a typed path led went.
+    281 -> 280: a collection's path wears its star as the family's mark, which the
+    header sets in ahead of the step's name, so the method that typed the star into
+    that name went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 281
+               for x in _class_def(VIEW, "GalleryView").body) == 280
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 84

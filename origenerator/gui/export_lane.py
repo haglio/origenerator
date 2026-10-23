@@ -71,7 +71,7 @@ class ExportLane:
 
     @property
     def sent_caption(self) -> str:
-        return f"✓ Sent to {self.name}"
+        return f"Sent to {self.name}"
 
     @property
     def failure_title(self) -> str:
@@ -119,7 +119,7 @@ GENAU = ExportLane(
 
 EXPORT_LANES = (KINO, GENAU)
 
-UNSEND_CAPTION = "✕ Unsend"
+UNSEND_CAPTION = "Unsend"
 
 
 def lane_for(row: dict) -> ExportLane:

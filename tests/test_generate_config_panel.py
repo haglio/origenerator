@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -2909,7 +2910,8 @@ def _lane_video(db, lane, prompt_id="vid1"):
 def _lane_offers(panel):
     """The words of every button and line on show that name an app a video can go to."""
     names = tuple(f" {lane.name}" for lane in _lanes())
-    return [widget.text() for widget in panel.findChildren((QPushButton, QLabel))
+    return [re.sub(r"^<img[^>]*>&nbsp;", "\u2713 ", widget.text())
+            for widget in panel.findChildren((QPushButton, QLabel))
             if widget.isVisibleTo(panel) and widget.text().endswith(names)]
 
 
@@ -2949,7 +2951,7 @@ def test_a_loop_already_sent_to_kino_offers_that_copy_back_before_genau(saved_pa
     panel.show_saved_generation(db.get_generation("vid1"), [])
     assert _lane_offers(panel) == ["✓ Sent to Kino"]
 
-    _press(panel, "✕ Unsend")
+    _press(panel, "Unsend")
 
     assert _lane_offers(panel) == ["→ Send to Genau"]
 
@@ -2965,7 +2967,7 @@ def test_a_loop_in_both_lanes_offers_its_kino_copy_back_and_then_its_genau_one(
     panel.show_saved_generation(db.get_generation("vid1"), [])
     assert _lane_offers(panel) == ["✓ Sent to Kino"]
 
-    _press(panel, "✕ Unsend")
+    _press(panel, "Unsend")
 
     assert _lane_offers(panel) == ["✓ Sent to Genau"]
 
@@ -3010,7 +3012,7 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
                                    funscript=None)
     assert panel._displayed_row[lane.flag]
-    assert _lane_offers(panel) == [lane.sent_caption]
+    assert _lane_offers(panel) == [f"✓ {lane.sent_caption}"]
 
 
 @pytest.mark.parametrize(("lane", "brings_its_funscript"),
@@ -3094,7 +3096,7 @@ def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane
     monkeypatch.setattr(evolver_export, "export_video", export)
 
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert _lane_offers(panel) == [lane.sent_caption]
+    assert _lane_offers(panel) == [f"✓ {lane.sent_caption}"]
     panel._on_send(lane)
 
     export.assert_not_called()
@@ -3157,7 +3159,7 @@ def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, 
 
     assert _lane_offers(panel) == [f"✓ Sent to {lane.name}"]
     assert [button.text() for button in panel.findChildren(QPushButton)
-            if button.isVisibleTo(panel) and "Unsend" in button.text()] == ["✕ Unsend"]
+            if button.isVisibleTo(panel) and "Unsend" in button.text()] == ["Unsend"]
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)

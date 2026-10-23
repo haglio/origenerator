@@ -23,17 +23,16 @@ own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
 with the cursor on it -- because each is a badge and a button at once: the mark
 says which state the item is in, and pressing it is what changes that state.
 
-:func:`tab_close_icon` is the one mark that is neither drawn nor shared: it is
-borrowed from the live style, so a button that closes tabs wears the very ✕ the
-tabs themselves do.
+:func:`tab_close_icon` is the family's cross, so a button that closes tabs wears
+the very mark the tabs themselves do.
 """
 from __future__ import annotations
 
 from functools import cache
 
-from PyQt6.QtCore import QPointF, QRect, QRectF, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
-from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
+from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
+from shared_ui import palette
 from shared_ui.colors import (
     AMBER,
     BG_PRIMARY,
@@ -44,8 +43,8 @@ from shared_ui.colors import (
     TEXT_MUTED,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
+    WHITE,
 )
-from shared_ui.icon_geometry import shapes_of
 from shared_ui.icons import CANVAS, draw_glyph, glyph_icon, glyph_pixmap
 
 from origenerator.gallery.collection import (
@@ -80,8 +79,8 @@ _LEVEL_BADGES = {
 # The Recents collection mixes images and videos in one flow, so each tile wears a
 # small corner badge naming its kind. A white glyph on a translucent dark chip,
 # so it reads over a thumbnail of any color.
-_BADGE_CHIP = QColor(0, 0, 0, 160)
-_BADGE_GLYPH = QColor(255, 255, 255)
+_BADGE_CHIP = QColor(*palette.BLACK, 160)
+_BADGE_GLYPH = WHITE
 _BADGE_DISPLAY = 22  # the badge's on-screen size, in px
 
 # Every chip carries its mark at one size, whichever mark it is. A star badge and
@@ -98,7 +97,7 @@ _CHIP_INSET = (_SIZE - _CHIP_GLYPH) / 2
 # tile is yellow (AMBER, this palette's yellow): green is spoken for and the two
 # badges can sit on one tile, and blue is genau's across this family.
 _STAR_GLYPH = GREEN
-_REROLL_GLYPH = QColor(255, 255, 255)
+_REROLL_GLYPH = WHITE
 
 # The re-roll glyph is a composite: the media mark up and to the left, leaving
 # the lower-right corner free for the small regenerate arrow that modifies it.
@@ -158,9 +157,13 @@ def mic_icon() -> QIcon:
     return glyph_icon("mic", size=_SIZE)
 
 
-def radio_icon() -> QIcon:
-    """A speaker sounding off — Origenerator Radio's on/off switch."""
-    return glyph_icon("speaker", size=_SIZE)
+def radio_icon(*, lit_ink=None) -> QIcon:
+    """A speaker sounding off — Origenerator Radio's on/off switch, drawn in
+    *lit_ink* while it is on when the ground it is lit on wants another ink."""
+    icon = glyph_icon("speaker", size=_SIZE)
+    if lit_ink is not None:
+        icon.addPixmap(glyph_pixmap("speaker", _SIZE, lit_ink), QIcon.Mode.Normal, QIcon.State.On)
+    return icon
 
 
 def trash_icon(*, color=None) -> QIcon:
@@ -192,49 +195,14 @@ def star_icon(*, filled: bool) -> QIcon:
     return glyph_icon("star_outline", size=_SIZE)
 
 
-_RING_WIDTH = 3.0
-
-
 def _ringed_star(painter: QPainter):
-    (star,) = shapes_of("star")
-    pen = QPen(TEXT_PRIMARY)
-    pen.setWidthF(2 * _RING_WIDTH)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-    painter.setPen(pen)
-    painter.setBrush(TEXT_PRIMARY)
-    painter.drawPolygon(*(QPointF(x, y) for x, y in star.points))
+    draw_glyph(painter, "star_ring", TEXT_PRIMARY, size=_SIZE)
     draw_glyph(painter, "star", _STAR_GLYPH, size=_SIZE)
 
 
 @cache
 def thumbs_up_icon() -> QIcon:
-    canvas = QPixmap(_SIZE, _SIZE)
-    canvas.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(canvas)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.scale(_SIZE / 24, _SIZE / 24)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(TEXT_PRIMARY)
-    painter.drawRoundedRect(QRectF(1.5, 10, 4, 12), 0.8, 0.8)
-    painter.drawPath(_thumb_and_fist())
-    painter.end()
-    return QIcon(canvas)
-
-
-def _thumb_and_fist() -> QPainterPath:
-    hand = QPainterPath(QPointF(7, 11))
-    hand.lineTo(11.2, 3.2)
-    hand.quadTo(12.2, 1.6, 13.6, 2.4)
-    hand.quadTo(15, 3.4, 14.5, 5.5)
-    hand.lineTo(13.4, 9.5)
-    hand.lineTo(20, 9.5)
-    hand.quadTo(22.4, 9.6, 22.2, 12)
-    hand.lineTo(20.6, 19.8)
-    hand.quadTo(20.1, 22, 17.8, 22)
-    hand.lineTo(9, 22)
-    hand.quadTo(7, 22, 7, 20)
-    hand.closeSubpath()
-    return hand
+    return glyph_icon("thumbs_up", size=_SIZE)
 
 
 @cache
@@ -274,10 +242,6 @@ def custom_folder_icon() -> QIcon:
     return glyph_icon("folder", size=_SIZE)
 
 
-# How far the lately-worked-in dot sits inside its canvas, so the soft edge it is
-# scaled down to has somewhere to fall rather than being clipped at the border.
-_MARK_INSET = 3.0
-
 
 @cache
 def recent_mark_icon() -> QIcon:
@@ -297,10 +261,7 @@ def recent_mark_icon() -> QIcon:
 
 def _disc(color):
     def draw(painter: QPainter):
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(color)
-        painter.drawEllipse(QRectF(_MARK_INSET, _MARK_INSET,
-                                   _SIZE - 2 * _MARK_INSET, _SIZE - 2 * _MARK_INSET))
+        draw_glyph(painter, "disc", color, size=_SIZE)
 
     return draw
 
@@ -512,51 +473,15 @@ def reroll_seed_icon(media_type: str) -> QIcon:
     # The media identity, drawn large so video vs image reads at a glance...
     draw_glyph(painter, "play" if media_type == MediaType.VIDEO else "photo", _REROLL_GLYPH,
                size=_REROLL_MEDIA, x=_REROLL_MEDIA_AT, y=_REROLL_MEDIA_AT)
-    _draw_regen_badge(painter)
+    draw_glyph(painter, "regenerate_corner", _REROLL_GLYPH, size=_SIZE)
     painter.end()
     return QIcon(pixmap)
 
 
-def _draw_regen_badge(painter: QPainter):
-    """A small circular arrow in the lower-right — the 're-roll' modifier over
-    the media glyph, so the control reads as 'regenerate this' not 'play this'."""
-    pen = QPen(_REROLL_GLYPH)
-    pen.setWidthF(3.4)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawArc(QRectF(29, 29, 15, 15), 35 * 16, 250 * 16)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(_REROLL_GLYPH)
-    painter.drawPolygon(QPointF(45, 33), QPointF(39, 31), QPointF(41, 38))  # arrowhead
-
-
-def tab_close_icon(widget=None) -> QIcon:
-    """The close mark the live style paints on a closable tab, at rest.
-
-    Borrowed rather than drawn, so every control that closes a tab wears one ✕ —
-    the tabs' own, and the config pane's "All" beside them. A hand-drawn glyph, or
-    the ✕ text character, is a second spelling of the same act.
-
-    Built the way QTabBar builds its own close button — the widget's palette, and
-    the auto-raise a flat little button paints with — but always in the resting
-    state, never the selected one the platform style turns red. Not cached: it
-    follows the style, which a theme change can swap under a running app.
-    """
-    style = (widget.style() if widget is not None else QApplication.style())
-    size = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    option = QStyleOption()
-    if widget is not None:
-        option.initFrom(widget)
-    option.rect = QRect(0, 0, size, size)
-    option.state = QStyle.StateFlag.State_Enabled | QStyle.StateFlag.State_AutoRaise
-    style.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorTabClose, option, painter,
-                        widget)
-    painter.end()
-    return QIcon(pixmap)
+def tab_close_icon() -> QIcon:
+    """The family's cross, so every control that closes a tab wears one mark --
+    the tabs' own, and the config pane's "All" beside them."""
+    return glyph_icon("cross", size=_SIZE)
 
 
 def folder_badge(group) -> tuple[QIcon, str] | None:

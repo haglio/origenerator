@@ -740,21 +740,19 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
     assert voice._request_target is None
 
 
-def test_a_fix_asked_for_in_a_request_runs_as_the_fix_on_what_it_was_about(router):
+def test_words_in_a_request_are_a_request_even_when_they_name_a_fix(router):
+    # A fix is said on its own; inside "Request … over" its words are a request.
     slideshow = FakeSlideshow(target="g1")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
                                       db=FakeDB([_row("g1")]))
     begun = []
     voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("fix hands", listening=True))
-    slideshow.target = "g2"
 
     voice.on_spoken_request(Spoken("fix hands", heard="Request, fix hands, over."))
 
-    assert [(prompt_id, [part.name for part in parts]) for prompt_id, parts in host.fixed] == [
-        ("g1", ["hands"])]
-    assert begun == []  # not a change to the prompt
-    assert slideshow.runs == [("g1", "🎤 fixing hands…", NOTICE)]
+    assert begun == ["g1"]
+    assert host.fixed == []
 
 
 def test_a_request_with_no_slideshow_up_is_about_the_picked_generation(router):

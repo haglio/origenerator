@@ -30,6 +30,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.file_channel import read_key_values
+from funestra.file_channel import append_command
+from funestra.playlist import write_playlist
 from shared_ui.orientation import orientation_of_size
 
 from origenerator.console_commands import spelled_filter, spelled_for
@@ -262,6 +265,18 @@ class FunestraChannel:
     command_file: Path
     status_file: Path
     hud_file: Path
+
+    def write_playlist(self, items) -> None:
+        write_playlist(self.playlist, items)
+
+    def send(self, verb: str) -> bool:
+        return append_command(self.command_file, verb)
+
+    def status(self) -> dict[str, str]:
+        try:
+            return read_key_values(self.status_file)
+        except OSError:
+            return {}
 
 
 @dataclass(frozen=True)

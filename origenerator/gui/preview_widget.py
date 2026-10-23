@@ -37,6 +37,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
 
 from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
@@ -56,7 +57,7 @@ from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
 
-_NOTICE_PLATE = ("color: white; background: rgba(0, 0, 0, 200);"
+_NOTICE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
                  " padding: 6px 12px; border-radius: 4px;")
 _NOTICE_MARGIN = 12  # how far the plate floats from the media's top-left corner
 

@@ -23,7 +23,9 @@ from collections.abc import Callable
 from typing import NamedTuple
 
 from PyQt6.QtWidgets import QToolButton, QWidget
+from shared_ui.colors import BG_PRIMARY
 from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.palette import AMBER, BLUE, as_hex
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP, BUTTON_SIZE
 
 from origenerator import ui_scale
@@ -38,8 +40,8 @@ def _lit(color: str) -> str:
 
 
 # A lit background while a switch is on.
-_LIT = _lit("#2d6cdf")
-_LIT_WHILE_THE_ROOM_IS_PAUSED = _lit("#a68600")
+_LIT = _lit(as_hex(BLUE))
+_LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(AMBER))
 
 # What the Auto switch's clickable tip says while the loop it would stop is
 # running in some other folder. Naming that folder is no use when a name is a
@@ -115,6 +117,7 @@ def _landing_at_the_huds_scale(length: int, *, hosted: bool) -> int:
 class _SoundSwitch(QToolButton):
     def set_frozen(self, frozen: bool) -> None:
         self.setStyleSheet(_LIT_WHILE_THE_ROOM_IS_PAUSED if frozen else _LIT)
+        self.setIcon(icons.radio_icon(lit_ink=BG_PRIMARY if frozen else None))
 
 
 def _tool_button(icon, tooltip: str, handler, *, checkable=False,

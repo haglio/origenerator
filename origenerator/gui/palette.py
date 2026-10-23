@@ -7,34 +7,33 @@ the frame a card rests and hovers at, the ground an empty slot shows. The same
 gray ended up written in two unrelated files, so changing it meant finding both
 — which is the one property the shared palette exists to give.
 
-Local rather than in `shared_ui`: these are this app's own cards. A color the
-family shares belongs over there, and moving one up is a cross-repo change of
-its own.
-
-A literal that happens to match one of these but means something else — a glyph
-drawn the color of a hover frame, a caption the color of a selected border —
-stays a literal. Collapsing two meanings onto one token is what makes a palette
-impossible to change later.
-
-The names read from `shared_ui.palette` below are this app's words for colors the
-family owns, rather than typed out again: the family has one blue and one green,
-and a second copy of either is a thing that drifts. `tests/test_family_colors.py`
-fails on any that is typed back in.
+Every value is one of `shared_ui.palette`'s, named here in this app's words:
+the family's look is its small set of colors, so a card's frame or an empty
+slot's ground takes the nearest of them rather than a shade of its own, and
+`tests/test_family_look.py` fails on any shade typed back in.
 """
 from __future__ import annotations
 
-from shared_ui.palette import BLUE, GREEN, TEXT_PRIMARY, as_hex
+from shared_ui.palette import (
+    BG_BUTTON,
+    BG_SECONDARY,
+    BLUE,
+    BORDER_PANEL,
+    GREEN,
+    TEXT_PRIMARY,
+    as_hex,
+)
 
 # A picked tile, card or version row: the ground it is filled with, and its frame.
 SELECTED_FILL = as_hex(BLUE)
 SELECTED_BORDER = as_hex(TEXT_PRIMARY)
 
 # A card's frame at rest, and under the pointer.
-CARD_BORDER = "#3f3f3f"
-CARD_HOVER_BORDER = "#6f6f6f"
+CARD_BORDER = as_hex(BG_BUTTON)
+CARD_HOVER_BORDER = as_hex(BORDER_PANEL)
 
 # The ground an empty slot sits on, where there is no picture to show yet.
-EMPTY_PLATE = "#2a2a2a"
+EMPTY_PLATE = as_hex(BG_SECONDARY)
 
 # The frame around something still being made — a queued enhancement, a card
 # whose generation is on the GPU.

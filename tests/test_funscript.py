@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 from app_support.funscript import read_actions
+from funestra.funscript import Funscript
+from funestra.heatmap import build_heatmap
 from funestra.robot_hand import RobotHandState, bpm_for_speed
 
 from origenerator.config import MOTION_DEFAULT_HZ
@@ -305,6 +307,13 @@ def test_the_heatmap_has_one_color_for_every_bucket_it_draws():
     assert len(colors) == 8
     for c in colors:
         assert len(c) == 3 and all(0 <= ch <= 255 for ch in c)
+
+
+def test_the_heatmap_is_the_one_the_funestras_scrubber_paints():
+    actions = [{"at": 0, "pos": 0}, {"at": 250, "pos": 90}, {"at": 1000, "pos": 10}]
+
+    assert heatmap_colors(actions, 4) == build_heatmap(
+        Funscript(actions=[(a["at"], a["pos"]) for a in actions]), 4, start_ms=0, end_ms=1000)
 
 
 def test_heatmap_colors_run_hotter_with_travel_speed():

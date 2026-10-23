@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import QPushButton, QWidget
+from shared_ui.palette import BLACK, as_rgba
 
 from origenerator import gallery
 from origenerator.gui import icons
@@ -46,7 +47,7 @@ _GLYPH_SIZE = CORNER_SIZE - 8
 # The translucent chip every hover control sits on, so white or colored line art
 # reads over a thumbnail of any color.
 CHIP_CSS = (
-    "QPushButton { background: rgba(0,0,0,0.55); border: none; border-radius: 6px; }"
+    f"QPushButton {{ background: {as_rgba(BLACK, 0.55)}; border: none; border-radius: 6px; }}"
 )
 
 _TIPS = {

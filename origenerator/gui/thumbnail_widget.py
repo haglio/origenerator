@@ -6,6 +6,7 @@ from typing import NamedTuple
 from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QCursor, QIcon, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from shared_ui.palette import BLUE, as_rgba
 
 from origenerator.gui import grid_card, palette
 from origenerator.gui.corner_controls import (
@@ -30,7 +31,7 @@ _BORDER_PX = 2
 # on hover, laid along the tile's top-left edge — the one edge the three corner
 # controls leave alone.
 _CORNER_BUTTON_CSS = (
-    CHIP_CSS + "QPushButton:hover { background: rgba(48,128,224,0.9); }"
+    CHIP_CSS + f"QPushButton:hover {{ background: {as_rgba(BLUE, 0.9)}; }}"
 )
 
 # A selected thumbnail fills its whole tile — under both the image and the

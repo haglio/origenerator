@@ -13,6 +13,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
+from shared_ui.palette import TEXT_MUTED, as_hex
 
 from origenerator.gui import grid_card, palette
 from origenerator.gui.combination import Combination
@@ -58,7 +59,7 @@ class GeneratingTile(QFrame):
         self._image.setFixedSize(*_IMAGE_SIZE)
         self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._image.setStyleSheet(
-            f"background: {palette.EMPTY_PLATE}; border-radius: 3px; color: #8a8a8a;"
+            f"background: {palette.EMPTY_PLATE}; border-radius: 3px; color: {as_hex(TEXT_MUTED)};"
         )
         layout.addWidget(self._image)
 

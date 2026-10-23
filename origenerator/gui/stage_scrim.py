@@ -15,12 +15,13 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel
+from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
 
 # Dark enough to read white letters against any frame, light enough to leave the
 # frame itself visible — which is the reason the scrim exists rather than a
 # placeholder that replaces the picture.
 _SCRIM_CSS = (
-    "background-color: rgba(0, 0, 0, 0.45); color: white;"
+    f"background-color: {as_rgba(BLACK, 0.45)}; color: {as_hex(WHITE)};"
     " font-weight: 600; border-radius: 3px;"
 )
 

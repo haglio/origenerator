@@ -15,7 +15,7 @@ import random
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
-from funestra.radio import radio_file_for, write_radio
+from funestra.radio import Radio, radio_file_for, write_radio
 
 from origenerator.config import RADIO_DIR, RADIO_STATIONS
 from origenerator.media import VIDEO_EXTS
@@ -79,45 +79,37 @@ class OrigeneratorRadio:
                  shuffle: Callable[[list], None] = random.shuffle) -> None:
         self._clips_dir = clips_dir
         self._count = stations
-        self._open_station = open_station
         self._shuffle = shuffle
-        self._stations: list = []
+        self._stations = Radio(open_station, together=True)
+        self._on = False
         self._frozen = False
 
     def start(self) -> None:
         """Tune every station in.  A no-op when already on, and silent -- with
         one line in the log -- when no folder is named or it holds no videos,
         which is what a public checkout has."""
-        if self._stations:
+        if self._on:
             return
         clips = find_clips(self._clips_dir)
         if not clips:
             logger.info("Origenerator Radio: no clips under %s, staying silent", self._clips_dir)
             return
-        opened: list = []
-        try:
-            opened.extend(self._open_station(station)
-                          for station in deal_stations(clips, self._count, shuffle=self._shuffle))
-        except Exception:
-            logger.exception("Origenerator Radio would not open its stations")
-            for station in opened:
-                station.close()
-            return
-        self._stations = opened
-        for station in self._stations:
-            station.set_paused(self._frozen)
-            station.tune(FULL_LEVEL)
-        logger.info("Origenerator Radio: %d stations over %d clips", len(opened), len(clips))
+        self._on = True
+        dealt = deal_stations(clips, self._count, shuffle=self._shuffle)
+        self._stations.take(dealt)
+        self._tune()
+        logger.info("Origenerator Radio: %d stations over %d clips", len(dealt), len(clips))
 
     def stop(self) -> None:
-        stations, self._stations = self._stations, []
-        for station in stations:
-            station.close()
+        self._on = False
+        self._stations.close()
 
     def set_frozen(self, frozen: bool) -> None:
         self._frozen = frozen
-        for station in self._stations:
-            station.set_paused(frozen)
+        self._tune()
+
+    def _tune(self) -> None:
+        self._stations.tick(picture=True, level=FULL_LEVEL, paused=self._frozen)
 
 
 def deal_to_the_funestras(playlists: Mapping[str, Path], *, clips_dir=RADIO_DIR,

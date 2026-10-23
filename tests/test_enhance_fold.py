@@ -82,6 +82,22 @@ def test_fold_upgrades_the_source_row_in_place(tmp_path):
     assert db.get_generation("e1") is None
 
 
+def test_the_places_an_enhancements_fixes_found_stay_with_its_file_once_folded(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]", "image_enhance_00001_.png")
+    places = [{"part": "faces", "left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.5}]
+    db.update_generation("e1", output_files=json.dumps([
+        {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output",
+         "points_of_interest": places}]))
+
+    fold_enhancement(db, db.get_generation("e1"))
+
+    enhanced, original = gallery.row_output_files(db.get_generation("src"))
+    assert enhanced["points_of_interest"] == places
+    assert "points_of_interest" not in original
+
+
 def test_refold_keeps_the_true_original_and_leads_with_the_newest(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_source(db)

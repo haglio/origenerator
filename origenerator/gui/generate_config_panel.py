@@ -46,6 +46,7 @@ from origenerator.gallery import (
     settings_signature,
     workflow_output_type,
 )
+from origenerator.gallery.labels import model_file_name
 from origenerator.gallery.sides import PORTRAIT
 from origenerator.generation_config import (
     ConfigSnapshot,
@@ -73,7 +74,7 @@ from origenerator.gui.inflight import (
     discard_run_tooltip,
 )
 from origenerator.gui.label_cells import LabelCell, LabelColumn
-from origenerator.gui.metadata_block import MetadataBlock
+from origenerator.gui.metadata_block import MetadataBlock, wrappable
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
@@ -89,12 +90,15 @@ from origenerator.picture_states import state_names
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
     fresh_settings,
+    not_installed,
+    not_installed_advice,
     recommendations,
     recommended_choices,
     setting_advice,
+    spoken_list,
 )
 from origenerator.timing import estimate_label
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import RETIRED_WORKFLOW_NAMES, WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +137,44 @@ _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 
 
 def _nothing_to_start_from(missing_images: list[str]) -> str:
-    named = " and ".join(missing_images)
+    named = spoken_list(missing_images, "and")
     article = "an" if named[:1].lower() in "aeiou" else "a"
     return f"Nothing to start from — pick {article} {named} first"
+
+
+def _lost_workflow_note(workflow_name: str) -> str:
+    retired = RETIRED_WORKFLOW_NAMES.get(workflow_name)
+    made_with = (f"{retired}, which has been retired," if retired
+                 else "a workflow Origenerator doesn't have,")
+    return (f"⚠ This was made with {made_with} so no new ones can be made. "
+            "Select a workflow above to make something new.")
+
+
+def _select_a_workflow_first(workflow_name: str) -> str:
+    retired = RETIRED_WORKFLOW_NAMES.get(workflow_name)
+    gone = (f"{retired} has been retired" if retired
+            else "Origenerator doesn't have the workflow this was made with")
+    return f"{gone} — select a workflow first"
+
+
+def _named_models(names: list[str]) -> str:
+    return spoken_list(map(model_file_name, names), "and")
+
+
+def _not_installed_note(names: list[str]) -> str:
+    shown = _named_models(names)
+    if len(names) == 1:
+        return (f"⚠ This was made with {shown}, which isn't installed anymore, so no new ones "
+                "can be made with it until an installed one is picked in its place.")
+    return (f"⚠ This was made with {shown}, which aren't installed anymore, so no new ones "
+            "can be made with them until installed ones are picked in their place.")
+
+
+def _pick_installed_ones_first(names: list[str]) -> str:
+    shown = _named_models(names)
+    if len(names) == 1:
+        return f"{shown} isn't installed anymore — pick an installed one first"
+    return f"{shown} aren't installed anymore — pick installed ones first"
 
 
 class GenerateConfigPanel(QWidget):
@@ -427,6 +466,11 @@ class GenerateConfigPanel(QWidget):
         header.addRow(LabelCell(self._workflow_warning, ElidingLabel("Workflow"), LabelColumn()),
                       self._workflow_combo)
         body.addLayout(header)
+        self._cannot_remake_note = QLabel()
+        self._cannot_remake_note.setObjectName("cannotRemakeNote")
+        self._cannot_remake_note.setWordWrap(True)
+        self._cannot_remake_note.hide()
+        body.addWidget(self._cannot_remake_note)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")
         # A sentence, so it wraps rather than holding the pane open at its own
@@ -553,13 +597,49 @@ class GenerateConfigPanel(QWidget):
         return (self._client is not None
                 and self._workflow_combo.currentData() is not None
                 and not self._folder_generating
-                and not self._missing_images())
+                and self._why_generate_is_blocked() is None)
 
     def _sync_generate(self) -> None:
         self._generate_pair.setEnabled(self._can_generate())
-        missing = self._missing_images()
-        if missing:
-            self._generate_btn.setToolTip(_nothing_to_start_from(missing))
+        blocked = self._why_generate_is_blocked()
+        if blocked:
+            self._generate_btn.setToolTip(blocked)
+        note = self._why_the_item_cannot_be_remade()
+        self._cannot_remake_note.setText(wrappable(note or ""))
+        self._cannot_remake_note.setVisible(note is not None)
+
+    def _why_generate_is_blocked(self) -> str | None:
+        lost = self._lost_workflow()
+        if lost is not None:
+            return _select_a_workflow_first(lost)
+        models = list(self._models_not_installed().values())
+        images = self._missing_images()
+        return ((_pick_installed_ones_first(models) if models else None)
+                or (_nothing_to_start_from(images) if images else None))
+
+    def _why_the_item_cannot_be_remade(self) -> str | None:
+        lost = self._lost_workflow()
+        if lost is not None:
+            return _lost_workflow_note(lost)
+        shown = self._displayed_row
+        if shown is None or shown.get("workflow_name") != self._workflow_combo.currentData():
+            return None
+        models = list(self._models_not_installed().values())
+        return _not_installed_note(models) if models else None
+
+    def _lost_workflow(self) -> str | None:
+        shown = self._displayed_row
+        if shown is None or self._workflow_combo.currentData() is not None:
+            return None
+        workflow_name = shown.get("workflow_name") or ""
+        return None if workflow_name in WORKFLOW_REGISTRY else workflow_name
+
+    def _models_not_installed(self) -> dict[str, str]:
+        wf = WORKFLOW_REGISTRY.get(self._form_workflow_key or "")
+        if wf is None or self._param_form is None:
+            return {}
+        return not_installed(self._param_form.get_values(), self._param_form.definitions(),
+                             (*wf.model_keys, *wf.lora_keys))
 
     def set_how_many(self, count: int) -> None:
         self._how_many.set_how_many(count)
@@ -666,7 +746,12 @@ class GenerateConfigPanel(QWidget):
         form = self._param_form
         if form is not None:
             values = form.get_values()
-            form.set_warnings(setting_advice(values, form.definitions()))
+            definitions = form.definitions()
+            missing = self._models_not_installed()
+            defaults = (WORKFLOW_REGISTRY[self._form_workflow_key].default_params()
+                        if missing else {})
+            form.set_warnings({**setting_advice(values, definitions),
+                               **not_installed_advice(missing, definitions, defaults)})
             form.mark_recommended(recommended_choices(values))
             form.explain(recommendations(values))
         self._workflow_warning.warn(form.every_warning() if form is not None else "")
@@ -772,11 +857,10 @@ class GenerateConfigPanel(QWidget):
         )
         self._generate_btn.set_caption(
             RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
-        missing = self._missing_images()
         self._generate_btn.setToolTip(
-            _nothing_to_start_from(missing) if missing
-            else ALREADY_MAKING_ONE_TIP if self._folder_generating
-            else _RANDOM_SEED_TIP if duplicate else "")
+            self._why_generate_is_blocked()
+            or (ALREADY_MAKING_ONE_TIP if self._folder_generating
+                else _RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder,
@@ -1249,7 +1333,7 @@ class GenerateConfigPanel(QWidget):
 
         The form is seeded first, with the newest-result autoshow held back while
         it is, so nothing but the selection is ever put up. A workflow the app
-        can't rebuild leaves the form as it was. Whatever the tab was about before
+        can't rebuild leaves no form at all. Whatever the tab was about before
         it lets go of (:meth:`_point_elsewhere`).
         """
         self._point_elsewhere(row)
@@ -1286,12 +1370,15 @@ class GenerateConfigPanel(QWidget):
         self._forget_recipe_source()
         self._end_folder_request()  # a workflow this app can't rebuild never reaches prefill
         workflow_name = row.get("workflow_name", "")
-        if workflow_name in WORKFLOW_REGISTRY:
-            self._autoshow_held = True
-            try:
+        self._autoshow_held = True
+        try:
+            if workflow_name in WORKFLOW_REGISTRY:
                 self.prefill(workflow_name, merge_denormalized(row))
-            finally:
-                self._autoshow_held = False
+            else:
+                with self._loading():
+                    self._workflow_combo.setCurrentIndex(-1)
+        finally:
+            self._autoshow_held = False
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
         """Show a generation this tab's own Generate just produced: the saved
@@ -1448,6 +1535,7 @@ class GenerateConfigPanel(QWidget):
             # over the very frames it had been standing over. Only re-asserted,
             # because the picture put up above took the notice off with the old one.
             self.refresh_modified_notice()
+        self._sync_generate()
         self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 

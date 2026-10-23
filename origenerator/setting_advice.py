@@ -4,8 +4,10 @@ from collections.abc import Callable
 from typing import NamedTuple
 
 from origenerator.content import load_content
+from origenerator.gallery.labels import model_file_name
 from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef
 from origenerator.workflows.duration import seconds_for_frames
+from origenerator.workflows.model_files import is_no_lora
 
 GOOD_STEP_SPACING = {
     "dpmpp_2m": ("karras", "exponential"),
@@ -100,6 +102,24 @@ def recommendations(params: dict) -> dict[str, str]:
     return {key: rule.said for key, rule in _recommended(params).items()}
 
 
+def not_installed(params: dict, definitions, keys) -> dict[str, str]:
+    return {pd.key: params[pd.key] for pd in definitions
+            if pd.key in keys and pd.options and params.get(pd.key)
+            and not is_no_lora(params[pd.key]) and params[pd.key] not in pd.options}
+
+
+def not_installed_advice(missing: dict[str, str], definitions, defaults: dict) -> dict[str, Advice]:
+    offered = {pd.key: pd.options for pd in definitions}
+    return {key: _installed_in_place_of(chosen, offered[key], defaults.get(key))
+            for key, chosen in missing.items()}
+
+
+def _installed_in_place_of(chosen: str, options: list, default) -> Advice:
+    fix = default if default in options else options[0]
+    return Advice("Not installed anymore, so nothing can be made with it.", chosen, fix,
+                  model_file_name)
+
+
 def _good_ranges(params: dict, definitions) -> dict[str, _Range]:
     return {pd.key: _Range(good_range_text(pd), pd.good, _shown_for(pd))
             for pd in definitions if pd.good and pd.key in params}
@@ -125,12 +145,12 @@ def _model_recommends(params: dict) -> dict:
     rules: dict = {}
     if choices["sampler_name"]:
         rules["sampler_name"] = _Choices(
-            f"{name}'s page recommends {_either(choices['sampler_name'])}.",
+            f"{name}'s page recommends {spoken_list(choices['sampler_name'], 'or')}.",
             choices["sampler_name"], SAMPLER_OPTIONS)
     if choices["scheduler"]:
         paired_by_page = bool((page.get("samplers") or {}).get(sampler))
         pairs = f"{name}'s page pairs {sampler}" if paired_by_page else f"{sampler} works best"
-        rules["scheduler"] = _Choices(f"{pairs} with {_either(choices['scheduler'])}.",
+        rules["scheduler"] = _Choices(f"{pairs} with {spoken_list(choices['scheduler'], 'or')}.",
                                      choices["scheduler"], SCHEDULER_OPTIONS)
     for key, unit in (("steps", " steps"), ("cfg", "")):
         if page.get(key):
@@ -201,6 +221,6 @@ def _span(span) -> str:
     return _shown(low) if low == high else f"{_shown(low)}–{_shown(high)}"
 
 
-def _either(names) -> str:
+def spoken_list(names, conjunction: str) -> str:
     names = list(names)
-    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} or {names[-1]}"
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} {conjunction} {names[-1]}"

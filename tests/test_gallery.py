@@ -1096,6 +1096,13 @@ def _workflow_labels(rows, meta=None):
             for workflow in _workflows(build_gallery_tree(rows, meta))}
 
 
+def test_a_retired_workflows_folder_keeps_the_name_it_had():
+    retired = dict(_LOOP_CLIP, prompt_id="old", workflow_name="wan21_ati_i2v")
+
+    assert _workflow_labels([retired]) == {
+        "video/wan21_ati_i2v": "WAN 2.1 Image-to-Video (Motion-Tracked)"}
+
+
 def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_by_the_recipes_own_name():
     # The two no longer share a parent, Images holding the one and Videos the
     # other, so neither needs telling apart from its twin by what it holds.

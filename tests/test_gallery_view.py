@@ -5291,9 +5291,7 @@ def test_a_rebuilds_reselection_does_not_reload_the_form(qtbot, tmp_path):
     assert _current_form(view).get_values()["positive_prompt"] == "my edit"
 
 
-def test_selecting_an_unregistered_thumbnail_leaves_the_reused_tab_alone(qtbot, tmp_path):
-    # Selecting an unregistered generation (a different folder) forks a fresh tab
-    # rather than corrupting the one showing a rebuildable generation.
+def test_selecting_an_unregistered_thumbnail_leaves_no_settings_from_before(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     db.insert_generation(
         prompt_id="reg", workflow_name="sdxl_t2i", workflow_version="v002",
@@ -5308,15 +5306,13 @@ def test_selecting_an_unregistered_thumbnail_leaves_the_reused_tab_alone(qtbot, 
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("reg")
-    reg_panel = view._info_tabs.current_config_panel()
-    reg_before = reg_panel._param_form.get_values()
 
-    view._on_thumbnail_clicked("unreg")  # a different folder → a fresh tab
+    view._on_thumbnail_clicked("unreg")
 
-    # The rebuildable tab keeps its form; the new tab (unregistered) left its own
-    # form as-is but now displays the imported row.
-    assert reg_panel._param_form.get_values() == reg_before
-    assert view._info_tabs.current_config_panel()._displayed_row["prompt_id"] == "unreg"
+    panel = view._info_tabs.current_config_panel()
+    assert panel._displayed_row["prompt_id"] == "unreg"
+    assert panel._workflow_combo.currentIndex() == -1
+    assert panel._param_form is None
 
 
 def test_the_folder_the_gallery_is_showing_is_the_one_it_reports(qtbot):

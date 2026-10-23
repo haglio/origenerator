@@ -22,3 +22,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowTemplate] = {
     "wan22_flf2v_loop": Wan22Flf2vLoopWorkflow(),
     "wan22_i2v": Wan22I2vWorkflow(),
 }
+
+RETIRED_WORKFLOW_NAMES: dict[str, str] = {
+    "wan21_ati_i2v": "WAN 2.1 Image-to-Video (Motion-Tracked)",
+}

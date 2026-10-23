@@ -248,7 +248,7 @@ def _label_widget(text: str, width: int) -> QLabel:
 def _value_widget(item: MetaItem) -> QLabel:
     """The value cell — a plain selectable label. A long, space-less value (a
     path, a filename) may wrap rather than force a scrollbar."""
-    value = QLabel(_wrappable(item.value))
+    value = QLabel(wrappable(item.value))
     value.setTextInteractionFlags(_SELECTABLE)
     value.setWordWrap(True)
     value.setStyleSheet(f"color: {_h(TEXT_SECONDARY)};")
@@ -261,7 +261,7 @@ def _value_widget(item: MetaItem) -> QLabel:
 _BREAK_AFTER = "\\/_-."
 
 
-def _wrappable(text: str) -> str:
+def wrappable(text: str) -> str:
     """Insert a zero-width space after each path/name separator, giving a
     word-wrapping label a place to break a long unbroken value. The spaces have
     no width so the visible text is unchanged, and copy buttons still carry the

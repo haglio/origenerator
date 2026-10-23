@@ -8,6 +8,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import QApplication, QPlainTextEdit
+from shared_ui.colors import GREEN
 
 from origenerator.gui import diff_text
 
@@ -40,7 +41,7 @@ def test_what_arrived_is_lit_rather_than_struck(qtbot):
     diff_text.show_diff(edit, "a woman", "a woman, freckles")
 
     assert not _format_at(edit, "freckles").fontStrikeOut()
-    assert _format_at(edit, "freckles").background().color().name() != "#000000"
+    assert _format_at(edit, "freckles").background().color() == GREEN
 
 
 def test_the_fields_value_is_the_prompt_that_would_generate(qtbot):

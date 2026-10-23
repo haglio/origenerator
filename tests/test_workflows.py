@@ -829,7 +829,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         assert denoise.default == 0.15
 
 
-_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "ltx")
+_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "ltx", "krea2")
 # The categories that hold more than one architecture. upscale_models is left
 # out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
 # over them is meant to list everything.

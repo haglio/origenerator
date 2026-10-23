@@ -916,6 +916,15 @@ def test_requests_list_newest_first(tmp_path):
     assert [r["prompt_id"] for r in db.list_requests()] == ["gen-2", "gen-1"]
 
 
+def test_the_requests_about_one_picture_list_newest_first(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _record(db, "gen-1", source="src-1")
+    _record(db, "gen-2", source="src-2")
+    _record(db, "gen-3", source="src-1")
+
+    assert [r["prompt_id"] for r in db.requests_about("src-1")] == ["gen-3", "gen-1"]
+
+
 def test_a_generation_nothing_asked_for_has_no_request(tmp_path):
     db = Database(tmp_path / "test.db")
     assert db.get_request("gen-unasked") is None

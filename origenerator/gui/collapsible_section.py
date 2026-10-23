@@ -165,6 +165,9 @@ class CollapsibleSection(QWidget):
 
     # --- state ---------------------------------------------------------------
 
+    def title(self) -> str:
+        return self._title
+
     def is_collapsed(self) -> bool:
         return self._collapsed
 

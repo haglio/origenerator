@@ -227,8 +227,7 @@ class GenerateConfigPanel(QWidget):
     # being worked in rather than looked at (see _loading_config).
     user_edited = pyqtSignal()
     form_replaced = pyqtSignal()        # a new workflow swapped the param form out
-    source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
-    animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
+    link_clicked = pyqtSignal(str)
     item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
     context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
     go_to_folder_requested = pyqtSignal(str)  # a file row's "Go to folder": the shown prompt_id
@@ -520,9 +519,10 @@ class GenerateConfigPanel(QWidget):
         self._related = RelatedMedia(video_rows=self._video_rows,
                                      row_of=self._db.get_generation,
                                      held_rows=lambda: self._library.now().held_rows,
-                                     name_of=self._names.of, previews=self._previews)
-        self._related.source_activated.connect(self.source_activated)
-        self._related.animated_activated.connect(self.animated_activated)
+                                     name_of=self._names.of, previews=self._previews,
+                                     request_of=self._db.get_request,
+                                     requests_about=self._db.requests_about)
+        self._related.link_clicked.connect(self.link_clicked)
         body.addWidget(self._related)
         # The preview opens on the most-enhanced version, and this is where the
         # earlier levels (and the original) are, each captioned with what made
@@ -839,7 +839,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self.refresh_generate_caption)
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
-        self._param_form.item_activated.connect(self.source_activated)
+        self._param_form.item_activated.connect(self.link_clicked)
         if form.request_field() is not None:
             form.request_field().asked.connect(self._on_request_asked)
         self._form_host_column.addWidget(self._param_form)
@@ -1318,7 +1318,7 @@ class GenerateConfigPanel(QWidget):
         return {"folds": self._param_form.folds() if self._param_form else {},
                 "enhancement_levels_folded": self._versions.is_collapsed(),
                 "details_folded": self._metadata_block.is_folded(),
-                "source_folded": self._related.is_source_folded(),
+                "related_folds": self._related.folds(),
                 "picture_border": self._picture_border}
 
     def restore_layout(self, saved) -> None:
@@ -1331,8 +1331,8 @@ class GenerateConfigPanel(QWidget):
             self._versions.set_collapsed(saved["enhancement_levels_folded"])
         if isinstance(saved.get("details_folded"), bool):
             self._metadata_block.set_folded(saved["details_folded"])
-        if isinstance(saved.get("source_folded"), bool):
-            self._related.set_source_folded(saved["source_folded"])
+        if isinstance(saved.get("related_folds"), dict):
+            self._related.set_folds(saved["related_folds"])
         self._picture_border = saved.get("picture_border")
         if self._fun_time is None:
             self._media_split.take_dragged_sizes(self._picture_border)
@@ -1383,11 +1383,9 @@ class GenerateConfigPanel(QWidget):
 
     # --- displaying a saved generation (the browsed selection) ----------------
 
-    def show_saved_generation(self, row: dict, image_rows: list[dict], request=None):
+    def show_saved_generation(self, row: dict, image_rows: list[dict]):
         """Display a browsed generation in this tab: its settings in the
-        editable form, its output in the preview, the info for its media type, and,
-        when ``request`` says a spoken request made it, a link back to the item it
-        was asked about.
+        editable form, its output in the preview, and the info for its media type.
 
         The form is seeded first, with the newest-result autoshow held back while
         it is, so nothing but the selection is ever put up. A workflow the tab
@@ -1395,7 +1393,7 @@ class GenerateConfigPanel(QWidget):
         it lets go of (:meth:`_point_elsewhere`).
         """
         self._point_elsewhere(row)
-        self._display_result(row, image_rows, request)
+        self._display_result(row, image_rows)
 
     def show_running_generation(self, row: dict):
         """Point this tab at a generation still being made: its settings
@@ -1568,7 +1566,7 @@ class GenerateConfigPanel(QWidget):
         self._live_note = None
         self._live_source = None
 
-    def _display_result(self, row: dict, image_rows: list[dict], request=None,
+    def _display_result(self, row: dict, image_rows: list[dict],
                         made_with: dict | None = None):
         """Point the preview and footer at ``row`` — the shared tail of showing a
         generation, whether freshly browsed or just completed. The form is left
@@ -1581,7 +1579,7 @@ class GenerateConfigPanel(QWidget):
             self._preview.show_media(*preview, row["prompt_id"])  # after any prefill, so it wins over autoshow
         else:
             self._preview.clear()
-        self._show_footer(row, image_rows, preview, request)
+        self._show_footer(row, image_rows, preview)
         self._arm_preview_actions()
         if arriving:
             self._note_displayed_config(made_with)
@@ -1750,20 +1748,18 @@ class GenerateConfigPanel(QWidget):
         self._pending_enhancement = None  # nothing on display to be enhancing
         self._update_lane_button(None)
 
-    def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
+    def _show_footer(self, row: dict, image_rows: list[dict], preview):
         """Reveal the info and actions for the generation on display: the
         read-only metadata block for every selection, the source tile + the lane
         button for a video, and the animations strip for an image. ``preview`` is the
         resolved ``(path, media_type)`` (or ``None``), so the lane button keys off the
         same lookup.
-
-        ``request`` is the spoken request that made this row, when one did.
         """
         self.reread_folder_buttons()
         self._metadata_block.setVisible(
             self._metadata_block.show_row(row, self._upscale_of(row), self._item_name()))
         self._action.show_row(row)
-        self._related.show_row(row, image_rows, request)
+        self._related.show_row(row, image_rows)
         self._refresh_versions()
         self._update_lane_button(preview)
 

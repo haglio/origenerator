@@ -405,7 +405,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 16391 when a lock's star, better version and gallery came to wait for the
 # Funestra to say it had locked, and set_locked's account of them went to the
 # tests that state it.
-MAX_PROSE_LINES = 16391
+# 16328 when a picture's requests and Modifies came to link both ways, each in
+# a section of its own, taken down to what the tree measured.
+MAX_PROSE_LINES = 16328
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -379,6 +379,10 @@ class FakeDB:
     def get_request(self, prompt_id):
         return self._requests.get(prompt_id)
 
+    def requests_about(self, source_prompt_id):
+        return [record for record in self.list_requests()
+                if record["source_prompt_id"] == source_prompt_id]
+
     # --- custom folders (the groupings the user composes) ------------------
 
     def create_custom_folder(self, name, folder_id=None, side=None):
@@ -16383,7 +16387,6 @@ def test_the_words_of_a_request_never_reach_the_fix_matcher(
 
 def test_a_request_item_links_back_to_what_it_was_asked_about(
         qtbot, tmp_path, monkeypatch):
-    # In the source tile, the same slot an I2V's start frame uses.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._slideshows.showing.close()
@@ -16392,9 +16395,10 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    panel = view._info_tabs.current_config_panel()
-    assert not panel._related._source_tile.isHidden()
-    assert panel._related._source_tile._prompt_id == "orig"
+    section = view._info_tabs.current_config_panel()._related._requests_section
+    assert not section.isHidden()
+    assert [(tile._heading.text(), tile._prompt_id) for tile in section._tiles] == [
+        ("Requested from", "orig")]
 
 
 def test_a_request_item_shows_its_words_in_its_tab_s_request_section(

@@ -1226,17 +1226,18 @@ def test_a_tabs_enhancement_levels_and_details_come_back_folded(qtbot, tmp_path)
     assert (panel._versions.is_collapsed(), panel._metadata_block.is_folded()) == (True, True)
 
 
-def test_a_tabs_source_comes_back_folded(qtbot, tmp_path):
+def test_a_tabs_link_sections_come_back_folded_as_they_were_left(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     panel = first._gallery_view._info_tabs.currentWidget()
     panel.prefill("sdxl_t2i", {})
-    panel._related.set_source_folded(True)
+    left = {"Source": True, "Requests": True, "Modifications": False, "Animations": True}
+    panel._related.set_folds(left)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._info_tabs.currentWidget()._related.is_source_folded()
+    assert reopened._gallery_view._info_tabs.currentWidget()._related.folds() == left
 
 
 def test_a_tabs_border_under_its_picture_is_where_it_was_left_after_a_restart(qtbot, tmp_path):

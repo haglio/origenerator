@@ -385,16 +385,12 @@ def test_info_and_form_share_one_scroll(panel):
 
 
 def test_file_info_above_form_related_media_below(panel):
-    # File/Created sits above the form; the source-image tile and animated-in strip
-    # sit below it, at the foot of the scroll.
     body = panel._scroll.widget().layout()
     form_at = body.indexOf(panel._form_host)
     assert body.indexOf(panel._metadata_block) < form_at
-    # The two links are one widget under the form now, carrying both.
     assert body.indexOf(panel._related) > form_at
     links = panel._related.layout()
-    assert links.indexOf(panel._related._source_tile) \
-        < links.indexOf(panel._related._animated_strip)
+    assert [links.indexOf(section) for section in panel._related._sections()] == [0, 1, 2, 3]
 
 
 def test_the_lane_button_shares_the_button_bank_with_generate_and_cancel(panel):
@@ -1236,6 +1232,12 @@ class SpyDB:
     def get_generation(self, prompt_id):
         return None
 
+    def get_request(self, prompt_id):
+        return None
+
+    def requests_about(self, prompt_id):
+        return []
+
     def library_version(self):
         return 0
 
@@ -1849,14 +1851,14 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
     assert panel._displayed_row is image
 
 
-def test_showing_an_image_footer_tile_click_emits_animated_activated(saved_panel, monkeypatch):
+def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel, monkeypatch):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     _video_row(db, "vid1", input_image="sdxl_img1.png")
     monkeypatch.setattr(gallery, "make_animated_preview", lambda r, o, t: None)
     panel.show_saved_generation(image, [image])
     got = []
-    panel.animated_activated.connect(got.append)
+    panel.link_clicked.connect(got.append)
 
     panel._related._animated_strip.video_activated.emit("vid1")
 
@@ -1898,7 +1900,7 @@ def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, mo
     assert panel._lane_button.isHidden() and panel._sent_row.isHidden()
 
 
-def test_video_source_tile_click_emits_source_activated(saved_panel, monkeypatch):
+def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, monkeypatch):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
@@ -1906,7 +1908,7 @@ def test_video_source_tile_click_emits_source_activated(saved_panel, monkeypatch
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(video, [image])
     got = []
-    panel.source_activated.connect(got.append)
+    panel.link_clicked.connect(got.append)
 
     panel._related._source_tile.activated.emit("img1")   # what a click on the tile does
 
@@ -3795,7 +3797,7 @@ def test_the_picture_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_p
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     zone = panel._param_form._widgets["input_image"]
     led_to = []
-    panel.source_activated.connect(led_to.append)
+    panel.link_clicked.connect(led_to.append)
 
     mime = generation_mime("img1")
     zone.dropEvent(QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,

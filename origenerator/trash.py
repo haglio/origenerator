@@ -65,6 +65,9 @@ class TrashedBatch:
         if self.subdir is not None:
             shutil.rmtree(self.subdir, ignore_errors=True)
 
+    def holding(self, original: Path) -> Path | None:
+        return next((trashed for was, trashed in self.moves if was == Path(original)), None)
+
     def record(self) -> dict:
         """This batch as plain data, so it can be stored and re-made later.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
+from pathlib import Path
 
 import pytest
 
@@ -846,6 +847,32 @@ def test_an_unheld_deletion_is_simply_absent(tmp_path):
     db = Database(tmp_path / "test.db")
     assert db.get_deletion("never") is None
     db.forget_deletion("never")  # must not raise
+
+
+def _held_in_the_trash(db, tmp_path, prompt_id: str, original: Path) -> Path:
+    held = tmp_path / "trash" / prompt_id / f"1_{original.name}"
+    held.parent.mkdir(parents=True)
+    held.write_bytes(b"fabricated image bytes")
+    db.record_deletion(prompt_id, {"prompt_id": prompt_id},
+                       {"moves": [[str(original), str(held)]], "subdir": str(held.parent)})
+    return held
+
+
+def test_a_file_the_newest_delete_took_is_found_where_the_trash_holds_it(tmp_path):
+    db = Database(tmp_path / "test.db")
+    original = tmp_path / "images" / "alpha_t2i_00007_.png"
+    _held_in_the_trash(db, tmp_path, "d-1", original)
+    newest = _held_in_the_trash(db, tmp_path, "d-2", original)
+
+    assert db.trashed_file(original) == newest
+
+
+def test_a_file_gone_from_the_trash_is_not_found_there(tmp_path):
+    db = Database(tmp_path / "test.db")
+    original = tmp_path / "images" / "alpha_t2i_00007_.png"
+    _held_in_the_trash(db, tmp_path, "d-1", original).unlink()
+
+    assert db.trashed_file(original) is None
 
 
 # --- spoken requests (what the Requests collection lists) --------------------

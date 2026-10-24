@@ -17,9 +17,9 @@ So this module is the one reading of a reference the rest of the app shares:
 * :func:`frame_name` — the *comparison key* for a file: its basename, lowercased,
   annotation gone. A stored output filename, a start-frame reference and a
   re-roll's annotated output all agree under it. Only a key, never a location.
-* :func:`reference_path` — where on disk a ``LoadImage`` value points, the way
-  ComfyUI's own LoadImage routes it: ``[output]`` under the output dir,
-  ``[input]`` (or no tag) under the input dir, an absolute path as itself.
+* :func:`reference_place` — where on disk a ``LoadImage`` value points, the way
+  ComfyUI's own LoadImage routes it, and :func:`reference_path` — that file,
+  when it is there.
 
 Kept free of every other module of this app, so the gallery's row logic and the
 workflow templates can both read from it without one importing the other.
@@ -74,10 +74,14 @@ def frame_name(image_ref: str | None) -> str:
 def reference_path(
     image_ref: str | None, *, places: OutputPlaces, input_dir: Path, temp_dir: Path | None = None,
 ) -> Path | None:
-    """The on-disk file a ``LoadImage`` value names, or ``None`` when it's empty,
-    absent, or not there.
+    path = reference_place(image_ref, places=places, input_dir=input_dir, temp_dir=temp_dir)
+    return path if path is not None and path.is_file() else None
 
-    ``"name [output]"`` lives in the place its folder names, ``"[temp]"`` under
+
+def reference_place(
+    image_ref: str | None, *, places: OutputPlaces, input_dir: Path, temp_dir: Path | None = None,
+) -> Path | None:
+    """``"name [output]"`` lives in the place its folder names, ``"[temp]"`` under
     ``temp_dir`` (nowhere, for a caller with none), and ``"[input]"`` (or an
     unannotated name) under ``input_dir`` — matching how ComfyUI's LoadImage
     routes the reference. An absolute path is taken as-is.
@@ -86,15 +90,10 @@ def reference_path(
     if not file:
         return None
     if tag == OUTPUT_TAG:
-        path = places.file(file)
-    elif tag == TEMP_TAG:
-        if temp_dir is None:
-            return None
-        path = temp_dir / file
-    elif tag == INPUT_TAG:
-        path = input_dir / file
-    else:
-        path = Path(file)
-        if not path.is_absolute():
-            path = input_dir / file
-    return path if path.is_file() else None
+        return places.file(file)
+    if tag == TEMP_TAG:
+        return temp_dir / file if temp_dir is not None else None
+    if tag == INPUT_TAG:
+        return input_dir / file
+    path = Path(file)
+    return path if path.is_absolute() else input_dir / file

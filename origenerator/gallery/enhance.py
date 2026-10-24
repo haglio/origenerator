@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import logging
 from bisect import bisect_left
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -378,6 +379,27 @@ def level_matching_params(row: dict, wanted: dict | None) -> int | None:
     return None
 
 
+def most_used_enhancements(rows, count: int) -> list[dict]:
+    uses = Counter(json.dumps(_settings_as_offered(row, level.params), sort_keys=True)
+                   for row in rows for level in enhance_levels(row) if level.params)
+    return [json.loads(settings) for settings, _uses in uses.most_common(count)]
+
+
+def _settings_as_offered(row: dict, params: dict) -> dict:
+    held_on_the_panel = full_settings(params)
+    if held_on_the_panel["checkpoint"] == _model_matching_the_source(
+            parse_params(row.get("params_json"))):
+        held_on_the_panel["checkpoint"] = MATCH_SOURCE_MODEL
+    return full_settings(held_on_the_panel)
+
+
+def _model_matching_the_source(source_params: dict) -> str:
+    checkpoint = source_params.get("checkpoint")
+    if isinstance(checkpoint, str) and checkpoint:
+        return checkpoint
+    return WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()["checkpoint"]
+
+
 def enhance_targets_row(input_image: str | None, row: dict) -> bool:
     """Whether an enhance running on ``input_image`` is an enhance of ``row``.
 
@@ -493,9 +515,7 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     params["input_image"] = input_ref
     params["positive_prompt"] = src.get("positive_prompt") or row.get("positive_prompt") or ""
     params["negative_prompt"] = src.get("negative_prompt") or row.get("negative_prompt") or ""
-    checkpoint = src.get("checkpoint")
-    if isinstance(checkpoint, str) and checkpoint:
-        params["checkpoint"] = checkpoint
+    params["checkpoint"] = _model_matching_the_source(src)
     for key, value in (settings.params if settings else {}).items():
         if key not in ENHANCE_SETTING_KEYS:
             continue

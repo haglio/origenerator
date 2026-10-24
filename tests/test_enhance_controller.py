@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from origenerator import config, gallery
+from origenerator.enhance_presets import Preset
 from origenerator.gui import enhance_controller as module
 from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
@@ -48,6 +49,9 @@ class FakePanel:
         self.on_changed = on_changed
         self.enhance_requested = FakeSignal()
         self.fix_training_requested = FakeSignal()
+        self.preset_saved = FakeSignal()
+        self.preset_renamed = FakeSignal()
+        self.presets = None
         self.training: dict = {}
         self.used: list = []
         self.shown = None
@@ -56,6 +60,9 @@ class FakePanel:
 
     def show_settings(self, settings):
         self.shown = settings
+
+    def show_presets(self, presets):
+        self.presets = list(presets)
 
     def set_applicable(self, applicable, why):
         self.applicable = (applicable, why)
@@ -479,6 +486,38 @@ def test_the_settings_survive_a_restart(enhance):
 
     assert controller.settings.auto is True
     assert controller.settings_json() == controller.settings.to_json()
+
+
+def test_the_panel_lists_the_presets_a_library_starts_with(enhance):
+    enhanced = dict(_image("i1"), params_json=json.dumps({"enhance": True, "enhance_steps": 30}))
+
+    controller, _host = enhance(db=FakeDB([enhanced]))
+
+    assert [preset.name for preset in controller.panel.presets] == ["2x · 30 steps · 0.15 redraw"]
+
+
+def _edited(enhance_steps):
+    return gallery.EnhanceSettings(params={**gallery.default_enhance_params(),
+                                           "enhance_steps": enhance_steps})
+
+
+def test_a_preset_named_on_the_panel_holds_the_settings_on_it_and_is_listed_last(enhance):
+    controller, _host = enhance()
+    controller.panel.on_changed(_edited(44))
+
+    controller.panel.preset_saved.emit("Crisp")
+
+    assert controller.panel.presets == [Preset("Crisp", _edited(44).params)]
+
+
+def test_a_preset_renamed_on_the_panel_keeps_its_settings_under_the_new_name(enhance):
+    controller, _host = enhance()
+    controller.panel.on_changed(_edited(44))
+    controller.panel.preset_saved.emit("Crisp")
+
+    controller.panel.preset_renamed.emit(0, "Bright")
+
+    assert controller.panel.presets == [Preset("Bright", _edited(44).params)]
 
 
 def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatch):

@@ -65,7 +65,14 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from pytestqt.qtbot import QtBot
 
-from origenerator import config, notice_toast, osr2_driver, osr2_motion_driver, running_ahead
+from origenerator import (
+    config,
+    enhance_presets,
+    notice_toast,
+    osr2_driver,
+    osr2_motion_driver,
+    running_ahead,
+)
 from origenerator.gui import desktop_notices, motion_panel, omnipause, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
@@ -414,6 +421,13 @@ def refuse_the_dialogs_nobody_can_answer(setattr) -> None:
 @pytest.fixture(autouse=True)
 def _no_dialog_nobody_can_answer(monkeypatch):
     refuse_the_dialogs_nobody_can_answer(monkeypatch.setattr)
+
+
+@pytest.fixture(autouse=True)
+def _enhance_presets_of_the_tests_own(monkeypatch, tmp_path_factory):
+    """Every window loads the presets, and one test's saved preset is no other's."""
+    monkeypatch.setattr(enhance_presets, "PRESETS_PATH",
+                        tmp_path_factory.mktemp("presets") / "enhance_presets.json")
 
 
 def pytest_collection_finish(session):

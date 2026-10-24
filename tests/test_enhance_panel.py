@@ -28,6 +28,7 @@ from shared_ui.toggle_switch import ToggleSwitch
 import origenerator.gui.enhance_panel as enhance_panel_module
 import origenerator.workflows.detail_parts as parts
 from origenerator import config
+from origenerator.enhance_presets import Preset
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceLevel,
@@ -315,6 +316,156 @@ def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_
 
     panel.show_offer(False, "Nothing here to enhance")
     assert not button.isEnabled() and button.toolTip() == "Nothing here to enhance"
+
+
+def test_the_presets_and_save_sit_left_of_the_enhance_button_on_its_line(qtbot):
+    panel, _ = _panel(qtbot)
+    line = (panel._preset_picker, panel._preset_button, panel._enhance_button)
+
+    for width in (2000, panel.minimumSizeHint().width()):
+        _laid_out_at(panel, width)
+        lefts = [widget.mapTo(panel, QPoint(0, 0)).x() for widget in line]
+        middles = {widget.mapTo(panel, QPoint(0, widget.height() // 2)).y() for widget in line}
+        assert lefts == sorted(lefts) and len(middles) == 1, width
+
+
+def _presets():
+    return [Preset("Crisp", {**default_enhance_params(), "enhance_steps": 40}),
+            Preset("Soft", {**default_enhance_params(), "enhance_steps": 30})]
+
+
+def _listed(picker):
+    return [picker.itemText(index) for index in range(picker.count())]
+
+
+def test_the_dropdown_lists_the_presets_and_reads_custom_while_the_settings_are_none_of_them(
+        qtbot):
+    panel, _ = _panel(qtbot)
+
+    panel.show_presets(_presets())
+
+    assert _listed(panel._preset_picker) == ["Crisp", "Soft"]
+    assert panel._preset_picker.currentIndex() == -1
+    assert panel._preset_picker.placeholderText() == "(custom)"
+    assert panel._preset_button.text() == "Save…"
+
+
+def test_the_presets_and_their_button_say_what_each_does(qtbot):
+    panel, _ = _panel(qtbot)
+    panel.show_presets(_presets())
+    assert panel._preset_picker.toolTip() == "Pick a preset to use its settings"
+    assert panel._preset_button.toolTip() == "Save these settings as a preset"
+
+    panel._steps.setValue(30)
+
+    assert panel._preset_button.toolTip() == "Rename this preset"
+
+
+def test_the_open_list_shows_each_preset_s_whole_name_however_narrow_the_box(qtbot):
+    panel, _ = _panel(qtbot)
+    long_name = "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6 · driftwood_v1.safetensors"
+
+    panel.show_presets([Preset(long_name, default_enhance_params())])
+
+    picker = panel._preset_picker
+    assert picker.view().minimumWidth() > picker.fontMetrics().horizontalAdvance(long_name)
+
+
+def test_the_dropdown_shows_the_preset_the_settings_are_and_the_button_offers_to_rename_it(
+        qtbot):
+    panel, _ = _panel(qtbot)
+    panel.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 30}))
+
+    panel.show_presets(_presets())
+
+    assert panel._preset_picker.currentText() == "Soft"
+    assert panel._preset_button.text() == "Rename…"
+
+
+def test_settings_turned_or_loaded_onto_a_preset_show_it_and_off_one_read_custom_again(qtbot):
+    panel, _ = _panel(qtbot)
+    panel.show_presets(_presets())
+
+    panel._steps.setValue(30)
+    assert panel._preset_picker.currentText() == "Soft"
+
+    panel._steps.setValue(31)
+    assert panel._preset_picker.currentIndex() == -1
+    assert panel._preset_button.text() == "Save…"
+
+    panel.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 40}))
+    assert panel._preset_picker.currentText() == "Crisp"
+
+
+def _pick(picker, index):
+    """What a choice from the open list does: the box moves to it, then says it
+    was picked."""
+    picker.setCurrentIndex(index)
+    picker.activated.emit(index)
+
+
+def test_picking_a_preset_puts_its_settings_on_the_panel_and_leaves_the_switch_alone(qtbot):
+    panel, edits = _panel(qtbot)
+    panel._auto.setChecked(True)
+    panel.show_presets(_presets())
+
+    _pick(panel._preset_picker, 1)
+
+    assert panel._steps.value() == 30
+    assert edits[-1].params["enhance_steps"] == 30 and edits[-1].auto is True
+    assert panel._preset_picker.currentText() == "Soft"
+    assert panel._preset_button.text() == "Rename…"
+
+
+def _answering_the_name_box(monkeypatch, name, ok=True):
+    asked = []
+
+    def answer(parent, title, label, *args, **kwargs):
+        asked.append((title, label, kwargs.get("text", "")))
+        return name, ok
+
+    monkeypatch.setattr(enhance_panel_module.QInputDialog, "getText", staticmethod(answer))
+    return asked
+
+
+def test_save_asks_for_a_name_and_saves_the_settings_on_the_panel_under_it(qtbot, monkeypatch):
+    panel, _ = _panel(qtbot)
+    panel.show_presets(_presets())
+    asked = _answering_the_name_box(monkeypatch, "  Bright  ")
+    saved = []
+    panel.preset_saved.connect(saved.append)
+
+    qtbot.mouseClick(panel._preset_button, Qt.MouseButton.LeftButton)
+
+    assert asked == [("Save Preset", "Preset name:", "")]
+    assert saved == ["Bright"]
+
+
+def test_rename_asks_with_the_presets_own_name_and_renames_that_preset(qtbot, monkeypatch):
+    panel, _ = _panel(qtbot)
+    panel.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 30}))
+    panel.show_presets(_presets())
+    asked = _answering_the_name_box(monkeypatch, "Gentle")
+    renamed = []
+    panel.preset_renamed.connect(lambda index, name: renamed.append((index, name)))
+
+    qtbot.mouseClick(panel._preset_button, Qt.MouseButton.LeftButton)
+
+    assert asked == [("Rename Preset", "Preset name:", "Soft")]
+    assert renamed == [(1, "Gentle")]
+
+
+@pytest.mark.parametrize(("name", "ok"), [("   ", True), ("Bright", False)])
+def test_a_blank_name_or_a_cancel_names_nothing(qtbot, monkeypatch, name, ok):
+    panel, _ = _panel(qtbot)
+    panel.show_presets(_presets())
+    _answering_the_name_box(monkeypatch, name, ok)
+    named = []
+    panel.preset_saved.connect(named.append)
+
+    qtbot.mouseClick(panel._preset_button, Qt.MouseButton.LeftButton)
+
+    assert named == []
 
 
 def test_the_fields_line_up_down_the_panel_either_way_the_numbers_lie(qtbot):

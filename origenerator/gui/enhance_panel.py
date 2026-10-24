@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLayout,
     QPlainTextEdit,
@@ -56,7 +57,8 @@ from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
-from origenerator import fix_training
+from origenerator import enhance_presets, fix_training
+from origenerator.enhance_presets import Preset
 from origenerator.gallery import (
     ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,
@@ -64,6 +66,7 @@ from origenerator.gallery import (
     EnhanceSettings,
 )
 from origenerator.gui.drop_target import DropTarget
+from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.metadata_block import reveal_button
@@ -316,6 +319,8 @@ class EnhancePanel(QWidget):
 
     enhance_requested = pyqtSignal()
     fix_training_requested = pyqtSignal(str)
+    preset_saved = pyqtSignal(str)
+    preset_renamed = pyqtSignal(int, str)
 
     def __init__(self, on_change, parent=None):
         super().__init__(parent)
@@ -397,9 +402,19 @@ class EnhancePanel(QWidget):
         self._enhance_button = QPushButton("Enhance")
         self._enhance_button.setObjectName("enhanceButton")
         self._enhance_button.clicked.connect(self.enhance_requested)
+        self._presets: list[Preset] = []
+        self._preset_picker = NoWheelComboBox()
+        self._preset_picker.floor_chars = 2
+        self._preset_picker.setPlaceholderText("(custom)")
+        self._preset_picker.setToolTip("Pick a preset to use its settings")
+        self._preset_picker.activated.connect(
+            lambda index: self._take_settings(self._presets[index].params))
+        self._preset_button = QPushButton("Save…")
+        self._preset_button.clicked.connect(self._name_the_settings)
         action_row = QHBoxLayout()
         action_row.setContentsMargins(0, 0, 0, 0)
-        action_row.addStretch(1)
+        action_row.addWidget(self._preset_picker, 1)
+        action_row.addWidget(self._preset_button)
         action_row.addWidget(self._enhance_button)
         column.addLayout(action_row)
         DropTarget(self, _settings_dragged, self._take_settings)  # a version's, dragged here
@@ -569,6 +584,33 @@ class EnhancePanel(QWidget):
         widget.valueChanged.connect(self._emit)
         return widget
 
+    def show_presets(self, presets: list[Preset]) -> None:
+        self._presets = list(presets)
+        self._preset_picker.clear()
+        self._preset_picker.addItems([preset.name for preset in presets])
+        open_the_list_in_full(self._preset_picker)
+        self._show_the_preset_held()
+
+    def _name_the_settings(self) -> None:
+        held = self._preset_picker.currentIndex()
+        title, given = (("Save Preset", "") if held < 0
+                        else ("Rename Preset", self._presets[held].name))
+        name, ok = QInputDialog.getText(self, title, "Preset name:", text=given)
+        if not ok or not name.strip():
+            return
+        if held < 0:
+            self.preset_saved.emit(name.strip())
+        else:
+            self.preset_renamed.emit(held, name.strip())
+
+    def _show_the_preset_held(self) -> None:
+        held = enhance_presets.matching(self._presets, self.settings().params)
+        self._preset_picker.setCurrentIndex(-1 if held is None else held)
+        text, tip = (("Save…", "Save these settings as a preset") if held is None
+                     else ("Rename…", "Rename this preset"))
+        self._preset_button.setText(text)
+        self._preset_button.setToolTip(tip)
+
     def set_applicable(self, applicable: bool, reason: str = "") -> None:
         """Switch the whole panel on or off, and look it.
 
@@ -660,6 +702,7 @@ class EnhancePanel(QWidget):
                 self._show_fix_on(name)
         finally:
             self._loading = False
+        self._show_the_preset_held()
 
     def settings(self) -> EnhanceSettings:
         """What the panel currently reads as."""
@@ -680,6 +723,7 @@ class EnhancePanel(QWidget):
 
     def _emit(self, *_args):
         if not self._loading:
+            self._show_the_preset_held()
             self._on_change(self.settings())
 
     def _take_settings(self, params: dict) -> None:

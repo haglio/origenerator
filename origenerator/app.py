@@ -706,6 +706,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     from origenerator import config
     from origenerator.config import (
         COMFYUI_DIR,
+        COMFYUI_FOLDERS,
         COMFYUI_HOST,
         COMFYUI_LOG_DIR,
         COMFYUI_OUTPUT_DIR,
@@ -793,6 +794,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     client = ComfyUIClient(
         host=COMFYUI_HOST, port=COMFYUI_PORT,
         client_id=resolve_comfyui_client_id(app_state),
+        folders=COMFYUI_FOLDERS,
     )
 
     from origenerator.gui.loading_screen import LoadingCanceled

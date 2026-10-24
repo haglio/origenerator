@@ -381,7 +381,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 17181 when the motion-tracked video workflow left the app, taken down
 # to what the tree measured.
 # 17172 when one enhancement's whole settings came to be said once.
-MAX_PROSE_LINES = 17172
+MAX_PROSE_LINES = 17162
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

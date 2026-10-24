@@ -1170,8 +1170,6 @@ def test_param_form_browse_button_picks_any_file(qtbot, monkeypatch):
     qtbot.addWidget(form)
     form._browse_buttons["input_image"].click()
 
-    # The full path is stored verbatim; ComfyUI's LoadImage resolves an
-    # absolute path outside its input folder.
     assert form.get_values()["input_image"] == "C:/Users/Example/Pictures/cat.png"
 
 

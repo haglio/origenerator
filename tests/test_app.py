@@ -27,7 +27,6 @@ from origenerator.app import (
     Library,
     _arm_the_crash_log,
     _configure_logging,
-    _ensure_comfyui_server,
     _file_what_comfyui_left,
     _fold_enhancements,
     _init_windows_taskbar_identity,
@@ -48,7 +47,7 @@ from origenerator.db import Database
 from origenerator.evolver_export import EvolverInbox
 from origenerator.fun_time_mode import OFFER_NAME
 from origenerator.gui.export_lane import GENAU
-from origenerator.gui.loading_screen import LoadingCanceled, loading_screen
+from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.output_places import OutputPlaces
 from tests.children import run_python
@@ -293,65 +292,6 @@ def test_init_windows_taskbar_identity_noop_off_windows():
     mock_stamp.assert_not_called()
 
 
-def test_ensure_server_warns_when_port_held_by_non_comfyui():
-    logger = MagicMock()
-    with patch("origenerator.comfyui_client.comfyui_responding", return_value=False), \
-         patch("socket.create_connection"), \
-         patch("importlib.util.spec_from_file_location") as mock_spec:
-        _ensure_comfyui_server(logger, "127.0.0.1", 8188, COMFYUI_DIR)
-
-    mock_spec.assert_not_called()
-    assert logger.warning.called
-    msg = logger.warning.call_args[0][0].lower()
-    assert "occupied" in msg or "not comfyui" in msg
-
-
-def test_ensure_server_noop_when_comfyui_already_responding():
-    logger = MagicMock()
-    with patch("origenerator.comfyui_client.comfyui_responding", return_value=True), \
-         patch("importlib.util.spec_from_file_location") as mock_spec:
-        _ensure_comfyui_server(logger, "127.0.0.1", 8188, COMFYUI_DIR)
-
-    mock_spec.assert_not_called()
-    logger.warning.assert_not_called()
-
-
-def test_ensure_server_forwards_status_and_pump_callbacks_to_launcher():
-    logger = MagicMock()
-    on_status = MagicMock()
-    pump_events = MagicMock()
-    fake_server = MagicMock()
-    fake_server.start.return_value = MagicMock(started=True, pid=4321, error=None)
-
-    with patch("origenerator.comfyui_client.comfyui_responding", return_value=False), \
-         patch("socket.create_connection", side_effect=OSError), \
-         patch("pathlib.Path.exists", return_value=True), \
-         patch("importlib.util.spec_from_file_location"), \
-         patch("importlib.util.module_from_spec", return_value=fake_server):
-        _ensure_comfyui_server(
-            logger, "127.0.0.1", 8188, COMFYUI_DIR,
-            on_status=on_status, pump_events=pump_events,
-        )
-
-    fake_server.start.assert_called_once()
-    kwargs = fake_server.start.call_args.kwargs
-    assert kwargs["on_status"] is on_status
-    assert kwargs["pump_events"] is pump_events
-
-
-def test_a_loading_canceled_while_comfyui_starts_is_no_failure_to_start_it():
-    fake_server = MagicMock()
-    fake_server.start.side_effect = LoadingCanceled
-
-    with patch("origenerator.comfyui_client.comfyui_responding", return_value=False), \
-         patch("socket.create_connection", side_effect=OSError), \
-         patch("pathlib.Path.exists", return_value=True), \
-         patch("importlib.util.spec_from_file_location"), \
-         patch("importlib.util.module_from_spec", return_value=fake_server), \
-         pytest.raises(LoadingCanceled):
-        _ensure_comfyui_server(MagicMock(), "127.0.0.1", 8188, COMFYUI_DIR)
-
-
 def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qapp):
     events = []
 
@@ -366,7 +306,7 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
          patch("origenerator.gui.loading_screen.loading_screen",
                side_effect=lambda *a, **k: events.append("loading opened") or loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
@@ -611,7 +551,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("shared_ui.foreground.bring_to_front",
                side_effect=lambda w: events.append(
                    "front:window" if w is window else "front:something else")), \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
@@ -634,7 +574,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
@@ -733,7 +673,7 @@ def test_main_reclaims_unreachable_trash_on_startup(qapp):
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash", return_value=trash), \
@@ -759,7 +699,7 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.app.resolve_comfyui_client_id", return_value="persisted-id"), \
          patch("origenerator.db.Database"), \
@@ -833,7 +773,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow",
                return_value=window) as mock_window, \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
@@ -881,7 +821,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen") as mock_loading, \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
@@ -1037,7 +977,7 @@ def _boot(library_path, argv=()):
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
-         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         assert main(list(argv)) == 0  # main hands the code back; __main__ exits with it
@@ -1220,7 +1160,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
     targets = {
         "origenerator.app._init_windows_taskbar_identity": DEFAULT,
         "origenerator.app._taskbar_identity": None,
-        "origenerator.app._ensure_comfyui_server": DEFAULT,
+        "origenerator.comfyui_launcher.ensure_comfyui_server": DEFAULT,
         "origenerator.gui.loading_screen.loading_screen": DEFAULT,
         "origenerator.gui.main_window.OrigeneratorWindow": DEFAULT,
         "origenerator.app_state.AppState": DEFAULT,
@@ -1622,7 +1562,7 @@ class TestASecondCopy:
 
         with _a_faked_boot([], **{
             "PyQt6.QtWidgets.QMessageBox.information": told,
-            "origenerator.app._ensure_comfyui_server": comfyui,
+            "origenerator.comfyui_launcher.ensure_comfyui_server": comfyui,
             "origenerator.gui.main_window.OrigeneratorWindow": window,
         }):
             code = main([])
@@ -1837,7 +1777,7 @@ with patch.object(app, "MAINTENANCE", ()), \\
         patch("origenerator.app._init_windows_taskbar_identity"), \\
         patch("origenerator.gui.link_listener.LinkListener"), \\
         patch("origenerator.app._taskbar_identity", return_value=None), \\
-        patch("origenerator.app._ensure_comfyui_server"), \\
+        patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \\
         patch("origenerator.app._disconnect", disconnected), \\
         patch("origenerator.comfyui_client.ComfyUIClient"), \\
         patch("origenerator.gui.loading_screen.loading_screen"), \\

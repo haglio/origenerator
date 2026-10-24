@@ -245,7 +245,7 @@ class GenerateConfigPanel(QWidget):
         self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
-        self._folder_generating = False
+        self._making_one = None
         self._launched_runs: list[str] = []            # the runs this tab's Generate started (see launched_runs)
         # The settings folder whose live run this tab's preview follows — its
         # own Generate's, or the run it was pointed at by a click on that
@@ -624,7 +624,7 @@ class GenerateConfigPanel(QWidget):
         images = self._missing_images()
         return ((_pick_installed_ones_first(models) if models else None)
                 or (_nothing_to_start_from(images) if images else None)
-                or (ALREADY_MAKING_ONE_TIP if self._folder_generating else None))
+                or (ALREADY_MAKING_ONE_TIP if self._folder_is_making_one() else None))
 
     def _why_the_item_cannot_be_remade(self) -> str | None:
         lost = self._lost_workflow()
@@ -653,10 +653,15 @@ class GenerateConfigPanel(QWidget):
     def set_how_many(self, count: int) -> None:
         self._how_many.set_how_many(count)
 
-    def note_folder_generating(self, generating: bool) -> None:
-        self._folder_generating = generating
+    def set_making_one_check(self, is_making_one) -> None:
+        self._making_one = is_making_one
+
+    def reread_generate_button(self) -> None:
         self._sync_generate()
         self.refresh_generate_caption()
+
+    def _folder_is_making_one(self) -> bool:
+        return self._making_one is not None and self._making_one(self.current_config())
 
     def _missing_images(self) -> list[str]:
         wf = workflow_named(self._workflow_combo.currentData())

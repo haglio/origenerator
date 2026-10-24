@@ -270,7 +270,7 @@ def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
         params_json=json.dumps({"input_image": "video/x_00001.mp4 [output]"}),
         workflow_json=json.dumps(graph),
     )
-    # A row whose graph loads no image (a text-to-image) has no source to recover.
+    # A row whose graph loads no image (a T2I) has no source to recover.
     db.insert_generation(
         prompt_id="t2i", workflow_name="sdxl_t2i", workflow_version="imported",
         params_json=json.dumps({"seed": 9}),
@@ -1120,7 +1120,7 @@ def test_backfill_fills_the_strength_each_wan_stage_ran_its_lora_at(tmp_path):
 
 
 def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
-    # WAN 2.2 text-to-image embeds no Wan conditioning node and no checkpoint, so
+    # WAN 2.2 T2I embeds no Wan conditioning node and no checkpoint, so
     # its EmptyHunyuanLatentVideo + ImageFromBatch + SaveImage signature is what
     # names it. The filename matches no workflow prefix, proving the graph alone
     # suffices. Prompts come from the CLIPTextEncode titles, the seed from the
@@ -1246,7 +1246,7 @@ _READ_AS = (
     (("UnetLoaderGGUF", "DualCLIPLoader"), "flux_t2i_upscaled"),
     (("FluxGuidance", "CheckpointLoaderSimple"), "flux_t2i_upscaled"),
     (("CheckpointLoaderSimple",), "sdxl_t2i"),
-    # A video latent that was NOT saved as an image is not text-to-image, and a
+    # A video latent that was NOT saved as an image is not T2I, and a
     # GGUF UNET without the dual encoders is not Flux: both fall through, and
     # the filename's guess (none, for this name) stands.
     (("EmptyHunyuanLatentVideo",), "unknown"),

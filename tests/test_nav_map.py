@@ -47,7 +47,7 @@ def test_the_seed_row_is_the_rest_of_the_items_own_settings_folder():
 
 
 def _video(prompt_id, prompt, *, noise_seed, frame, lora="lora_a", act=None):
-    """A WAN image-to-video row: its sampler seed is ``noise_seed``, so the
+    """A WAN I2V row: its sampler seed is ``noise_seed``, so the
     ``seed`` column a picture fills stays empty on it."""
     return {
         "prompt_id": prompt_id,

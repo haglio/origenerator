@@ -6,7 +6,7 @@ from origenerator.workflows.wan_experts import wan_expert_shift_param
 
 
 class Wan22T2iWorkflow(WorkflowTemplate):
-    """WAN 2.2 14B text-to-image, dual-noise (high/low) sampling.
+    """WAN 2.2 14B T2I, dual-noise (high/low) sampling.
 
     The WAN 2.2 T2V model has no still-image mode, so this coaxes one out of it:
     a tiny ``EmptyHunyuanLatentVideo`` is denoised by two ``KSamplerAdvanced``
@@ -25,7 +25,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
 
     name = "wan22_t2i"
     version = "v002"
-    display_name = "WAN 2.2 Text-to-Image"
+    display_name = "WAN 2.2 T2I"
     output_type = MediaType.IMAGE
     model_keys = ("unet_high", "unet_low")
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it

@@ -4,7 +4,7 @@ A queued job's own output is the one thing that doesn't exist yet, so a row can
 only be recognized by a picture of something *else*. Two somethings, and which
 one a row gets is decided by what the job is:
 
-* **What it is made from** — an image-to-video's start frame, an enhancement's
+* **What it is made from** — an I2V's start frame, an enhancement's
   original. Two queued videos off the same recipe are the same job in every
   respect but the frame they animate, so this is the whole of what tells them
   apart. A combine given a dropped video adds a second cell beside it: that

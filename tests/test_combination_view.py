@@ -33,7 +33,7 @@ def test_a_lone_picture_is_not_a_sum(qtbot, tmp_path):
 
 
 def test_a_run_made_from_nothing_draws_nothing(qtbot, tmp_path):
-    # A text-to-video has no picture to its name yet, and a stand-in would be a
+    # A T2V has no picture to its name yet, and a stand-in would be a
     # picture of something with nothing to do with it.
     assert combination_pixmap(Combination(), QSize(172, 160)) is None
     assert combination_pixmap(Combination(str(tmp_path / "gone.png")), QSize(172, 160)) is None

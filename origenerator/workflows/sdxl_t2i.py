@@ -12,7 +12,7 @@ from origenerator.workflows.model_files import ANY, list_model_files
 
 
 class SdxlT2iWorkflow(WorkflowTemplate):
-    """SDXL text-to-image, optionally finished by an upscale/enhance pass.
+    """SDXL T2I, optionally finished by an upscale/enhance pass.
 
     The base render is the plain SDXL recipe. With the ``enhance`` toggle on,
     its decode then runs the shared enhance tail
@@ -32,7 +32,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
 
     name = "sdxl_t2i"
     version = "v004"
-    display_name = "SDXL Text-to-Image"
+    display_name = "SDXL T2I"
     output_type = MediaType.IMAGE
     model_keys = ("checkpoint",)
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it

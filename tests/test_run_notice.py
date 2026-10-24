@@ -5,34 +5,34 @@ from origenerator.run_notice import RunOutcome, notice_for, outcome_of_row
 
 
 def test_a_video_over_in_seconds_is_not_worth_interrupting_for():
-    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=40.0, ok=True,
+    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 I2V", seconds=40.0, ok=True,
                          source=GenerationSource.GENERATED, generation="alpha-1")
     assert notice_for(outcome) is None
 
 
 def test_a_run_past_the_minute_says_what_landed_and_how_long_it_took():
-    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video",
+    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 I2V",
                          seconds=252.0, ok=True, source=GenerationSource.GENERATED,
                          generation="alpha-1")
     notice = notice_for(outcome)
     assert notice.title == "Video ready"
-    assert notice.body == "WAN 2.2 Image-to-Video · 4:12"
+    assert notice.body == "WAN 2.2 I2V · 4:12"
     assert notice.ok
 
 
 def test_a_long_run_that_died_says_so_rather_than_claiming_a_result():
-    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video",
+    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 I2V",
                          seconds=220.0, ok=False, source=GenerationSource.GENERATED,
                          generation="alpha-1")
     notice = notice_for(outcome)
     assert notice.title == "Video failed"
-    assert notice.body == "WAN 2.2 Image-to-Video · stopped after 3:40"
+    assert notice.body == "WAN 2.2 I2V · stopped after 3:40"
     assert not notice.ok
 
 
 def test_the_apps_own_background_work_interrupts_nobody():
     for source in (GenerationSource.EXPERIMENT, GenerationSource.BASE_RENDER):
-        outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video",
+        outcome = RunOutcome(kind="Video", recipe="WAN 2.2 I2V",
                              seconds=600.0, ok=True, source=source,
                              generation="alpha-1")
         assert notice_for(outcome) is None
@@ -46,20 +46,20 @@ def test_an_enhancement_interrupts_nobody_however_long_it_ran():
 
 
 def test_an_image_interrupts_nobody_however_long_it_ran():
-    outcome = RunOutcome(kind="Image", recipe="SDXL Text-to-Image", seconds=180.0, ok=True,
+    outcome = RunOutcome(kind="Image", recipe="SDXL T2I", seconds=180.0, ok=True,
                          source=GenerationSource.GENERATED, generation="alpha-1")
     assert notice_for(outcome) is None
 
 
 def test_a_notice_carries_the_item_a_click_on_it_should_open():
-    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=252.0,
+    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 I2V", seconds=252.0,
                          ok=True, source=GenerationSource.GENERATED,
                          generation="7f0c9b2e-1111-4444-8888-aaaabbbbcccc")
     assert notice_for(outcome).generation == "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
 
 
 def test_a_failed_run_points_at_the_item_too():
-    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=220.0,
+    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 I2V", seconds=220.0,
                          ok=False, source=GenerationSource.GENERATED, generation="beta-2")
     assert notice_for(outcome).generation == "beta-2"
 

@@ -270,11 +270,11 @@ RECOMMENDED: dict[str, str] = {
     ),
     "width": (
         "Good sizes: about one megapixel in all for SDXL, such as 832×1216, 1024×1024 "
-        "or 1216×832; up to about two for Flux and WAN 2.2 Text-to-Image."
+        "or 1216×832; up to about two for Flux and WAN 2.2 T2I."
     ),
     "height": (
         "Good sizes: about one megapixel in all for SDXL, such as 832×1216, 1024×1024 "
-        "or 1216×832; up to about two for Flux and WAN 2.2 Text-to-Image."
+        "or 1216×832; up to about two for Flux and WAN 2.2 T2I."
     ),
     "frame_count": (
         "A longer clip is made in pieces, each starting on the last frame of the one "

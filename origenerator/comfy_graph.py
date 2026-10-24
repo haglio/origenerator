@@ -168,7 +168,7 @@ def sound_params(graph: dict) -> dict:
 
 
 def input_image_name(graph: dict) -> str | None:
-    """The image filename an image-to-video graph loads, or ``None``.
+    """The image filename an I2V graph loads, or ``None``.
 
     i2v and flf2v graphs start from a single ``LoadImage`` whose ``image`` input
     names the source frame — the value the gallery links a video back to. Returns

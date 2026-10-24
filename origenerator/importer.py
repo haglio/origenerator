@@ -507,7 +507,7 @@ def _size_params(graph: dict) -> dict:
 
 
 def _input_image_params(graph: dict) -> dict:
-    """The image an image-to-video graph animated, when it names one."""
+    """The image an I2V graph animated, when it names one."""
     name = input_image_name(graph)
     return {} if name is None else {"input_image": name}
 
@@ -583,7 +583,7 @@ def _scalars(inputs: dict) -> dict:
 _GRAPH_SIGNATURES = (
     ("wan22_flf2v_loop", (frozenset({"WanFirstLastFrameToVideo"}),)),
     ("wan22_i2v", (frozenset({"WanImageToVideo"}),)),
-    # A Wan/Hunyuan video latent saved as a still image: text-to-image.
+    # A Wan/Hunyuan video latent saved as a still image: T2I.
     ("wan22_t2i", (frozenset({"EmptyHunyuanLatentVideo", "SaveImage"}),)),
     # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders and a
     # FluxGuidance node — none of which the other workflows use.

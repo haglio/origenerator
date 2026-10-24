@@ -17,7 +17,12 @@ from origenerator.comfy_graph import dual_sampler_model_files, graph_model_param
 from origenerator.gui.param_fields import clamped_number
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
 from origenerator.media import MediaType
-from origenerator.workflows import WORKFLOW_REGISTRY, base, offered_workflows
+from origenerator.workflows import (
+    RETIRED_WORKFLOW_NAMES,
+    WORKFLOW_REGISTRY,
+    base,
+    offered_workflows,
+)
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     RIFE_CHECKPOINT,
@@ -981,6 +986,13 @@ def test_a_tab_that_makes_nothing_yet_is_offered_the_workflows_of_both_kinds():
         *offered_workflows(makes=MediaType.IMAGE), *offered_workflows(makes=MediaType.VIDEO)}
 
 
+def test_every_workflow_name_says_t2i_i2v_and_t2v_rather_than_spelling_them_out():
+    names = [wf.display_name for wf in WORKFLOW_REGISTRY.values()]
+    spelled_out = re.compile(r"text-to-image|image-to-video|text-to-video", re.IGNORECASE)
+    assert [name for name in [*names, *RETIRED_WORKFLOW_NAMES.values()]
+            if spelled_out.search(name)] == []
+
+
 def test_enhance_keys_cover_every_param_only_the_tail_reads():
     # The gallery drops these from a row's identity, so an enhanced render shares
     # its unenhanced twin's folder. A tail param left off the list would silently
@@ -1279,7 +1291,7 @@ def test_a_videos_file_with_sound_is_listed_beside_its_soundless_copy(name):
                         "type": "output", "role": "silent"}
 
 
-# ---- WAN 2.2 I2V (dual-noise image-to-video) ----
+# ---- WAN 2.2 I2V (dual-noise) ----
 
 def test_wan22_i2v_default_params_has_required_keys():
     wf = Wan22I2vWorkflow()
@@ -1315,7 +1327,7 @@ def test_wan22_i2v_build_api_payload_structure():
     params["seed"] = 0
     payload = wf.build_api_payload(params)
 
-    # Image-to-video conditioning (NOT first-last-frame)
+    # I2V conditioning (NOT first-last-frame)
     i2v = _find_node(payload, "WanImageToVideo")
     assert i2v is not None
     assert i2v["inputs"]["length"] == params["frame_count"]
@@ -1695,7 +1707,7 @@ def test_sdxl_pose_transfer_extract_output_info():
     assert files[0]["filename"] == "sdxl_pose_transfer_00001_.png"
 
 
-# ---- WAN 2.2 T2I (dual-noise text-to-image) ----
+# ---- WAN 2.2 T2I (dual-noise) ----
 
 def test_wan22_t2i_is_registered_as_an_image_workflow():
     assert WORKFLOW_REGISTRY["wan22_t2i"].__class__ is Wan22T2iWorkflow
@@ -1731,7 +1743,7 @@ def test_wan22_t2i_build_api_payload_structure():
     def src(ref):  # resolve a [node_id, slot] link to its source node
         return payload[ref[0]]
 
-    # A bare video latent is the canvas — text-to-image, so no input image and
+    # A bare video latent is the canvas — T2I, so no input image and
     # none of the video conditioning the i2v/flf2v workflows use.
     latent = _find_node(payload, "EmptyHunyuanLatentVideo")
     assert latent["inputs"]["width"] == params["width"]
@@ -1792,7 +1804,7 @@ def test_wan22_t2i_extract_output_info():
     assert files[0]["filename"] == "wan22_t2i_00026_.png"
 
 
-# ---- Flux text-to-image, GGUF UNET, with a RealESRGAN upscale pass ----
+# ---- Flux T2I, GGUF UNET, with a RealESRGAN upscale pass ----
 
 def test_flux_t2i_upscaled_is_registered_as_an_image_workflow():
     assert WORKFLOW_REGISTRY["flux_t2i_upscaled"].__class__ is FluxT2iUpscaledWorkflow
@@ -2436,9 +2448,8 @@ def test_a_wan_2_2_form_offers_one_composition_focus_for_both_passes(name):
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
-def test_a_workflow_is_named_in_words_rather_than_model_card_shorthand(name):
-    assert not re.search(r"\b(I2V|T2V|FLF2V|ATI|T2I|I2I|S2V)\b",
-                         WORKFLOW_REGISTRY[name].display_name)
+def test_a_workflow_name_uses_no_model_card_shorthand_but_t2i_i2v_and_t2v(name):
+    assert not re.search(r"\b(FLF2V|ATI|I2I|S2V)\b", WORKFLOW_REGISTRY[name].display_name)
 
 
 def test_wan22_i2v_stages_take_their_own_prompt_strength_with_no_shared_one():

@@ -603,10 +603,10 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
     top = _top_level(view._tree)
     assert set(top) == {"All"}
     assert _collection_names(top["All"]) == _COLLECTION_NAMES
-    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 Image-to-Video"}
+    assert set(_workflow_rows(view._tree)) == {"SDXL T2I", "WAN 2.2 I2V"}
 
     workflow_node = _image_workflow(view._tree)
-    assert workflow_node.text(0) == "SDXL Text-to-Image"
+    assert workflow_node.text(0) == "SDXL T2I"
     # workflow -> one model -> its "(no LoRA)" level -> one settings folder, into
     # which the two seed variants collapse.
     assert len(_subs(workflow_node)) == 1           # one model
@@ -763,7 +763,7 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     # The title carries the full breadcrumb, which the narrow tree truncates.
-    assert "SDXL Text-to-Image" in view._folder_path.display_text()
+    assert "SDXL T2I" in view._folder_path.display_text()
     assert "All" in view._folder_path.display_text()
 
 
@@ -982,7 +982,7 @@ def test_the_tree_selection_is_what_the_search_covers(qtbot):
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["v1"]
-    assert "Image-to-Video" in view._folder_path.display_text()  # the header says where it looked
+    assert "I2V" in view._folder_path.display_text()  # the header says where it looked
 
 
 def test_picking_another_folder_re_asks_the_search_there(qtbot):
@@ -1142,7 +1142,7 @@ def test_images_shows_its_collections_then_its_workflow_folders_as_squares(qtbot
 
     view._tree.setCurrentItem(_alls(view._tree)["Images"])
 
-    assert _square_names(view) == [*_COLLECTION_NAMES, "SDXL Text-to-Image"]
+    assert _square_names(view) == [*_COLLECTION_NAMES, "SDXL T2I"]
 
 
 def test_videos_once_favorited_is_a_square_in_alls_favorites(qtbot, monkeypatch):
@@ -2243,14 +2243,14 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     view.refresh()
     # Unreviewed, but already filed in the tree — the collection is a queue over it,
     # not a holding pen outside it.
-    assert "SDXL Text-to-Image" in _workflow_rows(view._tree)
+    assert "SDXL T2I" in _workflow_rows(view._tree)
 
     view._on_experiment_verdict("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert view.visible_prompt_ids() == []          # reviewed: out of the collection...
-    assert "SDXL Text-to-Image" in _workflow_rows(view._tree)       # ...and still in its folder
+    assert "SDXL T2I" in _workflow_rows(view._tree)       # ...and still in its folder
 
 
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
@@ -2546,7 +2546,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
     view.restore_from_trash(["p1"])
 
-    assert "SDXL Text-to-Image" in _workflow_rows(view._tree)      # back in the tree...
+    assert "SDXL T2I" in _workflow_rows(view._tree)      # back in the tree...
     assert view.visible_prompt_ids() == ["p1"]     # ...and landed on, not left in the collection
     assert view._db.list_deletions() == []
 
@@ -3732,13 +3732,13 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     assert set(_top_level(view._tree)) == {"All"}
-    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image"}
+    assert set(_workflow_rows(view._tree)) == {"SDXL T2I"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 Image-to-Video"}
+    assert set(_workflow_rows(view._tree)) == {"SDXL T2I", "WAN 2.2 I2V"}
 
 
 def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
@@ -16084,7 +16084,7 @@ def test_the_words_of_a_request_never_reach_the_fix_matcher(
 
 def test_a_request_item_links_back_to_what_it_was_asked_about(
         qtbot, tmp_path, monkeypatch):
-    # In the source tile, the same slot an image-to-video's start frame uses.
+    # In the source tile, the same slot an I2V's start frame uses.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._slideshows.showing.close()

@@ -494,17 +494,17 @@ def test_a_slideshow_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, t
 def test_a_new_set_lands_the_funestra_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+    slideshow.play(_ITEMS, start=2, shuffle=in_order)
 
-    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE three.png", "RELOAD_PLAYLIST"]
+    assert _sent(slideshow) == ["SET_PACE 4", "PLAY_FILE three.png", "RELOAD_PLAYLIST"]
 
 
 def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="three.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+    slideshow.play(_ITEMS, start=2, shuffle=in_order)
 
-    assert _sent(slideshow) == ["SET_PACE 0", "RELOAD_PLAYLIST"]
+    assert _sent(slideshow) == ["SET_PACE 4", "RELOAD_PLAYLIST"]
 
 
 def test_the_slideshow_names_the_generation_it_is_locked_on(qtbot, tmp_path):
@@ -1322,12 +1322,6 @@ def test_an_item_nothing_is_being_made_of_holds_for_the_whole_pace(qtbot, tmp_pa
 
     _says(slideshow, video="two.png")
     slideshow.tick()
-
-    assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
-
-
-def test_an_item_being_made_under_a_pace_of_nought_is_held_like_any_other(qtbot, tmp_path):
-    slideshow = _being_enhanced_on_screen(qtbot, tmp_path, image_dwell_ms=0)
 
     assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
 

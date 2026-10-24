@@ -91,6 +91,16 @@ def _funestra_says(channel: FunestraChannel, *, loads: int = 1, idle: bool = Fal
         "".join(f"{key}={value}\n" for key, value in lines.items()), encoding="utf-8")
 
 
+def _recording_the_lock_into(asked: list) -> SlideshowActions:
+    return SlideshowActions(favorite=lambda pid: asked.append(("star", pid)),
+                            enhance=lambda pid: asked.append(("enhance", pid)) or True,
+                            lock=lambda pid: asked.append(("lock", pid)))
+
+
+def _the_whole_lock_on(prompt_id: str) -> list[tuple[str, str]]:
+    return [("star", prompt_id), ("enhance", prompt_id), ("lock", prompt_id)]
+
+
 def _slideshow_with_the_funestra_on(qtbot, tmp_path, **status) -> FunestraSlideshow:
     slideshow = _slideshow(qtbot, tmp_path)
     _says(slideshow, **status)
@@ -315,14 +325,11 @@ def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path
     and the slideshow favorites it, asks for the better version, and hands it to the
     gallery to open."""
     asked = []
-    actions = SlideshowActions(favorite=lambda pid: asked.append(("star", pid)),
-                               enhance=lambda pid: asked.append(("enhance", pid)) or True,
-                               lock=lambda pid: asked.append(("lock", pid)))
-    slideshow = _slideshow(qtbot, tmp_path, actions=actions)
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
 
     slideshow.slideshow_toggle_lock()
 
-    assert asked == [("star", "id-1"), ("enhance", "id-1"), ("lock", "id-1")]
+    assert asked == _the_whole_lock_on("id-1")
 
 
 def test_locking_an_item_whose_enhancement_is_waiting_still_asks_so_it_goes_first(
@@ -435,15 +442,36 @@ def test_the_panel_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path
         "portrait_shuffle", "portrait_latest", "portrait_cycle_version"]
 
 
-def test_a_map_click_plays_that_item_and_a_double_click_locks_it(qtbot, tmp_path):
-    """The same jump a click makes on a Funestra's own map, and the same lock its
-    double-click takes."""
-    slideshow = _slideshow(qtbot, tmp_path)
+def test_a_double_click_on_the_map_gives_that_item_the_lock_buttons_whole_lock(qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
     _sent(slideshow)
 
     slideshow.show_item("three.png", lock=True)
+    sent = _sent(slideshow)
+    _says(slideshow, video="three.png", locked=True)
+    slideshow.tick()
 
-    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON"]
+    assert sent == ["PLAY_FILE three.png", "LOCK_ON"]
+    assert asked == _the_whole_lock_on("id-3")
+
+
+def test_a_double_click_on_the_map_moves_a_lock_held_on_another_item_onto_that_one(
+        qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+    slideshow.slideshow_toggle_lock()
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+    _sent(slideshow)
+
+    slideshow.show_item("three.png", lock=True)
+    sent = _sent(slideshow)
+    _says(slideshow, video="three.png", locked=True)
+    slideshow.tick()
+
+    assert sent == ["LOCK_OFF", "PLAY_FILE three.png", "LOCK_ON"]
+    assert asked == _the_whole_lock_on("id-1") + _the_whole_lock_on("id-3")
 
 
 def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
@@ -569,10 +597,7 @@ def test_a_slideshow_picked_back_up_locked_locks_the_funestra_on_its_slide(qtbot
 
 def test_a_lock_picked_back_up_is_the_lock_alone(qtbot, tmp_path):
     asked = []
-    actions = SlideshowActions(favorite=lambda pid: asked.append(("star", pid)),
-                               enhance=lambda pid: asked.append(("enhance", pid)) or True,
-                               lock=lambda pid: asked.append(("lock", pid)))
-    slideshow = _slideshow(qtbot, tmp_path, actions=actions)
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
 
     slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-2", locked=True))
 

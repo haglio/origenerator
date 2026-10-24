@@ -877,8 +877,8 @@ class JobQueue(QObject):
 
     def _start_from(self, job: GenerationJob, start_image: str):
         job.start_from(start_image)
-        self._db.set_recipe(job.prompt_id, params_json=json.dumps(job.params),
-                            workflow_json=json.dumps(job.payload))
+        self._db.set_params_and_workflow(job.prompt_id, params_json=json.dumps(job.params),
+                                         workflow_json=json.dumps(job.payload))
 
     def _on_failed(self, key, job, message):
         ended = [(key, job, message)] + [

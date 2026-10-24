@@ -6,20 +6,29 @@ import json
 import pytest
 
 from origenerator.voice import hosted
+from origenerator.voice.app_commands import AppCommand, match_app_command, spoken_phrases
 from origenerator.voice.commands import hosted_phrases
 from origenerator.voice.dictation import LEAD_WORDS, request_bias
 
 
-def test_a_hosting_session_is_told_the_phrases_the_words_that_open_a_request_and_the_hint():
+def _told() -> dict:
     out = io.StringIO()
-
     hosted.main(out)
+    return json.loads(out.getvalue())
 
-    assert json.loads(out.getvalue()) == {
+
+def test_a_hosting_session_is_told_the_phrases_the_openers_the_hint_and_the_words_for_the_lock():
+    assert _told() == {
         "phrases": sorted(hosted_phrases()),
         "openers": list(LEAD_WORDS),
         "speech_hint": request_bias(),
+        "lock_phrases": sorted(phrase for phrase in spoken_phrases()
+                               if match_app_command(phrase) is AppCommand.LOCK),
     }
+
+
+def test_the_words_for_the_lock_a_hosting_session_is_told_of_take_in_hold():
+    assert {"lock", "hold"} <= set(_told()["lock_phrases"])
 
 
 def test_a_hosting_session_hears_the_word_that_opens_a_request():

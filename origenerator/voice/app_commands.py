@@ -291,8 +291,11 @@ for _bar in _BARS:
 def phrases_heard_only_outright() -> frozenset[str]:
     """What a recognizer's near miss is never repaired into: the switch with no spoken way
     back, and the word that takes a picture away."""
-    return frozenset(phrase for phrase in spoken_phrases()
-                     if _PHRASES[phrase] in (AppCommand.MIC_OFF, AppCommand.CULL))
+    return phrases_for(AppCommand.MIC_OFF, AppCommand.CULL)
+
+
+def phrases_for(*commands: AppCommand) -> frozenset[str]:
+    return frozenset(phrase for phrase in spoken_phrases() if _PHRASES[phrase] in commands)
 
 
 def spoken_phrases() -> frozenset[str]:

@@ -167,6 +167,17 @@ def installed_models(tmp_path, monkeypatch):
     return ModelTree(tmp_path)
 
 
+@pytest.fixture
+def titled_models(tmp_path, monkeypatch):
+    path = tmp_path / "model_titles.json"
+    monkeypatch.setattr(config, "MODEL_TITLES_PATH", path)
+
+    def write(titles: dict[str, str]) -> None:
+        path.write_text(json.dumps(titles), encoding="utf-8")
+
+    return write
+
+
 class FakeVoiceSteering(QObject):
     """Stands in for VoiceSteering so no test ever opens a real microphone.
 

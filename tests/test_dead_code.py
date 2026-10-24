@@ -387,7 +387,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # kept in, and the docstrings about one output folder went with it.
 # 17140 when a tab's Workflow dropdown came to list only the workflows that make
 # what the tab makes, taken down to what the tree measured.
-MAX_PROSE_LINES = 17140
+# 17130 when the dropdowns, the TOC and the Enhancement levels came to name a
+# model by its title, taken down to what the tree measured.
+MAX_PROSE_LINES = 17130
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

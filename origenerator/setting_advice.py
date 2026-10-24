@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import NamedTuple
 
 from origenerator.content import load_content
-from origenerator.gallery.labels import model_file_name
+from origenerator.model_titles import model_title
 from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef
 from origenerator.workflows.duration import seconds_for_frames
 from origenerator.workflows.model_files import is_no_lora
@@ -117,7 +117,7 @@ def not_installed_advice(missing: dict[str, str], definitions, defaults: dict) -
 def _installed_in_place_of(chosen: str, options: list, default) -> Advice:
     fix = default if default in options else options[0]
     return Advice("Not installed anymore, so nothing can be made with it.", chosen, fix,
-                  model_file_name)
+                  model_title)
 
 
 def _good_ranges(params: dict, definitions) -> dict[str, _Range]:

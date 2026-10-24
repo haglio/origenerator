@@ -18,6 +18,7 @@ from origenerator.gui.param_help import option_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.seed_combo import SeedComboBox
+from origenerator.model_titles import option_title
 from origenerator.seed_history import SeedHistory
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
@@ -207,21 +208,18 @@ class _Presets(FieldKind):
 class _Choice(FieldKind):
     def make(self, pd):
         widget = NoWheelComboBox()
-        for row, option in enumerate(pd.options or []):
-            widget.addItem(option)
-            widget.setItemData(row, option_help(pd.key, option) or None,
-                               Qt.ItemDataRole.ToolTipRole)
-        _select_combo_value(widget, str(pd.default))
+        offer_options(widget, pd.options or [], lambda option: option_help(pd.key, option))
+        choose_option(widget, str(pd.default))
         return widget
 
     def change_signal(self, widget):
         return widget.currentIndexChanged
 
     def read(self, pd, widget):
-        return widget.currentText()
+        return widget.currentData()
 
     def write(self, pd, widget, value):
-        _select_combo_value(widget, str(value))
+        choose_option(widget, str(value))
 
 
 _KINDS: dict[ParamType, FieldKind] = {
@@ -249,18 +247,22 @@ def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = No
     return _KINDS[pd.type]
 
 
-def _select_combo_value(combo: QComboBox, value: str):
+def offer_options(combo: QComboBox, options, tip=lambda _option: None) -> None:
+    for option in options:
+        combo.addItem(option_title(option), option)
+        combo.setItemData(combo.count() - 1, tip(option) or None, Qt.ItemDataRole.ToolTipRole)
+
+
+def choose_option(combo: QComboBox, value: str):
     """Show ``value`` in ``combo``, offering it as a new option if it isn't one.
 
     A workflow default or a reused choice (e.g. a LoRA whose file is gone) may
     not be among the scanned options; adding it keeps the combo faithful to the
     value it was given instead of snapping to whatever sorts first.
     """
-    idx = combo.findText(value)
-    if idx < 0:
-        combo.addItem(value)
-        idx = combo.findText(value)
-    combo.setCurrentIndex(idx)
+    if combo.findData(value) < 0:
+        offer_options(combo, [value])
+    combo.setCurrentIndex(combo.findData(value))
 
 
 def grey_out_of_reach(pd: ParamDef, widget: PresetComboBox) -> None:

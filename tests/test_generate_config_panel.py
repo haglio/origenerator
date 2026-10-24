@@ -2323,7 +2323,7 @@ def test_picking_an_installed_model_brings_generate_back(installed_models, saved
     checkpoint = panel._param_form._widgets["checkpoint"]
 
     checkpoint.setCurrentIndex(
-        checkpoint.findText(WORKFLOW_REGISTRY["sdxl_t2i"].default_params()["checkpoint"]))
+        checkpoint.findData(WORKFLOW_REGISTRY["sdxl_t2i"].default_params()["checkpoint"]))
 
     assert panel._generate_pair.isEnabled()
     assert _note(panel) == ""
@@ -3296,6 +3296,11 @@ def recommended(monkeypatch):
     return models
 
 
+def _pick_model(panel, file_name):
+    checkpoint = panel._param_form._widgets["checkpoint"]
+    checkpoint.setCurrentIndex(checkpoint.findData(file_name))
+
+
 def _drawing_settings(panel):
     values = panel._param_form.get_values()
     return values["sampler_name"], values["scheduler"], values["steps"], values["cfg"]
@@ -3311,7 +3316,7 @@ def test_picking_another_model_for_a_fresh_picture_takes_that_models_settings(
         blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 
-    blank_panel._param_form._widgets["checkpoint"].setCurrentText("example_other.safetensors")
+    _pick_model(blank_panel, "example_other.safetensors")
 
     assert _drawing_settings(blank_panel) == ("dpmpp_2m", "karras", 35, 5.0)
 
@@ -3322,7 +3327,7 @@ def test_picking_another_model_for_a_shown_picture_keeps_its_settings(recommende
     panel.show_saved_generation(image, [image])
     shown = _drawing_settings(panel)
 
-    panel._param_form._widgets["checkpoint"].setCurrentText("example_other.safetensors")
+    _pick_model(panel, "example_other.safetensors")
 
     assert _drawing_settings(panel) == shown
 
@@ -3369,7 +3374,7 @@ def test_a_settings_tooltip_says_the_range_its_models_page_holds_it_to(blank_pan
 def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 
-    blank_panel._param_form._widgets["checkpoint"].setCurrentText("example_other.safetensors")
+    _pick_model(blank_panel, "example_other.safetensors")
 
     tips = {key: blank_panel._param_form._widgets[key].toolTip() for key in ("steps", "cfg")}
     assert tips["steps"].endswith(" Other Model's page recommends 30–40 steps.")

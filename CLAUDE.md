@@ -127,6 +127,19 @@ The near miss that still counts: tightening a signature so an unfamiliar file
 lands in a family rather than in `None` — a confident wrong answer hides the
 model, where the honest shrug only leaves it listed.
 
+## A model is shown by its title, and installing one gives it its title
+
+The dropdowns, the TOC and the Enhancement levels name a model or LoRA file by
+its title (`model_titles.model_title`): the name its page on Civitai or Hugging
+Face gives it, tidied, with the version, the expert half and the precision where
+two files would otherwise read alike. Titles live in `model_titles.json` beside
+the library's records (`config.MODEL_TITLES_PATH`), keyed by the file's name
+without its extension, and outside the repo, since many of them name what the
+library holds. A file with no title is shown by its name, and a fix's LoRA by
+its fix and when it was trained. So an agent installing a model writes its title
+there in the same piece of work: the user asked for titles in place of
+filenames (2026-10-24), and a model added without one is the filename again.
+
 ## What a generation shows is said by hand, never read off its prompt
 
 Two columns answer it and nothing else does: a picture's `picture_state`, set in

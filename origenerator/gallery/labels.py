@@ -1,7 +1,7 @@
 """Human-facing folder names: how each tier of the tree is labelled for display.
 
 Turns a row's raw params into the short strings the gallery shows — a workflow's
-display name, the cleaned model/LoRA filenames, a settings group's prompt-led
+display name, the model and LoRA files' titles, a settings group's prompt-led
 description, a Generate tab's default title, and a source image's folder name.
 Pure presentation over the identity layer.
 
@@ -30,10 +30,8 @@ from origenerator.gallery.signatures import (
     workflow_output_type,
 )
 from origenerator.media import MediaType
+from origenerator.model_titles import model_title
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES
-
-# File extensions stripped from a model filename to make a tidy folder label.
-MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
 
 MEDIA_LABELS = {MediaType.IMAGE: "Images", MediaType.VIDEO: "Videos"}
 
@@ -46,29 +44,20 @@ def workflow_label(workflow_name: str | None) -> str:
     return RETIRED_WORKFLOW_NAMES.get(workflow_name or "") or workflow_name or "unknown"
 
 
-def model_file_name(value) -> str:
-    """A model file's display form: final path segment, model extension stripped."""
-    base = _basename(str(value))
-    for ext in MODEL_EXTS:
-        if base.lower().endswith(ext):
-            return base[: -len(ext)]
-    return base
-
-
 def _joined_file_label(keys: tuple[str, ...], params: dict, fallback: str) -> str:
-    """Join the cleaned filenames a row recorded for ``keys``, else ``fallback``.
+    """Join the titles of the files a row recorded for ``keys``, else ``fallback``.
 
     Shared by the model and LoRA folder labels: both name a folder after one or
     more model-file params, differing only in which keys and the empty fallback.
     """
-    parts = [model_file_name(params[key]) for key in keys if params.get(key)]
+    parts = [model_title(params[key]) for key in keys if params.get(key)]
     return " / ".join(parts) or fallback
 
 
 def model_label(workflow_name: str | None, params: dict) -> str:
     """Human-facing folder name for the model a row used.
 
-    Joins each model param's cleaned filename. Falls back to ``"(unknown
+    Joins each model param's file's title. Falls back to ``"(unknown
     model)"`` when the workflow declares no model keys or the row recorded none
     of their values (e.g. an imported file whose graph didn't carry the model).
     """
@@ -78,7 +67,7 @@ def model_label(workflow_name: str | None, params: dict) -> str:
 def lora_label(workflow_name: str | None, params: dict) -> str:
     """Human-facing folder name for the LoRA(s) a row used.
 
-    Joins each LoRA param's cleaned filename. Falls back to ``"(no LoRA)"`` when
+    Joins each LoRA param's file's title. Falls back to ``"(no LoRA)"`` when
     the row recorded no LoRA — none of the values (e.g. an older import that
     didn't carry the LoRA), or the "None" sentinel a run chose to bypass it.
     """

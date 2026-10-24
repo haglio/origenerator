@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from origenerator.model_titles import model_title
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detail_fixes_of, fix_prompts
 
@@ -146,5 +147,5 @@ def describe_enhance_params(params: dict) -> str:
                                for name, value in fixes.items()))
     checkpoint = params.get("checkpoint")
     if checkpoint and checkpoint != MATCH_SOURCE_MODEL:
-        bits.append(str(checkpoint))
+        bits.append(model_title(checkpoint))
     return " · ".join(bits)

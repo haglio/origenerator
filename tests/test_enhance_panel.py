@@ -606,6 +606,16 @@ def test_a_model_no_longer_installed_is_still_shown(qtbot):
     assert panel.settings().params["checkpoint"] == "retired_v1.safetensors"
 
 
+def test_the_model_picker_shows_a_files_title_and_keeps_its_name(qtbot, titled_models):
+    titled_models({"example_model": "Example Model v2"})
+    panel, _ = _panel(qtbot)
+
+    panel.show_settings(EnhanceSettings(params={"checkpoint": "example_model.safetensors"}))
+
+    assert panel._model.currentText() == "Example Model v2"
+    assert panel.settings().params["checkpoint"] == "example_model.safetensors"
+
+
 def test_settings_survive_a_load_and_read_back(qtbot):
     panel, _ = _panel(qtbot)
     original = EnhanceSettings(auto=True, params=dict(default_enhance_params(),
@@ -1599,16 +1609,18 @@ def test_each_fixs_edit_button_checkbox_name_and_value_sit_inside_one_thin_gray_
     assert len(frames) == len(panel._fix_prompt_buttons)
 
 
-def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, monkeypatch):
+def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, monkeypatch,
+                                                                    titled_models):
     monkeypatch.setattr(enhance_panel_module, "list_lora_files",
                         lambda fallback, accepts: ["None", "my_hands.safetensors"])
+    titled_models({"my_hands": "My Hands v1"})
     panel, edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
 
     assert [window.lora.itemText(i) for i in range(window.lora.count())] == [
-        "None", "my_hands.safetensors"]
-    window.lora.setCurrentText("my_hands.safetensors")
+        "None", "My Hands v1"]
+    window.lora.setCurrentIndex(window.lora.findData("my_hands.safetensors"))
     window.strength.setValue(0.7)
     window.accept()
 

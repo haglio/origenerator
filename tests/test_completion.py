@@ -152,3 +152,21 @@ def test_a_script_that_cannot_be_written_never_strands_a_finished_video(tmp_path
         I2V, _video_history("19", "images", video.name), OutputPlaces.in_one_folder(out), tmp_path / "thumbs", "n1")
 
     assert files == [{"filename": video.name, "subfolder": "video"}]
+
+
+def test_a_finished_run_is_filed_in_the_library_before_its_thumbnail_is_drawn(tmp_path):
+    library = tmp_path / "library"
+    places = OutputPlaces(comfyui=tmp_path / "comfyui saves", pictures=library / "pictures",
+                          videos=library / "videos", scripts=library / "scripts",
+                          audio=library / "sounds")
+    waiting = places.run("n1") / "image"
+    waiting.mkdir(parents=True)
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(waiting / "sdxl_t2i_00001_.png")
+    history = {"outputs": {"7": {"images": [
+        {"filename": "sdxl_t2i_00001_.png", "subfolder": "origenerator/n1/image", "type": "output"}]}}}
+
+    files, thumb, _duration = extract_completion(SDXL, history, places, tmp_path / "thumbs", "n1")
+
+    assert files == [{"filename": "sdxl_t2i_00001_.png", "subfolder": "image", "type": "output"}]
+    assert (places.pictures / "sdxl_t2i_00001_.png").is_file()
+    assert thumb is not None and Path(thumb).is_file()

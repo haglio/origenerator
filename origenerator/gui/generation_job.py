@@ -28,6 +28,7 @@ from origenerator import provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, SPEECH_PYTHON, THUMB_DIR
 from origenerator.generation_state import GenerationSource
+from origenerator.library_filing import forget_the_runs_copies, handed_to_comfyui
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
 from origenerator.thumbnail import frame_thumbnail
@@ -115,7 +116,7 @@ class GenerationJob(QObject):
 
     def __init__(self, client, workflow, params, *, source=GenerationSource.GENERATED,
                  places=OUTPUT_PLACES, thumb_dir=THUMB_DIR, input_dir=COMFYUI_INPUT_DIR,
-                 speaker=None, parent=None):
+                 speaker=None, prompt_id=None, parent=None):
         super().__init__(parent)
         self._client = client
         self.workflow = workflow
@@ -129,8 +130,10 @@ class GenerationJob(QObject):
         # the DB row) so the controller can tell a preemptible experiment from
         # user work it must never cancel.
         self.source = source
-        self.payload = workflow.build_api_payload(self.params)
-        self.prompt_id = str(uuid.uuid4())  # our id; also ComfyUI's, and the DB row key
+        self.prompt_id = prompt_id or str(uuid.uuid4())  # also ComfyUI's id, and the DB row key
+        self._handed = handed_to_comfyui(
+            workflow.build_api_payload(self.params), places, self.prompt_id)
+        self.payload = self._handed.payload
         # Which run this job belongs to. Its own prompt normally — but a chained
         # i2v is two prompts that are one run to whoever asked for it, so the
         # second stage is given the first's id (see JobQueue._launch).
@@ -310,8 +313,7 @@ class GenerationJob(QObject):
         last ran) seeds the resumed job's progress, so the bar shows its last position
         at once instead of an indeterminate spin until ComfyUI's next per-step push.
         """
-        job = cls(client, workflow, params, **kwargs)
-        job.prompt_id = prompt_id
+        job = cls(client, workflow, params, prompt_id=prompt_id, **kwargs)
         if progress_state:
             job._restore_progress(progress_state)
         job._attach()
@@ -330,8 +332,7 @@ class GenerationJob(QObject):
         have reached the server's last node after all, and its first start asks
         after that run rather than making the same picture again.
         """
-        job = cls(client, workflow, params, **kwargs)
-        job.prompt_id = prompt_id
+        job = cls(client, workflow, params, prompt_id=prompt_id, **kwargs)
         job._sent_before = True
         return job
 
@@ -370,6 +371,7 @@ class GenerationJob(QObject):
                 if history is not None:
                     landed.append(history)
                     return
+            self._handed.copy_reads()
             self._client.submit_job(self.payload, self.prompt_id)
 
         try:
@@ -428,6 +430,7 @@ class GenerationJob(QObject):
         self._detach()
         self._stop_on_server()
         self._state = JobState.CANCELED
+        forget_the_runs_copies(self._places, self.prompt_id)
 
     def defer(self) -> bool:
         """Take the job off the server to be sent again later, and say whether
@@ -592,6 +595,7 @@ class GenerationJob(QObject):
             return
         self._detach()
         self._state = JobState.FAILED
+        forget_the_runs_copies(self._places, self.prompt_id)
         self.failed.emit(message)
 
 

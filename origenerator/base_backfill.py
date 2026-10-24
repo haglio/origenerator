@@ -40,6 +40,7 @@ from origenerator.config import OUTPUT_PLACES, THUMB_DIR
 from origenerator.gallery.output import is_in_progress
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.inflight import drop_in_flight
+from origenerator.library_filing import handed_to_comfyui
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -204,7 +205,9 @@ def render_base_now(client, workflow, params: dict, *,
     ``now`` and ``sleep`` are injected so the wait can be tested without one.
     """
     prompt_id = str(uuid.uuid4())
-    client.submit_job(workflow.build_api_payload(params), prompt_id)
+    handed = handed_to_comfyui(workflow.build_api_payload(params), OUTPUT_PLACES, prompt_id)
+    handed.copy_reads()
+    client.submit_job(handed.payload, prompt_id)
     deadline = now() + RENDER_TIMEOUT_SECONDS
     while now() < deadline:
         sleep(RENDER_POLL_SECONDS)

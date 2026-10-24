@@ -151,10 +151,35 @@ fix in the sorting window, not in code. The near miss that still counts: a
 is exactly the shape that was removed, and it leaves one question with two
 answers again.
 
+## Where ComfyUI saves, and how an output reaches the library
+
+ComfyUI saves into a folder of its own (`comfyui_output_dir` in the settings
+all of Haglio shares), outside the library, and refuses to save into or read
+from anything a link inside that folder points at (its realpath check, since
+2026-07-02). So each run saves into `origenerator/<prompt id>/` there
+(`library_filing.handed_to_comfyui`, which also copies every past output or
+picked picture the run reads into that run's `reads/` and points the graph at
+the copy), and completion files each finished file into the library folder its
+kind is kept in (`file_into_library`; the kinds are `OutputPlaces`, read from
+the settings), numbered after the highest number already there, which is the
+name ComfyUI itself would have given it when it saved straight into the
+library. A record keeps naming its file by kind (`image`, `video`, ...), so
+every row made before this resolves unchanged. At launch,
+`file_what_comfyui_left` files what a run nobody finished, or another program,
+left in ComfyUI's folder.
+
+That folder still holds four links from the old scheme (`image`, `video`,
+`audio`, `funscript`, into the library). ComfyUI refuses them, nothing of this
+app's uses them, and they stay for a checkout older than this change: such a
+copy resolves its records through them, and with them gone, the first real
+folder of those names that a save created would read to its startup repair as
+every picture having vanished from a folder that still holds files. Removing
+them is safe only once no checkout that old can be started.
+
 ## A video's filename is not the video
 
-ComfyUI numbers a video from the files already in its output folder, so
-deleting the newest video gives its filename to the next one, and two videos
+A finished video is numbered after the highest number already in the folder it
+is filed in, so deleting the newest video gives its filename to the next one, and two videos
 can share a name: in two folders, or in one folder as an mp4 and a webm. So a
 script is filed where its video is, under the video's whole filename
 (`funscript_path_for`), and moves with the video when the app follows a move;

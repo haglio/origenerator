@@ -17,6 +17,7 @@ from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import synthesize_funscript
 from origenerator.gallery.output import output_file_path
 from origenerator.generation_state import GenerationStatus
+from origenerator.library_filing import file_into_library
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
@@ -25,22 +26,22 @@ from origenerator.timing import execution_duration_seconds
 logger = logging.getLogger(__name__)
 
 
-def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: Path, name):
+def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: Path, prompt_id):
     """Return ``(output_files, thumbnail_path | None, duration | None)`` for a run.
 
-    ``output_files`` is drawn from ``history_data`` via the workflow's own output
-    node; the thumbnail is rendered from the first file that exists on disk (named
-    by ``name`` so it's uniquely owned); ``duration`` is parsed from the history's
-    execution timestamps. The thumbnail and duration are best-effort — a failure
-    in either yields ``None`` rather than stranding an otherwise-finished run.
+    ``output_files`` come from the workflow's own output node, filed into the
+    library; the thumbnail is drawn from the first file on disk, named by the
+    run's id; ``duration`` is parsed from the history's timestamps. The thumbnail
+    and duration are best-effort: a failure in either yields ``None`` rather than
+    stranding an otherwise-finished run.
     """
-    files = workflow.extract_output_info(history_data)
-    thumb = _make_thumbnail(workflow, files, places, thumb_dir, name)
+    files = file_into_library(workflow.extract_output_info(history_data), places, prompt_id)
+    thumb = _make_thumbnail(workflow, files, places, thumb_dir, prompt_id)
     _write_video_funscript(workflow, files, places)
     try:
         duration = execution_duration_seconds(history_data)
     except Exception as e:
-        logger.warning("Duration parse failed for %s: %s", name, e)
+        logger.warning("Duration parse failed for %s: %s", prompt_id, e)
         duration = None
     return files, thumb, duration
 

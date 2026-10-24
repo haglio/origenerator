@@ -47,11 +47,20 @@ def _started_job(tmp_path):
     client = _client()
     job = GenerationJob(
         client, SDXL, _params(),
-        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
+        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A",
     )
-    job.prompt_id = "comfy-A"  # pin our id so the client-signal emits below match
     job.start()
     return job, client
+
+
+def test_a_jobs_payload_saves_into_the_folder_named_for_its_run(qtbot, tmp_path):
+    job = GenerationJob(_client(), SDXL, SDXL.default_params(),
+                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
+                        prompt_id="comfy-A")
+
+    prefixes = {node["inputs"]["filename_prefix"] for node in job.payload.values()
+                if "filename_prefix" in node.get("inputs", {})}
+    assert prefixes == {f"origenerator/comfy-A/{SDXL.default_params()['filename_prefix']}"}
 
 
 def test_start_submits_payload_under_our_prompt_id_and_queues(qtbot, tmp_path):
@@ -105,9 +114,8 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     client = _client()
     job = GenerationJob(
         client, wf, {**wf.default_params(), "steps": 20},
-        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
+        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A",
     )
-    job.prompt_id = "comfy-A"
     job.start()
     seen = []
     job.progress.connect(lambda v, m: seen.append((v, m)))
@@ -131,8 +139,7 @@ def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
     wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
     client = _client()
     job = GenerationJob(client, wf, wf.default_params(),
-                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
-    job.prompt_id = "comfy-A"
+                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
     job.start()
 
     client.progress.emit("comfy-A", "8", 5, 20)
@@ -147,8 +154,7 @@ def test_the_stage_is_named_from_the_first_node_long_before_any_step(qtbot, tmp_
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     client = _client()
     job = GenerationJob(client, wf, wf.default_params(),
-                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
-    job.prompt_id = "comfy-A"
+                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
     job.start()
 
     client.node_executing.emit("comfy-A", "4")     # the high-noise UNET
@@ -205,8 +211,7 @@ def test_completion_generates_thumbnail_when_output_exists(qtbot, tmp_path):
     out.mkdir()
     Image.new("RGB", (10, 10), (200, 50, 50)).save(out / "a.png")
     client = _client()
-    job = GenerationJob(client, SDXL, _params(), places=OutputPlaces.in_one_folder(out), thumb_dir=tmp_path / "thumbs")
-    job.prompt_id = "comfy-A"
+    job = GenerationJob(client, SDXL, _params(), places=OutputPlaces.in_one_folder(out), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
     job.start()
     finished = []
     job.finished.connect(lambda files, thumb, dur: finished.append((files, thumb, dur)))
@@ -363,8 +368,7 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
     # is, so a restart can resume it.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     job = GenerationJob(_client(), wf, {**wf.default_params(), "steps": 20},
-                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
-    job.prompt_id = "pid"
+                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="pid")
     job._on_progress("pid", "15", 10, 10)  # the high-noise pass is done
     job._on_progress("pid", "16", 3, 10)   # the low-noise one is 3 steps in
 
@@ -414,8 +418,7 @@ def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot
     # and the clock counts from its first word about it, not from the return.
     client = _client()
     job = GenerationJob(client, SDXL, _params(),
-                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
-    job.prompt_id = "comfy-A"
+                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
     heard_at = []
     client.submit_job.side_effect = lambda payload, prompt_id: (
         heard_at.append(time.time()), client.progress.emit(prompt_id, "5", 1, 50))
@@ -715,3 +718,55 @@ def test_a_job_waiting_here_or_on_the_server_is_called_queued_on_screen():
 def test_every_state_a_job_walks_through_is_named_once():
     assert {state.value for state in JobState} == {
         "idle", "speaking", "queued", "running", "finished", "failed", "canceled"}
+
+
+def test_a_job_hands_comfyui_a_copy_of_the_past_picture_it_reads_before_it_is_sent(
+        qtbot, tmp_path):
+    places = OutputPlaces.in_one_folder(tmp_path / "saves")
+    picture = places.folder("image") / "alpha_t2i_00042_.png"
+    picture.parent.mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(picture)
+    enhance = WORKFLOW_REGISTRY["image_enhance"]
+    client = _client()
+    job = GenerationJob(client, enhance,
+                        {**enhance.default_params(), "input_image": "image/alpha_t2i_00042_.png [output]"},
+                        places=places, thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
+    read = next(node["inputs"]["image"] for node in job.payload.values()
+                if node.get("class_type") == "LoadImage")
+    there_when_sent = []
+    client.submit_job.side_effect = lambda payload, prompt_id: there_when_sent.append(
+        (places.comfyui / read.removesuffix(" [output]")).is_file())
+
+    job.start()
+
+    assert read.startswith("origenerator/comfy-A/reads/")
+    assert there_when_sent == [True]
+
+
+def _an_enhance_sent_with_its_copy(tmp_path):
+    places = OutputPlaces.in_one_folder(tmp_path / "saves")
+    picture = places.folder("image") / "alpha_t2i_00042_.png"
+    picture.parent.mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(picture)
+    enhance = WORKFLOW_REGISTRY["image_enhance"]
+    job = GenerationJob(_client(), enhance,
+                        {**enhance.default_params(), "input_image": "image/alpha_t2i_00042_.png [output]"},
+                        places=places, thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
+    job.start()
+    return job, places
+
+
+def test_a_job_comfyui_fails_leaves_no_copy_behind(qtbot, tmp_path):
+    job, places = _an_enhance_sent_with_its_copy(tmp_path)
+
+    job._on_error("comfy-A", "it broke")
+
+    assert not places.run("comfy-A").exists()
+
+
+def test_a_canceled_job_leaves_no_copy_behind(qtbot, tmp_path):
+    job, places = _an_enhance_sent_with_its_copy(tmp_path)
+
+    job.cancel()
+
+    assert not places.run("comfy-A").exists()

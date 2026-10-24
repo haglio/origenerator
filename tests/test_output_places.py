@@ -119,3 +119,9 @@ def test_videos_are_kept_in_the_folders_of_the_videos_place_alone(tmp_path):
     places.working.mkdir()
 
     assert places.video_folders() == [places.folder("another"), places.folder("video")]
+
+
+def test_outputs_count_as_kept_in_comfyuis_folder_only_when_a_place_lies_inside_it(tmp_path):
+    assert OutputPlaces.in_one_folder(tmp_path).keeps_outputs_in_comfyuis_folder()
+    assert not OutputPlaces.from_settings(
+        _library(tmp_path), comfyui_dir=tmp_path / "ComfyUI").keeps_outputs_in_comfyuis_folder()

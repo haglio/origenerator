@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from io import BytesIO
@@ -57,6 +58,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import AMBER
+from shared_ui.folder_path import FolderPath
 from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
@@ -1039,12 +1041,13 @@ def test_each_side_grows_a_folder_for_a_kind_only_where_it_holds_that_kind(qtbot
     assert [row.text(0) for row in _subs(_top_level(view._tree, LANDSCAPE)["All"])] == ["Videos"]
 
 
-def test_entering_the_path_of_videos_goes_to_the_videos(qtbot):
+def test_clicking_videos_in_the_path_goes_to_the_videos(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
+    view._tree.setCurrentItem(_video_workflow(view._tree))
 
-    _enter_folder_path(view, qtbot, "Landscape  ›  All  ›  Videos")
+    _click_path_step(view, "Videos")
 
     assert view._tree.currentItem() is _alls(view._tree)["Videos"]
 
@@ -3948,88 +3951,65 @@ def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
     assert view._selected is None
 
 
-def test_double_clicking_the_path_opens_it_holding_where_you_are(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._tree.setCurrentItem(_first_leaf(view))
-
-    view._folder_path.edit_requested.emit()
-
-    assert view._folder_path._editing()
-    assert view._folder_path._edit.text() == view._folder_path.display_text() == (
-        view._tree_view.breadcrumb(_first_leaf(view)))
+def _path_links(view) -> dict[str, str]:
+    drawn = view._folder_path.findChild(FolderPath).text()
+    return {name: href for href, name in re.findall(r'<a href="([^"]*)"[^>]*>([^<]*)</a>', drawn)}
 
 
-def _enter_folder_path(view, qtbot, path):
-    view._folder_path.edit_requested.emit()
-    view._folder_path._edit.setText(path)
-    qtbot.keyClick(view._folder_path._edit, Qt.Key.Key_Return)
+def _click_path_step(view, name):
+    view._folder_path.findChild(FolderPath).linkActivated.emit(_path_links(view)[name])
 
 
-def test_entering_a_folders_path_goes_to_that_folder(qtbot):
+def test_clicking_a_step_of_the_path_goes_to_that_folder(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    folders = _children_by_prompt(_at(_image_workflow(view._tree), 0, 0))
-    view._tree.setCurrentItem(folders["a cat"])
-    dogs = view._tree_view.breadcrumb(folders["a dog"])
+    workflow = _image_workflow(view._tree)
+    view._tree.setCurrentItem(_first_leaf(view))
 
-    _enter_folder_path(view, qtbot, dogs)
+    _click_path_step(view, workflow.text(0))
 
-    assert view._tree.currentItem() is folders["a dog"]
-    assert view._folder_path.display_text() == dogs
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view._tree.currentItem() is workflow
+    assert view._folder_path.display_text() == view._tree_view.breadcrumb(workflow)
 
 
-def test_entering_a_path_no_folder_has_says_so_and_stays_put(qtbot, monkeypatch):
-    told = []
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
-                        lambda _parent, title, message: told.append((title, message)))
+def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     here = _first_leaf(view)
     view._tree.setCurrentItem(here)
 
-    _enter_folder_path(view, qtbot, "Landscape  ›  All  ›  Nowhere")
+    side, *above, _here = view._tree_view.path_steps(here)
 
-    assert view._tree.currentItem() is here
-    assert view._folder_path.display_text() == view._tree_view.breadcrumb(here)
-    assert told == [("Folder not found",
-                     "No folder is at this path:\n\nLandscape  ›  All  ›  Nowhere")]
+    assert list(_path_links(view)) == [step.name for step in above]
 
 
-def test_entering_a_path_during_a_search_puts_the_search_away_and_goes_there(qtbot):
+def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
+
+    assert list(_path_links(view)) == ["All"]
+    assert view._folder_path.display_text() == f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  ★ Favorites"
+
+
+def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     folders = _children_by_prompt(_at(_image_workflow(view._tree), 0, 0))
-    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+    view._tree.setCurrentItem(folders["a dog"])
     _search_for(view, "cat")
     assert view._showing_search()
 
-    _enter_folder_path(view, qtbot, view._tree_view.breadcrumb(folders["a dog"]))
+    _click_path_step(view, folders["a dog"].text(0))
 
     assert not view._showing_search()
     assert view._tree.currentItem() is folders["a dog"]
     assert view.visible_prompt_ids() == ["i2"]
-
-
-def test_entering_an_empty_path_goes_nowhere_and_says_nothing(qtbot, monkeypatch):
-    told = []
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
-                        lambda *args: told.append(args))
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-    here = _first_leaf(view)
-    view._tree.setCurrentItem(here)
-
-    _enter_folder_path(view, qtbot, "   ")
-
-    assert view._tree.currentItem() is here
-    assert told == []
 
 
 def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
@@ -4044,14 +4024,12 @@ def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
     assert list(_workflow_rows(view._tree, "video")) == [looping]
 
 
-def test_with_several_folders_picked_the_path_opens_empty(qtbot):
+def test_with_several_folders_picked_the_path_up_top_links_nothing(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
+
     _pick(view, cat, dog)
 
-    view._folder_path.edit_requested.emit()
-
-    assert view._folder_path._editing()
-    assert view._folder_path._edit.text() == ""
+    assert _path_links(view) == {}
 
 
 def _source_tile(view):

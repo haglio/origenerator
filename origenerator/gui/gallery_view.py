@@ -107,9 +107,10 @@ from origenerator.gui.gallery_tree import (
     GROUP_ROLE as _GROUP_ROLE,
 )
 from origenerator.gui.gallery_tree import (
-    PATH_SEPARATOR,
     GalleryTree,
+    PathStep,
     SideModel,
+    path_text,
 )
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
@@ -199,8 +200,12 @@ class _SearchScope(NamedTuple):
     place, where the path they clicked down does.
     """
 
-    path: str
+    steps: tuple[PathStep, ...]
     ids: set[str] | None
+
+    @property
+    def path(self) -> str:
+        return path_text(self.steps)
 
 
 def _kept_on_removal(custom) -> str:
@@ -764,8 +769,7 @@ class GalleryView(QWidget):
         """
         browser, browser_column = pane()
         self._folder_path = FolderPathHeader()
-        self._folder_path.edit_requested.connect(self._open_folder_path)
-        self._folder_path.entered.connect(self._go_to_folder_path)
+        self._folder_path.folder_chosen.connect(self._go_to_folder)
         browser_column.addWidget(self._folder_path)
         # The button bank over this pane (:mod:`origenerator.gui.toolbar_bank`).
         # It builds and lays out every button and is written from one state; what
@@ -1873,10 +1877,10 @@ class GalleryView(QWidget):
             self._image_index = gallery.build_image_config_index(self._image_rows)
         return self._image_index
 
-    def name_search_on_screen(self, query: str, scope: str) -> None:
+    def name_search_on_screen(self, query: str, scope: _SearchScope) -> None:
         """Say in the header that a search is what the pane is showing, in place
         of the folder that was there."""
-        self._folder_path.set_display(f"Search: “{query}” in {scope}")
+        self._folder_path.show_search(f"Search: “{query}” in ", scope.steps)
         self._avg_label.setText("")
         self._experiments_bar.hide()
 
@@ -1959,15 +1963,15 @@ class GalleryView(QWidget):
         item = self._tree.currentItem()
         if self._current_collection_key() is not None:
             rows = self._browser.selected_collection_rows() or []
-            return _SearchScope(self._tree_view.breadcrumb(item),
+            return _SearchScope(tuple(self._tree_view.path_steps(item)),
                                 {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
             # Nothing selected, or a side's header row selected: the
             # whole gallery, since neither names a folder to narrow to. The
             # trash's held rows share the index but belong to their collection alone.
-            return _SearchScope(gallery.ALL_LABEL, self._live_ids)
-        return _SearchScope(self._tree_view.breadcrumb(item),
+            return _SearchScope((PathStep(gallery.ALL_LABEL, None),), self._live_ids)
+        return _SearchScope(tuple(self._tree_view.path_steps(item)),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
 
@@ -2032,7 +2036,7 @@ class GalleryView(QWidget):
         # return-after-delete trail record.
         here = self._tree_view.selected_folder_key()
         self._note_folder_visit(here if group is not None else None)
-        self._folder_path.set_display(self._tree_view.breadcrumb(current))
+        self._folder_path.show_folder(self._tree_view.path_steps(current))
         self._update_folder_average(group)
         self._show_group_contents(group, current)
         landed = self._land_on_the_first_item()
@@ -2070,7 +2074,7 @@ class GalleryView(QWidget):
     def _open_collection(self, collection: FolderCollection, side: str | None, item):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
-        self._folder_path.set_display(self._collection_title(collection, item))
+        self._folder_path.show_folder(self._collection_steps(collection, item))
         self._avg_label.setText("")
         self._clear_metadata()
         self._browser.show_collection(collection.key, side)
@@ -2078,9 +2082,10 @@ class GalleryView(QWidget):
             self._re_aim()
         self._navigation.record()
 
-    def _collection_title(self, collection: FolderCollection, item) -> str:
+    def _collection_steps(self, collection: FolderCollection, item) -> list[PathStep]:
+        *above, here = self._tree_view.path_steps(item)
         star = "★ " if collection.which == _FAVORITES_KEY else ""
-        return f"{self._tree_view.breadcrumb(item.parent())}{PATH_SEPARATOR}{star}{item.text(0)}"
+        return [*above, here._replace(name=f"{star}{here.name}")]
 
     def _show_group_contents(self, group, item):
         if isinstance(group, gallery.SettingsGroup):
@@ -2095,7 +2100,7 @@ class GalleryView(QWidget):
         """Go to a folder: select its tree row, which draws it.
 
         The one move under every gesture that names a folder to open — a folder
-        tile's click, a config tab's "Go to folder", a pasted path — as
+        tile's click, a config tab's "Go to folder", a step of the path — as
         :meth:`_go_to_generation` is the one under every gesture that names a
         picture. Each is a decision to go there, so a running search is put away
         first: a search's results are folder tiles too, and this is how they
@@ -2106,19 +2111,6 @@ class GalleryView(QWidget):
         if item is not None:
             self._search.leave()
             self._tree.setCurrentItem(item)
-
-    def _open_folder_path(self):
-        here = self._tree.currentItem() if self._selection_group is None else None
-        self._folder_path.begin_edit(self._tree_view.breadcrumb(here))
-
-    def _go_to_folder_path(self, path: str):
-        if not path.strip():
-            return
-        key = self._tree_view.key_at_path(path)
-        if key is None:
-            self.tell("Folder not found", f"No folder is at this path:\n\n{path}")
-        else:
-            self._go_to_folder(key)
 
     # --- several folders at once: the folder they would make ------------------
 
@@ -2149,7 +2141,6 @@ class GalleryView(QWidget):
         group = self._selection_group
         self._experiments_bar.hide()
         self._folder_path.set_display(group.label)
-        self._folder_path.setToolTip("")  # a count of folders, with no one folder under it
         self._update_folder_average(group)
         self._browser.show_custom_folder(group)
         self._re_aim()

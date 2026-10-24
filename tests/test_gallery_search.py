@@ -64,8 +64,8 @@ class FakeHost:
     def show_search_results(self, tiles, **terms):
         self.shown.append((list(tiles), terms))
 
-    def name_search_on_screen(self, query: str, scope: str) -> None:
-        self.headers.append((query, scope))
+    def name_search_on_screen(self, query: str, scope) -> None:
+        self.headers.append((query, scope.path))
 
     def search_results_drawn(self) -> None:
         self.drawn += 1

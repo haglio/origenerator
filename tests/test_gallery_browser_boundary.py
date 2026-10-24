@@ -243,8 +243,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     so which dragged folders a row in the TOC takes is the gallery's to answer
     too, through one more. And the pane 85 -> 84: every drag the app starts
     reaches every place it could drop by itself, so the pane's relay of its
-    tiles' drags to Combine went.)"""
+    tiles' drags to Combine went. 283 -> 281: each step of the path over the
+    pictures opens its folder and a copy button copies the path, so the two
+    methods that opened the path for typing and went where a typed path led went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 283
+               for x in _class_def(VIEW, "GalleryView").body) == 281
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 84

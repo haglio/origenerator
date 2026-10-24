@@ -1,117 +1,94 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtGui import QFocusEvent
+import re
+
 from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from shared_ui.folder_path import FolderPath
+from shared_ui.spacing import GAP_MEDIUM
 
+from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.folder_path_header import FolderPathHeader
+from origenerator.gui.gallery_tree import PathStep
 
+_STEPS = [PathStep("Landscape", None), PathStep("All", "all@landscape"),
+          PathStep("SDXL Text-to-Image", "sdxl@landscape"), PathStep("3A7F2C10", "leaf@landscape")]
 _PATH = "Landscape  ›  All  ›  SDXL Text-to-Image  ›  3A7F2C10"
 
 
-def _header(qtbot, path=_PATH):
+def _header(qtbot):
     header = FolderPathHeader()
     qtbot.addWidget(header)
-    header.set_display(path)
     return header
 
 
-def test_double_clicking_the_path_asks_for_its_field(qtbot):
-    header = _header(qtbot)
-    header.show()
-
-    with qtbot.waitSignal(header.edit_requested):
-        qtbot.mouseDClick(header, Qt.MouseButton.LeftButton)
+def _links(header) -> dict[str, str]:
+    drawn = header.findChild(FolderPath).text()
+    return {name: href for href, name in re.findall(r'<a href="([^"]*)"[^>]*>([^<]*)</a>', drawn)}
 
 
-def test_the_field_opens_holding_the_whole_path_selected_for_copying(qtbot):
+def test_every_folder_above_the_one_shown_is_a_link_to_it(qtbot):
     header = _header(qtbot)
 
-    header.begin_edit(_PATH)
+    header.show_folder(_STEPS)
 
-    assert header._editing()
-    assert header._edit.selectedText() == _PATH
+    assert list(_links(header)) == ["All", "SDXL Text-to-Image"]
+    assert header.display_text() == _PATH
 
 
-def test_the_field_is_one_line_as_wide_as_the_path_over_it(qtbot):
+def test_clicking_a_step_chooses_the_folder_it_names(qtbot):
+    header = _header(qtbot)
+    header.show_folder(_STEPS)
+
+    with qtbot.waitSignal(header.folder_chosen) as chosen:
+        header.findChild(FolderPath).linkActivated.emit(_links(header)["All"])
+
+    assert chosen.args == ["all@landscape"]
+
+
+def test_a_search_links_every_folder_it_looks_in(qtbot):
+    header = _header(qtbot)
+
+    header.show_search("Search: “a cat” in ", _STEPS)
+
+    assert list(_links(header)) == ["All", "SDXL Text-to-Image", "3A7F2C10"]
+    assert header.display_text() == f"Search: “a cat” in {_PATH}"
+
+
+def test_a_line_that_is_no_folders_path_links_nothing(qtbot):
+    header = _header(qtbot)
+    header.show_folder(_STEPS)
+
+    header.set_display("2 folders")
+
+    assert _links(header) == {}
+    assert header.display_text() == "2 folders"
+
+
+def test_the_copy_button_copies_the_line_as_it_reads_now(qtbot):
+    header = _header(qtbot)
+    header.set_display("2 folders")
+    header.show_search("Search: “a cat” in ", _STEPS)
+
+    header.findChild(CopyButton).click()
+
+    assert QApplication.clipboard().text() == f"Search: “a cat” in {_PATH}"
+
+
+def test_the_copy_button_sits_left_of_a_wrapped_path_level_with_its_first_line(qtbot):
     pane = QWidget()
     qtbot.addWidget(pane)
     column = QVBoxLayout(pane)
     column.setContentsMargins(0, 0, 0, 0)
     header = FolderPathHeader()
-    header.set_display("Landscape  ›  All  ›  " + "  ›  ".join(["SDXL Text-to-Image"] * 6))
     column.addWidget(header)
     column.addStretch(1)
+    header.show_folder([PathStep("Landscape", None),
+                        *(PathStep("SDXL Text-to-Image", f"k{i}") for i in range(6))])
     pane.setFixedSize(400, 600)
     pane.show()
-    one_line = header._edit.sizeHint().height()
-    wrapped = header.height()
-    assert wrapped > one_line
-
-    header.begin_edit("Landscape  ›  All")
     column.activate()
+    copy, path = header.findChild(CopyButton).geometry(), header.findChild(FolderPath).geometry()
 
-    assert header._edit.width() == 400
-    assert header._edit.height() == one_line
-
-    qtbot.keyClick(header._edit, Qt.Key.Key_Escape)
-    column.activate()
-
-    assert header.height() == wrapped
-
-
-def test_an_empty_field_asks_for_a_path(qtbot):
-    header = _header(qtbot, "2 folders")
-
-    header.begin_edit("")
-
-    assert header._edit.placeholderText() == "Paste a folder's path"
-
-
-def test_enter_goes_to_the_path_in_the_field(qtbot):
-    header = _header(qtbot)
-    header.begin_edit(_PATH)
-    header._edit.setText("Portrait  ›  All")
-
-    with qtbot.waitSignal(header.entered) as blocker:
-        qtbot.keyClick(header._edit, Qt.Key.Key_Return)
-
-    assert blocker.args == ["Portrait  ›  All"]
-    assert not header._editing()
-
-
-def test_escape_puts_the_path_back_without_going_anywhere(qtbot):
-    header = _header(qtbot)
-    header.begin_edit(_PATH)
-    header._edit.setText("Portrait  ›  All")
-
-    with qtbot.assertNotEmitted(header.entered):
-        qtbot.keyClick(header._edit, Qt.Key.Key_Escape)
-
-    assert not header._editing()
-    assert header.display_text() == _PATH
-
-
-def _focus_leaves(header, reason):
-    QApplication.sendEvent(header._edit, QFocusEvent(QEvent.Type.FocusOut, reason))
-
-
-def test_clicking_elsewhere_puts_the_path_back_without_going_anywhere(qtbot):
-    header = _header(qtbot)
-    header.begin_edit(_PATH)
-
-    with qtbot.assertNotEmitted(header.entered):
-        _focus_leaves(header, Qt.FocusReason.MouseFocusReason)
-
-    assert not header._editing()
-
-
-def test_the_fields_own_menu_and_other_windows_leave_it_open(qtbot):
-    header = _header(qtbot)
-    header.begin_edit(_PATH)
-
-    _focus_leaves(header, Qt.FocusReason.PopupFocusReason)
-    _focus_leaves(header, Qt.FocusReason.ActiveWindowFocusReason)
-
-    assert header._editing()
-    assert header._edit.selectedText() == _PATH
+    assert path.left() - copy.right() - 1 == GAP_MEDIUM
+    assert copy.top() == path.top()
+    assert path.height() > 2 * copy.height()

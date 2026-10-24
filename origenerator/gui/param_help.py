@@ -19,6 +19,12 @@ from origenerator.setting_advice import good_range_text
 from origenerator.workflows.base import ParamDef
 
 # Keyed by param name: what the setting does.
+_COMPOSITION_FOCUS = (
+    "How the steps split between composition (the layout, the poses and, in a video, "
+    "the motion) and fine detail. Higher keeps the picture noisy for longer, so more "
+    "of the steps decide composition; lower gives more of them to texture and detail."
+)
+
 PARAM_HELP: dict[str, str] = {
     # --- prompts and the picture a run starts from ---
     "positive_prompt": (
@@ -63,7 +69,20 @@ PARAM_HELP: dict[str, str] = {
     ),
     "input_image": (
         "The picture this run is built from: the start frame for a video, or the "
-        "structure to re-skin. Browse to any file, or drop a generation on it."
+        "structure to re-skin. Drop a picture from the gallery on it, or right-click "
+        "it to paste an Origenerator name or browse to any file."
+    ),
+    "video": (
+        "The video of the library whose moves the picture's person performs: "
+        "the person's pose is read off every frame and performed, the video's "
+        "sound rides along, and its script becomes the result's. The run is "
+        "shaped like this video, with the picture fitted into that shape. Drop a "
+        "video from the gallery on it, or right-click it to paste an Origenerator "
+        "name or browse to one of the library's."
+    ),
+    "video_start": (
+        "How many seconds into that video the run starts; Duration says how much "
+        "of it is performed from there, and a video that ends sooner ends the run."
     ),
 
     # --- seeds ---
@@ -167,11 +186,8 @@ PARAM_HELP: dict[str, str] = {
         "goes with it. To compare two, keep the seed and change only this, on two or "
         "three different prompts."
     ),
-    "shift_high": (
-        "How the steps split between composition (the layout, the poses and, in a video, "
-        "the motion) and fine detail. Higher keeps the picture noisy for longer, so more "
-        "of the steps decide composition; lower gives more of them to texture and detail."
-    ),
+    "shift": _COMPOSITION_FOCUS,
+    "shift_high": _COMPOSITION_FOCUS,
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (
@@ -246,6 +262,10 @@ PARAM_HELP: dict[str, str] = {
 
 
 RECOMMENDED: dict[str, str] = {
+    "video_start": (
+        "Any second of the video; the run performs it from there for the Duration, "
+        "and ends where the video does."
+    ),
     "split_step": (
         "Leave it at 0, which hands over halfway through the steps and suits a "
         "Composition Focus of 8; set by hand, between 40% and 60% of Steps is usual."

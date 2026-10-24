@@ -11,6 +11,7 @@ from origenerator.funscript import (
     funscript_of,
     funscript_path_for,
     heatmap_colors,
+    library_funscript_of,
     resynthesize_funscript,
     synthesize_actions,
     synthesize_funscript,
@@ -151,6 +152,38 @@ def test_a_video_of_this_apps_own_named_like_an_upscale_keeps_its_own_script(tmp
     own.write_text("{}", encoding="utf-8")
 
     assert funscript_of(video, output_dir=tmp_path) == own
+
+
+def test_a_library_videos_script_is_filed_in_the_scripts_tree_at_the_videos_own_place(tmp_path):
+    videos = tmp_path / "videos" / "videos"
+    scripts = tmp_path / "videos" / "scripts" / "scripts"
+    video = videos / "2D" / "sample" / "scene one.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"v")
+    filed = scripts / "2D" / "sample" / "scene one.funscript"
+    write_funscript(filed, synthesize_actions(2.0, hz=1.0))
+
+    assert library_funscript_of(video, videos_dir=videos, scripts_dir=scripts) == filed
+    assert library_funscript_of(str(video).upper(), videos_dir=videos, scripts_dir=scripts) == filed
+
+
+def test_a_library_video_keeps_a_script_left_beside_it(tmp_path):
+    videos = tmp_path / "videos" / "videos"
+    scripts = tmp_path / "videos" / "scripts" / "scripts"
+    video = videos / "clip.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"v")
+    write_funscript(video.with_suffix(".funscript"), synthesize_actions(2.0, hz=1.0))
+
+    assert library_funscript_of(video, videos_dir=videos, scripts_dir=scripts) == video.with_suffix(".funscript")
+
+
+def test_a_video_with_no_script_anywhere_has_none(tmp_path):
+    videos = tmp_path / "videos" / "videos"
+    scripts = tmp_path / "videos" / "scripts" / "scripts"
+    assert library_funscript_of(videos / "clip.mp4", videos_dir=videos, scripts_dir=scripts) is None
+    assert library_funscript_of(tmp_path / "elsewhere" / "clip.mp4", videos_dir=videos, scripts_dir=scripts) is None
+    assert library_funscript_of("", videos_dir=videos, scripts_dir=scripts) is None
 
 
 def test_read_actions_passes_a_missing_script_through():

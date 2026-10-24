@@ -6,7 +6,17 @@ import struct
 import pytest
 
 from origenerator.workflows import model_arch
-from origenerator.workflows.model_arch import FLUX, KREA2, LTX, QWEN, SD15, SDXL, WAN, WAN_S2V
+from origenerator.workflows.model_arch import (
+    FLUX,
+    KREA2,
+    LTX,
+    QWEN,
+    SD15,
+    SDXL,
+    WAN,
+    WAN_ANIMATE,
+    WAN_S2V,
+)
 
 
 def _write(path, tensor_names):
@@ -75,6 +85,11 @@ ARCH_CASES = [
     # ...and one trained on the adapter alone, which is how the LoRA that stops
     # the prompt reader refusing an explicit prompt is made.
     (KREA2, ["diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lora_A.weight"]),
+    # WAN 2.2 Animate: WAN's blocks with the pose embedding beside them.
+    (WAN_ANIMATE, ["blocks.0.self_attn.q.weight", "face_adapter.fuser_blocks.0.k_norm.weight",
+                   "patch_embedding.weight", "pose_patch_embedding.weight"]),
+    (WAN_ANIMATE, ["model.diffusion_model.blocks.0.self_attn.q.weight",
+                   "model.diffusion_model.pose_patch_embedding.weight"]),
 ]
 
 

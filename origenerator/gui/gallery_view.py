@@ -541,7 +541,8 @@ class GalleryView(QWidget):
         # which _build_ui places under the tree.
         self._combine = CombineController(
             self, parent=self, db=db, jobs=self._jobs, client=client,
-            info_tabs_of=lambda: self._info_tabs, slideshows=self._slideshows)
+            info_tabs_of=lambda: self._info_tabs, slideshows=self._slideshows,
+            names=self._item_names)
         # The standalone enhance: its settings panel, what the Enhance button
         # would run on, and the live run's appearance on every surface showing
         # the picture it improves

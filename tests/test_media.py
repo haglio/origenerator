@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from origenerator.gallery.keys import settings_key
-from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
+from origenerator.media import (
+    MediaType,
+    media_type_from_filename,
+    sibling_of_type,
+    video_frame_size,
+)
+from tests.media_files import write_mp4
 
 
 def test_media_type_from_filename_classifies_by_extension():
@@ -36,3 +42,15 @@ def test_a_media_kind_that_was_never_made_has_no_sibling(tmp_path):
     lone = tmp_path / "clip.mp4"
     lone.write_bytes(b"v")
     assert sibling_of_type(lone, MediaType.IMAGE) is None
+
+
+def test_a_videos_frame_size_is_read_off_its_header(tmp_path):
+    video = write_mp4(tmp_path / "clip.mp4", seconds=0.5, width=64, height=48)
+    assert video_frame_size(video) == (64, 48)
+
+
+def test_a_file_that_is_no_video_has_no_frame_size(tmp_path):
+    (tmp_path / "notes.mp4").write_bytes(b"not a video")
+    assert video_frame_size(tmp_path / "notes.mp4") is None
+    assert video_frame_size(tmp_path / "absent.mp4") is None
+    assert video_frame_size("") is None

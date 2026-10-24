@@ -7,7 +7,6 @@ from pathlib import Path
 from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
@@ -20,12 +19,14 @@ from PyQt6.QtWidgets import (
 from shared_ui.orientation import orientation_of_size
 from shared_ui.tick_control import TickControl
 
-from origenerator.config import COMFYUI_INPUT_DIR
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR
 from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
+from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
+from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
@@ -35,6 +36,7 @@ from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.gui.warning_mark import WarningMark
+from origenerator.gui.zone_items import FilesOnly
 from origenerator.seed_history import SeedHistory
 from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE
@@ -118,6 +120,7 @@ class ParamForm(QWidget):
 
     changed = pyqtSignal()          # any field's value changed
     seed_drawn = pyqtSignal(str, object)
+    item_activated = pyqtSignal(str)  # a zone's held gallery item was clicked (prompt_id)
 
     def __init__(
         self,
@@ -125,16 +128,20 @@ class ParamForm(QWidget):
         parent=None,
         *,
         size_deriver: Callable[[dict], tuple[int, int] | None] | None = None,
+        size_source: str = "input_image",
         hidden_keys: tuple[str, ...] = (),
         pins_reused_seed: bool = True,
         heights=None,
         seed_history: SeedHistory | None = None,
+        items=None,
     ):
         super().__init__(parent)
         # Where a dragged prompt height is filed: the window's own set, handed
         # down rather than reached for, so a form can be built at chosen sizes.
         self._heights = heights
         self._seed_history = seed_history
+        self._items = items or FilesOnly(output_dir=COMFYUI_OUTPUT_DIR,
+                                         input_dir=COMFYUI_INPUT_DIR)
         self._item_seeds: dict[str, int] = {}
         self._item_thumbnail: str | None = None
         self._pins_reused_seed = pins_reused_seed
@@ -150,6 +157,8 @@ class ParamForm(QWidget):
         # manual-size or size-less workflow, leaving the Dimensions section to the
         # workflow's own width/height params (if any).
         self._size_deriver = size_deriver
+        # The field the size is derived from: its edits refresh the pair.
+        self._size_source_key = size_source
         # The unlock toggle and hint for the derived-size pair, built only in
         # derived mode. ``None`` otherwise. The toggle floats between the width and
         # height rows like the swap button, so it links the pair without shrinking
@@ -285,7 +294,7 @@ class ParamForm(QWidget):
             if widget is self._scenes:
                 continue
             edited = self._kind(pd).change_signal(widget)
-            if pd.key == "input_image":
+            if pd.key == self._size_source_key:
                 edited.connect(self._update_derived_display)
             edited.connect(self.changed)
 
@@ -319,8 +328,8 @@ class ParamForm(QWidget):
         label = self._labels[key]
         label.setToolTip(explained or label.text())
         widget = self._widgets.get(key)
-        if widget is not None and explained:
-            widget.setToolTip(explained)
+        if widget is not None and explained and not isinstance(widget, DropSlot):
+            widget.setToolTip(explained)  # a zone's tooltip names what it holds
 
     def _help(self, pd: ParamDef) -> str:
         warned_here = [other for other in self._param_defs
@@ -386,7 +395,7 @@ class ParamForm(QWidget):
             self._widgets[pd.key].activated.connect(lambda _row, cb=cb: cb.setChecked(False))
             self._randomize_checks[pd.key] = cb
             extras.append(cb)
-        if kind.browse_filter:
+        if kind.browse_filter and not kind.drops:
             # Elides: it is the widest thing on any row, so a plain button would
             # decide how narrow the whole form can be squeezed.
             browse = ElidingButton("Browse...")
@@ -677,8 +686,8 @@ class ParamForm(QWidget):
         return self._unlock_btn is not None and self._unlock_btn.isChecked()
 
     def _size_source(self) -> str:
-        image = self._defs.get("input_image")
-        return image.label.lower() if image is not None else "image"
+        source = self._defs.get(self._size_source_key)
+        return source.label.lower() if source is not None else "image"
 
     def _unlock_tip(self, unlocked: bool) -> str:
         if unlocked:
@@ -736,23 +745,13 @@ class ParamForm(QWidget):
             self._update_derived_display()
 
     def _browse_file(self, key: str):
-        """Pick a field's file anywhere on disk via the native file dialog: an
-        input image, or the recording a custom voice is copied from.
-
-        The chosen path is stored verbatim: ComfyUI's ``LoadImage`` resolves a
-        bare name against its input folder but takes an absolute path outside
-        it unchanged, so a full path lets the user draw an input from anywhere;
-        a recording is read by the voice from wherever it is.
-        """
+        """Pick a field's file anywhere on disk; the path is stored verbatim,
+        which ComfyUI's ``LoadImage`` takes as it is."""
         pd = self._defs[key]
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            f"Select {pd.label}",
-            self._initial_browse_path(self._widgets[key].text().strip(), pd.browse_dir),
-            self._kind(pd).browse_filter,
-        )
+        path = pick_a_file(self, pd.label, self._kind(pd).browse_filter,
+                           self._initial_browse_path(str(self._read_field(pd)), pd.browse_dir))
         if path:
-            self._widgets[key].setText(path)
+            self._write_field(pd, path)
 
     @staticmethod
     def _initial_browse_path(current: str, home: Path | None = None) -> str:
@@ -774,12 +773,21 @@ class ParamForm(QWidget):
         return str(COMFYUI_INPUT_DIR)
 
     def _kind(self, pd: ParamDef):
-        return field_kind(pd, self._heights, self._seed_history)
+        return field_kind(pd, self._heights, self._seed_history,
+                          items=self._items, browse=self._browse_file)
 
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
-        return self._kind(pd).make(pd)
+        widget = self._kind(pd).make(pd)
+        if isinstance(widget, DropSlot):
+            widget.activated.connect(self._lead_to_the_held_item)
+        return widget
+
+    def _lead_to_the_held_item(self, held: str) -> None:
+        prompt_id = self._items.item_of(held)
+        if prompt_id:
+            self.item_activated.emit(prompt_id)
 
     def definitions(self) -> list[ParamDef]:
         return list(self._param_defs)

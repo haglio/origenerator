@@ -6,7 +6,8 @@ from pathlib import Path
 from app_support.funscript import read_actions
 from PIL import Image
 
-from origenerator import gallery
+import origenerator.workflows.wan22_animate as animate
+from origenerator import config, gallery
 from origenerator.completion import extract_completion
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
@@ -14,6 +15,7 @@ from origenerator.funscript import (
     synthesize_actions,
     synthesize_funscript,
     video_duration_seconds,
+    write_funscript,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.frame_rate import NATIVE_FPS
@@ -126,6 +128,32 @@ def test_a_video_made_for_genau_is_scripted_as_exactly_one_cycle(tmp_path, monke
     actions = read_actions(funscript_of(video, output_dir=out))
     assert [a["pos"] for a in actions] == [0, 100, 0]
     assert actions[-1]["at"] == round(cycle_seconds * 1000)
+
+
+def test_a_video_performed_from_a_library_video_takes_that_videos_script(tmp_path, monkeypatch):
+    performs = WORKFLOW_REGISTRY["wan22_animate"]
+    videos, scripts = tmp_path / "videos" / "videos", tmp_path / "videos" / "scripts" / "scripts"
+    monkeypatch.setattr(config, "LIBRARY_VIDEOS_DIR", videos)
+    monkeypatch.setattr(config, "LIBRARY_SCRIPTS_DIR", scripts)
+    monkeypatch.setattr(animate, "video_duration_seconds", lambda path: 60.0)
+    driving = videos / "scene one.mp4"
+    driving.parent.mkdir(parents=True)
+    driving.write_bytes(b"v")
+    write_funscript(scripts / "scene one.funscript", synthesize_actions(60.0, hz=0.5))
+    out = tmp_path / "out"
+    video = out / "video" / "wan22_animate_00001_.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"v")
+    metronome = []
+    monkeypatch.setattr("origenerator.completion.synthesize_funscript",
+                        lambda *a, **k: metronome.append((a, k)))
+    params = dict(performs.default_params(), video=str(driving), video_start=2.0, frame_count=81)
+
+    extract_completion(performs, _video_history("24", "gifs", video.name), out, tmp_path / "thumbs",
+                       "n1", params=params)
+
+    assert read_actions(funscript_of(video, output_dir=out)) == performs.authored_actions(params)
+    assert metronome == []
 
 
 def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt
-from PyQt6.QtGui import QColor, QImage
+from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, Qt
+from PyQt6.QtGui import QColor, QDropEvent, QImage
 from PyQt6.QtWidgets import (
     QAbstractSlider,
     QApplication,
@@ -18,9 +18,11 @@ from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
-from origenerator.gui import icons, param_sections, pictured_dropdown
+from origenerator.gui import file_pick, icons, param_sections, pictured_dropdown
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.eliding import ElidingLabel
+from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
@@ -67,7 +69,7 @@ def test_browse_button_fits_its_caption(qtbot):
     is wider than the old fixed 80px width. The button must size to its content
     — matching a reference button under the same font and stylesheet.
     """
-    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    form = ParamForm([ParamDef("voice_sample", "Voice Sample", "audio", "")])
     form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
@@ -86,7 +88,7 @@ def test_browse_button_fits_its_caption(qtbot):
     gauge.show()
     qtbot.waitExposed(gauge)
 
-    btn = form._browse_buttons["input_image"]
+    btn = form._browse_buttons["voice_sample"]
     assert btn.width() >= reference.sizeHint().width()
 
 
@@ -496,13 +498,27 @@ def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made
     assert abs(picture.height() - 2 * picture.width()) <= 1
 
 
+def test_the_derived_size_follows_the_field_the_workflow_sizes_itself_off(qtbot):
+    form = ParamForm([ParamDef("input_image", "Picture", "image", ""),
+                      ParamDef("video", "Video to Perform", "video", "")],
+                     size_deriver=lambda values: (864, 480) if values.get("video") else None,
+                     size_source="video")
+    qtbot.addWidget(form)
+    assert form._dim_value_labels["width"].text() == "—"
+
+    form._widgets["video"].set_item("C:/library/videos/videos/scene one.mp4")
+
+    assert (form._dim_value_labels["width"].text(), form._dim_value_labels["height"].text()) == ("864", "480")
+    assert form._unlock_btn.toolTip() == "Unlock to override the size derived from the video to perform"
+
+
 def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qtbot):
     form = ParamForm([ParamDef("input_image", "Start Image", "image", ""),
                       ParamDef("seed", "Seed", "seed", 0)],
                      size_deriver=lambda values: (400, 800) if values.get("input_image") else None)
     qtbot.addWidget(form)
 
-    form._widgets["input_image"].setText("frame.png")
+    form._widgets["input_image"].set_item("frame.png")
 
     picture = form._widgets["seed"]._picture.pixmap()
     assert abs(picture.height() - 2 * picture.width()) <= 1
@@ -889,13 +905,13 @@ def test_a_size_read_off_the_start_image_puts_that_shape_on_the_size_heading(qtb
     form = _sized_form(qtbot, size=(464, 912))
     assert form._sections["Size"]._header._mark is None
 
-    form._widgets["input_image"].setText("frame.png")
+    form._widgets["input_image"].set_item("frame.png")
     assert _size_heading_wears(form, PORTRAIT)
 
 
 def test_derived_dimensions_track_the_input_image(qtbot):
     form = _sized_form(qtbot, size=(864, 480))
-    form._widgets["input_image"].setText("frame.png")
+    form._widgets["input_image"].set_item("frame.png")
     # Both the plain locked value and the spinner under it follow the image.
     assert form._dim_value_labels["width"].text() == "864"
     assert form._dim_value_labels["height"].text() == "480"
@@ -907,14 +923,14 @@ def test_locked_derived_dimensions_stay_out_of_the_values(qtbot):
     # Locked, the form emits no width/height, so the payload derives the size the
     # usual way — the displayed number is informational only.
     form = _sized_form(qtbot)
-    form._widgets["input_image"].setText("frame.png")
+    form._widgets["input_image"].set_item("frame.png")
     values = form.get_values()
     assert "width" not in values and "height" not in values
 
 
 def test_unlocking_lets_the_user_override_the_size(qtbot):
     form = _sized_form(qtbot)
-    form._widgets["input_image"].setText("frame.png")
+    form._widgets["input_image"].set_item("frame.png")
     fired = []
     form.changed.connect(lambda: fired.append(True))
 
@@ -930,7 +946,7 @@ def test_unlocking_lets_the_user_override_the_size(qtbot):
 
 def test_relocking_drops_the_override_and_restores_the_derived_size(qtbot):
     form = _sized_form(qtbot, size=(864, 480))
-    form._widgets["input_image"].setText("frame.png")
+    form._widgets["input_image"].set_item("frame.png")
     form._unlock_btn.setChecked(True)
     form._widgets["width"].setValue(1024)
     form._widgets["height"].setValue(576)
@@ -1021,6 +1037,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     (ParamDef("sampler", "Sampler", "combo", "euler", options=["euler", "dpm"]), "dpm", "dpm"),
     (ParamDef("input_image", "Input Image", "image", ""), "  frame.png ", "frame.png"),
     (ParamDef("voice_sample", "Voice Sample", "audio", ""), " sample.wav ", "sample.wav"),
+    (ParamDef("video", "Video to Perform", "video", ""), " scene one.mp4 ", "scene one.mp4"),
     (ParamDef("width", "Width", "int", 512, min_val=64, max_val=2048, step=64,
               options=[512, 768]), 768.0, 768),
     (ParamDef("frame_rate", "Frame Rate", "float", 24.0, min_val=1.0, max_val=120.0,
@@ -1147,6 +1164,11 @@ def test_param_form_seed_handles_64bit_values(qtbot):
     assert vals["seed"] == big_seed
 
 
+def _browse_the_zone(form, key):
+    actions = {action.text(): action for action in form._widgets[key].menu().actions()}
+    actions["Browse..."].trigger()
+
+
 def _stub_file_dialog(monkeypatch, chosen, captured=None):
     """Replace the native file dialog so Browse tests never open a window.
 
@@ -1160,7 +1182,7 @@ def _stub_file_dialog(monkeypatch, chosen, captured=None):
             captured["caption"] = caption
         return chosen, ""
 
-    monkeypatch.setattr(pf.QFileDialog, "getOpenFileName", fake)
+    monkeypatch.setattr(file_pick.QFileDialog, "getOpenFileName", fake)
 
 
 def test_param_form_browse_button_picks_any_file(qtbot, monkeypatch):
@@ -1168,7 +1190,7 @@ def test_param_form_browse_button_picks_any_file(qtbot, monkeypatch):
 
     form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
     qtbot.addWidget(form)
-    form._browse_buttons["input_image"].click()
+    _browse_the_zone(form, "input_image")
 
     # The full path is stored verbatim; ComfyUI's LoadImage resolves an
     # absolute path outside its input folder.
@@ -1180,7 +1202,7 @@ def test_param_form_browse_cancel_keeps_existing_image(qtbot, monkeypatch):
 
     form = ParamForm([ParamDef("input_image", "Input Image", "image", "preset.png")])
     qtbot.addWidget(form)
-    form._browse_buttons["input_image"].click()
+    _browse_the_zone(form, "input_image")
 
     assert form.get_values()["input_image"] == "preset.png"
 
@@ -1191,7 +1213,7 @@ def test_param_form_browse_defaults_to_input_dir(qtbot, monkeypatch):
 
     form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
     qtbot.addWidget(form)
-    form._browse_buttons["input_image"].click()
+    _browse_the_zone(form, "input_image")
 
     assert captured["dir"] == str(pf.COMFYUI_INPUT_DIR)
 
@@ -1208,7 +1230,7 @@ def test_param_form_browse_opens_in_the_folder_the_param_names(qtbot, monkeypatc
         [ParamDef("input_image", "Structure Image", "image", "", browse_dir=poses)]
     )
     qtbot.addWidget(form)
-    form._browse_buttons["input_image"].click()
+    _browse_the_zone(form, "input_image")
 
     assert captured["dir"] == str(poses)
 
@@ -1228,7 +1250,7 @@ def test_param_form_browse_falls_back_when_the_named_folder_is_absent(
                  browse_dir=tmp_path / "not_installed"),
     ])
     qtbot.addWidget(form)
-    form._browse_buttons["input_image"].click()
+    _browse_the_zone(form, "input_image")
 
     assert captured["dir"] == str(pf.COMFYUI_INPUT_DIR)
 
@@ -1239,7 +1261,7 @@ def test_the_browse_dialog_is_titled_with_the_fields_own_name(qtbot, monkeypatch
     form = ParamForm([ParamDef("input_image", "Structure Image", "image", "")])
     qtbot.addWidget(form)
 
-    form._browse_buttons["input_image"].click()
+    _browse_the_zone(form, "input_image")
 
     assert captured["caption"] == "Select Structure Image"
 
@@ -1252,7 +1274,7 @@ def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, 
 
     form = ParamForm([ParamDef("input_image", "Input Image", "image", str(img))])
     qtbot.addWidget(form)
-    form._browse_buttons["input_image"].click()
+    _browse_the_zone(form, "input_image")
 
     assert captured["dir"] == str(img)
 
@@ -1981,7 +2003,7 @@ def test_a_voice_sample_is_picked_with_a_browse_button(qtbot, monkeypatch):
         asked.update(caption=caption, kinds=kinds)
         return "C:/v/her.wav", ""
 
-    monkeypatch.setattr(pf.QFileDialog, "getOpenFileName", fake)
+    monkeypatch.setattr(file_pick.QFileDialog, "getOpenFileName", fake)
     form = ParamForm(_voice_defs())
     qtbot.addWidget(form)
     form._browse_buttons["voice_sample"].click()
@@ -2257,3 +2279,76 @@ def test_a_recommended_choices_tooltip_opens_with_recommended(qtbot):
     form.mark_recommended({"sampler_name": (), "scheduler": ()})
     assert _item_tooltip(samplers, "euler_ancestral") == option_help(
         "sampler_name", "euler_ancestral")
+
+
+# --- a picture or video input is a drop zone ---------------------------------
+
+class _Lends:
+    def lends(self, prompt_id, kind):
+        return f"{kind}/{prompt_id}.file [output]" if prompt_id.startswith(kind) else None
+
+    def item_of(self, held):
+        return held.split("/")[1].split(".")[0] if held.startswith(("image/", "video/")) else None
+
+    def named(self, name):
+        return {"AB12CD34 001": "image1"}.get(name)
+
+    def name_of(self, held):
+        return "AB12CD34 001" if "image1" in held else held
+
+    def preview(self, held):
+        return (None, None)
+
+
+def _let_go(slot, prompt_id):
+    mime = generation_mime(prompt_id)
+    event = QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    slot.dropEvent(event)
+
+
+@pytest.mark.parametrize("kind", ["image", "video"])
+def test_a_picture_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(qtbot, kind):
+    form = ParamForm([ParamDef("source", "Source", kind, "")])
+    qtbot.addWidget(form)
+    zone = form._widgets["source"]
+    assert isinstance(zone, DropSlot)
+    assert form.get_values()["source"] == ""
+    assert "source" not in form._browse_buttons
+    assert [action.text() for action in zone.menu().actions()] == ["Paste Origenerator name",
+                                                                   "Browse..."]
+
+    form.set_values({"source": "C:/somewhere/scene one.mp4"})
+
+    assert zone.current_id() == "C:/somewhere/scene one.mp4"
+    assert form.get_values()["source"] == "C:/somewhere/scene one.mp4"
+
+
+def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
+    form = ParamForm([ParamDef("input_image", "Picture", "image", ""),
+                      ParamDef("video", "Video to Perform", "video", "")], items=_Lends())
+    qtbot.addWidget(form)
+    edits = []
+    form.changed.connect(lambda: edits.append(form.get_values()))
+
+    _let_go(form._widgets["input_image"], "image1")
+    _let_go(form._widgets["video"], "image1")  # a picture lends a video zone nothing
+
+    assert form.get_values()["input_image"] == "image/image1.file [output]"
+    assert form.get_values()["video"] == ""
+    assert edits[-1]["input_image"] == "image/image1.file [output]"
+    assert form._widgets["input_image"].toolTip() == "AB12CD34 001"
+
+
+def test_clicking_a_held_item_leads_back_to_it(qtbot):
+    form = ParamForm([ParamDef("input_image", "Picture", "image", "")], items=_Lends())
+    qtbot.addWidget(form)
+    led_to = []
+    form.item_activated.connect(led_to.append)
+
+    form.set_values({"input_image": "C:/elsewhere/photo.png"})
+    form._widgets["input_image"].activated.emit("C:/elsewhere/photo.png")
+    form.set_values({"input_image": "image/image1.file [output]"})
+    form._widgets["input_image"].activated.emit("image/image1.file [output]")
+
+    assert led_to == ["image1"]

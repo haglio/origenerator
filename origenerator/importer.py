@@ -18,6 +18,7 @@ from shared_ui.orientation import orientation_of_size
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
+    driving_video_params,
     empty_latent,
     follow,
     graph_model_params,
@@ -591,6 +592,7 @@ def _scalars(inputs: dict) -> dict:
 # case with the losers named; tests/test_workflows.py holds these names against
 # the registry, and holds what every registered workflow's own graph reads as.
 _GRAPH_SIGNATURES = (
+    ("wan22_animate", (frozenset({"WanAnimateToVideo"}),)),
     ("wan22_flf2v_loop", (frozenset({"WanFirstLastFrameToVideo"}),)),
     ("wan22_i2v", (frozenset({"WanImageToVideo"}),)),
     # A Wan/Hunyuan video latent saved as a still image: text-to-image.
@@ -716,6 +718,7 @@ def _graph_params(graph: dict) -> dict:
     return {
         **_size_params(graph),
         **_input_image_params(graph),
+        **driving_video_params(graph),
         **sampler_params,
         **guidance_params(graph),
         **graph_model_params(graph),

@@ -130,7 +130,7 @@ from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.moving_previews import MovingPreviews
-from origenerator.gui.notice_overlay import ERROR, NOTICE
+from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.pane_arrangement import PaneArrangement
@@ -2809,10 +2809,10 @@ class GalleryView(QWidget):
 
     # --- what the spoken words ask of this window ----------------------------
 
-    def say(self, message: str) -> None:
+    def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
         """Flash a line on the voice caption. What the slideshows use when there is no
         slideshow up to put it in the corner of."""
-        self._voice.say(message)
+        self._voice.say(message, mark=mark)
 
     def collection_label(self, key: str) -> str:
         """A collection's plain name, for a spoken word to be answered in."""
@@ -3039,7 +3039,7 @@ class GalleryView(QWidget):
                   "negative_prompt": revision.negative}
         key = self.folder_key_for(row.get("workflow_name") or "", params)
         if not self._jobs.start_prepared(key, workflow, params):
-            return "🎤 couldn't queue the request — see the log", ERROR
+            return "couldn't queue the request — see the log", ERROR
         job = self._jobs.newest_job_for(key)
         logger.info("Request on %s: term %s, queued as %s", row.get("prompt_id"),
                     revision.action, job.prompt_id)
@@ -3051,7 +3051,7 @@ class GalleryView(QWidget):
             new_negative=revision.negative,
         )
         self.refresh()  # the collection shows the request the moment it is spoken
-        return f"🎤 {revision.describe()} — generating", NOTICE
+        return f"{revision.describe()} — generating", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
         """Bin some of one image's versions, from the info pane's version list.

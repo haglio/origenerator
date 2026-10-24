@@ -39,7 +39,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.level_stepper import LevelStepper
-from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
 from origenerator.gui.slideshow_map import SEED_AXIS
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_panel import slideshow_hud_model
@@ -473,8 +473,8 @@ class FunestraSlideshow(QObject):
             self._actions.delete(prompt_id)
         except OSError:
             logger.exception("The %s Funestra kept a condemned generation open", self._side)
-            self._flash("🗑 couldn't delete that one — the Funestra still has it open",
-                       kind=WARNING)
+            self._flash("couldn't delete that one — the Funestra still has it open",
+                        kind=WARNING, mark="trash")
 
     def cull(self) -> None:
         self.slideshow_cull()
@@ -826,7 +826,7 @@ class FunestraSlideshow(QObject):
         self.shown.request_line(message, request, working=working, kind=kind)
 
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
-        self.shown.flash(message, kind=kind, ms=2500)
+        self.shown.flash(message, kind=kind, ms=2500, mark=HEARD_MARK)
 
     def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
         if prompt_id is not None:
@@ -834,8 +834,8 @@ class FunestraSlideshow(QObject):
             self._publish()
         self.note_voice_command(message, kind=kind)
 
-    def _flash(self, message: str, *, kind: str = NOTICE) -> None:
-        self.shown.flash(message, kind=kind)
+    def _flash(self, message: str, *, kind: str = NOTICE, mark: str = "") -> None:
+        self.shown.flash(message, kind=kind, mark=mark)
 
     def release_media(self, paths) -> None:
         """Let go of any of *paths* on screen — a file about to be moved.
@@ -924,17 +924,17 @@ class OnASessionsFunestra:
         if text != self._published and publish_whole(self._channel.hud_file, text):
             self._published = text
 
-    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 0) -> None:
+    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 0, mark: str = "") -> None:
         if self._say is not None:
-            self._say(text)
+            self._say(text, mark=mark)
 
     def request_line(self, message: str, request=None, *, working: bool = False,
                      kind: str = NOTICE) -> None:
-        self.flash(message, kind=kind)
+        self.flash(message, kind=kind, mark=HEARD_MARK)
 
     def dictating(self, note: str) -> None:
         if note:
-            self.flash(note)
+            self.flash(note, mark=HEARD_MARK)
 
     def room_paused(self, paused: bool) -> None:
         pass

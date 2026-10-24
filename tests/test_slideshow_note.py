@@ -15,12 +15,13 @@ from origenerator.gui import voice_router
 from origenerator.gui.notice_overlay import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView
 from tests.funestra_fakes import FakeEngine
+from tests.marked_words import words
 from tests.test_gallery_view import _requesting_view
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]
 
-_WORKING = "🎤 working out “no hat”…"
-_ALSO_WORKING = "🎤 working out “no beard”…"
+_WORKING = "working out “no hat”…"
+_ALSO_WORKING = "working out “no beard”…"
 
 # Stand-ins for the SpokenRequest a line is about: the note only ever compares
 # them, so what one is made of is the request flow's business, not the corner's.
@@ -66,7 +67,7 @@ def _corner(view) -> str:
     """What the corner actually reads.  A note with nothing to say is hidden
     rather than emptied, and the notice keeps its last line under that — so
     ``text()`` alone would read a blank corner as still saying the old thing."""
-    return "" if view._note.isHidden() else view._note.text()
+    return "" if view._note.isHidden() else words(view._note)
 
 
 def test_the_note_that_says_the_app_is_still_working_does_not_fade(qtbot):
@@ -84,7 +85,7 @@ def test_the_answer_takes_the_corner_back_and_fades_as_notes_do(qtbot):
     view = _view(qtbot)
     view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
-    view.slideshow.note_request("🎤 dropped “hat” — generating", _ASKED)
+    view.slideshow.note_request("dropped “hat” — generating", _ASKED)
 
     assert "generating" in _corner(view)
     _fade(view)
@@ -99,7 +100,7 @@ def test_an_answer_to_one_request_leaves_another_still_being_worked_out(qtbot):
     view.slideshow.note_request(_WORKING, _ASKED, working=True)
     view.slideshow.note_request(_ALSO_WORKING, _ASKED_AGAIN, working=True)
 
-    view.slideshow.note_request("🎤 didn't catch what to change in “no hat”", _ASKED)
+    view.slideshow.note_request("didn't catch what to change in “no hat”", _ASKED)
 
     assert "didn't catch" in _corner(view)
     _fade(view)
@@ -113,7 +114,7 @@ def test_a_flash_while_the_work_goes_on_falls_back_to_the_work(qtbot):
     view = _view(qtbot)
     view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
-    view.slideshow.note_voice_command("🎤 heard: “no hat”")
+    view.slideshow.note_voice_command("heard: “no hat”")
     assert "heard" in _corner(view)
     _fade(view)
 
@@ -127,11 +128,11 @@ def test_a_line_keeps_its_color_and_the_corner_falls_back_to_white(qtbot):
     view = _view(qtbot)
     view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
-    view.slideshow.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
+    view.slideshow.note_voice_command("nothing here is enhanced", kind=WARNING)
     assert AMBER.name() in view._note.styleSheet()
-    view.slideshow.note_voice_run(None, "🎤 couldn't launch the enhance — see the log", kind=ERROR)
+    view.slideshow.note_voice_run(None, "couldn't launch the enhance — see the log", kind=ERROR)
     assert RED.name() in view._note.styleSheet()
-    view.slideshow.note_request("🎤 didn't catch what to change in “no beard”", _ASKED_AGAIN,
+    view.slideshow.note_request("didn't catch what to change in “no beard”", _ASKED_AGAIN,
                       kind=WARNING)
     assert AMBER.name() in view._note.styleSheet()
     _fade(view)
@@ -168,10 +169,10 @@ def test_the_pane_says_it_is_working_too_when_no_slideshow_is_up(qtbot, tmp_path
     which has one slot and reverted to "Listening…" — an idle line over an app
     still working, which is the same thing the corner was doing."""
     view = _mid_request(qtbot, tmp_path, monkeypatch, showing=False)
-    assert "working out" in view._voice.status.text()
+    assert "working out" in words(view._voice.status)
 
     view._voice.listener.heard.emit("something else entirely")
-    assert "heard" in view._voice.status.text()
+    assert "heard" in words(view._voice.status)
     view._voice._revert()  # what its 4 s timer does when it fires
 
-    assert "working out" in view._voice.status.text()
+    assert "working out" in words(view._voice.status)

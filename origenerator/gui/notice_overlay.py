@@ -26,6 +26,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui.colors import AMBER, BG_SECONDARY, GREEN, RED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
+from shared_ui.icons import marked_text
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 
@@ -40,6 +41,17 @@ ERROR = "error"
 FAVORITE = "favorite"
 _INK = {NOTICE: TEXT_PRIMARY, WARNING: AMBER, ERROR: RED, FAVORITE: GREEN}
 
+HEARD_MARK = "mic"
+
+
+def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
+    if not mark:
+        label.setTextFormat(Qt.TextFormat.PlainText)
+        label.setText(text)
+        return
+    label.setTextFormat(Qt.TextFormat.RichText)
+    label.setText(marked_text(mark, text, color=color, size=label.fontMetrics().height()))
+
 
 class NoticeOverlay(QLabel):
     """One line, centered across the top of the surface it belongs to."""
@@ -51,7 +63,7 @@ class NoticeOverlay(QLabel):
         float_over_media(self)
         self.hide()
 
-    def say(self, text: str, *, kind: str = NOTICE) -> None:
+    def say(self, text: str, *, kind: str = NOTICE, mark: str = "") -> None:
         """Put *text* up, and keep it up until something says otherwise."""
         ink = _INK[kind].name()
         self.setStyleSheet(
@@ -59,7 +71,7 @@ class NoticeOverlay(QLabel):
             f" color: {ink}; border: 1px solid {ink};"
             " padding: 8px 16px; border-radius: 4px;"
         )
-        self.setText(text)
+        set_marked_text(self, text, mark=mark, color=_INK[kind])
         self.show()
         self.reposition()
 

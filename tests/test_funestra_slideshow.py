@@ -24,6 +24,7 @@ from origenerator.funscript import funscript_path_for
 from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.notice_overlay import HEARD_MARK
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -39,6 +40,14 @@ FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 ROOT = Path(__file__).resolve().parent.parent
 DRIVERS = ("origenerator/gui/slideshow_panel.py", "origenerator/fun_time_bridge.py",
            "origenerator/gui/console.py")
+
+
+def _into(said: list):
+    return lambda message, *, mark: said.append(message)
+
+
+def _marked_into(said: list):
+    return lambda message, *, mark: said.append((mark, message))
 
 
 def _channel(tmp_path: Path) -> FunestraChannel:
@@ -369,12 +378,13 @@ def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot
     def delete(_prompt_id):
         raise PermissionError("the file is in use")
 
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(delete=delete), say=said.append,
-                           items=_ITEMS[:1])
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(delete=delete),
+                           say=_marked_into(said), items=_ITEMS[:1])
 
     slideshow.slideshow_cull()
 
-    assert said and "couldn't delete" in said[-1]
+    mark, line = said[-1]
+    assert mark == "trash" and "couldn't delete" in line
 
 
 def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):
@@ -845,7 +855,7 @@ def test_a_loop_hands_the_funestra_the_row_to_play_and_its_ending_hands_back_the
     """The row becomes the Funestra's list, the item on screen first so it keeps
     playing; the loop key ends it and the set comes back the same way."""
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_loop("seed")
@@ -945,7 +955,7 @@ def _acts(prompt_ids):
 def test_a_rows_button_narrows_the_slideshow_to_that_act_and_hands_the_funestra_what_is_left(
         qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_filter("alpha")
@@ -959,7 +969,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_act_and_hands_the_funestra_
 def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(
         qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
 
     slideshow.slideshow_filter_to_the_act_on_screen()
 
@@ -969,7 +979,7 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
 
 def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
 
     slideshow.slideshow_filter_to_the_act_on_screen()
 
@@ -978,7 +988,7 @@ def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot, tmp_path):
 
 def test_a_row_naming_two_acts_is_posted_with_its_spaces_as_underscores(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
 
     slideshow.slideshow_filter("source_image,_alpha")
 
@@ -998,7 +1008,7 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
         if pid == "id-1" else (),
         seeds=(Slide("one-y.png", "image", "id-1y"),) if pid == "id-1x" else ())
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=around, acts=_acts),
-                           say=said.append)
+                           say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_filter("e629425b")
@@ -1019,7 +1029,7 @@ def test_a_filter_past_the_item_on_screen_sends_the_funestra_to_what_is_left(qtb
 
 def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_filter("gamma")
@@ -1042,7 +1052,7 @@ def test_the_pass_is_as_long_as_what_the_funestra_was_handed(qtbot, tmp_path):
 
 def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=_into(said))
     slideshow.slideshow_loop("seed")
 
     slideshow.slideshow_loop("")
@@ -1056,7 +1066,7 @@ def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot, tmp_path
     still means "this one" — so the Funestra is told to lock it, the way its own
     loop button locks a clip whose group holds only that clip."""
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_loop("seed")
@@ -1067,7 +1077,7 @@ def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot, tmp_path
 
 def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_loop_cycle()
@@ -1077,10 +1087,21 @@ def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path
     assert said == ["Locked", "Unlocked"]
 
 
+def test_a_press_is_answered_plain_and_a_spoken_word_after_the_mic(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=_marked_into(said))
+    _sent(slideshow)
+
+    slideshow.slideshow_loop("seed")
+    slideshow.note_voice_command("favorited")
+
+    assert said == [("", "Locked"), (HEARD_MARK, "favorited")]
+
+
 def test_more_seeds_hands_the_funestra_the_wider_row(qtbot, tmp_path):
     said = []
     beyond = (Slide("far.png", "image", "id-far"),)
-    slideshow = _slideshow(qtbot, tmp_path, say=said.append, actions=SlideshowActions(
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said), actions=SlideshowActions(
         neighbors=_around, widen=lambda pid: beyond if pid == "id-1" else ()))
 
     slideshow.slideshow_more_seeds()
@@ -1092,7 +1113,7 @@ def test_more_seeds_hands_the_funestra_the_wider_row(qtbot, tmp_path):
 
 def test_more_seeds_with_nothing_beyond_the_row_says_so(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, say=said.append, actions=SlideshowActions(neighbors=_around))
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said), actions=SlideshowActions(neighbors=_around))
     _sent(slideshow)
 
     slideshow.slideshow_more_seeds()
@@ -1122,7 +1143,7 @@ def test_a_walk_off_a_locked_item_lets_go_of_it_first(qtbot, tmp_path):
 
 def test_a_walk_with_nothing_that_way_says_so_and_stays(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, say=said.append)
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_nav("right")
@@ -1561,7 +1582,7 @@ def test_taking_the_loop_off_a_folder_on_a_funestra_asks_for_the_regions_library
         qtbot, tmp_path):
     said, widened = [], []
     folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
-    slideshow = _slideshow(qtbot, tmp_path, items=folder, say=said.append, actions=SlideshowActions(
+    slideshow = _slideshow(qtbot, tmp_path, items=folder, say=_into(said), actions=SlideshowActions(
         neighbors=_row_only, browse_all=lambda s: widened.append(s) or True))
 
     slideshow.slideshow_loop("")
@@ -1572,7 +1593,7 @@ def test_taking_the_loop_off_a_folder_on_a_funestra_asks_for_the_regions_library
 def test_the_loop_key_off_a_folder_on_a_funestra_leaves_it_in_one_press(qtbot, tmp_path):
     said, widened = [], []
     folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
-    slideshow = _slideshow(qtbot, tmp_path, items=folder, say=said.append, actions=SlideshowActions(
+    slideshow = _slideshow(qtbot, tmp_path, items=folder, say=_into(said), actions=SlideshowActions(
         neighbors=_row_only, browse_all=lambda s: widened.append(s) or True))
 
     slideshow.slideshow_loop_cycle()

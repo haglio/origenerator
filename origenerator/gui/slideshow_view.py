@@ -24,8 +24,9 @@ from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_placement import HudCorner
 from funestra.pointer import OMNIPAUSE_TOGGLE
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from shared_ui.colors import BLACK
 
 from origenerator import osr2 as osr2_device
 from origenerator.config import FRAMES_BEING_MADE_DIR
@@ -42,7 +43,7 @@ from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import QueuePointer, queue_section
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.notice_overlay import NOTICE, NoticeOverlay
+from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, NoticeOverlay
 from origenerator.gui.slideshow_panel import (
     COLLAPSES,
     OPENS_IN,
@@ -102,7 +103,7 @@ class SlideshowView(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround under the media
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor("black"))
+        palette.setColor(QPalette.ColorRole.Window, BLACK)
         self.setPalette(palette)
 
         # A Fun Time notice, at the top center where Fun Time flashes the same
@@ -374,10 +375,10 @@ class SlideshowView(QWidget):
 
     # --- the lines it flashes over the picture --------------------------------
 
-    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 1500) -> None:
+    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 1500, mark: str = "") -> None:
         """Say something for a moment, then fall back to whatever the note would
         otherwise be saying."""
-        self._note.say(text, kind=kind)
+        self._note.say(text, kind=kind, mark=mark)
         self._note_timer.start(ms)
 
     def dictating(self, note: str) -> None:
@@ -405,13 +406,13 @@ class SlideshowView(QWidget):
             return
         if request is self._working_request:
             self._working_note, self._working_request = "", None
-        self.flash(message, ms=3000, kind=kind)
+        self.flash(message, ms=3000, kind=kind, mark=HEARD_MARK)
 
     def _refresh_note(self):
         if self._request_note:
-            self._note.say(self._request_note, kind=NOTICE)
+            self._note.say(self._request_note, kind=NOTICE, mark=HEARD_MARK)
         elif self._working_note:
-            self._note.say(self._working_note, kind=NOTICE)
+            self._note.say(self._working_note, kind=NOTICE, mark=HEARD_MARK)
         else:
             self._note.hide()
 

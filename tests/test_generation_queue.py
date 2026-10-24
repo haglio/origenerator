@@ -19,6 +19,7 @@ from origenerator.gui.generation_queue import (
 )
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.stylesheet import build_stylesheet
+from tests.marked_words import words
 
 
 @pytest.fixture
@@ -1213,8 +1214,8 @@ def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
 
     row.resize(row.width() - row._note.width() + room, row.height())
 
-    assert row._note.text().endswith("…")
-    assert row._note.text() != "Starting…"
+    assert words(row._note).endswith("…")
+    assert words(row._note) != "Starting…"
     assert row._note.toolTip() == "Starting…"
 
 

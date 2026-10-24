@@ -74,3 +74,10 @@ def test_the_contract_imports_first_though_the_workflows_it_reads_the_rate_from_
     imported = run_python(["-c", "import origenerator.gallery_contract"])
 
     assert imported.returncode == 0, imported.stderr
+
+
+def test_the_document_names_the_command_that_starts_this_apps_work_while_it_is_closed():
+    interpreter, *arguments = _document()["downtime_command"]
+
+    assert interpreter == ".venv/Scripts/python.exe"
+    assert arguments == ["-m", "origenerator.downtime"]

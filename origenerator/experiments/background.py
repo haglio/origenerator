@@ -1,7 +1,7 @@
-"""Background experiments: queued as the app closes, cleared when it opens.
+"""Background experiments: queued while the app is closed, cleared when it opens.
 
 Experiments belong to the stretch when Origenerator isn't running. ComfyUI is a
-server that outlives the app, so closing hands it a batch of policy-proposed
+server that outlives the app, so the closed app's turn hands it a batch of policy-proposed
 variations and it works through them alone; the next launch finds the finished
 ones in the Experiments collection (the startup reconcile finalizes their rows) and
 drops whatever hadn't run yet, so an open app never has an experiment competing

@@ -5,8 +5,8 @@ instance, on the live install's own library (the database in :data:`origenerator
 LIBRARY_STATE_DIR`, the thumbnails and trash in the library's app_data folder), so every instance
 shows every generation whichever of them made it. What such a session must not
 do is hand the *shared ComfyUI* work for the coming absence -- background
-experiments and base re-renders (``GalleryView.queue_experiments_for_absence``,
-``queue_base_renders_for_absence``) -- or clear the absence work the live app
+experiments and base re-renders (:mod:`origenerator.downtime`) -- or clear
+the absence work the live app
 queued: those outlive the preview in a queue only the app that queued them can
 account for.
 

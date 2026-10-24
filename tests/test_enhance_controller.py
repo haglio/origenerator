@@ -928,12 +928,16 @@ class _KeptTrainer:
     def running(self):
         return self.alive
 
+    def stop(self):
+        self.alive = False
 
-def _kept_training(photos, part="hands", **status) -> dict:
+
+def _kept_training(photos, part="hands", automatic=False, **status) -> dict:
     work = photos / "fix training" / part
     work.mkdir(parents=True)
     job = {"part": part, "work": str(work), "status": str(work / "status.json"),
-           "job_file": str(work / "job.json"), "process": str(work / "process.json")}
+           "job_file": str(work / "job.json"), "process": str(work / "process.json"),
+           "automatic": automatic}
     Path(job["job_file"]).write_text(json.dumps(job), encoding="utf-8")
     if status:
         Path(job["status"]).write_text(json.dumps(status), encoding="utf-8")
@@ -952,6 +956,19 @@ def test_a_training_an_earlier_launch_left_running_is_taken_up_and_holds_the_lin
     (run,) = _training_runs
     assert run.adopted is trainer
     assert run.job["part"] == "hands"
+
+
+def test_a_training_evolver_started_while_the_app_was_closed_stops_as_it_opens(
+        enhance, photos, monkeypatch):
+    _kept_training(photos, automatic=True)
+    trainer = _KeptTrainer(alive=True)
+    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: trainer)
+    controller, _host = enhance()
+
+    controller.take_up_trainings()
+
+    assert not trainer.running()
+    assert _training_runs == []
 
 
 def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(

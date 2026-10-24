@@ -27,7 +27,6 @@ from typing import NamedTuple, Protocol
 from PyQt6.QtWidgets import QMessageBox
 
 from origenerator import config, enhance_presets, fix_training, gallery
-from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
@@ -167,7 +166,8 @@ class EnhanceController:
                 self.panel, "Train", "No training program is set up: content.local.json "
                 "names no lora_training_python and lora_training_scripts.")
             return
-        job = fix_training.training_job(part, self._model_to_train_for(),
+        job = fix_training.training_job(part,
+                                        fix_training.model_to_train_for(self._settings.params),
                                         datetime.now().astimezone())
         self._watch(job).begin()
 
@@ -176,7 +176,9 @@ class EnhanceController:
             trainer = fix_training.trainer_of(job)
             if trainer is None:
                 continue
-            if trainer.running():
+            if trainer.running() and job.get("automatic"):
+                trainer.stop()
+            elif trainer.running():
                 if self._training is None:
                     self._watch(job).adopt(trainer)
             elif (lora := fix_training.untaken_lora(job)) is not None:
@@ -191,12 +193,6 @@ class EnhanceController:
         self._training.failed.connect(lambda why: self._training_ended(job, None, why))
         self._training.canceled.connect(lambda: self._training_ended(job, None))
         return self._training
-
-    def _model_to_train_for(self) -> str:
-        chosen = self._settings.params.get("checkpoint")
-        if not chosen or chosen == MATCH_SOURCE_MODEL:
-            return WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW].default_params()["checkpoint"]
-        return chosen
 
     def _training_ended(self, job: dict, lora: str | None, why: str = "") -> None:
         self._training = None

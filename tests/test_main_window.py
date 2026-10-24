@@ -18,7 +18,7 @@ from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.preview import Preview
 
-from origenerator import app_link, gallery, notice_toast, recipe_match, ui_scale
+from origenerator import app_link, downtime, gallery, notice_toast, recipe_match, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -582,18 +582,19 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     assert slideshow.hud_enhanced_mode
 
 
-def test_closing_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path):
-    # The switch is a standing "spend the time I'm not here": closing is what
-    # queues the batch, because ComfyUI outlives the app and works through it.
+def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path):
+    # The switch is a standing "spend the time I'm not here": once the app is
+    # closed, its turn hands ComfyUI the batch, and ComfyUI works through it.
     db = Database(tmp_path / "t.db")
     _completed_image(db)
     client = _QueueSpyClient()
     win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
     win._gallery_view.set_experiments_enabled(True)
-    assert client.submitted == []  # nothing while the app is open
-
     win.close()
+    assert client.submitted == []  # nothing while the app is open, or as it closes
+
+    downtime.hand_comfyui_the_work_left(db, client, AppState(tmp_path / "ui.json"))
 
     queued = [r for r in db.list_generations() if r.get("source") == "experiment"]
     assert client.submitted
@@ -601,16 +602,17 @@ def test_closing_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path
     assert all(r.get("status") == "running" for r in queued)
 
 
-def test_closing_with_the_switch_off_queues_nothing(qtbot, tmp_path):
+def test_with_the_switch_off_the_closed_apps_turn_runs_no_experiments(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     _completed_image(db)
     client = _QueueSpyClient()
     win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
-
     win.close()
 
-    assert client.submitted == []
+    downtime.hand_comfyui_the_work_left(db, client, AppState(tmp_path / "ui.json"))
+
+    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 
 def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):

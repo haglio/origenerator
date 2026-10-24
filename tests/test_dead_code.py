@@ -396,7 +396,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # their docstrings, and so did the notes on matching Fun Time's numbers by hand.
 # 16482 on 2026-10-24: the console's note on what the OSR2 row reads while nothing
 # hears it went; the tests for Off and for the Broker's word say it.
-MAX_PROSE_LINES = 16482
+# 16443 when the work Origenerator does while closed came to be started by Evolver,
+# and the gallery's two close-time batches and their notes went with it.
+MAX_PROSE_LINES = 16443
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

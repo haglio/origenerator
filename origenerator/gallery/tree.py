@@ -110,6 +110,14 @@ def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
     )
 
 
+
+def folder_key_for(workflow_name: str, params: dict, image_index: dict | None = None,
+                   workflow_version: str | None = None) -> str:
+    row = {"workflow_name": workflow_name, "params_json": json.dumps(params)}
+    if workflow_version is not None:
+        row["workflow_version"] = workflow_version
+    return settings_folder_key(row, image_index)
+
 def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) -> str:
     """The key of the ``level``-tier folder ``row`` belongs to, recomputed from the
     row under the *current* key formulas.

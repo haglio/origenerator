@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from origenerator import base_backfill, gallery
+from origenerator import base_backfill, downtime, gallery
 from origenerator.app_state import AppState
 from origenerator.base_backfill import (
     TARGET_KEY,
@@ -25,10 +25,12 @@ from origenerator.base_backfill import (
     rows_missing_their_base,
     typical_seconds,
 )
+from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.generation_job import GenerationJob
+from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tools import backfill_base_renders as backfill_tool
@@ -356,14 +358,12 @@ def test_typical_seconds_is_the_median_of_what_was_recorded(tmp_path):
 
 # --- the batch a real close actually hands over -----------------------------
 
-def test_the_close_batch_reaches_the_queue(qtbot, tmp_path, monkeypatch):
-    # The batch runs only from a closing window, where an exception is shown to
-    # nobody — so the wiring between the view and the queue is checked here
-    # rather than left to the one place it can fail in silence. It failed
-    # exactly that way: the launch adapter named a base-render source constant
-    # the gallery package never exported, so every close raised before the session
-    # was saved. Three days of closes queued no repair at all and lost the open
-    # tabs, the gallery folder and the window's place, with nothing in the log.
+def test_the_work_left_for_while_closed_reaches_the_queue(qtbot, tmp_path, monkeypatch):
+    # The batch runs where an exception is shown to nobody, so the wiring between
+    # it and the queue is checked here rather than left to the one place it can
+    # fail in silence. It failed exactly that way once: the launch adapter named
+    # a base-render source constant the gallery package never exported, and
+    # three days of closes queued no repair at all.
     #
     # Everything but the socket is the real path: the submit is stubbed,
     # because a job the server refuses is dropped from the line.
@@ -371,15 +371,43 @@ def test_the_close_batch_reaches_the_queue(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     for i in range(3):
         _baked(db, f"baked{i}", seed=i)
-    window = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
-    qtbot.addWidget(window)
+    jobs = JobQueue(db, ComfyUIClient())
 
-    assert window._gallery_view.queue_base_renders_for_absence() == 3
+    assert downtime.queue_the_work_left(jobs, db.list_generations(), experiments_on=False,
+                                        policy=None) == 3
 
     repairs = [r for r in db.list_generations()
                if r.get("source") == GenerationSource.BASE_RENDER]
     assert {gallery.parse_params(r["params_json"])[TARGET_KEY] for r in repairs} == \
         {"baked0", "baked1", "baked2"}
+
+
+def test_closing_leaves_work_for_while_closed_and_opening_takes_it_back(qtbot, tmp_path,
+                                                                         monkeypatch):
+    monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
+    db = Database(tmp_path / "t.db")
+    window = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(window)
+
+    window.close()
+    assert downtime.work_left()
+
+    reopened = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(reopened)
+    assert not downtime.work_left()
+
+
+def test_a_branch_sessions_close_leaves_no_work_for_while_closed(qtbot, tmp_path,
+                                                                  monkeypatch):
+    monkeypatch.setenv(ENV_FLAG, "1")
+    monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
+    window = OrigeneratorWindow(ComfyUIClient(), Database(tmp_path / "t.db"),
+                                AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(window)
+
+    window.close()
+
+    assert not downtime.work_left()
 
 
 def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
@@ -394,7 +422,7 @@ def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
     state_path = tmp_path / "ui.json"
     window = OrigeneratorWindow(ComfyUIClient(), db, AppState(state_path))
     qtbot.addWidget(window)
-    monkeypatch.setattr(window._gallery_view, "queue_base_renders_for_absence", boom)
+    monkeypatch.setattr(window, "_leave_work_for_while_closed", boom)
     window._gallery_view.select_generation("xyz")
 
     window.close()

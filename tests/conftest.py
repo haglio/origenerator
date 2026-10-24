@@ -121,6 +121,8 @@ ARCH_TENSOR_NAMES = {
                 "patch_embedding.weight"],
     "ltx": ["patchify_proj.weight", "transformer_blocks.0.attn1.to_q.weight"],
     "krea2": ["first.weight", "blocks.0.attn.wq.weight", "txtfusion.projector.weight"],
+    "minimax_h3": ["blocks.0.attn.qkv_proj.weight", "token_refiner.blocks.0.mlp.fc1.weight",
+                   "video_patch_proj.weight"],
 }
 
 

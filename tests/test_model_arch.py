@@ -6,7 +6,19 @@ import struct
 import pytest
 
 from origenerator.workflows import model_arch
-from origenerator.workflows.model_arch import FLUX, KREA2, LTX, QWEN, SD15, SDXL, WAN, WAN_S2V
+from origenerator.workflows.model_arch import (
+    FL2VA,
+    FLUX,
+    KREA2,
+    LTX,
+    MINIMAX_H3,
+    QWEN,
+    REF2VA,
+    SD15,
+    SDXL,
+    WAN,
+    WAN_S2V,
+)
 
 
 def _write(path, tensor_names):
@@ -75,12 +87,41 @@ ARCH_CASES = [
     # ...and one trained on the adapter alone, which is how the LoRA that stops
     # the prompt reader refusing an explicit prompt is made.
     (KREA2, ["diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lora_A.weight"]),
+    # MiniMax H3: WAN's `blocks.N` again, told apart by the layers around them
+    # (its token refiner, its video and audio patch projections) -- and, in a
+    # LoRA that touches nothing but the blocks, by the fused qkv projection
+    # inside them, which WAN's blocks (self_attn.q/k/v) never have.
+    (MINIMAX_H3, ["blocks.0.attn.qkv_proj.weight", "blocks.0.adaln_proj.linear.weight",
+                  "token_refiner.blocks.0.mlp.fc1.weight", "video_patch_proj.weight",
+                  "audio_patch_proj.weight", "adaln_t_table"]),
+    (MINIMAX_H3, ["diffusion_model.blocks.0.attn.qkv_proj.lora_A.weight",
+                  "diffusion_model.token_refiner.blocks.1.mlp.fc2.lora_B.weight"]),
+    (MINIMAX_H3, ["diffusion_model.blocks.3.attn.qkv_proj.lora_A.weight",
+                  "diffusion_model.blocks.3.mlp.fc1.lora_A.weight"]),
+    (MINIMAX_H3, ["lora_unet_blocks_3_attn_qkv_proj.lora_down.weight"]),
 ]
 
 
 @pytest.mark.parametrize("expected,tensor_names", ARCH_CASES)
 def test_reads_the_architecture_off_the_tensor_names(tmp_path, expected, tensor_names):
     assert model_arch.describe(_write(tmp_path / "m.safetensors", tensor_names)).arch == expected
+
+
+@pytest.mark.parametrize("name,mode", [
+    ("minimax_h3_fl2va_pruned_int8_convrot.safetensors", FL2VA),
+    ("MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors", REF2VA),
+    ("minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors", FL2VA),
+    ("minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", REF2VA),
+    ("h3_a_finetune_beta6.safetensors", None),
+    ("a_shelf2vase_still_life.safetensors", None),
+])
+def test_reads_which_of_h3s_two_tasks_a_file_is_for_off_its_name(tmp_path, name, mode):
+    # The two H3 checkpoints -- first-frame-to-video and reference-to-video --
+    # carry identical tensor names, so the name is the only thing that says
+    # which slot a file belongs in; a name that says neither stays offered in
+    # both, the way an unmarked WAN file does.
+    h3 = ARCH_CASES[-4][1]
+    assert model_arch.describe(_write(tmp_path / name, h3)).mode == mode
 
 
 def test_a_model_file_is_read_once_while_it_stays_the_same(tmp_path, monkeypatch):

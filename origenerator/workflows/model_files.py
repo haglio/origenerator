@@ -84,7 +84,7 @@ def _catalogue(directory: Path) -> list[tuple[str, model_arch.ModelFile]]:
 
 
 def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
-           want_lora: bool) -> bool:
+           mode: str | None, want_lora: bool) -> bool:
     """Whether a file read as *described* belongs in a picker with these terms.
 
     Each test drops a file only on a positive finding — an architecture that is
@@ -99,25 +99,28 @@ def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
         return False
     if accepts != ANY and described.arch is not None and described.arch not in accepts:
         return False
-    return not (expert and described.expert and described.expert != expert)
+    if expert and described.expert and described.expert != expert:
+        return False
+    return not (mode and described.mode and described.mode != mode)
 
 
-def _listing(category: str, fallback: list[str], accepts, expert, want_lora) -> list[str]:
+def _listing(category: str, fallback: list[str], accepts, expert, mode, want_lora) -> list[str]:
     directory = config.COMFYUI_DIR / "models" / category
     found = [name for name, described in _catalogue(directory)
-             if _offer(described, accepts, expert, want_lora)]
+             if _offer(described, accepts, expert, mode, want_lora)]
     return found or list(fallback)
 
 
 def list_model_files(
     category: str, fallback: list[str], *, accepts, expert: str | None = None,
+    mode: str | None = None,
 ) -> list[str]:
     """The model files in ``ComfyUI/models/<category>`` this picker can run.
 
     *accepts* is an architecture from :mod:`~origenerator.workflows.model_arch`,
     a tuple of them, or :data:`ANY`. *expert* is ``"high"`` or ``"low"`` for a
-    picker that fills one half of WAN 2.2's expert pair, which drops the files
-    whose names claim the other half.
+    picker that fills one half of WAN 2.2's expert pair, and *mode* MiniMax
+    H3's ``FL2VA`` or ``REF2VA``; each drops the files whose names claim the other.
 
     Names are given relative to the category directory (e.g.
     ``split_files\\diffusion_models\\wan.safetensors``), matching how ComfyUI's
@@ -126,21 +129,21 @@ def list_model_files(
     directory is missing or nothing in it qualifies, so the dropdown always
     offers at least the workflow's default.
     """
-    return _listing(category, fallback, accepts, expert, want_lora=False)
+    return _listing(category, fallback, accepts, expert, mode, want_lora=False)
 
 
 def list_lora_files(
-    fallback: list[str], *, accepts, expert: str | None = None,
+    fallback: list[str], *, accepts, expert: str | None = None, mode: str | None = None,
 ) -> list[str]:
     """The LoRA picker's options: the "None" sentinel first, then the installed
     LoRAs this picker can run. "None" bypasses the LoRA (see :data:`NO_LORA`), so
     every LoRA picker can opt out of applying one.
 
-    Takes the same *accepts*/*expert* terms as :func:`list_model_files`, against
-    the architecture each LoRA was *trained for* — and drops the occasional full
-    checkpoint that ends up filed under ``loras``, which no LoraLoader can take.
+    Takes the same *accepts*/*expert*/*mode* terms as :func:`list_model_files`,
+    against the architecture each LoRA was *trained for* — and drops the occasional
+    full checkpoint that ends up filed under ``loras``, which no LoraLoader can take.
     """
-    listing = _listing("loras", fallback, accepts, expert, want_lora=True)
+    listing = _listing("loras", fallback, accepts, expert, mode, want_lora=True)
     return [NO_LORA, *(name for name in listing if not is_no_lora(name))]
 
 

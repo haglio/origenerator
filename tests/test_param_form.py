@@ -1761,6 +1761,7 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
         field = scene.fields[key]
         assert field.isReadOnly()
         assert field.property("inert") is True
+        assert scene.captions[key].property("inert") is True
         assert field.toolTip() == SPEAKING_HELP
         assert scene.captions[key].text() == caption + SPEAKING_NOTE
         assert scene.captions[key].toolTip() == SPEAKING_HELP
@@ -1781,6 +1782,7 @@ def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
                          ("negative_prompt", "Negative Prompt")):
         assert not scene.fields[key].isReadOnly()
         assert scene.fields[key].property("inert") is False
+        assert scene.captions[key].property("inert") is False
         assert scene.fields[key].toolTip() == param_help(key)
         assert scene.captions[key].text() == caption
     # ...and what was typed is still there: the prompts were shut down, not wiped
@@ -1918,13 +1920,13 @@ def test_the_sound_prompts_are_shut_down_while_every_scene_speaks(qtbot):
 def _shut_down_with(form, key, tip):
     field, label = form._widgets[key], form._labels[key]
     return (_row_visible(form, key) and field.isReadOnly() and field.property("inert") is True
-            and field.toolTip() == label.toolTip() == tip)
+            and label.property("inert") is True and field.toolTip() == label.toolTip() == tip)
 
 
 def _in_use_with(form, key, tip):
     field, label = form._widgets[key], form._labels[key]
     return (_row_visible(form, key) and not field.isReadOnly() and field.property("inert") is False
-            and field.toolTip() == label.toolTip() == tip)
+            and label.property("inert") is False and field.toolTip() == label.toolTip() == tip)
 
 
 def test_the_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):

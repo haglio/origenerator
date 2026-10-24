@@ -100,10 +100,10 @@ def build_stylesheet() -> str:
         border: 1px solid {_h(BORDER_SUBTLE)};
         border-radius: 3px;
     }}
-    /* A prompt the run would ignore (prompt_field.set_in_use marks it "inert"):
-       dim, so a field you cannot type into doesn't read as one you simply
-       haven't filled in yet. */
-    QPlainTextEdit[inert="true"] {{
+    /* A prompt the run would ignore and its label (prompt_field.set_in_use marks
+       both "inert"): dim, so a field you cannot type into doesn't read as one
+       you simply haven't filled in yet. */
+    QPlainTextEdit[inert="true"], QLabel[inert="true"] {{
         color: {_h(TEXT_MUTED)};
     }}
     QLabel#estimateLabel {{

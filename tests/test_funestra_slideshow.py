@@ -26,6 +26,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.notice_overlay import HEARD_MARK
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
+from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.output_places import OutputPlaces
@@ -263,7 +264,7 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
 
 def test_the_funestra_is_told_how_long_a_picture_holds_that_nothing_holds_it_and_to_read_the_list(
         qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=6000)
+    slideshow = _slideshow(qtbot, tmp_path, pace=SlideshowPace(seconds=6))
 
     assert _sent(slideshow) == ["SET_PACE 6", "LOCK_OFF", "RELOAD_PLAYLIST"]
 
@@ -1296,9 +1297,8 @@ def test_a_slideshow_opened_on_a_slide_and_picked_back_up_there_has_the_funestra
     assert _sent(slideshow).count("PLAY_FILE three.png") == 1
 
 
-def _being_enhanced_on_screen(qtbot, tmp_path, image_dwell_ms=4000) -> FunestraSlideshow:
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=image_dwell_ms,
-                           hud=HudFacts(enhancing={"id-1": "running"}))
+def _being_enhanced_on_screen(qtbot, tmp_path) -> FunestraSlideshow:
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhancing={"id-1": "running"}))
     _says(slideshow, video="one.png")
     slideshow.tick()
     return slideshow
@@ -1347,7 +1347,7 @@ def test_a_slide_a_request_is_spoken_over_stays_held_through_a_new_list(qtbot, t
 
 
 def _following_a_run(qtbot, tmp_path) -> FunestraSlideshow:
-    slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=4000)
+    slideshow = _slideshow(qtbot, tmp_path)
     slideshow.note_generating("id-run", FRAME)
     slideshow.follow_what_is_being_made()
     _says(slideshow, video=str(read_playlist(slideshow.channel.playlist)[0].path))

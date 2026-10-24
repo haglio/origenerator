@@ -7436,6 +7436,20 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
     assert view._voice.status.isHidden()
 
 
+def test_the_captions_section_is_up_only_while_the_caption_is(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.show()
+    section = view._voice.status.parentWidget()
+    assert not section.isVisible()
+
+    view._bank.mic.setChecked(True)
+    assert section.isVisible()
+
+    view._bank.mic.setChecked(False)
+    assert not section.isVisible()
+
+
 def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     """The caption holds an utterance for a beat and then reverts — to "Listening"
     while the mic is still open, and to nothing at all once it is closed."""
@@ -10928,6 +10942,22 @@ def _insert_completed_video(db, prompt_id, params, filename):
     )
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": filename, "subfolder": ""}]))
+
+
+def test_the_combine_panel_is_up_under_the_folders_when_comfyui_can_be_reached(qtbot, tmp_path):
+    view = GalleryView(Database(tmp_path / "test.db"), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.show()
+
+    assert view._combine.panel.isVisible()
+
+
+def test_without_comfyui_the_combine_panel_takes_its_section_with_it(qtbot, tmp_path):
+    view = GalleryView(Database(tmp_path / "test.db"))
+    qtbot.addWidget(view)
+    view.show()
+
+    assert not view._combine.panel.parentWidget().isVisible()
 
 
 def test_combining_a_pair_already_made_makes_another_video(qtbot, tmp_path):

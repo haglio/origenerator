@@ -1336,6 +1336,24 @@ def test_a_request_spoken_over_a_picture_keeps_it_on_the_funestra_still_moving(q
     assert (while_said, _sent(slideshow), slideshow.locked) == (["LOCK_ON"], ["LOCK_OFF"], False)
 
 
+def test_a_slideshow_closed_while_a_request_holds_its_slide_lets_the_funestra_go(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow.pause_for_request(True)
+    _sent(slideshow)
+
+    slideshow.close()
+
+    assert _sent(slideshow) == ["LOCK_OFF"]
+
+
+def test_a_slideshow_closed_on_a_slide_it_locked_leaves_the_funestra_locked(qtbot, tmp_path):
+    slideshow = _slideshow_locked_on(qtbot, tmp_path, "one.png")
+
+    slideshow.close()
+
+    assert _sent(slideshow) == []
+
+
 def test_a_slide_a_request_is_spoken_over_stays_held_through_a_new_list(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.pause_for_request(True)

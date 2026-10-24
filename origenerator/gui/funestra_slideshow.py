@@ -867,6 +867,8 @@ class FunestraSlideshow(QObject):
         if not self._open:
             return
         self._open = False
+        if self._keep_told and not self._locked:
+            self._send(LOCK_OFF)
         slide = self._set.playlist.current()
         self._timer.stop()
         self.shown.gone()

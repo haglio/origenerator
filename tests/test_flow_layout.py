@@ -98,6 +98,40 @@ def test_align_right_pushes_each_row_against_the_right_edge(qtbot):
         assert tile.x() + tile.width() == host.width()       # ...against the edge
 
 
+def test_a_trailing_item_sits_against_the_right_edge_of_whichever_row_it_lands_on(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = FlowLayout(host, spacing=6)
+    leading, trailing = QWidget(), QWidget()
+    leading.setFixedSize(120, 30)
+    trailing.setFixedSize(80, 30)
+    layout.addWidget(leading)
+    layout.add_trailing(trailing)
+    host.resize(400, 200)
+    host.show()
+    assert (leading.x(), trailing.y()) == (0, leading.y())
+    assert trailing.x() + trailing.width() == host.width()
+
+    host.resize(150, 200)
+    layout.activate()
+
+    assert trailing.y() > leading.y()
+    assert trailing.x() + trailing.width() == host.width()
+
+
+def test_an_item_wider_than_the_whole_row_is_narrowed_to_the_row_rather_than_cut_off(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = FlowLayout(host)
+    wide = QLabel("a label far wider than the row it has to sit in")
+    wide.setMinimumWidth(40)
+    layout.addWidget(wide)
+    host.resize(120, 100)
+    host.show()
+
+    assert (wide.x(), wide.width()) == (0, 120)
+
+
 def test_a_full_row_sits_alone_across_the_whole_width_between_the_rows_of_tiles(qtbot):
     host = QWidget()
     qtbot.addWidget(host)

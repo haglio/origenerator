@@ -15,6 +15,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropE
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QApplication,
+    QDialogButtonBox,
     QLabel,
     QLineEdit,
     QMenu,
@@ -1637,6 +1638,36 @@ def test_a_fixs_lora_strength_says_what_range_works_well_as_every_forms_does(qtb
 
     assert "Good range: 0.6–1.2." in window.strength.toolTip()
     assert window.strength.toolTip().startswith("How hard the LoRA pulls.")
+
+
+def _fix_window_laid_out_at(window, width: int) -> dict:
+    window.resize(width, 600)
+    window.layout().activate()
+    buttons = window.findChild(QDialogButtonBox)
+    return {"ok": buttons.button(QDialogButtonBox.StandardButton.Ok),
+            "cancel": buttons.button(QDialogButtonBox.StandardButton.Cancel),
+            "train": window.train, "prompt_height": window.positive.height()}
+
+
+def _rows_of(window, widget) -> set[int]:
+    top = widget.mapTo(window, QPoint()).y()
+    return set(range(top, top + widget.height()))
+
+
+def test_a_fixs_lora_controls_take_a_row_of_their_own_rather_than_squeeze_any_button(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+
+    wide = _fix_window_laid_out_at(window, 1600)
+    assert _rows_of(window, wide["ok"]) & _rows_of(window, wide["train"])
+    tall_prompts = wide["prompt_height"]
+
+    narrow = _fix_window_laid_out_at(window, 420)
+    assert min(_rows_of(window, narrow["ok"])) > max(_rows_of(window, narrow["train"]))
+    assert narrow["prompt_height"] < tall_prompts
+    for button in (narrow["ok"], narrow["cancel"], narrow["train"]):
+        assert button.width() >= button.sizeHint().width()
 
 
 def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):

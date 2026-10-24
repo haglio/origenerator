@@ -31,7 +31,7 @@ from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.item_names import ItemNames
 from origenerator.orientation import oriented_key
 from origenerator.output_places import OutputPlaces
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, Slide, SlideshowFilters, SlideshowState
+from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from tests.slideshow_hud_support import open_both_sides
@@ -1326,15 +1326,25 @@ def test_the_spoken_pause_leaves_a_room_already_paused_as_it_is(slideshows):
     assert host.room_paused == []
 
 
-def test_the_spoken_play_plays_a_paused_room_again_and_sets_the_slideshow_going(slideshows):
+def test_the_spoken_play_plays_a_paused_room_again_at_the_clip_seconds_set(slideshows):
     director, host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
+    made[0].dwell_s = 7
     made[0].actions.omnipause()
 
     director.run_slideshow_command(SlideshowCommand.START, None)
 
     assert host.room_paused == [True, False]
-    assert (made[0].paused, made[0].dwell_s) == (False, DEFAULT_IMAGE_DWELL_MS // 1000)
+    assert (made[0].paused, made[0].dwell_s) == (False, 7)
+
+
+def test_the_spoken_start_with_no_slideshow_up_opens_one_at_the_clip_seconds_set(slideshows):
+    director, _host, made = slideshows(FakeHost(rows=[_row("g1")]))
+    director._pace.set_seconds(7)
+
+    director.run_slideshow_command(SlideshowCommand.START, None)
+
+    assert director._pace.seconds == 7
 
 
 @pytest.mark.parametrize(("command", "paused", "asked"), [

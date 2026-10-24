@@ -76,7 +76,6 @@ from origenerator.orientation import (
     split_key as _split_collection_key,
 )
 from origenerator.slideshow import (
-    DEFAULT_IMAGE_DWELL_MS,
     Slide,
     SlideshowFilters,
     SlideshowState,
@@ -1367,13 +1366,7 @@ class SlideshowDirector:
     def run_slideshow_command(self, command: SlideshowCommand, side: str | None):
         """Get the slideshow going, pause the room, or close the slideshow — on
         *side*'s region when the utterance named one, else on the slideshow that
-        is up.
-
-        The pace is set through the slideshow when there is one, not only posted to
-        the app-wide number: a slideshow sitting at nought while that number already
-        reads four would get no word of a change that never happened, and would
-        stay frozen through the very command meant to start it.
-        """
+        is up."""
         slideshow = self.surface_for(side)
         if command is SlideshowCommand.STOP:
             if slideshow is None:
@@ -1390,15 +1383,12 @@ class SlideshowDirector:
                 slideshow.note_voice_command("slideshow paused")
             return
         self._ask_for_the_room(paused=False)
-        seconds = DEFAULT_IMAGE_DWELL_MS // 1000
         if slideshow is None:
-            self._pace.set_seconds(seconds)  # what the next slideshow opens at
             self.start(side=side)
             if self._slideshow is None:
                 self._host.say("nothing here to play")
             return
-        slideshow.set_dwell_s(seconds)
-        slideshow.note_voice_command(f"slideshow at {seconds}s")
+        slideshow.note_voice_command(f"slideshow at {slideshow.dwell_s}s")
 
     def play_collection(self, command) -> None:
         """A spoken collection name, on the named side.

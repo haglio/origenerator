@@ -73,7 +73,7 @@ from origenerator import (
     osr2_motion_driver,
     running_ahead,
 )
-from origenerator.gui import desktop_notices, motion_panel, omnipause, voice_router
+from origenerator.gui import desktop_notices, job_queue, motion_panel, omnipause, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
@@ -313,6 +313,19 @@ def refuse_the_comfyui_on_this_machine(setattr) -> None:
 def _never_reach_the_comfyui_on_this_machine():
     with pytest.MonkeyPatch.context() as patch:
         refuse_the_comfyui_on_this_machine(patch.setattr)
+        yield
+
+
+def start_no_comfyui_on_this_machine(setattr) -> None:
+    """A queue whose submit is refused starts the ComfyUI here; a queue the
+    suite builds has nothing to start, unless its test hands it a stand-in."""
+    setattr(job_queue, "BRING_UP_COMFYUI", None)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _never_start_the_comfyui_on_this_machine():
+    with pytest.MonkeyPatch.context() as patch:
+        start_no_comfyui_on_this_machine(patch.setattr)
         yield
 
 

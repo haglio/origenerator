@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import importlib.util
 import socket
+import time
 from pathlib import Path
 
 from origenerator.comfyui_api import comfyui_responding
+
+POLL_SECONDS = 1.0
 
 
 def script(comfyui_dir: Path) -> Path:
@@ -54,6 +57,18 @@ def ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_
             logger.info("ComfyUI server was already running")
     except Exception as e:
         logger.warning("Failed to start ComfyUI server: %s", e)
+
+
+def bring_up(logger, host, port, comfyui_dir, *, sleep=time.sleep) -> bool:
+    launcher = load(comfyui_dir)
+    if not launcher.server_starting():
+        ensure_comfyui_server(logger, host, port, comfyui_dir)
+    while not comfyui_responding(host, port):
+        if not launcher.server_starting():
+            logger.warning("ComfyUI stopped starting without answering on %s:%d", host, port)
+            return False
+        sleep(POLL_SECONDS)
+    return True
 
 
 def _port_open(host, port) -> bool:

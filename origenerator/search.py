@@ -40,14 +40,12 @@ overlay extends this table rather than standing apart from it.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
-import urllib.request
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 
-from origenerator import gallery
+from origenerator import gallery, local_llm
 from origenerator.content import load_content
 from origenerator.gallery.item_numbers import name_starts_in, without_name_starts
 from origenerator.gallery.signatures import READINGS_KEPT
@@ -602,17 +600,6 @@ def build_expansion_messages(words, system_prompt: str) -> list[dict]:
     ]
 
 
-def _extract_json(content: str) -> dict:
-    """Parse a JSON object out of an LLM reply, tolerating fences/preamble."""
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        start, end = content.find("{"), content.rfind("}")
-        if start != -1 and end > start:
-            return json.loads(content[start:end + 1])
-        raise
-
-
 def parse_expansion(completion: dict, words) -> dict[str, tuple[str, ...]]:
     """The widened vocabulary from a chat completion: ``{search word: related}``.
 
@@ -620,7 +607,7 @@ def parse_expansion(completion: dict, words) -> dict[str, tuple[str, ...]]:
     each list — a model that answers with a phrase, a key of its own invention,
     or a stray sentence contributes nothing rather than poisoning the match.
     """
-    obj = _extract_json(completion["choices"][0]["message"]["content"])
+    obj = local_llm.answer_of(completion)
     wanted = {word.lower(): word for word in words}
     expansions: dict[str, tuple[str, ...]] = {}
     for key, value in (obj or {}).items():
@@ -644,27 +631,15 @@ def expand_query(query: str, *, base_url: str, model: str, system_prompt: str,
     Returns ``{}`` for anything short of a usable answer — no words to widen,
     the endpoint down, a reply that will not parse. The caller's results are
     already on screen by then, so an empty answer is a widening that did not
-    happen rather than a search that failed. Mirrors the transport the voice
-    rewrite and the act match use: stdlib ``urllib``, one POST, no deps.
+    happen rather than a search that failed.
     """
     words = query_words(query)
     if not words:
         return {}
-    payload = {
-        "model": model,
-        "messages": build_expansion_messages(words, system_prompt),
-        "temperature": 0.2,  # a vocabulary lookup, not brainstorming
-        "stream": False,
-        "response_format": {"type": "json_object"},
-    }
-    request = urllib.request.Request(
-        base_url.rstrip("/") + "/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}, method="POST",
-    )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            expansions = parse_expansion(json.loads(response.read()), words)
+        expansions = parse_expansion(local_llm.ask_json(
+            build_expansion_messages(words, system_prompt),
+            base_url=base_url, model=model, temperature=0.2, timeout=timeout), words)
     except Exception as exc:  # endpoint down / unparseable: the table tier stands
         logger.warning("search: widening %r failed (%s)", query, exc)
         return {}

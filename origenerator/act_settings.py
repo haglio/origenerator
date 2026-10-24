@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import json
 import logging
-import urllib.request
 from collections import defaultdict
 
+from origenerator import local_llm
 from origenerator.content import genau_flick_word, load_content
 
 logger = logging.getLogger(__name__)
@@ -191,47 +191,17 @@ def build_scene_messages(category: str, image_scene: str, representatives: list,
     ]
 
 
-def _extract_json(content: str) -> dict:
-    """Parse a JSON object out of an LLM reply, tolerating fences/preamble."""
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        start, end = content.find("{"), content.rfind("}")
-        if start != -1 and end > start:
-            return json.loads(content[start:end + 1])
-        raise
-
-
 def parse_choice(completion: dict, options: list) -> str | None:
     """The chosen video's prompt_id from a chat completion, or ``None`` for none.
 
     ``{"choice": n}`` indexes ``options``; ``-1`` or out of range → ``None`` (a
     legitimate "none of these fit"). Raises on a reply with no usable choice, which
     the caller treats like any other model failure."""
-    obj = _extract_json(completion["choices"][0]["message"]["content"])
+    obj = local_llm.answer_of(completion)
     index = int(obj["choice"])
     if 0 <= index < len(options):
         return options[index]["prompt_id"]
     return None
-
-
-def _post_chat(base_url: str, model: str, messages: list, timeout: float) -> dict:
-    """POST one chat request to the local OpenAI-compatible endpoint; return its
-    JSON. The single I/O boundary, at a low temperature: a lookup."""
-    url = base_url.rstrip("/") + "/chat/completions"
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": 0.1,
-        "stream": False,
-        "response_format": {"type": "json_object"},
-    }
-    request = urllib.request.Request(
-        url, data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}, method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read())
 
 
 def scene_matched_video(category: str, image_scene: str, video_rows, *, base_url: str,
@@ -246,11 +216,9 @@ def scene_matched_video(category: str, image_scene: str, video_rows, *, base_url
     if not representatives:
         return None
     try:
-        completion = _post_chat(
-            base_url, model,
+        completion = local_llm.ask_json(
             build_scene_messages(category, image_scene, representatives, system_prompt),
-            timeout,
-        )
+            base_url=base_url, model=model, temperature=0.1, timeout=timeout)
         chosen = parse_choice(completion, representatives)
         logger.info("act_settings: category=%s scene-match chosen=%s of %d videos",
                     category, chosen, len(representatives))

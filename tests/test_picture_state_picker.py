@@ -49,6 +49,13 @@ def test_a_picture_nobody_has_sorted_yet_opens_on_nothing(picker):
     assert picker.chosen_state() == ""
 
 
+def test_a_picture_sorted_as_a_state_the_list_no_longer_offers_opens_on_nothing(picker):
+    picker.show_row(_row(state="a state taken off the list"))
+
+    assert not picker.isHidden()
+    assert picker.chosen_state() == ""
+
+
 def test_picking_a_state_says_which_picture_it_is_for(picker, qtbot):
     picker.show_row(_row("img-7"))
 

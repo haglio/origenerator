@@ -60,7 +60,7 @@ class PictureStatePicker(QWidget):
         return self._states_combo.currentData() or ""
 
     def pick(self, state: str) -> None:
-        self._states_combo.setCurrentIndex(max(0, self.offered().index(state)))
+        self._states_combo.setCurrentIndex(max(0, self._states_combo.findData(state)))
 
 
     def show_row(self, row: dict) -> None:

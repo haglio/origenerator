@@ -31,8 +31,8 @@ def _client():
     client.submit_job = MagicMock(return_value="comfy-X")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()
-    # A job set aside asks after its stopped run when its turn comes round
-    # again; answered here, never by a server on the machine.
+    # Every send asks after an earlier run of its id first; answered here,
+    # never by a server on the machine.
     client.fetch_history = MagicMock(return_value={})
     client.forget_history = MagicMock()
     return client

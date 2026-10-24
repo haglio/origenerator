@@ -151,10 +151,6 @@ class GenerationJob(QObject):
         # idle -> queued -> running -> finished/failed/canceled; and back to idle
         # from queued or running when the job is set aside (see defer()).
         self._state = JobState.IDLE
-        # Whether the server has been handed this prompt id. A job set aside may
-        # have finished without this app hearing of it, or left a record of its stopped
-        # run that reads as this job's, so a second send asks after the first.
-        self._sent_before = False
         # What the app is doing right now, by the node ComfyUI says it is running
         # (see origenerator.progress.stage_names). Kept rather than recomputed so
         # a node with nothing worth saying about it leaves the last real stage
@@ -329,22 +325,6 @@ class GenerationJob(QObject):
         job._state = JobState.QUEUED if job.started_at is None else JobState.RUNNING
         return job
 
-    @classmethod
-    def readopt(cls, client, workflow, params, prompt_id, **kwargs):
-        """Take back a job the queue was still holding when the app closed.
-
-        The counterpart to :meth:`reconnect`, for a row that is not running — a
-        video waiting out a slideshow, say, or a run set aside mid-way. There is
-        nothing to rebind to, so it comes back as a job that has not started,
-        keeping its row's prompt id so the row it already owns is the one it
-        eventually runs under. It is taken as sent before: a run set aside may
-        have reached the server's last node after all, and its first start asks
-        after that run rather than making the same picture again.
-        """
-        job = cls(client, workflow, params, prompt_id=prompt_id, **kwargs)
-        job._sent_before = True
-        return job
-
     def start(self, submit=None):
         """Submit the job and begin tracking it. Raises if the submit fails.
 
@@ -375,11 +355,10 @@ class GenerationJob(QObject):
         landed: list[dict] = []  # the earlier run's history, if it finished after all
 
         def post():
-            if self._sent_before:
-                history = self._stopped_run_landed()
-                if history is not None:
-                    landed.append(history)
-                    return
+            history = self._stopped_run_landed()
+            if history is not None:
+                landed.append(history)
+                return
             self._client.submit_job(self.payload, self.prompt_id)
 
         try:
@@ -387,7 +366,6 @@ class GenerationJob(QObject):
         except Exception:
             self._detach()
             raise
-        self._sent_before = True
         if landed:
             self._finish(landed[0])
             return
@@ -409,7 +387,8 @@ class GenerationJob(QObject):
             history = self._client.fetch_history(self.prompt_id)
             if self.workflow.extract_output_info(history):
                 return history
-            self._client.forget_history(self.prompt_id)
+            if history:
+                self._client.forget_history(self.prompt_id)
         except Exception as e:
             logger.warning("Could not ask after the stopped run of %s: %s", self.prompt_id, e)
         return None

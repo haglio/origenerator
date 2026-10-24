@@ -29,8 +29,8 @@ def _client():
     client.submit_job = MagicMock(return_value="comfy-A")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()
-    # A job taken back or set aside asks after its earlier run before sending
-    # again; answered here, never by a server on the machine.
+    # Every send asks after an earlier run of its id first; answered here,
+    # never by a server on the machine.
     client.fetch_history = MagicMock(return_value={})
     client.forget_history = MagicMock()
     return client
@@ -543,31 +543,15 @@ def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
     assert job.state == "idle"
 
 
-def test_readopt_comes_back_unsent_under_the_rows_prompt_id(qtbot, tmp_path):
-    # The counterpart to reconnect, for a row the queue was still holding when the
-    # app closed: nothing of it is running on the server, so there is nothing to
-    # rebind to and everything to send when its turn comes.
-    client = _client()
-
-    job = GenerationJob.readopt(client, SDXL, _params(), "held-1")
-
-    assert (job.prompt_id, job.state) == ("held-1", "idle")
-    client.submit_job.assert_not_called()
-
-    job.start()
-    client.submit_job.assert_called_once_with(job.payload, "held-1")
-
-
-def test_a_re_adopted_job_lands_the_run_the_last_session_had_already_sent(qtbot, tmp_path):
-    # The previous session sent this id and the server still holds its record:
+def test_a_job_taken_back_lands_the_run_the_last_copy_had_already_sent(qtbot, tmp_path):
+    # The previous copy sent this id and the server still holds its record:
     # the stop that set the job aside reached ComfyUI after its last node had
     # saved. Sending it again makes a second picture nothing points at, and
     # leaves every read of the id answering with the first one.
     client = _client()
     client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
-    client.forget_history = MagicMock()
-    job = GenerationJob.readopt(
-        client, SDXL, _params(), "held-1",
+    job = GenerationJob(
+        client, SDXL, _params(), prompt_id="held-1",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
     finished = []
@@ -580,12 +564,12 @@ def test_a_re_adopted_job_lands_the_run_the_last_session_had_already_sent(qtbot,
     client.submit_job.assert_not_called()
 
 
-def test_a_re_adopted_job_reports_the_run_it_is_finally_given(qtbot, tmp_path):
+def test_a_job_taken_back_reports_the_run_it_is_finally_given(qtbot, tmp_path):
     # It has to listen on the same id its row carries, or the run it eventually
     # gets would finish invisibly.
     client = _client()
-    job = GenerationJob.readopt(
-        client, SDXL, _params(), "held-1",
+    job = GenerationJob(
+        client, SDXL, _params(), prompt_id="held-1",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
     job.start()
@@ -670,6 +654,22 @@ def test_a_deferred_job_sent_again_first_forgets_its_false_start(qtbot, tmp_path
     assert job.state == "queued"
 
 
+def test_a_job_taken_over_from_another_copy_forgets_its_false_start_when_sent_again(qtbot, tmp_path):
+    # One copy of Origenerator sent it, another took it over while ComfyUI made
+    # it and then set it aside for an image: the record of the stopped run is
+    # under its id all the same, whichever copy sends it again.
+    client = _client()
+    job = GenerationJob.reconnect(client, SDXL, _params(), "comfy-A",
+                                  places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
+    client.fetch_history = MagicMock(return_value={"outputs": {}})
+    job.defer()
+
+    job.start()
+
+    client.forget_history.assert_called_once_with("comfy-A")
+    client.submit_job.assert_called_once_with(job.payload, "comfy-A")
+
+
 def test_a_deferred_job_whose_run_finished_after_all_lands_instead_of_running_again(qtbot, tmp_path):
     # A stop that reaches the server after the last node has saved stops
     # nothing: the run finished, and sending the prompt again would make the
@@ -689,14 +689,14 @@ def test_a_deferred_job_whose_run_finished_after_all_lands_instead_of_running_ag
     client.forget_history.assert_not_called()
 
 
-def test_a_first_send_asks_the_server_nothing_first(qtbot, tmp_path):
+def test_a_first_send_forgets_nothing_on_a_server_with_no_record_of_it(qtbot, tmp_path):
     client = _client()
-    client.fetch_history = MagicMock()
-    client.forget_history = MagicMock()
-    GenerationJob(client, SDXL, _params()).start()
+    job = GenerationJob(client, SDXL, _params())
 
-    client.fetch_history.assert_not_called()
+    job.start()
+
     client.forget_history.assert_not_called()
+    client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
 
 
 def test_a_row_waiting_to_be_sent_is_called_queued_on_screen():

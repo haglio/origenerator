@@ -27,6 +27,8 @@ from typing import Protocol
 
 from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QWidget
+from shared_ui import colors
+from shared_ui.palette import BG_PRIMARY, WHITE, as_hex, as_rgba
 
 from origenerator import gallery, prompt_edit
 from origenerator.animate_command import AnimateRequest
@@ -48,7 +50,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
-from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE, WARNING, set_marked_text
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.prompt_edit import apply_request
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
@@ -251,7 +253,7 @@ class VoiceRouter(QObject):
         self.status.setObjectName("voiceStatus")
         self.status.setWordWrap(True)  # a long utterance grows down, not sideways
         self.status.setStyleSheet(
-            "#voiceStatus { color: white; background: rgba(20, 20, 20, 225);"
+            f"#voiceStatus {{ color: {as_hex(WHITE)}; background: {as_rgba(BG_PRIMARY, 0.88)};"
             " padding: 6px 10px; border-radius: 6px; }"
         )
         self.status.hide()
@@ -351,7 +353,7 @@ class VoiceRouter(QObject):
             )
         else:
             self.listener.stop()  # no loop to steer; the commands hold the mic open
-        self._show("🎤 Listening…", transient=False)
+        self._show("Listening…", transient=False)
 
     @property
     def steering(self) -> str | None:
@@ -375,12 +377,12 @@ class VoiceRouter(QObject):
 
     # --- the caption --------------------------------------------------------
 
-    def say(self, message: str) -> None:
+    def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
         """Flash a line on the caption. The slideshows use this when there is no slideshow
         up to put it in the corner of."""
-        self._show(message, transient=True)
+        self._show(message, transient=True, mark=mark)
 
-    def _set_caption(self, text: str | None) -> None:
+    def _set_caption(self, text: str | None, mark: str = HEARD_MARK) -> None:
         """Put *text* on the caption, or take the caption away with ``None``.
 
         The section the caption rides in comes and goes with it, so every
@@ -389,12 +391,12 @@ class VoiceRouter(QObject):
         if text is None:
             self.status.hide()
         else:
-            self.status.setText(text)
+            set_marked_text(self.status, text, mark=mark, color=colors.WHITE)
             self.status.show()
         self.caption_shown.emit(text is not None)
 
-    def _show(self, text: str, *, transient: bool) -> None:
-        self._set_caption(text)
+    def _show(self, text: str, *, transient: bool, mark: str = HEARD_MARK) -> None:
+        self._set_caption(text, mark)
         if transient:
             self._flash_timer.start(_FLASH_MS)  # then revert to the idle caption
         else:
@@ -409,7 +411,7 @@ class VoiceRouter(QObject):
             # that was dropped.
             self._show(self._working_status, transient=False)
         elif self.listening():  # still listening
-            self._show("🎤 Listening…", transient=False)
+            self._show("Listening…", transient=False)
         else:
             self._set_caption(None)
 
@@ -426,13 +428,13 @@ class VoiceRouter(QObject):
         """
         if any(char.isalpha() for char in text):
             self._say_both(
-                f"🎤 heard: “{gallery.recognized_spelling(text) or text}”")
+                f"heard: “{gallery.recognized_spelling(text) or text}”")
 
     def _on_edited(self, _new_prompt: str) -> None:
-        self._say_both("🎤 ✓ prompt updated")
+        self._say_both("prompt updated")
 
     def _on_error(self, message: str) -> None:
-        self._say_both(f"🎤 {message}", kind=ERROR)
+        self._say_both(message, kind=ERROR)
 
     def _say_both(self, message: str, *, kind: str = NOTICE) -> None:
         """Put what voice heard or hit in front of whoever is listening.
@@ -560,9 +562,9 @@ class VoiceRouter(QObject):
         label = self._host.collection_label(key)
         if not self._host.stand_in_collection(key, side):
             # Recents and Favorites appear only once there is one
-            self._slideshows.answer(f"🎤 no {label} collection yet", kind=WARNING)
+            self._slideshows.answer(f"no {label} collection yet", kind=WARNING)
             return
-        self._slideshows.answer(f"🎤 {label}")
+        self._slideshows.answer(label)
 
     def _flip_switch(self, command: AppCommand) -> None:
         """Set one of the app-wide switches, through its button rather than
@@ -577,14 +579,14 @@ class VoiceRouter(QObject):
         switch, want, name = _SWITCHES[command]
         button = self._switches[switch]
         if button is None:  # hosted: the session owns the radio and the mic
-            self._slideshows.answer(f"🎤 {name} is the session's here", kind=WARNING)
+            self._slideshows.answer(f"{name} is the session's here", kind=WARNING)
             return
         if not button.isEnabled():
-            self._slideshows.answer(f"🎤 {name} can't be switched here", kind=WARNING)
+            self._slideshows.answer(f"{name} can't be switched here", kind=WARNING)
             return
         on = (not button.isChecked()) if want is None else want
         button.setChecked(on)  # its toggled signal is what does the work
-        self._slideshows.answer(f"🎤 {name} {'on' if on else 'off'}")
+        self._slideshows.answer(f"{name} {'on' if on else 'off'}")
 
     def _move_the_motion(self, command: AppCommand) -> None:
         """Make the move a motion key makes, said instead of pressed.
@@ -598,10 +600,10 @@ class VoiceRouter(QObject):
             self._say_the_motion_is_the_sessions()
             return
         move() if argument is None else move(argument)
-        self._slideshows.answer(f"🎤 {self._motion.status_text()}")
+        self._slideshows.answer(self._motion.status_text())
 
     def _say_the_motion_is_the_sessions(self) -> None:
-        self._slideshows.answer("🎤 the motion is the session's here", kind=WARNING)
+        self._slideshows.answer("the motion is the session's here", kind=WARNING)
 
     def _set_motion_bar(self, setting: BarSetting) -> None:
         """Put one of the motion's bars where a spoken number asks for it.
@@ -617,13 +619,13 @@ class VoiceRouter(QObject):
             self._say_the_motion_is_the_sessions()
             return
         set_the_bar(setting.value)
-        self._slideshows.answer(f"🎤 {self._motion.status_text()}")
+        self._slideshows.answer(self._motion.status_text())
 
     def _run_in_gallery(self, command: AppCommand) -> None:
         """A word said with no slideshow to take it: the bank button it names, aimed
         exactly as a click on it would be."""
         if command in (AppCommand.LOCK, AppCommand.UNLOCK):
-            self._slideshows.answer(f"🎤 {command.value} is a slideshow's — none is up",
+            self._slideshows.answer(f"{command.value} is a slideshow's — none is up",
                                     kind=WARNING)
             return
         button, act = self._bank[command]
@@ -640,11 +642,11 @@ class VoiceRouter(QObject):
         as one.
         """
         if button.isHidden() or not button.isEnabled():
-            self._slideshows.answer(f"🎤 {refusal or button.toolTip()}", kind=WARNING)
+            self._slideshows.answer(refusal or button.toolTip(), kind=WARNING)
             return
         said = button.toolTip()  # read first: the action re-aims the bank
         act()
-        self._slideshows.answer(f"🎤 {said}")
+        self._slideshows.answer(said)
 
     def _on_picture_command(self, command) -> None:
         """A spoken command about the picture on screen: a targeted "fix <part>"
@@ -672,7 +674,7 @@ class VoiceRouter(QObject):
             wants = (_WANTS_ANIMATING
                      if isinstance(command.command, AnimateRequest)
                      else f"a {name_parts(command.command)} fix")
-            self._show(f"🎤 {wants} needs a picture on screen", transient=True)
+            self._show(f"{wants} needs a picture on screen", transient=True)
             return
         target = slideshow.voice_target()
         if isinstance(command.command, AnimateRequest):
@@ -711,7 +713,7 @@ class VoiceRouter(QObject):
         self._request_target = None
         self._pause_for_request(slideshow, spoken)
         if spoken.state != COMPLETED:  # given up on — the terminator never came
-            self._answer_request(slideshow, "🎤 request dropped — never heard “over”", spoken)
+            self._answer_request(slideshow, "request dropped — never heard “over”", spoken)
             return
         self._begin_request(target, spoken, side)
 
@@ -730,11 +732,11 @@ class VoiceRouter(QObject):
         """Pause (or release) the slideshow while the sentence is being said, and say
         so — in the slideshow's own corner when one is up, since that is where the
         speaker is looking, and in this pane's voice caption otherwise."""
-        note = f"🎤 Request: {spoken.text}…" if spoken.listening else ""
+        note = f"Request: {spoken.text}…" if spoken.listening else ""
         if slideshow is not None:
             slideshow.pause_for_request(spoken.listening, note)
         elif spoken.listening:
-            self._show(note or "🎤 Request…", transient=False)
+            self._show(note or "Request…", transient=False)
 
     def _answer_request(self, slideshow, message: str, spoken, *,
                         working: bool = False, kind: str = NOTICE) -> None:
@@ -782,16 +784,16 @@ class VoiceRouter(QObject):
         slideshow = self._slideshows.surface_for(side)
         if row is None:
             self._answer_request(
-                slideshow, "🎤 nothing on screen to request a change to", spoken)
+                slideshow, "nothing on screen to request a change to", spoken)
             return
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None or self._client is None:
             self._answer_request(
-                slideshow, "🎤 this one can't be re-made, so there's nothing to revise",
+                slideshow, "this one can't be re-made, so there's nothing to revise",
                 spoken)
             return
         params = filled_params(row, workflow)
-        self._answer_request(slideshow, f"🎤 working out “{spoken.text}”…", spoken,
+        self._answer_request(slideshow, f"working out “{spoken.text}”…", spoken,
                              working=True)
         QThreadPool.globalInstance().start(ReviseTask(
             self._revision, (row, workflow, params, spoken, side),
@@ -810,12 +812,12 @@ class VoiceRouter(QObject):
         slideshow = self._slideshows.surface_for(side)
         if revision is None:
             self._answer_request(
-                slideshow, f"🎤 didn't catch what to change in “{spoken.text}”", spoken,
+                slideshow, f"didn't catch what to change in “{spoken.text}”", spoken,
                 kind=WARNING)
             return
         if not revision.changed:
             self._answer_request(
-                slideshow, f"🎤 “{revision.term}” is already how you asked for it", spoken,
+                slideshow, f"“{revision.term}” is already how you asked for it", spoken,
                 kind=WARNING)
             return
         message, kind = self._host.queue_request(row, workflow, params, spoken, revision)

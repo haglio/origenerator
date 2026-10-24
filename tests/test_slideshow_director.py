@@ -1291,7 +1291,7 @@ def test_the_spoken_close_with_no_slideshow_up_says_so(slideshows):
 
     director.run_slideshow_command(SlideshowCommand.STOP, None)
 
-    assert host.said == ["🎤 no slideshow to close"]
+    assert host.said == ["no slideshow to close"]
     assert made == []
 
 
@@ -1302,7 +1302,7 @@ def test_the_spoken_pause_with_no_slideshow_up_pauses_the_room_as_esc_does(slide
 
     assert host.room_paused == [True]
     assert director._pace.seconds is None
-    assert host.said == ["🎤 paused"]
+    assert host.said == ["paused"]
 
 
 def test_the_spoken_pause_pauses_the_room_and_leaves_the_slideshow_up_at_its_pace(slideshows):
@@ -1314,7 +1314,7 @@ def test_the_spoken_pause_pauses_the_room_and_leaves_the_slideshow_up_at_its_pac
 
     assert host.room_paused == [True]
     assert (made[0].paused, made[0].dwell_s, made[0].closes) == (True, 4, 0)
-    assert made[0].said == ["🎤 slideshow paused"]
+    assert made[0].said == ["slideshow paused"]
 
 
 def test_the_spoken_pause_leaves_a_room_already_paused_as_it_is(slideshows):
@@ -1363,9 +1363,9 @@ def test_a_spoken_word_is_answered_in_the_slideshows_own_corner(slideshows):
     director, host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.answer("🎤 audio on")
+    director.answer("audio on")
 
-    assert made[0].said == ["🎤 audio on"]
+    assert made[0].said == ["audio on"]
     assert host.said == []
 
 
@@ -1373,7 +1373,7 @@ def test_an_answer_keeps_its_kind_in_the_slideshows_corner(slideshows):
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.answer("🎤 no Latest collection yet", kind=WARNING)
+    director.answer("no Latest collection yet", kind=WARNING)
 
     assert made[0].said_kinds == [WARNING]
 
@@ -1381,9 +1381,9 @@ def test_an_answer_keeps_its_kind_in_the_slideshows_corner(slideshows):
 def test_a_spoken_word_with_no_slideshow_up_is_answered_on_the_caption(slideshows):
     director, host, _made = slideshows()
 
-    director.answer("🎤 audio on")
+    director.answer("audio on")
 
-    assert host.said == ["🎤 audio on"]
+    assert host.said == ["audio on"]
 
 
 def test_a_named_side_holding_nothing_is_an_answer_in_itself(slideshows):
@@ -1410,7 +1410,7 @@ def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(slid
 
     assert made[0].hud_favorites_filter is True
     assert len(made) == 1  # no second slideshow opened
-    assert host.said == ["🎤 F-mode on"]
+    assert host.said == ["F-mode on"]
 
 
 def test_a_spoken_collection_with_nothing_in_it_opens_nothing(slideshows):
@@ -1423,7 +1423,7 @@ def test_a_spoken_collection_with_nothing_in_it_opens_nothing(slideshows):
     director.play_collection(Spoken())
 
     assert made == []
-    assert host.said == ["🎤 nothing there to play"]
+    assert host.said == ["nothing there to play"]
 
 
 def test_the_transport_words_step_the_slide_and_say_which_way(slideshows):
@@ -1434,7 +1434,7 @@ def test_the_transport_words_step_the_slide_and_say_which_way(slideshows):
     director.run_on_slide(AppCommand.BACK)
 
     assert made[0].steps == [1, -1]
-    assert made[0].said == ["🎤 next", "🎤 back"]
+    assert made[0].said == ["next", "back"]
     assert made[0].said_kinds == [NOTICE, NOTICE]
 
 
@@ -1445,7 +1445,7 @@ def test_a_favorite_over_a_slide_with_nothing_to_favorite_says_so(slideshows):
 
     director.run_on_slide(AppCommand.FAVORITE)
 
-    assert made[0].said == ["🎤 nothing here to favorite"]
+    assert made[0].said == ["nothing here to favorite"]
     assert made[0].said_kinds == [WARNING]
 
 
@@ -1455,7 +1455,7 @@ def test_a_favorite_that_lands_says_so_in_the_favorites_green(slideshows):
 
     director.run_on_slide(AppCommand.FAVORITE)
 
-    assert made[0].said == ["🎤 favorited"]
+    assert made[0].said == ["favorited"]
     assert made[0].said_kinds == [FAVORITE]
 
 
@@ -1636,7 +1636,7 @@ def test_the_spoken_filter_narrows_the_slideshow_and_says_what_is_left(slideshow
 
     director.filter_enhanced(True)
 
-    assert slideshow.said == ["🎤 enhanced only — 2 to play"]
+    assert slideshow.said == ["enhanced only — 2 to play"]
 
 
 def test_a_slideshow_with_nothing_enhanced_in_it_says_so(slideshows):
@@ -1646,7 +1646,7 @@ def test_a_slideshow_with_nothing_enhanced_in_it_says_so(slideshows):
 
     director.filter_enhanced(True)
 
-    assert slideshow.said == ["🎤 nothing here is enhanced"]
+    assert slideshow.said == ["nothing here is enhanced"]
     assert slideshow.said_kinds == [WARNING]
 
 
@@ -1661,7 +1661,7 @@ def test_clearing_the_filter_takes_f_mode_with_it(slideshows):
     director.filter_enhanced(False)
 
     assert slideshow.hud_favorites_filter is False
-    assert slideshow.said == ["🎤 showing all of them"]
+    assert slideshow.said == ["showing all of them"]
 
 
 def test_the_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slideshows):
@@ -1669,7 +1669,7 @@ def test_the_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slidesh
 
     director.filter_enhanced(True)
 
-    assert host.said == ["🎤 the filter needs a slideshow to narrow"]
+    assert host.said == ["the filter needs a slideshow to narrow"]
 
 
 def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(slideshows):

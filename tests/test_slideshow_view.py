@@ -19,13 +19,14 @@ from PyQt6.QtGui import QIcon, QKeyEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
+from shared_ui.icons import marked_text
 
 from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.notice_overlay import ERROR, FAVORITE, WARNING, NoticeOverlay
+from origenerator.gui.notice_overlay import ERROR, FAVORITE, HEARD_MARK, WARNING, NoticeOverlay
 from origenerator.gui.notice_overlay import TOP_MARGIN as NOTICE_TOP_MARGIN
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -35,6 +36,7 @@ from origenerator.gui.stylesheet import dress_application
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE, Slide, SlideshowFilters, in_order
 from tests import gestures
 from tests.funestra_fakes import FakeEngine
+from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, speaker_on_screen, thumbnail_on_screen
 from tests.slideshow_support import ahead, slides_named
@@ -663,11 +665,11 @@ def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot
 
     _press(view, Qt.Key.Key_E)
     assert view.slideshow.locked and asked == ["id-a"]
-    assert view._note.text() == "Locked"
+    assert words(view._note) == "Locked"
 
     _press(view, Qt.Key.Key_Home)
     assert not view.slideshow.locked
-    assert view._note.text() == "Unlocked"
+    assert words(view._note) == "Unlocked"
 
 
 def _around(prompt_id):
@@ -725,7 +727,7 @@ def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot):
     _settle(view)
 
     assert view.slideshow.locked is True
-    assert view._note.text() == "Locked"
+    assert words(view._note) == "Locked"
 
 
 def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
@@ -735,7 +737,7 @@ def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot
     _press(view, Qt.Key.Key_E)
     assert view.slideshow.hud_map().loop == "seed"
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["id-a", "id-b"]
-    assert view._note.text() == "Looping seeds: 2"
+    assert words(view._note) == "Looping seeds: 2"
 
     _press(view, Qt.Key.Key_E)
     assert view.slideshow.hud_map().loop == "action"
@@ -744,7 +746,7 @@ def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot
     _press(view, Qt.Key.Key_E)
     assert view.slideshow.hud_map().loop == ""
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["id-a", "id-b", "id-z"]  # its own set
-    assert view._note.text() == "Loop off"
+    assert words(view._note) == "Loop off"
 
 
 def test_the_forward_step_out_of_a_row_down_to_one_picture_ends_the_loop(qtbot):
@@ -810,7 +812,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_act_without_redrawing_what_
 
     assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
     assert shown == []
-    assert view._note.text() == "Filter: 'source image, alpha' (1)"
+    assert words(view._note) == "Filter: 'source image, alpha' (1)"
 
 
 def test_a_filter_past_the_slide_on_screen_puts_up_what_is_left(qtbot):
@@ -831,7 +833,7 @@ def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot):
     _settle(view)
 
     assert (shown, view.slideshow.hud_act_filter) == ([], "")
-    assert view._note.text() == "Filter: no matches for 'gamma'"
+    assert words(view._note) == "Filter: no matches for 'gamma'"
 
 
 def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(qtbot):
@@ -841,7 +843,7 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
     _settle(view)
 
     assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
-    assert view._note.text() == "Filter: 'source image, alpha' (1)"
+    assert words(view._note) == "Filter: 'source image, alpha' (1)"
 
 
 def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot):
@@ -850,7 +852,7 @@ def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot):
     view.slideshow.slideshow_filter_to_the_act_on_screen()
     _settle(view)
 
-    assert (view.slideshow.hud_act_filter, view._note.text()) == ("", "No act for this one")
+    assert (view.slideshow.hud_act_filter, words(view._note)) == ("", "No act for this one")
 
 
 def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
@@ -942,7 +944,7 @@ def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library
     _settle(view)
 
     assert widened == [view.slideshow]
-    assert view._note.text() == "Loop off"
+    assert words(view._note) == "Loop off"
 
 
 def test_the_loop_key_off_a_folder_slideshow_leaves_the_folder_in_one_press(qtbot):
@@ -953,7 +955,7 @@ def test_the_loop_key_off_a_folder_slideshow_leaves_the_folder_in_one_press(qtbo
     _press(view, Qt.Key.Key_Home)
 
     assert widened == [view.slideshow]
-    assert view._note.text() == "Loop off"
+    assert words(view._note) == "Loop off"
 
 
 def test_up_over_a_favorite_takes_the_star_back_rather_than_the_picture(qtbot):
@@ -1017,12 +1019,12 @@ def test_a_run_of_an_item_this_slideshow_never_asked_about_is_named_all_the_same
 
 def test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: True))
-    view.slideshow.note_voice_run("id-a", "🎤 fixing teeth…")
+    view.slideshow.note_voice_run("id-a", "fixing teeth…")
 
     view.slideshow.note_enhancing({"id-a": "running"})
     _settle(view)
 
-    assert "fixing teeth" in view._note.text()
+    assert "fixing teeth" in words(view._note)
     assert view.slideshow.hud_item_note == "Enhancing…"
 
 
@@ -1090,11 +1092,22 @@ def test_a_spoken_answer_is_a_notice_across_the_top(qtbot):
     view = _view(qtbot, _KEYED)
     view.resize(800, 600)
 
-    view.slideshow.note_voice_command("🎤 next")
+    view.slideshow.note_voice_command("next")
 
     note = view._note.geometry()
     assert note.top() == NOTICE_TOP_MARGIN
     assert abs(note.center().x() - view.width() // 2) <= 1
+
+
+def test_a_press_is_answered_plain_and_a_spoken_word_after_the_mic(qtbot):
+    view = _view(qtbot, _KEYED)
+
+    _press(view, Qt.Key.Key_E)
+    assert (view._note.textFormat(), view._note.text()) == (Qt.TextFormat.PlainText, "Locked")
+
+    view.slideshow.note_voice_command("next")
+    assert view._note.text() == marked_text(HEARD_MARK, "next", color=TEXT_PRIMARY,
+                                            size=view._note.fontMetrics().height())
 
 
 def test_what_is_being_made_of_the_slide_is_no_notice_across_the_top(qtbot):
@@ -1366,8 +1379,8 @@ def test_a_spoken_fix_targets_the_slide_on_screen(qtbot):
 
 def test_a_spoken_fix_answers_in_the_corner_and_the_hud_follows_its_run(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: True))
-    view.slideshow.note_voice_run("id-a", "🎤 fixing teeth…")
-    assert "fixing teeth" in view._note.text()
+    view.slideshow.note_voice_run("id-a", "fixing teeth…")
+    assert "fixing teeth" in words(view._note)
     assert view.slideshow.hud_item_note == "Enhancement queued"
     view.slideshow.note_enhancing({"id-a": "running"})
     _settle(view)
@@ -1376,8 +1389,8 @@ def test_a_spoken_fix_answers_in_the_corner_and_the_hud_follows_its_run(qtbot):
 
 def test_a_declined_spoken_fix_flashes_and_marks_nothing(qtbot):
     view = _view(qtbot, _KEYED)
-    view.slideshow.note_voice_run(None, "🎤 no teeth detector installed")
-    assert "no teeth detector" in view._note.text()
+    view.slideshow.note_voice_run(None, "no teeth detector installed")
+    assert "no teeth detector" in words(view._note)
     _fade(view)
     assert view._note.isHidden()
     assert view.slideshow.hud_item_note == ""
@@ -1545,7 +1558,7 @@ def test_a_slideshow_reopened_on_a_locked_slide_opens_it_locked(qtbot):
 def test_a_request_holds_the_picture_where_its_move_had_got_to_and_its_release_lets_it_go(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
-    view.slideshow.pause_for_request(True, "🎤 listening…")
+    view.slideshow.pause_for_request(True, "listening…")
     _settle(view)
     assert _engine(view).pace_s == 0
 
@@ -1568,7 +1581,7 @@ def test_a_locked_slide_is_stilled_again_by_a_request_and_by_the_rooms_freeze(qt
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Down)
 
-    view.slideshow.pause_for_request(True, "🎤 listening…")
+    view.slideshow.pause_for_request(True, "listening…")
     _settle(view)
     assert _engine(view).pace_s == 0
     view.slideshow.pause_for_request(False)
@@ -1586,7 +1599,7 @@ def test_a_request_released_under_the_rooms_freeze_leaves_it_frozen(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
     view.slideshow.set_paused(True)
-    view.slideshow.pause_for_request(True, "🎤 listening…")
+    view.slideshow.pause_for_request(True, "listening…")
     _settle(view)
     view.slideshow.pause_for_request(False)
     _settle(view)
@@ -1600,7 +1613,7 @@ def test_a_request_leaves_a_clip_playing_and_only_stops_the_slideshow_moving_on(
     view = _view(qtbot, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Right)          # -> the video
 
-    view.slideshow.pause_for_request(True, "🎤 listening…")
+    view.slideshow.pause_for_request(True, "listening…")
     _settle(view)
 
     assert _engine(view).paused is False
@@ -2173,16 +2186,16 @@ def test_a_request_pauses_the_advance_and_says_so(qtbot):
     view = _view(qtbot, _KEYED)
     assert _will_move_on(view)  # an image, dwelling
 
-    view.slideshow.pause_for_request(True, "🎤 Request: no hat…")
+    view.slideshow.pause_for_request(True, "Request: no hat…")
     _settle(view)
 
     assert not _will_move_on(view)
-    assert "Request" in view._note.text()
+    assert "Request" in words(view._note)
 
 
 def test_releasing_the_pause_resumes_the_dwell(qtbot):
     view = _view(qtbot, _KEYED)
-    view.slideshow.pause_for_request(True, "🎤 Request…")
+    view.slideshow.pause_for_request(True, "Request…")
     _settle(view)
 
     view.slideshow.pause_for_request(False)
@@ -2196,7 +2209,7 @@ def test_the_slide_stays_put_while_a_request_is_being_said(qtbot):
     # The point of the pause: the request is about this slide, so the slideshow must
     # not page on while the sentence is still being spoken.
     view = _view(qtbot, _KEYED)
-    view.slideshow.pause_for_request(True, "🎤 Request…")
+    view.slideshow.pause_for_request(True, "Request…")
     _settle(view)
 
     _runs_out(view)  # the clip on screen ran out mid-sentence
@@ -2208,7 +2221,7 @@ def test_releasing_the_pause_leaves_a_locked_slide_locked(qtbot):
     view = _view(qtbot, _KEYED)
     view.slideshow.set_locked(True)  # the user locked this one
     _settle(view)
-    view.slideshow.pause_for_request(True, "🎤 Request…")
+    view.slideshow.pause_for_request(True, "Request…")
     _settle(view)
 
     view.slideshow.pause_for_request(False)
@@ -2227,8 +2240,8 @@ def test_a_request_targets_the_slide_on_screen(qtbot):
 
 def test_a_finished_request_answers_in_the_corner(qtbot):
     view = _view(qtbot, _KEYED)
-    view.slideshow.note_request("🎤 dropped “a hat” — generating")
-    assert "dropped" in view._note.text()
+    view.slideshow.note_request("dropped “a hat” — generating")
+    assert "dropped" in words(view._note)
 
 
 def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_path):

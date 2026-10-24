@@ -665,7 +665,7 @@ def test_a_spoken_enhance_refuses_a_picture_that_already_has_one(enhance,
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: True)
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    assert controller.enhance_it("i1") == (None, "🎤 this one is enhanced already", WARNING)
+    assert controller.enhance_it("i1") == (None, "this one is enhanced already", WARNING)
 
 
 def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,
@@ -674,7 +674,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,
     controller, _host = enhance(db=FakeDB([_video("v1")]))
 
     assert controller.enhance_it("v1") == (
-        None, "🎤 only a finished image can be enhanced", WARNING)
+        None, "only a finished image can be enhanced", WARNING)
 
 
 def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
@@ -706,7 +706,7 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
     prompt_id, message, kind = controller.fix_parts("i1", [hands, teeth])
 
     assert prompt_id == "i1"
-    assert message == "🎤 fixing hands…"
+    assert message == "fixing hands…"
     assert kind == NOTICE
 
 
@@ -722,7 +722,7 @@ def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch, p
 
     _prompt_id, message, kind = controller.fix_parts("i1", [part])
 
-    assert message == (f"🎤 no {part.name} detector installed "
+    assert message == (f"no {part.name} detector installed "
                        f"(ComfyUI models/ultralytics/{folder})")
     assert kind == WARNING
 
@@ -739,7 +739,7 @@ def test_a_spoken_enhance_over_a_picture_that_has_one_in_flight_is_refused(enhan
                                 jobs=FakeReroll([FakeJob("run-a")]))
 
     assert controller.enhance_it("i1") == (
-        None, "🎤 an enhance of this image is already running", WARNING)
+        None, "an enhance of this image is already running", WARNING)
 
 
 def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkeypatch):
@@ -754,7 +754,7 @@ def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkey
     monkeypatch.setattr(controller, "_launch", lambda row, params: False)
 
     assert controller.enhance_it("i1") == (
-        None, "🎤 couldn't launch the enhance — see the log", ERROR)
+        None, "couldn't launch the enhance — see the log", ERROR)
 
 
 def test_a_locked_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):

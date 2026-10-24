@@ -443,12 +443,12 @@ class EnhanceController:
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
-            return None, "🎤 only a finished image can be enhanced", WARNING
+            return None, "only a finished image can be enhanced", WARNING
         if gallery.is_enhanced_row(row):
-            return None, "🎤 this one is enhanced already", WARNING
+            return None, "this one is enhanced already", WARNING
         params = gallery.enhance_params_for(row, self._settings)
         if params is None:
-            return None, "🎤 this one has no file to enhance", WARNING
+            return None, "this one has no file to enhance", WARNING
         return self._launch_spoken(row, params, "enhance", "enhancing…")
 
     def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
@@ -467,13 +467,13 @@ class EnhanceController:
         asked = name_parts(parts)
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
-            return None, f"🎤 only a finished image can get a {asked} fix", WARNING
+            return None, f"only a finished image can get a {asked} fix", WARNING
         params = gallery.fix_params_for(row, parts, self._settings)
         if params is None:
             folders = " or ".join(sorted({detector_folder(part) for part in parts}))
-            return None, f"🎤 no {asked} detector installed (ComfyUI {folders})", WARNING
+            return None, f"no {asked} detector installed (ComfyUI {folders})", WARNING
         if gallery.level_matching_params(row, params) is not None:
-            return None, f"🎤 already has this {asked} fix", WARNING
+            return None, f"already has this {asked} fix", WARNING
         fixing = name_parts(
             [part for part in parts if part.name in params["enhance_detail_fixes"]])
         return self._launch_spoken(row, params, f"{fixing} fix", f"fixing {fixing}…")
@@ -489,12 +489,12 @@ class EnhanceController:
         while it runs.
         """
         if self.run_of(row) is not None:
-            return None, "🎤 an enhance of this image is already running", WARNING
+            return None, "an enhance of this image is already running", WARNING
         logger.info("Voice %s on %s at %s", what, row.get("prompt_id"),
                     gallery.describe_enhance_params(params))
         if not self._launch(row, params):
-            return None, f"🎤 couldn't launch the {what} — see the log", ERROR
-        return row["prompt_id"], f"🎤 {doing}", NOTICE
+            return None, f"couldn't launch the {what} — see the log", ERROR
+        return row["prompt_id"], doing, NOTICE
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
         """Locking a slide asked for it to be enhanced, first. Returns whether a

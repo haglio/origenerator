@@ -58,14 +58,14 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-ALREADY_GENAUD = "🎤 already Genau'd"
-ALREADY_MAKING_ONE = "🎤 already making it — handing that one over"
+ALREADY_GENAUD = "already Genau'd"
+ALREADY_MAKING_ONE = "already making it — handing that one over"
 
 # What a picture can be animated as is read off what it SHOWS, and a picture
 # nobody has said that about yet can be animated as nothing at all. Said
 # rather than guessed: the guess would be an act the picture cannot do, which
 # is minutes of the one machine spent on a clip that was never going to work.
-NOT_A_PICTURE = "🎤 only a picture can be animated"
+NOT_A_PICTURE = "only a picture can be animated"
 
 
 class CombineHost(Protocol):
@@ -578,7 +578,7 @@ class CombineController(QObject):
                 else f"“{category}” video")
         if self._slideshows.showing is not None:
             self._slideshows.note_voice_run(
-                None, f"🎤 no past {what} to base a recipe on yet", kind=WARNING)
+                None, f"no past {what} to base a recipe on yet", kind=WARNING)
             return
         self._host.tell(
             "No recipe yet",
@@ -787,15 +787,15 @@ class CombineController(QObject):
             return None, ALREADY_GENAUD, WARNING
         answer = what_to_animate(asked, row.get("picture_state") or "")
         if answer.act is None:
-            return None, f"🎤 {answer.said}", ERROR if answer.unsupported else WARNING
+            return None, answer.said, ERROR if answer.unsupported else WARNING
         act = answer.act
         available = recipe_match.available_categories(
             self.rebuildable_videos(self._db.list_generations()), asked.lane)
         if act not in available:
-            return None, f"🎤 no “{act}” recipe to base this on yet", WARNING
+            return None, f"no “{act}” recipe to base this on yet", WARNING
         logger.info("animate as: image=%s lane=%s -> act=%s", image_id, asked.lane, act)
         self.generate_category(image_id, act, asked.lane, send=loop)
-        return image_id, f"🎤 animating as “{act}”", NOTICE
+        return image_id, f"animating as “{act}”", NOTICE
 
 
 def _the_row_this_run_will_make(video_row: dict, params: dict, workflow) -> dict:

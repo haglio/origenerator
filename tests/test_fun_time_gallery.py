@@ -32,6 +32,7 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
+from tests.marked_words import words
 from tests.slideshow_hud_support import (
     engine_of,
     funestra_of,
@@ -742,7 +743,7 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     assert model.filter_query == model.current_action == "Source image"
     assert model.title.startswith("Looping seeds")
     assert "Unlocked" not in model.title
-    assert slideshow.shown._note.text() == "Looping seeds: 2"
+    assert words(slideshow.shown._note) == "Looping seeds: 2"
 
     slideshow.shown.press("portrait_no_loop")
 
@@ -769,7 +770,7 @@ def test_more_seeds_widens_the_row_to_the_nearest_configurations_and_loops_it(
     assert [cell.path for cell in model.seeds] == ["g2.png", "g3.png", "g4.png"]
     assert model.active_loop == "seed"
     assert [item[2] for item in slideshow._set.playlist.items] == ["g1", "g2", "g3", "g4"]
-    assert slideshow.shown._note.text() == "More seeds"
+    assert words(slideshow.shown._note) == "More seeds"
 
 
 def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
@@ -1547,7 +1548,7 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
     for word in (AppCommand.RADIO_ON, AppCommand.DRIVE_ON, AppCommand.MIC_OFF):
         view._voice.on_command(word)
 
-    assert answers == [(f"🎤 {name} is the session's here", WARNING)
+    assert answers == [(f"{name} is the session's here", WARNING)
                        for name in ("Origenerator Radio", "OSR2", "the mic")]
 
 
@@ -1562,7 +1563,7 @@ def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
     view.osr2_control.the_session_has_it(True)
     view._voice.on_command(AppCommand.DRIVE_ON)
 
-    assert answers == [("🎤 OSR2 can't be switched here", WARNING)]
+    assert answers == [("OSR2 can't be switched here", WARNING)]
 
 
 def _thick_borders(view):

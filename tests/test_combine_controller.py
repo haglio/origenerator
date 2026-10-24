@@ -625,7 +625,7 @@ def test_that_hint_lands_in_the_slideshows_corner_rather_than_a_dialog(combine,
 
     assert host.told == []
     assert slideshows.runs_said == [
-        (None, "🎤 no past looping “waving” flick to base a recipe on yet", WARNING)]
+        (None, "no past looping “waving” flick to base a recipe on yet", WARNING)]
 
 
 def test_the_mined_recipe_is_matched_against_its_start_frames_scene(combine,
@@ -918,7 +918,7 @@ def test_animate_as_runs_the_act_it_names_in_the_lane_it_names(combine, monkeypa
 
     answer = controller.animate_it("img", AnimateRequest(recipe_match.GENAU, "waving"))
 
-    assert answer == ("img", "🎤 animating as “waving”", NOTICE)
+    assert answer == ("img", "animating as “waving”", NOTICE)
     assert launched == [(("img", "waving", recipe_match.GENAU), {"send": True})]
 
 
@@ -977,7 +977,7 @@ def test_animate_as_declines_a_video(combine):
     controller, _host = combine(db=FakeDB([_video("clip")]))
 
     assert controller.animate_it("clip", AnimateRequest(recipe_match.VIDEO, "waving")) == (
-        None, "🎤 only a picture can be animated", WARNING)
+        None, "only a picture can be animated", WARNING)
 
 
 def test_an_act_with_no_recipe_under_it_yet_says_so(combine, monkeypatch):

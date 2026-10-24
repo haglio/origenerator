@@ -55,7 +55,7 @@ from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.level_stepper import Version
-from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
+from origenerator.gui.notice_overlay import FAVORITE, HEARD_MARK, NOTICE, WARNING
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -161,7 +161,7 @@ class SlideshowHost(Protocol):
         """Stop the room or play it again: the slideshows, the pictures, the sound
         and the device."""
 
-    def say(self, message: str) -> None:
+    def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
         """Flash a line on the gallery's own caption."""
 
 
@@ -1377,17 +1377,17 @@ class SlideshowDirector:
         slideshow = self.surface_for(side)
         if command is SlideshowCommand.STOP:
             if slideshow is None:
-                self._host.say("🎤 no slideshow to close")
+                self._host.say("no slideshow to close")
                 return
             slideshow.close()
-            self._host.say("🎤 slideshow closed")
+            self._host.say("slideshow closed")
             return
         if command is SlideshowCommand.PAUSE:
             self._ask_for_the_room(paused=True)
             if slideshow is None:
-                self._host.say("🎤 paused")
+                self._host.say("paused")
             else:
-                slideshow.note_voice_command("🎤 slideshow paused")
+                slideshow.note_voice_command("slideshow paused")
             return
         self._ask_for_the_room(paused=False)
         seconds = DEFAULT_IMAGE_DWELL_MS // 1000
@@ -1395,10 +1395,10 @@ class SlideshowDirector:
             self._pace.set_seconds(seconds)  # what the next slideshow opens at
             self.start(side=side)
             if self._slideshow is None:
-                self._host.say("🎤 nothing here to play")
+                self._host.say("nothing here to play")
             return
         slideshow.set_dwell_s(seconds)
-        slideshow.note_voice_command(f"🎤 slideshow at {seconds}s")
+        slideshow.note_voice_command(f"slideshow at {seconds}s")
 
     def play_collection(self, command) -> None:
         """A spoken collection name, on the named side.
@@ -1425,7 +1425,7 @@ class SlideshowDirector:
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
-            self._host.say("🎤 nothing there to play")
+            self._host.say("nothing there to play")
             return
         self.open(items, rows=rows, location=key, side=command.side,
                   **self._order(command.collection_key == _RECENTS_KEY))
@@ -1438,10 +1438,10 @@ class SlideshowDirector:
         without anything here having to draw it."""
         slideshow = self.surface_for(side)
         if slideshow is None:
-            self._host.say("🎤 F-mode needs a slideshow to narrow")
+            self._host.say("F-mode needs a slideshow to narrow")
             return
         slideshow.toggle_favorites_filter()
-        self._host.say("🎤 F-mode on" if slideshow.hud_favorites_filter else "🎤 F-mode off")
+        self._host.say("F-mode on" if slideshow.hud_favorites_filter else "F-mode off")
 
     def filter_enhanced(self, enhanced_only: bool, side: str | None = None):
         """Narrow the slideshow in front of the speaker to its enhanced pictures, or
@@ -1464,17 +1464,17 @@ class SlideshowDirector:
         """
         slideshow = self.surface_for(side)
         if slideshow is None:
-            self._host.say("🎤 the filter needs a slideshow to narrow")
+            self._host.say("the filter needs a slideshow to narrow")
             return
         if not enhanced_only:
             slideshow.clear_modes()
-            slideshow.note_voice_command("🎤 showing all of them")
+            slideshow.note_voice_command("showing all of them")
             return
         if slideshow.set_enhanced_mode(True) or slideshow.hud_enhanced_mode:
             slideshow.note_voice_command(
-                f"🎤 enhanced only — {slideshow.pass_size()} to play")
+                f"enhanced only — {slideshow.pass_size()} to play")
         else:
-            slideshow.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
+            slideshow.note_voice_command("nothing here is enhanced", kind=WARNING)
 
     def run_on_slide(self, command: AppCommand) -> None:
         """A word about the slide filling the screen: step off it either way,
@@ -1489,22 +1489,22 @@ class SlideshowDirector:
         kind = NOTICE
         if command is AppCommand.BACK:
             slideshow.slideshow_step(-1)
-            said = "🎤 back"
+            said = "back"
         elif command is AppCommand.FORWARD:
             slideshow.slideshow_step(1)
-            said = "🎤 next"
+            said = "next"
         elif command is AppCommand.CULL:
             slideshow.cull()
-            said = "🎤 gone"
+            said = "gone"
         elif command is AppCommand.FAVORITE:
-            said, kind = (("🎤 favorited", FAVORITE) if slideshow.favorite()
-                          else ("🎤 nothing here to favorite", WARNING))
+            said, kind = (("favorited", FAVORITE) if slideshow.favorite()
+                          else ("nothing here to favorite", WARNING))
         elif command is AppCommand.LOCK:
-            said, kind = (("🎤 locked this one", NOTICE) if slideshow.set_locked(True)
-                          else ("🎤 already locked", WARNING))
+            said, kind = (("locked this one", NOTICE) if slideshow.set_locked(True)
+                          else ("already locked", WARNING))
         else:  # UNLOCK
-            said, kind = (("🎤 let go", NOTICE) if slideshow.set_locked(False)
-                          else ("🎤 nothing was locked", WARNING))
+            said, kind = (("let go", NOTICE) if slideshow.set_locked(False)
+                          else ("nothing was locked", WARNING))
         self.answer(said, kind=kind)
 
     # --- what the HUD's two switches judge items by -------------------------

@@ -38,7 +38,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
 from origenerator.gui import omnipause
 from origenerator.gui.combination_view import CombinationView
@@ -554,7 +554,7 @@ class PreviewWidget(QWidget):
     def _show_timeline(self, video_path) -> None:
         if self._timeline is None:
             return
-        actions = (read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
+        actions = (read_actions(funscript_of(video_path, places=OUTPUT_PLACES))
                    if video_path else [])
         self._timeline.set_actions(actions)
         self._timeline.setVisible(bool(video_path))

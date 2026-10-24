@@ -29,6 +29,7 @@ from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.item_names import ItemNames
 from origenerator.orientation import oriented_key
+from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, Slide, SlideshowFilters, SlideshowState
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
@@ -877,7 +878,7 @@ def test_a_landed_enhancement_reaches_every_surface(slideshows, tmp_path, monkey
     output = tmp_path / "output"
     output.mkdir()
     (output / "better.png").write_bytes(b"pixels")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     director, _host, made = slideshows(fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
@@ -899,7 +900,7 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
     upscale = library / "landscape" / "origenerator" / "clip_topaz.mp4"
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     monkeypatch.setattr(module, "EVOLVER_UPSCALED_DIR", library)
     return _row("g1", files=("clip.mp4",)), video, upscale
 
@@ -2125,7 +2126,7 @@ def test_a_landed_enhancement_hands_every_slideshow_the_pictures_new_versions(
     output = tmp_path / "output"
     output.mkdir()
     (output / "better.png").write_bytes(b"pixels")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     director, _host, made = slideshows(fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], side=PORTRAIT)

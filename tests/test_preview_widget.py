@@ -24,6 +24,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.output_places import OutputPlaces
 from tests.heard_drags import HeardDrags
 
 
@@ -583,10 +584,10 @@ def test_a_scripted_video_fills_its_timeline_with_the_motion(qtbot, tmp_path):
 def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monkeypatch):
     """Where new scripts go: a folder under the output dir, laid out like the
     output folder, rather than next to the video."""
-    monkeypatch.setattr(preview_widget, "COMFYUI_OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(preview_widget, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     vid = tmp_path / "video" / "filed.mp4"
     vid.parent.mkdir()
-    write_funscript(funscript_path_for(vid, output_dir=tmp_path),
+    write_funscript(funscript_path_for(vid, places=OutputPlaces.in_one_folder(tmp_path)),
                     synthesize_actions(2.0, hz=1.0))
 
     w = _timeline_preview(qtbot)

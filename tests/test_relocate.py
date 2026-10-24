@@ -15,6 +15,7 @@ from origenerator.funscript import (
 )
 from origenerator.gallery import output_file_path, resolve_preview
 from origenerator.importer import import_comfyui_output
+from origenerator.output_places import OutputPlaces
 from origenerator.relocate import relocate_moved_outputs
 
 
@@ -52,10 +53,10 @@ def test_a_file_swept_into_a_subfolder_is_followed_there(tmp_path):
     (output_dir / "image").mkdir()
     (output_dir / "image" / "sdxl_t2i_00001_.png").write_bytes(b"png")
 
-    assert relocate_moved_outputs(db, output_dir) == 1
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     assert _files(db, "a")[0]["subfolder"] == "image"
-    assert output_file_path(_files(db, "a")[0], output_dir).is_file()
+    assert output_file_path(_files(db, "a")[0], OutputPlaces.in_one_folder(output_dir)).is_file()
 
 
 def test_it_follows_a_file_out_of_a_subfolder_too(tmp_path):
@@ -64,7 +65,7 @@ def test_it_follows_a_file_out_of_a_subfolder_too(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("clip.mp4", "video")]})
     (output_dir / "clip.mp4").write_bytes(b"mp4")
 
-    assert relocate_moved_outputs(db, output_dir) == 1
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
     assert _files(db, "a")[0]["subfolder"] == ""
 
 
@@ -73,7 +74,7 @@ def test_a_record_that_still_resolves_is_left_untouched(tmp_path):
     (output_dir / "image").mkdir()
     (output_dir / "image" / "still.png").write_bytes(b"png")
 
-    assert relocate_moved_outputs(db, output_dir) == 0
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
     assert _files(db, "a")[0]["subfolder"] == "image"
 
 
@@ -86,14 +87,14 @@ def test_a_name_in_two_places_is_left_alone(tmp_path):
         (output_dir / folder).mkdir()
         (output_dir / folder / "wan22_i2v_00007_.mp4").write_bytes(b"mp4")
 
-    assert relocate_moved_outputs(db, output_dir) == 0
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
     assert _files(db, "a")[0]["subfolder"] == ""
 
 
 def test_a_file_that_is_simply_gone_keeps_saying_where_it_was(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("deleted.png", "image")]})
 
-    assert relocate_moved_outputs(db, output_dir) == 0
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
     assert _files(db, "a")[0]["subfolder"] == "image"
 
 
@@ -108,7 +109,7 @@ def test_a_file_the_recovery_bin_holds_is_not_followed(tmp_path):
         tmp_path, {"a": [_file("held.png", "image", path=str(trashed))]})
     (output_dir / "held.png").write_bytes(b"png")
 
-    assert relocate_moved_outputs(db, output_dir) == 0
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
     assert _files(db, "a")[0]["path"] == str(trashed)
 
 
@@ -121,7 +122,7 @@ def test_the_pre_enhance_original_is_followed_as_well(tmp_path):
     for name in ("enhanced.png", "before.png"):
         (output_dir / "image" / name).write_bytes(b"png")
 
-    assert relocate_moved_outputs(db, output_dir) == 2
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 2
     assert _files(db, "a")[0]["subfolder"] == "image"
     assert _files(db, "a", "original_files")[0]["subfolder"] == "image"
 
@@ -131,14 +132,14 @@ def test_it_is_idempotent(tmp_path):
     (output_dir / "image").mkdir()
     (output_dir / "image" / "sdxl_t2i_00001_.png").write_bytes(b"png")
 
-    assert relocate_moved_outputs(db, output_dir) == 1
-    assert relocate_moved_outputs(db, output_dir) == 0
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
 
 
 def test_an_output_dir_that_is_not_there_costs_nothing(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("x.png")]})
 
-    assert relocate_moved_outputs(db, tmp_path / "nowhere") == 0
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(tmp_path / "nowhere")) == 0
     assert _files(db, "a")[0]["subfolder"] == ""
     assert output_dir.is_dir()  # the real one, untouched
 
@@ -152,9 +153,9 @@ def test_the_moved_file_is_not_then_imported_a_second_time(tmp_path):
     (output_dir / "image").mkdir()
     (output_dir / "image" / "sdxl_t2i_00001_.png").write_bytes(b"png")
 
-    relocate_moved_outputs(db, output_dir)
+    relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir))
 
-    assert import_comfyui_output(output_dir, db, tmp_path / "thumbs") == 0
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir), db, tmp_path / "thumbs") == 0
     assert [r["prompt_id"] for r in db.list_generations()] == ["a"]
 
 
@@ -165,7 +166,7 @@ def test_without_it_the_scan_does_duplicate_the_row(tmp_path):
     (output_dir / "image").mkdir()
     (output_dir / "image" / "sdxl_t2i_00001_.png").write_bytes(b"png")
 
-    assert import_comfyui_output(output_dir, db, tmp_path / "thumbs") == 1
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir), db, tmp_path / "thumbs") == 1
 
 
 def test_a_followed_row_previews_again(tmp_path):
@@ -175,41 +176,41 @@ def test_a_followed_row_previews_again(tmp_path):
     (output_dir / "video").mkdir()
     (output_dir / "video" / "clip.mp4").write_bytes(b"mp4")
 
-    assert resolve_preview(_row(db, "a"), output_dir) is None
+    assert resolve_preview(_row(db, "a"), OutputPlaces.in_one_folder(output_dir)) is None
 
-    relocate_moved_outputs(db, output_dir)
+    relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir))
 
-    assert resolve_preview(_row(db, "a"), output_dir) == (
+    assert resolve_preview(_row(db, "a"), OutputPlaces.in_one_folder(output_dir)) == (
         output_dir / "video" / "clip.mp4", "video")
 
 
 def test_a_moved_videos_script_moves_with_it(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     was = output_dir / "video" / "wan22_i2v_00001_.mp4"
-    write_funscript(funscript_path_for(was, output_dir=output_dir),
+    write_funscript(funscript_path_for(was, places=OutputPlaces.in_one_folder(output_dir)),
                     synthesize_actions(2.0, hz=1.0))
     moved = output_dir / "tidied" / "wan22_i2v_00001_.mp4"
     moved.parent.mkdir()
     moved.write_bytes(b"mp4")
 
-    relocate_moved_outputs(db, output_dir)
+    relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir))
 
-    assert read_actions(funscript_of(moved, output_dir=output_dir)) == synthesize_actions(
+    assert read_actions(funscript_of(moved, places=OutputPlaces.in_one_folder(output_dir))) == synthesize_actions(
         2.0, hz=1.0)
 
 
 def test_a_script_already_where_a_video_went_is_left_as_it_is(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     write_funscript(funscript_path_for(output_dir / "video" / "wan22_i2v_00001_.mp4",
-                                       output_dir=output_dir),
+                                       places=OutputPlaces.in_one_folder(output_dir)),
                     synthesize_actions(2.0, hz=1.0))
     moved = output_dir / "tidied" / "wan22_i2v_00001_.mp4"
     moved.parent.mkdir()
     moved.write_bytes(b"mp4")
-    already = funscript_path_for(moved, output_dir=output_dir)
+    already = funscript_path_for(moved, places=OutputPlaces.in_one_folder(output_dir))
     write_funscript(already, synthesize_actions(5.0, hz=1.0))
 
-    assert relocate_moved_outputs(db, output_dir) == 1
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     assert read_actions(already) == synthesize_actions(5.0, hz=1.0)
 
@@ -217,7 +218,7 @@ def test_a_script_already_where_a_video_went_is_left_as_it_is(tmp_path):
 def test_a_script_that_will_not_move_leaves_its_video_followed(tmp_path, monkeypatch):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     write_funscript(funscript_path_for(output_dir / "video" / "wan22_i2v_00001_.mp4",
-                                       output_dir=output_dir),
+                                       places=OutputPlaces.in_one_folder(output_dir)),
                     synthesize_actions(2.0, hz=1.0))
     (output_dir / "tidied").mkdir()
     (output_dir / "tidied" / "wan22_i2v_00001_.mp4").write_bytes(b"mp4")
@@ -227,5 +228,5 @@ def test_a_script_that_will_not_move_leaves_its_video_followed(tmp_path, monkeyp
 
     monkeypatch.setattr(Path, "rename", held_open)
 
-    assert relocate_moved_outputs(db, output_dir) == 1
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
     assert _files(db, "a")[0]["subfolder"] == "tidied"

@@ -34,6 +34,7 @@ from origenerator.gallery import (
     remove_enhance_levels,
     resolve_preview,
 )
+from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.undo_stack import UndoEntry, UndoStack
 
@@ -54,10 +55,10 @@ class GalleryEnvironment:
 
 
 class GalleryActions:
-    def __init__(self, db, output_dir: Path, trash, limit: int = 50,
+    def __init__(self, db, places: OutputPlaces, trash, limit: int = 50,
                  environment: GalleryEnvironment | None = None):
         self._db = db
-        self._output_dir = Path(output_dir)
+        self._places = places
         self._trash = trash
         self._environment = environment or GalleryEnvironment()
         # Every mutation below records how to reverse itself here. Generic and
@@ -72,9 +73,8 @@ class GalleryActions:
     # thousand ran against the live ones. It asks here instead.
 
     @property
-    def output_dir(self) -> Path:
-        """Where a generation's files are."""
-        return self._output_dir
+    def places(self) -> OutputPlaces:
+        return self._places
 
     @property
     def thumb_dir(self) -> Path | None:
@@ -171,7 +171,7 @@ class GalleryActions:
         if thumb_dir is None:
             return
         row = self._db.get_generation(prompt_id)
-        preview = resolve_preview(row, self._output_dir) if row else None
+        preview = resolve_preview(row, self._places) if row else None
         if preview is None:
             return
         try:
@@ -246,7 +246,7 @@ class GalleryActions:
         seen: set[str] = set()
         by_row: list[list[Path]] = []
         for row in rows:
-            candidates = list(output_disk_files(row, self._output_dir, names))
+            candidates = list(output_disk_files(row, self._places, names))
             thumb = row.get("thumbnail_path")
             if thumb and names is None:
                 candidates.append(Path(thumb))

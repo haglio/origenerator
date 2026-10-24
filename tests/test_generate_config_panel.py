@@ -42,6 +42,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
@@ -1378,7 +1379,7 @@ def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
     upscale = library / "portrait" / EVOLVER_SOURCE / f"{prompt_id}_topaz.mp4"
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     monkeypatch.setattr(gcp_module, "EVOLVER_UPSCALED_DIR", library)
     return _video_row(db, prompt_id), upscale
 
@@ -1488,7 +1489,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     output_dir = tmp_path / "out"
     (output_dir / "image").mkdir(parents=True)
     (output_dir / "image" / "sdxl_img1.png").write_bytes(b"x")
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
 
     image = _image_row(db, "img1")
     panel.show_saved_generation(image, [image])
@@ -1530,7 +1531,7 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
     (output_dir / "image").mkdir(parents=True)
     for name in ("image_enhance_00001_.png", "sdxl_img1.png"):
         (output_dir / "image" / name).write_bytes(b"x")
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
 
     image = _enhanced_image_row(db)
     panel.show_saved_generation(image, [image])
@@ -1551,7 +1552,7 @@ def test_an_arrow_after_a_level_is_clicked_puts_the_next_level_in_the_preview(
     (output_dir / "image").mkdir(parents=True)
     for name in ("image_enhance_00001_.png", "sdxl_img1.png"):
         (output_dir / "image" / name).write_bytes(b"x")
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     image = _enhanced_image_row(db)
     panel.show_saved_generation(image, [image])
     newest = _level_rows(panel)[0]
@@ -1709,7 +1710,7 @@ def _wizard_panel(qtbot, tmp_path, monkeypatch):
     output = tmp_path / "out"
     (output / "image").mkdir(parents=True)
     (output / "image" / "sdxl_g1.png").write_bytes(b"png")
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     db = Database(tmp_path / "t.db")
     db.insert_generation(prompt_id="g1", workflow_name="sdxl_t2i",
                          workflow_version=_SDXL_VERSION, positive_prompt="a wizard",
@@ -1817,7 +1818,7 @@ def _script_for(video_path, output_dir=None):
     ``output_dir``, or, with none named, in the old place beside the clip."""
     actions = synthesize_actions(2.0, hz=1.0)
     dest = (video_path.with_suffix(".funscript") if output_dir is None
-            else funscript_path_for(video_path, output_dir=output_dir))
+            else funscript_path_for(video_path, places=OutputPlaces.in_one_folder(output_dir)))
     write_funscript(dest, actions)
     return actions
 
@@ -1845,7 +1846,7 @@ def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tm
     vpath = tmp_path / "video" / "vid1.mp4"
     vpath.parent.mkdir()
     vpath.write_bytes(b"v")
-    monkeypatch.setattr(osr2_driver, "COMFYUI_OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(osr2_driver, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     actions = _script_for(vpath, output_dir=tmp_path)
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
     panel.show_saved_generation(video, [])
@@ -2403,7 +2404,7 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
     (output_dir / "image").mkdir(parents=True)
     for name in ("sdxl_img1.png", "image_enhance_00001_.png"):
         (output_dir / "image" / name).write_bytes(b"x")
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
 
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
@@ -2929,7 +2930,7 @@ def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alo
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (video_path, "video"))
     monkeypatch.setattr(export_lane_module, "funscript_of",
-                        lambda video, output_dir: funscript if video == video_path else None)
+                        lambda video, places: funscript if video == video_path else None)
     export = MagicMock(return_value=EVOLVER_INBOX_DIR / lane.source / "vid1.mp4")
     monkeypatch.setattr(evolver_export, "export_video", export)
 
@@ -2968,8 +2969,8 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
     clip = output / "video" / "vid1.mp4"
     clip.parent.mkdir(parents=True)
     clip.write_bytes(b"pixels")
-    write_funscript(funscript_path_for(clip, output_dir=output), [{"at": 0, "pos": 0}])
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output)
+    write_funscript(funscript_path_for(clip, places=OutputPlaces.in_one_folder(output)), [{"at": 0, "pos": 0}])
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "0_inbox"

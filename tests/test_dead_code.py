@@ -381,7 +381,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 17181 when the motion-tracked video workflow left the app, taken down
 # to what the tree measured.
 # 17172 when one enhancement's whole settings came to be said once.
-MAX_PROSE_LINES = 17162
+# 17162 when each file a run loads from outside ComfyUI's folders came to be
+# handed over as a copy in its temp folder.
+# 17151 when every output came to be found through the places its kind is
+# kept in, and the docstrings about one output folder went with it.
+MAX_PROSE_LINES = 17151
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -25,6 +25,7 @@ import pytest
 from origenerator.comfyui_api import ComfyUIApi, comfyui_responding, format_prompt_error
 from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
 from origenerator.comfyui_inputs import ComfyFolders
+from origenerator.output_places import OutputPlaces
 
 
 def _mock_response(status: int, body: bytes):
@@ -503,8 +504,9 @@ def test_free_memory_asks_comfyui_to_unload_its_models():
 
 
 def _folders(tmp_path):
-    folders = ComfyFolders(input=tmp_path / "input", output=tmp_path / "output", temp=tmp_path / "temp")
-    for folder in folders:
+    folders = ComfyFolders(input=tmp_path / "input", places=OutputPlaces.in_one_folder(tmp_path / "output"),
+                           temp=tmp_path / "temp")
+    for folder in (folders.input, folders.places.comfyui, folders.temp):
         folder.mkdir()
     return folders
 

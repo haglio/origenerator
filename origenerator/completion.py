@@ -15,15 +15,17 @@ from pathlib import Path
 
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import synthesize_funscript
+from origenerator.gallery.output import output_file_path
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
+from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
 logger = logging.getLogger(__name__)
 
 
-def extract_completion(workflow, history_data, output_dir: Path, thumb_dir: Path, name):
+def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: Path, name):
     """Return ``(output_files, thumbnail_path | None, duration | None)`` for a run.
 
     ``output_files`` is drawn from ``history_data`` via the workflow's own output
@@ -33,8 +35,8 @@ def extract_completion(workflow, history_data, output_dir: Path, thumb_dir: Path
     in either yields ``None`` rather than stranding an otherwise-finished run.
     """
     files = workflow.extract_output_info(history_data)
-    thumb = _make_thumbnail(workflow, files, output_dir, thumb_dir, name)
-    _write_video_funscript(workflow, files, output_dir)
+    thumb = _make_thumbnail(workflow, files, places, thumb_dir, name)
+    _write_video_funscript(workflow, files, places)
     try:
         duration = execution_duration_seconds(history_data)
     except Exception as e:
@@ -43,33 +45,32 @@ def extract_completion(workflow, history_data, output_dir: Path, thumb_dir: Path
     return files, thumb, duration
 
 
-def _first_output_file(files, output_dir: Path) -> Path | None:
+def _first_output_file(files, places: OutputPlaces) -> Path | None:
     """The on-disk path of a run's first output, if it exists — the file both the
     thumbnail and the funscript are made from."""
     if not files:
         return None
-    first = files[0]
-    source = output_dir / first.get("subfolder", "") / first["filename"]
+    source = output_file_path(files[0], places)
     return source if source.exists() else None
 
 
-def _write_video_funscript(workflow, files, output_dir: Path):
+def _write_video_funscript(workflow, files, places: OutputPlaces):
     """ComfyUI gives a deleted video's filename to the next video it saves, and
     the deleted one's script is still where the new one's goes, so the finished
     video's own script is written over it."""
     if workflow.output_type != MediaType.VIDEO:
         return
-    source = _first_output_file(files, output_dir)
+    source = _first_output_file(files, places)
     if source is None:
         return
     try:
-        synthesize_funscript(source, hz=MOTION_DEFAULT_HZ, output_dir=output_dir)
+        synthesize_funscript(source, hz=MOTION_DEFAULT_HZ, places=places)
     except Exception as e:
         logger.warning("Funscript generation failed for %s: %s", source, e)
 
 
-def _make_thumbnail(workflow, files, output_dir: Path, thumb_dir: Path, name):
-    source = _first_output_file(files, output_dir)
+def _make_thumbnail(workflow, files, places: OutputPlaces, thumb_dir: Path, name):
+    source = _first_output_file(files, places)
     if source is None:
         return None
     try:

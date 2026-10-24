@@ -74,9 +74,9 @@ from origenerator.animate_command import AnimateRequest
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR,
     EVOLVER_INBOX_DIR,
     GENAU_SOURCE,
+    OUTPUT_PLACES,
     THUMB_DIR,
 )
 from origenerator.db import Database
@@ -131,6 +131,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, key_holds, oriented_key
+from origenerator.output_places import OutputPlaces
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
 from origenerator.slideshow_buttons import MODE_BUTTONS
@@ -184,8 +185,8 @@ class FakeActions:
     which library the view is looking at.
     """
 
-    def __init__(self, output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR):
-        self.output_dir = output_dir
+    def __init__(self, places=OUTPUT_PLACES, thumb_dir=THUMB_DIR):
+        self.places = places
         self.thumb_dir = thumb_dir
         self.deleted = []   # each entry is one delete batch (list of rows)
         self.rejected = []  # experiment rows handed to reject_experiment
@@ -245,7 +246,7 @@ def _stub_preview_resolution(monkeypatch):
     PreviewWidget never starts WMF playback (which deadlocks at teardown).
     Tests that assert routing override this with their own return value.
     """
-    monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: None)
+    monkeypatch.setattr(gallery, "resolve_preview", lambda row, places: None)
 
 
 class FakeDB:
@@ -2461,7 +2462,7 @@ def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, t
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -2535,7 +2536,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
                          params_json=json.dumps({"steps": 20}), workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -2752,7 +2753,7 @@ def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -2880,7 +2881,7 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("v1", status="completed", output_files=json.dumps(
         [{"filename": "clip.mp4", "subfolder": "video"}]))
-    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -3645,8 +3646,8 @@ def test_recents_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, mo
     ]
     calls = []
 
-    def fake_anim(row, output_dir, thumb_dir):
-        calls.append((row["prompt_id"], output_dir, thumb_dir))
+    def fake_anim(row, places, thumb_dir):
+        calls.append((row["prompt_id"], places, thumb_dir))
         return str(webp) if gallery.media_type_of_row(row) == "video" else None
 
     monkeypatch.setattr(gallery, "animated_preview_path", fake_anim)
@@ -3658,7 +3659,7 @@ def test_recents_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, mo
     assert view._browser._thumb_widgets["v1"].findChildren(QMovie)          # the video loops
     assert view._browser._thumb_widgets["i1"].findChildren(QMovie) == []    # the image is a still
     # Each tile resolved its preview through the shared helper, with the app's dirs.
-    assert ("v1", COMFYUI_OUTPUT_DIR, THUMB_DIR) in calls
+    assert ("v1", OUTPUT_PLACES, THUMB_DIR) in calls
 
 
 def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
@@ -4666,7 +4667,7 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
                              workflow_json="{}")
         db.update_generation(pid, status="completed",
                              output_files=json.dumps([{"filename": f"{pid}.png", "subfolder": ""}]))
-    actions = GalleryActions(db, tmp_path / "out", Trash(tmp_path / "trash"))
+    actions = GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -5452,7 +5453,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
     generate form under someone else's picture.
     """
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (Path("C:/out/sdxl_t2i_i2.png"), "image"))
+                        lambda row, places: (Path("C:/out/sdxl_t2i_i2.png"), "image"))
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     db = FakeDB(rows)
     probe = GalleryView(db)
@@ -5720,7 +5721,7 @@ def test_a_branch_session_deletes_into_the_shared_trash(qtbot, monkeypatch, tmp_
     output_dir.mkdir()
     file_path = output_dir / "sdxl_t2i_i1.png"
     file_path.write_bytes(b"data")
-    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gallery_view_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "trash")
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)  # builds its own actions, the way the app does
@@ -6084,7 +6085,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
             pid, status="completed",
             output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
         )
-    actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
+    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -6117,7 +6118,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
             pid, status="completed",
             output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
         )
-    actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
+    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -6272,7 +6273,7 @@ def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, output_dir, Trash(tmp_path / "trash"))
+    actions = GalleryActions(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -7502,7 +7503,7 @@ def _resolve_by_id(monkeypatch):
     """Resolve every row's preview to a per-row image path (the autouse default
     stubs resolution to None, which would leave the slideshow nothing to seed)."""
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
 
 
 def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
@@ -8386,7 +8387,7 @@ def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeyp
 def _resolve_each_to_its_own_kind(monkeypatch):
     """Resolve a picture's preview to an image and a video's to a video, the way
     a slideshow of a picture and the videos animated from it plays them."""
-    monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: (
+    monkeypatch.setattr(gallery, "resolve_preview", lambda row, places: (
         (f"{row['prompt_id']}.mp4", "video") if row["workflow_name"] == "wan22_i2v"
         else (f"{row['prompt_id']}.png", "image")))
 
@@ -8620,7 +8621,7 @@ def _resolve_finished_only(monkeypatch):
     still being made has no file to point at."""
     monkeypatch.setattr(
         gallery, "resolve_preview",
-        lambda row, output_dir: (None if row.get("status") != "completed"
+        lambda row, places: (None if row.get("status") != "completed"
                                  else (f"{row['prompt_id']}.png", "image")),
     )
 
@@ -9199,7 +9200,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     done = tmp_path / "done.png"
     Image.new("RGB", (8, 8), (10, 120, 200)).save(done, "PNG")
     monkeypatch.setattr(gcp_module, "resolve_preview",
-                        lambda row, output_dir: (done, "image"))
+                        lambda row, places: (done, "image"))
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
@@ -9211,7 +9212,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
 
 def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
         qtbot, tmp_path, monkeypatch):
-    by_id = lambda row, output_dir: (f"{row['prompt_id']}.png", "image")
+    by_id = lambda row, places: (f"{row['prompt_id']}.png", "image")
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
     monkeypatch.setattr(gcp_module, "resolve_preview", by_id)
     client = _reroll_client()
@@ -9668,7 +9669,7 @@ def _shown_view_with_one_image(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, output_dir, Trash(tmp_path / "trash"))
+    actions = GalleryActions(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.show()
@@ -9706,7 +9707,7 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
+    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     win = QMainWindow()
     win.setCentralWidget(view)
@@ -12135,7 +12136,7 @@ def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
     (output_dir / "image").mkdir(parents=True)
     picture = output_dir / "image" / "sdxl_t2i_g0.png"
     picture.write_bytes(_png_bytes())
-    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
     qtbot.addWidget(view)
@@ -12664,7 +12665,7 @@ def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_pa
     # Holding a slide asks for an enhancement, and what it gets first is a place
     # in the line — a slideshow of held slides has several out at once.
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -12690,7 +12691,7 @@ def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypat
     # An enhancement is a version of the image it improves, so deleting the image
     # leaves its run nowhere to fold: it comes off the queue rather than spending
     # minutes producing an enhanced file with no original to belong to.
-    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(gallery_view_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "output"))
     monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "state" / "trash")
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())  # its own actions, as the app builds them
@@ -12711,7 +12712,7 @@ def test_a_re_enhance_is_cancelled_by_deleting_its_image_too(qtbot, monkeypatch,
     # A re-enhance runs on the pre-enhance original still listed under the
     # enhanced file, so the run to stop is found by the image's whole file list
     # rather than by whichever version leads it.
-    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(gallery_view_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "output"))
     monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "state" / "trash")
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation(
@@ -12741,7 +12742,7 @@ def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, mon
     # A rejection keeps the row but takes its files, so nothing is left for a
     # landing enhance to fold onto — and one that did land would bring a rejected
     # experiment back as an enhanced image.
-    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(gallery_view_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "output"))
     monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "state" / "trash")
     db = Database(tmp_path / "test.db")
     db.insert_generation(
@@ -13487,7 +13488,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     qtbot.addWidget(view)
     monkeypatch.setattr(
         gallery, "resolve_preview",
-        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"),
+        lambda row, places: (f"{row['prompt_id']}.png", "image"),
     )
     view.refresh()
     _open_leaf(view)
@@ -13508,7 +13509,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
 def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
         qtbot, tmp_path, monkeypatch):
-    by_id = lambda row, output_dir: (f"{row['prompt_id']}.png", "image")
+    by_id = lambda row, places: (f"{row['prompt_id']}.png", "image")
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
     monkeypatch.setattr(gcp_module, "resolve_preview", by_id)
     client = _reroll_client()
@@ -14024,7 +14025,7 @@ def _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch):
     """A gallery on screen with the sound on and a standalone Slideshow over it,
     active: where a key pressed at the Slideshow lands."""
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("g0.png", "image"))
+                        lambda row, places: ("g0.png", "image"))
     bed = _FakeAmbientAudio()
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), ambient_audio=bed)
     qtbot.addWidget(view)
@@ -14090,7 +14091,7 @@ def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_aga
 def _startable_view(qtbot, tmp_path, monkeypatch):
     """A gallery on a loopable folder with nothing running — the app as it opens."""
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("g0.png", "image"))
+                        lambda row, places: ("g0.png", "image"))
     bed = _FakeAmbientAudio()
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), ambient_audio=bed)
     qtbot.addWidget(view)
@@ -15482,7 +15483,7 @@ def test_a_landed_enhancement_upgrades_that_item_in_the_open_slideshow(
     # on the item that asked — it takes the upgrade wherever that item sits.
     paths = {"g0": "g0.png", "g1": "g1.png"}
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (paths[row["prompt_id"]], "image"))
+                        lambda row, places: (paths[row["prompt_id"]], "image"))
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -15551,7 +15552,7 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
     qtbot.addWidget(view)
     monkeypatch.setattr(
         gallery, "resolve_preview",
-        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"),
+        lambda row, places: (f"{row['prompt_id']}.png", "image"),
     )
     view.refresh()
     _open_leaf(view)
@@ -15594,7 +15595,7 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
     qtbot.addWidget(view)
     monkeypatch.setattr(
         gallery, "resolve_preview",
-        lambda row, output_dir: (f"{row['prompt_id']}.mp4", "video"),
+        lambda row, places: (f"{row['prompt_id']}.mp4", "video"),
     )
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["v1"])
@@ -15612,7 +15613,7 @@ def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
     # It used to arm the mic and disarm it again, which is what left "start
     # slideshow" unhearable in the one state it is for.
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("g0.png", "image"))
+                        lambda row, places: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -15645,7 +15646,7 @@ def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
     """A gallery playing one image fullscreen with the mic on, and exactly these
     detectors installed — the state every spoken fix is said into."""
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("g0.png", "image"))
+                        lambda row, places: ("g0.png", "image"))
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: list(detectors))
     db = _enhanceable_db(tmp_path, count=1)
@@ -15716,7 +15717,7 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
 def _voiceable(qtbot, tmp_path, monkeypatch):
     """A gallery on a playable folder with the microphone switched on."""
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("g0.png", "image"))
+                        lambda row, places: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -15874,7 +15875,7 @@ def _requestable_db(tmp_path, prompt="a woman, a hat, soft light"):
 
 def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("orig.png", "image"))
+                        lambda row, places: ("orig.png", "image"))
     view = GalleryView(_requestable_db(tmp_path, **kw), client=_reroll_client())
     qtbot.addWidget(view)
     # The words alone, with no smart matcher: these cover the policy and the
@@ -17088,14 +17089,14 @@ def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_
     asked = []
     monkeypatch.setattr(
         gallery, "animated_preview_path",
-        lambda row, output_dir, thumb_dir: asked.append((output_dir, thumb_dir)))
-    view = GalleryView(_bin_db(), actions=FakeActions(output_dir=tmp_path / "output",
+        lambda row, places, thumb_dir: asked.append((places, thumb_dir)))
+    view = GalleryView(_bin_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(tmp_path / "output"),
                                                  thumb_dir=tmp_path / "thumbs"))
     qtbot.addWidget(view)
 
     view.animated_preview({"prompt_id": "p1"})
 
-    assert asked == [(tmp_path / "output", tmp_path / "thumbs")]
+    assert asked == [(OutputPlaces.in_one_folder(tmp_path / "output"), tmp_path / "thumbs")]
 
 
 def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):

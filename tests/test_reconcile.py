@@ -15,6 +15,7 @@ from origenerator.bookmark_reconcile import (
 from origenerator.db import Database
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.inflight import reconcile_in_flight
+from origenerator.output_places import OutputPlaces
 
 # sdxl_t2i saves under output node "7".
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -53,7 +54,7 @@ def test_finished_row_is_finalized_from_history(tmp_path):
     Image.new("RGB", (8, 8), (1, 2, 3)).save(out / "a.png")
 
     summary = reconcile_in_flight(db, FakeComfy(histories={"p1": SDXL_HISTORY}),
-                                  out, tmp_path / "thumbs")
+                                  OutputPlaces.in_one_folder(out), tmp_path / "thumbs")
 
     row = db.get_generation("p1")
     assert row["status"] == "completed"
@@ -66,7 +67,7 @@ def test_still_queued_row_is_left_running(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1")
 
-    summary = reconcile_in_flight(db, FakeComfy(queue={"p1"}), tmp_path, tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(queue={"p1"}), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert db.get_generation("p1")["status"] == "running"
     assert summary["running"] == 1
@@ -79,7 +80,7 @@ def test_a_row_the_queue_is_still_holding_is_left_alone(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1", status="pending")
 
-    summary = reconcile_in_flight(db, FakeComfy(), tmp_path, tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert db.get_generation("p1")["status"] == "pending"
     assert summary == {"finalized": 0, "running": 0, "cleared": 0}
@@ -89,7 +90,7 @@ def test_gone_row_is_cleared(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1")  # not in the queue, not in history
 
-    summary = reconcile_in_flight(db, FakeComfy(), tmp_path, tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert db.get_generation("p1") is None  # any file it wrote is caught by the importer
     assert summary["cleared"] == 1
@@ -100,7 +101,7 @@ def test_completed_rows_are_untouched(tmp_path):
     _insert_in_flight(db, "done", status="completed")
     _insert_in_flight(db, "gone")  # an in-flight row so the reconcile loop runs
 
-    reconcile_in_flight(db, FakeComfy(), tmp_path, tmp_path / "thumbs")
+    reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert db.get_generation("done") is not None  # not an in-flight row: never considered
 
@@ -109,7 +110,7 @@ def test_server_unreachable_leaves_rows_intact(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1")
 
-    summary = reconcile_in_flight(db, FakeComfy(queue_error=True), tmp_path, tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(queue_error=True), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     # A server we can't read is not evidence the job is gone — don't clear it.
     assert db.get_generation("p1")["status"] == "running"
@@ -120,7 +121,7 @@ def test_no_in_flight_rows_is_a_noop(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "done", status="completed")
 
-    summary = reconcile_in_flight(db, FakeComfy(), tmp_path, tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert summary == {"finalized": 0, "running": 0, "cleared": 0}
 

@@ -9,6 +9,7 @@ from origenerator import gallery
 from origenerator.db import Database
 from origenerator.gallery.sides import PORTRAIT
 from origenerator.gallery_actions import GalleryActions
+from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 
 
@@ -294,7 +295,7 @@ def test_repointing_onto_a_folder_it_already_gathers_merges_them(tmp_path):
 
 def _actions(tmp_path):
     db = Database(tmp_path / "t.db")
-    return db, GalleryActions(db, tmp_path / "output", Trash(tmp_path / "trash"))
+    return db, GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "output"), Trash(tmp_path / "trash"))
 
 
 def test_undoing_a_removal_brings_the_folder_back_whole(tmp_path):

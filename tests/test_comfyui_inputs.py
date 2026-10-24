@@ -9,11 +9,13 @@ from pathlib import Path
 
 from origenerator import config
 from origenerator.comfyui_inputs import HANDED_OVER, ComfyFolders, within_reach
+from origenerator.output_places import OutputPlaces
 
 
 def _folders(tmp_path: Path) -> ComfyFolders:
-    folders = ComfyFolders(input=tmp_path / "input", output=tmp_path / "output", temp=tmp_path / "temp")
-    for folder in folders:
+    folders = ComfyFolders(input=tmp_path / "input", places=OutputPlaces.in_one_folder(tmp_path / "output"),
+                           temp=tmp_path / "temp")
+    for folder in (folders.input, folders.places.comfyui, folders.temp):
         folder.mkdir()
     return folders
 
@@ -50,7 +52,7 @@ def test_a_picture_named_by_its_whole_path_goes_to_comfyui_as_a_copy_in_its_temp
 def test_a_file_comfyui_can_already_open_is_left_as_it_was_named(tmp_path):
     folders = _folders(tmp_path)
     _picture(folders.input / "in_reach.png")
-    _picture(folders.output / "image" / "made_here.png")
+    _picture(folders.places.pictures / "made_here.png")
     _picture(folders.temp / "scratch" / "preview.png")
     payload = {
         "1": {"class_type": "LoadImage", "inputs": {"image": "in_reach.png"}},
@@ -66,11 +68,25 @@ def test_an_output_reference_reached_through_a_link_into_another_place_is_copied
     folders = _folders(tmp_path)
     library = tmp_path / "library"
     picture = _picture(library / "jane_doe.png")
-    _winapi.CreateJunction(str(library), str(folders.output / "image"))
+    _winapi.CreateJunction(str(library), str(folders.places.pictures))
 
     posted = within_reach(_load_image("image/jane_doe.png [output]"), folders)
 
     assert posted["1"]["inputs"]["image"].endswith("/jane_doe.png [temp]")
+    assert [copy.read_bytes() for copy in _handed_over(folders)] == [picture.read_bytes()]
+
+
+def test_an_output_kept_in_the_library_goes_to_comfyui_as_a_copy_in_its_temp_folder(tmp_path):
+    library = tmp_path / "library"
+    places = OutputPlaces(comfyui=tmp_path / "output", pictures=library / "pictures",
+                          videos=library / "videos", scripts=library / "scripts",
+                          audio=library / "sounds")
+    folders = ComfyFolders(input=tmp_path / "input", places=places, temp=tmp_path / "temp")
+    picture = _picture(places.pictures / "alpha_t2i_00007_.png")
+
+    posted = within_reach(_load_image("image/alpha_t2i_00007_.png [output]"), folders)
+
+    assert posted["1"]["inputs"]["image"].endswith("/alpha_t2i_00007_.png [temp]")
     assert [copy.read_bytes() for copy in _handed_over(folders)] == [picture.read_bytes()]
 
 
@@ -124,6 +140,6 @@ def test_only_the_loading_nodes_file_inputs_are_touched(tmp_path):
     assert posted["2"] == payload["2"] and posted["3"] == payload["3"]
 
 
-def test_the_apps_folders_are_comfyuis_input_output_and_temp():
+def test_the_apps_folders_are_comfyuis_input_and_temp_and_the_places_outputs_are_kept():
     assert ComfyFolders(
-        input=config.COMFYUI_INPUT_DIR, output=config.COMFYUI_OUTPUT_DIR, temp=config.COMFYUI_TEMP_DIR) == config.COMFYUI_FOLDERS
+        input=config.COMFYUI_INPUT_DIR, places=config.OUTPUT_PLACES, temp=config.COMFYUI_TEMP_DIR) == config.COMFYUI_FOLDERS

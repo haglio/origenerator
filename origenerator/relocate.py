@@ -1,6 +1,6 @@
 """Follow an output file the user moved, so the row that recorded it keeps up.
 
-ComfyUI's output folder belongs to the user, not to this app: it gets tidied
+The library's folders belong to the user, not to this app: they get tidied
 between sessions -- a loose file swept into a subfolder, a whole prefix's worth
 filed somewhere else -- and every generation that recorded one keeps naming
 where it *was*. Two things then go wrong, and only the first of them shows:
@@ -9,12 +9,12 @@ where it *was*. Two things then go wrong, and only the first of them shows:
   no reveal, no enhance, no delete, because each of those resolves through the
   recorded ``subfolder`` (see :func:`origenerator.gallery.output_file_path`);
 * the startup import scan finds that file at its new path, does not recognize it
-  -- it keys what it has already seen by path under the output dir -- and builds
+  -- it keys what it has already seen by the folder its record names -- and builds
   a second, lesser row for it: an ``imported`` one, beside the generated row
   that still holds the prompt and the settings.
 
 So this runs *before* that scan, and looks for every recorded file no longer
-where its row says, by name, across the output tree:
+where its row says, by name, across every place outputs are kept:
 
 * **exactly one file of that name** -> rewrite that record's ``subfolder``;
 * **none** -> leave it alone. The file was deleted rather than moved, and a row
@@ -26,7 +26,7 @@ where its row says, by name, across the output tree:
   is not.
 
 A record the recovery bin re-pointed carries an absolute ``path`` of its own and
-is skipped: its file is in the trash, which is not the output tree.
+is skipped: its file is in the trash, which is none of those places.
 """
 
 from __future__ import annotations
@@ -38,6 +38,7 @@ from pathlib import Path
 
 from origenerator.funscript import funscript_path_for
 from origenerator.gallery.output import parse_file_list
+from origenerator.output_places import OutputPlaces
 
 logger = logging.getLogger(__name__)
 
@@ -48,23 +49,19 @@ logger = logging.getLogger(__name__)
 FILE_LISTS = ("output_files", "original_files")
 
 
-def _by_name(output_dir: Path) -> dict[str, set[str]]:
-    """Every file under *output_dir*, as name -> the subfolder(s) holding one.
+def _by_name(places: OutputPlaces) -> dict[str, set[str]]:
+    """Every file kept in *places*, as name -> the subfolder(s) holding one.
 
-    A subfolder is spelled the way a record spells it: posix-separated and
-    relative to the output dir, with the root itself as ``""``. One walk rather
-    than a stat per recorded file, because a healthy library pays this on every
-    launch and there are thousands of rows and only one tree.
+    One walk rather than a stat per recorded file, because a healthy library
+    pays this on every launch and there are thousands of rows.
     """
     index: dict[str, set[str]] = defaultdict(set)
-    for path in output_dir.rglob("*"):
-        if path.is_file():
-            subfolder = path.parent.relative_to(output_dir).as_posix()
-            index[path.name].add("" if subfolder == "." else subfolder)
+    for path, subfolder in places.files():
+        index[path.name].add(subfolder)
     return index
 
 
-def _followed(files: list, index: dict[str, set[str]], output_dir: Path) -> int:
+def _followed(files: list, index: dict[str, set[str]], places: OutputPlaces) -> int:
     """Repoint each record in *files* whose file has moved; how many, in place."""
     moved = 0
     for record in files:
@@ -76,15 +73,15 @@ def _followed(files: list, index: dict[str, set[str]], output_dir: Path) -> int:
         if len(holders) != 1 or was in holders:
             continue
         record["subfolder"] = next(iter(holders))
-        _move_script(output_dir / was / name, output_dir / record["subfolder"] / name,
-                     output_dir)
+        _move_script(places.folder(was) / name, places.folder(record["subfolder"]) / name,
+                     places)
         moved += 1
     return moved
 
 
-def _move_script(was: Path, now: Path, output_dir: Path) -> None:
-    script = funscript_path_for(was, output_dir=output_dir)
-    destination = funscript_path_for(now, output_dir=output_dir)
+def _move_script(was: Path, now: Path, places: OutputPlaces) -> None:
+    script = funscript_path_for(was, places=places)
+    destination = funscript_path_for(now, places=places)
     if script.is_file() and not destination.exists():
         try:
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -93,23 +90,20 @@ def _move_script(was: Path, now: Path, output_dir: Path) -> None:
             logger.warning("A moved video's script stayed at %s: %s", script, e)
 
 
-def relocate_moved_outputs(db, output_dir) -> int:
+def relocate_moved_outputs(db, places: OutputPlaces) -> int:
     """Repoint every recorded output file that moved. Returns how many.
 
     Best effort by construction: a name that is ambiguous or gone is left as it
     is, so the worst this can do to a library it cannot make sense of is
     nothing.
     """
-    output_dir = Path(output_dir)
-    if not output_dir.is_dir():
-        return 0
-    index = _by_name(output_dir)
+    index = _by_name(places)
     moved = 0
     for row in db.list_generations():
         updates = {}
         for column in FILE_LISTS:
             files = parse_file_list(row.get(column))
-            followed = _followed(files, index, output_dir) if files else 0
+            followed = _followed(files, index, places) if files else 0
             if followed:
                 updates[column] = json.dumps(files)
                 moved += followed

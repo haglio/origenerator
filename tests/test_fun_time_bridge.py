@@ -743,7 +743,7 @@ def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_f
                                  tall=False):
     """A session with its Funestras handed over, a run going in the tab in front,
     and that tab's preview double-clicked on the run's first frame."""
-    def by_id(row, output_dir):
+    def by_id(row, places):
         if row.get("status") != "completed":
             return None
         return str(tmp_path / f"{row['prompt_id']}.png"), "image"

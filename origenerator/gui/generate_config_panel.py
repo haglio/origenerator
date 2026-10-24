@@ -23,9 +23,9 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
 from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR,
     EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
+    OUTPUT_PLACES,
     THUMB_DIR,
 )
 from origenerator.db import Database
@@ -1005,7 +1005,7 @@ class GenerateConfigPanel(QWidget):
 
     def _looping_preview(self, item: str) -> str | None:
         row = self._db.get_generation(item)
-        return animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR) if row else None
+        return animated_preview_path(row, OUTPUT_PLACES, THUMB_DIR) if row else None
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)
@@ -1130,7 +1130,7 @@ class GenerateConfigPanel(QWidget):
         if self._autoshow_held:
             return
         row = self._recent_matching_row()
-        if row is not None and resolve_preview(row, COMFYUI_OUTPUT_DIR) is not None:
+        if row is not None and resolve_preview(row, OUTPUT_PLACES) is not None:
             self._display_result(row, self._image_rows())
             return
         self._preview.clear()  # nothing generated with these settings yet
@@ -1416,7 +1416,7 @@ class GenerateConfigPanel(QWidget):
         would open a tab beside it instead of filling it; the tab that *did* launch
         the run gets the whole end state through :meth:`show_completed_result`.
         """
-        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is None:
             return  # nothing to look at; leave the frames rather than blank the pane
         self._live_note = None
@@ -1517,7 +1517,7 @@ class GenerateConfigPanel(QWidget):
         arriving = (self._displayed_row is None
                     or self._displayed_row.get("prompt_id") != row.get("prompt_id"))
         self._set_displayed_row(row)
-        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is not None:
             self._preview.show_media(*preview, row["prompt_id"])  # after any prefill, so it wins over autoshow
         else:
@@ -1674,7 +1674,7 @@ class GenerateConfigPanel(QWidget):
         """Put the displayed generation's own output back in the preview, after
         a live enhancement of it has finished streaming over the top."""
         row = self._displayed_row
-        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
+        preview = resolve_preview(row, OUTPUT_PLACES) if row else None
         if preview is None:
             self._preview.clear()
             return
@@ -1775,7 +1775,7 @@ class GenerateConfigPanel(QWidget):
         """The upscale Evolver has made of the video on display, if it has."""
         if media_type_of_row(row) != MediaType.VIDEO:
             return None
-        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is None:
             return None
         return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE).upscale_of(preview[0])
@@ -1790,7 +1790,7 @@ class GenerateConfigPanel(QWidget):
     def _level_path(level) -> Path:
         """Where one version's file lives — under ComfyUI's output folder, or in
         the trash once the generation has been deleted."""
-        return output_file_path(level.file, COMFYUI_OUTPUT_DIR)
+        return output_file_path(level.file, OUTPUT_PLACES)
 
     def _show_level(self, position: int):
         """Put one of the displayed generation's versions in the preview.
@@ -1872,7 +1872,7 @@ class GenerateConfigPanel(QWidget):
             return
         try:
             lane.send(path, self._displayed_row["prompt_id"], db=self._db,
-                      inbox=self._inbox, output_dir=COMFYUI_OUTPUT_DIR)
+                      inbox=self._inbox, places=OUTPUT_PLACES)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
             QMessageBox.warning(self._preview, lane.failure_title,
@@ -1910,7 +1910,7 @@ class GenerateConfigPanel(QWidget):
         either way."""
         if not self._displayed_row:
             return None
-        preview = resolve_preview(self._displayed_row, COMFYUI_OUTPUT_DIR)
+        preview = resolve_preview(self._displayed_row, OUTPUT_PLACES)
         if preview is None or preview[1] != MediaType.VIDEO:
             return None
         return preview[0]

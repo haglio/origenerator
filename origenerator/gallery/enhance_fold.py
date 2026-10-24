@@ -49,6 +49,7 @@ from origenerator.gallery.output import (
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
+from origenerator.output_places import OutputPlaces
 
 logger = logging.getLogger(__name__)
 
@@ -172,13 +173,13 @@ def fold_completed_enhancements(db) -> int:
     return folded
 
 
-def enhancements_of_pictures_gone(rows, *, output_dir: Path, input_dir: Path) -> list[dict]:
+def enhancements_of_pictures_gone(rows, *, places: OutputPlaces, input_dir: Path) -> list[dict]:
     return [
         row for row in rows
         if row.get("workflow_name") == ENHANCE_WORKFLOW
         and row.get("status") == GenerationStatus.COMPLETED
         and (picture := parse_params(row.get("params_json")).get("input_image"))
-        and reference_path(picture, output_dir=output_dir, input_dir=input_dir) is None
+        and reference_path(picture, places=places, input_dir=input_dir) is None
     ]
 
 

@@ -25,7 +25,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 
-from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import OUTPUT_PLACES, THUMB_DIR
 from origenerator.gallery import (
     animated_preview_path,
     find_source_image_id,
@@ -187,7 +187,7 @@ class RelatedMedia(QWidget):
             logger.info("Image %s has %d animations; showing the first %d",
                         row["prompt_id"], len(videos), ANIMATED_STRIP_LIMIT)
         return [
-            (v["prompt_id"], animated_preview_path(v, COMFYUI_OUTPUT_DIR, THUMB_DIR),
+            (v["prompt_id"], animated_preview_path(v, OUTPUT_PLACES, THUMB_DIR),
              v.get("thumbnail_path"))
             for v in videos[:ANIMATED_STRIP_LIMIT]
         ]

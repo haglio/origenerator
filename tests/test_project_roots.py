@@ -8,8 +8,6 @@ is not one of those repos: it did not move, so it stays on ``library_root`` whil
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 from app_support import haglio_settings
 
 from origenerator import config, osr2
@@ -66,16 +64,6 @@ class TestWhichPathsMovedAndWhichDidNot:
     def test_comfyui_stays_on_the_library_root_because_it_is_not_one_of_our_repos(self):
         """ComfyUI is a third-party app that did not move with the suite."""
         assert config.COMFYUI_DIR == config.LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
-
-
-class TestWhereComfyUISaves:
-    def test_is_the_folder_the_shared_settings_name(self):
-        saves = config.comfyui_output_dir({"comfyui_output_dir": "D:/example/saves"}, Path("C:/example/ComfyUI"))
-
-        assert saves == Path("D:/example/saves")
-
-    def test_is_comfyuis_own_output_folder_while_the_shared_settings_name_none(self):
-        assert config.comfyui_output_dir({}, Path("C:/example/ComfyUI")) == Path("C:/example/ComfyUI/output")
 
 
 class TestTheValuesAnotherAppHoldsToo:

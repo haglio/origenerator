@@ -45,9 +45,9 @@ def the_animation_window():
     from origenerator.config import (
         COMFYUI_FOLDERS,
         COMFYUI_HOST,
-        COMFYUI_OUTPUT_DIR,
         COMFYUI_PORT,
         DB_PATH,
+        OUTPUT_PLACES,
         THUMB_DIR,
     )
     from origenerator.db import Database
@@ -63,9 +63,9 @@ def the_animation_window():
         """The picture this clip was made from, and the clip's own loop."""
         source = gallery.find_source_image_id(sample, pictures)
         row = db.get_generation(source) if source else None
-        still = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
+        still = gallery.resolve_preview(row, OUTPUT_PLACES) if row else None
         return (str(still[0]) if still and still[1] == MediaType.IMAGE else None,
-                gallery.animated_preview_path(sample, COMFYUI_OUTPUT_DIR, THUMB_DIR))
+                gallery.animated_preview_path(sample, OUTPUT_PLACES, THUMB_DIR))
 
     return AnimationCheckWindow(
         AnimationCheckSession(

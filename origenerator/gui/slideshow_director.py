@@ -32,10 +32,10 @@ from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR,
     EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
     FRAMES_BEING_MADE_DIR,
+    OUTPUT_PLACES,
 )
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
@@ -622,7 +622,7 @@ class SlideshowDirector:
         only needs to know there is one stops at the first."""
         upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
         for row in rows:
-            resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+            resolved = gallery.resolve_preview(row, OUTPUT_PLACES)
             if resolved is None:
                 continue  # nothing to look at yet, or ever
             path, media_type = resolved
@@ -637,13 +637,13 @@ class SlideshowDirector:
         playlists = {}
         for row in rows:
             media_type = gallery.media_type_of_row(row)
-            resolved = (gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+            resolved = (gallery.resolve_preview(row, OUTPUT_PLACES)
                         if media_type == MediaType.VIDEO else None)
             upscale = upscales.upscale_of(resolved[0]) if resolved is not None else None
             levels = gallery.displayed_levels(row, upscale)
             if len(levels) < 2:
                 continue
-            entries = [(gallery.output_file_path(level.file, COMFYUI_OUTPUT_DIR),
+            entries = [(gallery.output_file_path(level.file, OUTPUT_PLACES),
                         media_type, level.label) for level in levels]
             playlists[str(entries[0][0])] = entries
         return playlists
@@ -1315,7 +1315,7 @@ class SlideshowDirector:
         """
         if row is None:
             return
-        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        preview = gallery.resolve_preview(row, OUTPUT_PLACES)
         if preview is None:
             return
         versions = self.versions_of([row])

@@ -36,7 +36,7 @@ from PIL import Image
 from shared_ui.orientation import orientation_of_size
 
 from origenerator import gallery
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import OUTPUT_PLACES
 from origenerator.gallery.sides import LANDSCAPE, SIDES, on_side
 from origenerator.gallery.signatures import READINGS_KEPT, canonical_settings
 from origenerator.media import MediaType
@@ -147,7 +147,7 @@ def _own_files(row: dict) -> Iterator[Path]:
     thumb = row.get("thumbnail_path")
     if thumb:
         yield Path(thumb)
-    resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+    resolved = gallery.resolve_preview(row, OUTPUT_PLACES)
     if resolved is not None and resolved[1] == MediaType.IMAGE:
         yield Path(resolved[0])
 

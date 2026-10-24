@@ -10,6 +10,7 @@ from funestra.robot_hand import bpm_for_speed
 from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.content import load_content
+from origenerator.output_places import OutputPlaces
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 # The checkout's own state directory, unless the process says otherwise.  Only
@@ -121,15 +122,10 @@ LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 COMFYUI_DIR = LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 
 
-def comfyui_output_dir(settings: dict[str, Any], comfyui_dir: Path) -> Path:
-    named = settings.get("comfyui_output_dir")
-    return Path(named) if named else comfyui_dir / "output"
-
-
-COMFYUI_OUTPUT_DIR = comfyui_output_dir(haglio_settings.load(), COMFYUI_DIR)
+OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR)
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
-COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, output=COMFYUI_OUTPUT_DIR, temp=COMFYUI_TEMP_DIR)
+COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, places=OUTPUT_PLACES, temp=COMFYUI_TEMP_DIR)
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
 # the "Prompt executed in N seconds" lines feed duration backfill.
 COMFYUI_LOG_DIR = COMFYUI_DIR / "user"

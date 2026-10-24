@@ -21,6 +21,7 @@ from origenerator.file_refs import frame_name
 from origenerator.gallery.signatures import READINGS_KEPT, workflow_output_type
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
+from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)
@@ -96,11 +97,11 @@ def _media_type_of(output_files: str | None, workflow_name: str | None) -> Media
     return workflow_output_type(workflow_name) or MediaType.IMAGE
 
 
-def output_file_path(file: dict, output_dir: Path) -> Path:
+def output_file_path(file: dict, places: OutputPlaces) -> Path:
     """Where one recorded output file actually sits on disk.
 
-    Normally under ``output_dir``, at the subfolder and name ComfyUI wrote it
-    to. A file the recovery bin has re-pointed carries an absolute ``path`` of
+    Normally in the place its subfolder names, under the name it was filed
+    under. A file the recovery bin has re-pointed carries an absolute ``path`` of
     its own — its place inside the trash — so a deleted item's row resolves to
     the files it still has rather than to where they used to be, and every
     surface that shows a generation follows it there without having to know the
@@ -109,7 +110,7 @@ def output_file_path(file: dict, output_dir: Path) -> Path:
     moved = file.get("path")
     if moved:
         return Path(moved)
-    return output_dir / (file.get("subfolder") or "") / (file.get("filename") or "")
+    return places.folder(file.get("subfolder") or "") / (file.get("filename") or "")
 
 
 _COPY_COUNTER = re.compile(r" \(\d+\)$")
@@ -129,10 +130,10 @@ def generation_of_file(path, rows: list[dict]) -> str | None:
                  if Path(frame_name(file.get("filename"))).stem == stem), None)
 
 
-def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
+def resolve_preview(row: dict, places: OutputPlaces) -> tuple[Path, str] | None:
     """Locate the file to preview for ``row`` and how to render it.
 
-    Prefers the full-resolution output under ``output_dir`` (so videos play and
+    Prefers the full-resolution output itself (so videos play and
     images show at full quality), classifying it by extension. Falls back to the
     stored thumbnail — always a still image — when the output is missing. Returns
     ``None`` when nothing displayable can be found.
@@ -141,7 +142,7 @@ def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
         filename = f.get("filename")
         if not filename:
             continue
-        full = output_file_path(f, output_dir)
+        full = output_file_path(f, places)
         rendered_as = media_type_from_filename(filename)
         if rendered_as is not None and full.exists():
             return full, rendered_as
@@ -154,7 +155,7 @@ def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
     return None
 
 
-def animated_preview_path(row: dict, output_dir: Path, thumb_dir: Path) -> str | None:
+def animated_preview_path(row: dict, places: OutputPlaces, thumb_dir: Path) -> str | None:
     """A cached looping-WebP preview of a video ``row``, generated on first need.
 
     ``None`` for a non-video row, or when the video file is missing or unreadable
@@ -163,7 +164,7 @@ def animated_preview_path(row: dict, output_dir: Path, thumb_dir: Path) -> str |
     frame-sampling cost; every gallery surface that shows a video tile resolves
     its moving preview through here.
     """
-    preview = resolve_preview(row, output_dir)
+    preview = resolve_preview(row, places)
     if preview is None or preview[1] != MediaType.VIDEO:
         return None
     try:
@@ -174,7 +175,7 @@ def animated_preview_path(row: dict, output_dir: Path, thumb_dir: Path) -> str |
     return str(result) if result is not None else None
 
 
-def output_disk_files(row: dict, output_dir: Path,
+def output_disk_files(row: dict, places: OutputPlaces,
                       names: set[str] | None = None) -> list[Path]:
     """Every on-disk output file a row owns, for deletion.
 
@@ -192,7 +193,7 @@ def output_disk_files(row: dict, output_dir: Path,
         filename = f.get("filename")
         if not filename or (names is not None and filename not in names):
             continue
-        full = output_file_path(f, output_dir)
+        full = output_file_path(f, places)
         if not full.exists():
             continue
         paths.append(full)

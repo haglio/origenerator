@@ -49,6 +49,7 @@ from origenerator.fun_time_mode import OFFER_NAME
 from origenerator.gui.export_lane import GENAU
 from origenerator.gui.loading_screen import LoadingCanceled, loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.output_places import OutputPlaces
 from tests.children import run_python
 from tests.hosted_launch import hosted_launch
 from tests.loading_screens import opened_here
@@ -1015,13 +1016,14 @@ def library(tmp_path, monkeypatch):
     """
     state = tmp_path / "state"
     for name, path in (("STATE_DIR", state),
-                       ("COMFYUI_OUTPUT_DIR", tmp_path / "output"),
                        ("COMFYUI_LOG_DIR", tmp_path / "logs"),
                        ("THUMB_DIR", tmp_path / "thumbs"),
                        ("TRASH_DIR", state / "trash"),
                        ("PROJECT_DIR", tmp_path / "checkout")):
         path.mkdir(parents=True, exist_ok=True)
         monkeypatch.setattr(config, name, path)
+    (tmp_path / "output").mkdir()
+    monkeypatch.setattr(config, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "output"))
     monkeypatch.setattr(config, "DB_PATH", state / "origenerator.db")
     monkeypatch.setattr(config, "UI_STATE_PATH", state / "ui.json")
     return config.DB_PATH
@@ -1118,7 +1120,7 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
                          workflow_version="imported", params_json="{}",
                          workflow_json="{}", source="imported")
     finished = datetime(2026, 6, 29, 12, 20, 53).timestamp()
-    picture = config.COMFYUI_OUTPUT_DIR / "image" / "sdxl_t2i_00001_.png"
+    picture = config.OUTPUT_PLACES.folder("image") / "sdxl_t2i_00001_.png"
     picture.parent.mkdir(parents=True, exist_ok=True)
     picture.write_bytes(b"")
     db.update_generation(
@@ -1301,7 +1303,8 @@ def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(
             [{"filename": filename, "subfolder": "video", "type": "output"}]))
     db.mark_genau_exported("copy")
     inbox = tmp_path / "0_inbox"
-    library = Library(db=db, client=None, output_dir=output, thumb_dir=tmp_path / "thumbs",
+    library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
+                      thumb_dir=tmp_path / "thumbs",
                       log_dir=tmp_path / "logs", inbox=EvolverInbox(inbox))
 
     assert _merge_soundless_copies(library) == 1
@@ -1323,7 +1326,8 @@ def test_an_enhancement_of_a_deleted_picture_goes_to_the_trash_at_startup(tmp_pa
                          params_json=json.dumps({"input_image": "image/deleted.png [output]"}))
     db.update_generation("enhancement", status="completed", output_files=json.dumps(
         [{"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}]))
-    library = Library(db=db, client=None, output_dir=output, thumb_dir=tmp_path / "thumbs",
+    library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
+                      thumb_dir=tmp_path / "thumbs",
                       log_dir=tmp_path / "logs", inbox=None)
 
     assert _fold_enhancements(library) == 1
@@ -1349,7 +1353,8 @@ def test_a_videos_first_frame_filed_in_another_folder_goes_to_the_trash_at_start
                              workflow_json=recipe, source="imported")
         db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": filename, "subfolder": subfolder, "type": "output"}]))
-    library = Library(db=db, client=None, output_dir=output, thumb_dir=tmp_path / "thumbs",
+    library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
+                      thumb_dir=tmp_path / "thumbs",
                       log_dir=tmp_path / "logs", inbox=None)
 
     _tidy_video_previews(library)

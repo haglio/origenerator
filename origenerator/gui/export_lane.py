@@ -80,8 +80,8 @@ class ExportLane:
     def failure_body(self, error) -> str:
         return f"Could not send this {self.noun} to {self.name}:\n\n{error}"
 
-    def send(self, video: Path, prompt_id: str, *, db, inbox, output_dir) -> Path:
-        funscript = (funscript_of(video, output_dir=output_dir)
+    def send(self, video: Path, prompt_id: str, *, db, inbox, places) -> Path:
+        funscript = (funscript_of(video, places=places)
                      if self.hands_over_funscript else None)
         landed = inbox.hand_over(video, self.source, funscript=funscript)
         self.mark(db, prompt_id)

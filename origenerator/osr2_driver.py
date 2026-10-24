@@ -17,7 +17,7 @@ from funestra.funscript import Funscript
 from funestra.robot_hand import FULL_INTENSITY
 from PyQt6.QtCore import QObject, QTimer
 
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
 from origenerator.osr2 import Osr2Broker
 from origenerator.running_ahead import ahead_while_playing
@@ -38,7 +38,7 @@ def drive_target_for(video_path, player):
     """
     if video_path is None:
         return None
-    actions = read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
+    actions = read_actions(funscript_of(video_path, places=OUTPUT_PLACES))
     if not actions:
         return None
     return video_path, player, actions

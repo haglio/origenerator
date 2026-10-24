@@ -26,6 +26,7 @@ from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
+from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
 from origenerator.slideshow_buttons import answer
 from tests.slideshow_support import slides_named
@@ -117,10 +118,10 @@ def test_a_slideshow_hands_the_funestra_the_pass_it_is_to_play(qtbot, tmp_path):
 
 def _scripted(monkeypatch, tmp_path, *clips: str) -> dict[str, Path]:
     output = tmp_path / "output"
-    monkeypatch.setattr(slideshow_pass, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(slideshow_pass, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     scripts = {}
     for clip in clips:
-        script = funscript_path_for(clip, output_dir=output)
+        script = funscript_path_for(clip, places=OutputPlaces.in_one_folder(output))
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text("{}", encoding="utf-8")
         scripts[clip] = script

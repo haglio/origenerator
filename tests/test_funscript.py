@@ -16,19 +16,20 @@ from origenerator.funscript import (
     synthesize_funscript,
     write_funscript,
 )
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows.frame_rate import NATIVE_FPS
 
 
 def test_a_script_goes_in_the_scripts_folder_under_the_folders_its_video_is_in():
     assert funscript_path_for(
-        Path("/out/video/wan22_i2v_00001_.mp4"), output_dir=Path("/out")
+        Path("/out/video/wan22_i2v_00001_.mp4"), places=OutputPlaces.in_one_folder(Path("/out"))
     ) == Path("/out/funscript/video/wan22_i2v_00001_.mp4.funscript")
-    assert funscript_path_for("/out/deep/nested/clip.webm", output_dir="/out") == Path(
+    assert funscript_path_for("/out/deep/nested/clip.webm", places=OutputPlaces.in_one_folder("/out")) == Path(
         "/out/funscript/deep/nested/clip.webm.funscript")
 
 
 def test_a_video_outside_the_output_dir_has_its_script_in_the_scripts_folder_itself():
-    assert funscript_path_for("deep/nested/clip.webm", output_dir="/out") == Path(
+    assert funscript_path_for("deep/nested/clip.webm", places=OutputPlaces.in_one_folder("/out")) == Path(
         "/out/funscript/clip.webm.funscript")
 
 
@@ -40,11 +41,11 @@ def test_two_videos_with_one_name_each_have_a_script_of_their_own(tmp_path):
     lengths = {alpha: 2.0, beta: 5.0}
 
     for video in lengths:
-        synthesize_funscript(video, hz=1.0, output_dir=tmp_path,
+        synthesize_funscript(video, hz=1.0, places=OutputPlaces.in_one_folder(tmp_path),
                              duration_provider=lengths.get)
 
     for video, seconds in lengths.items():
-        assert read_actions(funscript_of(video, output_dir=tmp_path)) == synthesize_actions(
+        assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path))) == synthesize_actions(
             seconds, hz=1.0)
 
 
@@ -52,11 +53,11 @@ def test_two_videos_of_one_name_in_one_folder_each_have_a_script_of_their_own(tm
     lengths = {tmp_path / "alpha" / "clip.mp4": 2.0, tmp_path / "alpha" / "clip.webm": 5.0}
 
     for video in lengths:
-        synthesize_funscript(video, hz=1.0, output_dir=tmp_path,
+        synthesize_funscript(video, hz=1.0, places=OutputPlaces.in_one_folder(tmp_path),
                              duration_provider=lengths.get)
 
     for video, seconds in lengths.items():
-        assert read_actions(funscript_of(video, output_dir=tmp_path)) == synthesize_actions(
+        assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path))) == synthesize_actions(
             seconds, hz=1.0)
 
 
@@ -64,21 +65,21 @@ def test_a_videos_own_script_is_found_before_those_older_versions_filed(tmp_path
     video = tmp_path / "video" / "clip.mp4"
     video.parent.mkdir()
     video.write_bytes(b"v")
-    assert funscript_of(video, output_dir=tmp_path) is None
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) is None
 
     beside = video.with_suffix(".funscript")
     beside.write_text("{}", encoding="utf-8")
-    assert funscript_of(video, output_dir=tmp_path) == beside
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) == beside
 
     filed_under_its_stem = tmp_path / "funscript" / "clip.funscript"
     filed_under_its_stem.parent.mkdir()
     filed_under_its_stem.write_text("{}", encoding="utf-8")
-    assert funscript_of(video, output_dir=tmp_path) == filed_under_its_stem
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) == filed_under_its_stem
 
-    own = funscript_path_for(video, output_dir=tmp_path)
+    own = funscript_path_for(video, places=OutputPlaces.in_one_folder(tmp_path))
     own.parent.mkdir()
     own.write_text("{}", encoding="utf-8")
-    assert funscript_of(video, output_dir=tmp_path) == own
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) == own
 
 
 def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
@@ -90,8 +91,8 @@ def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
     beside = video.with_suffix(".funscript")
     write_funscript(beside, synthesize_actions(2.0, hz=1.0))
 
-    assert funscript_of(video, output_dir=tmp_path) == beside
-    assert read_actions(funscript_of(video, output_dir=tmp_path))
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) == beside
+    assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)))
 
 
 def test_an_evolver_upscale_has_the_script_of_the_video_it_was_made_from(tmp_path):
@@ -101,7 +102,7 @@ def test_an_evolver_upscale_has_the_script_of_the_video_it_was_made_from(tmp_pat
     upscale = (tmp_path / "upscaled_by_orientation" / "portrait" / "origenerator"
                / "clip_topaz.mp4")
 
-    assert funscript_of(upscale, output_dir=tmp_path / "output") == script
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output")) == script
 
 
 def test_an_upscale_has_the_script_in_its_videos_own_place_before_one_under_its_name(tmp_path):
@@ -109,14 +110,14 @@ def test_an_upscale_has_the_script_in_its_videos_own_place_before_one_under_its_
     video = output / "video" / "clip.mp4"
     video.parent.mkdir(parents=True)
     video.write_bytes(b"v")
-    own = funscript_path_for(video, output_dir=output)
+    own = funscript_path_for(video, places=OutputPlaces.in_one_folder(output))
     write_funscript(own, synthesize_actions(5.0, hz=1.0))
     write_funscript(output / "funscript" / "clip.funscript",
                     synthesize_actions(2.0, hz=1.0))
     upscale = (tmp_path / "upscaled_by_orientation" / "portrait" / "origenerator"
                / "clip_topaz.mp4")
 
-    assert funscript_of(upscale, output_dir=output) == own
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(output)) == own
 
 
 def test_an_upscale_of_a_webm_has_the_script_in_that_videos_own_place(tmp_path):
@@ -124,12 +125,12 @@ def test_an_upscale_of_a_webm_has_the_script_in_that_videos_own_place(tmp_path):
     video = output / "video" / "clip.webm"
     video.parent.mkdir(parents=True)
     video.write_bytes(b"v")
-    own = funscript_path_for(video, output_dir=output)
+    own = funscript_path_for(video, places=OutputPlaces.in_one_folder(output))
     write_funscript(own, synthesize_actions(5.0, hz=1.0))
     upscale = (tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator"
                / "clip_topaz.mp4")
 
-    assert funscript_of(upscale, output_dir=output) == own
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(output)) == own
 
 
 def test_an_upscale_finds_the_script_still_beside_the_video_it_was_made_from(tmp_path):
@@ -139,7 +140,7 @@ def test_an_upscale_finds_the_script_still_beside_the_video_it_was_made_from(tmp
     upscale = (tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator"
                / "clip_topaz.mp4")
 
-    assert funscript_of(upscale, output_dir=tmp_path / "output") == beside
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output")) == beside
 
 
 def test_a_video_of_this_apps_own_named_like_an_upscale_keeps_its_own_script(tmp_path):
@@ -150,7 +151,7 @@ def test_a_video_of_this_apps_own_named_like_an_upscale_keeps_its_own_script(tmp
     own.parent.mkdir()
     own.write_text("{}", encoding="utf-8")
 
-    assert funscript_of(video, output_dir=tmp_path) == own
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) == own
 
 
 def test_read_actions_passes_a_missing_script_through():
@@ -220,26 +221,26 @@ def test_a_script_that_is_missing_or_will_not_read_holds_no_actions(tmp_path):
 def test_a_script_is_written_in_its_videos_own_place_for_the_length_measured(tmp_path):
     video = tmp_path / "video" / "clip.mp4"
 
-    dest = synthesize_funscript(video, hz=1.0, output_dir=tmp_path,
+    dest = synthesize_funscript(video, hz=1.0, places=OutputPlaces.in_one_folder(tmp_path),
                                 duration_provider=lambda _p: 2.0)
 
-    assert dest == funscript_path_for(video, output_dir=tmp_path)
+    assert dest == funscript_path_for(video, places=OutputPlaces.in_one_folder(tmp_path))
     assert read_actions(dest) == synthesize_actions(2.0, hz=1.0)
 
 
 def test_a_video_of_unknown_length_gets_no_funscript(tmp_path):
     video = tmp_path / "clip.mp4"
     video.write_bytes(b"v")
-    assert synthesize_funscript(video, hz=1.0, output_dir=tmp_path,
+    assert synthesize_funscript(video, hz=1.0, places=OutputPlaces.in_one_folder(tmp_path),
                                 duration_provider=lambda _p: None) is None
-    assert not funscript_path_for(video, output_dir=tmp_path).exists()
+    assert not funscript_path_for(video, places=OutputPlaces.in_one_folder(tmp_path)).exists()
 
 
 def _scripted_video(tmp_path, actions):
     video = tmp_path / "video" / "clip.mp4"
     video.parent.mkdir()
     video.write_bytes(b"v")
-    script = funscript_path_for(video, output_dir=tmp_path)
+    script = funscript_path_for(video, places=OutputPlaces.in_one_folder(tmp_path))
     write_funscript(script, actions)
     return video, script
 

@@ -22,6 +22,7 @@ from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineControlle
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.export_lane import GENAU
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.output_places import OutputPlaces
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
@@ -749,7 +750,7 @@ def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_p
     output = tmp_path / "output"
     output.mkdir()
     (output / "clip.mp4").write_bytes(b"pixels")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     sent = []
     monkeypatch.setattr(module.evolver_export, "export_video",
                         lambda path, destination, funscript=None: sent.append(path.name))
@@ -770,7 +771,7 @@ def test_the_clip_lands_in_the_inbox_this_controller_was_handed(combine, monkeyp
     output = tmp_path / "output"
     output.mkdir()
     (output / "clip.mp4").write_bytes(b"pixels")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     inbox = tmp_path / "somebody elses inbox"
     controller, _host = combine(db=FakeDB(),
                                 inbox=evolver_export.EvolverInbox(inbox))
@@ -798,7 +799,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
     output = tmp_path / "output"
     output.mkdir()
     (output / "clip.mp4").write_bytes(b"pixels")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
 
     def boom(path, destination, funscript=None):
         raise OSError("the inbox is not there")

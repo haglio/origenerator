@@ -26,7 +26,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from origenerator import provenance, speech
 from origenerator.completion import extract_completion
-from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
+from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, SPEECH_PYTHON, THUMB_DIR
 from origenerator.generation_state import GenerationSource
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
@@ -114,7 +114,7 @@ class GenerationJob(QObject):
     failed = pyqtSignal(str)                     # error message
 
     def __init__(self, client, workflow, params, *, source=GenerationSource.GENERATED,
-                 output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR, input_dir=COMFYUI_INPUT_DIR,
+                 places=OUTPUT_PLACES, thumb_dir=THUMB_DIR, input_dir=COMFYUI_INPUT_DIR,
                  speaker=None, parent=None):
         super().__init__(parent)
         self._client = client
@@ -142,7 +142,7 @@ class GenerationJob(QObject):
         # JobQueue._launch and :mod:`origenerator.queue_line`).
         self.run_media_type = self.media_type
         self.shielded = False
-        self._output_dir = output_dir
+        self._places = places
         self._thumb_dir = thumb_dir
         # idle -> queued -> running -> finished/failed/canceled; and back to idle
         # from queued or running when the job is set aside (see defer()).
@@ -577,7 +577,7 @@ class GenerationJob(QObject):
         # Thumbnail and duration are best-effort inside extract_completion — a
         # failure in either yields None rather than stranding a real completion.
         files, thumb, duration = extract_completion(
-            self.workflow, history_data, self._output_dir, self._thumb_dir,
+            self.workflow, history_data, self._places, self._thumb_dir,
             self.prompt_id,
         )
         if not files:

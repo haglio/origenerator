@@ -36,7 +36,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR,
+    OUTPUT_PLACES,
     THUMB_DIR,
     TRASH_DIR,
 )
@@ -339,7 +339,7 @@ class GalleryView(QWidget):
         self._reconciling_osr2 = False
         self._build_the_queue_of_runs(db, client)
         self._actions = actions or GalleryActions(
-            db, COMFYUI_OUTPUT_DIR, Trash(TRASH_DIR),
+            db, OUTPUT_PLACES, Trash(TRASH_DIR),
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
@@ -4259,7 +4259,7 @@ class GalleryView(QWidget):
         Feeds the grid tiles and the Recents collection (the info pane's 'Animated in'
         strip resolves the same path through :func:`gallery.animated_preview_path`)."""
         return gallery.animated_preview_path(
-            row, self._actions.output_dir, self._actions.thumb_dir)
+            row, self._actions.places, self._actions.thumb_dir)
 
     def follow_link(self, prompt_id: str):
         """Follow a link to another generation — a video's source image, an

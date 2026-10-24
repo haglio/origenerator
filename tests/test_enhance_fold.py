@@ -19,6 +19,7 @@ from origenerator.gallery import (
     is_enhanced_row,
 )
 from origenerator.generation_metadata import basic_section, file_item
+from origenerator.output_places import OutputPlaces
 
 
 def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", favorite=False):
@@ -278,7 +279,7 @@ def test_an_enhancement_whose_picture_is_gone_is_one_to_scrap(tmp_path):
                  status="running")
 
     gone = gallery.enhancements_of_pictures_gone(
-        db.list_generations(), output_dir=output_dir, input_dir=tmp_path / "input")
+        db.list_generations(), places=OutputPlaces.in_one_folder(output_dir), input_dir=tmp_path / "input")
 
     assert [row["prompt_id"] for row in gone] == ["of_a_deleted_picture"]
 

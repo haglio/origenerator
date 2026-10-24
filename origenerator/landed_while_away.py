@@ -21,15 +21,16 @@ from origenerator.comfyui_api import ComfyUIApi
 from origenerator.completion import extract_completion, mark_generation_completed
 from origenerator.config import (
     COMFYUI_HOST,
-    COMFYUI_OUTPUT_DIR,
     COMFYUI_PORT,
     LIBRARY_STATE_DIR,
+    OUTPUT_PLACES,
     STATE_DIR,
     THUMB_DIR,
 )
 from origenerator.db import Database
 from origenerator.generation_state import GenerationStatus
 from origenerator.notice_toast import raise_notice
+from origenerator.output_places import OutputPlaces
 from origenerator.run_notice import Notice, notice_for, outcome_of_row
 from origenerator.single_instance import Copies
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -50,7 +51,7 @@ def runs_in_flight(db) -> list[dict]:
             if row.get("status") == GenerationStatus.RUNNING]
 
 
-def take_what_landed(db, api, row: dict, *, output_dir: Path, thumb_dir: Path) -> Notice | None:
+def take_what_landed(db, api, row: dict, *, places: OutputPlaces, thumb_dir: Path) -> Notice | None:
     """Record ``row`` if ComfyUI has finished it, and say what to announce."""
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
     if workflow is None:
@@ -60,7 +61,7 @@ def take_what_landed(db, api, row: dict, *, output_dir: Path, thumb_dir: Path) -
     if not history:
         return None
     files, thumb, duration = extract_completion(
-        workflow, history, output_dir, thumb_dir, prompt_id)
+        workflow, history, places, thumb_dir, prompt_id)
     mark_generation_completed(db, prompt_id, files, thumb, duration)
     return notice_for(outcome_of_row(db.get_generation(prompt_id) or row,
                                      ok=True, seconds=duration))
@@ -80,7 +81,7 @@ def _training_ended(job: dict, announce) -> bool:
 
 
 def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monotonic,
-          output_dir: Path = COMFYUI_OUTPUT_DIR, thumb_dir: Path = THUMB_DIR,
+          places: OutputPlaces = OUTPUT_PLACES, thumb_dir: Path = THUMB_DIR,
           poll_seconds: float = POLL_SECONDS,
           patience_seconds: float = PATIENCE_SECONDS, trainings=None) -> None:
     """Wait out every run the app left in flight, announcing each as it lands."""
@@ -95,7 +96,7 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
         for row in waiting:
             try:
                 notice = take_what_landed(db, api, row,
-                                          output_dir=output_dir, thumb_dir=thumb_dir)
+                                          places=places, thumb_dir=thumb_dir)
             except Exception as e:
                 # One unreadable run must not strand the others: the point of
                 # this process is the news, and it has no window to fail in.

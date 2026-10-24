@@ -28,6 +28,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from origenerator.output_places import OutputPlaces
+
 # ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
 TYPE_ANNOTATIONS = frozenset({"[output]", "[input]", "[temp]"})
 OUTPUT_TAG = "[output]"
@@ -70,12 +72,12 @@ def frame_name(image_ref: str | None) -> str:
 
 
 def reference_path(
-    image_ref: str | None, *, output_dir: Path, input_dir: Path, temp_dir: Path | None = None,
+    image_ref: str | None, *, places: OutputPlaces, input_dir: Path, temp_dir: Path | None = None,
 ) -> Path | None:
     """The on-disk file a ``LoadImage`` value names, or ``None`` when it's empty,
     absent, or not there.
 
-    ``"name [output]"`` lives under ``output_dir``, ``"[temp]"`` under
+    ``"name [output]"`` lives in the place its folder names, ``"[temp]"`` under
     ``temp_dir`` (nowhere, for a caller with none), and ``"[input]"`` (or an
     unannotated name) under ``input_dir`` — matching how ComfyUI's LoadImage
     routes the reference. An absolute path is taken as-is.
@@ -84,7 +86,7 @@ def reference_path(
     if not file:
         return None
     if tag == OUTPUT_TAG:
-        path = output_dir / file
+        path = places.file(file)
     elif tag == TEMP_TAG:
         if temp_dir is None:
             return None

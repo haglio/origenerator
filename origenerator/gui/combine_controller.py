@@ -38,9 +38,9 @@ from origenerator import (
 from origenerator.animate_command import what_to_animate
 from origenerator.check_animations import the_animation_window
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR,
     LOCAL_LLM_BASE_URL,
     LOCAL_LLM_MODEL,
+    OUTPUT_PLACES,
 )
 from origenerator.content import genau_flick_word
 from origenerator.generation_state import GenerationStatus
@@ -467,7 +467,7 @@ class CombineController(QObject):
         """The best picture of ``row`` for a pane to show: its full-size output
         where that is a still, else the stored thumbnail (which a pane this big
         would be enlarging), else nothing."""
-        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        preview = gallery.resolve_preview(row, OUTPUT_PLACES)
         if preview is not None and preview[1] == MediaType.IMAGE:
             return str(preview[0])
         return row.get("thumbnail_path")
@@ -733,12 +733,12 @@ class CombineController(QObject):
         """
         if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):
             return
-        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        preview = gallery.resolve_preview(row, OUTPUT_PLACES)
         if preview is None or preview[1] != MediaType.VIDEO:
             return
         try:
             GENAU_LANE.send(preview[0], row["prompt_id"], db=self._db,
-                            inbox=self._inbox, output_dir=COMFYUI_OUTPUT_DIR)
+                            inbox=self._inbox, places=OUTPUT_PLACES)
         except Exception as e:
             logger.warning("Automatic send to Genau failed for %s: %s",
                            row.get("prompt_id"), e)

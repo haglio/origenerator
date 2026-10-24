@@ -8,6 +8,7 @@ import json
 
 from origenerator import gallery
 from origenerator.db import Database
+from origenerator.output_places import OutputPlaces
 from origenerator.sort_pictures import waiting_pictures
 
 
@@ -20,7 +21,7 @@ def test_each_waiting_picture_carries_the_name_its_tile_wears(tmp_path):
                          output_files=json.dumps([{"filename": "gen-one.png", "subfolder": ""}]))
     row = db.get_generation("gen-one")
 
-    waiting = waiting_pictures(db, tmp_path)
+    waiting = waiting_pictures(db, OutputPlaces.in_one_folder(tmp_path))
 
     assert [picture["name"] for picture in waiting] == [
         f"{gallery.folder_id(gallery.settings_folder_key(row))} 000"]

@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 
 from origenerator import config
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import OUTPUT_PLACES
 from origenerator.generation_metadata import basic_section, created_item, file_item
+from origenerator.output_places import OutputPlaces
 
 
 def _row(**overrides):
@@ -80,7 +81,7 @@ def test_file_item_reveals_the_absolute_output_path():
 
     row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video"}]))
     file_item = basic_section(row).items[0]
-    assert file_item.reveal == str(COMFYUI_OUTPUT_DIR / "video" / "clip.mp4")
+    assert file_item.reveal == str(OUTPUT_PLACES.folder("video") / "clip.mp4")
 
 
 def test_file_item_reveals_a_deleted_items_file_where_it_now_sits():
@@ -208,13 +209,13 @@ def test_a_batch_still_lists_the_siblings_no_version_claims():
 
 
 def test_a_files_row_can_be_pointed_at_a_different_output_folder(tmp_path):
-    """It resolved every path against the global `COMFYUI_OUTPUT_DIR` from
+    """It resolved every path against the configured output folder from
     inside the function, so nothing in the signature said it touched the
     filesystem at all, and it could not be pointed at another library without
     monkeypatching a module. Its neighbours -- importer, completion, reconcile,
     base_backfill, recovery -- all take the folder as an argument."""
     item = file_item({"filename": "alpha_00001_.png", "subfolder": "image"},
-                     output_dir=tmp_path / "elsewhere")
+                     places=OutputPlaces.in_one_folder(tmp_path / "elsewhere"))
 
     assert item.reveal == str(tmp_path / "elsewhere" / "image" / "alpha_00001_.png")
 
@@ -225,14 +226,14 @@ def test_created_reads_the_file_in_the_folder_it_is_given(tmp_path):
     (written / "alpha_00001_.png").write_bytes(b"a picture")
 
     item = created_item({"filename": "alpha_00001_.png", "subfolder": "image"},
-                        "never", output_dir=tmp_path / "elsewhere")
+                        "never", places=OutputPlaces.in_one_folder(tmp_path / "elsewhere"))
 
     assert item.value != "never"
 
 
 def test_the_output_folder_still_defaults_to_the_configured_one(tmp_path, monkeypatch):
     """Resolved when it is called, not bound when the module was imported."""
-    monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path / "configured")
+    monkeypatch.setattr(config, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "configured"))
 
     item = file_item({"filename": "alpha_00001_.png", "subfolder": "image"})
 

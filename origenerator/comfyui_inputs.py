@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from origenerator.file_refs import OUTPUT_TAG, TEMP_TAG, reference_path, split_annotation
+from origenerator.output_places import OutputPlaces
 
 HANDED_OVER = "origenerator"
 FILE_INPUTS = {"LoadImage": "image", "LoadVideo": "file", "LoadAudio": "audio"}
@@ -18,7 +19,7 @@ FILE_INPUTS = {"LoadImage": "image", "LoadVideo": "file", "LoadAudio": "audio"}
 
 class ComfyFolders(NamedTuple):
     input: Path
-    output: Path
+    places: OutputPlaces
     temp: Path
 
 
@@ -35,7 +36,7 @@ def _with_its_file_in_reach(node: dict, folders: ComfyFolders) -> dict:
 
 
 def reachable(ref: str, folders: ComfyFolders) -> str:
-    file = reference_path(ref, output_dir=folders.output, input_dir=folders.input, temp_dir=folders.temp)
+    file = reference_path(ref, places=folders.places, input_dir=folders.input, temp_dir=folders.temp)
     if file is None or _inside(file, _folder_named_by(ref, folders)):
         return ref
     copy = _copied_in(file, folders.temp / HANDED_OVER)
@@ -44,7 +45,7 @@ def reachable(ref: str, folders: ComfyFolders) -> str:
 
 def _folder_named_by(ref: str, folders: ComfyFolders) -> Path:
     tag = split_annotation(ref)[1]
-    return {OUTPUT_TAG: folders.output, TEMP_TAG: folders.temp}.get(tag, folders.input)
+    return {OUTPUT_TAG: folders.places.comfyui, TEMP_TAG: folders.temp}.get(tag, folders.input)
 
 
 def _inside(file: Path, folder: Path) -> bool:

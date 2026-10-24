@@ -31,6 +31,7 @@ from origenerator.gallery.enhance_settings import (
     describe_enhance_params,
     level_settings,
 )
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 
@@ -350,7 +351,7 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video_itself(tmp_pa
     evolved, original = displayed_levels(video, upscale)
 
     assert (evolved.label, original.label) == ("Evolved", "Original")
-    assert gallery.output_file_path(evolved.file, tmp_path / "output") == upscale
+    assert gallery.output_file_path(evolved.file, OutputPlaces.in_one_folder(tmp_path / "output")) == upscale
     assert original.file["filename"] == "wan_00001.mp4"
     assert evolved.params == {}  # nothing Evolver ran for the Enhance panel to take
 

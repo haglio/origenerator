@@ -18,6 +18,7 @@ from app_support.process_identity import ProcessNamer
 from shared_ui.preview import Preview, taskbar_identity, window_title
 
 from origenerator.branch_session import LAUNCHER, shown_as
+from origenerator.output_places import OutputPlaces
 
 # The persisted ComfyUI client id lives under this key in the UI state file.
 _CLIENT_ID_KEY = "comfyui_client_id"
@@ -182,7 +183,7 @@ def _warm_voice_runtimes() -> None:
 class Library:
     db: object
     client: object
-    output_dir: Path
+    places: OutputPlaces
     thumb_dir: Path
     log_dir: Path
     inbox: object
@@ -224,7 +225,7 @@ def _reconnect_to_running_generations(library: Library):
     so a finalized job's output is already recorded and isn't imported twice."""
     from origenerator.inflight import reconcile_in_flight
 
-    reconcile_in_flight(library.db, library.client, library.output_dir, library.thumb_dir)
+    reconcile_in_flight(library.db, library.client, library.places, library.thumb_dir)
 
 
 def _follow_moved_files(library: Library):
@@ -236,13 +237,13 @@ def _follow_moved_files(library: Library):
     holds the prompt and the settings."""
     from origenerator.relocate import relocate_moved_outputs
 
-    return relocate_moved_outputs(library.db, library.output_dir)
+    return relocate_moved_outputs(library.db, library.places)
 
 
 def _import_new_files(library: Library):
     from origenerator.importer import import_comfyui_output
 
-    return import_comfyui_output(library.output_dir, library.db, library.thumb_dir)
+    return import_comfyui_output(library.places, library.db, library.thumb_dir)
 
 
 def _tidy_video_previews(library: Library):
@@ -268,11 +269,11 @@ def _merge_soundless_copies(library: Library):
     lanes = {lane.source_key: lane for lane in EXPORT_LANES}
 
     def send_down(video: dict, lane_key: str) -> None:
-        shown = resolve_preview(video, library.output_dir)
+        shown = resolve_preview(video, library.places)
         if shown is None or shown[1] != MediaType.VIDEO:
             raise FileNotFoundError(f"{video['prompt_id']} has no video on disk")
         lanes[lane_key].send(shown[0], video["prompt_id"], db=library.db,
-                             inbox=library.inbox, output_dir=library.output_dir)
+                             inbox=library.inbox, places=library.places)
 
     return (merge_soundless_copy_rows(library.db, send_down=send_down)
             + fold_sound_versions_into_their_videos(library.db))
@@ -297,7 +298,7 @@ def _backfill_import_params(library: Library):
     workflow's defaults, and files it on the side its folder's size names."""
     from origenerator.importer import backfill_import_params
 
-    return backfill_import_params(library.db, library.output_dir)
+    return backfill_import_params(library.db, library.places)
 
 
 def _backfill_imported_video_seeds(library: Library):
@@ -317,7 +318,7 @@ def _fold_enhancements(library: Library):
 
     fold_completed_enhancements(library.db)
     return _scrap(library, enhancements_of_pictures_gone(library.db.list_generations(),
-                                                         output_dir=library.output_dir,
+                                                         places=library.places,
                                                          input_dir=config.COMFYUI_INPUT_DIR))
 
 
@@ -326,7 +327,7 @@ def _scrap(library: Library, rows: list[dict]) -> int:
     from origenerator.gallery_actions import GalleryActions
     from origenerator.trash import Trash
 
-    GalleryActions(library.db, library.output_dir, Trash(config.TRASH_DIR)).delete_rows(rows)
+    GalleryActions(library.db, library.places, Trash(config.TRASH_DIR)).delete_rows(rows)
     return len(rows)
 
 
@@ -345,7 +346,7 @@ def _repair_thumbnails(library: Library):
     missing, so each generation's thumbnail matches its own preview again."""
     from origenerator.importer import backfill_shared_thumbnails
 
-    return backfill_shared_thumbnails(library.db, library.output_dir, library.thumb_dir)
+    return backfill_shared_thumbnails(library.db, library.places, library.thumb_dir)
 
 
 def _recover_generation_times(library: Library):
@@ -368,7 +369,7 @@ def _record_workflow_versions(library: Library):
 def _repair_records(library: Library):
     from origenerator.record_repair import repair_records
 
-    return repair_records(library.db, library.output_dir)
+    return repair_records(library.db, library.places)
 
 
 def _reconcile_bookmarks(library: Library):
@@ -709,10 +710,10 @@ def _boot_and_run(app, app_args, preview) -> int:
         COMFYUI_FOLDERS,
         COMFYUI_HOST,
         COMFYUI_LOG_DIR,
-        COMFYUI_OUTPUT_DIR,
         COMFYUI_PORT,
         DB_PATH,
         LIBRARY_STATE_DIR,
+        OUTPUT_PLACES,
         PRODUCTION_CHECKOUT,
         STATE_DIR,
         THUMB_DIR,
@@ -814,7 +815,7 @@ def _boot_and_run(app, app_args, preview) -> int:
 
         from origenerator.evolver_export import default_inbox
         _run_maintenance(
-            Library(db=db, client=client, output_dir=COMFYUI_OUTPUT_DIR,
+            Library(db=db, client=client, places=OUTPUT_PLACES,
                     thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR, inbox=default_inbox()),
             MAINTENANCE, loading.say, logger,
         )

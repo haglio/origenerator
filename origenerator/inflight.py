@@ -31,6 +31,7 @@ from pathlib import Path
 from origenerator.completion import extract_completion
 from origenerator.gallery.output import is_in_progress
 from origenerator.generation_state import GenerationStatus
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def drop_in_flight(db, client, source: str, noun: str) -> int:
     return dropped
 
 
-def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:
+def reconcile_in_flight(db, client, places: OutputPlaces, thumb_dir: Path) -> dict:
     """Reconcile every submitted-and-unfinished DB row against ``client`` (ComfyUI).
 
     Returns a summary ``{"finalized": n, "running": n, "cleared": n}``.
@@ -88,7 +89,7 @@ def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:
         return summary
 
     for row in rows:
-        summary[_reconcile_row(db, client, row, queued, output_dir, thumb_dir)] += 1
+        summary[_reconcile_row(db, client, row, queued, places, thumb_dir)] += 1
     logger.info(
         "Reconciled in-flight generations: %d finalized, %d still running, %d cleared",
         summary["finalized"], summary["running"], summary["cleared"],
@@ -96,13 +97,13 @@ def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:
     return summary
 
 
-def _reconcile_row(db, client, row, queued, output_dir: Path, thumb_dir: Path) -> str:
+def _reconcile_row(db, client, row, queued, places: OutputPlaces, thumb_dir: Path) -> str:
     prompt_id = row["prompt_id"]
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
     history = _safe_history(client, prompt_id)
     if workflow is not None and history:
         files, thumb, duration = extract_completion(
-            workflow, history, output_dir, thumb_dir, prompt_id)
+            workflow, history, places, thumb_dir, prompt_id)
         if files:
             fields = dict(
                 status=GenerationStatus.COMPLETED,

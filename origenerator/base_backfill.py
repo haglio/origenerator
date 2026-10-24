@@ -36,7 +36,7 @@ import uuid
 
 from origenerator import gallery
 from origenerator.completion import extract_completion
-from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import OUTPUT_PLACES, THUMB_DIR
 from origenerator.gallery.output import is_in_progress
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.inflight import drop_in_flight
@@ -214,7 +214,7 @@ def render_base_now(client, workflow, params: dict, *,
         if not history:
             continue
         files, _thumb, _duration = extract_completion(
-            workflow, history, COMFYUI_OUTPUT_DIR, THUMB_DIR, prompt_id)
+            workflow, history, OUTPUT_PLACES, THUMB_DIR, prompt_id)
         return files
     logger.warning("Base re-render %s did not land within %ss",
                    prompt_id, RENDER_TIMEOUT_SECONDS)

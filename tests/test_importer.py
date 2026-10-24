@@ -18,6 +18,7 @@ from origenerator.importer import (
     import_comfyui_output,
     merge_video_sidecar_rows,
 )
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -53,7 +54,7 @@ def test_import_png_extracts_metadata(tmp_path):
     _make_png_with_metadata(output_dir / "test_00001_.png", prompt_data)
 
     db = Database(tmp_path / "test.db")
-    count = import_comfyui_output(output_dir.parent, db, thumb_dir)
+    count = import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir)
     assert count == 1
 
     rows = db.list_generations()
@@ -77,7 +78,7 @@ def test_import_video_infers_workflow_from_filename_prefix(tmp_path):
     (output_dir / "mystery_clip_00001.mp4").write_bytes(b"")
 
     db = Database(tmp_path / "test.db")
-    import_comfyui_output(output_dir.parent, db, thumb_dir)
+    import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir)
 
     name_by_file = {}
     for row in db.list_generations():
@@ -121,7 +122,7 @@ def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
         workflow_json=json.dumps(graph),
     )
 
-    updated = backfill_import_params(db, tmp_path)
+    updated = backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
@@ -132,7 +133,7 @@ def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
     # The already-complete row's LoRA is not overwritten by the graph's.
     assert json.loads(db.get_generation("fresh")["params_json"])["lora_high"] == "l_h.safetensors"
     # Idempotent: a second pass finds nothing left to fill.
-    assert backfill_import_params(db, tmp_path) == 0
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
 
 def test_backfill_fills_a_videos_sound_settings_from_its_stored_graph(tmp_path):
@@ -148,14 +149,14 @@ def test_backfill_fills_a_videos_sound_settings_from_its_stored_graph(tmp_path):
         workflow_json=json.dumps(_SOUND_STAGE),
     )
 
-    updated = backfill_import_params(db, tmp_path)
+    updated = backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
     assert {key: old[key] for key in _SOUND_PARAMS} == _SOUND_PARAMS
     assert old["positive_prompt"] == "a fox"
     assert json.loads(db.get_generation("made")["params_json"])["audio_seed"] == 9
-    assert backfill_import_params(db, tmp_path) == 0
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
 
 def test_backfill_gives_an_imported_video_back_the_seed_that_added_its_noise(tmp_path):
@@ -197,12 +198,12 @@ def test_backfill_fills_the_size_and_prompts_an_imports_graph_states(tmp_path):
         workflow_json=json.dumps(graph), source="imported",
     )
 
-    assert backfill_import_params(db, tmp_path) == 1
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
 
     params = json.loads(db.get_generation("old")["params_json"])
     assert (params["width"], params["height"]) == (720, 1280)
     assert params["negative_prompt"] == "fog"
-    assert backfill_import_params(db, tmp_path) == 0
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
 
 
@@ -224,7 +225,7 @@ def test_backfill_gives_an_import_whose_graph_states_no_size_the_size_of_its_pic
     db.update_generation("old", output_files=json.dumps(
         [{"filename": "sdxl_t2i_00009_.png", "subfolder": "image", "type": "output"}]))
 
-    assert backfill_import_params(db, output_dir) == 1
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     params = json.loads(db.get_generation("old")["params_json"])
     assert (params["width"], params["height"]) == (720, 1072)
@@ -241,11 +242,11 @@ def test_backfill_splits_the_imports_of_no_known_recipe_by_their_shape(tmp_path)
         db.update_generation(name, output_files=json.dumps(
             [{"filename": f"{name}.png", "subfolder": "image", "type": "output"}]))
 
-    assert backfill_import_params(db, output_dir) == 2
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(output_dir)) == 2
 
     shapes = {row["prompt_id"]: json.loads(row["params_json"]) for row in db.list_generations()}
     assert shapes == {"tall": {"orientation": "portrait"}, "wide": {"orientation": "landscape"}}
-    assert backfill_import_params(db, output_dir) == 0
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(output_dir)) == 0
 
 
 def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
@@ -277,7 +278,7 @@ def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
         source="imported",
     )
 
-    updated = backfill_import_params(db, tmp_path)
+    updated = backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
@@ -287,7 +288,7 @@ def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
     assert json.loads(db.get_generation("fresh")["params_json"])["input_image"] == "video/x_00001.mp4 [output]"
     assert "input_image" not in json.loads(db.get_generation("t2i")["params_json"])
     # Idempotent: a second pass finds nothing left to fill.
-    assert backfill_import_params(db, tmp_path) == 0
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
 
 def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
@@ -558,8 +559,8 @@ def test_import_skips_already_imported(tmp_path):
     _make_png_with_metadata(output_dir / "test_00001_.png", {"2": {}})
 
     db = Database(tmp_path / "test.db")
-    assert import_comfyui_output(output_dir.parent, db, thumb_dir) == 1
-    assert import_comfyui_output(output_dir.parent, db, thumb_dir) == 0
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir) == 1
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir) == 0
 
 
 def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
@@ -582,7 +583,7 @@ def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
     (output_dir / "flf2v_loop_00001.mp4").write_bytes(b"")
 
     db = Database(tmp_path / "test.db")
-    count = import_comfyui_output(output_dir.parent, db, thumb_dir)
+    count = import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir)
 
     assert count == 1  # one entry, not one-per-file
     rows = db.list_generations()
@@ -603,7 +604,7 @@ def test_a_video_is_never_filed_under_a_recipe_that_only_makes_pictures(tmp_path
     (output_dir / "renamed_00001.mp4").write_bytes(b"")
 
     db = Database(tmp_path / "test.db")
-    import_comfyui_output(output_dir.parent, db, tmp_path / "thumbs")
+    import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, tmp_path / "thumbs")
 
     (row,) = db.list_generations()
     assert json.loads(row["output_files"])[0]["filename"] == "renamed_00001.mp4"
@@ -626,7 +627,7 @@ def test_import_same_stem_image_and_video_get_distinct_thumbnails(tmp_path):
     (output_dir / "video" / "ComfyUI_00001_.mp4").write_bytes(b"")
 
     db = Database(tmp_path / "test.db")
-    assert import_comfyui_output(output_dir, db, thumb_dir) == 2
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir), db, thumb_dir) == 2
 
     thumbs = [r["thumbnail_path"] for r in db.list_generations()]
     assert all(thumbs) and len(set(thumbs)) == 2          # two distinct thumbnails
@@ -639,7 +640,7 @@ def test_import_standalone_video_without_sidecar_still_imports(tmp_path):
     (output_dir / "wan22_i2v_00001_.mp4").write_bytes(b"")
 
     db = Database(tmp_path / "test.db")
-    assert import_comfyui_output(output_dir.parent, db, tmp_path / "thumbs") == 1
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, tmp_path / "thumbs") == 1
     files = json.loads(db.list_generations()[0]["output_files"])
     assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
 
@@ -658,7 +659,7 @@ def test_a_finished_videos_soundless_copy_and_picture_are_not_found_as_a_new_ite
             {"filename": "flf2v_loop_00001-audio.mp4", "subfolder": "video", "type": "output",
              "workflow": "flf2v_loop_00001.png"}]}}})))
 
-    assert import_comfyui_output(output_dir, db, tmp_path / "thumbs") == 0
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir), db, tmp_path / "thumbs") == 0
     assert len(db.list_generations()) == 1
 
 
@@ -924,7 +925,7 @@ def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
     _completed(db, "img", "ComfyUI_00001_.png", "", thumbnail_path=str(shared))
     _completed(db, "vid", "ComfyUI_00001_.mp4", "video", thumbnail_path=str(shared))
 
-    assert backfill_shared_thumbnails(db, output_dir, thumb_dir) == 2
+    assert backfill_shared_thumbnails(db, OutputPlaces.in_one_folder(output_dir), thumb_dir) == 2
 
     img_thumb = db.get_generation("img")["thumbnail_path"]
     vid_thumb = db.get_generation("vid")["thumbnail_path"]
@@ -948,7 +949,7 @@ def test_backfill_leaves_a_uniquely_owned_thumbnail_untouched(tmp_path):
     db = Database(tmp_path / "test.db")
     _completed(db, "solo", "sdxl_t2i_1_.png", "", thumbnail_path=str(thumb))
 
-    assert backfill_shared_thumbnails(db, output_dir, thumb_dir) == 0
+    assert backfill_shared_thumbnails(db, OutputPlaces.in_one_folder(output_dir), thumb_dir) == 0
     assert db.get_generation("solo")["thumbnail_path"] == str(thumb)
 
 
@@ -968,7 +969,7 @@ def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
     _completed(db, "gone", "sdxl_t2i_5_.png", "",
                thumbnail_path=str(thumb_dir / "sdxl_t2i_5_.jpg"))  # never on disk
 
-    assert backfill_shared_thumbnails(db, output_dir, thumb_dir) == 1
+    assert backfill_shared_thumbnails(db, OutputPlaces.in_one_folder(output_dir), thumb_dir) == 1
     new = db.get_generation("gone")["thumbnail_path"]
     assert Path(new).name == "gone.jpg"
     assert Path(new).exists()
@@ -1052,11 +1053,11 @@ def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
         params_json=json.dumps({"positive_prompt": "a portrait", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
     )
-    assert backfill_import_params(db, tmp_path) == 1
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
     params = json.loads(db.get_generation("flux-old")["params_json"])
     assert params["unet"] == "cyberrealisticFlux_v25GGUFQ80.gguf"
     assert params["positive_prompt"] == "a portrait"   # existing params kept
-    assert backfill_import_params(db, tmp_path) == 0         # idempotent
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0         # idempotent
 
 
 def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(tmp_path):
@@ -1066,7 +1067,7 @@ def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(t
         params_json="{}", workflow_json=json.dumps(_A_FLUX_PICTURES_RECIPE), source="imported",
     )
 
-    assert backfill_import_params(db, tmp_path) == 1
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
     assert json.loads(db.get_generation("flux-old")["params_json"])["guidance"] == 3.5
 
 
@@ -1085,7 +1086,7 @@ def test_backfill_fills_the_lora_a_flux_imports_graph_loaded_at_the_strength_it_
         params_json="{}", workflow_json=json.dumps(graph), source="imported",
     )
 
-    backfill_import_params(db, tmp_path)
+    backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
     params = json.loads(db.get_generation("flux-old")["params_json"])
     assert (params["lora"], params["lora_strength"]) == ("example_style.safetensors", 0.5)
@@ -1112,7 +1113,7 @@ def test_backfill_fills_the_strength_each_wan_stage_ran_its_lora_at(tmp_path):
         params_json="{}", workflow_json=json.dumps(graph), source="imported",
     )
 
-    backfill_import_params(db, tmp_path)
+    backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
     params = json.loads(db.get_generation("old")["params_json"])
     assert (params["lora_strength_high"], params["lora_strength_low"]) == (0.8, 0.6)

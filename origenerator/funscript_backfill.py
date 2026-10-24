@@ -19,30 +19,31 @@ from origenerator.funscript import (
 )
 from origenerator.gallery import media_type_of_row, resolve_preview
 from origenerator.media import MediaType
+from origenerator.output_places import OutputPlaces
 
 logger = logging.getLogger(__name__)
 
 
-def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
+def backfill(db, places: OutputPlaces | None = None, *, hz: float | None = None,
              write=synthesize_funscript, rewrite=resynthesize_funscript,
              resolve=resolve_preview) -> dict:
-    output_dir = config.COMFYUI_OUTPUT_DIR if output_dir is None else output_dir
+    places = config.OUTPUT_PLACES if places is None else places
     hz = config.MOTION_DEFAULT_HZ if hz is None else hz
     result = {"written": 0, "rewritten": 0, "skipped": 0, "missing": 0, "failed": 0}
     videos = []
     for row in db.list_generations():
         if media_type_of_row(row) != MediaType.VIDEO:
             continue
-        preview = resolve(row, output_dir)
+        preview = resolve(row, places)
         if preview is None or preview[1] != MediaType.VIDEO:
             result["missing"] += 1
             continue
         videos.append(preview[0])
     shared_stems = _stems_more_than_one_video_has(videos)
     for path in videos:
-        script = _script_of(path, output_dir, shared_stems)
+        script = _script_of(path, places, shared_stems)
         if script is None:
-            written = write(path, hz=hz, output_dir=output_dir)
+            written = write(path, hz=hz, places=places)
             result["failed" if written is None else "written"] += 1
         elif rewrite(path, script, hz=hz):
             result["rewritten"] += 1
@@ -56,10 +57,10 @@ def _stems_more_than_one_video_has(videos) -> set[str]:
     return {stem for stem, count in stems.items() if count > 1}
 
 
-def _script_of(video: Path, output_dir, shared_stems) -> Path | None:
+def _script_of(video: Path, places: OutputPlaces, shared_stems) -> Path | None:
     if video.stem not in shared_stems:
-        return funscript_of(video, output_dir=output_dir)
-    own = funscript_path_for(video, output_dir=output_dir)
+        return funscript_of(video, places=places)
+    own = funscript_path_for(video, places=places)
     return own if own.is_file() else None
 
 

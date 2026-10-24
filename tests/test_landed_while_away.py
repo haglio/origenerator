@@ -16,6 +16,7 @@ import pytest
 
 from origenerator import landed_while_away
 from origenerator.db import Database
+from origenerator.output_places import OutputPlaces
 from origenerator.single_instance import Copies
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -60,7 +61,7 @@ def _watch(db, api, tmp_path, **over):
         announce=said.append,
         app_is_running=over.pop("app_is_running", lambda: False),
         sleep=over.pop("sleep", lambda _seconds: None),
-        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
         **over)
     return said
 

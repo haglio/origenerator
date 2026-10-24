@@ -4,31 +4,31 @@ on its own (:mod:`origenerator.own_window`), beside the app or without it."""
 from __future__ import annotations
 
 
-def _picture_of(row: dict, output_dir):
+def _picture_of(row: dict, places):
     """The full-size still where it is on disk, else the stored thumbnail."""
     from origenerator import gallery
     from origenerator.media import MediaType
 
-    found = gallery.resolve_preview(row, output_dir)
+    found = gallery.resolve_preview(row, places)
     if found is not None and found[1] == MediaType.IMAGE:
         return str(found[0])
     return row.get("thumbnail_path")
 
 
-def waiting_pictures(db, output_dir) -> list[dict]:
+def waiting_pictures(db, places) -> list[dict]:
     from origenerator.item_names import ItemNames
     from origenerator.picture_sorting import pictures_to_sort
 
     names = ItemNames.from_library(db)
     return [{"prompt_id": row["prompt_id"], "name": names.of(row["prompt_id"]),
-             "picture_path": _picture_of(row, output_dir)}
+             "picture_path": _picture_of(row, places)}
             for row in pictures_to_sort(db.list_generations())]
 
 
 def the_sorting_window():
     """The sorting window on every picture nobody has said an action for, or the
     sentence to say instead when there is none left."""
-    from origenerator.config import COMFYUI_OUTPUT_DIR, DB_PATH
+    from origenerator.config import DB_PATH, OUTPUT_PLACES
     from origenerator.db import Database
     from origenerator.gui.sorting_window import SortingWindow
     from origenerator.picture_marks import mark_for
@@ -36,7 +36,7 @@ def the_sorting_window():
     from origenerator.sorting_session import SortingSession
 
     db = Database(DB_PATH)
-    waiting = waiting_pictures(db, COMFYUI_OUTPUT_DIR)
+    waiting = waiting_pictures(db, OUTPUT_PLACES)
     if not waiting:
         return "Every picture already says what it shows."
 

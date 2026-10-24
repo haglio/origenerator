@@ -21,7 +21,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, COMFYUI_TEMP_DIR
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_TEMP_DIR, OUTPUT_PLACES
 from origenerator.file_refs import reference_path
 
 # The default pixel budget (what the video workflows scale to in-graph) and the
@@ -56,7 +56,7 @@ def resolve_input_image_path(input_image: str | None) -> Path | None:
     a ``"[temp]"`` one under the temp dir, and an ``"[input]"`` (or unannotated)
     one under the input dir, matching how ComfyUI's LoadImage routes the
     reference. An absolute path is taken as-is."""
-    return reference_path(input_image, output_dir=COMFYUI_OUTPUT_DIR,
+    return reference_path(input_image, places=OUTPUT_PLACES,
                           input_dir=COMFYUI_INPUT_DIR, temp_dir=COMFYUI_TEMP_DIR)
 
 

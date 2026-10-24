@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import json
 import logging
-import os
 import shutil
 import subprocess
 import uuid
@@ -29,6 +28,7 @@ from origenerator.db import Database
 from origenerator.gallery import (
     ENHANCE_WORKFLOW,
     media_type_of_row,
+    output_file_path,
     parse_params,
     row_output_files,
     workflow_output_type,
@@ -36,6 +36,7 @@ from origenerator.gallery import (
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
+from origenerator.output_places import OutputPlaces
 from origenerator.record_fold import file_key, fold_record_into
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -76,77 +77,68 @@ def infer_workflow_name(filename: str) -> str | None:
     return best_name
 
 
-def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> int:
+def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -> int:
     imported = 0
     existing = _get_existing_filenames(db)
 
-    for dirpath, _, filenames in os.walk(output_dir):
-        for fname in sorted(filenames):
-            fpath = Path(dirpath) / fname
-            output_type = media_type_from_filename(fname)
-            if output_type is None:
-                continue
-            # A video with a metadata image beside it is represented (and made
-            # playable) by that image's entry, so skip the bare video file.
-            if (output_type == MediaType.VIDEO
-                    and sibling_of_type(fpath, MediaType.IMAGE) is not None):
-                continue
-            # An image beside a video is that video's metadata/preview sidecar
-            # (VHS_VideoCombine writes one per clip): its entry should play the
-            # video, not show the still frame.
-            play_path = fpath
-            if output_type == MediaType.IMAGE:
-                sibling_video = sibling_of_type(fpath, MediaType.VIDEO)
-                if sibling_video is not None:
-                    play_path = sibling_video
+    for fpath, subfolder in places.files():
+        output_type = media_type_from_filename(fpath.name)
+        if output_type is None:
+            continue
+        # A video with a metadata image beside it is represented (and made
+        # playable) by that image's entry, so skip the bare video file.
+        if (output_type == MediaType.VIDEO
+                and sibling_of_type(fpath, MediaType.IMAGE) is not None):
+            continue
+        # An image beside a video is that video's metadata/preview sidecar
+        # (VHS_VideoCombine writes one per clip): its entry should play the
+        # video, not show the still frame.
+        play_path = fpath
+        if output_type == MediaType.IMAGE:
+            sibling_video = sibling_of_type(fpath, MediaType.VIDEO)
+            if sibling_video is not None:
+                play_path = sibling_video
 
-            rel_path = play_path.relative_to(output_dir).as_posix()
-            if rel_path in existing:
-                continue
+        entry = {"filename": play_path.name, "subfolder": subfolder, "type": "output"}
+        if _record_key(entry) in existing:
+            continue
 
-            metadata = _extract_metadata(fpath, fpath.suffix.lower(),
-                                         media_type_from_filename(play_path.name))
-            prompt_id = str(uuid.uuid4())
+        metadata = _extract_metadata(fpath, fpath.suffix.lower(),
+                                     media_type_from_filename(play_path.name))
+        prompt_id = str(uuid.uuid4())
 
-            thumb_path = None
-            try:
-                thumb_path = str(
-                    generate_thumbnail(fpath, output_type, thumb_dir, name=prompt_id)
-                )
-            except Exception as e:
-                logger.warning("Thumbnail failed for %s: %s", fpath, e)
-
-            mtime = datetime.fromtimestamp(fpath.stat().st_mtime, tz=UTC)
-
-            db.insert_generation(
-                prompt_id=prompt_id,
-                workflow_name=metadata.get("workflow_name", "unknown"),
-                workflow_version=metadata.get("workflow_version", "imported"),
-                positive_prompt=metadata.get("positive_prompt"),
-                negative_prompt=metadata.get("negative_prompt"),
-                seed=metadata.get("seed"),
-                params_json=json.dumps(metadata.get("params", {})),
-                workflow_json=json.dumps(metadata.get("prompt_data", {})),
-                source=GenerationSource.IMPORTED,
+        thumb_path = None
+        try:
+            thumb_path = str(
+                generate_thumbnail(fpath, output_type, thumb_dir, name=prompt_id)
             )
-            db.update_generation(
-                prompt_id,
-                status=GenerationStatus.COMPLETED,
-                output_files=json.dumps([_output_entry(play_path, output_dir)]),
-                thumbnail_path=thumb_path,
-                completed_at=mtime.isoformat(),
-            )
-            existing.add(rel_path)
-            imported += 1
+        except Exception as e:
+            logger.warning("Thumbnail failed for %s: %s", fpath, e)
+
+        mtime = datetime.fromtimestamp(fpath.stat().st_mtime, tz=UTC)
+
+        db.insert_generation(
+            prompt_id=prompt_id,
+            workflow_name=metadata.get("workflow_name", "unknown"),
+            workflow_version=metadata.get("workflow_version", "imported"),
+            positive_prompt=metadata.get("positive_prompt"),
+            negative_prompt=metadata.get("negative_prompt"),
+            seed=metadata.get("seed"),
+            params_json=json.dumps(metadata.get("params", {})),
+            workflow_json=json.dumps(metadata.get("prompt_data", {})),
+            source=GenerationSource.IMPORTED,
+        )
+        db.update_generation(
+            prompt_id,
+            status=GenerationStatus.COMPLETED,
+            output_files=json.dumps([entry]),
+            thumbnail_path=thumb_path,
+            completed_at=mtime.isoformat(),
+        )
+        existing.add(_record_key(entry))
+        imported += 1
 
     return imported
-
-
-def _output_entry(path: Path, output_dir: Path) -> dict:
-    subfolder = path.parent.relative_to(output_dir).as_posix()
-    if subfolder == ".":
-        subfolder = ""
-    return {"filename": path.name, "subfolder": subfolder, "type": "output"}
 
 
 def merge_video_sidecar_rows(db: Database) -> int:
@@ -258,7 +250,7 @@ def _fold_soundless_copy(db: Database, copy: dict, video: dict, rows: list[dict]
     db.delete_generation(copy["prompt_id"])
 
 
-def backfill_shared_thumbnails(db: Database, output_dir: Path, thumb_dir: Path) -> int:
+def backfill_shared_thumbnails(db: Database, places: OutputPlaces, thumb_dir: Path) -> int:
     """Re-render thumbnails an old naming collision left wrong or missing.
 
     Thumbnails were once named after the source file's stem, so two outputs that
@@ -280,14 +272,14 @@ def backfill_shared_thumbnails(db: Database, output_dir: Path, thumb_dir: Path) 
             continue
         if owners[thumb] == 1 and Path(thumb).exists():
             continue  # uniquely owned and present — already correct
-        fresh = _render_row_thumbnail(row, output_dir, thumb_dir)
+        fresh = _render_row_thumbnail(row, places, thumb_dir)
         if fresh is not None:
             db.update_generation(row["prompt_id"], thumbnail_path=str(fresh))
             repaired += 1
     return repaired
 
 
-def _render_row_thumbnail(row: dict, output_dir: Path, thumb_dir: Path) -> Path | None:
+def _render_row_thumbnail(row: dict, places: OutputPlaces, thumb_dir: Path) -> Path | None:
     """A fresh thumbnail for ``row`` from its own output, keyed by its prompt_id.
 
     Returns the new path, or ``None`` when the row has no renderable output file
@@ -300,7 +292,7 @@ def _render_row_thumbnail(row: dict, output_dir: Path, thumb_dir: Path) -> Path 
     media = media_type_from_filename(first.get("filename", ""))
     if media is None:
         return None
-    source = output_dir / first.get("subfolder", "") / first.get("filename", "")
+    source = output_file_path(first, places)
     if not source.exists():
         return None
     try:
@@ -341,7 +333,7 @@ def refile_enhancements_another_recipe_made(db: Database) -> int:
     return refiled
 
 
-def backfill_import_params(db: Database, output_dir: Path) -> int:
+def backfill_import_params(db: Database, places: OutputPlaces) -> int:
     """Give every import the settings its own file states and its row is
     missing — the size it was made at, what it was told to avoid, the models it
     loaded, the image it started from, the sound it was scored with — read off
@@ -364,7 +356,7 @@ def backfill_import_params(db: Database, output_dir: Path) -> int:
         params = parse_params(row.get("params_json"))
         stated = _graph_params(recipe_of(row))
         if "width" not in params and "width" not in stated:
-            stated.update(_size_from_its_own_file(_first_output_path(row, output_dir),
+            stated.update(_size_from_its_own_file(_first_output_path(row, places),
                                     row.get("workflow_name") or ""))
         missing = {k: v for k, v in stated.items() if k not in params}
         if not missing:
@@ -390,10 +382,9 @@ def backfill_imported_video_seeds(db: Database) -> int:
     return updated
 
 
-def _first_output_path(row: dict, output_dir: Path) -> Path:
+def _first_output_path(row: dict, places: OutputPlaces) -> Path:
     files = row_output_files(row)
-    first = files[0] if files else {}
-    return output_dir / first.get("subfolder", "") / first.get("filename", "")
+    return output_file_path(files[0] if files else {}, places)
 
 
 def _get_existing_filenames(db: Database) -> set[str]:
@@ -402,16 +393,15 @@ def _get_existing_filenames(db: Database) -> set[str]:
         files_json = row.get("output_files")
         if files_json:
             try:
-                for f in json.loads(files_json):
-                    sub = f.get("subfolder", "")
-                    name = f.get("filename", "")
-                    if sub:
-                        result.add(f"{sub}/{name}")
-                    else:
-                        result.add(name)
+                result.update(_record_key(f) for f in json.loads(files_json))
             except (json.JSONDecodeError, KeyError):
                 pass
     return result
+
+
+def _record_key(entry: dict) -> str:
+    sub, name = entry.get("subfolder", ""), entry.get("filename", "")
+    return f"{sub}/{name}" if sub else name
 
 
 def recipe_of(row: dict) -> dict:

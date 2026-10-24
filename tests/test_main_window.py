@@ -152,7 +152,7 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
         qtbot, tmp_path, monkeypatch):
     _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
     _completed_image(Database(tmp_path / "t.db"))
     win = _window(qtbot, tmp_path)
     win.show()
@@ -538,7 +538,7 @@ def _completed_image(db, prompt_id="g-1", prompt="a cat", seed=1, **params):
 def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
         qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
     _completed_image(Database(tmp_path / "t.db"), enhance=True)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))

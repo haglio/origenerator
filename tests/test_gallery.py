@@ -62,6 +62,7 @@ from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.gallery.tree import folder_chain
 from origenerator.generation_config import prepared_params
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import NO_LORA
 
@@ -170,7 +171,7 @@ def test_animated_preview_path_generates_a_cached_webp_for_a_video(tmp_path, mon
 
     monkeypatch.setattr(gallery_output, "generate_animated_thumbnail", fake_generate)
 
-    result = animated_preview_path(row, tmp_path, tmp_path / "thumbs")
+    result = animated_preview_path(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert result == str(tmp_path / "thumbs" / "v1_anim.webp")
     assert calls == [(video, tmp_path / "thumbs", "v1")]  # generated from the real file
@@ -184,7 +185,7 @@ def test_animated_preview_path_is_none_for_an_image(tmp_path, monkeypatch):
     generate = MagicMock()
     monkeypatch.setattr(gallery_output, "generate_animated_thumbnail", generate)
 
-    assert animated_preview_path(row, tmp_path, tmp_path / "thumbs") is None
+    assert animated_preview_path(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs") is None
     generate.assert_not_called()
 
 
@@ -197,7 +198,7 @@ def test_animated_preview_path_is_none_when_the_video_yields_no_frames(tmp_path,
     monkeypatch.setattr(gallery_output, "generate_animated_thumbnail",
                         lambda *a, **k: None)
 
-    assert animated_preview_path(row, tmp_path, tmp_path / "thumbs") is None
+    assert animated_preview_path(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs") is None
 
 
 def test_a_rows_kind_is_read_out_of_its_stored_files_once(monkeypatch):
@@ -1824,7 +1825,7 @@ def test_a_picture_previews_from_its_own_full_file(tmp_path):
     full.write_bytes(b"x")
     row = _row(output_files=json.dumps([{"filename": "sdxl_t2i_1_.png",
                                          "subfolder": "image"}]))
-    assert resolve_preview(row, out) == (full, "image")
+    assert resolve_preview(row, OutputPlaces.in_one_folder(out)) == (full, "image")
 
 
 def test_a_video_previews_from_its_own_full_file(tmp_path):
@@ -1834,7 +1835,7 @@ def test_a_video_previews_from_its_own_full_file(tmp_path):
     full.write_bytes(b"x")
     row = _row(output_files=json.dumps([{"filename": "wan22_i2v_1_.mp4",
                                          "subfolder": "video"}]))
-    assert resolve_preview(row, out) == (full, "video")
+    assert resolve_preview(row, OutputPlaces.in_one_folder(out)) == (full, "video")
 
 
 def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
@@ -1845,7 +1846,7 @@ def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
     # Output references a video that is not on disk; the thumbnail still previews.
     row = _row(output_files=json.dumps([{"filename": "gone_1_.mp4", "subfolder": "video"}]),
                thumbnail_path=str(thumb))
-    assert resolve_preview(row, out) == (thumb, "image")
+    assert resolve_preview(row, OutputPlaces.in_one_folder(out)) == (thumb, "image")
 
 
 def test_resolve_preview_follows_a_file_the_bin_has_re_pointed(tmp_path):
@@ -1859,7 +1860,7 @@ def test_resolve_preview_follows_a_file_the_bin_has_re_pointed(tmp_path):
     row = _row(output_files=json.dumps([{"filename": "wan22_i2v_1_.mp4",
                                          "subfolder": "video",
                                          "path": str(trashed)}]))
-    assert resolve_preview(row, out) == (trashed, "video")
+    assert resolve_preview(row, OutputPlaces.in_one_folder(out)) == (trashed, "video")
 
 
 def test_a_row_whose_files_are_gone_previews_nothing(tmp_path):
@@ -1867,14 +1868,14 @@ def test_a_row_whose_files_are_gone_previews_nothing(tmp_path):
     out.mkdir()
     row = _row(output_files=json.dumps([{"filename": "gone.png"}]),
                thumbnail_path=str(tmp_path / "missing.jpg"))
-    assert resolve_preview(row, out) is None
+    assert resolve_preview(row, OutputPlaces.in_one_folder(out)) is None
 
 
 def test_resolve_preview_handles_missing_output_files(tmp_path):
     thumb = tmp_path / "thumb.jpg"
     thumb.write_bytes(b"x")
     row = _row(output_files=None, thumbnail_path=str(thumb))
-    assert resolve_preview(row, tmp_path) == (thumb, "image")
+    assert resolve_preview(row, OutputPlaces.in_one_folder(tmp_path)) == (thumb, "image")
 
 
 def test_a_rows_files_on_disk_include_the_one_it_points_at(tmp_path):
@@ -1884,7 +1885,7 @@ def test_a_rows_files_on_disk_include_the_one_it_points_at(tmp_path):
     png.write_bytes(b"x")
     row = _row(output_files=json.dumps([{"filename": "sdxl_t2i_1_.png",
                                          "subfolder": "image"}]))
-    assert output_disk_files(row, out) == [png]
+    assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [png]
 
 
 def test_output_disk_files_includes_a_video_metadata_sidecar(tmp_path):
@@ -1898,7 +1899,7 @@ def test_output_disk_files_includes_a_video_metadata_sidecar(tmp_path):
     # PNG, or the next import would resurrect the orphaned still as an image.
     row = _row(output_files=json.dumps([{"filename": "wan22_i2v_1_.mp4",
                                          "subfolder": "video"}]))
-    assert output_disk_files(row, out) == [mp4, sidecar]
+    assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [mp4, sidecar]
 
 
 def test_deleting_a_video_takes_its_soundless_copy_and_that_copys_picture_along(tmp_path):
@@ -1912,14 +1913,14 @@ def test_deleting_a_video_takes_its_soundless_copy_and_that_copys_picture_along(
     row = _row(output_files=json.dumps([
         {"filename": "flf2v_loop_1-audio.mp4", "subfolder": "video"},
         {"filename": "flf2v_loop_1.mp4", "subfolder": "video", "role": "silent"}]))
-    assert output_disk_files(row, out) == [sounded, soundless, picture]
+    assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [sounded, soundless, picture]
 
 
 def test_output_disk_files_omits_files_not_on_disk(tmp_path):
     out = tmp_path / "output"
     out.mkdir()
     row = _row(output_files=json.dumps([{"filename": "gone.png", "subfolder": ""}]))
-    assert output_disk_files(row, out) == []
+    assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == []
 
 
 def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies():

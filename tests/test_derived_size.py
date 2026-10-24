@@ -4,6 +4,7 @@ from __future__ import annotations
 from PIL import Image
 
 import origenerator.workflows.derived_size as ds
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows.derived_size import (
     measure_derived_size,
     override_size,
@@ -39,7 +40,7 @@ def test_resolve_input_image_routes_by_annotation(tmp_path, monkeypatch):
     in_dir.mkdir()
     out_dir.mkdir()
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", in_dir)
-    monkeypatch.setattr(ds, "COMFYUI_OUTPUT_DIR", out_dir)
+    monkeypatch.setattr(ds, "OUTPUT_PLACES", OutputPlaces.in_one_folder(out_dir))
     (in_dir / "frame.png").write_bytes(b"x")
     (out_dir / "gen.png").write_bytes(b"x")
 
@@ -57,7 +58,7 @@ def test_resolve_input_image_routes_a_temp_reference(tmp_path, monkeypatch):
     temp_dir = tmp_path / "temp"
     temp_dir.mkdir()
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path / "input")
-    monkeypatch.setattr(ds, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(ds, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "output"))
     monkeypatch.setattr(ds, "COMFYUI_TEMP_DIR", temp_dir)
     (temp_dir / "scratch.png").write_bytes(b"x")
 

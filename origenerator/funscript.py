@@ -10,9 +10,9 @@ already knows: the video's duration. The result is a rhythm, not a
 pixel-accurate script; the whole generator is one function so a later swap to a
 measured (FunGen) source touches nothing else.
 
-The scripts have a folder of their own -- ``<output dir>/funscript`` -- laid out
-like the output folder around it, each script named for its video's whole
-filename, so no two videos share one.
+The scripts have a place of their own, laid out like the folders the videos are
+kept in, each script named for its video's whole filename, so no two videos
+share one.
 """
 
 from __future__ import annotations
@@ -24,48 +24,36 @@ from app_support.funscript import document, read_actions, write
 
 from origenerator.evolver_upscales import original_stem
 from origenerator.media import VIDEO_EXTS
+from origenerator.output_places import OutputPlaces
 
 logger = logging.getLogger(__name__)
 
-
-#: Where the scripts live, under the ComfyUI output dir.
-FUNSCRIPT_SUBFOLDER = "funscript"
 
 #: This app's name on the scripts it authors.
 CREATOR = "origenerator"
 
 
-def funscript_path_for(video_path, *, output_dir) -> Path:
-    """``output_dir`` has no default: one read at import would pin every caller
-    to wherever the content overlay pointed then."""
+def funscript_path_for(video_path, *, places: OutputPlaces) -> Path:
     video = Path(video_path)
-    return (Path(output_dir) / FUNSCRIPT_SUBFOLDER / _folder_within(video.parent, output_dir)
-            / f"{video.name}.funscript")
+    return places.scripts / (places.subfolder_of(video.parent) or "") / f"{video.name}.funscript"
 
 
-def _folder_within(folder: Path, output_dir) -> Path:
-    try:
-        return folder.relative_to(output_dir)
-    except ValueError:
-        return Path()
-
-
-def _filed_under(stem: str, output_dir) -> Path:
-    return Path(output_dir) / FUNSCRIPT_SUBFOLDER / f"{stem}.funscript"
+def _filed_under(stem: str, places: OutputPlaces) -> Path:
+    return places.scripts / f"{stem}.funscript"
 
 
 def _beside(video_path) -> Path:
     return Path(video_path).with_suffix(".funscript")
 
 
-def funscript_of(video_path, *, output_dir) -> Path | None:
+def funscript_of(video_path, *, places: OutputPlaces) -> Path | None:
     """The script this video HAS, or ``None`` when it has none. An upscale
     Evolver made of a video has that video's."""
     original = original_stem(video_path)
     if original is not None:
-        return _script_of_upscaled(original, output_dir)
-    return _first_file([funscript_path_for(video_path, output_dir=output_dir),
-                        _filed_under(Path(video_path).stem, output_dir),
+        return _script_of_upscaled(original, places)
+    return _first_file([funscript_path_for(video_path, places=places),
+                        _filed_under(Path(video_path).stem, places),
                         _beside(video_path)])
 
 
@@ -73,16 +61,15 @@ def _first_file(paths) -> Path | None:
     return next((path for path in paths if path.is_file()), None)
 
 
-def _script_of_upscaled(stem: str, output_dir) -> Path | None:
-    """The upscale's own path does not say which output folder the video it was
-    made from was saved in, so that video's script is looked for as if it were
-    in each of them."""
-    output = Path(output_dir)
+def _script_of_upscaled(stem: str, places: OutputPlaces) -> Path | None:
+    """The upscale's own path does not say which folder the video it was made
+    from was kept in, so that video's script is looked for as if it were in
+    each of them."""
     videos = [folder / f"{stem}{suffix}"
-              for folder in (output.iterdir() if output.is_dir() else ())
+              for folder in places.video_folders()
               for suffix in sorted(VIDEO_EXTS)]
-    return _first_file([*(funscript_path_for(video, output_dir=output) for video in videos),
-                        _filed_under(stem, output),
+    return _first_file([*(funscript_path_for(video, places=places) for video in videos),
+                        _filed_under(stem, places),
                         *(_beside(video) for video in videos)])
 
 
@@ -191,7 +178,7 @@ def video_duration_seconds(video_path) -> float | None:
     return None
 
 
-def synthesize_funscript(video_path, *, hz: float, output_dir,
+def synthesize_funscript(video_path, *, hz: float, places: OutputPlaces,
                          duration_provider=video_duration_seconds) -> Path | None:
     duration = duration_provider(video_path)
     if not duration or duration <= 0:
@@ -200,7 +187,7 @@ def synthesize_funscript(video_path, *, hz: float, output_dir,
     actions = synthesize_actions(duration, hz=hz)
     if not actions:
         return None
-    dest = funscript_path_for(video_path, output_dir=output_dir)
+    dest = funscript_path_for(video_path, places=places)
     write_funscript(dest, actions, duration_seconds=round(duration))
     return dest
 

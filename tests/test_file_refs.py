@@ -12,6 +12,7 @@ from origenerator.file_refs import (
     split_annotation,
     unannotated,
 )
+from origenerator.output_places import OutputPlaces
 
 
 def test_split_annotation_takes_the_type_tag_off_and_nothing_else():
@@ -48,7 +49,7 @@ def test_reference_path_routes_the_way_comfyuis_loadimage_does(tmp_path):
     in_dir.mkdir()
     (out_dir / "image" / "gen.png").write_bytes(b"x")
     (in_dir / "frame.png").write_bytes(b"x")
-    resolve = lambda ref: reference_path(ref, output_dir=out_dir, input_dir=in_dir)
+    resolve = lambda ref: reference_path(ref, places=OutputPlaces.in_one_folder(out_dir), input_dir=in_dir)
 
     assert resolve("image/gen.png [output]") == out_dir / "image" / "gen.png"
     assert resolve("frame.png [input]") == in_dir / "frame.png"
@@ -70,6 +71,6 @@ def test_reference_path_routes_a_temp_reference_under_the_temp_dir(tmp_path):
         d.mkdir()
     (temp_dir / "scratch.png").write_bytes(b"x")
 
-    assert reference_path("scratch.png [temp]", output_dir=out_dir, input_dir=in_dir,
+    assert reference_path("scratch.png [temp]", places=OutputPlaces.in_one_folder(out_dir), input_dir=in_dir,
                           temp_dir=temp_dir) == temp_dir / "scratch.png"
-    assert reference_path("scratch.png [temp]", output_dir=out_dir, input_dir=in_dir) is None
+    assert reference_path("scratch.png [temp]", places=OutputPlaces.in_one_folder(out_dir), input_dir=in_dir) is None

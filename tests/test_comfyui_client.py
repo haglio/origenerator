@@ -13,6 +13,7 @@ import struct
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
+from origenerator.output_places import OutputPlaces
 
 
 def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
@@ -165,7 +166,8 @@ def test_binary_non_preview_event_is_ignored(qtbot):
 
 
 def test_the_client_hands_its_folders_to_the_api(qtbot, tmp_path):
-    folders = ComfyFolders(input=tmp_path / "input", output=tmp_path / "output", temp=tmp_path / "temp")
+    folders = ComfyFolders(input=tmp_path / "input", places=OutputPlaces.in_one_folder(tmp_path / "output"),
+                           temp=tmp_path / "temp")
 
     client = ComfyUIClient(folders=folders)
 

@@ -28,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 
 from origenerator import config, gallery
+from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, FILE_DATE
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -79,44 +80,38 @@ def _held_prefix(held_days: int | None) -> str:
     return f"({held_days} day{'s' if held_days != 1 else ''} in trash) "
 
 
-def _output_dir(given: Path | None) -> Path:
-    """The folder a file is resolved against: the caller's, or the configured one."""
-    return config.COMFYUI_OUTPUT_DIR if given is None else given
+def _places(given: OutputPlaces | None) -> OutputPlaces:
+    return config.OUTPUT_PLACES if given is None else given
 
 
 def file_item(file: dict, label: str = "File", *,
-              held_days: int | None = None, output_dir: Path | None = None) -> MetaItem:
+              held_days: int | None = None, places: OutputPlaces | None = None) -> MetaItem:
     """One output file as a row: its path, a copy of just its filename (dropping
     the image/ or video/ subfolder the displayed path carries), and a reveal of
-    its absolute location — under ComfyUI's output folder, or wherever the
-    recovery bin has since moved it.
+    its absolute location — in the library, or wherever the recovery bin has
+    since moved it.
 
     ``held_days`` is set only for a deleted item, and puts how long it has been
     in the trash in front of the path.
 
     Shared with the version strip, which puts this exact row beside the level it
-    belongs to — the same file information, wherever the file is listed.
-
-    ``output_dir`` defaults to the configured ComfyUI output folder, resolved
-    when this is called rather than when the module was imported — so the
-    signature says this touches the filesystem, the way every neighbour that
-    does takes the folder as an argument."""
+    belongs to — the same file information, wherever the file is listed."""
     filename = file.get("filename") or ""
-    full = gallery.output_file_path(file, _output_dir(output_dir))
+    full = gallery.output_file_path(file, _places(places))
     return MetaItem(label, _held_prefix(held_days) + _output_path(file),
                     copy=filename, reveal=str(full))
 
 
 def created_item(file: dict, fallback: str = "", *,
-                 output_dir: Path | None = None) -> MetaItem:
+                 places: OutputPlaces | None = None) -> MetaItem:
     """When one output file was written, from the file itself.
 
     Per file rather than per row, because an image's versions were made at
     different moments — the enhancement you queued this evening sits beside a
     render from last week, and one ``created_at`` on the row can only be honest
     about one of them. Falls back to the row's own timestamp when the file is
-    gone from disk. ``output_dir`` is :func:`file_item`'s."""
-    full = gallery.output_file_path(file, _output_dir(output_dir))
+    gone from disk."""
+    full = gallery.output_file_path(file, _places(places))
     try:
         stamp = datetime.fromtimestamp(full.stat().st_mtime)
     except OSError:

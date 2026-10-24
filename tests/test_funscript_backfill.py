@@ -16,6 +16,7 @@ from origenerator.funscript import (
     write_funscript,
 )
 from origenerator.funscript_backfill import backfill
+from origenerator.output_places import OutputPlaces
 from tests.media_files import write_mp4
 
 
@@ -37,9 +38,9 @@ def _row(prompt_id, workflow_name, filename, subfolder=""):
 
 
 def _recording_write(seen):
-    def write(path, *, hz, output_dir):
+    def write(path, *, hz, places):
         seen.append(path.name)
-        dest = funscript_path_for(path, output_dir=output_dir)
+        dest = funscript_path_for(path, places=places)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text("{}", encoding="utf-8")
         return dest
@@ -56,7 +57,7 @@ def test_backfill_scripts_each_video_and_skips_images(tmp_path):
         _row("3", "sdxl_t2i", "still.png"),
     ])
     seen = []
-    result = backfill(db, tmp_path, write=_recording_write(seen))
+    result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
 
     assert sorted(seen) == ["v_i2v.mp4", "v_loop.mp4"]  # the still image isn't
     assert result["written"] == 2 and result["skipped"] == 0
@@ -65,14 +66,14 @@ def test_backfill_scripts_each_video_and_skips_images(tmp_path):
 def test_backfill_rewrites_the_scripts_synthesized_at_an_older_pace_and_says_how_many(tmp_path):
     for name in ("older_pace.mp4", "todays_pace.mp4"):
         (tmp_path / name).write_bytes(b"v")
-    older = funscript_path_for(tmp_path / "older_pace.mp4", output_dir=tmp_path)
+    older = funscript_path_for(tmp_path / "older_pace.mp4", places=OutputPlaces.in_one_folder(tmp_path))
     write_funscript(older, synthesize_actions(5.0, hz=1.2))
-    write_funscript(funscript_path_for(tmp_path / "todays_pace.mp4", output_dir=tmp_path),
+    write_funscript(funscript_path_for(tmp_path / "todays_pace.mp4", places=OutputPlaces.in_one_folder(tmp_path)),
                     synthesize_actions(5.0, hz=0.5))
     db = FakeDB([_row("1", "wan22_i2v", "older_pace.mp4"),
                  _row("2", "wan22_i2v", "todays_pace.mp4")])
 
-    result = backfill(db, tmp_path, hz=0.5, rewrite=partial(
+    result = backfill(db, OutputPlaces.in_one_folder(tmp_path), hz=0.5, rewrite=partial(
         resynthesize_funscript, duration_provider=lambda _video: 5.0))
 
     assert read_actions(older) == synthesize_actions(5.0, hz=0.5)
@@ -82,10 +83,10 @@ def test_backfill_rewrites_the_scripts_synthesized_at_an_older_pace_and_says_how
 def test_backfill_is_idempotent(tmp_path):
     (tmp_path / "v.mp4").write_bytes(b"v")
     db = FakeDB([_row("1", "wan22_i2v", "v.mp4")])
-    backfill(db, tmp_path, write=_recording_write([]))
+    backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write([]))
 
     seen = []
-    result = backfill(db, tmp_path, write=_recording_write(seen))
+    result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
     assert result["written"] == 0 and result["skipped"] == 1
 
 
@@ -97,10 +98,10 @@ def test_videos_sharing_a_name_are_each_scripted_for_their_own_length(tmp_path):
     db = FakeDB([_row("1", "unknown", "clip.mp4", subfolder="alpha"),
                  _row("2", "unknown", "clip.mp4", subfolder="beta/one")])
 
-    backfill(db, tmp_path, hz=1.0)
+    backfill(db, OutputPlaces.in_one_folder(tmp_path), hz=1.0)
 
     for video in (alpha, beta):
-        assert read_actions(funscript_of(video, output_dir=tmp_path)) == synthesize_actions(
+        assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path))) == synthesize_actions(
             video_duration_seconds(video), hz=1.0)
 
 
@@ -114,7 +115,7 @@ def test_two_types_of_one_video_name_in_one_folder_are_each_scripted(tmp_path):
 
     result = backfill(FakeDB([_row("1", "unknown", "clip.mp4", subfolder="alpha"),
                               _row("2", "unknown", "clip.webm", subfolder="alpha")]),
-                      tmp_path, write=_recording_write(seen))
+                      OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
 
     assert sorted(seen) == ["clip.mp4", "clip.webm"]
     assert result["written"] == 2
@@ -135,7 +136,7 @@ def test_a_video_no_other_shares_a_name_with_keeps_the_script_an_older_version_f
     seen = []
 
     result = backfill(FakeDB([_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
-                      tmp_path, write=_recording_write(seen))
+                      OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
 
     assert seen == [] and result["skipped"] == 1
     assert older.read_text(encoding="utf-8") == "keep me"
@@ -152,36 +153,36 @@ def test_a_script_an_older_version_filed_at_another_pace_is_rewritten_where_it_i
     write_funscript(older, synthesize_actions(5.0, hz=1.2))
 
     result = backfill(FakeDB([_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
-                      tmp_path, hz=0.5,
+                      OutputPlaces.in_one_folder(tmp_path), hz=0.5,
                       rewrite=partial(resynthesize_funscript, duration_provider=lambda _v: 5.0))
 
     assert result["rewritten"] == 1
     assert read_actions(older) == synthesize_actions(5.0, hz=0.5)
-    assert not funscript_path_for(video, output_dir=tmp_path).exists()
+    assert not funscript_path_for(video, places=OutputPlaces.in_one_folder(tmp_path)).exists()
 
 
 def test_backfill_counts_a_video_whose_file_is_missing(tmp_path):
     db = FakeDB([_row("1", "wan22_i2v", "gone.mp4")])  # no file on disk
     seen = []
-    result = backfill(db, tmp_path, write=_recording_write(seen))
+    result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
     assert seen == []  # nothing to script
     assert result["missing"] == 1 and result["written"] == 0
 
 
-def test_the_output_folder_is_resolved_when_the_sweep_runs(tmp_path, monkeypatch):
-    """It was a signature default -- ``output_dir: Path = COMFYUI_OUTPUT_DIR`` --
-    evaluated at import, from a constant that was itself built by reading the
-    content overlay at import. So the sweep could not be pointed anywhere the
-    module had not already decided on before anything called it."""
-    monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path / "elsewhere")
+def test_the_output_places_are_resolved_when_the_sweep_runs(tmp_path, monkeypatch):
+    """It was a signature default, evaluated at import from a constant that was
+    itself built by reading the content overlay at import. So the sweep could not
+    be pointed anywhere the module had not already decided on before anything
+    called it."""
+    monkeypatch.setattr(config, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "elsewhere"))
     seen = []
 
     funscript_backfill.backfill(
         FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
-        resolve=lambda row, output_dir: seen.append(output_dir) or None,
+        resolve=lambda row, places: seen.append(places) or None,
     )
 
-    assert seen == [tmp_path / "elsewhere"]
+    assert seen == [OutputPlaces.in_one_folder(tmp_path / "elsewhere")]
 
 
 def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
@@ -193,8 +194,8 @@ def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
 
     funscript_backfill.backfill(
         FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
-        resolve=lambda row, output_dir: (clip, "video"),
-        write=lambda path, *, hz, output_dir: rates.append(hz) or None,
+        resolve=lambda row, places: (clip, "video"),
+        write=lambda path, *, hz, places: rates.append(hz) or None,
     )
 
     assert rates == [2.5]

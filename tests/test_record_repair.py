@@ -7,6 +7,7 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from origenerator.db import Database
+from origenerator.output_places import OutputPlaces
 from origenerator.record_repair import repair_records
 
 GRAPH = {"3": {"class_type": "KSampler", "inputs": {"seed": 7}}}
@@ -47,7 +48,7 @@ def test_of_two_records_of_one_picture_the_one_whose_graph_it_carries_stays(tmp_
     _row(db, "made-it", filename="sdxl_t2i_00001_.png", graph=GRAPH)
     _row(db, "answered-from-cache", filename="sdxl_t2i_00001_.png", graph=OTHER_GRAPH)
 
-    assert repair_records(db, output_dir) == 1
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     assert _ids(db) == {"made-it"}
 
@@ -59,7 +60,7 @@ def test_the_earliest_record_stays_when_every_one_of_them_ran_the_same_graph(tmp
     _row(db, "first", filename="sdxl_t2i_00002_.png")
     _row(db, "sent-again", filename="sdxl_t2i_00002_.png")
 
-    assert repair_records(db, output_dir) == 1
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     assert _ids(db) == {"first"}
 
@@ -71,7 +72,7 @@ def test_a_folded_record_waits_in_the_trash_with_its_picture_left_alone(tmp_path
     _row(db, "first", filename="sdxl_t2i_00003_.png")
     _row(db, "repeat", filename="sdxl_t2i_00003_.png")
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     (held,) = db.list_deletions()
     assert held["prompt_id"] == "repeat"
@@ -87,7 +88,7 @@ def test_a_star_on_the_folded_record_stays_with_the_picture(tmp_path):
     _row(db, "repeat", filename="sdxl_t2i_00004_.png")
     db.set_generation_favorite("repeat", True)
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     assert db.get_generation("first")["starred"] == 1
 
@@ -103,7 +104,7 @@ def test_the_better_versions_of_the_folded_record_stay_with_the_picture(tmp_path
                          original_files=json.dumps([{"filename": "sdxl_t2i_00005_.png",
                                                      "subfolder": "image"}]))
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     kept = db.get_generation("first")
     assert json.loads(kept["enhance_history"]) == json.loads(levels)
@@ -119,7 +120,7 @@ def test_a_version_run_aimed_at_the_folded_record_follows_the_picture(tmp_path):
     _row(db, "making-a-better-one", status="running")
     db.set_enhance_target("making-a-better-one", "repeat")
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     assert db.get_generation("making-a-better-one")["enhance_of"] == "first"
 
@@ -133,7 +134,7 @@ def test_a_starred_folder_keyed_from_the_folded_record_keeps_its_star(tmp_path):
     db.upsert_folder_meta("sdxl_t2i/reapony/abc123", custom_name="Kept for later",
                           favorite=True, level="settings", ref_prompt_id="repeat")
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     (bookmark,) = db.folder_meta_full()
     assert bookmark["ref_prompt_id"] == "first"
@@ -150,7 +151,7 @@ def test_a_folder_of_your_own_holding_the_folded_record_holds_the_picture_still(
     folder_id = db.create_custom_folder("Mine")
     db.add_items_to_custom_folder(folder_id, ["repeat", "other"])
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     (record,) = db.list_custom_folders()
     assert record["items"] == ["first", "other"]
@@ -165,7 +166,7 @@ def test_a_folder_of_your_own_holding_both_records_of_one_picture_holds_it_once(
     folder_id = db.create_custom_folder("Mine")
     db.add_items_to_custom_folder(folder_id, ["first", "repeat"])
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     (record,) = db.list_custom_folders()
     assert record["items"] == ["first"]
@@ -180,7 +181,7 @@ def test_a_combine_made_from_the_folded_record_names_the_record_that_stays(tmp_p
     _row(db, "combined", status="running")
     db.set_recipe_source("combined", category="alpha", video_prompt_id="repeat")
 
-    repair_records(db, output_dir)
+    repair_records(db, OutputPlaces.in_one_folder(output_dir))
 
     combined = db.get_generation("combined")
     assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "first")
@@ -193,7 +194,7 @@ def test_a_run_that_finished_with_no_picture_is_dropped(tmp_path):
     _row(db, "made-a-picture", filename="sdxl_t2i_00008_.png")
     _row(db, "made-nothing")
 
-    assert repair_records(db, output_dir) == 1
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     assert _ids(db) == {"made-a-picture"}
     assert [held["prompt_id"] for held in db.list_deletions()] == ["made-nothing"]
@@ -206,7 +207,7 @@ def test_an_experiment_you_turned_down_keeps_its_record(tmp_path):
     _row(db, "turned-down", source="experiment")
     db.set_experiment_verdict("turned-down", "down")
 
-    assert repair_records(db, output_dir) == 0
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 0
 
     assert _ids(db) == {"turned-down"}
 
@@ -218,7 +219,7 @@ def test_a_record_whose_picture_is_gone_from_its_folder_is_dropped(tmp_path):
     _row(db, "still-there", filename="sdxl_t2i_00010_.png")
     _row(db, "picture-gone", filename="sdxl_t2i_00011_.png")
 
-    assert repair_records(db, output_dir) == 1
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     assert _ids(db) == {"still-there"}
     assert [held["prompt_id"] for held in db.list_deletions()] == ["picture-gone"]
@@ -231,7 +232,7 @@ def test_no_record_goes_when_the_folder_its_picture_lived_in_is_not_there(tmp_pa
     db = Database(tmp_path / "test.db")
     _row(db, "library-not-mounted", filename="sdxl_t2i_00012_.png")
 
-    assert repair_records(db, output_dir) == 0
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 0
 
     assert _ids(db) == {"library-not-mounted"}
 
@@ -243,7 +244,7 @@ def test_a_run_still_going_keeps_its_record(tmp_path):
     for status in ("pending", "running", "error"):
         _row(db, f"{status}-run", status=status)
 
-    assert repair_records(db, output_dir) == 0
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 0
 
     assert _ids(db) == {"pending-run", "running-run", "error-run"}
 
@@ -256,9 +257,9 @@ def test_a_second_pass_over_a_repaired_library_finds_nothing_to_do(tmp_path):
     _row(db, "repeat", filename="sdxl_t2i_00014_.png")
     _row(db, "made-nothing")
 
-    assert repair_records(db, output_dir) == 2
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 2
 
-    assert repair_records(db, output_dir) == 0
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 0
 
 
 def test_a_record_that_lists_its_picture_twice_lists_it_once(tmp_path):
@@ -269,7 +270,7 @@ def test_a_record_that_lists_its_picture_twice_lists_it_once(tmp_path):
     twice = json.loads(db.get_generation("listed-twice")["output_files"]) * 2
     db.update_generation("listed-twice", output_files=json.dumps(twice))
 
-    assert repair_records(db, output_dir) == 1
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     kept = json.loads(db.get_generation("listed-twice")["output_files"])
     assert [entry["filename"] for entry in kept] == ["sdxl_t2i_00015_.png"]
@@ -286,7 +287,7 @@ def test_a_record_that_also_holds_a_picture_of_its_own_keeps_it_and_stays(tmp_pa
         {"filename": "image_enhance_00016_.png", "subfolder": "image"},
         {"filename": "sdxl_t2i_00016_.png", "subfolder": "image"}]))
 
-    assert repair_records(db, output_dir) == 1
+    assert repair_records(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
     assert _ids(db) == {"made-the-enhanced-one", "its-name-was-reused"}
     kept = json.loads(db.get_generation("its-name-was-reused")["output_files"])

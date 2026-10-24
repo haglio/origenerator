@@ -6,7 +6,7 @@ from pathlib import Path
 
 from funestra.playlist import PlaylistItem
 
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
 from origenerator.media import MediaType
 
@@ -15,7 +15,7 @@ def playlist_item(path, media_type: str) -> PlaylistItem:
     path = Path(str(path))
     if media_type != MediaType.VIDEO:
         return PlaylistItem(path)
-    return PlaylistItem(path, funscript_of(path, output_dir=COMFYUI_OUTPUT_DIR))
+    return PlaylistItem(path, funscript_of(path, places=OUTPUT_PLACES))
 
 
 def slide_item(slide) -> PlaylistItem:

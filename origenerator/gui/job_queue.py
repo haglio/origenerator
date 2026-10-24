@@ -538,8 +538,10 @@ class JobQueue(QObject):
         except Exception as e:
             if self._key_of(job) is None:
                 return False  # canceled while out, and never taken: nothing to undo
-            if self._bring_up_comfyui is not None and comfyui_api.unreachable(e) and not closing:
-                self._wait_for_comfyui(job)
+            if comfyui_api.unreachable(e) and (closing or self._bring_up_comfyui is not None):
+                self._waiting.insert(0, job)
+                if not closing:
+                    self._wait_for_comfyui(job)
                 return False
             logger.warning("Re-roll submission failed for %s: %s", key, e)
             self._refuse(key, job, str(e))
@@ -559,7 +561,6 @@ class JobQueue(QObject):
         return True
 
     def _wait_for_comfyui(self, job: GenerationJob) -> None:
-        self._waiting.insert(0, job)
         if self._awaiting_comfyui:
             return
         self._awaiting_comfyui = True
@@ -606,6 +607,10 @@ class JobQueue(QObject):
             self._waiting.remove(job)
             if self._hand_over(job, closing=True):
                 handed += 1
+            elif self._waiting and self._waiting[0] is job:
+                logger.info("Left %d queued job(s) for the next launch: ComfyUI did not answer",
+                            len(self._waiting))
+                break
         if handed:
             logger.info("Handed ComfyUI %d queued job(s) as the app closed", handed)
         return handed

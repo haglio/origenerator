@@ -175,6 +175,7 @@ def _why_the_training_stopped(tail: bytes, log: str) -> str:
 
 
 def train(job: dict) -> None:
+    import json  # noqa: PLC0415
     from pathlib import Path  # noqa: PLC0415
 
     work = Path(job["work"])
@@ -186,7 +187,10 @@ def train(job: dict) -> None:
     code, tail = _train(job, str(images))
     if code != 0:
         raise Stopped(_why_the_training_stopped(tail, job["log"]))
-    _status(job, state="done", lora=f"{job['output_name']}.safetensors")
+    lora = f"{job['output_name']}.safetensors"
+    Path(job["trained"]).write_text(json.dumps({"photo_stamps": job["photo_stamps"], "lora": lora}),
+                                    encoding="utf-8")
+    _status(job, state="done", lora=lora)
 
 
 def _said_why(job: dict) -> bool:

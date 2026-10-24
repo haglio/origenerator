@@ -9,6 +9,7 @@ import subprocess
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path, PureWindowsPath
 
 from app_support.win32 import process_started
@@ -47,13 +48,42 @@ def training_photos(part) -> list[Path]:
     return [photo for folder in training_folders(part) for photo in photo_files(folder)]
 
 
+def photo_stamps(part) -> dict[str, list[int]]:
+    stamps = {}
+    for photo in training_photos(part):
+        found = photo.stat()
+        stamps[f"{photo.parent.name}/{photo.name}"] = [found.st_size, found.st_mtime_ns]
+    return stamps
+
+
+class TrainingState(Enum):
+    UNTRAINED = "untrained"
+    CURRENT = "current"
+    OUT_OF_DATE = "out of date"
+
+
+def _work_folder(part) -> Path:
+    return config.FIX_TRAINING_DIR / part.name
+
+
+def training_state(part) -> TrainingState:
+    try:
+        trained = json.loads((_work_folder(part) / "trained.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return TrainingState.UNTRAINED
+    if trained.get("photo_stamps") == photo_stamps(part):
+        return TrainingState.CURRENT
+    return TrainingState.OUT_OF_DATE
+
+
 def training_job(part, checkpoint: str, now: datetime) -> dict:
     models = config.COMFYUI_DIR / "models"
-    work = config.FIX_TRAINING_DIR / part.name
+    work = _work_folder(part)
     return {
         "part": part.name,
         "photos": [str(path) for path in training_photos(part)],
         "photos_folders": [str(folder) for folder in training_folders(part)],
+        "photo_stamps": photo_stamps(part),
         "detector": str(config.COMFYUI_DIR / detector_folder(part) / detector_for_part(part)),
         "caption": f"close-up photo of {part.name}",
         "base_model": str(models / "checkpoints" / checkpoint),
@@ -65,6 +95,7 @@ def training_job(part, checkpoint: str, now: datetime) -> dict:
         "log": str(work / "training.log"),
         "job_file": str(work / "job.json"),
         "process": str(work / "process.json"),
+        "trained": str(work / "trained.json"),
     }
 
 

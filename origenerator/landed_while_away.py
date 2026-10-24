@@ -18,7 +18,6 @@ from app_support.logging_utils import configure_logging, install_exception_loggi
 
 from origenerator import app_link, fix_training
 from origenerator.comfyui_api import ComfyUIApi
-from origenerator.completion import extract_completion, mark_generation_completed
 from origenerator.config import (
     COMFYUI_HOST,
     COMFYUI_PORT,
@@ -28,13 +27,12 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.db import Database
-from origenerator.gallery import parse_params
 from origenerator.generation_state import GenerationStatus
+from origenerator.inflight import take_in_what_landed
 from origenerator.notice_toast import raise_notice
 from origenerator.output_places import OutputPlaces
 from origenerator.run_notice import Notice, notice_for, outcome_of_row
 from origenerator.single_instance import Copies
-from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -54,19 +52,10 @@ def runs_in_flight(db) -> list[dict]:
 
 def take_what_landed(db, api, row: dict, *, places: OutputPlaces, thumb_dir: Path) -> Notice | None:
     """Record ``row`` if ComfyUI has finished it, and say what to announce."""
-    workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-    if workflow is None:
+    if not take_in_what_landed(db, api, row, places, thumb_dir):
         return None
-    prompt_id = row["prompt_id"]
-    history = api.fetch_history(prompt_id)  # empty until the prompt finishes
-    if not history:
-        return None
-    files, thumb, duration = extract_completion(
-        workflow, history, places, thumb_dir, prompt_id,
-        params=parse_params(row.get("params_json")))
-    mark_generation_completed(db, prompt_id, files, thumb, duration)
-    return notice_for(outcome_of_row(db.get_generation(prompt_id) or row,
-                                     ok=True, seconds=duration))
+    landed = db.get_generation(row["prompt_id"]) or row
+    return notice_for(outcome_of_row(landed, ok=True, seconds=landed.get("duration_seconds")))
 
 
 def training_notice(job: dict) -> Notice | None:

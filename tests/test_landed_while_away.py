@@ -111,6 +111,16 @@ def test_a_run_still_going_is_waited_out(tmp_path):
     assert [notice.title for notice in said] == ["Video ready"]
 
 
+def test_a_run_comfyui_ended_with_nothing_saved_is_not_written_down_as_finished(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _in_flight(db)
+
+    said = _watch(db, _Api({"vid": {"outputs": {}}}), tmp_path, patience_seconds=0)
+
+    assert said == []
+    assert db.get_generation("vid")["status"] == "running"
+
+
 @pytest.mark.parametrize(("landed", "over", "said"), [
     ({"vid": _landed()}, {}, "every run"),
     ({}, {"app_is_running": lambda: True}, "Origenerator is open again"),

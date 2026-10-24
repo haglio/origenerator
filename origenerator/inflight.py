@@ -23,12 +23,10 @@ this but the word. What it needs is the REST surface --
 """
 from __future__ import annotations
 
-import json
 import logging
-from datetime import UTC, datetime
 from pathlib import Path
 
-from origenerator.completion import extract_completion
+from origenerator.completion import extract_completion, mark_generation_completed
 from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationStatus
@@ -98,29 +96,27 @@ def reconcile_in_flight(db, client, places: OutputPlaces, thumb_dir: Path) -> di
     return summary
 
 
-def _reconcile_row(db, client, row, queued, places: OutputPlaces, thumb_dir: Path) -> str:
+def take_in_what_landed(db, client, row, places: OutputPlaces, thumb_dir: Path) -> bool:
     prompt_id = row["prompt_id"]
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-    history = _safe_history(client, prompt_id)
-    if workflow is not None and history:
-        files, thumb, duration = extract_completion(
-            workflow, history, places, thumb_dir, prompt_id,
-            params=parse_params(row.get("params_json")),
-        )
-        if files:
-            fields = dict(
-                status=GenerationStatus.COMPLETED,
-                output_files=json.dumps(files),
-                thumbnail_path=thumb,
-                completed_at=datetime.now(UTC).isoformat(),
-            )
-            if duration is not None:
-                fields["duration_seconds"] = duration
-            db.update_generation(prompt_id, **fields)
-            return "finalized"
-    if prompt_id in queued:
+    history = _safe_history(client, prompt_id) if workflow is not None else {}
+    if not history:
+        return False
+    files, thumb, duration = extract_completion(
+        workflow, history, places, thumb_dir, prompt_id,
+        params=parse_params(row.get("params_json")))
+    if not files:
+        return False
+    mark_generation_completed(db, prompt_id, files, thumb, duration)
+    return True
+
+
+def _reconcile_row(db, client, row, queued, places: OutputPlaces, thumb_dir: Path) -> str:
+    if take_in_what_landed(db, client, row, places, thumb_dir):
+        return "finalized"
+    if row["prompt_id"] in queued:
         return "running"  # still in flight; leave it for the UI to reconnect to
-    db.delete_generation(prompt_id)  # gone from the server with no output recorded
+    db.delete_generation(row["prompt_id"])  # gone from the server with no output recorded
     return "cleared"
 
 

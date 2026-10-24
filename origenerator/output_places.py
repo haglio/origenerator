@@ -76,6 +76,13 @@ class OutputPlaces:
     def working(self) -> Path:
         return self.comfyui / WORKING_FOLDER
 
+    def run(self, prompt_id: str) -> Path:
+        return self.working / prompt_id
+
+    def keeps_outputs_in_comfyuis_folder(self) -> bool:
+        return any(_parts_within(home, self.comfyui) is not None
+                   for home in (self.videos, *self._named().values()))
+
     def _named(self) -> dict[str, Path]:
         return {PICTURES: self.pictures, SCRIPTS: self.scripts, AUDIO: self.audio}
 

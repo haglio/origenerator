@@ -228,6 +228,14 @@ def _reconnect_to_running_generations(library: Library):
     reconcile_in_flight(library.db, library.client, library.places, library.thumb_dir)
 
 
+def _file_what_comfyui_left(library: Library):
+    from origenerator.gallery import is_in_progress
+    from origenerator.library_filing import file_what_comfyui_left
+
+    in_flight = {row["prompt_id"] for row in library.db.list_generations() if is_in_progress(row)}
+    return file_what_comfyui_left(library.places, in_flight=in_flight)
+
+
 def _follow_moved_files(library: Library):
     """Repoint every recorded output file the user has since moved on disk.
 
@@ -394,6 +402,9 @@ MAINTENANCE = (
              failure="Copying the records for backup failed: %s"),
     BootPass("Reconnecting to running generations...", _reconnect_to_running_generations,
              failure="Reconcile of in-flight generations failed: %s"),
+    BootPass(None, _file_what_comfyui_left,
+             counted="Filed %d file(s) ComfyUI had saved into the library",
+             failure="Filing what ComfyUI saved failed: %s"),
     BootPass("Finding files that moved...", _follow_moved_files,
              counted="Followed %d output file(s) to where they moved",
              failure="Relocating moved output files failed: %s"),

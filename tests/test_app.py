@@ -28,6 +28,7 @@ from origenerator.app import (
     _arm_the_crash_log,
     _configure_logging,
     _ensure_comfyui_server,
+    _file_what_comfyui_left,
     _fold_enhancements,
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
@@ -1186,6 +1187,7 @@ def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
 _MAINTENANCE_PASSES = (
     ("origenerator.records_copy", "copy_the_records"),
     ("origenerator.inflight", "reconcile_in_flight"),
+    ("origenerator.library_filing", "file_what_comfyui_left"),
     ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
@@ -1384,6 +1386,28 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
             runpy.run_module("origenerator", run_name="__main__")
 
     assert exit_.value.code == 3
+
+
+def test_the_launch_files_what_a_finished_run_left_and_leaves_a_run_still_going(tmp_path):
+    library_root = tmp_path / "library"
+    places = OutputPlaces(comfyui=tmp_path / "saves", pictures=library_root / "pictures",
+                          videos=library_root / "videos", scripts=library_root / "scripts",
+                          audio=library_root / "sounds")
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="going", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json="{}", workflow_json="{}")
+    db.update_generation("going", status="running")
+    for prompt_id in ("going", "gone"):
+        saved = places.run(prompt_id) / "image" / f"{prompt_id}_t2i_00001_.png"
+        saved.parent.mkdir(parents=True)
+        saved.write_bytes(b"png")
+    library = Library(db=db, client=None, places=places, thumb_dir=tmp_path / "thumbs",
+                      log_dir=tmp_path / "logs", inbox=None)
+
+    assert _file_what_comfyui_left(library) == 1
+
+    assert (places.pictures / "gone_t2i_00001_.png").is_file()
+    assert (places.run("going") / "image" / "going_t2i_00001_.png").is_file()
 
 
 # Every line the splash shows while the library is maintained, in order. The

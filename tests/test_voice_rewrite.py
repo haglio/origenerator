@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+from origenerator import local_llm
 from origenerator.voice import rewrite
 
 
@@ -33,14 +34,10 @@ def test_build_messages_carries_both_prompts_and_the_instruction():
     assert "a woman, tan" in content and "blurry" in content and "no tan lines" in content
 
 
-def test_parse_completion_extracts_the_json_object():
-    data = {"choices": [{"message": {"content": '{"positive": "a woman", "negative": "tan lines"}'}}]}
-    assert rewrite.parse_completion(data) == {"positive": "a woman", "negative": "tan lines"}
+def test_the_answer_asked_for_shows_no_dots_a_model_could_copy_back_as_a_prompt():
+    content = rewrite.build_messages("a woman, tan", "", "no tan lines", "SYSTEM")[1]["content"]
 
-
-def test_parse_completion_tolerates_fenced_or_wrapped_json():
-    data = {"choices": [{"message": {"content": 'Sure —\n```json\n{"positive": "a", "negative": "b"}\n```'}}]}
-    assert rewrite.parse_completion(data) == {"positive": "a", "negative": "b"}
+    assert "..." not in content and "…" not in content
 
 
 def test_a_rewrite_sends_both_prompts_and_answers_with_both():
@@ -51,7 +48,7 @@ def test_a_rewrite_sends_both_prompts_and_answers_with_both():
         captured["body"] = json.loads(request.data)
         return _reply('{"positive": "a woman", "negative": "tan lines"}')
 
-    with patch.object(rewrite.urllib.request, "urlopen", _fake_urlopen):
+    with patch.object(local_llm.urllib.request, "urlopen", _fake_urlopen):
         result = rewrite.rewrite_prompt(
             "a woman, tan", "", "no tan lines",
             base_url="http://localhost:11434/v1", model="dolphin", system_prompt="SYSTEM",
@@ -65,7 +62,7 @@ def test_a_rewrite_sends_both_prompts_and_answers_with_both():
 
 
 def test_rewrite_prompt_keeps_a_field_the_model_omits():
-    with patch.object(rewrite.urllib.request, "urlopen",
+    with patch.object(local_llm.urllib.request, "urlopen",
                       lambda request, timeout=None: _reply('{"positive": "a man"}')):
         positive, negative = rewrite.rewrite_prompt(
             "a woman", "existing negative", "make her a man",

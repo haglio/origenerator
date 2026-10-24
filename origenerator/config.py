@@ -194,4 +194,4 @@ VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time lis
 # listens to the liveliest input instead (`python -m sounddevice` lists the names).
 VOICE_DEVICE_NAME = "Brio"
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
-LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit edits
+LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"  # uncensored; a censored one refuses explicit edits

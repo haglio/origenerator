@@ -172,6 +172,23 @@ def test_a_term_the_rewrite_weights_at_nothing_is_taken_out():
     assert (revision.positive, revision.negative) == ("a woman, beach", "blurry")
 
 
+def test_a_rewrite_that_stands_dots_in_for_a_prompt_leaves_that_prompt_as_it_was():
+    revision = apply_request("A dog sits on a porch at sunset.", "", "bigger ears",
+                             rewrite=lambda positive, negative, words: (
+                                 "A dog with big ears sits on a porch at sunset.", "..."))
+
+    assert (revision.positive, revision.negative) == (
+        "A dog with big ears sits on a porch at sunset.", "")
+
+
+def test_a_rewrite_that_leaves_part_of_the_prompt_out_with_dots_is_no_answer():
+    revision = apply_request("A dog sits on a porch at sunset, warm light", "", "bigger ears",
+                             rewrite=lambda positive, negative, words: (
+                                 "A dog with bigger ears ... warm light", ""))
+
+    assert revision.positive == "A dog sits on a porch at sunset, warm light, bigger ears"
+
+
 def test_a_phrase_that_is_the_whole_term_is_dropped_by_the_rules_alone():
     def rewrite(positive, negative, words):
         raise AssertionError("not asked")

@@ -501,8 +501,8 @@ def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
 
 def test_set_generating_offers_cancel_and_leaves_generate_to_the_folder(panel):
     # This flag is about the tab's own run: Cancel appears. Whether Generate is
-    # pressable is the folder's business, and the gallery says so separately
-    # (note_folder_generating), so one item at a time per folder holds however the
+    # pressable is the folder's business, which the gallery answers separately
+    # (set_making_one_check), so one item at a time per folder holds however the
     # run was started.
     panel.set_generating(True)
     assert panel._cancel_btn.isHidden() is False
@@ -672,12 +672,17 @@ def _left_of_the_number(panel):
     return pair.grab().toImage().pixelColor(panel._how_many.x() + 4, pair.height() // 2)
 
 
+def _its_folder_is_making_one(panel):
+    panel.set_making_one_check(lambda _config: True)
+    panel.reread_generate_button()
+
+
 def test_generates_dropdown_wears_generates_blue_and_grays_out_with_it(panel, app_chrome):
     panel.show()
     QApplication.processEvents()
     assert _left_of_the_number(panel) == BLUE
 
-    panel.note_folder_generating(True)
+    _its_folder_is_making_one(panel)
 
     assert _left_of_the_number(panel) == BG_SECONDARY
 
@@ -694,7 +699,7 @@ def test_generates_dropdown_draws_its_arrow_in_generates_ink(panel, app_chrome):
     QApplication.processEvents()
     assert TEXT_PRIMARY.name() in _arrow_inks(panel._how_many)
 
-    panel.note_folder_generating(True)
+    _its_folder_is_making_one(panel)
 
     assert TEXT_MUTED.name() in _arrow_inks(panel._how_many)
 
@@ -3263,12 +3268,15 @@ def test_generate_is_off_while_its_folder_is_already_making_one(panel, qtbot):
     # His rule: one item at a time per folder. The app has been slow enough that
     # he double-clicks Generate to be sure the press took, and the second press
     # used to make a second picture nobody asked for.
-    panel.note_folder_generating(True)
+    panel.set_making_one_check(
+        lambda config: config.params["positive_prompt"] == "a folder making one")
+    prompt = panel._param_form._widgets["positive_prompt"]
 
+    prompt.setPlainText("a folder making one")
     assert panel._generate_btn.isEnabled() is False
     qtbot.waitUntil(lambda: "already making" in panel._generate_btn.toolTip())
 
-    panel.note_folder_generating(False)
+    prompt.setPlainText("a folder of its own")
     assert panel._generate_btn.isEnabled() is True
     qtbot.waitUntil(lambda: panel._generate_btn.toolTip() == "")
 

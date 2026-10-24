@@ -97,6 +97,12 @@ _SECTION_SPACING = 14
 SEARCH_DRAW_LIMIT = 200
 
 
+def play_once_made(pane: BrowserPane, prompt_id: str, movie_path: str) -> None:
+    tile = pane._thumb_widgets.get(prompt_id)
+    if tile is not None:
+        tile.play_moving_preview(movie_path)
+
+
 class BrowserScrollArea(QScrollArea):
     """The middle pane's scroll area, which says when a click landed on nothing.
 
@@ -1286,7 +1292,7 @@ class BrowserPane(QObject):
             return []
         actions = [CornerAction(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
                                 "Randomize video seed")]
-        if gallery.find_source_image_id(row, self._host.image_rows()) is not None:
+        if gallery.rebuildable_source_image(row, self._host.image_rows()) is not None:
             actions.append(CornerAction(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
                                         "Randomize image seed"))
         return actions

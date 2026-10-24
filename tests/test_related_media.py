@@ -13,6 +13,7 @@ import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor, QMouseEvent, QPixmap
 
+from origenerator.generation_state import GenerationSource
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.related_media import RelatedMedia
 
@@ -103,6 +104,24 @@ def test_the_start_picture_is_called_by_its_name_not_its_file(related):
     assert related._source_tile._name.text() == "3FA9C0D2 004"
 
 
+def _hidden_frame():
+    return {**_image_row("frame1", "frame1.jpg"), "source": GenerationSource.STARTING_FRAME}
+
+
+def test_a_video_another_source_made_from_words_alone_points_at_no_source(related):
+    video = {**_video_row(input_image="frame1.jpg"), "source": GenerationSource.OUTSIDE}
+
+    related.show_row(video, [_hidden_frame()])
+
+    assert related._source_section.isHidden()
+
+
+def test_a_video_made_here_from_a_hidden_starting_frame_points_back_at_the_frame(related):
+    related.show_row(_video_row(input_image="frame1.jpg"), [_hidden_frame()])
+
+    assert related._source_tile._prompt_id == "frame1"
+
+
 def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(make_related):
     related = make_related(_video_row("vid0"))
 
@@ -125,6 +144,18 @@ def test_an_image_lists_the_videos_it_was_animated_into(make_related):
     assert not related._animated_strip.isHidden()
     assert len(related._animated_strip.findChildren(_VideoTile)) == 1
     assert related._source_tile.isHidden()      # an image has no start frame
+
+
+def test_a_hidden_starting_frame_lists_only_the_videos_made_from_it_here(make_related):
+    frame = _hidden_frame()
+    taken_out_of = {**_video_row("vid1", input_image="frame1.jpg"),
+                    "source": GenerationSource.OUTSIDE}
+    related = make_related(taken_out_of, _video_row("vid2", input_image="frame1.jpg"))
+
+    related.show_row(frame, [frame])
+
+    assert [tile._prompt_id for tile in related._animated_strip.findChildren(_VideoTile)] == [
+        "vid2"]
 
 
 def test_a_requested_row_points_at_the_item_it_was_asked_about(related):

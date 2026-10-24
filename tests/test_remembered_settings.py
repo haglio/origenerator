@@ -55,7 +55,7 @@ def _tabs(view) -> list:
 REMEMBERED = {
     "generate_tabs": lambda view: [
         widget for panel in _tabs(view) for widget in _within(panel)
-        if widget is not panel._how_many and not panel._picture_state.isAncestorOf(widget)
+        if widget is not panel._how_many and not panel._action.isAncestorOf(widget)
     ] + [view._info_tabs.tabBar()],
     "how_many": lambda view: [panel._how_many for panel in _tabs(view)],
     "toc_sides": lambda view: [view._tree.separate_button, view._tree.together_button],
@@ -73,8 +73,8 @@ REMEMBERED = {
 NO_SETTING = {
     "what is being looked for, which is not a place to come back to": lambda view: [
         view._search.field, *_within(view._find_bar), *_within(view._folder_path)],
-    "what one picture shows, which the library keeps with the picture": lambda view: [
-        widget for panel in _tabs(view) for widget in _within(panel._picture_state)],
+    "what one item shows, which the library keeps with the item": lambda view: [
+        widget for panel in _tabs(view) for widget in _within(panel._action)],
     ("Auto-generate, which a restart leaves off, since a loop that came back on by itself"
      " could run unnoticed"): lambda view: [view._bank.auto],
 }

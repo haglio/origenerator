@@ -591,6 +591,15 @@ def _watch_for_fun_time(window, state_dir, library_state_dir):
     return watch
 
 
+def _look_for_other_sources_videos(db, app) -> None:
+    from origenerator.gui.outside_video_watch import OutsideVideoWatch
+    from origenerator.outside_videos import places_here
+
+    watch = OutsideVideoWatch(db, places_here, parent=app)
+    app.aboutToQuit.connect(watch.stop)
+    watch.start()
+
+
 def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     """Say which keys `content.local.json` is short of, and stop the launch.
 
@@ -862,6 +871,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     # Last, so a click that came in during the boot lands on a window that is
     # up and in front rather than on one still being built.
     clicked_notices.answer_with(window.go_to_generation)
+    _look_for_other_sources_videos(db, app)
 
     from origenerator.freeze_watch import watch_the_window
     if crash_log is not None:

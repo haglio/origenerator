@@ -51,6 +51,7 @@ from functools import lru_cache
 from origenerator import gallery
 from origenerator.content import load_content
 from origenerator.gallery.signatures import READINGS_KEPT
+from origenerator.generation_state import in_sight
 
 logger = logging.getLogger(__name__)
 
@@ -443,7 +444,7 @@ class GallerySearch:
         for row in rows:
             prompt_id = row.get("prompt_id")
             if not prompt_id or prompt_id in entries \
-                    or not gallery.produced_output(row):
+                    or not gallery.produced_output(row) or not in_sight(row):
                 continue
             folders = _folder_stems(folder_names.get(prompt_id, ()))
             known = self._entries.get(prompt_id)

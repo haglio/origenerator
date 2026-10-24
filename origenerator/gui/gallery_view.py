@@ -26,6 +26,7 @@ from shared_ui.tick_control import TickControl
 
 from origenerator import (
     gallery,
+    outside_videos,
     recovery,
     timing,
 )
@@ -89,6 +90,7 @@ from origenerator.gui.browser_pane import (
     LeadTiles,
     PaneHost,
     TreeNavigation,
+    play_once_made,
 )
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
@@ -128,6 +130,7 @@ from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
+from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.notice_overlay import ERROR, NOTICE
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
@@ -345,6 +348,10 @@ class GalleryView(QWidget):
                 cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
             ),
         )
+        self._moving_previews = MovingPreviews(self._actions.places,
+                                               self._actions.thumb_dir, parent=self)
+        self._moving_previews.made.connect(
+            lambda prompt_id, path: play_once_made(self._browser, prompt_id, path))
         # Derives the background experiments this gallery hands ComfyUI as the
         # app closes (the Experiments collection's switch): variations of the user's
         # own work, landing in that collection for review at the next launch.
@@ -860,7 +867,8 @@ class GalleryView(QWidget):
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time,
-                                       heights=self._prompt_heights, names=self._item_names)
+                                       heights=self._prompt_heights, names=self._item_names,
+                                       previews=self._moving_previews)
         # One OSR2 driver for the whole view, under the one global switch
         # (self.osr2_control): while that's on it follows whichever video is foreground —
         # an open slideshow, else whatever scripted video is in the front tab —
@@ -1975,10 +1983,6 @@ class GalleryView(QWidget):
             return _SearchScope((PathStep(gallery.ALL_LABEL, None),), self._live_ids)
         return _SearchScope(tuple(self._tree_view.path_steps(item)),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
-
-
-
-
 
     def search_sort(self) -> str:
         """The results order in force, for the session state to remember."""
@@ -3812,6 +3816,8 @@ class GalleryView(QWidget):
         for pid in prompt_ids:
             self._db.set_generation_favorite(pid, favorite)
         ids = set(prompt_ids)
+        outside_videos.tell_fun_time([row for row in self._listed_rows if row["prompt_id"] in ids],
+                                     favorite)
         for row in self._listed_rows:
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if favorite else 0
@@ -4256,12 +4262,11 @@ class GalleryView(QWidget):
         self._selected_row = row
 
     def animated_preview(self, row: dict) -> str | None:
-        """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
-        video whose file is gone or unreadable, so the tile shows its still instead.
-        Feeds the grid tiles and the Recents collection (the info pane's 'Animated in'
-        strip resolves the same path through :func:`gallery.animated_preview_path`)."""
-        return gallery.animated_preview_path(
-            row, self._actions.places, self._actions.thumb_dir)
+        """The looping-WebP preview for a video ``row`` once one is made — until then
+        ``None``, and the tile shows its still while one is made off the window's
+        thread and starts playing it when it is. Feeds the grid tiles, the Recents
+        collection and Combine's slots; the info pane's strip asks the same maker."""
+        return self._moving_previews.of(row)
 
     def follow_link(self, prompt_id: str):
         """Follow a link to another generation — a video's source image, an
@@ -4302,6 +4307,7 @@ class GalleryView(QWidget):
         the move is a stop at all is the caller's business: Back and Forward walk
         history rather than add to it, and suppress it around this.
         """
+        prompt_id = gallery.landing_for(prompt_id, self._listed_rows, self.image_config_index())
         item = self._folder_row_for(prompt_id)
         if item is not None:
             with self._navigation.off_the_record():
@@ -4345,9 +4351,6 @@ class GalleryView(QWidget):
     def _current_collection_key(self) -> str | None:
         key = self.selected_folder_key()
         return key if folder_collection(_base_of(key)) is not None else None
-
-
-
 
     def _clear_metadata(self):
         """Drop the gallery's selection: no saved generation is the selected

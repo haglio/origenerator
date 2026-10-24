@@ -207,6 +207,9 @@ class ThumbnailWidget(QWidget):
         self._enhance = enhance
         self._sync_controls()
 
+    def play_moving_preview(self, movie_path: str) -> None:
+        play_in(self._image_label, movie_path, _IMAGE_SIZE)
+
     def set_favorite(self, favorite: bool):
         self._favorite = favorite
         self._sync_controls()

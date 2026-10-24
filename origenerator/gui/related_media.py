@@ -27,13 +27,14 @@ from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.config import OUTPUT_PLACES, THUMB_DIR
 from origenerator.gallery import (
-    animated_preview_path,
-    find_source_image_id,
     media_type_of_row,
+    source_image_of,
     videos_from_source_image,
+    was_made_from,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
 
@@ -52,7 +53,8 @@ class RelatedMedia(QWidget):
 
     def __init__(self, parent=None, *, video_rows=None,
                  row_of: Callable[[str], dict | None],
-                 name_of: Callable[[str], str]):
+                 name_of: Callable[[str], str],
+                 previews: MovingPreviews | None = None):
         """``video_rows`` answers the library's videos, and is asked only for a
         row that could have animations, or is a cycle cut out of one of them —
         which is why it is a call rather than a list. Reading it is a whole-table
@@ -63,6 +65,10 @@ class RelatedMedia(QWidget):
         self._video_rows = video_rows or (list)
         self._row_of = row_of
         self._name_of = name_of
+        self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
+        self._previews.made.connect(self._show_made_preview)
+        self._shown: dict | None = None
+        self._in_strip: set[str] = set()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)
@@ -101,7 +107,10 @@ class RelatedMedia(QWidget):
         self._source_section.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         # Hides itself when empty, which for anything but an animated image it is.
-        self._animated_strip.show_videos(self._animated_items(row))
+        self._shown = row
+        items = self._animated_items(row)
+        self._in_strip = {item[0] for item in items}
+        self._animated_strip.show_videos(items)
 
     def is_source_folded(self) -> bool:
         return self._source_section.is_collapsed()
@@ -111,6 +120,7 @@ class RelatedMedia(QWidget):
 
     def clear(self) -> None:
         """Put every link down — the tab has no generation on display."""
+        self._shown, self._in_strip = None, set()
         self._source_tile.clear()
         self._source_video_tile.clear()
         self._source_section.hide()
@@ -162,12 +172,9 @@ class RelatedMedia(QWidget):
                          if v.get("prompt_id") == cut_from), None)
             if clip is not None:
                 return clip, "Trimmed from", MediaType.VIDEO
-        source_id = find_source_image_id(row, image_rows)
-        if source_id:
-            frame = next(
-                (r for r in image_rows if r.get("prompt_id") == source_id), None)
-            if frame is not None:
-                return frame, None, MediaType.IMAGE
+        frame = source_image_of(row, image_rows)
+        if frame is not None and was_made_from(row, frame):
+            return frame, None, MediaType.IMAGE
         if request is not None and request.get("source_row"):
             asked_about = request["source_row"]
             return asked_about, "Requested from", media_type_of_row(asked_about)
@@ -187,7 +194,10 @@ class RelatedMedia(QWidget):
             logger.info("Image %s has %d animations; showing the first %d",
                         row["prompt_id"], len(videos), ANIMATED_STRIP_LIMIT)
         return [
-            (v["prompt_id"], animated_preview_path(v, OUTPUT_PLACES, THUMB_DIR),
-             v.get("thumbnail_path"))
+            (v["prompt_id"], self._previews.of(v), v.get("thumbnail_path"))
             for v in videos[:ANIMATED_STRIP_LIMIT]
         ]
+
+    def _show_made_preview(self, prompt_id: str, _path: str) -> None:
+        if prompt_id in self._in_strip:
+            self._animated_strip.show_videos(self._animated_items(self._shown))

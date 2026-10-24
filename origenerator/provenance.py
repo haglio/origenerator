@@ -19,6 +19,7 @@ from app_support import provenance as family
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 from origenerator import gallery
+from origenerator.generation_state import made_here
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
 
 APP = "origenerator"
@@ -150,7 +151,7 @@ def stamp_unstamped(db, *, history=_source_history) -> int:
     launches = _launches(rows)
     blocks = {}
     for row in rows:
-        if row["provenance"] is None:
+        if row["provenance"] is None and made_here(row):
             block = _block_for(row, landings, launches)
             if block is not None:
                 blocks[row["prompt_id"]] = json.dumps(block)

@@ -8,11 +8,16 @@ read-only, so tests/test_db_schema.py holds them.
 """
 from __future__ import annotations
 
+import json
 import threading
 
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS
-from origenerator.generation_state import GenerationSource, GenerationStatus
+from origenerator.generation_state import (
+    MADE_ELSEWHERE,
+    GenerationSource,
+    GenerationStatus,
+)
 
 #: The columns :meth:`GenerationStore.update_generation` writes: a job's
 #: lifecycle, from queued to finished or failed. Everything else on the row is
@@ -33,6 +38,16 @@ SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
 _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
+_MADE_HERE = f"source NOT IN ({', '.join('?' * len(MADE_ELSEWHERE))})"
+
+
+def library_paths_in(output_files: str | None) -> set[str]:
+    try:
+        files = json.loads(output_files or "[]")
+    except (ValueError, TypeError):
+        return set()
+    return {file["library_path"] for file in files
+            if isinstance(file, dict) and file.get("library_path")} if isinstance(files, list) else set()
 
 
 class GenerationStore(Store):
@@ -187,6 +202,17 @@ class GenerationStore(Store):
                 [(block, prompt_id) for prompt_id, block in blocks.items()],
             )
 
+    def set_recorded_fields(self, rows: list[dict]):
+        with self._connect() as conn:
+            conn.executemany(
+                "UPDATE generations SET source = :source, workflow_name = :workflow_name,"
+                " params_json = :params_json,"
+                " positive_prompt = :positive_prompt, negative_prompt = :negative_prompt,"
+                " seed = :seed, recipe_category = :recipe_category, created_at = :created_at,"
+                " completed_at = :completed_at WHERE prompt_id = :prompt_id",
+                rows,
+            )
+
     def set_generation_favorite(self, prompt_id: str, favorite: bool):
         """Favorite (or unfavorite) one generation — the user's per-item bookmark.
 
@@ -208,6 +234,9 @@ class GenerationStore(Store):
         """Record what a still picture was sorted as showing, or ``None`` to take
         the sorting back, which puts it among the ones still to be looked at."""
         self._set(prompt_id, "picture_state", state or None)
+
+    def set_act(self, prompt_id: str, act: str | None):
+        self._set(prompt_id, "recipe_category", act or None)
 
     def set_shielded(self, prompt_id: str, shielded: bool):
         self._set(prompt_id, "shielded", 1 if shielded else 0)
@@ -291,8 +320,9 @@ class GenerationStore(Store):
                      AND duration_seconds IS NULL
                      AND completed_at IS NOT NULL
                      AND {_OF_A_KNOWN_SOURCE}
+                     AND {_MADE_HERE}
                    ORDER BY id""",
-                (GenerationStatus.COMPLETED, *_KNOWN_SOURCES),
+                (GenerationStatus.COMPLETED, *_KNOWN_SOURCES, *MADE_ELSEWHERE),
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -327,13 +357,17 @@ class GenerationStore(Store):
         ``row`` — including the original ``id`` and ``created_at`` — so an undone
         deletion reappears in its former gallery position rather than on top.
         """
-        cols = [c for c in GENERATION_COLUMNS if c in row]
-        placeholders = ", ".join("?" for _ in cols)
+        self.insert_rows([row])
+
+    def insert_rows(self, rows: list[dict]):
         with self._connect() as conn:
-            conn.execute(
-                f"INSERT INTO generations ({', '.join(cols)}) VALUES ({placeholders})",
-                [row[c] for c in cols],
-            )
+            for row in rows:
+                cols = [c for c in GENERATION_COLUMNS if c in row]
+                conn.execute(
+                    f"INSERT INTO generations ({', '.join(cols)})"
+                    f" VALUES ({', '.join('?' for _ in cols)})",
+                    [row[c] for c in cols],
+                )
 
     def get_generation(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:
@@ -352,11 +386,18 @@ class GenerationStore(Store):
             if self._listed is None or self._listed[0] != version:
                 with self._connect() as conn:
                     rows = conn.execute(
-                        f"SELECT * FROM generations WHERE {_OF_A_KNOWN_SOURCE} ORDER BY id DESC",
-                        _KNOWN_SOURCES,
+                        f"SELECT * FROM generations WHERE {_OF_A_KNOWN_SOURCE}"
+                        " AND source != ? ORDER BY id DESC",
+                        (*_KNOWN_SOURCES, GenerationSource.LEFT_OUT),
                     ).fetchall()
                 self._listed = (version, [dict(r) for r in rows])
             return [dict(r) for r in self._listed[1]]
+
+    def library_paths(self) -> set[str]:
+        with self._connect() as conn:
+            lists = conn.execute("SELECT output_files FROM generations"
+                                 " WHERE output_files LIKE '%library_path%'").fetchall()
+        return {path for files in lists for path in library_paths_in(files[0])}
 
     def seed_history_rows(self) -> list[dict]:
         with self._connect() as conn:

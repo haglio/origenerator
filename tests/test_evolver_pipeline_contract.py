@@ -18,7 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from origenerator import config, evolver_export
+from origenerator import config, evolver_export, outside_videos
+from origenerator.generation_state import GenerationSource
 
 CONTRACT = Path("evolver") / "evolver_contract.json"
 
@@ -59,3 +60,27 @@ def test_a_copy_still_being_written_wears_the_name_evolver_walks_past():
     partial = evolver_export.partial_name(Path("some-clip.mp4"))
 
     assert marker in partial.name
+
+
+def test_a_star_this_app_journals_is_a_line_evolver_carries_into_fun_times_favorites(tmp_path):
+    """Evolver's favorites stage reads every journal in the folder it publishes,
+    in the fields it publishes, so a star set on another source's video here
+    reaches Fun Time's list the way the phone's favorites do."""
+    promise = _promise()
+    journals = promise["journals"]
+    video = (config.LIBRARY_ROOT / Path(promise["library_relative"]["upscaled_dir"])
+             / "portrait" / "a-site" / "c1_topaz.mp4")
+    places = outside_videos.Places(
+        upscaled_dir=video.parents[2], records_folder=tmp_path, frames_dir=tmp_path,
+        thumb_dir=tmp_path, skip_sources=frozenset(), library_root=config.LIBRARY_ROOT,
+        journal=tmp_path / outside_videos.JOURNAL_NAME)
+    row = {"source": GenerationSource.OUTSIDE,
+           "output_files": json.dumps([{"filename": video.name, "library_path": str(video)}])}
+
+    outside_videos.journal_stars(places, [row], True)
+    outside_videos.journal_stars(places, [row], False)
+
+    lines = [json.loads(line) for line in places.journal.read_text(encoding="utf-8").splitlines()]
+    assert all(set(line) == set(journals["fields"]) for line in lines)
+    assert [line["event"] for line in lines] == journals["favorite_events"]
+    assert {config.LIBRARY_ROOT / Path(line["path"]) for line in lines} == {video}

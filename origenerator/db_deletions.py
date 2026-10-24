@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 
 from origenerator.db_connection import Store
+from origenerator.db_generations import library_paths_in
 from origenerator.generation_state import GenerationSource, source_of
 
 
@@ -58,6 +59,13 @@ class DeletionStore(Store):
             ).fetchone()
             deletion = _deletion(record) if record else None
             return deletion if deletion is not None and _of_a_known_source(deletion) else None
+
+    def binned_library_paths(self) -> set[str]:
+        with self._connect() as conn:
+            held = conn.execute("SELECT row_json FROM deletions"
+                                " WHERE row_json LIKE '%library_path%'").fetchall()
+        return {path for record in held
+                for path in library_paths_in(json.loads(record[0]).get("output_files"))}
 
     def forget_deletion(self, prompt_id: str):
         """Drop a held deletion — the item was restored or purged."""

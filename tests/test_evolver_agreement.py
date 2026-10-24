@@ -105,6 +105,22 @@ class TestWhenThereIsNoEvolver:
         assert "evolver_contract.json" in said[0]
 
 
+def _publishing(tmp_path: Path, **sections) -> Path:
+    checkout = _evolver(tmp_path)
+    document = json.loads((checkout / "evolver_contract.json").read_text(encoding="utf-8"))
+    (checkout / "evolver_contract.json").write_text(json.dumps({**document, **sections}),
+                                                    encoding="utf-8")
+    return checkout
+
+
+class TestTheFoldersEvolverPublishesForTheOtherApps:
+    def test_every_videos_record_is_under_the_folder_it_names(self, tmp_path: Path):
+        checkout = _publishing(tmp_path, library_record={"folder": "videos/records"})
+
+        assert evolver_agreement.records_folder(checkout, Path("L:/library")) == Path(
+            "L:/library/videos/records")
+
+
 class TestWhatTheAppCompares:
     def test_our_side_is_read_off_this_app_s_own_config(self):
         """The record the check is given is built from config, so a value renamed

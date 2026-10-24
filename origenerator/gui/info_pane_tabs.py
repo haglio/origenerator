@@ -35,10 +35,11 @@ from origenerator.gui.copy_names import offer_copy_names
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.how_many import HOW_MANY
+from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import workflow_named
 
 
 class SavedTab(NamedTuple):
@@ -65,7 +66,7 @@ def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
         if not isinstance(entry, dict):
             continue
         snapshot = ConfigSnapshot.from_dict(entry.get("config") or {})
-        if snapshot.workflow_name not in WORKFLOW_REGISTRY:
+        if workflow_named(snapshot.workflow_name) is None:
             continue
         launched = entry.get("launched_runs")
         layout = entry.get("layout")
@@ -92,8 +93,10 @@ class InfoPaneTabs(QTabWidget):
     folder_requested = pyqtSignal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
-                 *, fun_time=None, heights=None, names: ItemNames | None = None):
+                 *, fun_time=None, heights=None, names: ItemNames | None = None,
+                 previews: MovingPreviews | None = None):
         super().__init__(parent)
+        self._previews = previews
         self._heights = heights  # the window's prompt heights, for its panels
         self._client = client
         # The hosting session, or None standalone: a tab lays its picture out
@@ -182,7 +185,7 @@ class InfoPaneTabs(QTabWidget):
         """
         panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time,
                                     heights=self._heights, library=self._library,
-                                    names=self._names)
+                                    names=self._names, previews=self._previews)
         index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
         # Editing anything in a tab keeps it, the way a double-click on its name

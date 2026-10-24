@@ -20,6 +20,10 @@ def test_an_item_is_named_by_its_folders_code_and_its_number_in_three_digits():
     assert item_name(ItemNumber(FOLDER, 7)) == f"{folder_id(FOLDER)} 007"
 
 
+def test_an_item_numbered_past_999_is_named_999():
+    assert item_name(ItemNumber(FOLDER, 1234)) == f"{folder_id(FOLDER)} 999"
+
+
 def test_the_widest_name_an_item_can_wear_is_made_of_the_widest_characters():
     widths = {"D": 3, "8": 2}
 

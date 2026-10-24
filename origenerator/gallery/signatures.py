@@ -15,7 +15,7 @@ from functools import cache, lru_cache
 
 from origenerator.file_refs import frame_name, reference_basename, unannotated
 from origenerator.media import MediaType
-from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
+from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY, workflow_named
 from origenerator.workflows.model_files import is_no_lora
 
 READINGS_KEPT = 20_000
@@ -27,8 +27,8 @@ READINGS_KEPT = 20_000
 # the raw filename keeps a video with its own re-rolls; the *configuration* that
 # produced the frame is added back by :func:`settings_signature` so videos built
 # from differently configured frames still split. See :func:`_input_image_config`.
-# This static set serves only rows with no registered workflow (imports), where
-# there's no template to ask; a registered row's instance keys are derived from
+# This static set serves only rows with no known workflow (imports), where
+# there's no template to ask; a known row's instance keys are derived from
 # its declared seed params instead (:func:`_workflow_instance_keys`), so a
 # workflow growing a seed can't silently start splitting folders by it.
 INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
@@ -38,8 +38,8 @@ INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 # one folder. An enhancement is a finish applied to an image, not a different
 # image: the standalone enhancer already folds its result onto the row it
 # upgrades without moving it, and the workflows' inline ``enhance`` toggle means
-# the same thing. This static set serves rows with no registered workflow
-# (imports); a registered row's keys come from its template instead
+# the same thing. This static set serves rows with no known workflow
+# (imports); a known row's keys come from its template instead
 # (:meth:`WorkflowTemplate.enhance_keys`), so a workflow growing another enhance
 # setting can't silently start splitting folders by it.
 ENHANCE_KEYS = frozenset({"enhance", "enhance_scale", "enhance_steps", "enhance_denoise"})
@@ -85,7 +85,7 @@ def _registered(workflow_name: str | None):
 
 def _grouping_version(workflow_name: str | None, workflow_version: str | None) -> str:
     """The workflow generation a row groups under: its stored version when that
-    names a concrete one, else the workflow's current registered version.
+    names a concrete one, else the workflow's current version.
 
     Folding this into the settings key is what puts different generations of a
     workflow in different folders. When a workflow's recipe changes (a v002 SDXL
@@ -99,41 +99,45 @@ def _grouping_version(workflow_name: str | None, workflow_version: str | None) -
     """
     if workflow_version and workflow_version not in UNRECORDED_VERSIONS:
         return workflow_version
-    wf = _registered(workflow_name)
+    wf = workflow_named(workflow_name)
     return wf.version if wf else ""
 
 
 @cache
 def _workflow_instance_keys(workflow_name: str) -> frozenset:
-    """A registered workflow's per-instance keys: every seed param it declares
+    """A workflow's per-instance keys: every seed param it declares
     (sampler and foley alike — a variation re-rolls them all), every seed a
     recipe carries without a field for it, and the start frame. Cached because
     ``seed_keys()`` walks ``param_definitions()``, which scans the model
     directories."""
-    return frozenset(_registered(workflow_name).seed_keys()) | INSTANCE_KEYS
+    return frozenset(workflow_named(workflow_name).seed_keys()) | INSTANCE_KEYS
 
 
 @cache
 def _workflow_enhance_keys(workflow_name: str) -> frozenset:
-    """A registered workflow's enhancement-layer keys (see :data:`ENHANCE_KEYS`).
+    """A workflow's enhancement-layer keys (see :data:`ENHANCE_KEYS`).
     Cached for the same reason as :func:`_workflow_instance_keys` — it too walks
     ``param_definitions()``."""
-    return frozenset(_registered(workflow_name).enhance_keys())
+    return frozenset(workflow_named(workflow_name).enhance_keys())
 
 
 def workflow_enhance_keys(workflow_name: str | None) -> frozenset:
     """The param keys that configure ``workflow_name``'s enhancement rather than
     its recipe, falling back to the static :data:`ENHANCE_KEYS` for a workflow
-    with no registered template."""
-    wf = _registered(workflow_name)
+    with no template."""
+    wf = workflow_named(workflow_name)
     return _workflow_enhance_keys(workflow_name) if wf is not None else ENHANCE_KEYS
 
 
+def made_from_a_picture(workflow_name: str | None) -> bool:
+    wf = workflow_named(workflow_name)
+    return wf is not None and wf.starts_from_a_picture()
+
+
 def is_image_conditioned(workflow_name: str | None) -> bool:
-    """True when a workflow drives its output from an ``input_image`` — an i2v
-    whose start frame is itself (usually) a generation with its own settings."""
-    wf = _registered(workflow_name)
-    return wf is not None and "input_image" in wf.default_params()
+    """True when one of this app's workflows drives its output from an
+    ``input_image`` — an i2v whose start frame is itself (usually) a generation."""
+    return _registered(workflow_name) is not None and made_from_a_picture(workflow_name)
 
 
 def rerollable(row: dict) -> bool:
@@ -145,20 +149,19 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
     """The settings that place a row in a folder, normalized so a row's provenance
     can't split it from its own re-roll.
 
-    For a registered workflow this is exactly its non-instance ``default_params``
+    For a known workflow this is exactly its non-instance ``default_params``
     keys, valued from the row where present and the workflow default otherwise —
     so a sparse import (which recorded only a few keys) and a full re-roll of it
     (``prepared_params`` fills every default) hash the same, and stored keys the
     workflow doesn't define (an i2v import's in-graph-derived ``width``/``height``,
-    raw sampler-node fields) never split a folder. Falls back to dropping only the
-    per-instance and enhancement keys when the workflow is unknown — there are then
-    no defaults to normalize against.
+    raw sampler-node fields) never split a folder. An unknown workflow is placed
+    by everything but the per-instance and enhancement keys.
 
     The enhancement layer (:data:`ENHANCE_KEYS`) is dropped alongside the
     per-instance keys: whether a render ran the enhance tail, and how, doesn't
     make it a different image.
     """
-    wf = _registered(workflow_name)
+    wf = workflow_named(workflow_name)
     if wf is None:
         return {k: v for k, v in settings_only(params).items() if k not in ENHANCE_KEYS}
     ungrouped = _workflow_instance_keys(workflow_name) | _workflow_enhance_keys(workflow_name)
@@ -203,7 +206,7 @@ def workflow_output_type(workflow_name: str | None) -> str | None:
 
 def workflow_model_keys(workflow_name: str | None) -> tuple[str, ...]:
     """The param keys whose values name the model a workflow's row ran with."""
-    wf = _registered(workflow_name)
+    wf = workflow_named(workflow_name)
     return tuple(wf.model_keys) if wf else ()
 
 
@@ -213,7 +216,7 @@ def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
     Empty for a workflow with no LoRA; every row then shares one empty signature,
     collapsing the model folder's LoRA level to a single "(no LoRA)" folder.
     """
-    wf = _registered(workflow_name)
+    wf = workflow_named(workflow_name)
     return tuple(wf.lora_keys) if wf else ()
 
 
@@ -263,7 +266,7 @@ _frame_name = frame_name
 def _outputs_video(workflow_name: str | None) -> bool:
     """True when a workflow's results are videos — the one kind whose folders grow
     a source-image tier under their LoRA folders."""
-    wf = _registered(workflow_name)
+    wf = workflow_named(workflow_name)
     return wf is not None and wf.output_type == MediaType.VIDEO
 
 
@@ -365,7 +368,7 @@ def folder_signature(
 
 def _frame_of(workflow_name: str | None, params_json: str | None,
               image_index: dict | None) -> str | None:
-    if not is_image_conditioned(workflow_name):
+    if not made_from_a_picture(workflow_name):
         return None
     return _input_image_config(_input_image_of(params_json), image_index,
                                identify=_outputs_video(workflow_name))

@@ -89,6 +89,9 @@ class Database:
     def set_provenance(self, blocks: dict[str, str]):
         return self.generations.set_provenance(blocks)
 
+    def set_recorded_fields(self, rows: list[dict]):
+        return self.generations.set_recorded_fields(rows)
+
     def set_generation_favorite(self, prompt_id: str, favorite: bool):
         return self.generations.set_generation_favorite(prompt_id, favorite)
 
@@ -97,6 +100,9 @@ class Database:
 
     def set_picture_state(self, prompt_id: str, state: str | None):
         return self.generations.set_picture_state(prompt_id, state)
+
+    def set_act(self, prompt_id: str, act: str | None):
+        return self.generations.set_act(prompt_id, act)
 
     def set_shielded(self, prompt_id: str, shielded: bool):
         return self.generations.set_shielded(prompt_id, shielded)
@@ -130,6 +136,12 @@ class Database:
 
     def restore_generation(self, row: dict):
         return self.generations.restore_generation(row)
+
+    def insert_rows(self, rows: list[dict]):
+        return self.generations.insert_rows(rows)
+
+    def library_paths(self) -> set[str]:
+        return self.generations.library_paths()
 
     def get_generation(self, prompt_id: str) -> dict | None:
         return self.generations.get_generation(prompt_id)
@@ -183,6 +195,9 @@ class Database:
     def forget_deletion(self, prompt_id: str):
         return self.deletions.forget_deletion(prompt_id)
 
+    def binned_library_paths(self) -> set[str]:
+        return self.deletions.binned_library_paths()
+
     # --- item numbers (see origenerator.db_item_numbers) ---------------------
 
     def list_item_numbers(self) -> dict[str, tuple[str, int]]:
@@ -190,6 +205,9 @@ class Database:
 
     def record_item_numbers(self, numbers: Mapping[str, tuple[str, int]]):
         return self.item_numbers.record_item_numbers(numbers)
+
+    def forget_item_numbers(self, prompt_ids: list[str]):
+        return self.item_numbers.forget_item_numbers(prompt_ids)
 
     # --- spoken requests (see origenerator.db_requests) ----------------------
 

@@ -22,6 +22,7 @@ from origenerator.workflows import (
     WORKFLOW_REGISTRY,
     base,
     offered_workflows,
+    workflow_named,
 )
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
@@ -42,6 +43,7 @@ from origenerator.workflows.frame_rate import (
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
 from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
 from origenerator.workflows.model_files import NO_LORA
+from origenerator.workflows.outside import VideoKind, outside_workflow
 from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
@@ -1010,6 +1012,8 @@ def test_a_tab_that_makes_nothing_yet_is_offered_the_workflows_of_both_kinds():
 
 def test_every_workflow_name_says_t2i_i2v_and_t2v_rather_than_spelling_them_out():
     names = [wf.display_name for wf in WORKFLOW_REGISTRY.values()]
+    names += [workflow_named(outside_workflow("a-site", MediaType.VIDEO, kind)).display_name
+              for kind in VideoKind]
     spelled_out = re.compile(r"text-to-image|image-to-video|text-to-video", re.IGNORECASE)
     assert [name for name in [*names, *RETIRED_WORKFLOW_NAMES.values()]
             if spelled_out.search(name)] == []

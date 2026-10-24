@@ -21,3 +21,8 @@ class ItemNumberStore(Store):
                 " VALUES (?, ?, ?)",
                 [(prompt_id, key, number) for prompt_id, (key, number) in numbers.items()],
             )
+
+    def forget_item_numbers(self, prompt_ids: list[str]):
+        with self._connect() as conn:
+            conn.executemany("DELETE FROM item_numbers WHERE prompt_id = ?",
+                             [(prompt_id,) for prompt_id in prompt_ids])

@@ -41,6 +41,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
 from origenerator import animation_paths
 from origenerator.content import genau_flick_word
+from origenerator.gui.action_picker import ACTION_LABEL
 from origenerator.gui.drop_slot import DropSlot, DropZone
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.generate_button import (
@@ -49,7 +50,6 @@ from origenerator.gui.generate_button import (
     GenerateButton,
 )
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
-from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.media import MediaType
 from origenerator.recipe_match import GENAU, VIDEO

@@ -25,6 +25,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
+from origenerator.gallery import media_type_of_row as gallery_media_type
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
@@ -33,7 +34,6 @@ from origenerator.gui import corner_controls, icons
 from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
-from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
@@ -43,6 +43,8 @@ from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
+from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
+from origenerator.recipe_match import CATEGORIES
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
@@ -280,7 +282,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     The failure this exists for: a row layout squeezed them past their minimum and
     clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
     """
-    panel._sent_note.setText(export_lane_module.EVOLVER.sent_caption)
+    panel._sent_note.setText(export_lane_module.KINO.sent_caption)
     buttons = [panel._sent_row, panel._cancel_btn, panel._generate_btn.parentWidget()]
     for button in buttons:
         button.show()          # the busiest the bank ever is: every button on
@@ -569,7 +571,7 @@ def test_a_video_tabs_seed_dropdown_plays_the_videos_it_lists(blank_panel, qtbot
     panel = blank_panel
     _video_row(panel._db, noise_seed=30)
     clip = looping_clip(tmp_path)
-    monkeypatch.setattr(gcp_module, "animated_preview_path",
+    monkeypatch.setattr(gallery, "animated_preview_if_made",
                         lambda row, *_folders: clip if row["prompt_id"] == "vid1" else None)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     field = panel._param_form._widgets["noise_seed"]
@@ -1799,7 +1801,7 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     _video_row(db, "vid1", input_image="sdxl_img1.png")
-    monkeypatch.setattr(related_media_module, "animated_preview_path", lambda r, o, t: None)
+    monkeypatch.setattr(gallery, "make_animated_preview", lambda r, o, t: None)
     image_rows = [image]
 
     panel.show_saved_generation(image, image_rows)
@@ -1815,7 +1817,7 @@ def test_showing_an_image_footer_tile_click_emits_animated_activated(saved_panel
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     _video_row(db, "vid1", input_image="sdxl_img1.png")
-    monkeypatch.setattr(related_media_module, "animated_preview_path", lambda r, o, t: None)
+    monkeypatch.setattr(gallery, "make_animated_preview", lambda r, o, t: None)
     panel.show_saved_generation(image, [image])
     got = []
     panel.animated_activated.connect(got.append)
@@ -1840,6 +1842,24 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
     assert panel._related._source_tile._prompt_id == "img1"   # the tile points at that image
     assert panel._related._source_tile._name.text() == name   # called by its name, not its file
     assert panel._related._animated_strip.isHidden()    # a video isn't animated into anything
+
+
+def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, monkeypatch,
+                                                                    tmp_path):
+    panel, db = saved_panel
+    file = tmp_path / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
+    file.parent.mkdir(parents=True)
+    file.write_bytes(b"not really a video")
+    db.insert_rows(rows_bringing_in(
+        OutsideVideo(file, "a-site"), Record(), frames_dir=tmp_path / "frames",
+        thumb_dir=tmp_path / "thumbs", grab=lambda _path: Image.new("RGB", (64, 96))))
+    [video] = [row for row in db.list_generations()
+               if gallery_media_type(row) == MediaType.VIDEO]
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (file, "video"))
+
+    panel.show_saved_generation(video, [])
+
+    assert panel._lane_button.isHidden() and panel._sent_row.isHidden()
 
 
 def test_video_source_tile_click_emits_source_activated(saved_panel, monkeypatch):
@@ -1925,7 +1945,7 @@ def test_osr2_drive_target_is_none_for_an_image(saved_panel, monkeypatch):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="i.png")
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (Path("C:/i.png"), "image"))
-    monkeypatch.setattr(related_media_module, "animated_preview_path", lambda r, o, t: None)
+    monkeypatch.setattr(gallery, "make_animated_preview", lambda r, o, t: None)
     panel.show_saved_generation(image, [image])
 
     assert panel.osr2_drive_target() is None
@@ -2894,9 +2914,9 @@ def _lane_offers(panel):
 
 
 @pytest.mark.parametrize(("workflow", "offer"), [(_LOOP, "→ Send to Genau"),
-                                                 ("wan22_i2v", "→ Send to Evolver"),
-                                                 ("unknown", "→ Send to Evolver")])
-def test_a_loop_is_offered_to_genau_and_any_other_video_to_evolver_alone(
+                                                 ("wan22_i2v", "→ Send to Kino"),
+                                                 ("unknown", "→ Send to Kino")])
+def test_a_loop_is_offered_to_genau_and_any_other_video_to_kino_alone(
         saved_panel, monkeypatch, workflow, offer):
     panel, db = saved_panel
     monkeypatch.setattr(gcp_module, "resolve_preview",
@@ -2907,28 +2927,34 @@ def test_a_loop_is_offered_to_genau_and_any_other_video_to_evolver_alone(
     assert _lane_offers(panel) == [offer]
 
 
+def test_the_kino_lanes_button_says_where_its_video_ends_up():
+    assert export_lane_module.KINO.tooltip == (
+        "Send this video down the Kino lane: Evolver sorts and upscales it on its usual "
+        "schedule, then files it where Kino plays it.")
+
+
 def _press(panel, caption):
     (button,) = [button for button in panel.findChildren(QPushButton)
                  if button.isVisibleTo(panel) and button.text() == caption]
     button.click()
 
 
-def test_a_loop_already_in_evolver_offers_that_copy_back_before_genau(saved_panel,
-                                                                       monkeypatch):
+def test_a_loop_already_sent_to_kino_offers_that_copy_back_before_genau(saved_panel,
+                                                                         monkeypatch):
     panel, db = saved_panel
     _video_row(db, "vid1", workflow_name=_LOOP)
     db.mark_evolver_exported("vid1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert _lane_offers(panel) == ["✓ Sent to Evolver"]
+    assert _lane_offers(panel) == ["✓ Sent to Kino"]
 
     _press(panel, "✕ Unsend")
 
     assert _lane_offers(panel) == ["→ Send to Genau"]
 
 
-def test_a_loop_in_both_apps_offers_its_evolver_copy_back_and_then_its_genau_one(
+def test_a_loop_in_both_lanes_offers_its_kino_copy_back_and_then_its_genau_one(
         saved_panel, monkeypatch):
     panel, db = saved_panel
     _video_row(db, "vid1", workflow_name=_LOOP)
@@ -2937,7 +2963,7 @@ def test_a_loop_in_both_apps_offers_its_evolver_copy_back_and_then_its_genau_one
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert _lane_offers(panel) == ["✓ Sent to Evolver"]
+    assert _lane_offers(panel) == ["✓ Sent to Kino"]
 
     _press(panel, "✕ Unsend")
 
@@ -2988,7 +3014,7 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
 
 
 @pytest.mark.parametrize(("lane", "brings_its_funscript"),
-                         [(export_lane_module.EVOLVER, True),
+                         [(export_lane_module.KINO, True),
                           (export_lane_module.GENAU, False)],
                          ids=lambda value: getattr(value, "name", value))
 def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alone(
@@ -3049,9 +3075,9 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
     panel._preview.show_media = MagicMock()
 
     panel.show_saved_generation(_video_row(db, "vid1"), [])
-    _press(panel, export_lane_module.EVOLVER.send_caption)
+    _press(panel, export_lane_module.KINO.send_caption)
 
-    lane = inbox / export_lane_module.EVOLVER.source
+    lane = inbox / export_lane_module.KINO.source
     assert sorted(path.name for path in lane.iterdir()) == ["vid1.funscript", "vid1.mp4"]
 
 
@@ -3454,10 +3480,10 @@ def test_saying_what_the_shown_picture_shows_lands_on_its_row(saved_panel):
     picture is being looked at on."""
     panel, db = saved_panel
     image = _image_row(db, "img9")
-    states = panel._picture_state.offered()
+    states = panel._action.offered()
 
     panel.show_saved_generation(image, [image])
-    panel._picture_state.pick(states[1])
+    panel._action.pick(states[1])
 
     assert db.get_generation("img9")["picture_state"] == states[1]
 
@@ -3465,19 +3491,31 @@ def test_saying_what_the_shown_picture_shows_lands_on_its_row(saved_panel):
 def test_taking_that_answer_back_leaves_the_picture_unsorted_again(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img9")
-    states = panel._picture_state.offered()
+    states = panel._action.offered()
     panel.show_saved_generation(image, [image])
-    panel._picture_state.pick(states[1])
+    panel._action.pick(states[1])
 
-    panel._picture_state.pick("")
+    panel._action.pick("")
 
     assert db.get_generation("img9")["picture_state"] is None
 
 
-def test_a_video_on_the_tab_is_offered_no_such_row(saved_panel):
+def test_a_video_on_the_tab_is_offered_the_acts_opened_on_its_own(saved_panel):
     panel, db = saved_panel
-    clip = _video_row(db, "vid9")
+    _video_row(db, "vid9")
+    db.set_recipe_source("vid9", category=CATEGORIES[1])
 
-    panel.show_saved_generation(clip, [])
+    panel.show_saved_generation(db.get_generation("vid9"), [])
 
-    assert panel._picture_state.isHidden()
+    assert not panel._action.isHidden()
+    assert panel._action.offered() == ["", *CATEGORIES]
+    assert panel._action.picked() == CATEGORIES[1]
+
+
+def test_saying_what_act_the_shown_video_is_lands_on_its_row(saved_panel):
+    panel, db = saved_panel
+    panel.show_saved_generation(_video_row(db, "vid9"), [])
+
+    panel._action.pick(CATEGORIES[1])
+
+    assert db.get_generation("vid9")["recipe_category"] == CATEGORIES[1]

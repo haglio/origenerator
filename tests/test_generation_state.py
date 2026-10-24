@@ -50,7 +50,8 @@ def test_a_status_goes_to_the_database_as_its_plain_string(tmp_path):
 
 def test_the_sources_are_the_strings_rows_have_always_carried():
     assert {source.value for source in GenerationSource} == {
-        "generated", "imported", "experiment", "base_render", "stroke_trim"}
+        "generated", "imported", "experiment", "base_render", "stroke_trim", "outside",
+        "starting_frame", "left_out"}
 
 
 def test_a_row_inserted_without_a_source_is_the_users_own_work(tmp_path):

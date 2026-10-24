@@ -4,7 +4,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from origenerator.gallery.output import parse_file_list
+from origenerator.gallery.output import output_file_path, parse_file_list
 from origenerator.generation_state import GenerationStatus
 from origenerator.importer import graph_in_file, recipe_of
 from origenerator.output_places import OutputPlaces
@@ -35,14 +35,14 @@ def _list_each_picture_once(db, rows) -> int:
 
 def _leave_one_record_per_picture(db, rows, places: OutputPlaces) -> int:
     folded = 0
-    for (subfolder, filename), claimants in _claimants_by_picture(rows).items():
+    for picture, claimants in _claimants_by_picture(rows, places).items():
         if len(claimants) < 2:
             continue
-        keeper = _the_one_that_made_it(claimants, places.folder(subfolder) / filename)
+        keeper = _the_one_that_made_it(claimants, picture)
         for row in claimants:
             if row["prompt_id"] == keeper["prompt_id"]:
                 continue
-            _stop_claiming(db, row, (subfolder, filename))
+            _stop_claiming(db, row, picture, places)
             if parse_file_list(row.get("output_files")):
                 folded += 1
                 continue
@@ -52,9 +52,9 @@ def _leave_one_record_per_picture(db, rows, places: OutputPlaces) -> int:
     return folded
 
 
-def _stop_claiming(db, row: dict, picture: tuple[str, str]) -> None:
+def _stop_claiming(db, row: dict, picture: Path, places: OutputPlaces) -> None:
     left = [entry for entry in parse_file_list(row.get("output_files"))
-            if file_key(entry) != picture]
+            if output_file_path(entry, places) != picture]
     row["output_files"] = json.dumps(left)
     db.update_generation(row["prompt_id"], output_files=row["output_files"])
 
@@ -75,8 +75,7 @@ def _drop_records_of_no_picture(db, rows, places: OutputPlaces) -> int:
 
 def _has_no_picture(row: dict, places: OutputPlaces) -> bool:
     listed = parse_file_list(row.get("output_files"))
-    paths = [places.folder(subfolder) / filename
-             for subfolder, filename in map(file_key, listed)]
+    paths = [output_file_path(entry, places) for entry in listed]
     if not paths:
         return True
     if any(path.exists() for path in paths):
@@ -88,13 +87,12 @@ def _folder_holds_anything(folder: Path) -> bool:
     return folder.is_dir() and any(folder.iterdir())
 
 
-def _claimants_by_picture(rows) -> dict[tuple[str, str], list[dict]]:
-    claimants: dict[tuple[str, str], dict[str, dict]] = defaultdict(dict)
+def _claimants_by_picture(rows, places: OutputPlaces) -> dict[Path, list[dict]]:
+    claimants: dict[Path, dict[str, dict]] = defaultdict(dict)
     for row in rows:
         for entry in parse_file_list(row.get("output_files")):
-            key = file_key(entry)
-            if key[1]:
-                claimants[key][row["prompt_id"]] = row
+            if entry.get("filename"):
+                claimants[output_file_path(entry, places)][row["prompt_id"]] = row
     return {key: list(by_id.values()) for key, by_id in claimants.items()}
 
 

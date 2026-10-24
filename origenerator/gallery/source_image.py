@@ -13,9 +13,11 @@ from dataclasses import dataclass
 from origenerator.gallery.output import frame_names_of, row_output_files
 from origenerator.gallery.signatures import (
     _frame_name,
+    _registered,
     parse_params,
     settings_signature,
 )
+from origenerator.generation_state import GenerationSource, in_sight, made_here, source_of
 
 
 @dataclass
@@ -35,14 +37,26 @@ def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str 
     name. Takes the bare value so the Generate tab — which has the field, not a
     stored row — can resolve it the same way :func:`find_source_image_id` does.
     """
+    image = _image_named(input_image, image_rows)
+    return image["prompt_id"] if image is not None else None
+
+
+def _image_named(input_image: str | None, image_rows: list[dict]) -> dict | None:
     if not input_image:
         return None
     target = _frame_name(input_image)
-    for image in image_rows:
-        for f in row_output_files(image):
-            if _frame_name(f.get("filename")) == target:
-                return image["prompt_id"]
-    return None
+    return next((image for image in image_rows
+                 if any(_frame_name(f.get("filename")) == target
+                        for f in row_output_files(image))), None)
+
+
+def source_image_of(row: dict, image_rows: list[dict]) -> dict | None:
+    return _image_named(parse_params(row.get("params_json")).get("input_image"), image_rows)
+
+
+def rebuildable_source_image(row: dict, image_rows: list[dict]) -> dict | None:
+    source = source_image_of(row, image_rows)
+    return source if source is not None and _registered(source.get("workflow_name")) else None
 
 
 def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
@@ -52,9 +66,8 @@ def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
     image generation by basename. Returns ``None`` when the row has no input
     image or none of ``image_rows`` produced a file with that name.
     """
-    return source_image_id_for(
-        parse_params(row.get("params_json")).get("input_image"), image_rows
-    )
+    image = source_image_of(row, image_rows)
+    return image["prompt_id"] if image is not None else None
 
 
 def source_image_id_in(row: dict, image_index: dict) -> str | None:
@@ -64,6 +77,15 @@ def source_image_id_in(row: dict, image_index: dict) -> str | None:
     for a row with no input image, or one no indexed generation produced."""
     entry = image_index.get(_frame_name(parse_params(row.get("params_json")).get("input_image")))
     return (entry.prompt_id or None) if entry is not None else None
+
+
+def landing_for(prompt_id: str, rows: list[dict], image_index: dict) -> str:
+    row = next((r for r in rows if r.get("prompt_id") == prompt_id), None)
+    if row is None or source_of(row) != GenerationSource.STARTING_FRAME:
+        return prompt_id
+    return next((video["prompt_id"] for video in rows
+                 if source_of(video) == GenerationSource.OUTSIDE
+                 and source_image_id_in(video, image_index) == prompt_id), prompt_id)
 
 
 def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
@@ -96,4 +118,9 @@ def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[di
     image_id = image_row.get("prompt_id")
     if image_id is None:
         return []
-    return [v for v in video_rows if find_source_image_id(v, [image_row]) == image_id]
+    return [v for v in video_rows if find_source_image_id(v, [image_row]) == image_id
+            and was_made_from(v, image_row)]
+
+
+def was_made_from(video: dict, picture: dict) -> bool:
+    return made_here(video) or in_sight(picture)

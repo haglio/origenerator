@@ -63,6 +63,15 @@ def _published(checkout: Path) -> dict | None:
     return json.loads(document.read_text(encoding="utf-8"))
 
 
+def records_folder(checkout: Path, library_root: Path) -> Path | None:
+    try:
+        published = _published(checkout) or {}
+    except (OSError, ValueError):
+        return None
+    folder = (published.get("library_record") or {}).get("folder")
+    return library_root / Path(folder) if folder else None
+
+
 def _differing(what: str, ours, theirs) -> str | None:
     if theirs is None or str(ours) == str(theirs):
         return None

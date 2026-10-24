@@ -28,7 +28,7 @@ from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
-from origenerator.gui.param_fields import field_kind, grey_out_of_reach
+from origenerator.gui.param_fields import NOT_KNOWN, field_kind, grey_out_of_reach
 from origenerator.gui.param_help import advice_help, definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import set_in_use
@@ -651,10 +651,10 @@ class ParamForm(QWidget):
             spinner.setMinimum(0)  # 0 == "size not yet known", shown as the em dash
             spinner.setMaximum(_DIMENSION_MAX)
             spinner.setSingleStep(_DIMENSION_STEP)
-            spinner.setSpecialValueText("—")
+            spinner.setSpecialValueText(NOT_KNOWN)
             spinner.valueChanged.connect(self.changed)
             self._widgets[key] = spinner
-            value_label = QLabel("—")
+            value_label = QLabel(NOT_KNOWN)
             value_label.setObjectName("readonlyParamValue")  # match the passthrough rows
             self._dim_value_labels[key] = value_label
             # A stack so locking swaps the plain value for the spinner in place,
@@ -736,7 +736,7 @@ class ParamForm(QWidget):
             blocked = spinner.blockSignals(True)  # a display refresh isn't a user edit
             spinner.setValue(value)
             spinner.blockSignals(blocked)
-            self._dim_value_labels[key].setText(str(value) if value else "—")
+            self._dim_value_labels[key].setText(str(value) if value else NOT_KNOWN)
 
     def _override_dimensions(self) -> dict:
         """The explicit width/height to emit — only when the pair is unlocked and
@@ -924,6 +924,9 @@ class ParamForm(QWidget):
             result.update(dict.fromkeys(pd.also_sets, result[pd.key]))
         result.update(self._override_dimensions())
         return result
+
+    def replace_values(self, params: dict):
+        self.set_values({**{pd.key: pd.default for pd in self._param_defs}, **params})
 
     def set_values(self, params: dict):
         # Retain any params without a field so they survive the read-back; the rest

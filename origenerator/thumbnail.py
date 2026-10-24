@@ -21,7 +21,7 @@ def generate_thumbnail(
     collapse onto one thumbnail, leaving one row showing the other's frame.
     """
     if output_type == MediaType.VIDEO:
-        img = _first_frame_from_video(source_path)
+        img = first_frame_of(source_path) or Image.new("RGB", (_THUMB_MAX, _THUMB_MAX), (64, 64, 64))
     else:
         img = Image.open(source_path)
     return _saved_thumbnail(img, thumb_dir, name)
@@ -44,13 +44,13 @@ def _saved_thumbnail(img: Image.Image, thumb_dir: Path, name: str) -> Path:
     return dest
 
 
-def _first_frame_from_video(path: Path) -> Image.Image:
+def first_frame_of(path: Path) -> Image.Image | None:
     import cv2  # noqa: PLC0415 (heavy; only a video needs it)
     cap = cv2.VideoCapture(str(path))
     ret, frame = cap.read()
     cap.release()
     if not ret:
-        return Image.new("RGB", (_THUMB_MAX, _THUMB_MAX), (64, 64, 64))
+        return None
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     return Image.fromarray(frame_rgb)
 
@@ -68,7 +68,7 @@ def generate_animated_thumbnail(
     video player per tile.
     """
     thumb_dir.mkdir(parents=True, exist_ok=True)
-    dest = thumb_dir / f"{name}_anim.webp"
+    dest = animated_thumbnail_path(thumb_dir, name)
     if dest.exists():
         return dest
     images = _sample_video_frames(source_path, frames, _THUMB_MAX)
@@ -79,6 +79,10 @@ def generate_animated_thumbnail(
         duration=duration_ms, loop=0,
     )
     return dest
+
+
+def animated_thumbnail_path(thumb_dir: Path, name: str) -> Path:
+    return thumb_dir / f"{name}_anim.webp"
 
 
 def _sample_video_frames(path: Path, count: int, size: int) -> list[Image.Image]:

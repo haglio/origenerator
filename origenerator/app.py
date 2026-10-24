@@ -115,51 +115,6 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
                 log.warning("Could not stamp AppUserModelID on %s: %s", pin, refusal)
 
 
-def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_events=None):
-    import socket
-
-    from origenerator import comfyui_launcher
-    from origenerator.comfyui_client import comfyui_responding
-
-    def port_open():
-        try:
-            with socket.create_connection((host, port), timeout=0.4):
-                return True
-        except OSError:
-            return False
-
-    if comfyui_responding(host, port):
-        logger.info("ComfyUI server already running on %s:%d", host, port)
-        return
-
-    if port_open():
-        logger.warning(
-            "Port %d is occupied by a non-ComfyUI server; ComfyUI cannot start there. "
-            "Stop that process (or change COMFYUI_PORT) and relaunch Origenerator.",
-            port,
-        )
-        return
-
-    server_script = comfyui_launcher.script(comfyui_dir)
-    if not server_script.exists():
-        logger.warning("ComfyUI not running and launcher not found at %s", server_script)
-        return
-
-    try:
-        server = comfyui_launcher.load(comfyui_dir)
-        logger.info("Starting ComfyUI server via %s...", server_script)
-        result = server.start(base_dir=comfyui_dir.parent, on_status=on_status,
-                              pump_events=pump_events)
-        if result.started:
-            logger.info("ComfyUI server started (PID %s)", result.pid)
-        elif result.error:
-            logger.warning("ComfyUI server failed to start: %s", result.error)
-        else:
-            logger.info("ComfyUI server was already running")
-    except Exception as e:
-        logger.warning("Failed to start ComfyUI server: %s", e)
-
-
 def _warm_voice_runtimes() -> None:
     """Load the voice stack's native DLLs before Qt can spoil their welcome.
 
@@ -818,11 +773,12 @@ def _boot_and_run(app, app_args, preview) -> int:
         folders=COMFYUI_FOLDERS,
     )
 
+    from origenerator import comfyui_launcher
     from origenerator.gui.loading_screen import LoadingCanceled
     window = None
     try:
         loading.say(STARTING_THE_SERVER)
-        _ensure_comfyui_server(
+        comfyui_launcher.ensure_comfyui_server(
             logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR,
             on_status=loading.say, pump_events=app.processEvents,
         )

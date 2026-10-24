@@ -1862,6 +1862,15 @@ def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, mon
     assert (kept["lora"], kept["strength"]) == ("my_hands.safetensors", 0.7)
 
 
+def test_a_fixs_lora_strength_says_what_range_works_well_as_every_forms_does(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+
+    assert "Good range: 0.6–1.2." in window.strength.toolTip()
+    assert window.strength.toolTip().startswith("How hard the LoRA pulls.")
+
+
 def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):
     panel, _edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()

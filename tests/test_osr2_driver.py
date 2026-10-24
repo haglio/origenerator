@@ -4,23 +4,8 @@ from app_support.osr2_hold import PARK, RESUME
 from funestra.funscript import Funscript
 
 from origenerator.osr2_driver import Osr2Driver
+from tests.osr2_fakes import FakeBroker
 from tests.running_ahead_support import record_the_app_running_ahead
-
-
-class FakeBroker:
-    def __init__(self):
-        self.positions = []
-        self.asked = []
-
-    def send_position(self, pos, interval_ms):
-        self.positions.append((pos, interval_ms))
-
-    def ask(self, verb):
-        self.asked.append(verb)
-
-    @property
-    def parked(self):
-        return self.asked.count(PARK)
 
 
 class FakePlayer:

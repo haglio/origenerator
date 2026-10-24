@@ -43,6 +43,7 @@ def the_animation_window():
     from origenerator.animation_recipes import AcceptedRecipes
     from origenerator.comfyui_client import ComfyUIClient
     from origenerator.config import (
+        COMFYUI_FOLDERS,
         COMFYUI_HOST,
         COMFYUI_OUTPUT_DIR,
         COMFYUI_PORT,
@@ -73,7 +74,7 @@ def the_animation_window():
             AcceptedRecipes(),
             pinned=recipe_match.curated_recipe),
         look,
-        _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT)),
+        _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS)),
     )
 
 

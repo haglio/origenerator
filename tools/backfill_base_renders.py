@@ -42,7 +42,7 @@ from origenerator.base_backfill import (
     rows_missing_their_base,
 )
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import DB_PATH
+from origenerator.config import COMFYUI_FOLDERS, DB_PATH
 from origenerator.db import Database
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -72,7 +72,7 @@ def main(argv=None) -> int:
         print("re-run with --apply to generate them")
         return 0
 
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=COMFYUI_FOLDERS)
     done = failed = 0
     for i, row in enumerate(rows, 1):
         workflow = WORKFLOW_REGISTRY[row["workflow_name"]]

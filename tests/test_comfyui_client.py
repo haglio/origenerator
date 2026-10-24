@@ -12,6 +12,7 @@ import json
 import struct
 
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.comfyui_inputs import ComfyFolders
 
 
 def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
@@ -161,3 +162,11 @@ def test_binary_non_preview_event_is_ignored(qtbot):
     client._handle_ws_binary(struct.pack(">I", 3) + b"not-an-image")
 
     assert received == []
+
+
+def test_the_client_hands_its_folders_to_the_api(qtbot, tmp_path):
+    folders = ComfyFolders(input=tmp_path / "input", output=tmp_path / "output", temp=tmp_path / "temp")
+
+    client = ComfyUIClient(folders=folders)
+
+    assert client.api.folders == folders

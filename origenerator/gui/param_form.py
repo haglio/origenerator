@@ -736,14 +736,6 @@ class ParamForm(QWidget):
             self._update_derived_display()
 
     def _browse_file(self, key: str):
-        """Pick a field's file anywhere on disk via the native file dialog: an
-        input image, or the recording a custom voice is copied from.
-
-        The chosen path is stored verbatim: ComfyUI's ``LoadImage`` resolves a
-        bare name against its input folder but takes an absolute path outside
-        it unchanged, so a full path lets the user draw an input from anywhere;
-        a recording is read by the voice from wherever it is.
-        """
         pd = self._defs[key]
         path, _ = QFileDialog.getOpenFileName(
             self,

@@ -8,6 +8,7 @@ from app_support import haglio_settings, siblings
 from funestra.robot_hand import bpm_for_speed
 
 from origenerator.branch_session import is_branch_session
+from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.content import load_content
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -123,9 +124,8 @@ def comfyui_output_dir(settings: dict[str, Any], comfyui_dir: Path) -> Path:
 
 COMFYUI_OUTPUT_DIR = comfyui_output_dir(haglio_settings.load(), COMFYUI_DIR)
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
-# Where ComfyUI keeps a ``name [temp]`` LoadImage source -- a preview or a
-# node's scratch output, the third place its LoadImage can point.
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
+COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, output=COMFYUI_OUTPUT_DIR, temp=COMFYUI_TEMP_DIR)
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
 # the "Prompt executed in N seconds" lines feed duration backfill.
 COMFYUI_LOG_DIR = COMFYUI_DIR / "user"
@@ -162,9 +162,8 @@ GENAU_SOURCE = haglio_settings.value("genau_source")
 
 # The curated pose references the SDXL Pose Transfer workflow is steered by. Its
 # Structure Image picker opens here rather than in ComfyUI's input folder, which
-# collects generated frames instead; LoadImage takes the absolute path back
-# unchanged, so drawing the input from outside costs nothing. Built from the
-# library root because that root is private and must stay out of source.
+# collects generated frames instead. Built from the library root because that
+# root is private and must stay out of source.
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"
 
 # --- Funscript ---------------------------------------------------------------

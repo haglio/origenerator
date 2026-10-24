@@ -776,12 +776,13 @@ def test_a_run_alone_in_its_folder_double_clicked_goes_to_the_funestra_of_its_sh
     assert shown.is_file() and shown.read_bytes() == _png_bytes()
 
 
-def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made(
+def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made_still_moving(
         qtbot, tmp_path, monkeypatch):
     _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
 
-    paces = [verb for verb in _told(tmp_path, "landscape") if verb.startswith("SET_PACE")]
-    assert paces[-1] == "SET_PACE 0"
+    told = _told(tmp_path, "landscape")
+    locks = [verb for verb in told if verb.startswith("LOCK_")]
+    assert (locks[-1], "SET_PACE 0" in told) == ("LOCK_ON", False)
 
 
 def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_picture(

@@ -103,6 +103,7 @@ class FunestraSlideshow(QObject):
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._locked = False
+        self._keep_told: bool | None = None
         self._refusal_checked = False
         self._loads_seen: str | None = None
         self._levels = LevelStepper()
@@ -148,27 +149,30 @@ class FunestraSlideshow(QObject):
         if lands:
             self._levels.restart()
         self._tell_the_pace()  # ahead of the file it opens, which reads it
+        self._tell_the_keep()
         if lands:
             # Before the reload, which then keeps it: after, it would load twice.
             self._send(play_file(self._funestra_item(current)))
         self._send(RELOAD_PLAYLIST)
 
     def _tell_the_pace(self) -> None:
-        self._pace_told = self._funestra_pace()
-        self._send(f"{SET_PACE} {self._pace_told}")
+        self._send(f"{SET_PACE} {self._dwell_s}")
         self._hold_what_is_being_made_for_half()
 
-    def _funestra_pace(self) -> int:
-        """The slideshow's pace, or nought while a spoken request, the run it was
-        opened over or a comparison of its versions holds the slide still."""
-        current = self._set.playlist.current()
-        on_the_run = (current is not None and current.is_live
-                      and current.prompt_id == self._following)
-        return 0 if self._request_holds_it or on_the_run else self._levels.pace(self._dwell_s)
+    def _tell_the_keep(self) -> None:
+        keeps = self._keeps()
+        if keeps != self._keep_told:
+            self._keep_told = keeps
+            self._send(LOCK_ON if keeps else LOCK_OFF)
 
-    def _keep_the_pace(self) -> None:
-        if self._funestra_pace() != self._pace_told:
-            self._tell_the_pace()
+    def _keeps(self) -> bool:
+        return (self._locked or self._request_holds_it or self._on_the_run()
+                or self._levels.stepping)
+
+    def _on_the_run(self) -> bool:
+        current = self._set.playlist.current()
+        return (current is not None and current.is_live
+                and current.prompt_id == self._following)
 
     def _file_of(self, slide) -> str:
         if slide.is_live:
@@ -245,16 +249,16 @@ class FunestraSlideshow(QObject):
             self._frame_on_funestra = None
             self._show_what_is_being_made()
         self._step_past_a_file_that_would_not_open(fields, status)
-        self._keep_the_pace()
+        self._tell_the_keep()
 
     def _hold_what_is_being_made_for_half(self) -> None:
         """An item something better is being made of holds the Funestra for
         half the pace, its move still made at the whole: the Funestra moves on
         from it early, and its scrubber counts that half down.  Any other, and
         one under the lock, holds for the pace."""
-        current, pace = self._set.playlist.current(), self._funestra_pace()
+        current, pace = self._set.playlist.current(), self._dwell_s
         held_for = self._set.pace_for(current, pace) if current is not None and pace else pace
-        if pace and held_for < pace and not self.locked:
+        if pace and held_for < pace and not self._keeps():
             self._send(f"{HOLD_PICTURE} {held_for:g}")
             self._held_short = True
         elif self._held_short:
@@ -319,7 +323,7 @@ class FunestraSlideshow(QObject):
         version = self._levels.step(delta, base=self._current_base())
         if version is None:
             return
-        self._keep_the_pace()
+        self._tell_the_keep()
         self._send(play_file(playlist_item(version.path, version.media_type,
                                            version.points_of_interest)))
         self.media_changed.emit()
@@ -331,7 +335,7 @@ class FunestraSlideshow(QObject):
             # The version stepped to was spliced into the Funestra's list after its
             # item; the set's own list stands it back on the item before it moves.
             self._hand_over()
-        self._keep_the_pace()
+        self._tell_the_keep()
 
     def _current_base(self) -> str:
         """The file the set lists the item on screen under — what its versions
@@ -404,7 +408,7 @@ class FunestraSlideshow(QObject):
 
     def _lock(self, on: bool) -> None:
         self._locked = on
-        self._send(LOCK_ON if on else LOCK_OFF)
+        self._tell_the_keep()
         self._publish()
 
     def _unlock(self) -> None:
@@ -805,14 +809,8 @@ class FunestraSlideshow(QObject):
         self.shown.room_paused(paused)
 
     def pause_for_request(self, paused: bool, note: str = "") -> None:
-        """Stop the advance while a request is being spoken: the pace goes to
-        nought, which is how anything is kept still on a Funestra, and back after.
-
-        A request is about what is on screen, and a set that pages on every few
-        seconds would hand the words to whatever came up next.
-        """
         self._request_holds_it = paused
-        self._tell_the_pace()
+        self._tell_the_keep()
         self.shown.dictating(note if paused else "")
 
     def note_request(self, message: str, request=None, *, working: bool = False,

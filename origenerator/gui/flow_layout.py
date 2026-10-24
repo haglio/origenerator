@@ -9,6 +9,10 @@ class _FullRow(QWidgetItem):
         return QSize(0, super().minimumSize().height())
 
 
+class _Trailing(QWidgetItem):
+    pass
+
+
 class FlowLayout(QLayout):
     """Lay items out left-to-right, wrapping to a new row when the width runs out.
 
@@ -52,6 +56,10 @@ class FlowLayout(QLayout):
     def add_full_row(self, widget):
         self.addChildWidget(widget)
         self.addItem(_FullRow(widget))
+
+    def add_trailing(self, widget):
+        self.addChildWidget(widget)
+        self.addItem(_Trailing(widget))
 
     def count(self):
         return len(self._items)
@@ -112,6 +120,7 @@ class FlowLayout(QLayout):
                 row, x = [], area.x()
                 continue
             hint = item.sizeHint()
+            hint.setWidth(min(hint.width(), max(area.width(), item.minimumSize().width())))
             if row and x + hint.width() > area.right():
                 rows.append(row)            # won't fit
                 row, x = [], area.x()       # wrap
@@ -122,15 +131,22 @@ class FlowLayout(QLayout):
 
         y = area.y()
         for placed in rows:
+            leading = [(item, hint) for item, hint in placed if not isinstance(item, _Trailing)]
+            trailing = [(item, hint) for item, hint in placed if isinstance(item, _Trailing)]
             x = area.x()
             if self._align_right:
-                width = sum(hint.width() for _item, hint in placed) + spacing * (len(placed) - 1)
-                x += max(0, area.width() - width)
-            for item, hint in placed:
-                if place:
-                    item.setGeometry(QRect(QPoint(x, y), hint))
-                x += hint.width() + spacing
+                x += max(0, area.width() - _span_of(placed, spacing))
+            for run, start in ((leading, x),
+                               (trailing, area.x() + max(0, area.width() - _span_of(trailing, spacing)))):
+                for item, hint in run:
+                    if place:
+                        item.setGeometry(QRect(QPoint(start, y), hint))
+                    start += hint.width() + spacing
             y += max(hint.height() for _item, hint in placed) + self._row_spacing
         if not rows:
             return margin_height
         return y - self._row_spacing - area.y() + margin_height
+
+
+def _span_of(placed, spacing) -> int:
+    return sum(hint.width() for _item, hint in placed) + spacing * max(0, len(placed) - 1)

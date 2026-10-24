@@ -729,6 +729,16 @@ class EnhancePanel(QWidget):
         self._emit()
 
 
+def _side_by_side(*widgets) -> QWidget:
+    host = QWidget()
+    row = QHBoxLayout(host)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(GAP_SMALL)
+    for widget in widgets:
+        row.addWidget(widget)
+    return host
+
+
 class FixPromptsDialog(QDialog):
     def __init__(self, parent, part, current: dict, loras: list[str]):
         super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
@@ -775,12 +785,11 @@ class FixPromptsDialog(QDialog):
         self.show_photos.setToolTip(f"Open {self._photos_folder} in Explorer")
         self.show_photos.clicked.connect(self._show_photos)
         self._count_photos()
-        foot = QHBoxLayout()
-        for widget in (QLabel("LoRA"), self.lora, QLabel("LoRA Strength"), self.strength,
-                       self.train, self.photo_count, self.show_photos):
-            foot.addWidget(widget)
-        foot.addStretch(1)
-        foot.addWidget(buttons)
+        foot = FlowLayout(spacing=GAP_SMALL)
+        for together in ((QLabel("LoRA"), self.lora), (QLabel("LoRA Strength"), self.strength),
+                         (self.train, self.photo_count, self.show_photos)):
+            foot.addWidget(_side_by_side(*together))
+        foot.add_trailing(buttons)
         layout.addLayout(foot)
 
     def show_training(self, text: str | None) -> None:

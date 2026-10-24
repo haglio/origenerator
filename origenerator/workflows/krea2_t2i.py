@@ -7,6 +7,12 @@ from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_files import NO_LORA, list_model_files
 
 
+def _negative_conditioning(negative_prompt: str) -> dict:
+    if negative_prompt:
+        return {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": negative_prompt}}
+    return {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["5", 0]}}
+
+
 def _diffusion_model_loader(unet: str) -> dict:
     if unet.endswith(".gguf"):
         return {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": unet}}
@@ -15,7 +21,7 @@ def _diffusion_model_loader(unet: str) -> dict:
 
 class Krea2T2iWorkflow(WorkflowTemplate):
     name = "krea2_t2i"
-    version = "v001"
+    version = "v002"
     display_name = "Krea 2 T2I"
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
@@ -27,6 +33,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
     def default_params(self) -> dict:
         return {
             "positive_prompt": "",
+            "negative_prompt": "",
             "seed": 0,
             "steps": 8,
             "cfg": 1.0,
@@ -53,12 +60,14 @@ class Krea2T2iWorkflow(WorkflowTemplate):
         unets = list_model_files("diffusion_models", [defaults["unet"]], accepts=(KREA2,))
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
             *lora_choice(defaults, "lora", "lora_strength", accepts=(KREA2,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=512, max_val=2048, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=512, max_val=2048, step=16),
-            ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=50, good=(8, 12)),
+            ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(8, 12)),
+            ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=10.0, step=0.1, good=(1.0, 3.5)),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
@@ -94,10 +103,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": ["2", 0], "text": params["positive_prompt"]},
             },
-            "6": {
-                "class_type": "ConditioningZeroOut",
-                "inputs": {"conditioning": ["5", 0]},
-            },
+            "6": _negative_conditioning(params["negative_prompt"]),
             "7": {
                 "class_type": "EmptyLatentImage",
                 "inputs": {

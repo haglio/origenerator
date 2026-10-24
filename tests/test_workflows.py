@@ -534,6 +534,28 @@ def test_krea2_builds_the_turbo_graph_on_the_official_recipe():
         "images": [_node_id(payload, "VAEDecode"), 0], "filename_prefix": "image/krea2_t2i"}
 
 
+def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
+    # Krea 2 Raw, the training version of the model, reads a negative prompt at
+    # a prompt strength above 1 over about fifty steps, where Turbo ignores
+    # both: the form offers them at Turbo's defaults, and a negative given is
+    # encoded in place of the zeroed positive.
+    wf = Krea2T2iWorkflow()
+    pds = {pd.key: pd for pd in wf.param_definitions()}
+    assert pds["negative_prompt"].type == "str" and pds["negative_prompt"].default == ""
+    assert pds["cfg"].label == "Prompt Strength" and pds["cfg"].default == 1.0
+    assert pds["steps"].max_val >= 52
+
+    payload = wf.build_api_payload(dict(wf.default_params(), negative_prompt="blurry",
+                                        cfg=3.5, steps=52))
+
+    sampler = _find_node(payload, "KSampler")["inputs"]
+    assert payload[sampler["negative"][0]] == {
+        "class_type": "CLIPTextEncode",
+        "inputs": {"clip": [_node_id(payload, "CLIPLoader"), 0], "text": "blurry"}}
+    assert _find_node(payload, "ConditioningZeroOut") is None
+    assert sampler["cfg"] == 3.5 and sampler["steps"] == 52
+
+
 def test_krea2_runs_its_lora_on_the_model_alone():
     # A Krea 2 LoRA trains the diffusion model; its prompt reader is left as it
     # is, and a picker set to "None" builds the graph with no LoRA node at all.

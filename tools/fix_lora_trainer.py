@@ -126,7 +126,7 @@ def crop(job: dict, find=None) -> int:
                 image = opened.convert("RGB")
         except (OSError, ValueError) as error:
             raise Stopped(f"{Path(photo).name} couldn't be opened as a picture. Take it out of "
-                          f"{job['photos_folder']} or replace it, then press Train "
+                          f"{Path(photo).parent} or replace it, then press Train "
                           "again.") from error
         box = find(image)
         if box is None:
@@ -138,8 +138,8 @@ def crop(job: dict, find=None) -> int:
     if not kept:
         name = job["part"].capitalize()
         raise Stopped(f"The {name} detector didn't find {name} in any of the {len(photos)} "
-                      f"photos in {job['photos_folder']}. Add photos where {name} is clearly "
-                      "visible, then press Train again.")
+                      f"photos in {' and '.join(job['photos_folders'])}. Add photos where "
+                      f"{name} is clearly visible, then press Train again.")
     return kept
 
 

@@ -46,6 +46,7 @@ class DetailPart:
     avoid: str = ""
     dilation: int = 10  # pixels grown around each rect, so edges are inside
     framed_together: bool = False
+    shared_photos: bool = True
 
 
 # Fragments follow the naming the ADetailer-style YOLO models use in the wild,
@@ -94,7 +95,8 @@ def _overlay_parts(content: dict | None = None) -> tuple:
         matches = tuple(str(w).lower() for w in entry.get("matches") or ()) or (name.lower(),)
         parts.append(DetailPart(name, spoken, matches, outline=entry.get("outline") is True,
                                 prompt=_text(entry.get("prompt")),
-                                avoid=_text(entry.get("avoid"))))
+                                avoid=_text(entry.get("avoid")),
+                                shared_photos=entry.get("shared_photos") is not False))
     return tuple(parts)
 
 

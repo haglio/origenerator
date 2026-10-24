@@ -15,8 +15,8 @@ def _part(name):
     return next(part for part in detail_parts.part_table() if part.name == name)
 
 
-def test_each_fix_takes_its_photos_from_a_folder_named_for_it():
-    assert fix_training.photos_folder(_part("hands")) == config.FIX_PHOTOS_DIR / "Hands"
+def test_each_fix_takes_its_photos_from_a_folder_of_fixes_named_for_it_in_lowercase():
+    assert fix_training.photos_folder(_part("hands")).parts[-2:] == ("fixes", "hands")
 
 
 def test_only_photos_in_a_fixs_folder_are_trained_on(tmp_path):
@@ -27,20 +27,43 @@ def test_only_photos_in_a_fixs_folder_are_trained_on(tmp_path):
     assert fix_training.photo_files(tmp_path / "not made yet") == []
 
 
+def test_a_fix_trains_on_its_own_photos_and_the_shared_folders(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+    for folder, name in (("hands", "own.jpg"), ("shared", "everyone.jpg"), ("faces", "other.jpg")):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / name).write_bytes(b"")
+
+    assert [path.name for path in fix_training.training_photos(_part("hands"))] == [
+        "own.jpg", "everyone.jpg"]
+
+
+def test_a_fix_its_settings_keep_off_the_shared_folder_trains_on_its_own_photos_alone(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+    for folder in ("alpha", "shared"):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / f"{folder}.jpg").write_bytes(b"")
+    (alpha,) = detail_parts.part_table({"detail_fix_parts": [
+        {"name": "alpha", "shared_photos": False}]})[-1:]
+
+    assert [path.name for path in fix_training.training_photos(alpha)] == ["alpha.jpg"]
+
+
 def test_a_training_job_names_the_fixs_photos_its_detector_and_the_model_to_train_for(
         monkeypatch, tmp_path):
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
     monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
-    (tmp_path / "Hands").mkdir()
-    (tmp_path / "Hands" / "one.jpg").write_bytes(b"")
+    for folder, name in (("hands", "one.jpg"), ("shared", "two.jpg")):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / name).write_bytes(b"")
     monkeypatch.setattr(config, "LORA_TRAINING_SCRIPTS", Path("C:/sd-scripts"))
     models = config.COMFYUI_DIR / "models"
 
     job = fix_training.training_job(_part("hands"), "base.safetensors",
                                     datetime(2026, 10, 19, 1, 30))
 
-    assert job["photos"] == [str(tmp_path / "Hands" / "one.jpg")]
-    assert job["photos_folder"] == str(tmp_path / "Hands")
+    assert job["photos"] == [str(tmp_path / "hands" / "one.jpg"), str(tmp_path / "shared" / "two.jpg")]
+    assert job["photos_folders"] == [str(tmp_path / "hands"), str(tmp_path / "shared")]
     assert job["detector"] == str(models / "ultralytics" / "bbox" / "hand_yolov8s.pt")
     assert job["base_model"] == str(models / "checkpoints" / "base.safetensors")
     assert job["output_dir"] == str(models / "loras" / "fixes")

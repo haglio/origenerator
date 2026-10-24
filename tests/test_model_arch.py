@@ -35,6 +35,13 @@ ARCH_CASES = [
     (SD15, ["lora_te_text_model_encoder_layers_0_mlp_fc1.lora_down.weight",
             "lora_unet_down_blocks_0_attn.lora_down.weight"]),
     (SD15, ["control_model.zero_convs.0.0.weight", "control_model.input_hint_block.0.weight"]),
+    # A UNet-only kohya LoRA, the shape the enhance's fix training writes: no
+    # text-encoder marker to go on, so the two SD families are told apart by
+    # the stacked transformer blocks only SDXL's attentions have.
+    (SDXL, ["lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_q.lora_down.weight",
+            "lora_unet_output_blocks_2_1_proj_in.lora_down.weight"]),
+    (SD15, ["lora_unet_input_blocks_4_1_transformer_blocks_0_attn1_to_q.lora_down.weight",
+            "lora_unet_output_blocks_2_1_proj_in.lora_down.weight"]),
     # Flux, in all three forms it ships in.
     (FLUX, ["double_blocks.0.img_attn.qkv.weight", "single_blocks.0.linear1.weight"]),
     (FLUX, ["lora_unet_double_blocks_0_img_attn_qkv.lora_down.weight"]),
@@ -104,6 +111,27 @@ def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeyp
 
     assert model_arch.describe(path).arch == SDXL
     assert reads == []
+
+
+def test_a_header_remembered_by_an_older_reader_is_read_again(tmp_path, monkeypatch):
+    # What a file was taken for is only as good as the reader that took it, so a
+    # launch whose reader has changed reads every header again: the fix LoRAs
+    # stayed unrecognized in every picker after the reader learned their shape.
+    monkeypatch.setattr(model_arch, "_HEADERS_PATH", tmp_path / "headers.json")
+    monkeypatch.setattr(model_arch, "_described", None)
+    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    stat = path.stat()
+    remembered = {"path": str(path), "size": stat.st_size, "mtime_ns": stat.st_mtime_ns,
+                  "arch": None, "is_lora": False, "expert": None, "is_shard": False}
+    (tmp_path / "headers.json").write_text(json.dumps(
+        {"reader": "an older reader", "entries": [remembered]}))
+    assert model_arch.describe(path).arch == SDXL
+
+    # ...and what the readers before this one left on disk, a bare list, is older still.
+    monkeypatch.setattr(model_arch, "_described", None)
+    (tmp_path / "headers.json").write_text(json.dumps([remembered]))
+
+    assert model_arch.describe(path).arch == SDXL
 
 
 def test_a_model_file_written_over_is_read_again(tmp_path):

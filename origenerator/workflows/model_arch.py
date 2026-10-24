@@ -4,6 +4,7 @@ guessing: an unrecognized file reads as ``None``, which every picker keeps.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import struct
@@ -65,6 +66,12 @@ _EXPERT_BOUNDED = re.compile(r"(?:^|[^A-Za-z])(high|low)", re.IGNORECASE)
 # MLP -- dotted, or flattened as lycoris spells it (`lycoris_blocks_0_attn_wq`).
 _KREA2_BLOCK = re.compile(r"blocks[._]\d+[._](?:attn[._]w[qkvo]|mlp[._](?:gate|up|down))")
 
+# kohya's flattened SD UNet, which is how the enhance's fix training writes a
+# LoRA with no text encoder in it. SDXL stacks transformer blocks in an attention
+# where SD1.5 has one, so a second block tells the two apart without the encoders.
+_SD_UNET_LORA = re.compile(r"^lora_unet_(?:input|output|middle)_block")
+_SDXL_STACKED_BLOCKS = re.compile(r"transformer_blocks_[1-9]")
+
 
 @dataclass(frozen=True)
 class ModelFile:
@@ -83,6 +90,7 @@ class ModelFile:
 # What each model file turned out to be, kept between launches: a header is a
 # file of gigabytes opened, and a file unchanged in size and time reads the same.
 _HEADERS_PATH = config.STATE_DIR / "model_headers.json"
+_READER_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
 _described: dict[tuple[str, int, int], ModelFile] | None = None
 
 
@@ -109,11 +117,13 @@ def _remembered() -> dict[tuple[str, int, int], ModelFile]:
 
 def _read_remembered(path: Path) -> dict[tuple[str, int, int], ModelFile]:
     try:
-        entries = json.loads(path.read_text(encoding="utf-8"))
+        saved = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+    if not isinstance(saved, dict) or saved.get("reader") != _READER_DIGEST:
+        return {}
     remembered = {}
-    for entry in entries if isinstance(entries, list) else ():
+    for entry in saved.get("entries", ()):
         try:
             remembered[(entry["path"], entry["size"], entry["mtime_ns"])] = ModelFile(
                 arch=entry["arch"], is_lora=entry["is_lora"], expert=entry["expert"],
@@ -129,7 +139,8 @@ def _remember(described: dict[tuple[str, int, int], ModelFile]) -> None:
     try:
         _HEADERS_PATH.parent.mkdir(parents=True, exist_ok=True)
         written = _HEADERS_PATH.with_name(_HEADERS_PATH.name + ".tmp")
-        written.write_text(json.dumps(entries), encoding="utf-8")
+        written.write_text(json.dumps({"reader": _READER_DIGEST, "entries": entries}),
+                           encoding="utf-8")
         written.replace(_HEADERS_PATH)
     except OSError:
         return  # a launch that cannot write its state reads the headers again
@@ -203,6 +214,8 @@ def _arch_from(keys: list[str]) -> str | None:
     # otherwise claim it below.
     if has("conditioner", "label_emb", "add_embedding") or starts("lora_te1_", "lora_te2_"):
         return SDXL
+    if any(_SD_UNET_LORA.match(key) for key in keys):
+        return SDXL if any(_SDXL_STACKED_BLOCKS.search(key) for key in keys) else SD15
     # Flux before Qwen and LTX: its diffusers-form LoRAs carry plain
     # `transformer_blocks` too, and only the `single_` twin separates them.
     if (has("double_blocks", "single_blocks", "single_transformer_blocks", "guidance_in")

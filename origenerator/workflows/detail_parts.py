@@ -112,6 +112,10 @@ def part_named(name: str) -> DetailPart:
     return next(part for part in part_table() if part.name == name)
 
 
+def parts_framed_together() -> frozenset[str]:
+    return frozenset(part.name for part in part_table() if part.framed_together)
+
+
 # A command is a few words; anything sentence-shaped is a prompt edit that
 # happens to start with "fix" ("fix the color of her eyes to blue").
 _MAX_COMMAND_WORDS = 6

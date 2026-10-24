@@ -919,18 +919,32 @@ def test_shift_arrows_step_from_an_upscale_to_the_video_it_was_made_from(tmp_pat
         str(upscale): [(upscale, "video", "Evolved", ()), (video, "video", "Original", ())]}
 
 
-def test_each_version_of_an_enhanced_picture_brings_the_places_its_fixes_found(tmp_path, monkeypatch):
-    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
-    face = {"part": "faces", "left": 0.4, "top": 0.1, "right": 0.6, "bottom": 0.3}
-    row = {**_row("g1", files=()), "output_files": json.dumps([
-        {"filename": "enhanced.png", "subfolder": "image", "points_of_interest": [face]},
+def _enhanced_with(places: list[dict]) -> dict:
+    return {**_row("g1", files=()), "output_files": json.dumps([
+        {"filename": "enhanced.png", "subfolder": "image", "points_of_interest": places},
         {"filename": "base.png", "subfolder": "image"}]),
         "original_files": json.dumps([{"filename": "base.png", "subfolder": "image"}])}
 
-    ((_key, (enhanced, original)),) = _director().versions_of([row]).items()
+
+def test_each_version_of_an_enhanced_picture_brings_the_places_its_fixes_found(tmp_path, monkeypatch):
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    face = {"part": "faces", "left": 0.4, "top": 0.1, "right": 0.6, "bottom": 0.3}
+
+    ((_key, (enhanced, original)),) = _director().versions_of([_enhanced_with([face])]).items()
 
     assert enhanced.points_of_interest == ((0.4, 0.1, 0.6, 0.3),)
     assert original.points_of_interest == ()
+
+
+def test_the_eyes_of_two_faces_in_an_enhanced_picture_come_back_as_a_close_up_of_each_pair(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    eyes = [{"part": "eyes", "left": left, "top": 0.1, "right": right, "bottom": 0.19}
+            for left, right in ((0.10, 0.25), (0.20, 0.35), (0.33, 0.48), (0.43, 0.58))]
+
+    ((_key, (enhanced, _original)),) = _director().versions_of([_enhanced_with(eyes)]).items()
+
+    assert enhanced.points_of_interest == ((0.1, 0.1, 0.35, 0.19), (0.33, 0.1, 0.58, 0.19))
 
 
 def test_a_region_reset_re_points_what_feeds_it(slideshows):

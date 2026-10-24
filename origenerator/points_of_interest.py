@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
+from itertools import combinations
 
 FILE_KEY = "points_of_interest"
+_FORMAT_KEY = "points_of_interest_format"
+_FORMAT = 1
 _EDGES = ("left", "top", "right", "bottom")
 _REPORT_ID = re.compile(r"fix(\d+)_points")
 _SIZE, _MASK, _WHOLE = "places_size", "places_mask", "places_whole"
@@ -39,19 +42,7 @@ def reported(outputs: dict, parts: Mapping | None = None) -> list[dict] | None:
 def _of_part(places: list[dict], part) -> list[dict]:
     if part is None:
         return places
-    if part.framed_together:
-        places = _overlaps_joined(places)
     return [{**place, "part": part.name} for place in places]
-
-
-def _overlaps_joined(places: list[dict]) -> list[dict]:
-    joined: list[dict] = []
-    for place in places:
-        while (other := next((kept for kept in joined if _overlap(kept, place)), None)) is not None:
-            joined.remove(other)
-            place = _union(other, place)
-        joined.append(place)
-    return joined
 
 
 def _overlap(one: dict, other: dict) -> bool:
@@ -87,9 +78,47 @@ def _region(text):
     return None
 
 
-def boxes_of(file_entry: dict) -> tuple[tuple[float, float, float, float], ...]:
-    return tuple(tuple(place[edge] for edge in _EDGES)
-                 for place in file_entry.get(FILE_KEY) or () if _is_a_place(place))
+def kept(places: list[dict]) -> dict:
+    return {FILE_KEY: places, _FORMAT_KEY: _FORMAT}
+
+
+def kept_the_current_way(file_entry: dict) -> bool:
+    return file_entry.get(_FORMAT_KEY) == _FORMAT
+
+
+def boxes_of(file_entry: dict, *,
+             framed_together: Collection[str]) -> tuple[tuple[float, float, float, float], ...]:
+    places = [place for place in file_entry.get(FILE_KEY) or () if _is_a_place(place)]
+    return tuple(tuple(place[edge] for edge in _EDGES) for place in _close_ups(places, framed_together))
+
+
+def _close_ups(places: list[dict], framed_together: Collection[str]) -> list[dict]:
+    partners = _partners(places, framed_together)
+    close_ups = []
+    for index, place in enumerate(places):
+        partner = partners.get(index)
+        if partner is None:
+            close_ups.append(place)
+        elif partner > index:
+            close_ups.append(_union(place, places[partner]))
+    return close_ups
+
+
+def _partners(places: list[dict], framed_together: Collection[str]) -> dict[int, int]:
+    pairs = sorted((_distance(one, other), first, second)
+                   for (first, one), (second, other) in combinations(enumerate(places), 2)
+                   if one.get("part") in framed_together and other.get("part") == one.get("part")
+                   and _overlap(one, other))
+    partners: dict[int, int] = {}
+    for _, first, second in pairs:
+        if first not in partners and second not in partners:
+            partners[first], partners[second] = second, first
+    return partners
+
+
+def _distance(one: dict, other: dict) -> float:
+    return ((one["left"] + one["right"] - other["left"] - other["right"]) ** 2
+            + (one["top"] + one["bottom"] - other["top"] - other["bottom"]) ** 2)
 
 
 def _is_a_place(place) -> bool:

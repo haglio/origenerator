@@ -76,7 +76,7 @@ def _keep(db, row_id, filename, places: list[dict]) -> bool:
     entry = next((f for f in files if f.get("filename") == filename), None)
     if entry is None:
         return False
-    entry[points_of_interest.FILE_KEY] = places
+    entry.update(points_of_interest.kept(places))
     db.update_generation(row_id, output_files=json.dumps(files))
     return True
 
@@ -106,9 +106,5 @@ def finding_graph(level: gallery.EnhanceLevel) -> dict:
 def pictures_to_look_over(rows: list[dict]) -> list[tuple[dict, gallery.EnhanceLevel]]:
     return [(row, level) for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE
             for level in gallery.enhance_levels(row)
-            if not level.is_original and _unlooked(level.file) and detail_fix_passes(level.params)]
-
-
-def _unlooked(file_entry: dict) -> bool:
-    places = file_entry.get(points_of_interest.FILE_KEY)
-    return places is None or any(not isinstance(place, dict) or "part" not in place for place in places)
+            if not level.is_original and not points_of_interest.kept_the_current_way(level.file)
+            and detail_fix_passes(level.params)]

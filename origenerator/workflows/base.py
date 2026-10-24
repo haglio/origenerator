@@ -919,7 +919,7 @@ class WorkflowTemplate(ABC):
         files = _listed_files(outputs.get(self.output_node_id, {}))
         places = points_of_interest.reported(outputs, parts_found_by(history_data))
         if files and places is not None:
-            files[0] = {**files[0], points_of_interest.FILE_KEY: places}
+            files[0] = {**files[0], **points_of_interest.kept(places)}
         files += soundless_copies_of(files)
         if self.base_output_node_id is None:
             return files

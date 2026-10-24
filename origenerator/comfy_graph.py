@@ -167,6 +167,20 @@ def sound_params(graph: dict) -> dict:
     return params
 
 
+def driving_video_params(graph: dict) -> dict:
+    """The video a graph performed and, at a forced rate, the second it started at."""
+    for node in graph.values():
+        inputs = node.get("inputs", {})
+        video = inputs.get("video") if node.get("class_type") == "VHS_LoadVideoPath" else None
+        if not isinstance(video, str):
+            continue
+        rate, skipped = inputs.get("force_rate"), inputs.get("skip_first_frames")
+        if rate and isinstance(skipped, (int, float)):
+            return {"video": video, "video_start": skipped / rate}
+        return {"video": video}
+    return {}
+
+
 def input_image_name(graph: dict) -> str | None:
     """The image filename an image-to-video graph loads, or ``None``.
 

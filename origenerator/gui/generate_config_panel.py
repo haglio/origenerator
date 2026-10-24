@@ -23,6 +23,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
 from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
+    COMFYUI_INPUT_DIR,
     COMFYUI_OUTPUT_DIR,
     EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
@@ -82,6 +83,7 @@ from origenerator.gui.picture_state_picker import PictureStatePicker
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.warning_mark import WarningMark
+from origenerator.gui.zone_items import ZoneItems
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
@@ -686,7 +688,8 @@ class GenerateConfigPanel(QWidget):
                                          pins_reused_seed=wf.pins_reused_seed(),
                                          heights=self._heights,
                                          seed_history=SeedHistory(
-                                             self._seed_uses, self._looping_preview)))
+                                             self._seed_uses, self._looping_preview),
+                                         items=self._zone_items()))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {
@@ -800,6 +803,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self.refresh_generate_caption)
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
+        self._param_form.item_activated.connect(self.source_activated)
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
@@ -1007,6 +1011,14 @@ class GenerateConfigPanel(QWidget):
     def _looping_preview(self, item: str) -> str | None:
         row = self._db.get_generation(item)
         return animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR) if row else None
+
+    def _zone_items(self) -> ZoneItems:
+        return ZoneItems(self._db, self._names, self._rows_of_kind, output_dir=COMFYUI_OUTPUT_DIR,
+                         input_dir=COMFYUI_INPUT_DIR, thumb_dir=THUMB_DIR)
+
+    def _rows_of_kind(self, kind: MediaType) -> list[dict]:
+        library = self._library.now()
+        return library.image_rows if kind == MediaType.IMAGE else library.video_rows
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)

@@ -14,6 +14,7 @@ class ItemNames:
     def __init__(self, numbers):
         self._numbers = numbers
         self._names: dict[str, str] = {}
+        self._wearing: dict[str, str] = {}
 
     @classmethod
     def from_library(cls, db) -> ItemNames:
@@ -34,9 +35,13 @@ class ItemNames:
             self._numbers.record_item_numbers(changed)
         self._names = {prompt_id: item_name(item)
                        for prompt_id, item in numbering.items()}
+        self._wearing = {name: prompt_id for prompt_id, name in self._names.items()}
 
     def of(self, prompt_id: str | None) -> str:
         return self._names.get(prompt_id, "")
+
+    def prompt_id_of(self, name: str) -> str | None:
+        return self._wearing.get(name)
 
 
 def _items_oldest_first(rows: list[dict], held_rows: list[dict]) -> list[dict]:

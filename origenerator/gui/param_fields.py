@@ -7,32 +7,31 @@ kind's ``read`` is a contract, not only a display.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 
 from origenerator.gui import diff_text
+from origenerator.gui.drop_slot import DropSlot, placeholder_for
+from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.param_help import option_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.seed_combo import SeedComboBox
+from origenerator.media import MediaType
 from origenerator.seed_history import SeedHistory
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
-
-# Zero-width spaces / joiners / BOM that can ride invisibly on a pasted path.
-# The metadata block inserts zero-width spaces into displayed paths for on-screen
-# wrapping, so text copied from there carries them; none belongs in a real path.
-# U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+2060 word-joiner, U+FEFF BOM.
-_INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
 
 
 class FieldKind(ABC):
     copyable = False
     randomizable = False
     browse_filter: str | None = None
+    drops = False  # a zone an item is dropped on, which browses from its own menu
 
     @abstractmethod
     def make(self, pd: ParamDef) -> QWidget: ...
@@ -89,26 +88,51 @@ class _Seed(FieldKind):
         widget.setEditText(str(int(value)))
 
 
-class _ImagePath(_Line):
-    browse_filter = "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)"
-
-    def read(self, pd, widget):
-        # A LoadImage path resolves only without the invisible wrapping above.
-        return widget.text().translate(_INVISIBLE).strip()
-
-
 class _AudioPath(_Line):
-    browse_filter = "Audio (*.wav *.mp3 *.flac *.m4a *.ogg);;All Files (*)"
+    browse_filter = AUDIO_FILE_FILTER
 
     def read(self, pd, widget):
         return widget.text().strip()
 
 
-class _VideoPath(_Line):
-    browse_filter = "Videos (*.mp4 *.webm *.mkv *.mov);;All Files (*)"
+# The zero-width characters the metadata block wraps a displayed path with.
+_INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
+
+
+class _Drop(FieldKind):
+    """A picture or video input: a zone, read back as the reference the graph loads."""
+
+    drops = True
+
+    def __init__(self, kind: MediaType, items, browse: Callable[[str], None]):
+        self._kind = kind
+        self._items = items
+        self._browse = browse
+        self.browse_filter = FILE_FILTERS[kind]
+
+    def make(self, pd):
+        zone = DropSlot(
+            self._kind, lambda prompt_id: self._items.lends(prompt_id, self._kind),
+            self._items.preview, placeholder_for(self._kind),
+            named=self._items.named, name_of=self._items.name_of,
+            browse=lambda: self._browse(pd.key))
+        self.write(pd, zone, pd.default)
+        return zone
+
+    def change_signal(self, widget):
+        return widget.changed
 
     def read(self, pd, widget):
-        return widget.text().strip()
+        return widget.current_id() or ""
+
+    def write(self, pd, widget, value):
+        held = str(value or "").translate(_INVISIBLE).strip()
+        if held == self.read(pd, widget):
+            return
+        if held:
+            widget.set_item(held)
+        else:
+            widget.clear()
 
 
 class _Prompt(FieldKind):
@@ -237,21 +261,23 @@ _KINDS: dict[ParamType, FieldKind] = {
     ParamType.INT: _WholeSpinner(),
     ParamType.FLOAT: _DecimalSpinner(),
     ParamType.COMBO: _Choice(),
-    ParamType.IMAGE: _ImagePath(),
     ParamType.AUDIO: _AudioPath(),
-    ParamType.VIDEO: _VideoPath(),
 }
 _PROMPT = _Prompt()
 _PRESETS = _Presets()
 
 
-def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = None) -> FieldKind:
+def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = None, *,
+               items=None, browse: Callable[[str], None] | None = None) -> FieldKind:
     """The kind of field ``pd`` is edited in. ``heights`` is the set a prompt's
-    dragged height is filed in, which is the form's to supply."""
+    dragged height is filed in, ``items`` how a zone reads what it holds and
+    ``browse`` what its menu's Browse does, all the form's to supply."""
     if pd.type == ParamType.STR and pd.multiline:
         return _Prompt(heights) if heights is not None else _PROMPT
     if pd.type == ParamType.SEED:
         return _Seed(seed_history)
+    if pd.type in (ParamType.IMAGE, ParamType.VIDEO):
+        return _Drop(MediaType(pd.type), items, browse)
     if pd.type in (ParamType.INT, ParamType.FLOAT) and pd.options:
         return _PRESETS
     return _KINDS[pd.type]

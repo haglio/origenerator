@@ -69,14 +69,16 @@ PARAM_HELP: dict[str, str] = {
     ),
     "input_image": (
         "The picture this run is built from: the start frame for a video, or the "
-        "structure to re-skin. Browse to any file, or drop a generation on it."
+        "structure to re-skin. Drop a picture from the gallery on it, or right-click "
+        "it to paste an Origenerator name or browse to any file."
     ),
     "video": (
         "The video of the library whose moves the picture's person performs: "
         "the person's pose is read off every frame and performed, the video's "
         "sound rides along, and its script becomes the result's. The run is "
-        "shaped like this video, with the picture fitted into that shape. "
-        "Browse to one."
+        "shaped like this video, with the picture fitted into that shape. Drop a "
+        "video from the gallery on it, or right-click it to paste an Origenerator "
+        "name or browse to one of the library's."
     ),
     "video_start": (
         "How many seconds into that video the run starts; Duration says how much "

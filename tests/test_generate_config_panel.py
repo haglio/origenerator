@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, QSize, Qt
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
+from PyQt6.QtGui import QColor, QDropEvent, QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
 from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 
@@ -37,6 +37,7 @@ from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
@@ -457,7 +458,7 @@ def test_i2v_form_shows_the_measured_size_of_a_real_input_image(panel, tmp_path,
     Image.new("RGB", (1920, 1080), (128, 128, 128)).save(tmp_path / "wide.png")
 
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
-    panel._param_form._widgets["input_image"].setText("wide.png")
+    panel._param_form._widgets["input_image"].set_item("wide.png")
 
     width, height = scale_to_total_pixels(1920, 1080)
     assert panel._param_form._dim_value_labels["width"].text() == str(width)
@@ -769,7 +770,7 @@ def test_picking_the_picture_to_start_from_lights_generate(qtbot, tmp_path):
     qtbot.addWidget(panel)
     panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
 
-    panel._param_form._widgets["input_image"].setText("picked.png")
+    panel._param_form._widgets["input_image"].set_item("picked.png")
 
     assert panel._generate_btn.isEnabled()
     qtbot.waitUntil(lambda: not panel._caption_timer.isActive())
@@ -3406,3 +3407,28 @@ def test_a_video_on_the_tab_is_offered_no_such_row(saved_panel):
     panel.show_saved_generation(clip, [])
 
     assert panel._picture_state.isHidden()
+
+
+def test_the_picture_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_path, monkeypatch,
+                                                                    installed_models):
+    output_dir = tmp_path / "output"
+    (output_dir / "image").mkdir(parents=True)
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(output_dir / "image" / "sdxl_img1.png")
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    db = Database(tmp_path / "t.db")
+    _image_row(db, "img1", filename="sdxl_img1.png")
+    panel = GenerateConfigPanel(ComfyUIClient(), db, names=ItemNames.from_library(db))
+    qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    zone = panel._param_form._widgets["input_image"]
+    led_to = []
+    panel.source_activated.connect(led_to.append)
+
+    mime = generation_mime("img1")
+    zone.dropEvent(QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
+                              Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+    zone.activated.emit(zone.current_id())
+
+    assert panel._param_form.get_values()["input_image"] == "image/sdxl_img1.png [output]"
+    assert zone.toolTip() == panel._names.of("img1")
+    assert led_to == ["img1"]

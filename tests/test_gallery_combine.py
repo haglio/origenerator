@@ -23,19 +23,14 @@ def _video_row(**params):
     }
 
 
-def _image_row(files):
-    """An image row with the given output_files list (or None)."""
-    return {
-        "prompt_id": "img",
-        "workflow_name": "sdxl_t2i",
-        "params_json": "{}",
-        "output_files": json.dumps(files) if files is not None else None,
-    }
+def _picture(files):
+    """The reference a dropped picture with the given output_files lends."""
+    return gallery.output_file_reference(files or [])
 
 
 def test_a_combination_runs_the_recipe_on_the_dropped_picture_with_fresh_seeds():
     video = _video_row(noise_seed=0, audio_seed=0, positive_prompt="a cat", steps=20)
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.combined_params(video, image, _I2V)
 
@@ -48,7 +43,7 @@ def test_a_combination_runs_the_recipe_on_the_dropped_picture_with_fresh_seeds()
 def test_combined_params_fills_missing_params_from_workflow_defaults():
     # A sparse video row (e.g. an import) still builds a full, submittable recipe.
     video = _video_row(seed=3, noise_seed=9)
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.combined_params(video, image, _I2V)
 
@@ -58,13 +53,13 @@ def test_combined_params_fills_missing_params_from_workflow_defaults():
 def test_a_picture_with_no_file_on_disk_cannot_be_combined():
     video = _video_row(seed=3, noise_seed=9)
 
-    assert gallery.combined_params(video, _image_row([]), _I2V) is None
-    assert gallery.combined_params(video, _image_row(None), _I2V) is None
+    assert gallery.combined_params(video, _picture([]), _I2V) is None
+    assert gallery.combined_params(video, None, _I2V) is None
 
 
 def test_combined_params_references_the_images_subfolder_output():
     video = _video_row(seed=3, noise_seed=9)
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": "images"}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": "images"}])
 
     params = gallery.combined_params(video, image, _I2V)
 
@@ -76,7 +71,7 @@ def test_combined_params_drops_the_recipes_stored_size():
     # override — sized the frame IT ran on. Carried onto a differently shaped
     # image it would stretch it, so the swap drops it.
     video = _video_row(seed=3, noise_seed=9, width=720, height=928)
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.combined_params(video, image, _I2V)
 
@@ -88,7 +83,7 @@ def test_combined_params_payload_derives_the_size_from_the_dropped_image():
     # scales to the pixel budget and reads the size back off the result, rather
     # than forcing the recipe's WxH onto an image of another shape.
     video = _video_row(seed=3, noise_seed=9, width=720, height=928)
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     payload = _I2V.build_api_payload(gallery.combined_params(video, image, _I2V))
 
@@ -117,7 +112,7 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
             return ()
 
     video = _video_row(width=720, height=928)
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.combined_params(video, image, _ManualSize())
 
@@ -129,7 +124,7 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
 def _recipe_run(**recipe_params):
     recipe = _video_row(**recipe_params)
     return recipe, gallery.combined_params(
-        recipe, _image_row([{"filename": "sdxl_new.png", "subfolder": ""}]), _I2V)
+        recipe, _picture([{"filename": "sdxl_new.png", "subfolder": ""}]), _I2V)
 
 
 def test_a_run_whose_negative_prompt_moved_off_its_recipes_differs_from_it():
@@ -186,7 +181,7 @@ _SPEC = {
 
 
 def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.curated_params(_SPEC, image, _I2V)
 
@@ -200,7 +195,7 @@ def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
 def test_curated_params_rerolls_every_seed():
     # A curated recipe has no exemplar run to reproduce; a pinned seed would
     # render the identical video for the same image every time.
-    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.curated_params(_SPEC, image, _I2V)
 
@@ -209,8 +204,8 @@ def test_curated_params_rerolls_every_seed():
 
 
 def test_a_picture_with_no_file_on_disk_cannot_be_curated():
-    assert gallery.curated_params(_SPEC, _image_row([]), _I2V) is None
-    assert gallery.curated_params(_SPEC, _image_row(None), _I2V) is None
+    assert gallery.curated_params(_SPEC, _picture([]), _I2V) is None
+    assert gallery.curated_params(_SPEC, _picture(None), _I2V) is None
 
 
 def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
@@ -220,7 +215,7 @@ def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
     spec = {"workflow": "wan22_i2v",
             "params": {"cfg": 1.0, "cfg_high": 0.0, "cfg_low": 0.0, "steps": 8}}
 
-    params = gallery.curated_params(spec, _image_row([{"filename": "a.png", "subfolder": ""}]), _I2V)
+    params = gallery.curated_params(spec, _picture([{"filename": "a.png", "subfolder": ""}]), _I2V)
     samplers = [n for n in _I2V.build_api_payload(params).values()
                 if n["class_type"] == "KSamplerAdvanced"]
 

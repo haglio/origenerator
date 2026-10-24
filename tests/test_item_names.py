@@ -94,3 +94,12 @@ def test_only_a_finished_item_takes_a_number(db, not_an_item):
     names.take([item, other], [], {})
 
     assert (names.of("gen-one"), names.of("gen-two")) == ("", f"{_code(item)} 000")
+
+
+def test_a_name_leads_back_to_the_item_wearing_it(db):
+    first, second = _picture("gen-one", 1), _picture("gen-two", 2)
+    names = ItemNames(db)
+    names.take([second, first], [], {})
+
+    assert names.prompt_id_of(f"{_code(second)} 001") == "gen-two"
+    assert names.prompt_id_of(f"{_code(second)} 002") is None

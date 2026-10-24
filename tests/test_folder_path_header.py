@@ -11,8 +11,8 @@ from origenerator.gui.folder_path_header import FolderPathHeader
 from origenerator.gui.gallery_tree import PathStep
 
 _STEPS = [PathStep("Landscape", None), PathStep("All", "all@landscape"),
-          PathStep("SDXL Text-to-Image", "sdxl@landscape"), PathStep("3A7F2C10", "leaf@landscape")]
-_PATH = "Landscape  ›  All  ›  SDXL Text-to-Image  ›  3A7F2C10"
+          PathStep("SDXL T2I", "sdxl@landscape"), PathStep("3A7F2C10", "leaf@landscape")]
+_PATH = "Landscape  ›  All  ›  SDXL T2I  ›  3A7F2C10"
 
 
 def _header(qtbot):
@@ -31,7 +31,7 @@ def test_every_folder_above_the_one_shown_is_a_link_to_it(qtbot):
 
     header.show_folder(_STEPS)
 
-    assert list(_links(header)) == ["All", "SDXL Text-to-Image"]
+    assert list(_links(header)) == ["All", "SDXL T2I"]
     assert header.display_text() == _PATH
 
 
@@ -50,7 +50,7 @@ def test_a_search_links_every_folder_it_looks_in(qtbot):
 
     header.show_search("Search: “a cat” in ", _STEPS)
 
-    assert list(_links(header)) == ["All", "SDXL Text-to-Image", "3A7F2C10"]
+    assert list(_links(header)) == ["All", "SDXL T2I", "3A7F2C10"]
     assert header.display_text() == f"Search: “a cat” in {_PATH}"
 
 
@@ -83,7 +83,7 @@ def test_the_copy_button_sits_left_of_a_wrapped_path_level_with_its_first_line(q
     column.addWidget(header)
     column.addStretch(1)
     header.show_folder([PathStep("Landscape", None),
-                        *(PathStep("SDXL Text-to-Image", f"k{i}") for i in range(6))])
+                        *(PathStep("SDXL T2I", f"k{i}") for i in range(6))])
     pane.setFixedSize(400, 600)
     pane.show()
     column.activate()

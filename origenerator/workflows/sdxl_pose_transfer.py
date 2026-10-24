@@ -19,7 +19,7 @@ _TARGET_MEGAPIXELS = 1.0
 
 
 class SdxlPoseTransferWorkflow(WorkflowTemplate):
-    """SDXL text-to-image steered by the structure of an input image.
+    """SDXL T2I steered by the structure of an input image.
 
     A variation of :class:`~origenerator.workflows.sdxl_t2i.SdxlT2iWorkflow`
     that re-skins an image: a structure map extracted from the input is applied

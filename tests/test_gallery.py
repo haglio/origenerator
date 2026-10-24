@@ -108,11 +108,11 @@ def test_folder_level_names_the_recipe_levels_and_nothing_else():
 
 def test_config_tab_title_leads_with_model_then_prompt():
     title = config_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
-    assert title == "SDXL Text-to-Image › a cat in a hat"
+    assert title == "SDXL T2I › a cat in a hat"
 
 
 def test_config_tab_title_is_just_the_model_without_a_prompt():
-    assert config_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL Text-to-Image"
+    assert config_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL T2I"
 
 
 def test_config_tab_title_handles_unknown_workflow():
@@ -1101,7 +1101,7 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
     retired = dict(_LOOP_CLIP, prompt_id="old", workflow_name="wan21_ati_i2v")
 
     assert _workflow_labels([retired]) == {
-        "video/wan21_ati_i2v": "WAN 2.1 Image-to-Video (Motion-Tracked)"}
+        "video/wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)"}
 
 
 def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_by_the_recipes_own_name():
@@ -1777,7 +1777,7 @@ def test_child_groups_and_rows_under_walk_the_tree():
 def test_build_gallery_tree_labels_workflow_with_display_name():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1)])
     (wf,) = _workflows(tree)
-    assert wf.label == "SDXL Text-to-Image"
+    assert wf.label == "SDXL T2I"
 
 
 def test_settings_folders_are_named_by_a_code_not_by_their_prompt():

@@ -20,7 +20,7 @@ to a new place in the line. A row says what the job will cost and what kind of
 thing it is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a
 line of waiting work is read to find out how long the wait is, and the
 workflow-and-prompt name that used to be here is the same on every row of a
-folder being re-rolled. Beside that, a picture — the frame an image-to-video
+folder being re-rolled. Beside that, a picture — the frame an I2V
 animates, the gray clip a dropped-video combine takes its settings from, or a
 four-up of the folder the run will land in — because the one picture a queued
 job cannot show is its own.
@@ -337,7 +337,7 @@ class RunningPreview(OpensAFolder, QWidget):
         and the folder's own tile show for that job — the frame, a plus, and the
         recipe clip in gray where a combine brought one
         (:func:`~origenerator.gui.combination_view.combination_pixmap`) — and
-        nothing at all for a run made from nothing, which is a text-to-video with
+        nothing at all for a run made from nothing, which is a T2V with
         no picture to its name yet.
 
         The label is sized to what it draws, since the pair is twice as wide as
@@ -386,7 +386,7 @@ class QueueRow(OpensAFolder, QWidget):
     which was the ten-minute one. It is still a hover away.
 
     The picture is second because that is where it lines up into a column and
-    where the eye lands: the frame an image-to-video animates (with the gray
+    where the eye lands: the frame an I2V animates (with the gray
     recipe video beside it, where one was dropped), or four out of the folder the
     run will land in (:mod:`origenerator.gui.queue_thumbs`).
 

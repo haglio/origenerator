@@ -22,7 +22,7 @@ from origenerator.win32 import APP_USER_MODEL_ID
 
 
 def _outcome(**over):
-    fields = dict(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=252.0,
+    fields = dict(kind="Video", recipe="WAN 2.2 I2V", seconds=252.0,
                   ok=True, source=GenerationSource.GENERATED,
                   generation="7f0c9b2e-1111-4444-8888-aaaabbbbcccc")
     return RunOutcome(**{**fields, **over})
@@ -50,7 +50,7 @@ def test_a_long_run_reaches_the_desktop_as_a_windows_notification(qapp, monkeypa
     notices.note(_outcome())
 
     assert said[0][0] == APP_USER_MODEL_ID
-    assert _lines(said) == ["Video ready", "WAN 2.2 Image-to-Video · 4:12"]
+    assert _lines(said) == ["Video ready", "WAN 2.2 I2V · 4:12"]
 
 
 def test_a_run_nobody_left_the_room_for_says_nothing(qapp, monkeypatch):
@@ -200,7 +200,7 @@ def test_a_mark_that_cannot_be_written_leaves_the_notice_to_speak_for_itself(
 
     notices.note(_outcome())
 
-    assert _lines(said) == ["Video ready", "WAN 2.2 Image-to-Video · 4:12"]
+    assert _lines(said) == ["Video ready", "WAN 2.2 I2V · 4:12"]
     assert _toast(said).find("./visual/binding/image") is None
 
 

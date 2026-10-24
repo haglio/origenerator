@@ -29,7 +29,7 @@ class _ImageConfig:
 def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
     """The prompt_id of the image generation an ``input_image`` value names.
 
-    Image-to-video rows reference their start frame by filename; match it to an
+    I2V rows reference their start frame by filename; match it to an
     image generation by basename (through any ``[output]`` annotation). ``None``
     when the value is empty or none of ``image_rows`` produced a file with that
     name. Takes the bare value so the Generate tab — which has the field, not a
@@ -48,7 +48,7 @@ def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str 
 def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
     """Return the prompt_id of the image used as this row's ``input_image``.
 
-    Image-to-video rows reference their start frame by filename; match it to an
+    I2V rows reference their start frame by filename; match it to an
     image generation by basename. Returns ``None`` when the row has no input
     image or none of ``image_rows`` produced a file with that name.
     """

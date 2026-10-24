@@ -103,7 +103,7 @@ Qwen and bare SDXL UNets together; `loras` holds a LoRA for every one of those,
 plus the occasional full checkpoint filed there by mistake. So a dropdown built
 from a plain folder listing offers runs that can only error — and worse, presents
 them as choices the user is being asked to make. That is exactly how the SDXL
-Text-to-Image form came to show WAN 2.2's high/low expert pairs, with nothing to
+T2I form came to show WAN 2.2's high/low expert pairs, with nothing to
 say which one to pick or that neither belonged.
 
 So every picker states what its graph runs: `list_model_files(category, fallback,

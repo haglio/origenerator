@@ -705,7 +705,7 @@ def test_the_pair_is_repainted_only_when_it_changes(tabs):
 
 @pytest.mark.parametrize("made_from", [Combination(), Combination(recipe_prompt_edited=True)])
 def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs, made_from):
-    # A text-to-video has no picture to stand, so the words are all there is.
+    # A T2V has no picture to stand, so the words are all there is.
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
 

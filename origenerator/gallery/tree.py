@@ -3,7 +3,7 @@
 The gallery view organizes generations as nested folders: Images or
 Videos -> workflow -> model -> LoRA -> [source image] -> settings group
 (rows sharing every setting except per-instance ones: the seed,
-and — for an image-to-video workflow — the specific start-frame *file*. A re-roll
+and — for an I2V workflow — the specific start-frame *file*. A re-roll
 regenerates that frame, so the raw filename is per-instance; but the
 *configuration* that produced the frame is not, so it is folded back into the
 settings key. Two i2v videos built from re-rolls of one image stay together,

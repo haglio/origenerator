@@ -8,7 +8,7 @@ from origenerator.workflows.model_files import NO_LORA, list_model_files
 
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
-    """Flux text-to-image on a GGUF-quantized UNET, with a RealESRGAN upscale.
+    """Flux T2I on a GGUF-quantized UNET, with a RealESRGAN upscale.
 
     Flux is guidance-distilled: it samples at cfg 1.0 with an empty negative, so
     the meaningful "prompt strength" setting is ``FluxGuidance``, not cfg. The GGUF
@@ -32,7 +32,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
 
     name = "flux_t2i_upscaled"
     version = "v002"
-    display_name = "Flux Text-to-Image (Upscaled)"
+    display_name = "Flux T2I"
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
     lora_keys = ("lora",)

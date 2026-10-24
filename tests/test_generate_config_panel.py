@@ -468,7 +468,7 @@ def test_i2v_form_shows_the_measured_size_of_a_real_input_image(blank_panel, tmp
 
 
 def test_manual_size_workflow_form_has_no_deriver(panel):
-    # A text-to-image workflow sizes by hand, so its form gets no deriver and keeps
+    # A T2I workflow sizes by hand, so its form gets no deriver and keeps
     # its own editable width/height (and the swap button), nothing to unlock.
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     form = panel._param_form
@@ -2131,7 +2131,7 @@ def _note(panel):
     return "" if note.isHidden() else note.text().replace("\u200b", "")
 
 
-_RETIRED_NOTE = ("⚠ This was made with WAN 2.1 Image-to-Video (Motion-Tracked), which has been "
+_RETIRED_NOTE = ("⚠ This was made with WAN 2.1 I2V (Motion-Tracked), which has been "
                  "retired, so no new ones can be made. Select a workflow above to make something new.")
 
 
@@ -2186,7 +2186,7 @@ def test_generate_says_why_it_is_grayed_out_beside_such_a_video(saved_panel):
     panel._apply_generate_caption()
 
     assert not panel._generate_pair.isEnabled()
-    assert panel._generate_btn.toolTip() == ("WAN 2.1 Image-to-Video (Motion-Tracked) has been "
+    assert panel._generate_btn.toolTip() == ("WAN 2.1 I2V (Motion-Tracked) has been "
                                              "retired — select a workflow first")
 
 

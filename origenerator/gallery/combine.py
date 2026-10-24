@@ -1,6 +1,6 @@
 """Combine a gallery image with a video recipe into new i2v params.
 
-The gallery already holds both halves of an image-to-video: a video row carries a
+The gallery already holds both halves of an I2V: a video row carries a
 full recipe (workflow + settings + seed), and any image row's output file can seed
 an i2v. This readies a recipe to re-run on a *different* image — the one input a
 user picks — without touching a Generate tab. The recipe is either a past video's

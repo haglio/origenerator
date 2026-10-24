@@ -146,8 +146,8 @@ def job_kind_label(workflow_name: str | None) -> str:
     Three answers, because they are what a queued job costs: an "Image" is
     seconds, a "Video" is minutes, and an "Enhance" is a second pass over
     something already made. The workflow's own display name is beside this in
-    the row and answers none of them — "WAN 2.2 Image-to-Video (Looping)" and
-    "WAN 2.2 Image-to-Video" are the same kind of ask, at the same price.
+    the row and answers none of them — "WAN 2.2 I2V (Looping)" and
+    "WAN 2.2 I2V" are the same kind of ask, at the same price.
 
     ``""`` for a workflow this build doesn't have registered — an old import,
     say. A row that says nothing about its kind is read as unknown; one that

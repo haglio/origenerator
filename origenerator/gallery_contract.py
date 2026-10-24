@@ -60,7 +60,7 @@ OPTIONAL_COLUMNS = (
 #: ``checkpoint``.  The first present is the model.
 PARAMS_MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 
-#: Inside ``params_json``, the start frame an image-to-video run was animated
+#: Inside ``params_json``, the start frame an I2V run was animated
 #: from, as ComfyUI's LoadImage recorded it.
 PARAMS_INPUT_IMAGE_KEY = "input_image"
 

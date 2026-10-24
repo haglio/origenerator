@@ -38,7 +38,7 @@ _SPEECH_SHIFT = 8.0
 
 
 class Wan22I2vWorkflow(WorkflowTemplate):
-    """WAN 2.2 14B image-to-video, dual-noise (high/low) sampling.
+    """WAN 2.2 14B I2V, dual-noise (high/low) sampling.
 
     Reproduces the ``wan22_14b_i2v_dual_noise_template`` ComfyUI graph: a single
     input image is encoded with CLIP-Vision and fed to ``WanImageToVideo``, then
@@ -64,7 +64,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     name = "wan22_i2v"
     version = "v007"
-    display_name = "WAN 2.2 Image-to-Video"
+    display_name = "WAN 2.2 I2V"
     output_type = MediaType.VIDEO
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")

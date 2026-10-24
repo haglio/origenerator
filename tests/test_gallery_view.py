@@ -11138,6 +11138,32 @@ def test_another_images_tab_can_still_generate_while_the_first_runs(qtbot, tmp_p
     assert second._cancel_btn.isHidden() is True
 
 
+def test_a_setting_that_moves_the_folder_frees_generate_and_moving_back_grays_it(
+        qtbot, tmp_path):
+    # Reported: a run in flight grays Generate ("This folder is already making
+    # one"), and a changed LoRA, which puts the next run in another folder, left
+    # it grayed until the run ended. Any setting that moves the folder does it.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    panel.use_random_seed()
+    panel._on_generate()
+    assert panel._generate_btn.isEnabled() is False
+    steps = panel._param_form._widgets["steps"]
+
+    steps.setValue(_SDXL.default_params()["steps"] + 1)
+
+    assert panel._generate_btn.isEnabled() is True
+    qtbot.waitUntil(lambda: "already making" not in panel._generate_btn.toolTip())
+
+    steps.setValue(_SDXL.default_params()["steps"])
+
+    assert panel._generate_btn.isEnabled() is False
+    qtbot.waitUntil(lambda: "already making" in panel._generate_btn.toolTip())
+
+
 def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
     # When the run ends the tab drops Cancel and Generate returns.
     client = _reroll_client()

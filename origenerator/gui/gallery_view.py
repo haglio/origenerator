@@ -970,6 +970,8 @@ class GalleryView(QWidget):
         panel.animated_activated.connect(self.follow_link)
         panel.go_to_folder_requested.connect(self.follow_link)
         panel.set_folder_check(self._can_open_containing_folder)
+        panel.set_making_one_check(
+            lambda config: self._config_folder_key(config) in self._live_jobs)
         # Its preview's corners and its right-click are the same acts, on the same
         # generation, as a browser thumbnail's — so they land in the same places.
         panel.item_action_requested.connect(self.run_item_action)
@@ -1312,14 +1314,13 @@ class GalleryView(QWidget):
         for a caller holding the row rather than a config."""
         return gallery.settings_folder_key(row, self.image_config_index())
 
-    def _panel_reroll_key(self, panel) -> str:
-        """The settings-folder key the config in ``panel`` would run in."""
-        config = panel.current_config()
+    def _config_folder_key(self, config) -> str:
+        """The settings-folder key ``config`` would run in."""
         return self.folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
         """Point every config tab's discard button at the run *it* launched, and
-        turn its Generate off while its folder is making one.
+        have its Generate ask again whether its folder is making one.
 
         A tab follows the *oldest still alive* of its own runs — the one nearest to
         being made, and so the one its button discards — across a chained i2v's
@@ -1331,7 +1332,6 @@ class GalleryView(QWidget):
         front tab. Every tab is reconciled, not just the front one, so a run
         launched from a tab that is now under another still shows there.
         """
-        making_one = set(self._live_jobs)
         for panel in self._info_tabs.config_panels():
             live = [(origin, job) for origin in panel.launched_runs()
                     if (job := self._jobs.job_for_origin(origin)) is not None]
@@ -1340,7 +1340,7 @@ class GalleryView(QWidget):
             job = live[0][1] if live else None  # the oldest still alive: nearest done
             panel.set_generating(job is not None,
                                  auto_generating=self._auto_generating(job))
-            panel.note_folder_generating(self._panel_reroll_key(panel) in making_one)
+            panel.reread_generate_button()
         self._combine.reconcile_generating()
 
     def _auto_generating(self, job) -> bool:
@@ -1378,7 +1378,7 @@ class GalleryView(QWidget):
         job = self._jobs.newest_job_for(key)
         if panel is None or job is None or panel.workflow_and_signature() is None:
             return
-        if self._panel_reroll_key(panel) == key:
+        if self._config_folder_key(panel.current_config()) == key:
             panel.note_launched(job.origin)
             self._info_tabs.pin_tab(panel)
             self._reconcile_generating()  # the launch's own reconcile ran before this
@@ -3306,7 +3306,7 @@ class GalleryView(QWidget):
         if panel is None:
             front = tabs.current_config_panel()
             if (front is not None and front.workflow_and_signature() is not None
-                    and self._panel_reroll_key(front) == key):
+                    and self._config_folder_key(front.current_config()) == key):
                 panel = front
             else:
                 panel = tabs.landing_panel()

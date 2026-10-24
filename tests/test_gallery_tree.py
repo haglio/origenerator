@@ -9,9 +9,15 @@ from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
 
 from origenerator import gallery
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, SIDE_LABELS
 from origenerator.gui.folder_tree import DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
-from origenerator.gui.gallery_tree import GROUP_ROLE, GalleryTree, SideModel
+from origenerator.gui.gallery_tree import (
+    GROUP_ROLE,
+    PATH_SEPARATOR,
+    GalleryTree,
+    PathStep,
+    SideModel,
+)
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.orientation import base_of, side_of
 
@@ -205,31 +211,26 @@ def _first_frame(prompt_id):
                 f"renamed_{prompt_id}.png")
 
 
-def test_every_row_is_found_again_by_the_path_it_shows(qtbot):
+def _rows_down_to(row):
+    held_by = []
+    while row is not None:
+        held_by.append(row)
+        row = row.parent()
+    return held_by[::-1]
+
+
+def test_a_rows_path_steps_from_its_side_down_through_every_row_holding_it(qtbot):
     _pane, tree, _model = _gathered_tree(
         qtbot, [_image("i1", "a cat"), _video("v1", "style_a"), _first_frame("f1")],
         _keepers_holding_the_images)
-    rows = tree.item_by_key
 
-    assert len({tree.breadcrumb(row) for row in rows.values()}) == len(rows) > 30
-    for key, row in rows.items():
-        assert tree.key_at_path(tree.breadcrumb(row)) == key, tree.breadcrumb(row)
-
-
-def test_a_path_is_found_whatever_its_spacing_or_capitals(qtbot):
-    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat")])
-    latest = tree.key_at_path("Landscape  ›  All  ›  Latest")
-
-    assert latest is not None
-    assert tree.key_at_path(" landscape ›all›   LATEST ") == latest
-
-
-def test_a_path_no_row_has_finds_nothing(qtbot):
-    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat")])
-
-    for path in ("", "Landscape", "Landscape  ›  All  ›  Nowhere",
-                 "Sideways  ›  All", "All  ›  Latest", "Landscape  ›  Latest"):
-        assert tree.key_at_path(path) is None, path
+    for key, row in tree.item_by_key.items():
+        side, *steps = tree.path_steps(row)
+        assert side == PathStep(SIDE_LABELS[side_of(key)], None)
+        assert [step.key for step in steps] == [
+            held.data(0, TREE_KEY_ROLE) for held in _rows_down_to(row)]
+        assert tree.breadcrumb(row) == PATH_SEPARATOR.join(
+            step.name for step in (side, *steps))
 
 
 def _drawn_down(row):

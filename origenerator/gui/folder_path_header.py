@@ -1,83 +1,46 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QLabel, QLineEdit, QStackedLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QWidget
+from shared_ui.folder_path import FolderPath
+from shared_ui.spacing import GAP_MEDIUM
 
-_STILL_IN_THE_FIELD = (Qt.FocusReason.PopupFocusReason,
-                       Qt.FocusReason.ActiveWindowFocusReason)
-
-
-class _PathField(QLineEdit):
-    dismissed = pyqtSignal()
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape:
-            self.dismissed.emit()
-        else:
-            super().keyPressEvent(event)
-
-    def focusOutEvent(self, event):
-        super().focusOutEvent(event)
-        if event.reason() not in _STILL_IN_THE_FIELD:
-            self.dismissed.emit()
+from origenerator.gui.copy_button import CopyButton
+from origenerator.gui.gallery_tree import PATH_SEPARATOR, PathStep
 
 
 class FolderPathHeader(QWidget):
-    edit_requested = pyqtSignal()
-    entered = pyqtSignal(str)
+    folder_chosen = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._stack = QStackedLayout(self)
-        self._stack.setContentsMargins(0, 0, 0, 0)
+        self._keys: tuple[str | None, ...] = ()
+        self._path = FolderPath(PATH_SEPARATOR)
+        self._path.setWordWrap(True)
+        self._path.setStyleSheet("font-size: 15px; font-weight: 600; padding: 2px;")
+        self._path.step_clicked.connect(lambda step: self.folder_chosen.emit(self._keys[step]))
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(GAP_MEDIUM)
+        row.addWidget(CopyButton(self.display_text), 0, Qt.AlignmentFlag.AlignTop)
+        row.addWidget(self._path, 1)
 
-        self._label = QLabel("")
-        self._label.setWordWrap(True)
-        self._label.setStyleSheet("font-size: 15px; font-weight: 600; padding: 2px;")
-        self._stack.addWidget(self._label)
+    def show_folder(self, steps: Sequence[PathStep]) -> None:
+        self._show(steps, links_among=steps[:-1])
 
-        self._edit = _PathField()
-        self._edit.setPlaceholderText("Paste a folder's path")
-        self._edit.returnPressed.connect(self._on_entered)
-        self._edit.dismissed.connect(self._close_field)
-        self._stack.addWidget(self._edit)
+    def show_search(self, words: str, steps: Sequence[PathStep]) -> None:
+        self._show(steps, links_among=steps, lead=words)
 
-    def set_display(self, text: str):
-        self._label.setText(text)
+    def set_display(self, text: str) -> None:
+        self._show([PathStep(text, None)], links_among=())
+
+    def _show(self, steps: Sequence[PathStep], *, links_among: Sequence[PathStep],
+              lead: str = "") -> None:
+        self._keys = tuple(step.key for step in steps)
+        self._path.set_path([step.name for step in steps], lead=lead,
+                            linked=[i for i, step in enumerate(links_among) if step.key])
 
     def display_text(self) -> str:
-        return self._label.text()
-
-    def begin_edit(self, path: str):
-        self._edit.setText(path)
-        self._stack.setCurrentWidget(self._edit)
-        self._edit.setFocus()
-        self._edit.selectAll()
-
-    def heightForWidth(self, width: int) -> int:
-        if self._editing():
-            return self._edit.sizeHint().height()
-        return self._label.heightForWidth(width)
-
-    def sizeHint(self):
-        return self._edit.sizeHint() if self._editing() else self._label.sizeHint()
-
-    def minimumSizeHint(self):
-        return (self._edit.minimumSizeHint() if self._editing()
-                else self._label.minimumSizeHint())
-
-    def _editing(self) -> bool:
-        return self._stack.currentWidget() is self._edit
-
-    def _on_entered(self):
-        path = self._edit.text()
-        self._close_field()
-        self.entered.emit(path)
-
-    def _close_field(self):
-        self._stack.setCurrentWidget(self._label)
-
-    def mouseDoubleClickEvent(self, event):
-        if not self._editing():
-            self.edit_requested.emit()
-        super().mouseDoubleClickEvent(event)
+        return self._path.plain_text()

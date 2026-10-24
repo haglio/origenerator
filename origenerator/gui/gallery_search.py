@@ -63,7 +63,7 @@ class SearchHost(Protocol):
     def show_search_results(self, tiles, **terms) -> None:
         """Hand the pane the results to draw."""
 
-    def name_search_on_screen(self, query: str, scope: str) -> None:
+    def name_search_on_screen(self, query: str, scope) -> None:
         """Say in the header that a search is what the pane is showing."""
 
     def search_results_drawn(self) -> None:
@@ -203,7 +203,7 @@ class GallerySearchController(QObject):
             self._query, expansions=self._expansions, within=scope.ids
         )
         self._tiles = self._collapse_to_folders(self._outcome.results)
-        self._host.name_search_on_screen(self._query, scope.path)
+        self._host.name_search_on_screen(self._query, scope)
         self._count.setText(self._count_text())
         self.bar.show()
         self._host.show_search_results(

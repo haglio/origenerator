@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QTreeWidgetItem
@@ -64,6 +65,15 @@ _COLLECTION_TIPS = {
 PATH_SEPARATOR = "  ›  "
 
 
+class PathStep(NamedTuple):
+    name: str
+    key: str | None
+
+
+def path_text(steps) -> str:
+    return PATH_SEPARATOR.join(step.name for step in steps)
+
+
 def _name_of(row) -> str:
     group = row.data(0, GROUP_ROLE)
     return group.label if group is not None else row.text(0)
@@ -71,10 +81,6 @@ def _name_of(row) -> str:
 
 def _children(row) -> Iterator[QTreeWidgetItem]:
     return (row.child(i) for i in range(row.childCount()))
-
-
-def _same_name(typed: str, name: str) -> bool:
-    return " ".join(typed.split()).casefold() == " ".join(name.split()).casefold()
 
 
 def _tooltip_of(group, badge) -> str:
@@ -319,7 +325,7 @@ class GalleryTree:
         item = self._tree.currentItem()
         return item.data(0, TREE_KEY_ROLE) if item is not None else None
 
-    def breadcrumb(self, item) -> str:
+    def path_steps(self, item) -> list[PathStep]:
         """The path down to ``item``, led by its side.
 
         The side comes from the row's own key rather than from a row above it —
@@ -328,26 +334,15 @@ class GalleryTree:
         are standing in. The header over the browser pane is a long way from
         the label over the half you clicked.
         """
-        parts = []
+        steps = []
         node = item
         while node is not None:
-            parts.append(_name_of(node))
+            steps.append(PathStep(_name_of(node), node.data(0, TREE_KEY_ROLE)))
             node = node.parent()
         side = side_of(item.data(0, TREE_KEY_ROLE)) if item is not None else None
         if side is not None:
-            parts.append(SIDE_LABELS[side])
-        return PATH_SEPARATOR.join(reversed(parts))
+            steps.append(PathStep(SIDE_LABELS[side], None))
+        return steps[::-1]
 
-    def key_at_path(self, path: str) -> str | None:
-        side_name, *names = path.split(PATH_SEPARATOR.strip())
-        side = next((side for side, label in SIDE_LABELS.items()
-                     if _same_name(side_name, label)), None)
-        if side is None or not names:
-            return None
-        row = self._tree.root_for(side)
-        for name in names:
-            row = next((child for child in _children(row)
-                        if _same_name(name, _name_of(child))), None)
-            if row is None:
-                return None
-        return row.data(0, TREE_KEY_ROLE)
+    def breadcrumb(self, item) -> str:
+        return path_text(self.path_steps(item))

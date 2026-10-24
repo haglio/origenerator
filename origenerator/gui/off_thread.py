@@ -6,9 +6,9 @@ run inline it froze the whole window for exactly as long — most visibly on a
 spoken animation, where the window is a fullscreen picture and the freeze is all
 there is to look at.
 
-Deliberately tiny: Qt's global pool does the running, and the result crosses
-back through a queued signal, so ``done`` runs on the thread that called this —
-free to touch widgets, the database, and everything else the caller owns.
+Deliberately tiny: Qt's global pool, or a daemon thread for a call that may wait
+minutes, does the running, and the result crosses back through a queued signal,
+so ``done`` runs on the calling thread, free to touch all the caller owns.
 
 Queued is what makes the carrier's lifetime the whole problem here: between the
 pool thread's emit and the delivery a turn later, anything that frees the
@@ -18,6 +18,7 @@ handler leaves Qt to call a function that no longer exists. See
 from __future__ import annotations
 
 import logging
+import threading
 
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
@@ -56,7 +57,7 @@ class _Task(QRunnable):
             logger.info("An off-thread answer came back after the app let go of it")
 
 
-def run_off_thread(work, done, *, owner: QObject) -> None:
+def run_off_thread(work, done, *, owner: QObject, waits_long: bool = False) -> None:
     """Call ``work()`` on the global pool, then ``done(result)`` back on this
     thread -- unless ``owner`` has been deleted by then.
 
@@ -87,4 +88,8 @@ def run_off_thread(work, done, *, owner: QObject) -> None:
         done(value)
 
     result.ready.connect(deliver)
-    QThreadPool.globalInstance().start(_Task(work, result))
+    task = _Task(work, result)
+    if waits_long:
+        threading.Thread(target=task.run, name="off-thread wait", daemon=True).start()
+    else:
+        QThreadPool.globalInstance().start(task)

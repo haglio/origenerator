@@ -804,11 +804,9 @@ class JobQueue(QObject):
 
         Nothing of it is running on the server, so there is nothing to rebind
         to and nothing lost by rebuilding it: the job comes back under the row's
-        own prompt id and waits its turn like any other — asking, when the turn
-        comes, after any run of it the line had set aside
-        (:meth:`GenerationJob.readopt`). One whose workflow the app no longer
-        has is deleted instead — it could never be sent, and left alone it
-        would sit in the queue forever.
+        own prompt id and waits its turn like any other. One whose workflow the
+        app no longer has is deleted instead — it could never be sent, and left
+        alone it would sit in the queue forever.
         """
         key = gallery.settings_folder_key(row, image_index)
         if self.job_for_prompt(row["prompt_id"]) is not None:
@@ -817,9 +815,9 @@ class JobQueue(QObject):
         try:
             if workflow is None:
                 raise ValueError(f"unknown workflow {row.get('workflow_name')!r}")
-            job = GenerationJob.readopt(
+            job = GenerationJob(
                 self._client, workflow, gallery.parse_params(row.get("params_json")),
-                row["prompt_id"], source=source_of(row),
+                prompt_id=row["prompt_id"], source=source_of(row),
             )
         except Exception as e:
             logger.warning("Dropping a queued generation we can no longer build: %s", e)

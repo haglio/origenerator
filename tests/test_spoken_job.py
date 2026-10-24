@@ -32,6 +32,9 @@ def _client():
     client = ComfyUIClient()
     client.submit_job = MagicMock(return_value="comfy-A")
     client.free_memory = MagicMock()
+    # Every send asks after an earlier run of its id first; answered here,
+    # never by a server on the machine.
+    client.fetch_history = MagicMock(return_value={})
     return client
 
 

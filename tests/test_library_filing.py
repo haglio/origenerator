@@ -4,7 +4,7 @@ from pathlib import Path
 from origenerator.library_filing import (
     file_into_library,
     file_what_comfyui_left,
-    handed_to_comfyui,
+    saving_into_its_run_folder,
 )
 from origenerator.output_places import OutputPlaces
 
@@ -20,7 +20,7 @@ def test_a_run_saves_into_a_folder_of_its_own_in_comfyuis_folder(tmp_path):
     payload = {"9": {"class_type": "SaveImage",
                      "inputs": {"images": ["8", 0], "filename_prefix": "image/alpha_t2i"}}}
 
-    handed = handed_to_comfyui(payload, _places(tmp_path), "run-one").payload
+    handed = saving_into_its_run_folder(payload, _places(tmp_path), "run-one")
 
     assert handed["9"]["inputs"]["filename_prefix"] == "origenerator/run-one/image/alpha_t2i"
     assert payload["9"]["inputs"]["filename_prefix"] == "image/alpha_t2i"
@@ -93,64 +93,6 @@ def test_the_runs_folder_goes_once_everything_in_it_is_filed(tmp_path):
     assert not places.run("run-four").exists()
 
 
-def test_a_past_output_a_run_reads_is_handed_to_comfyui_as_a_copy_in_the_runs_folder(tmp_path):
-    places = _places(tmp_path)
-    picture = places.folder("image") / "alpha_t2i_00042_.png"
-    picture.parent.mkdir(parents=True)
-    picture.write_bytes(b"the picture")
-    payload = {"3": {"class_type": "LoadImage",
-                     "inputs": {"image": "image/alpha_t2i_00042_.png [output]"}}}
-
-    handed = handed_to_comfyui(payload, places, "run-five")
-    handed.copy_reads()
-
-    reference = handed.payload["3"]["inputs"]["image"]
-    assert reference == "origenerator/run-five/reads/image/alpha_t2i_00042_.png [output]"
-    assert (places.comfyui / reference.removesuffix(" [output]")).read_bytes() == b"the picture"
-    assert picture.read_bytes() == b"the picture"
-
-
-def test_a_picture_picked_from_anywhere_on_disk_is_handed_over_as_a_copy_too(tmp_path):
-    places = _places(tmp_path)
-    picked = tmp_path / "poses" / "standing.png"
-    picked.parent.mkdir()
-    picked.write_bytes(b"a pose")
-    payload = {"5": {"class_type": "LoadImage", "inputs": {"image": str(picked)}}}
-
-    handed = handed_to_comfyui(payload, places, "run-six")
-    handed.copy_reads()
-
-    reference = handed.payload["5"]["inputs"]["image"]
-    assert reference.endswith(" [output]")
-    assert (places.comfyui / reference.removesuffix(" [output]")).read_bytes() == b"a pose"
-
-
-def test_a_reference_to_a_file_that_is_gone_is_left_for_comfyui_to_refuse(tmp_path):
-    payload = {"3": {"class_type": "LoadImage", "inputs": {"image": "image/gone_00001_.png [output]"}}}
-
-    handed = handed_to_comfyui(payload, _places(tmp_path), "run-seven")
-
-    assert handed.payload["3"]["inputs"]["image"] == "image/gone_00001_.png [output]"
-    assert handed.reads == ()
-
-
-def test_the_copies_a_run_read_go_once_its_outputs_are_filed(tmp_path):
-    places = _places(tmp_path)
-    picture = places.folder("image") / "alpha_t2i_00042_.png"
-    picture.parent.mkdir(parents=True)
-    picture.write_bytes(b"the picture")
-    handed_to_comfyui({"3": {"class_type": "LoadImage",
-                             "inputs": {"image": "image/alpha_t2i_00042_.png [output]"}}},
-                      places, "run-eight").copy_reads()
-    _saved_by_comfyui(places, "run-eight", "image", "alpha_enhance_00001_.png")
-
-    file_into_library([_listed("run-eight", "image", "alpha_enhance_00001_.png")],
-                      places, "run-eight")
-
-    assert not places.run("run-eight").exists()
-    assert picture.read_bytes() == b"the picture"
-
-
 def test_what_another_program_saved_in_a_folder_of_comfyuis_is_filed_where_that_folder_names(
         tmp_path):
     places = _places(tmp_path)
@@ -201,15 +143,13 @@ def test_a_run_still_in_flight_is_left_waiting_in_comfyuis_folder(tmp_path):
     assert waiting.is_file()
 
 
-def test_a_run_nobody_finished_has_its_outputs_filed_and_its_copies_cleared(tmp_path):
+def test_a_run_nobody_finished_has_its_outputs_filed_and_its_folder_cleared(tmp_path):
     places = _places(tmp_path)
     _saved_by_comfyui(places, "run-ten", "image", "alpha_t2i_00001_.png")
-    _saved_by_comfyui(places, "run-ten", "reads/image", "alpha_t2i_00009_.png", data=b"copy")
 
     assert file_what_comfyui_left(places, in_flight=set()) == 1
 
     assert (places.pictures / "alpha_t2i_00001_.png").read_bytes() == b"new"
-    assert not (places.pictures / "alpha_t2i_00009_.png").exists()
     assert not places.run("run-ten").exists()
 
 

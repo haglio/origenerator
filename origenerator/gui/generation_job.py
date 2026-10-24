@@ -28,7 +28,7 @@ from origenerator import provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, SPEECH_PYTHON, THUMB_DIR
 from origenerator.generation_state import GenerationSource
-from origenerator.library_filing import forget_the_runs_copies, handed_to_comfyui
+from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
 from origenerator.thumbnail import frame_thumbnail
@@ -131,9 +131,8 @@ class GenerationJob(QObject):
         # user work it must never cancel.
         self.source = source
         self.prompt_id = prompt_id or str(uuid.uuid4())  # also ComfyUI's id, and the DB row key
-        self._handed = handed_to_comfyui(
+        self.payload = saving_into_its_run_folder(
             workflow.build_api_payload(self.params), places, self.prompt_id)
-        self.payload = self._handed.payload
         # Which run this job belongs to. Its own prompt normally — but a chained
         # i2v is two prompts that are one run to whoever asked for it, so the
         # second stage is given the first's id (see JobQueue._launch).
@@ -371,7 +370,6 @@ class GenerationJob(QObject):
                 if history is not None:
                     landed.append(history)
                     return
-            self._handed.copy_reads()
             self._client.submit_job(self.payload, self.prompt_id)
 
         try:
@@ -430,7 +428,6 @@ class GenerationJob(QObject):
         self._detach()
         self._stop_on_server()
         self._state = JobState.CANCELED
-        forget_the_runs_copies(self._places, self.prompt_id)
 
     def defer(self) -> bool:
         """Take the job off the server to be sent again later, and say whether
@@ -595,7 +592,6 @@ class GenerationJob(QObject):
             return
         self._detach()
         self._state = JobState.FAILED
-        forget_the_runs_copies(self._places, self.prompt_id)
         self.failed.emit(message)
 
 

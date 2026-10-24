@@ -106,9 +106,6 @@ class FolderTile(QFrame):
     def set_favorite(self, favorite: bool) -> None:
         self._caption.setText(self._captioned(favorite))
 
-    def is_selected(self) -> bool:
-        return self._selected
-
     def set_selected(self, selected: bool) -> None:
         if selected == self._selected:
             return

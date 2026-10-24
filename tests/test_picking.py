@@ -1,4 +1,4 @@
-"""Which thumbnails are picked, with no pane and no Qt around it.
+"""Which entries are picked, with no pane and no Qt around it.
 
 The rule is a file browser's, and it used to be three fields and fourteen lines
 among the pane's widgets: the only way to ask what a Shift-click would pick was to
@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-from origenerator.gui.thumbnail_selection import ThumbnailSelection
+from origenerator.gui.picking import Picking
 
 
 @pytest.fixture
 def picked():
     def build(*shown):
-        selection = ThumbnailSelection()
+        selection = Picking()
         for prompt_id in shown:
             selection.note_shown(prompt_id)
         return selection

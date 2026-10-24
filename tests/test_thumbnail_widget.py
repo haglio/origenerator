@@ -389,7 +389,7 @@ def test_a_collections_own_actions_keep_the_top_left_edge_to_themselves(qtbot):
 def test_thumbnail_starts_unselected(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)
-    assert tw.is_selected() is False
+    assert tw._selected is False
     assert tw.styleSheet() == ""  # no selection fill at rest
 
 

@@ -100,7 +100,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     written out a second time went, and with them the three predicates only that
     second copy asked. The pane keeps 74 while its three selection fields go: which
     tiles are picked, the anchor a Shift-click measures from and the order they
-    are shown are a `ThumbnailSelection` now, so what stays are delegations, and the
+    are shown are a `Picking` now, so what stays are delegations, and the
     five collections are one `PaneCollection` record apiece rather than a branch in each of two
     chains. 74 -> 75: the card for a run still in flight was built by hand on
     Latest, in a folder and on Requests, and is one method now, so Requests can

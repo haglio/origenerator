@@ -2284,7 +2284,7 @@ def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot
     assert _selected_folder(view) == gallery.settings_folder_key(experiment)
     assert view.visible_prompt_ids() == ["e1"]  # its own settings folder, not i1's
     assert view.selected_prompt_ids() == ["e1"]  # landed selected
-    assert view._browser._thumb_widgets["e1"].is_selected()
+    assert view._browser._thumb_widgets["e1"]._selected
 
 
 def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
@@ -3132,7 +3132,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     # The item lands selected — its tile picked and highlighted, not merely
     # previewed — as if we'd navigated in and clicked it.
     assert view.selected_prompt_ids() == ["i2"]         # landed selected
-    assert view._browser._thumb_widgets["i2"].is_selected()
+    assert view._browser._thumb_widgets["i2"]._selected
 
 
 def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
@@ -4807,7 +4807,7 @@ def test_following_a_source_link_lands_on_the_image_itself(qtbot):
     view.follow_link("i7")                    # follow its source-image link
 
     assert view.selected_prompt_ids() == ["i7"]
-    assert view._browser._thumb_widgets["i7"].is_selected()
+    assert view._browser._thumb_widgets["i7"]._selected
     assert _in_view(view, "i7")
 
 
@@ -4987,7 +4987,7 @@ def test_back_to_recents_restores_the_item_selected_on_the_collection(qtbot):
     view._navigation.go_back()
     assert view._browser.showing_recents()                       # back in the collection...
     assert view.selected_generation() == "i2"            # ...with i2 previewed again
-    assert view._browser._thumb_widgets["i2"].is_selected()       # and its tile re-highlighted
+    assert view._browser._thumb_widgets["i2"]._selected       # and its tile re-highlighted
 
 
 def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
@@ -5026,8 +5026,8 @@ def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
 
     view._navigation.go_back()
 
-    assert view._browser._thumb_widgets["i1"].is_selected()
-    assert not view._browser._thumb_widgets["i2"].is_selected()
+    assert view._browser._thumb_widgets["i1"]._selected
+    assert not view._browser._thumb_widgets["i2"]._selected
 
 
 def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
@@ -5042,7 +5042,7 @@ def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
     view._navigation.go_back()
 
     assert view.selected_generation() == "i1"
-    assert view._browser._thumb_widgets["i1"].is_selected()
+    assert view._browser._thumb_widgets["i1"]._selected
 
 
 def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
@@ -5940,7 +5940,7 @@ def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert set(view.visible_prompt_ids()) == {"i1", "i2"}
-    assert not any(w.is_selected() for w in view._browser._thumb_widgets.values())
+    assert not any(w._selected for w in view._browser._thumb_widgets.values())
 
 
 def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
@@ -8345,7 +8345,7 @@ def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(
 
     assert view._tree.currentItem() is all_row
     assert view._browser.selected_ids == set()
-    picked = [tile.key for tile in _folder_squares(view) if tile.is_selected()]
+    picked = [tile.key for tile in _folder_squares(view) if tile._selected]
     assert picked == [_folder_square_holding(view, shown)]
 
 
@@ -8370,7 +8370,7 @@ def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_cam
     slideshow.close()
 
     assert view._tree.currentItem() is collection
-    picked = [tile.key for tile in _folder_squares(view) if tile.is_selected()]
+    picked = [tile.key for tile in _folder_squares(view) if tile._selected]
     assert picked == [bookmarked]
 
 
@@ -8397,7 +8397,7 @@ def test_the_picture_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_
     view.refresh()
     qtbot.wait(1)
 
-    assert view._browser._thumb_widgets[far].is_selected()
+    assert view._browser._thumb_widgets[far]._selected
     assert _in_view(view, far)
 
 
@@ -8443,7 +8443,7 @@ def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(q
     view.set_items_favorite([view.visible_prompt_ids()[0]], False)
     qtbot.wait(1)
 
-    assert view._browser._thumb_widgets[far].is_selected()
+    assert view._browser._thumb_widgets[far]._selected
     assert _in_view(view, far)
 
 
@@ -9173,7 +9173,7 @@ def test_selecting_the_reroll_highlights_its_tile_and_drops_thumbnail_picks(qtbo
 
     _generating_tile(view).selected.emit()
 
-    assert _generating_tile(view).is_selected()
+    assert _generating_tile(view)._selected
     assert view.selected_prompt_ids() == []  # the thumbnail pick is cleared
 
 
@@ -9408,7 +9408,7 @@ def test_clicking_add_opens_a_tab_on_the_run_it_started(qtbot, tmp_path):
 
     assert view._info_tabs.current_config_panel().watched_key() == key
     assert view._selected_reroll_key == key
-    assert _generating_tile(view).is_selected()
+    assert _generating_tile(view)._selected
 
 
 def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, tmp_path):
@@ -9539,7 +9539,7 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     view._poll()  # the rebuild the new running row triggers
 
     assert view._selected_reroll_key == key
-    assert _generating_tile(view).is_selected()
+    assert _generating_tile(view)._selected
     # The tab following the run kept its frame: a rebuild repaints no tab.
     assert view._info_tabs.current_config_panel() is panel
     assert panel.watched_key() == key and _frame_shown(panel._preview, frame)
@@ -10494,7 +10494,7 @@ def test_clicking_an_enhancements_row_in_the_queue_goes_to_its_image(qtbot, tmp_
     qtbot.mouseClick(row, Qt.MouseButton.LeftButton)
 
     assert view.selected_prompt_ids() == ["g1"]
-    assert view._browser._thumb_widgets["g1"].is_selected()
+    assert view._browser._thumb_widgets["g1"]._selected
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == "g1"
 
 

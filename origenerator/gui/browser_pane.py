@@ -68,7 +68,7 @@ from origenerator.gui.pane_place import (
     place_of,
     stand_at,
 )
-from origenerator.gui.thumbnail_selection import ThumbnailSelection
+from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
 from origenerator.orientation import base_of, filter_rows, key_holds, split_key
@@ -380,8 +380,8 @@ class BrowserPane(QObject):
         }
         # Which tiles are picked, the anchor a Shift-click measures its run
         # from, and what is on screen in the order it is shown
-        # (:mod:`origenerator.gui.thumbnail_selection`).
-        self._selection = ThumbnailSelection()
+        # (:mod:`origenerator.gui.picking`).
+        self._selection = Picking()
         self._visible_keys: list[str] = []  # folders on screen (tile overview)
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
         self._wired: dict[str, str] = {}      # how each drawn tile is wired

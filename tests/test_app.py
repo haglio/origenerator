@@ -1496,6 +1496,35 @@ class TestAnOverlayShortOfAKey:
         window.show.assert_called_once()
 
 
+class TestACopyThatWouldStartALibraryOfItsOwn:
+    """A checkout that is neither the production one nor started as a preview
+    would open a database of its own beside the library's pictures and Trash."""
+
+    def test_it_stops_before_it_opens_a_database(self, qapp, monkeypatch):
+        monkeypatch.setattr(config, "STARTS_A_LIBRARY_OF_ITS_OWN", True)
+        opened = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.db.Database": opened,
+            "PyQt6.QtWidgets.QMessageBox.critical": MagicMock(),
+        }):
+            code = main([])
+
+        assert code != 0
+        opened.assert_not_called()
+
+    def test_it_says_where_it_runs_from_and_how_a_branch_is_started(self, qapp, monkeypatch):
+        monkeypatch.setattr(config, "STARTS_A_LIBRARY_OF_ITS_OWN", True)
+        told = MagicMock()
+
+        with _a_faked_boot([], **{"PyQt6.QtWidgets.QMessageBox.critical": told}):
+            main([])
+
+        said = " ".join(str(arg) for arg in told.call_args.args)
+        assert str(config.PROJECT_DIR) in said
+        assert "launch_preview_branch.vbs" in said
+
+
 class TestWhenEvolverHasBeenRenamedUnderUs:
     """Four values decide where a sent clip lands and whether Evolver picks it
     up, and each is written down in both apps. A rename on either side used to

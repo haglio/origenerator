@@ -617,6 +617,20 @@ def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     return 1
 
 
+def _refuse_a_library_of_its_own(checkout: Path, fun_time) -> int:
+    message = (
+        f"This copy runs from {checkout}, which is not the production Origenerator's "
+        "folder, and it was not started as a preview, so it would open a gallery of "
+        "its own beside yours. It does not start. A branch's copy starts with the "
+        "launch_preview_branch.vbs in its folder."
+    )
+    print(f"Origenerator: {message}", file=sys.stderr)
+    if fun_time is None:
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.critical(None, "Origenerator: not the production copy", message)
+    return 1
+
+
 def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
     """Name every value the two apps have stopped spelling the same, and open.
 
@@ -689,6 +703,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     if missing:
         return _refuse_an_incomplete_overlay(missing, fun_time)
 
+    from origenerator import config
     from origenerator.config import (
         COMFYUI_DIR,
         COMFYUI_HOST,
@@ -703,6 +718,9 @@ def _boot_and_run(app, app_args, preview) -> int:
         TRASH_DIR,
         UI_STATE_PATH,
     )
+
+    if config.STARTS_A_LIBRARY_OF_ITS_OWN:
+        return _refuse_a_library_of_its_own(config.PROJECT_DIR, fun_time)
 
     logger = _configure_logging(STATE_DIR)
 

@@ -93,15 +93,19 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
 
 
-# The library's database is the production app's wherever this app runs from,
+# The production app and every preview open the production checkout's database,
 # so every instance shows every generation; its thumbnails and Trash live in the
 # library itself, beside the copy of its records. Only what is about this
 # window alone (UI_STATE_PATH, the logs) stays in the checkout that runs it.
 RECORDS_DIR = LIBRARY_ROOT / "app_data" / "origenerator"
-PRODUCTION_CHECKOUT = project_dir("origenerator") if _BRANCH_SESSION else PROJECT_DIR
+_THE_LIBRARYS_CHECKOUT = project_dir("origenerator")
+PRODUCTION_CHECKOUT = _THE_LIBRARYS_CHECKOUT if _BRANCH_SESSION else PROJECT_DIR
 LIBRARY_STATE_DIR = PRODUCTION_CHECKOUT / "state" if _BRANCH_SESSION else STATE_DIR
 DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
-_LIBRARY_FILES_DIR = STATE_DIR if _TOLD_WHERE_STATE_IS else RECORDS_DIR
+OPENS_THE_LIBRARY = (not _TOLD_WHERE_STATE_IS and LIBRARY_STATE_DIR.resolve()
+                     == (_THE_LIBRARYS_CHECKOUT / "state").resolve())
+_LIBRARY_FILES_DIR = RECORDS_DIR if OPENS_THE_LIBRARY else STATE_DIR
+STARTS_A_LIBRARY_OF_ITS_OWN = not (OPENS_THE_LIBRARY or _TOLD_WHERE_STATE_IS)
 THUMB_DIR = _LIBRARY_FILES_DIR / "thumbnails"
 TRASH_DIR = _LIBRARY_FILES_DIR / "trash"
 FIX_PHOTOS_DIR = _LIBRARY_FILES_DIR / "fix photos"

@@ -1,8 +1,8 @@
 """What a slideshow tells the Funestras' panel to draw, and which presses it answers itself.
 
 Every slideshow wears the Funestras' own panel: the set and its map
-(:mod:`origenerator.gui.slideshow_map`), the device on a host driving one
-(:attr:`~origenerator.gui.slideshow_host.SlideshowHost.hud_device`), and at its foot the
+(:mod:`origenerator.gui.slideshow_map`), the device where this app's window drives
+one (:class:`~origenerator.gui.console.SlideshowDevice`), and at its foot the
 generation queue (:mod:`origenerator.gui.hud_queue`).  A slideshow on a session's
 Funestra publishes the model for the session to draw; a slideshow on this app's own
 Funestra hands it over in process, and the Funestra draws it.
@@ -37,9 +37,9 @@ def _cell(slide, label: str = "") -> HudCell:
                    label=label)
 
 
-def slideshow_hud_model(side: str, host, *, hosted: bool = True,
+def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
                         own_window: bool = True, device=None, foot=None) -> HudModel | None:
-    """The host slideshow's state as the Funestras' HUD model, or ``None`` for a slideshow
+    """The slideshow's state as the Funestras' HUD model, or ``None`` for a slideshow
     with nothing to map (``hud_map`` unanswered).
 
     *hosted* and *own_window* decide which buttons the panel declares
@@ -49,14 +49,14 @@ def slideshow_hud_model(side: str, host, *, hosted: bool = True,
     to the OSR2 (:class:`~origenerator.gui.console.SlideshowDevice`) -- each None
     where there is none, which is what a slideshow on a session's Funestra answers.
     """
-    shown = host.hud_map()
+    shown = slideshow.hud_map()
     if shown is None:
-        return None  # a host with no set under it, and so nothing to map
-    locked = host.locked
-    favorites_filter = host.hud_favorites_filter
-    enhanced = host.hud_enhanced_mode
-    order_label = host.hud_order_label
-    act_filter = host.hud_act_filter
+        return None  # no set under it, and so nothing to map
+    locked = slideshow.locked
+    favorites_filter = slideshow.hud_favorites_filter
+    enhanced = slideshow.hud_enhanced_mode
+    order_label = slideshow.hud_order_label
+    act_filter = slideshow.hud_act_filter
     return HudModel(
         funestra=side,
         locked=locked,
@@ -73,18 +73,17 @@ def slideshow_hud_model(side: str, host, *, hosted: bool = True,
                         filters=(act_filter,)),
         # The Funestras' favorite star, over the same items the Favorites
         # collection lists: it lights when the item on screen is a favorite.
-        is_favorite=host.hud_is_favorite,
-        item_note=host.hud_item_note,
+        is_favorite=slideshow.hud_is_favorite,
+        item_note=slideshow.hud_item_note,
         # The buttons this slideshow answers, in the bands the panel draws them in —
         # which ones depends on what is drawing it.
         rows=(*slideshow_rows(side, locked=locked, favorites_filter=favorites_filter,
                               enhanced=enhanced, order=order_label, hosted=hosted,
                               own_window=own_window,
-                              has_other_versions=host.has_other_versions),
+                              has_other_versions=slideshow.has_other_versions),
               *(device.rows if device is not None else ())),
         # The device's own line and readout, where this window is the one
-        # driving: on the panel the set is on, because a slideshow is one host doing
-        # both and a second panel underneath said everything twice.
+        # driving: on the panel the set is on, so nothing is said twice.
         osr2_rows=device.osr2_rows if device is not None else (),
         osr2=device.osr2 if device is not None else "",
         osr2_control=device.osr2_control if device is not None else "",

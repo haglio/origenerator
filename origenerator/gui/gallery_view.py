@@ -3427,13 +3427,11 @@ class GalleryView(QWidget):
 
     def _abandon_reroll_preview(self, key: str):
         """A run in folder ``key`` ended with nothing to show (cancelled or
-        failed): its tile stops being the selected item and a slideshow opened over
-        its frames closes; and once the folder has no run left, the tabs
-        following it put their own pictures back. While it still has one — the
-        next of a batch, the loop's next seed — they keep following, since that
-        run's frames are what comes next."""
+        failed): its tile stops being the selected item; and once the folder has
+        no run left, the tabs following it put their own pictures back. While it
+        still has one — the next of a batch, the loop's next seed — they keep
+        following, since that run's frames are what comes next."""
         if key == self._selected_reroll_key:
-            self._slideshows.close_live()
             self._clear_reroll_selection()
             self._selected_row = None
         if not self._jobs.has(key):

@@ -23,7 +23,7 @@ _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
 
 def _set(items=_ITEMS, *, hud=None, start=None, **asked_of_the_library):
     dealt = []
-    slideshow_set = SlideshowSet(items, image_dwell_ms=4000,
+    slideshow_set = SlideshowSet(items,
                                  actions=SlideshowActions(**asked_of_the_library),
                                  shuffle=in_order, start=start, hud=hud,
                                  on_pass_change=dealt.append)
@@ -169,11 +169,11 @@ def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded
 
 
 def test_a_shuffled_pass_begun_on_a_slide_plays_every_other_one_before_coming_back(seeded):
-    slideshow_set = SlideshowSet(_TWELVE, image_dwell_ms=4000, actions=SlideshowActions(),
+    slideshow_set = SlideshowSet(_TWELVE, actions=SlideshowActions(),
                                  start=5)
     played = [slideshow_set.current_prompt_id()]
     for _ in _TWELVE[1:]:
-        slideshow_set.step(1)
+        slideshow_set.playlist.advance()
         played.append(slideshow_set.current_prompt_id())
 
     assert played[0] == "id-5"
@@ -216,15 +216,6 @@ def test_a_run_still_streaming_its_frames_leads_when_the_slideshow_is_asked_to()
 
     assert slideshow_set.lead_with_what_is_being_made() is True
     assert slideshow_set.current_prompt_id() == "id-run"
-
-
-def test_a_locked_slide_is_not_taken_off_the_screen_for_what_is_being_made():
-    slideshow_set, _dealt = _set()
-    slideshow_set.playlist.toggle_lock()
-    slideshow_set.note_enhancing({"id-3": "running"})
-
-    assert slideshow_set.lead_with_what_is_being_made() is False
-    assert slideshow_set.current_prompt_id() == "id-1"
 
 
 def test_a_picture_being_made_holds_the_screen_half_as_long_as_the_pace():
@@ -391,46 +382,26 @@ def test_a_slide_taken_away_leaves_the_loop_it_was_in():
     assert [cell.prompt_id for cell in slideshow_set.map().seeds] == ["id-1c"]
 
 
-def test_a_forward_step_in_a_loop_down_to_one_slide_leaves_the_loop():
+def test_a_loop_down_to_one_slide_is_one_to_end():
     """A cull can leave a loop holding only the slide on screen, and stepping
-    round a row of one is that same picture again — so the forward step ends the
-    loop and lands on what the browse plays next, the way Right leaves a lock."""
-    slideshow_set, dealt = _mapped()
+    round a row of one is that same picture again — so a forward step ends it."""
+    slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
     slideshow_set.playlist.drop("id-1b")
     slideshow_set.playlist.drop("id-1c")
-    dealt.clear()
 
-    slideshow_set.step(1)
-
+    assert slideshow_set.end_a_loop_of_one() is True
     assert slideshow_set.loop is None
-    assert slideshow_set.current_prompt_id() == "id-2"
 
 
-def test_a_forward_step_in_a_loop_with_somewhere_to_go_stays_in_the_loop():
+def test_a_loop_with_somewhere_to_go_is_not_one_to_end():
     """The row is what the forward step walks while it still holds another
     slide; only a row down to the one on screen is the dead end that ends it."""
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
 
-    slideshow_set.step(1)
-
+    assert slideshow_set.end_a_loop_of_one() is False
     assert slideshow_set.loop is not None
-    assert slideshow_set.current_prompt_id() == "id-1b"
-
-
-def test_a_step_back_in_a_loop_down_to_one_slide_leaves_it_looping():
-    """Only the forward step is the way out, as on a Funestra: back is the loop's
-    own step the other way, and what it finds in a row of one is that slide."""
-    slideshow_set, _dealt = _mapped()
-    slideshow_set.start_loop("seed")
-    slideshow_set.playlist.drop("id-1b")
-    slideshow_set.playlist.drop("id-1c")
-
-    slideshow_set.step(-1)
-
-    assert slideshow_set.loop is not None
-    assert slideshow_set.current_prompt_id() == "id-1"
 
 
 def test_the_loop_key_steps_seeds_then_configs_then_off_and_round_again():
@@ -696,15 +667,6 @@ def test_a_set_taken_up_under_the_slide_is_no_row_to_be_dealt_as_a_loop():
 
     slideshow_set.reorder(_ROW, latest=True)
     assert slideshow_set.loop is not None
-
-
-def test_a_new_set_that_is_one_row_is_taken_up_looping_too():
-    slideshow_set, _dealt = _set(neighbors=_row_mates)
-    assert slideshow_set.map().loop == ""
-
-    slideshow_set.reseed(_ROW)
-
-    assert slideshow_set.map().loop == "seed"
 
 
 def test_a_generation_landing_in_a_row_that_is_looping_joins_the_loop():

@@ -1,24 +1,13 @@
-"""The ordering and pacing under the fullscreen slideshow.
+"""The order a slideshow plays its set in.
 
-Pure, Qt-free playlist state: what's on screen, how to step through it, and how
-long to dwell on an image before advancing. :class:`SlideshowPlaylist` plays a
-set of :class:`Slide` in a random order, reshuffled each pass, with the shuffle
-injectable so the order is deterministic under test; a lock holds one item against the advance,
-answering Fun Time's padlock. The set grows as generations land in what the slideshow
+Pure, Qt-free playlist state: what's on screen and how to step through it.
+:class:`SlideshowPlaylist` plays a set of :class:`Slide` in a random order,
+reshuffled each pass, with the shuffle injectable so the order is deterministic
+under test. The set grows as generations land in what the slideshow
 is playing (:meth:`SlideshowPlaylist.add`) — a folder that is auto-generating is
 the case that asks for it — and it grows earlier still for one that is only being
 made: a :data:`LIVE` slide is the frames ComfyUI is streaming of a run, standing
 in for the file until :meth:`SlideshowPlaylist.replace_live` swaps it for one.
-Videos aren't dwell-timed: they play once and the view advances when they end,
-so ``dwell_ms`` returns ``None`` for them. Keeping this a plain, Qt-free object
-lets the policy be unit-tested without a window or a clock.
-
-A dwell of zero means never: the slideshow holds whatever is on screen until an arrow
-moves it.
-
-A third stop — :attr:`SlideshowPlaylist.paused` — is the slideshow's own rather than
-the user's or the pace's: speaking a request stops the advance for as long as
-the sentence takes, and releases it without disturbing either of the others.
 
 Closing a slideshow is rarely being done with it, so where one was is kept:
 :class:`SlideshowState` says it and :meth:`SlideshowPlaylist.resume` lays a fresh
@@ -31,8 +20,6 @@ from __future__ import annotations
 import random
 from dataclasses import asdict, dataclass
 from typing import NamedTuple
-
-from origenerator.media import MediaType
 
 # How long an image holds the screen unless something says otherwise.
 # Genau's console shows this as its clip-seconds pace and sets it from
@@ -164,8 +151,7 @@ def in_order(order: list) -> None:
 
 
 class SlideshowPlaylist:
-    def __init__(self, items, *, image_dwell_ms=DEFAULT_IMAGE_DWELL_MS,
-                 shuffle=random.shuffle, start=None):
+    def __init__(self, items, *, shuffle=random.shuffle, start=None):
         self._items = [Slide.of(item) for item in items]
         self._shuffle = shuffle
         self._order = list(range(len(self._items)))
@@ -175,9 +161,6 @@ class SlideshowPlaylist:
         # this pass's order happens to have put it.
         self._pos = (self._order.index(start)
                      if start is not None and 0 <= start < len(self._items) else 0)
-        self._locked = False
-        self._paused = False
-        self._image_dwell_ms = image_dwell_ms
         self._waiting: list[int] = []
 
     def is_empty(self) -> bool:
@@ -420,76 +403,3 @@ class SlideshowPlaylist:
         for index in found:
             self._items[index] = self._items[index].upgraded(path, media_type, still)
         return bool(found)
-
-    @property
-    def image_dwell_ms(self) -> int:
-        """How long an image holds the screen, zero meaning never move on.
-        Settable, because Genau's console carries the pair that sets it — the same
-        clip-seconds pace Genau leaves its own clips up for."""
-        return self._image_dwell_ms
-
-    @image_dwell_ms.setter
-    def image_dwell_ms(self, value: int) -> None:
-        self._image_dwell_ms = max(0, int(value))
-
-    # --- lock: keep this one against the advance ---------------------------
-
-    @property
-    def locked(self) -> bool:
-        """Whether the item on screen is locked against the advance.
-
-        "Lock" is what it is called everywhere else — the auto-generate
-        rotation, Fun Time's console — so it is what it is called here.
-        """
-        return self._locked
-
-    def toggle_lock(self) -> bool:
-        self._locked = not self._locked
-        return self._locked
-
-    def set_locked(self, locked: bool) -> None:
-        """Put the lock back where a closed slideshow left it — a slide it was closed
-        on locked is one it reopens locked."""
-        self._locked = bool(locked)
-
-    def unlock(self) -> None:
-        self._locked = False
-
-    # --- pause: a stop the slideshow puts on itself ------------------------
-
-    @property
-    def paused(self) -> bool:
-        """Whether something other than the user's lock is stopping the slide.
-
-        Speaking a request pauses the slideshow: the request is *about* what is on
-        screen, and a set that pages on every few seconds would hand the words
-        to whatever came up next. Kept apart from the lock so releasing one
-        never releases the other — a paused slide the user had locked stays
-        locked when the request ends, and stepping off a slide (which drops its
-        lock) doesn't quietly resume a slideshow that is still listening.
-        """
-        return self._paused
-
-    def set_paused(self, paused: bool) -> None:
-        self._paused = bool(paused)
-
-    def locked_or_paused(self) -> bool:
-        """Whether anything at all is stopping this slide — locked or paused."""
-        return self._locked or self._paused
-
-    def current_is_video(self) -> bool:
-        slide = self.current()
-        return slide is not None and slide.media_type == MediaType.VIDEO
-
-    def pace_ms(self):
-        if self.current() is None or self.current_is_video():
-            return None
-        return self._image_dwell_ms or None
-
-    def dwell_ms(self):
-        """Milliseconds to wait before auto-advancing the current item, or ``None``
-        when it shouldn't be timer-advanced: an empty, locked or paused playlist, a
-        pace of nought (hold this one until an arrow moves it), or a video — which
-        advances when it ends, not on a clock."""
-        return None if self.locked_or_paused() else self.pace_ms()
-

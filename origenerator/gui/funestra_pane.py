@@ -1,18 +1,14 @@
 """The one Funestra a standalone Origenerator activates for a Slideshow, in a pane of the slideshow's window.
 
-The Funestra is the family's window (:class:`funestra.funestra.Funestra`):
-it plays what it is handed, draws its own panel over the picture, answers the
-presses on it, and moves slowly over a still while it holds the screen.  Here
-it draws into a native window of this pane's, and the Slideshow runs on it the
-way Kino runs on Fun Time's Main Funestra: handed the playback, asked about
-every press, given a pass of its own each frame.
+The Funestra is the family's window (:class:`funestra.funestra.Funestra`), and the
+Slideshow drives it the way it drives one of a session's: through the pane's
+:class:`PaneChannel`, which answers the three calls a session's Funestra answers on
+its files, in this process.
 
 The engine is handed a window, so it cannot exist before there is one to hand
-it; a pass handed over before then is kept and opened on the moment the pane
+it; a list handed over before then is kept and opened on the moment the pane
 is first shown.  A platform with no windows in it -- the suite's -- never
-shows one, and a test hands the pane an engine of its own instead.  What has
-nothing to open yet -- the wait before a run's first frame -- is a line on a
-label, which the picture replaces.
+shows one, and a test hands the pane an engine of its own instead.
 """
 from __future__ import annotations
 
@@ -20,9 +16,9 @@ import logging
 import threading
 import time
 from contextlib import ExitStack
-from pathlib import Path
 
 from funestra.funestra import Channels, Funestra
+from funestra.funestra_verbs import RELOAD_PLAYLIST
 from funestra.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
@@ -43,8 +39,38 @@ _TICK_MS = 16
 WHEEL_NOTCH = 120
 
 
+class PaneChannel:
+    def __init__(self) -> None:
+        self.on_a_list = lambda: None
+        self._funestra: Funestra | None = None
+        self.items: list[PlaylistItem] = []
+        self._owed: list[str] = []
+
+    def write_playlist(self, items) -> None:
+        self.items = list(items)
+        self.on_a_list()
+
+    def send(self, verb: str) -> bool:
+        if self._funestra is None:
+            self._owed.append(verb)
+        elif verb == RELOAD_PLAYLIST:
+            self._funestra.take_the_list(self.items)
+        else:
+            self._funestra.apply(verb)
+        return True
+
+    def status(self) -> dict[str, str]:
+        return {} if self._funestra is None else self._funestra.status_fields()
+
+    def opened(self, funestra: Funestra) -> None:
+        self._funestra = funestra
+        owed, self._owed = self._owed, []
+        for verb in owed:
+            self.send(verb)
+
+
 class FunestraPane(QWidget):
-    def __init__(self, parent=None, *, user, panel, on_open=None, engine_for=None,
+    def __init__(self, parent=None, *, channel: PaneChannel, user, panel, engine_for=None,
                  radio=None, volume=None, on_volume_moved=None):
         super().__init__(parent)
         self._user = user
@@ -52,12 +78,12 @@ class FunestraPane(QWidget):
         self._radio = radio
         self._volume = volume
         self._on_volume_moved = on_volume_moved
-        self._on_open = on_open
         self._engine_for = engine_for
         self._engine = None
         self._funestra: Funestra | None = None
-        self._owed: tuple[list[PlaylistItem], Path | None] | None = None
+        self.channel = channel
         self._muted = False
+        self._paused = False
         self._pressing_again = False
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -82,63 +108,46 @@ class FunestraPane(QWidget):
         self._stop_moving = threading.Event()
         self._mover: threading.Thread | None = None
         self._running_ahead = ExitStack()
+        channel.on_a_list = self._open_if_ready
+        self._open_if_ready()
 
     @property
     def playback(self):
         return None if self._funestra is None else self._funestra.playback
 
-    def hand_over(self, items: list[PlaylistItem], *, land: Path | None = None) -> None:
-        """Give the Funestra this pass to play, standing on *land* where that
-        names an item of it: opening the Funestra on the pass if it is not
-        open yet, and keeping the pass for it if it cannot open yet."""
-        if not items:
-            return
-        if self._funestra is None:
-            self._owed = (items, land)
-            self._stack.setCurrentWidget(self._window)
-            self._open_if_ready()
-            return
-        playback = self._funestra.playback
-        landing = next((item for item in items if item.path == land), None)
-        if landing is not None and playback.current_video != landing.path:
-            playback.play_file(landing.path, landing.funscript, landing.points_of_interest)
-        playback.take_the_list(items)
-
     def show_message(self, text: str) -> None:
         self._message.setText(text)
-        if self._funestra is None and self._owed is None:
+        if self._funestra is None and not self.channel.items:
             self._stack.setCurrentWidget(self._message)
 
     def message(self) -> str:
         return self._message.text() if self._stack.currentWidget() is self._message else ""
 
     def _open_if_ready(self) -> None:
-        if self._funestra is not None or self._owed is None:
+        if self._funestra is not None or not self.channel.items:
             return
+        self._stack.setCurrentWidget(self._window)
+        if self._funestra is not None:
+            return  # the window's first showing opened it
         engine = self._engine_for(int(self._window.winId())) if self._engine_for else self._open_engine()
         if engine is None:
             return
-        items, land = self._owed
-        self._owed = None
         self._engine = engine
         self._funestra = Funestra(
-            engine, channels=Channels(), playlist=items, audible=True, muted=self._muted,
-            users={"slideshow": self._user}, panel=self._panel,
+            engine, channels=Channels(), playlist=self.channel.items, audible=True,
+            muted=self._muted, users={"slideshow": self._user}, panel=self._panel,
             radio=None if self._radio is None else self._radio.held_by_a_slideshow(),
             on_volume_moved=self._on_volume_moved)
         self._funestra.set_muted(self._muted)
         if self._volume is not None:
             self._funestra.set_volume(self._volume)
-        if land is not None and self._funestra.playback.current_video != land:
-            self.hand_over(items, land=land)
-        self._stack.setCurrentWidget(self._window)
+        self._funestra.playback.set_paused(self._paused)
+        self.channel.opened(self._funestra)
         self._running_ahead.enter_context(ahead_while_playing())
         self._tick.start()
         self._mover = threading.Thread(target=self._move_until_closed,
                                        name="slideshow-mover", daemon=True)
         self._mover.start()
-        if self._on_open is not None:
-            self._on_open()
 
     def _open_engine(self):
         """The engine on this pane's window, or None where there is no window
@@ -181,6 +190,11 @@ class FunestraPane(QWidget):
         self._muted = muted
         if self._funestra is not None:
             self._funestra.set_muted(muted)
+
+    def set_paused(self, paused: bool) -> None:
+        self._paused = paused
+        if self._funestra is not None:
+            self._funestra.playback.set_paused(paused)
 
     def position(self) -> int:
         """How far into the clip on screen the Funestra has got, in milliseconds."""

@@ -91,7 +91,7 @@ class FakeEngine:
         self.pace_s = seconds
 
     def hold_picture_for(self, seconds: float | None) -> None:
-        self.held_for = seconds
+        self.held_for = seconds or None
 
     def seek_picture(self, ms: float) -> None:
         self.picture_seeks.append(ms)

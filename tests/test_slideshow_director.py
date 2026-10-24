@@ -651,7 +651,6 @@ def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(slideshow
     director.open([("g1.png", "image", "g1", None), ("g2.png", "image", "g2", None)],
                   side=PORTRAIT, location="collection/a")
     watched = made[0]
-    watched.dwell_s = 6
     watched.state_at_close = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
     watched.filters = SlideshowFilters(favorites=True)
     director.become_hosted(FakeSession())
@@ -667,7 +666,6 @@ def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_a
     assert [slide[2] for slide in carried.items] == ["g1", "g2"]
     assert carried.resumed == replace(watched.state_at_close, location="collection/a")
     assert carried.taken_up == (SlideshowFilters(favorites=True), False)
-    assert carried.opened_with["image_dwell_ms"] == 6000
     assert [slide[2] for slide in director.region_slideshow(LANDSCAPE).items] == ["g5"]
 
 

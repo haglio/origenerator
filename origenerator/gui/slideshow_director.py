@@ -169,7 +169,6 @@ class HeldSlideshow:
     items: tuple
     side: str | None
     order_label: str
-    image_dwell_ms: int
     state: SlideshowState
     filters: SlideshowFilters
 
@@ -950,7 +949,6 @@ class SlideshowDirector:
             return None
         return HeldSlideshow(items=tuple(slideshow.whole_set()),
                         side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
-                        image_dwell_ms=slideshow.dwell_s * 1000,
                         state=self._where_it_stands(slideshow), filters=slideshow.filters)
 
     def put_back(self, held: HeldSlideshow):
@@ -959,7 +957,6 @@ class SlideshowDirector:
                          rows=[row for row in map(self._host.row_for, ids) if row is not None],
                          location=held.state.location, side=held.side, resume=held.state,
                          filters=held.filters,
-                         image_dwell_ms=held.image_dwell_ms,
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,
                          hud=HudFacts(order_label=held.order_label,
                                       favorite_ids=self._favorite_prompt_ids()))

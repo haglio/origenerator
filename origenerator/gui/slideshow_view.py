@@ -74,7 +74,7 @@ _WASD_AS_ARROWS = {
 
 
 class SlideshowView(QWidget):
-    def __init__(self, items, *, side: str = "", start=None, image_dwell_ms=None,
+    def __init__(self, items, *, side: str = "", start=None,
                  shuffle=None, actions=None, hud=None, engine=None, motion=None,
                  pace=None, frames=None, radio=None, volume=None,
                  clock=time.monotonic, parent=None):
@@ -123,7 +123,7 @@ class SlideshowView(QWidget):
         self.slideshow = FunestraSlideshow(
             items, side=side, channel=channel, shown=self,
             frames=frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen"),
-            actions=self._actions, hud=hud, pace=pace, image_dwell_ms=image_dwell_ms,
+            actions=self._actions, hud=hud, pace=pace,
             start=start, shuffle=shuffle, parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

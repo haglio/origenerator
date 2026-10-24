@@ -21,11 +21,6 @@ import random
 from dataclasses import asdict, dataclass
 from typing import NamedTuple
 
-# How long an image holds the screen unless something says otherwise.
-# Genau's console shows this as its clip-seconds pace and sets it from
-# there, so the number it opens at has to be the one the slideshow uses.
-DEFAULT_IMAGE_DWELL_MS = 4000
-
 # The media type of a slide that is a generation still being made. Its "path" is
 # the newest frame ComfyUI has streamed of it, held as encoded bytes, because
 # there is no file to point at yet. A run with no frame yet is no slide at all:

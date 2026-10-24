@@ -873,7 +873,7 @@ def test_up_from_the_top_level_takes_the_highlight_onto_the_enhance_row(qtbot):
 
     qtbot.keyClick(row, Qt.Key.Key_Up)
 
-    assert enhance_row.is_selected()
+    assert enhance_row._selected
     assert versions.selected_positions() == []
 
 
@@ -898,7 +898,7 @@ def test_enter_on_a_dimmed_enhance_row_enhances_nothing_as_a_click_would_not(qtb
 
     qtbot.keyClick(row, Qt.Key.Key_Return)
 
-    assert enhance_row.is_selected()
+    assert enhance_row._selected
     assert pressed == []
 
 
@@ -911,7 +911,7 @@ def test_down_from_the_enhance_row_picks_and_shows_the_top_level_again(qtbot):
     qtbot.keyClick(row, Qt.Key.Key_Down)
 
     assert shown == [0]
-    assert (enhance_row.is_selected(), versions.selected_positions()) == (False, [0])
+    assert (enhance_row._selected, versions.selected_positions()) == (False, [0])
 
 
 def test_the_arrows_are_the_lists_only_while_a_level_was_the_last_thing_clicked(qtbot):

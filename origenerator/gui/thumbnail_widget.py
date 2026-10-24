@@ -186,9 +186,6 @@ class ThumbnailWidget(QWidget):
         return (prompt_id, thumb_path, label_text, media_type, movie_path, controls,
                 tuple(action.action_id for action in corner_actions or ()))
 
-    def is_selected(self) -> bool:
-        return self._selected
-
     def set_selected(self, selected: bool):
         """Lighten the whole tile when selected; restore the resting look when not."""
         if selected == self._selected:

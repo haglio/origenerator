@@ -2,7 +2,7 @@
 
 A module here serves something on screen: a widget, a controller that owns
 one, or the Qt-free reading a widget is built from -- which is why
-``console``, ``slideshow_map`` and ``thumbnail_selection`` sit here with no Qt in
+``console``, ``slideshow_map`` and ``picking`` sit here with no Qt in
 them at all, each answering for the widget next to it.
 
 What does NOT belong here is the app's own machinery, however much a widget

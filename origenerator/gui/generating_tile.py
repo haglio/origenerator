@@ -94,9 +94,6 @@ class GeneratingTile(QFrame):
         self._render_state()
         self._tick.start()
 
-    def is_selected(self) -> bool:
-        return self._selected
-
     def set_selected(self, selected: bool):
         """Fill the tile with the selected blue when it drives the info pane."""
         self._selected = selected

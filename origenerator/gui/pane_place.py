@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from PyQt6.QtCore import QCoreApplication, QEvent, QPoint, QRect, Qt
 from PyQt6.QtWidgets import QWidget
 
-from origenerator.gui.thumbnail_selection import Picks, ThumbnailSelection
+from origenerator.gui.picking import Picking, Picks
 
 REVEAL_MARGIN = 40
 
@@ -18,7 +18,7 @@ class PanePlace:
     picture_at: int = 0
 
 
-def place_of(scroll, selection: ThumbnailSelection, tiles: dict) -> PanePlace:
+def place_of(scroll, selection: Picking, tiles: dict) -> PanePlace:
     offset = scroll.verticalScrollBar().value()
     picture = _picked_in_view(scroll, selection, tiles) if offset else None
     return PanePlace(selection.picks(), offset, picture,
@@ -34,7 +34,7 @@ def stand_at(scroll, tiles: dict, place: PanePlace, drawn) -> None:
         else tile.mapTo(drawn, QPoint(0, 0)).y() - place.picture_at)
 
 
-def _picked_in_view(scroll, selection: ThumbnailSelection, tiles: dict) -> str | None:
+def _picked_in_view(scroll, selection: Picking, tiles: dict) -> str | None:
     seen = scroll.viewport().rect()
     for prompt_id in selection.in_shown_order():
         tile = tiles.get(prompt_id)

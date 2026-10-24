@@ -104,14 +104,14 @@ def test_a_click_on_the_tile_selects_it(qtbot):
 def test_set_selected_toggles_the_tile_highlight(qtbot):
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
-    assert not tile.is_selected()
+    assert not tile._selected
 
     tile.set_selected(True)
-    assert tile.is_selected()
+    assert tile._selected
     assert "solid" in tile.styleSheet()  # a solid selection border, not the dashed resting one
 
     tile.set_selected(False)
-    assert not tile.is_selected()
+    assert not tile._selected
     assert "dashed" in tile.styleSheet()
 
 

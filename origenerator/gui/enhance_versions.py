@@ -63,6 +63,7 @@ from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_block import label_column_width, meta_cells
+from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 # A dragged enhancement level carries the params that produced it under this
@@ -211,9 +212,6 @@ class _Row(QWidget):
         self._resting_ink: dict[QLabel, str] = {}
         self._selected = False
         row.addLayout(facts, 1)
-
-    def is_selected(self) -> bool:
-        return self._selected
 
     def set_selected(self, selected: bool) -> None:
         if selected == self._selected:
@@ -496,6 +494,7 @@ class EnhanceVersions(QWidget):
         self._pending: _PendingRow | None = None
         self._enhance_row: _AddRow | None = None
         self._rows: list[_LevelRow] = []
+        self._picking = Picking()
         self._arrows_from: int | None = None
         self._deletable = True
         self._versions_listed = 0
@@ -546,6 +545,7 @@ class EnhanceVersions(QWidget):
         self._pending = None
         self._enhance_row = None
         self._rows = []
+        self._picking = Picking()
         self._arrows_from = None
         self._deletable = deletable
         self._versions_listed = len(items)
@@ -570,6 +570,7 @@ class EnhanceVersions(QWidget):
             row.context_requested.connect(self._on_row_menu)
             row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))
             self._rows.append(row)
+            self._picking.note_shown(position)
             column.addWidget(row)
         form.addRow(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
@@ -578,29 +579,35 @@ class EnhanceVersions(QWidget):
 
     def selected_positions(self) -> list[int]:
         """The levels currently picked, in list order."""
-        return [row.position() for row in self._rows if row.is_selected()]
+        return self._picking.in_shown_order()
 
     def _on_row_clicked(self, position: int, modifiers):
-        """Pick a level and put it in the preview.
+        """Pick a level as a click picks a thumbnail, and put it in the preview.
 
-        Ctrl adds to the picking without moving the preview — the gesture is
-        "these ones", aimed at the Delete that follows, and swapping the picture
-        under each ctrl-click would fight it."""
+        Ctrl leaves the preview where it was — the gesture is "these ones",
+        aimed at the Delete that follows, and swapping the picture under each
+        ctrl-click would fight it."""
+        ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
         self._arrows_from = position
-        if modifiers & Qt.KeyboardModifier.ControlModifier:
-            if self._enhance_row is not None:
-                self._enhance_row.set_selected(False)
-            for row in self._rows:
-                if row.position() == position:
-                    row.set_selected(not row.is_selected())
-            return
-        self._pick_and_show(position)
+        self._picking.apply(position, ctrl=ctrl)
+        self._show_picks()
+        if not ctrl:
+            self.level_selected.emit(position)
+
+    def _show_picks(self) -> None:
+        if self._enhance_row is not None:
+            self._enhance_row.set_selected(False)
+        for row in self._rows:
+            row.set_selected(self._picking.holds(row.position()))
 
     def _pick_only(self, position: int) -> None:
-        if self._enhance_row is not None:
-            self._enhance_row.set_selected(position == _ENHANCE_ROW)
-        for row in self._rows:
-            row.set_selected(row.position() == position)
+        if position == _ENHANCE_ROW:
+            self._picking.clear()
+            self._show_picks()
+            self._enhance_row.set_selected(True)
+            return
+        self._picking.apply(position)
+        self._show_picks()
 
     def _pick_and_show(self, position: int) -> None:
         self._pick_only(position)

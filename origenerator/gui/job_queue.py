@@ -515,10 +515,11 @@ class JobQueue(QObject):
         except Exception as e:
             if self._key_of(job) is None:
                 return False  # canceled while out, and never taken: nothing to undo
-            if comfyui_api.unreachable(e) and (closing or self._bring_up_comfyui is not None):
+            if comfyui_api.unreachable(e) and closing:
                 self._waiting.insert(0, job)
-                if not closing:
-                    self._wait_for_comfyui(job)
+                return False
+            if comfyui_api.unreachable(e) and self._bring_up_comfyui is not None:
+                self._hold_for_comfyui(job)
                 return False
             logger.warning("Re-roll submission failed for %s: %s", key, e)
             self._refuse(key, job, str(e))
@@ -537,7 +538,8 @@ class JobQueue(QObject):
         self._db.update_generation(job.prompt_id, status=GenerationStatus.RUNNING)
         return True
 
-    def _wait_for_comfyui(self, job: GenerationJob) -> None:
+    def _hold_for_comfyui(self, job: GenerationJob) -> None:
+        self._waiting.insert(0, job)
         if self._awaiting_comfyui:
             return
         self._awaiting_comfyui = True
@@ -564,8 +566,7 @@ class JobQueue(QObject):
         self._on_server.remove(job)
         self._db.update_generation(job.prompt_id, status=GenerationStatus.PENDING,
                                    progress_json=None)
-        self._waiting.insert(0, job)
-        self._wait_for_comfyui(job)
+        self._hold_for_comfyui(job)
         self.changed.emit()
 
     def _refuse(self, key: str, job: GenerationJob, reason: str) -> None:

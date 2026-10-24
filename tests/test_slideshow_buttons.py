@@ -105,11 +105,11 @@ class _Host:
     def slideshow_step(self, delta):
         self.calls.append(("step", delta))
 
-    def slideshow_toggle_lock(self):
-        self.calls.append("lock")
+    def slideshow_toggle_lock(self, aimed_at=""):
+        self.calls.append(("lock", aimed_at) if aimed_at else "lock")
 
-    def set_locked(self, locked):
-        self.calls.append(("locked", locked))
+    def set_locked(self, locked, aimed_at=""):
+        self.calls.append(("locked", locked, aimed_at) if aimed_at else ("locked", locked))
 
     def set_favorites_filter(self, on):
         self.calls.append(("favorites filter", on))
@@ -198,6 +198,15 @@ def test_every_declared_button_is_answered_by_the_slideshow():
     assert host.calls == [("step", -1), ("step", 1), "lock", "cull", "fmode",
                           "enhanced", "reset", ("order", False), ("order", True),
                           ("version", -1)]
+
+
+def test_a_lock_the_session_aims_at_a_picture_is_that_pictures():
+    host = _Host()
+
+    assert answer(host, "lock", "scene one.png")
+    assert answer(host, "lock_on", "scene two.png")
+
+    assert host.calls == [("lock", "scene one.png"), ("locked", True, "scene two.png")]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_locks_it():

@@ -175,12 +175,37 @@ def test_the_slideshows_lock_is_the_funestras_own(qtbot, tmp_path):
     _sent(slideshow)
 
     slideshow.slideshow_toggle_lock()
-    assert _sent(slideshow) == ["LOCK_ON"]
+    assert _sent(slideshow) == ["LOCK_ON one.png"]
     assert slideshow.locked is True
 
     _says(slideshow, video="one.png", locked=False)   # the Funestra says otherwise
     slideshow.tick()
     assert slideshow.locked is False
+
+
+def test_a_lock_aimed_at_the_picture_the_funestra_moved_on_from_is_that_pictures(qtbot, tmp_path):
+    asked = []
+    actions = SlideshowActions(favorite=lambda pid: asked.append(("star", pid)),
+                               enhance=lambda pid: asked.append(("enhance", pid)) or True,
+                               lock=lambda pid: asked.append(("lock", pid)))
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    slideshow._actions = actions
+    _says(slideshow, video="two.png")
+    slideshow.tick()
+
+    slideshow.slideshow_toggle_lock(aimed_at="one.png")
+
+    assert _sent(slideshow) == ["LOCK_ON one.png"]
+    assert asked == [("star", "id-1"), ("enhance", "id-1"), ("lock", "id-1")]
+    assert slideshow.hud_prompt_id == "id-1"
+
+
+def test_a_lock_while_another_version_of_the_picture_is_up_holds_that_version(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one-enhanced.png")
+
+    slideshow.slideshow_toggle_lock()
+
+    assert _sent(slideshow) == ["LOCK_ON one-enhanced.png"]
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
@@ -320,14 +345,19 @@ def test_the_panel_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_locks_it(qtbot, tmp_path):
-    """The same jump a click makes on a Funestra's own map, and the same lock its
-    double-click takes."""
-    slideshow = _slideshow(qtbot, tmp_path)
+    """The same jump a click makes on a Funestra's own map, and the whole of the
+    lock its Lock button takes."""
+    asked = []
+    actions = SlideshowActions(favorite=lambda pid: asked.append(("star", pid)),
+                               enhance=lambda pid: asked.append(("enhance", pid)) or True,
+                               lock=lambda pid: asked.append(("lock", pid)))
+    slideshow = _slideshow(qtbot, tmp_path, actions=actions)
     _sent(slideshow)
 
     slideshow.show_item("three.png", lock=True)
 
-    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON"]
+    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON three.png"]
+    assert asked == [("star", "id-3"), ("enhance", "id-3"), ("lock", "id-3")]
 
 
 def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
@@ -963,7 +993,7 @@ def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot, tmp_path
 
     slideshow.slideshow_loop("seed")
 
-    assert (_sent(slideshow), said) == (["LOCK_ON"], ["Locked"])
+    assert (_sent(slideshow), said) == (["LOCK_ON one.png"], ["Locked"])
     assert slideshow.locked is True
 
 
@@ -975,7 +1005,8 @@ def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path
     slideshow.slideshow_loop_cycle()
     slideshow.slideshow_loop_cycle()
 
-    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == ["LOCK_ON", "LOCK_OFF"]
+    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == [
+        "LOCK_ON one.png", "LOCK_OFF"]
     assert said == ["Locked", "Unlocked"]
 
 

@@ -583,6 +583,25 @@ def test_locking_a_slide_whose_enhancement_is_waiting_still_asks_so_it_goes_firs
     assert asked == ["id-a"]
 
 
+def test_a_lock_aimed_at_another_slide_stands_on_it_and_locks_it(qtbot):
+    asked = []
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: asked.append(pid) or True))
+
+    view.slideshow_toggle_lock(aimed_at="b.png")
+
+    assert (view.locked_on, asked) == ("id-b", ["id-b"])
+
+
+def test_a_double_click_on_the_map_moves_the_whole_lock_there(qtbot):
+    asked = []
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: asked.append(pid) or True))
+    _press(view, Qt.Key.Key_Down)                 # lock the slide on screen
+
+    view.show_item("b.png", lock=True)
+
+    assert (view.locked_on, asked) == ("id-b", ["id-a", "id-b"])
+
+
 def test_a_locked_slideshow_names_the_generation_it_is_locked_on(qtbot):
     view = _view(qtbot, _KEYED)
     assert view.locked_on is None

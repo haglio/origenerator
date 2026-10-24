@@ -1133,7 +1133,7 @@ class SlideshowView(QWidget):
         to a slideshow landing on a satellite region."""
         self._pane.set_audio_muted(muted)
 
-    def set_locked(self, locked: bool) -> bool:
+    def set_locked(self, locked: bool, aimed_at: str = "") -> bool:
         """Lock the slide on screen or let it go, saying which way rather than
         flipping; ``True`` when that moved it.
 
@@ -1146,8 +1146,15 @@ class SlideshowView(QWidget):
         """
         if locked == self._playlist.locked:
             return False
+        if locked:
+            self._stand_on(aimed_at)
         self._lock_current() if locked else self._flip_lock()
         return True
+
+    def _stand_on(self, path: str) -> None:
+        slide = self._set.slide_for_path(path) if path else None
+        if slide is not None and slide is not self._playlist.current():
+            self._jump_to(slide)
 
     def favorite(self) -> bool:
         """Bookmark the slide on screen; ``False`` when there is nothing to
@@ -1164,8 +1171,8 @@ class SlideshowView(QWidget):
     def slideshow_step(self, delta: int) -> None:
         self.step(delta)
 
-    def slideshow_toggle_lock(self) -> None:
-        self.toggle_lock()
+    def slideshow_toggle_lock(self, aimed_at: str = "") -> None:
+        self.set_locked(not self._playlist.locked, aimed_at)
 
     def slideshow_cull(self) -> None:
         self.cull()
@@ -1239,14 +1246,14 @@ class SlideshowView(QWidget):
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same
-        jump a satellite's map makes; *lock* keeps it there (the double-click),
-        exactly as it locks a Funestra's clip."""
+        jump a satellite's map makes; *lock* (the double-click) then takes
+        Down's whole lock there."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
         self._jump_to(slide)
-        if lock and not self._playlist.locked:
-            self._flip_lock()
+        if lock:
+            self._lock_current()
 
     def _jump_to(self, slide) -> None:
         """Stand the slideshow on *slide*, wherever the map found it: the lock

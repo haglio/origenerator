@@ -48,11 +48,11 @@ class SlideshowHost(Protocol):
         """Move a slide either way — prev/next, however it was pressed."""
         ...
 
-    def slideshow_toggle_lock(self) -> None:
-        """Lock what is on screen, or let it go."""
+    def slideshow_toggle_lock(self, aimed_at: str = "") -> None:
+        """Lock what is on screen, or the picture *aimed_at* names, or let it go."""
         ...
 
-    def set_locked(self, locked: bool) -> bool: ...
+    def set_locked(self, locked: bool, aimed_at: str = "") -> bool: ...
 
     def slideshow_cull(self) -> None:
         """Take what is on screen away and move on."""

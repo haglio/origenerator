@@ -373,14 +373,14 @@ class FunestraSlideshow(QObject):
     def step(self, delta: int) -> None:
         self.slideshow_step(delta)
 
-    def slideshow_toggle_lock(self) -> None:
+    def slideshow_toggle_lock(self, aimed_at: str = "") -> None:
         """Lock what is on screen, or let it go — the whole of the gesture."""
-        self.set_locked(not self._locked)
+        self.set_locked(not self._locked, aimed_at)
 
     def toggle_lock(self) -> None:
         self.slideshow_toggle_lock()
 
-    def set_locked(self, locked: bool) -> bool:
+    def set_locked(self, locked: bool, aimed_at: str = "") -> bool:
         """Lock the item on screen or let it go, saying which way rather than
         flipping; ``True`` when that moved it.
 
@@ -390,21 +390,32 @@ class FunestraSlideshow(QObject):
         """
         if locked == self._locked:
             return False
-        self._lock(locked)
         if not locked:
+            self._lock(False)
             return True
+        held = aimed_at or self._what_is_up()
+        if held != self._what_is_up():
+            self._follow(held)
+        self._full_lock(held)
+        return True
+
+    def _full_lock(self, held: str) -> None:
+        self._lock(True, held)
         self.favorite()
         self._enhance_current()
         prompt_id = self._set.current_prompt_id()
         if self._actions.lock is not None and prompt_id is not None:
             self._actions.lock(prompt_id)
-        return True
 
-    def _lock(self, on: bool) -> None:
+    def _what_is_up(self) -> str:
+        current = self._set.playlist.current()
+        return self._showing or ("" if current is None else self._file_of(current))
+
+    def _lock(self, on: bool, held: str = "") -> None:
         # Held here as well as sent, so the panel lights on the press rather
         # than a tick later; the Funestra's own status settles it either way.
         self._locked = on
-        self._send(LOCK_ON if on else LOCK_OFF)
+        self._send(f"{LOCK_ON} {held}".strip() if on else LOCK_OFF)
         self._publish()
 
     def _unlock(self) -> None:
@@ -518,12 +529,12 @@ class FunestraSlideshow(QObject):
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump
-        it makes on a Funestra's own map; *lock* keeps it there."""
+        it makes on a Funestra's own map; *lock* gives it the full lock."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
         self._jump_to(slide)
-        self._lock(lock)
+        self._full_lock(self._file_of(slide)) if lock else self._lock(False)
 
     def _jump_to(self, slide) -> None:
         """Stand the pass on *slide* and send the Funestra there.

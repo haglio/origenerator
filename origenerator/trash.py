@@ -15,10 +15,11 @@ bin does *not* name, which is the only thing left that nothing can reach.
 from __future__ import annotations
 
 import shutil
-import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+
+from app_support.file_channel import retried_while_held
 
 _MOVE_ATTEMPTS = 12     # a freshly-closed media file can stay locked for a beat
 _MOVE_RETRY_DELAY = 0.15
@@ -124,11 +125,5 @@ def _move(src: Path, dest: Path) -> None:
     its own, which is why the release runs first (see
     ``GalleryActions._trash_files``).
     """
-    for attempt in range(_MOVE_ATTEMPTS):
-        try:
-            shutil.move(str(src), str(dest))
-            return
-        except PermissionError:
-            if attempt == _MOVE_ATTEMPTS - 1:
-                raise
-            time.sleep(_MOVE_RETRY_DELAY)
+    retried_while_held(lambda: shutil.move(str(src), str(dest)),
+                       attempts=_MOVE_ATTEMPTS, delay_s=_MOVE_RETRY_DELAY)

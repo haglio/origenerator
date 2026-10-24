@@ -87,6 +87,7 @@ class GallerySearchController(QObject):
         self._index = search.GallerySearch()
         self._query = ""            # what the field holds, stripped ("" = not searching)
         self._expansions = None     # the widening in force for that query, if any
+        self._widening_awaited = False
         self._outcome = search.SearchOutcome((), ())
         self._tiles: list = []      # its hits as the pane draws them
         self._sort = search.SORT_RECENT
@@ -211,6 +212,7 @@ class GallerySearchController(QObject):
             query=self._query, outcome=self._outcome,
             scope=scope.path, collapsed=self._collapsed,
             on_section_toggled=self._on_section_toggled,
+            still_searching=self._widening_awaited,
         )
         self._host.search_results_drawn()
 
@@ -243,10 +245,12 @@ class GallerySearchController(QObject):
         twice: the restore fills it itself."""
         self._query = ""
         self._expansions = None
+        self._widening_awaited = False
         self._outcome = search.SearchOutcome((), ())
         self._tiles = []
         self._timer.stop()
         self._expand_timer.stop()
+        self.field.set_working(False)
         self.bar.hide()
 
     def restore(self, query: str) -> None:
@@ -290,8 +294,10 @@ class GallerySearchController(QObject):
         if query != self._query:
             self._expansions = None  # last query's widening isn't this one's
         self._query = query
+        self._widening_awaited = self._expander.unanswered(query)
         self._timer.start()
         self._expand_timer.start()
+        self.field.set_working(True)
 
     def _run_pending(self) -> None:
         """Typing has paused: run the standing query and draw it."""
@@ -302,6 +308,7 @@ class GallerySearchController(QObject):
         # first draw, and one it hasn't waits for _request_expansion.
         self._expansions = self._expander.cached(self._query)
         self.run()
+        self.field.set_working(self._widening_awaited)
 
     def _exit(self) -> None:
         """Put the search away and give the pane back to the selected folder."""
@@ -330,10 +337,13 @@ class GallerySearchController(QObject):
         Only for the query still in the field — a slow answer can land after the
         user has typed on, and widening results for a query they are no longer
         running would put items on screen they cannot account for. An empty
-        answer (the endpoint down, or nothing to add) changes nothing, so it
-        doesn't redraw the pane out from under them either.
+        answer redraws only a pane with nothing in it, to say nothing matched.
         """
-        if expansions and query == self._query:
+        if not self._expander.same_words(query, self._query):
+            return
+        self._widening_awaited = False
+        self.field.set_working(False)
+        if expansions or not self._tiles:
             self._expansions = expansions
             self.run()
 

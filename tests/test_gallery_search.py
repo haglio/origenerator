@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import QWidget
 from origenerator import gallery
 from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.gallery_search import MIN_CHARS, GallerySearchController
+from origenerator.gui.search_expander import SearchExpander
 
 
 class _Scope(NamedTuple):
@@ -85,10 +86,10 @@ def controller(qtbot):
     parent is collected takes its timers down with it."""
     built = []
 
-    def build(rows=(), host=None):
+    def build(rows=(), host=None, expander=None):
         parent = QWidget()
         qtbot.addWidget(parent)
-        found = GallerySearchController(host or FakeHost(), parent=parent)
+        found = GallerySearchController(host or FakeHost(), parent=parent, expander=expander)
         found.index.update(list(rows))
         built.append((parent, found))
         return found
@@ -102,6 +103,65 @@ def _type(found, text):
     if found._timer.isActive():
         found._timer.stop()
         found._run_pending()
+
+
+def _let_the_widening_land(qtbot, found):
+    with qtbot.waitSignal(found._expander.expanded):
+        found._expand_timer.stop()
+        found._request_expansion()
+
+
+def test_the_field_shows_a_search_is_still_going_until_its_widening_lands(controller, qtbot):
+    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
+    found = controller([_row("g1", "a tabby on a wall")], expander=expander)
+
+    _type(found, "kitten")
+    assert found.field.working()
+
+    _let_the_widening_land(qtbot, found)
+    assert not found.field.working()
+
+
+def test_a_search_for_a_name_alone_has_finished_once_it_is_drawn(controller):
+    found = controller([_row("g1", "a tabby on a wall")])
+
+    _type(found, "3FA9C0D2 004")
+
+    assert not found.field.working()
+
+
+def test_leaving_a_search_stops_the_circle(controller):
+    found = controller([_row("g1", "a tabby on a wall")])
+    _type(found, "kitten")
+
+    found.leave()
+
+    assert not found.field.working()
+
+
+def test_an_answer_for_the_same_words_typed_another_way_ends_the_wait(controller, qtbot):
+    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
+    found = controller([_row("g1", "a tabby on a wall")], expander=expander)
+    _type(found, "kitten")
+
+    with qtbot.waitSignal(expander.expanded):
+        found._request_expansion()
+        _type(found, "the kitten")
+        found._request_expansion()
+
+    assert not found.field.working()
+
+
+def test_an_empty_search_says_so_only_once_it_has_finished(controller, qtbot):
+    host = FakeHost()
+    expander = SearchExpander(expand=lambda query: {})
+    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
+
+    _type(found, "aardvark")
+    assert host.shown[-1][1]["still_searching"]
+
+    _let_the_widening_land(qtbot, found)
+    assert not host.shown[-1][1]["still_searching"]
 
 
 def test_a_query_reaches_the_pane_as_the_rows_that_matched_it(controller):
@@ -190,28 +250,32 @@ def test_a_folder_the_tree_has_no_row_for_falls_back_to_its_own_items(controller
     assert all(tile.group is None for tile in tiles)
 
 
-def test_a_widening_that_lands_for_the_running_query_re_runs_it(controller):
+def test_a_widening_that_lands_for_the_running_query_re_runs_it(controller, qtbot):
     host = FakeHost()
+    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
     found = controller([_row("g1", "a tabby on a wall"), _row("g2", "a hound")],
-                       host=host)
+                       host=host, expander=expander)
     _type(found, "kitten")
     assert host.shown[-1][0] == []            # nothing matches the bare word
 
-    found._expander.expanded.emit("kitten", {"kitten": ("tabby",)})
+    _let_the_widening_land(qtbot, found)
 
     assert [tile.row["prompt_id"] for tile in host.shown[-1][0]] == ["g1"]
 
 
-def test_a_widening_for_a_query_the_user_has_typed_past_is_ignored(controller):
+def test_a_widening_for_a_query_the_user_has_typed_past_is_ignored(controller, qtbot):
     # A slow answer can land after the user has moved on, and widening results
     # for a query they are no longer running would put items on screen they
     # cannot account for.
     host = FakeHost()
-    found = controller([_row("g1", "a tabby on a wall")], host=host)
-    _type(found, "hound")
-    drawn = len(host.shown)
+    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
+    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
+    _type(found, "kitten")
 
-    found._expander.expanded.emit("kitten", {"kitten": ("tabby",)})
+    with qtbot.waitSignal(expander.expanded):
+        found._request_expansion()
+        _type(found, "hound")
+        drawn = len(host.shown)
 
     assert len(host.shown) == drawn
 

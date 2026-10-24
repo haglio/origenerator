@@ -62,6 +62,14 @@ class SearchExpander(QObject):
         spaces and stop words are not a new question to ask the model."""
         return " ".join(search.query_words(query))
 
+    def unanswered(self, query: str) -> bool:
+        key = self._key(query)
+        with self._lock:
+            return bool(key) and key not in self._cache
+
+    def same_words(self, query: str, other: str) -> bool:
+        return self._key(query) == self._key(other)
+
     def cached(self, query: str) -> dict | None:
         """The widening already known for ``query``, or ``None``. Asks nothing and
         starts nothing: this is what a keystroke consults, so that typing costs

@@ -1388,6 +1388,7 @@ def test_an_empty_search_names_the_folder_it_looked_in(qtbot):
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
     _search_for(view, "dog")
+    view._search._expander.expanded.emit("dog", {})
 
     assert videos.text(0) in view._scroll.widget().text()
 
@@ -1619,8 +1620,21 @@ def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
     view.refresh()
 
     _search_for(view, "cat aardvark")
+    view._search._expander.expanded.emit("cat aardvark", {})
 
     assert view.visible_prompt_ids() == []
+    assert "aardvark" in view._scroll.widget().text()
+
+
+def test_an_empty_search_names_nothing_until_it_has_finished(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "aardvark")
+    assert "aardvark" not in view._scroll.widget().text()
+
+    view._search._expander.expanded.emit("aardvark", {})
     assert "aardvark" in view._scroll.widget().text()
 
 

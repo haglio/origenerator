@@ -580,7 +580,8 @@ class BrowserPane(QObject):
     # --- the search results: whatever the query reached, wherever it lives ---
 
     def show_search_results(self, tiles, *, sort_mode: str, query: str, outcome,
-                            scope: str = "", collapsed=(), on_section_toggled=None):
+                            scope: str = "", collapsed=(), on_section_toggled=None,
+                            still_searching: bool = False):
         """Fill the pane with ``tiles`` — the whole point of searching here rather
         than in the tree, since a thumbnail is recognizable and a folder name is
         not.
@@ -607,8 +608,8 @@ class BrowserPane(QObject):
         """
         self._reset_pane_state()
         if not tiles:
-            self.show_widget(
-                self._empty_state(_search_empty_hint(outcome, query, scope)))
+            self.show_widget(self._empty_state(
+                "" if still_searching else _search_empty_hint(outcome, query, scope)))
             self._showing_search = True
             return
         drawn = list(tiles)[:SEARCH_DRAW_LIMIT]

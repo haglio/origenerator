@@ -151,11 +151,12 @@ from tests import gestures
 from tests.drop_style_seen import worn
 from tests.lit_switches import lit_in
 from tests.marked_words import words
+from tests.osr2_fakes import FakeBroker
 from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
 from tests.test_combine_panel import _listed_under_recent
 from tests.test_folder_tree import _shown
-from tests.test_osr2_driver import ACTIONS, FakeBroker, FakePlayer
+from tests.test_osr2_driver import ACTIONS, FakePlayer
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 _WAN_I2V = WORKFLOW_REGISTRY["wan22_i2v"]

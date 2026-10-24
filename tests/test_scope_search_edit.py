@@ -5,6 +5,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 from PyQt6.QtGui import QResizeEvent
+from PyQt6.QtWidgets import QToolButton
 
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 
@@ -72,3 +73,61 @@ def test_naming_the_same_folder_again_leaves_the_placeholder_alone(qtbot):
     once = field.placeholderText()
     field.set_scope("Library / Alpha")
     assert field.placeholderText() == once
+
+
+def _clear_button(field: ScopeSearchEdit) -> QToolButton:
+    (button,) = [button for button in field.findChildren(QToolButton) if button.isVisibleTo(field)]
+    return button
+
+
+def _searching(qtbot) -> ScopeSearchEdit:
+    field = _field(qtbot, 300)
+    field.setClearButtonEnabled(True)
+    with qtbot.waitExposed(field):
+        field.show()
+    field.setText("kitten " * 12)
+    field.set_working(True)
+    return field
+
+
+def test_a_search_going_on_leaves_the_clear_button_where_it_was(qtbot):
+    field = _field(qtbot, 300)
+    field.setClearButtonEnabled(True)
+    field.show()
+    field.setText("kitten")
+    before = _clear_button(field).geometry()
+
+    field.set_working(True)
+
+    assert _clear_button(field).geometry() == before
+
+
+def test_the_working_circle_turns_just_left_of_the_clear_button(qtbot):
+    field = _searching(qtbot)
+
+    assert field._circle_box().right() <= _clear_button(field).geometry().left()
+
+
+def test_typed_words_never_run_under_the_working_circle(qtbot):
+    field = _searching(qtbot)
+
+    field.end(False)
+    field.repaint()
+
+    assert field.cursorRect().right() <= field._circle_box().left()
+
+
+def test_the_circle_turns_while_a_search_is_going(qtbot):
+    field = _searching(qtbot)
+    started_at = field._turned
+
+    qtbot.waitUntil(lambda: field._turned != started_at)
+
+
+def test_the_circle_goes_with_the_search_and_gives_the_words_their_room_back(qtbot):
+    field = _searching(qtbot)
+
+    field.set_working(False)
+
+    assert not field.working()
+    assert field.textMargins().right() == 0

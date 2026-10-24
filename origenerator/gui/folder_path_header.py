@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import html
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
-from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.folder_path import FolderPath
-from shared_ui.icons import marked_text
 from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
 from shared_ui.type_scale import SIZE_BODY, in_pixels
 
@@ -33,9 +30,7 @@ class FolderPathHeader(QWidget):
         row.addWidget(self._path, 1)
 
     def show_folder(self, steps: Sequence[PathStep], *, mark: str = "") -> None:
-        self._show(steps, links_among=steps[:-1])
-        if mark:
-            self._lead_the_last_step_with(mark, steps[-1].name)
+        self._show(steps, links_among=steps[:-1], marks={len(steps) - 1: mark} if mark else None)
 
     def show_search(self, words: str, steps: Sequence[PathStep]) -> None:
         self._show(steps, links_among=steps, lead=words)
@@ -44,15 +39,10 @@ class FolderPathHeader(QWidget):
         self._show([PathStep(text, None)], links_among=())
 
     def _show(self, steps: Sequence[PathStep], *, links_among: Sequence[PathStep],
-              lead: str = "") -> None:
+              lead: str = "", marks: Mapping[int, str] | None = None) -> None:
         self._keys = tuple(step.key for step in steps)
-        self._path.set_path([step.name for step in steps], lead=lead,
+        self._path.set_path([step.name for step in steps], lead=lead, marks=marks,
                             linked=[i for i, step in enumerate(links_among) if step.key])
-
-    def _lead_the_last_step_with(self, mark: str, name: str) -> None:
-        before, _name, after = self._path.text().rpartition(html.escape(name))
-        self._path.setText(before + marked_text(mark, name, color=TEXT_PRIMARY,
-                                                size=self._path.fontMetrics().height()) + after)
 
     def display_text(self) -> str:
         return self._path.plain_text()

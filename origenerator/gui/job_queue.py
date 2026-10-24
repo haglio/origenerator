@@ -580,6 +580,17 @@ class JobQueue(QObject):
             self._refuse(self._key_of(job), job, COMFYUI_DID_NOT_START)
         self.changed.emit()
 
+    def _comfyui_unreachable(self, key: str, job: GenerationJob, message: str) -> None:
+        if self._bring_up_comfyui is None:
+            self._on_failed(key, job, message)
+            return
+        self._on_server.remove(job)
+        self._db.update_generation(job.prompt_id, status=GenerationStatus.PENDING,
+                                   progress_json=None)
+        self._waiting.insert(0, job)
+        self._wait_for_comfyui(job)
+        self.changed.emit()
+
     def _refuse(self, key: str, job: GenerationJob, reason: str) -> None:
         self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
                                    error_message=reason)
@@ -688,6 +699,7 @@ class JobQueue(QObject):
             lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
         )
         job.failed.connect(lambda msg, k=key, j=job: self._on_failed(k, j, msg))
+        job.unreachable.connect(lambda msg, k=key, j=job: self._comfyui_unreachable(k, j, msg))
         job.preview.connect(
             lambda data, k=key, j=job: self.preview.emit(k, j.prompt_id, data)
         )

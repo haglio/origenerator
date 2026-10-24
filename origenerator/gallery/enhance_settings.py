@@ -71,6 +71,10 @@ def level_settings(params: dict) -> dict:
     return settings
 
 
+def full_settings(params: dict) -> dict:
+    return {**default_enhance_params(), **level_settings(params)}
+
+
 @dataclass(frozen=True)
 class EnhanceSettings:
     """One folder's enhancement configuration.

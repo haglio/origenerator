@@ -20,7 +20,7 @@ from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
-from origenerator.gui import file_pick, icons, param_sections, pictured_dropdown
+from origenerator.gui import diff_text, file_pick, icons, param_sections, pictured_dropdown
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.eliding import ElidingLabel
@@ -68,6 +68,18 @@ def test_a_form_with_no_prompt_has_no_request_to_make(qtbot):
 
     assert "Request" not in _section_titles(form)
     assert form.request_field() is None
+
+
+def test_prompts_a_request_rewrites_show_their_whole_change_at_once(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+    form.track_prompt_rewrites({"positive_prompt": "a cat on a couch", "negative_prompt": ""})
+
+    form.set_prompts("a dog on a couch", "")
+
+    field = form._widgets["positive_prompt"]
+    assert diff_text.live_text(field) == "a dog on a couch"
+    assert "cat" in field.toPlainText()  # struck through beside the dog
 
 
 def test_field_labels_fit_the_heading_font(qtbot):

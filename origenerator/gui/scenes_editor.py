@@ -43,7 +43,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
 
-from origenerator.gui import diff_text
+from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.icons import tab_close_icon
 from origenerator.gui.panes import border_as_a_set
@@ -279,8 +279,7 @@ class ScenesEditor(QWidget):
         if key == "positive_prompt":
             self._resize_to(len(texts))
         for index, field in enumerate(self.fields(key)):
-            diff_text.forget(field)
-            field.setPlainText(scene_text(texts, index))
+            tracked_prompt.write(field, scene_text(texts, index))
 
     def scene_frames(self) -> list[int]:
         return [scene.frames() for scene in self._scenes]
@@ -296,7 +295,7 @@ class ScenesEditor(QWidget):
 
     def set_lines(self, lines) -> None:
         for field, text in zip(self.fields("scene_lines"), list(lines or [])):
-            field.setPlainText(str(text))
+            tracked_prompt.write(field, str(text))
 
     def total_frames(self) -> int:
         """The clip's length: the scenes end to end, each after the first

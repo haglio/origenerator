@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from origenerator import search
+from origenerator import local_llm, search
 from origenerator.generation_state import GenerationSource
 
 
@@ -402,7 +402,7 @@ def test_a_widening_that_will_not_parse_leaves_the_table_tier_standing(monkeypat
     def explode(*_args, **_kwargs):
         raise ValueError("no JSON here")
 
-    monkeypatch.setattr(search.urllib.request, "urlopen", explode)
+    monkeypatch.setattr(local_llm.urllib.request, "urlopen", explode)
     assert search.expand_query(
         "two women", base_url="http://localhost:1", model="m", system_prompt="R"
     ) == {}
@@ -412,6 +412,6 @@ def test_a_query_with_no_words_asks_the_model_nothing(monkeypatch):
     def explode(*_args, **_kwargs):
         raise AssertionError("should not have called out")
 
-    monkeypatch.setattr(search.urllib.request, "urlopen", explode)
+    monkeypatch.setattr(local_llm.urllib.request, "urlopen", explode)
     assert search.expand_query(
         "   ", base_url="http://localhost:1", model="m", system_prompt="R") == {}

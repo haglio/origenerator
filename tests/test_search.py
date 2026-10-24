@@ -202,6 +202,45 @@ def test_a_whole_name_lands_on_its_item_alone():
     assert _hits(index, "3FA9C0D2 004") == ["picture"]
 
 
+def test_the_start_of_a_name_finds_the_items_whose_names_start_that_way():
+    rows = [_row("g1", "a quiet street"), _row("g2", "a quiet street"),
+            _row("g3", "a quiet street")]
+    names = {"g1": "79BB46F1 000", "g2": "79BB0C2A 004", "g3": "3FA9C0D2 004"}
+    index = search.GallerySearch()
+    index.update(rows, item_name=names.get)
+
+    assert _hits(index, "79BB") == ["g1", "g2"]
+    assert _hits(index, "79bb46f1 0") == ["g1"]
+
+
+def test_a_word_under_four_letters_is_never_taken_for_the_start_of_a_name():
+    rows = [_row("g1", "a bed by a window"), _row("g2", "a quiet street")]
+    names = {"g1": "11111111 000", "g2": "BED00000 000"}
+    index = search.GallerySearch()
+    index.update(rows, item_name=names.get)
+
+    assert _hits(index, "bed") == ["g1"]
+
+
+def test_a_word_that_starts_a_name_still_finds_the_prompts_that_use_it():
+    rows = [_row("g1", "a face at a window"), _row("g2", "a quiet street")]
+    names = {"g1": "11111111 000", "g2": "FACE0000 000"}
+    index = search.GallerySearch()
+    index.update(rows, item_name=names.get)
+
+    assert _hits(index, "face") == ["g1", "g2"]
+
+
+def test_a_word_that_starts_a_name_is_never_widened():
+    rows = [_row("g1", "a quiet street"), _row("g2", "a quiet street")]
+    names = {"g1": "79BB46F1 000", "g2": "3FA9C0D2 004"}
+    index = search.GallerySearch()
+    index.update(rows, item_name=names.get)
+
+    assert _hits(index, "79bb", expansions={"79bb": ["street"]}) == ["g1"]
+    assert not index.widens("79bb")
+
+
 def test_a_search_can_be_held_to_a_set_of_generations():
     # The gallery's tree selection is the scope: standing in a folder asks the
     # question there, and a hit outside it is not an answer.

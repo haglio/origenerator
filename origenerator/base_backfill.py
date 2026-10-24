@@ -13,7 +13,7 @@ the first time.
 It is GPU nobody asked for, though — one full render per row, and the library
 here has well over a hundred — so doing it while the app is open would put every
 one of them in front of the user's own work. It rides the same absence the
-background experimenter does: queued as the app closes, cleared when it opens.
+background experimenter does: queued while the app is closed, cleared when it opens.
 ComfyUI outlives the app and works through the batch alone; the next launch
 folds whatever finished into the images it belongs to and drops whatever hadn't
 started. How much goes is a time budget rather than a row count

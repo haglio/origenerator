@@ -14,11 +14,13 @@ from pathlib import Path, PureWindowsPath
 
 from app_support.win32 import process_started
 
-from origenerator import comfyui_launcher, config, timing
+from origenerator import comfyui_launcher, config, gallery, timing
 from origenerator.gallery import JobKind
+from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
 from origenerator.model_titles import FIX_LORA_FOLDER, fix_lora_name
 from origenerator.run_notice import RunOutcome
-from origenerator.workflows.detail_parts import detector_folder, detector_for_part
+from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.detail_parts import detector_folder, detector_for_part, part_table
 
 TRAINER = Path(__file__).resolve().parents[1] / "tools" / "fix_lora_trainer.py"
 _PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
@@ -76,7 +78,20 @@ def training_state(part) -> TrainingState:
     return TrainingState.OUT_OF_DATE
 
 
-def training_job(part, checkpoint: str, now: datetime) -> dict:
+def fix_to_train():
+    return next((part for part in part_table()
+                 if detector_for_part(part) and training_photos(part)
+                 and training_state(part) is not TrainingState.CURRENT), None)
+
+
+def model_to_train_for(enhance_params: dict) -> str:
+    chosen = enhance_params.get("checkpoint")
+    if not chosen or chosen == MATCH_SOURCE_MODEL:
+        return WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW].default_params()["checkpoint"]
+    return chosen
+
+
+def training_job(part, checkpoint: str, now: datetime, *, automatic: bool = False) -> dict:
     models = config.COMFYUI_DIR / "models"
     work = _work_folder(part)
     return {
@@ -96,6 +111,7 @@ def training_job(part, checkpoint: str, now: datetime) -> dict:
         "job_file": str(work / "job.json"),
         "process": str(work / "process.json"),
         "trained": str(work / "trained.json"),
+        "automatic": automatic,
     }
 
 
@@ -201,7 +217,15 @@ def untaken_lora(job: dict) -> str | None:
 
 
 def mark_taken(job: dict) -> None:
-    Path(job["status"]).write_text(json.dumps(dict(read_status(job) or {}, taken=True)),
+    _mark(job, taken=True)
+
+
+def mark_announced(job: dict) -> None:
+    _mark(job, announced=True)
+
+
+def _mark(job: dict, **marks) -> None:
+    Path(job["status"]).write_text(json.dumps(dict(read_status(job) or {}, **marks)),
                                    encoding="utf-8")
 
 

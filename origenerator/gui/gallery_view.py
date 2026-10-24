@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import random
 from typing import NamedTuple
 
 from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
@@ -30,8 +29,6 @@ from origenerator import (
     recovery,
     timing,
 )
-from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
-from origenerator.base_backfill import queue_base_renders
 from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
@@ -41,8 +38,6 @@ from origenerator.config import (
     TRASH_DIR,
 )
 from origenerator.db import Database
-from origenerator.experiments.background import queue_experiments
-from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
@@ -291,7 +286,6 @@ class GalleryView(QWidget):
                  osr2_motion: Osr2MotionDriver | None = None,
                  radio: OrigeneratorRadio | None = None,
                  search_expander: SearchExpander | None = None,
-                 experiment_policy: ExperimentPolicy | None = None,
                  fun_time: FunTimeSession | None = None,
                  prompt_heights=None):
         super().__init__(parent)
@@ -350,12 +344,6 @@ class GalleryView(QWidget):
                                                self._actions.thumb_dir, parent=self)
         self._moving_previews.made.connect(
             lambda prompt_id, path: play_once_made(self._browser, prompt_id, path))
-        # Derives the background experiments this gallery hands ComfyUI as the
-        # app closes (the Experiments collection's switch): variations of the user's
-        # own work, landing in that collection for review at the next launch.
-        self._experiment_policy = experiment_policy or ExperimentPolicy(
-            registry=WORKFLOW_REGISTRY, rng=random.Random()
-        )
         self._forget_the_listing()
         self._build_the_panes(db, client, search_expander)
         # What another app has on the shared ComfyUI, re-read on every poll so the
@@ -809,7 +797,7 @@ class GalleryView(QWidget):
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         # Scheduling an absence is the production app's alone, so a branch session
-        # can't reach the switch (see queue_experiments_for_absence).
+        # can't reach the switch.
         self._experiments_cb.setEnabled(not is_branch_session())
         self._experiments_status = QLabel("")
         self._experiments_status.setObjectName("estimateLabel")
@@ -1179,52 +1167,6 @@ class GalleryView(QWidget):
         state is seeded from the production app's, switch position included."""
         self._experiments_cb.setChecked(bool(enabled) and not is_branch_session())
 
-    def queue_experiments_for_absence(self) -> int:
-        """Hand ComfyUI a batch of experiments to run while the app is closed.
-
-        Called from the window's close, the one moment the GPU becomes nobody's:
-        ComfyUI outlives the app and works through the batch alone, and the next
-        launch finalizes what finished into the Experiments collection. A no-op with
-        the switch off. Returns how many were queued.
-
-        Only the production app schedules an absence. A branch preview shares the
-        one ComfyUI, and its batch outlives it there as work no app can account
-        for: the live session cancels only the experiments its own database
-        records, so a preview's survive every launch, and each Generate after
-        them waits on jobs "from another app" that were the user's own
-        preview. The GPU while Origenerator is closed belongs to the install
-        that is actually closed.
-        """
-        if is_branch_session():
-            logger.info("Branch session: experiments left to the production app")
-            return 0
-        if not self.experiments_enabled() or self._jobs.training_holds_the_machine():
-            return 0
-        return queue_experiments(
-            self._db.list_generations(), self._experiment_policy,
-            self._launch_experiment,
-        )
-
-    def queue_base_renders_for_absence(self) -> int:
-        """Hand ComfyUI a batch of base re-renders to run while the app is closed.
-
-        Called from the window's close beside the experiments batch, and for the
-        same reason: this is a full render per repaired image and there are a
-        great many of them, so putting one in front of the user's own work would
-        be the whole cost of the feature. The next launch folds what finished and
-        drops what hadn't started. Returns how many were queued.
-
-        A branch preview queues none, exactly as it queues no experiments: its
-        batch would outlive it in the one shared ComfyUI as work no app can
-        account for, and the repairs belong to the live library anyway.
-        """
-        if is_branch_session():
-            logger.info("Branch session: base re-renders left to the production app")
-            return 0
-        if self._jobs.training_holds_the_machine():
-            return 0
-        return queue_base_renders(self._db.list_generations(), self._launch_base_render)
-
     def flush_queue_to_server(self) -> int:
         """Hand ComfyUI everything the queue is still holding, as the app closes.
 
@@ -1242,17 +1184,6 @@ class GalleryView(QWidget):
     def say_generations_failed_as_it_closed(self, reasons: list[str] | None) -> None:
         if reasons:
             defer(self, lambda: self._generation_failed.say_each(reasons))
-
-    def _launch_base_render(self, workflow, params):
-        """The batch's launch adapter: submit one re-render as a normal re-roll
-        job tagged ``source="base_render"``, keyed to a folder of its own so it
-        can never displace the user's work under a folder they might re-roll.
-        Returns its prompt_id, or ``None`` when the launch didn't take."""
-        key = f"base_render/{params[BASE_RENDER_TARGET_KEY]}"
-        if not self._jobs.start_prepared(key, workflow, params,
-                                           source=GenerationSource.BASE_RENDER):
-            return None
-        return self._jobs.jobs[key].prompt_id
 
     def _on_experiments_toggled(self, _checked: bool):
         self._sync_experiments_bar()
@@ -1272,19 +1203,6 @@ class GalleryView(QWidget):
             "On — variations run after you close the app and land here for review"
             if self.experiments_enabled() else "Off — the GPU stays all yours"
         )
-
-    def _launch_experiment(self, proposal):
-        """The batch's launch adapter: submit a proposal as a normal re-roll job
-        (tagged ``source="experiment"``), keyed to the settings folder its params
-        land in. Returns the launched row's prompt_id, or ``None`` when the
-        launch didn't take — no client, the submit failed, or an earlier
-        proposal in this batch already claimed the folder (the same recipe
-        twice explores nothing)."""
-        key = self.folder_key_for(proposal.workflow.name, proposal.params)
-        if not self._jobs.start_prepared(key, proposal.workflow, proposal.params,
-                                           source=GenerationSource.EXPERIMENT):
-            return None
-        return self._jobs.job_for(key).prompt_id
 
     def _on_experiment_verdict(self, prompt_id: str, action_id: str):
         """A review from the Experiments collection: "keep" admits the result to the
@@ -1312,10 +1230,8 @@ class GalleryView(QWidget):
         were meaningful. They are arguments now, and a caller that already holds a
         row asks :meth:`folder_key_of` instead.
         """
-        row = {"workflow_name": workflow_name, "params_json": json.dumps(params)}
-        if workflow_version is not None:
-            row["workflow_version"] = workflow_version
-        return self.folder_key_of(row)
+        return gallery.folder_key_for(workflow_name, params, self.image_config_index(),
+                                      workflow_version)
 
     def folder_key_of(self, row: dict) -> str:
         """The settings-folder key a stored row lands in — the same derivation,

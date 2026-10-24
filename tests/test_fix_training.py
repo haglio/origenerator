@@ -68,6 +68,26 @@ def test_a_fix_is_untrained_until_a_training_keeps_its_photos_then_current_until
     assert fix_training.training_state(hands) is fix_training.TrainingState.OUT_OF_DATE
 
 
+def test_the_next_fix_to_train_is_the_first_with_photos_and_a_detector_not_trained_on_them(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path / "fixes")
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["face_yolov8m.pt", "hand_yolov8s.pt"])
+    for folder in ("faces", "hands", "teeth"):
+        (tmp_path / "fixes" / folder).mkdir(parents=True)
+        (tmp_path / "fixes" / folder / "one.jpg").write_bytes(b"one")
+    record = tmp_path / "fix training" / "faces" / "trained.json"
+    record.parent.mkdir(parents=True)
+    record.write_text(json.dumps({"photo_stamps": fix_training.photo_stamps(_part("faces"))}),
+                      encoding="utf-8")
+
+    assert fix_training.fix_to_train().name == "hands"
+
+    (tmp_path / "fixes" / "hands" / "one.jpg").unlink()
+    assert fix_training.fix_to_train() is None
+
+
 def test_a_training_job_names_the_fixs_photos_its_detector_and_the_model_to_train_for(
         monkeypatch, tmp_path):
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
@@ -84,6 +104,9 @@ def test_a_training_job_names_the_fixs_photos_its_detector_and_the_model_to_trai
     assert job["photos"] == [str(tmp_path / "hands" / "one.jpg"), str(tmp_path / "shared" / "two.jpg")]
     assert job["photos_folders"] == [str(tmp_path / "hands"), str(tmp_path / "shared")]
     assert list(job["photo_stamps"]) == ["hands/one.jpg", "shared/two.jpg"]
+    assert job["automatic"] is False
+    assert fix_training.training_job(_part("hands"), "base.safetensors", datetime(2026, 10, 24),
+                                     automatic=True)["automatic"] is True
     assert job["detector"] == str(models / "ultralytics" / "bbox" / "hand_yolov8s.pt")
     assert job["base_model"] == str(models / "checkpoints" / "base.safetensors")
     assert job["output_dir"] == str(models / "loras" / "fixes")

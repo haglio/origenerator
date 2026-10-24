@@ -67,15 +67,19 @@ def take_what_landed(db, api, row: dict, *, places: OutputPlaces, thumb_dir: Pat
                                      ok=True, seconds=duration))
 
 
+def training_notice(job: dict) -> Notice | None:
+    trainer = fix_training.trainer_of(job)
+    status = fix_training.read_status(job) or {}
+    return notice_for(fix_training.outcome_of(
+        job, ok=status.get("state") == "done",
+        seconds=None if trainer is None else fix_training.time_taken(job, trainer)))
+
+
 def _training_ended(job: dict, announce) -> bool:
     trainer = fix_training.trainer_of(job)
     if trainer is not None and trainer.running():
         return False
-    status = fix_training.read_status(job) or {}
-    notice = notice_for(fix_training.outcome_of(
-        job, ok=status.get("state") == "done",
-        seconds=None if trainer is None else fix_training.time_taken(job, trainer)))
-    if notice is not None:
+    if (notice := training_notice(job)) is not None:
         announce(notice)
     return True
 

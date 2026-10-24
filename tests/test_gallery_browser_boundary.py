@@ -248,8 +248,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     methods that opened the path for typing and went where a typed path led went.
     281 -> 280: a collection's path wears its star as the family's mark, which the
     header sets in ahead of the step's name, so the method that typed the star into
-    that name went.)"""
+    that name went. 280 -> 276: what the app does with the graphics card while it
+    is closed is started by Evolver, so the two batches the closing gallery queued,
+    and their two launch adapters, went to origenerator.downtime.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 280
+               for x in _class_def(VIEW, "GalleryView").body) == 276
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 84

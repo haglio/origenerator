@@ -6,6 +6,8 @@ that says a send has been taken back, which tells it to delete the copies it is
 holding.  Upscaling a video, it gives Topaz only the frames its model generated:
 smoothing the motion puts a whole number of frames between each two of those and
 keeps them all, so at M times the generated rate they are every M-th frame from the first.
+While this app is closed, Evolver also runs the command named here, from this
+checkout, to start the work this app leaves for that time.
 
 It cannot import this package -- no app here reaches into another's repo -- so
 this module is the promise, and ``origenerator_gallery_contract.json`` at the
@@ -75,6 +77,8 @@ LANES = {
 
 SILENT_COPY_ROLE = "silent"
 
+DOWNTIME_COMMAND = (".venv/Scripts/python.exe", "-m", "origenerator.downtime")
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -92,6 +96,7 @@ def declaration() -> dict:
         "lanes": {lane: dict(stamps) for lane, stamps in LANES.items()},
         "silent_copy_role": SILENT_COPY_ROLE,
         "generated_fps": NATIVE_FPS,
+        "downtime_command": list(DOWNTIME_COMMAND),
     }
 
 

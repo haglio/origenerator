@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from origenerator import gallery, places_backfill, points_of_interest
+from origenerator import downtime, gallery, places_backfill, points_of_interest
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -185,7 +185,8 @@ def test_a_picture_gone_before_its_places_came_back_is_passed_over(tmp_path):
     assert places_backfill.fold_found_places(db, opening, record) == 0
 
 
-def test_closing_the_app_hands_comfyui_the_pictures_to_look_over(qtbot, tmp_path, monkeypatch):
+def test_once_closed_the_apps_turn_hands_comfyui_the_pictures_to_look_over(qtbot, tmp_path,
+                                                                             monkeypatch):
     submitted = []
     monkeypatch.setattr(ComfyUIClient, "submit_job", lambda self, payload, prompt_id: submitted.append(prompt_id))
     monkeypatch.setattr(places_backfill, "RECORD", tmp_path / "finding.json")
@@ -193,11 +194,14 @@ def test_closing_the_app_hands_comfyui_the_pictures_to_look_over(qtbot, tmp_path
     _enhanced(db, "a", _file("enhanced_a.png"))
     window = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(window)
-
     window.close()
+    assert submitted == []
 
-    assert submitted
-    assert list(json.loads((tmp_path / "finding.json").read_text(encoding="utf-8"))) == submitted
+    downtime.hand_comfyui_the_work_left(db, ComfyUIClient(), AppState(tmp_path / "ui.json"))
+
+    looked_over = list(json.loads((tmp_path / "finding.json").read_text(encoding="utf-8")))
+    assert looked_over
+    assert set(looked_over) <= set(submitted)
 
 
 def test_a_branch_preview_hands_comfyui_no_pictures_to_look_over(tmp_path, monkeypatch):

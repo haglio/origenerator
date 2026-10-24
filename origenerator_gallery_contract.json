@@ -37,5 +37,10 @@
     }
   },
   "silent_copy_role": "silent",
-  "generated_fps": 16.0
+  "generated_fps": 16.0,
+  "downtime_command": [
+    ".venv/Scripts/python.exe",
+    "-m",
+    "origenerator.downtime"
+  ]
 }

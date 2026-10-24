@@ -6,6 +6,8 @@ already received.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
@@ -28,7 +30,7 @@ from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.gui.enhance_panel as enhance_panel_module
 import origenerator.workflows.detail_parts as parts
-from origenerator import config
+from origenerator import config, fix_training
 from origenerator.enhance_presets import Preset
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
@@ -1873,11 +1875,12 @@ def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):
 
 def _fix_photos(monkeypatch, tmp_path, *names):
     monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
     if names:
-        (tmp_path / "Hands").mkdir()
+        (tmp_path / "hands").mkdir()
     for name in names:
-        (tmp_path / "Hands" / name).write_bytes(b"")
-    return tmp_path / "Hands"
+        (tmp_path / "hands" / name).write_bytes(b"")
+    return tmp_path / "hands"
 
 
 def test_beside_train_a_fixs_prompts_say_how_many_photos_its_folder_holds(
@@ -1932,6 +1935,35 @@ def test_a_fixs_train_button_says_how_its_training_is_going_until_it_ends(qtbot)
     panel.show_fix_training("hands", None)
 
     assert (window.train.text(), window.train.isEnabled()) == ("Train", True)
+
+
+def test_a_trained_fixs_button_says_retrain_grayed_until_its_photos_change(
+        qtbot, monkeypatch, tmp_path):
+    folder = _fix_photos(monkeypatch, tmp_path, "one.jpg")
+    record = tmp_path / "fix training" / "hands" / "trained.json"
+    record.parent.mkdir(parents=True)
+    record.write_text(json.dumps({"photo_stamps": fix_training.photo_stamps(
+        parts.part_named("hands"))}), encoding="utf-8")
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    assert (window.train.text(), window.train.isEnabled()) == ("Retrain", False)
+
+    (folder / "two.jpg").write_bytes(b"")
+    QApplication.sendEvent(window, QEvent(QEvent.Type.WindowActivate))
+
+    assert (window.train.text(), window.train.isEnabled()) == ("Retrain", True)
+
+
+def test_train_says_it_draws_on_the_shared_folder_only_for_a_fix_that_does(qtbot, monkeypatch):
+    monkeypatch.setattr(parts, "_overlay_parts", lambda content=None: (
+        parts.DetailPart("alpha", ("alpha",), ("alpha",), shared_photos=False),))
+    panel, _edits = _panel(qtbot)
+    for name in ("hands", "alpha"):
+        panel.open_fix_prompts(name)
+
+    assert "fixes\\shared" in panel._fix_prompt_windows["hands"].train.toolTip()
+    assert "shared" not in panel._fix_prompt_windows["alpha"].train.toolTip()
 
 
 def test_a_trained_lora_is_put_on_its_fix(qtbot):

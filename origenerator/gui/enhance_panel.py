@@ -98,11 +98,14 @@ _AUTO_TOOLTIP = (
     "below. The original is kept, so an enhancement can always be compared "
     "against it or redone."
 )
-_TRAIN_TOOLTIP = (
-    "Trains this fix a LoRA from the photos in its folder in the library's "
-    "app_data\\origenerator\\fix photos, each cropped down to the part by the "
-    "fix's own detector. Nothing generates while it trains."
-)
+
+
+def _train_tooltip(part) -> str:
+    folders = (f"{part.name.lower()}, and in fixes\\shared," if part.shared_photos
+               else part.name.lower())
+    return ("Trains this fix a LoRA from the photos in the library's "
+            f"app_data\\origenerator\\fixes\\{folders} each cropped down to the part by the "
+            "fix's own detector. Nothing generates while it trains.")
 _NO_DETECTOR_TOOLTIP = (
     "Unavailable: ComfyUI hasn't got a model that finds {}. Install the Impact "
     "Subpack node pack, put one whose name says \"{}\" in its "
@@ -760,7 +763,8 @@ class FixPromptsDialog(QDialog):
         self.strength.setSingleStep(0.05)
         self.strength.setValue(current["strength"])
         self.train = QPushButton()
-        self.train.setToolTip(_TRAIN_TOOLTIP)
+        self.train.setToolTip(_train_tooltip(part))
+        self._training: str | None = None
         self._photos_folder = fix_training.photos_folder(part)
         self.photo_count = QLabel()
         self.photo_count.setToolTip(str(self._photos_folder))
@@ -777,8 +781,17 @@ class FixPromptsDialog(QDialog):
         layout.addLayout(foot)
 
     def show_training(self, text: str | None) -> None:
-        self.train.setText(text or "Train")
-        self.train.setEnabled(text is None)
+        self._training = text
+        self._show_train()
+
+    def _show_train(self) -> None:
+        if self._training is not None:
+            self.train.setText(self._training)
+            self.train.setEnabled(False)
+            return
+        state = fix_training.training_state(self._part)
+        self.train.setText("Train" if state is fix_training.TrainingState.UNTRAINED else "Retrain")
+        self.train.setEnabled(state is not fix_training.TrainingState.CURRENT)
 
     def _count_photos(self) -> None:
         count = len(fix_training.photo_files(self._photos_folder))
@@ -791,6 +804,7 @@ class FixPromptsDialog(QDialog):
     def event(self, event) -> bool:
         if event.type() == QEvent.Type.WindowActivate:
             self._count_photos()
+            self._show_train()
         return super().event(event)
 
     def choose_lora(self, lora: str) -> None:

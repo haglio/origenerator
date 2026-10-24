@@ -49,6 +49,25 @@ def test_a_fix_its_settings_keep_off_the_shared_folder_trains_on_its_own_photos_
     assert [path.name for path in fix_training.training_photos(alpha)] == ["alpha.jpg"]
 
 
+def test_a_fix_is_untrained_until_a_training_keeps_its_photos_then_current_until_one_changes(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path / "fixes")
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
+    hands = _part("hands")
+    (tmp_path / "fixes" / "shared").mkdir(parents=True)
+    (tmp_path / "fixes" / "shared" / "one.jpg").write_bytes(b"one")
+    assert fix_training.training_state(hands) is fix_training.TrainingState.UNTRAINED
+
+    record = tmp_path / "fix training" / "hands" / "trained.json"
+    record.parent.mkdir(parents=True)
+    record.write_text(json.dumps({"photo_stamps": fix_training.photo_stamps(hands)}),
+                      encoding="utf-8")
+    assert fix_training.training_state(hands) is fix_training.TrainingState.CURRENT
+
+    (tmp_path / "fixes" / "shared" / "one.jpg").write_bytes(b"one, retouched")
+    assert fix_training.training_state(hands) is fix_training.TrainingState.OUT_OF_DATE
+
+
 def test_a_training_job_names_the_fixs_photos_its_detector_and_the_model_to_train_for(
         monkeypatch, tmp_path):
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
@@ -64,6 +83,7 @@ def test_a_training_job_names_the_fixs_photos_its_detector_and_the_model_to_trai
 
     assert job["photos"] == [str(tmp_path / "hands" / "one.jpg"), str(tmp_path / "shared" / "two.jpg")]
     assert job["photos_folders"] == [str(tmp_path / "hands"), str(tmp_path / "shared")]
+    assert list(job["photo_stamps"]) == ["hands/one.jpg", "shared/two.jpg"]
     assert job["detector"] == str(models / "ultralytics" / "bbox" / "hand_yolov8s.pt")
     assert job["base_model"] == str(models / "checkpoints" / "base.safetensors")
     assert job["output_dir"] == str(models / "loras" / "fixes")

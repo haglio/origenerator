@@ -27,7 +27,8 @@ def _job(tmp_path, photos: dict, shared: dict | None = None) -> dict:
     work = tmp_path / "work"
     return {"part": "hands",
             "photos": [str(folder / name) for folder, these in folders.items() for name in these],
-            "photos_folders": [str(folder) for folder in folders],
+            "photos_folders": [str(folder) for folder in folders], "photo_stamps": {},
+            "trained": str(work / "trained.json"),
             "caption": "close-up photo of hands",
             "detector": str(tmp_path / "hand_yolov8s.pt"), "work": str(work),
             "status": str(work / "status.json"), "log": str(work / "training.log")}
@@ -224,6 +225,17 @@ def test_a_finished_training_names_its_lora_and_passes_on_what_it_printed(tmp_pa
 
     assert _status(job) == {"state": "done", "lora": "hands 2026-10-21 1500.safetensors"}
     assert "5/10" in capfd.readouterr().out
+
+
+def test_a_finished_training_keeps_a_record_of_the_photos_it_trained_on(tmp_path):
+    stamps = {"hands/one.png": [10, 20], "shared/two.png": [30, 40]}
+    job = dict(_cropped_job(tmp_path, "print('done')\n"), photo_stamps=stamps,
+               trained=str(tmp_path / "work" / "trained.json"))
+
+    fix_lora_trainer.train(job)
+
+    assert json.loads(Path(job["trained"]).read_text(encoding="utf-8")) == {
+        "photo_stamps": stamps, "lora": "hands 2026-10-21 1500.safetensors"}
 
 
 def test_a_part_is_cropped_to_a_square_twice_its_size_around_it():

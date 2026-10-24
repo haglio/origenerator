@@ -157,10 +157,10 @@ ComfyUI saves into a folder of its own (`comfyui_output_dir` in the settings
 all of Haglio shares), outside the library, and refuses to save into or read
 from anything a link inside that folder points at (its realpath check, since
 2026-07-02). So each run saves into `origenerator/<prompt id>/` there
-(`library_filing.handed_to_comfyui`, which also copies every past output or
-picked picture the run reads into that run's `reads/` and points the graph at
-the copy), and completion files each finished file into the library folder its
-kind is kept in (`file_into_library`; the kinds are `OutputPlaces`, read from
+(`library_filing.saving_into_its_run_folder`; a past output or picked picture
+the run reads reaches ComfyUI the way every file kept outside its folders
+does, as a copy in its temp folder, `comfyui_inputs`), and completion files
+each finished file into the library folder its kind is kept in (`file_into_library`; the kinds are `OutputPlaces`, read from
 the settings), numbered after the highest number already there, which is the
 name ComfyUI itself would have given it when it saved straight into the
 library. A record keeps naming its file by kind (`image`, `video`, ...), so

@@ -75,6 +75,15 @@ def _unmark(edit: QPlainTextEdit) -> None:
     cursor.mergeCharFormat(_plain_format(edit))
 
 
+def _spliced(layout: list, position: int, removed: int, inserted: str) -> list:
+    before, after, doc = [], [], 0
+    for kind, text in layout:
+        before.append((kind, text[:max(0, position - doc)]))
+        after.append((kind, text[max(0, position + removed - doc):]))
+        doc += len(text)
+    return [(kind, text) for kind, text in before + [(ADDED, inserted)] + after if text]
+
+
 class _Tracker(QObject):
     """Keeps one field's marks — and the prompt under them — in step with what is
     typed into it."""
@@ -95,12 +104,17 @@ class _Tracker(QObject):
         self._settle.setSingleShot(True)
         self._settle.setInterval(SETTLE_MS)
         self._settle.timeout.connect(self.show_whole_change)
+        self._prompt_caret = 0
+        self._redraw = QTimer(self)
+        self._redraw.setSingleShot(True)
+        self._redraw.timeout.connect(lambda: self._show_prompt_only(self._prompt_caret))
         edit.setUndoRedoEnabled(False)  # see the module docstring
         edit.installEventFilter(self)
         edit.document().contentsChange.connect(self._on_contents_change)
 
     def detach(self) -> None:
         self._settle.stop()
+        self._redraw.stop()
         self._edit.removeEventFilter(self)
         self._edit.document().contentsChange.disconnect(self._on_contents_change)
         self._edit.setUndoRedoEnabled(True)
@@ -197,6 +211,7 @@ class _Tracker(QObject):
         """Put the words that left back into the field, struck through beside the
         ones that arrived. What a settled field shows."""
         self._settle.stop()
+        self._redraw.stop()
         caret = self._prompt_offset(self._edit.textCursor().position())
         spans = diff_spans(self._baseline, self._value)
         if any(kind == REMOVED for kind, _piece in spans):
@@ -233,7 +248,11 @@ class _Tracker(QObject):
         start = self._prompt_offset(position)
         end = self._prompt_offset(position + removed)
         self._value = self._value[:start] + inserted + self._value[end:]
-        self._show_prompt_only(start + len(inserted))
+        self._layout = _spliced(self._layout, position, removed, inserted)
+        diff_text.hold_value(self._edit,
+                             None if self._edit.toPlainText() == self._value else self._value)
+        self._prompt_caret = start + len(inserted)
+        self._redraw.start()
         self._settle.start()  # ...and the strikes come back once the typing stops
 
     def _step(self, back: list[str], forth: list[str]) -> None:
@@ -242,9 +261,18 @@ class _Tracker(QObject):
         if not back:
             return
         forth.append(self._value)
-        self._value = back.pop()
+        self._show_whole(back.pop())
+
+    def take(self, value: str) -> None:
+        self._undone.append(self._value)
+        self._redone.clear()
+        self._show_whole(value)
+
+    def _show_whole(self, value: str) -> None:
+        self._value = value
         self._settle.stop()
-        self._paint(diff_spans(self._baseline, self._value), len(self._value))
+        self._redraw.stop()
+        self._paint(diff_spans(self._baseline, value), len(value))
 
     def eventFilter(self, obj, event):
         # Leaving the field ends the typing, whatever the clock still says.
@@ -270,6 +298,15 @@ def track(edit: QPlainTextEdit, baseline: str) -> None:
     """
     untrack(edit)
     _Tracker(edit, baseline).show_whole_change()
+
+
+def write(edit: QPlainTextEdit, value: str) -> None:
+    trackers = edit.findChildren(_Tracker)
+    if trackers:
+        trackers[0].take(value)
+    else:
+        diff_text.forget(edit)
+        edit.setPlainText(value)
 
 
 def untrack(edit: QPlainTextEdit) -> None:

@@ -38,8 +38,16 @@ def pair(qtbot):
 
 def _settle_timer(edit: QPlainTextEdit) -> QTimer:
     """The clock a tracked field puts the departed words back on."""
-    timer, = edit.findChildren(QTimer)
+    timer, = [timer for timer in edit.findChildren(QTimer) if timer.interval()]
     return timer
+
+
+def _drawn(edit: QPlainTextEdit) -> None:
+    """The redraw a keystroke leaves waiting, delivered the way its timer does."""
+    redraw, = [timer for timer in edit.findChildren(QTimer) if not timer.interval()]
+    if redraw.isActive():
+        redraw.stop()
+        redraw.timeout.emit()
 
 
 def _settle(qtbot, edit: QPlainTextEdit) -> None:
@@ -91,6 +99,19 @@ def _marked(edit, mark) -> str:
     return "".join(text for text, kind in _marks(edit) if kind == mark).strip()
 
 
+def _heard_either_side_of_the_tracker(edit, baseline) -> tuple[list, list]:
+    """What the field holds at every change it reports, heard just before the
+    tracker and just after it."""
+    before, after = [], []
+    edit.document().contentsChange.connect(
+        lambda *_change: before.append((edit.toPlainText(), _marks(edit))))
+    tracked_prompt.track(edit, baseline)
+    edit.document().contentsChange.connect(
+        lambda *_change: after.append((edit.toPlainText(), _marks(edit))))
+    before.clear()
+    return before, after
+
+
 def test_a_prompt_is_not_a_change_to_itself(pair):
     tracked_prompt.track(pair.edit, pair.edit.toPlainText())
 
@@ -103,6 +124,7 @@ def test_words_typed_in_are_lit_as_they_are_typed(pair):
     pair.edit.setFocus()
 
     pair.edit.setPlainText("a ginger cat on a couch")
+    _drawn(pair.edit)
 
     assert _marked(pair.edit, "lit") == "ginger"
     # Lighting a word adds no text: the field still says exactly the prompt.
@@ -120,6 +142,7 @@ def test_lighting_a_word_does_not_move_the_cursor(pair):
     pair.edit.setTextCursor(cursor)
 
     pair.edit.insertPlainText("ginger ")
+    _drawn(pair.edit)
 
     assert pair.edit.textCursor().position() == len("a ginger ")
     assert _marked(pair.edit, "lit") == "ginger"
@@ -197,12 +220,25 @@ def test_typing_on_takes_the_strike_back_out_and_keeps_the_prompt_right(pair, qt
     _settle(qtbot, pair.edit)
 
     pair.edit.insertPlainText("og")
+    _drawn(pair.edit)
 
     assert pair.edit.toPlainText() == "a frog on a couch"
     assert diff_text.live_text(pair.edit) == "a frog on a couch"
     _settle(qtbot, pair.edit)
     assert _marked(pair.edit, "struck") == "cat"
     assert diff_text.live_text(pair.edit) == "a frog on a couch"
+
+
+def test_typing_while_the_strike_is_up_leaves_the_field_alone_until_the_keystroke_is_told(
+        pair, qtbot):
+    before, after = _heard_either_side_of_the_tracker(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    _type_over(pair.edit, "cat", "dog")
+    _settle(qtbot, pair.edit)
+
+    pair.edit.insertPlainText("gy")
+
+    assert before == after
 
 
 def test_a_word_typed_and_taken_back_out_stops_being_marked(pair, qtbot):
@@ -231,6 +267,19 @@ def test_undo_takes_back_the_last_burst_of_typing_and_redo_puts_it_back(pair, qt
     qtbot.keyClick(pair.edit, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
     assert diff_text.live_text(pair.edit) == "a dog on a couch"
     assert _marked(pair.edit, "struck") == "cat"
+
+
+def test_a_prompt_written_into_the_field_shows_its_whole_change_at_once(pair, qtbot):
+    before, after = _heard_either_side_of_the_tracker(pair.edit, "a cat on a couch")
+
+    tracked_prompt.write(pair.edit, "a dog on a couch")
+
+    assert before == after
+    assert diff_text.live_text(pair.edit) == "a dog on a couch"
+    assert (_marked(pair.edit, "struck"), _marked(pair.edit, "lit")) == ("cat", "dog")
+    pair.edit.setFocus()
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+    assert diff_text.live_text(pair.edit) == "a cat on a couch"
 
 
 def test_leaving_the_field_settles_it_without_waiting_out_the_clock(pair):

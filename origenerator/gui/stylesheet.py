@@ -100,7 +100,7 @@ def build_stylesheet() -> str:
         border: 1px solid {_h(BORDER_SUBTLE)};
         border-radius: 3px;
     }}
-    /* A prompt a spoken scene will not use (scenes_editor marks it "inert"):
+    /* A prompt the run would ignore (prompt_field.set_in_use marks it "inert"):
        dim, so a field you cannot type into doesn't read as one you simply
        haven't filled in yet. */
     QPlainTextEdit[inert="true"] {{

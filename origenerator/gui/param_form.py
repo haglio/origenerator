@@ -31,6 +31,7 @@ from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import advice_help, definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.prompt_field import set_in_use
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
@@ -63,16 +64,32 @@ def _pushes_the_prompt(values) -> bool:
     return not strengths or any(float(strength) != 1.0 for strength in strengths)
 
 
+STRENGTH_ONE_HELP = ("Prompt Strength is 1, so the Negative Prompt is not used. "
+                     "Raise Prompt Strength above 1 to use it.")
+BOTH_STRENGTHS_ONE_HELP = ("Both Prompt Strengths are 1, so the Negative Prompt is not used. "
+                           "Raise either one above 1 to use it.")
+EVERY_SCENE_SPEAKS_HELP = ("Every scene has a line, so the sound is her speaking and this "
+                           "prompt is not used. Clear Her Lines on a scene to use it.")
+
+
+def _strength_one_help(values) -> str:
+    return STRENGTH_ONE_HELP if "cfg" in values else BOTH_STRENGTHS_ONE_HELP
+
+
 _SHOWN_WHILE = {
-    "negative_prompt": _pushes_the_prompt,
     "voice": _speaks,
     "voice_sample": lambda values: _speaks(values) and values.get("voice") == CUSTOM_VOICE,
     "voice_sample_text": lambda values: _speaks(values) and values.get("voice") == CUSTOM_VOICE,
     "unet_s2v": _speaks,
-    "audio_prompt": lambda values: not _all_speak(values),
-    "audio_negative_prompt": lambda values: not _all_speak(values),
     "lora_strength_high": lambda values: not is_no_lora(values.get("lora_high")),
     "lora_strength_low": lambda values: not is_no_lora(values.get("lora_low")),
+}
+
+_SOUND_IN_USE = (lambda values: not _all_speak(values), lambda values: EVERY_SCENE_SPEAKS_HELP)
+_IN_USE_WHILE = {
+    "negative_prompt": (_pushes_the_prompt, _strength_one_help),
+    "audio_prompt": _SOUND_IN_USE,
+    "audio_negative_prompt": _SOUND_IN_USE,
 }
 
 # The locked-dimension spinners span from a stride floor up past any realistic
@@ -199,7 +216,7 @@ class ParamForm(QWidget):
                 lines=any(pd.key == "scene_lines" for pd in self._param_defs))
             self._scenes.changed.connect(self.changed)
         self._build()
-        self._wire_rows_shown_while()
+        self._wire_row_rules()
         for pd in self._seed_defs():
             self._draw(pd)
         self.changed.connect(self._describe_seed_fields)
@@ -218,19 +235,27 @@ class ParamForm(QWidget):
             tip = f"Square, so it goes under {tip}"
         self._sections["Size"].set_mark(icons.side_mark(orientation), tip)
 
-    def _wire_rows_shown_while(self):
-        self.changed.connect(self._refresh_rows_shown_while)
-        self._refresh_rows_shown_while()
+    def _wire_row_rules(self):
+        self.changed.connect(self._refresh_row_rules)
+        self._refresh_row_rules()
 
-    def _refresh_rows_shown_while(self):
+    def _refresh_row_rules(self):
         values = {pd.key: self._read_field(pd) for pd in self._param_defs}
         for row, shows in _SHOWN_WHILE.items():
+            if row in self._widgets:
+                self._set_row_visible(row, shows(values))
+        for row, (in_use, shut_down_help) in _IN_USE_WHILE.items():
             if row not in self._widgets:
                 continue
+            help_text = None if in_use(values) else shut_down_help(values)
             if self._widgets[row] is self._scenes:
-                self._scenes.show_text(row, shows(values))
+                self._scenes.set_text_in_use(row, help_text)
             else:
-                self._set_row_visible(row, shows(values))
+                self._set_row_in_use(row, help_text)
+
+    def _set_row_in_use(self, key: str, shut_down_help: str | None) -> None:
+        set_in_use(self._widgets[key], self._labels[key], shut_down_help is None,
+                   self._help(self._defs[key]) if shut_down_help is None else shut_down_help)
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
         """Show or hide one row, label and field together."""

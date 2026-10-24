@@ -389,7 +389,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # what the tab makes, taken down to what the tree measured.
 # 17130 when the dropdowns, the TOC and the Enhancement levels came to name a
 # model by its title, taken down to what the tree measured.
-MAX_PROSE_LINES = 17130
+MAX_PROSE_LINES = 17125
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

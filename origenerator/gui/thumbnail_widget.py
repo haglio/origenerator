@@ -7,6 +7,7 @@ from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QCursor, QIcon, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
+from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.gui import grid_card, palette
 from origenerator.gui.corner_controls import (
@@ -43,7 +44,7 @@ _CORNER_BUTTON_CSS = (
 #     paints them opaque and the fill only peeks through the 4px margin as a
 #     frame (which is what an earlier attempt did).
 _SELECTED_TILE_CSS = (
-    f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}")
+    f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}")
 _BORDER_UNSELECTED = f"2px solid {palette.CARD_BORDER}"
 _BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
@@ -313,7 +314,7 @@ class ThumbnailWidget(QWidget):
             border = _BORDER_UNSELECTED
         # Transparent background so the tile fill shows under any letterboxing.
         self._image_label.setStyleSheet(
-            f"background-color: transparent; border: {border}; border-radius: 3px;"
+            f"background-color: transparent; border: {border}; border-radius: {BUTTON_RADIUS}px;"
         )
 
     # --- corner action buttons (hover-revealed per-seed re-rolls) -----------

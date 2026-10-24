@@ -26,7 +26,13 @@ from PyQt6.QtWidgets import QToolButton, QWidget
 from shared_ui.colors import BG_PRIMARY
 from shared_ui.mark_button import fill_square_with_mark
 from shared_ui.palette import AMBER, BLUE, as_hex
-from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP, BUTTON_SIZE
+from shared_ui.spacing import (
+    BUTTON_GAP,
+    BUTTON_GROUP_GAP,
+    BUTTON_RADIUS,
+    BUTTON_ROW_GAP,
+    BUTTON_SIZE,
+)
 
 from origenerator import ui_scale
 from origenerator.config import RADIO_STATIONS
@@ -36,7 +42,7 @@ from origenerator.gui.link_tip import LinkTip, link
 
 
 def _lit(color: str) -> str:
-    return f"QToolButton:checked {{ background-color: {color}; border-radius: 4px; }}"
+    return f"QToolButton:checked {{ background-color: {color}; border-radius: {BUTTON_RADIUS}px; }}"
 
 
 # A lit background while a switch is on.

@@ -6,19 +6,18 @@ beside it. They stand shoulder to shoulder in one flow, so they are one size and
 their captions are set one way. Kept here rather than in any one of them so the
 family cannot drift apart the next time one is touched.
 
-The caption is set a step below the app's font (:data:`CAPTION_SCALE`), and the
-band is two lines of *that* tall, so a caption long enough to wrap -- a run in
-flight is captioned with its model and its prompt -- wraps rather than being
-clipped. The card's height follows from the band, so choosing a bigger caption
-never quietly costs a line.
+The caption is set in the family's tiny type, and the band is two lines of it
+tall, so a caption long enough to wrap -- a run in flight is captioned with its
+model and its prompt -- wraps rather than being clipped. The card's height
+follows from the band, so a caption never quietly costs a line.
 """
 from __future__ import annotations
 
-from functools import cache
-
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QFont, QFontMetrics, QPainter
-from PyQt6.QtWidgets import QApplication, QLabel
+from PyQt6.QtWidgets import QLabel
+from shared_ui.fonts import FONT_UI, SIZE_TINY, make_font
+from shared_ui.spacing import BUTTON_RADIUS
 
 # The picture a card gives to its content, and the frame around it. The picture
 # is what the grid is for, so the card's height is what gives when the caption
@@ -28,42 +27,20 @@ PICTURE_SIZE = (172, 160)
 CARD_MARGIN = 4
 CARD_SPACING = 2
 
-# How far below the app's own font a caption is set: large enough to still read
-# as text rather than as fine print, which a first pass much further down did not.
-CAPTION_SCALE = 0.8
-# Point sizes are picked on a half-point grid, and never below what is legible.
-_STEP_PT = 0.5
-_FLOOR_PT = 7.0
-
-
-
-def scaled_point_size(base_pt: float) -> float:
-    """The caption's size for an app font of ``base_pt`` — scaled down, rounded
-    to the half point, and never below what can still be read."""
-    return max(_FLOOR_PT, round(base_pt * CAPTION_SCALE / _STEP_PT) * _STEP_PT)
-
-
-@cache
-def _caption_font() -> QFont:
-    app = QApplication.instance()
-    base = app.font() if app is not None else QFont()
-    font = QFont(base)
-    font.setPointSizeF(scaled_point_size(base.pointSizeF()))
-    return font
-
-
 def caption_font() -> QFont:
-    """The font every card's caption is set in — a copy of the one built once
-    for the app's own font, since a caller may set it on a widget that then
-    changes it."""
-    return QFont(_caption_font())
+    """The family's tiny type, which a card's caption, count and breadcrumb are
+    set in: a copy, since a caller may set it on a widget that then changes it."""
+    return QFont(make_font(FONT_UI, SIZE_TINY))
 
+
+def line_height() -> int:
+    return QFontMetrics(caption_font()).height()
 
 
 def caption_height() -> int:
     """The caption band: two lines of :func:`caption_font`, so a caption long
     enough to wrap is read rather than cut in half."""
-    return 2 * QFontMetrics(caption_font()).height()
+    return 2 * line_height()
 
 
 def card_size() -> tuple:
@@ -77,20 +54,15 @@ def picture_size() -> QSize:
     return QSize(*PICTURE_SIZE)
 
 
-# The two lines a folder's card carries that a generation's does not: how many
-# items are in it, and -- in the Favorites collection, where a folder is out of its
-# parent's context -- the breadcrumb saying where it lives.
-COUNT_HEIGHT = 14
-BREADCRUMB_HEIGHT = 14
-
-
 def folder_card_size(breadcrumb: bool = False) -> tuple:
-    """A folder's outside: the same card as a generation's, plus its count line
-    and, in the collection, its breadcrumb."""
+    """A folder's outside: the same card as a generation's, plus a line of the
+    caption's type saying how many items are in it, and another saying where it
+    lives in the Favorites collection, where a folder is out of its parent's
+    context."""
     width, height = card_size()
-    height += CARD_SPACING + COUNT_HEIGHT
+    height += CARD_SPACING + line_height()
     if breadcrumb:
-        height += CARD_SPACING + BREADCRUMB_HEIGHT
+        height += CARD_SPACING + line_height()
     return width, height
 
 
@@ -111,18 +83,20 @@ from origenerator.gui.palette import (
     SELECTED_FILL,
 )
 
+_CORNER = f"border-radius: {BUTTON_RADIUS}px;"
+
 # The resting dashed outline, versus the blue and white marking the card as the item
 # driving the info pane — the same marks a selected thumbnail wears.
 IDLE_FRAME_CSS = (
-    "#{name} {{ border: 1px dashed " + as_hex(BORDER_SUBTLE) + "; border-radius: 4px; }}"
+    "#{name} {{ border: 1px dashed " + as_hex(BORDER_SUBTLE) + "; " + _CORNER + " }}"
     "#{name}:hover {{ border-color: " + CARD_HOVER_BORDER + "; }}"
     "#{name}:disabled {{ border-color: " + as_hex(BORDER_SUBTLE) + "; }}"
     "#{name} QLabel:disabled {{ color: " + as_hex(TEXT_MUTED) + "; }}"
 )
 SELECTED_FRAME_CSS = ("#{name} {{ border: 2px solid " + SELECTED_BORDER
-                      + "; background-color: " + SELECTED_FILL + "; border-radius: 4px; }}")
+                      + "; background-color: " + SELECTED_FILL + "; " + _CORNER + " }}")
 
-_PLATE_CSS = f"QLabel {{ background: {EMPTY_PLATE}; border-radius: 3px; }}"
+_PLATE_CSS = f"QLabel {{ background: {EMPTY_PLATE}; {_CORNER} }}"
 
 
 def idle_css(name: str) -> str:

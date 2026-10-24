@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QWidget
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.folder_path import FolderPath
 from shared_ui.icons import marked_text
-from shared_ui.spacing import GAP_MEDIUM
+from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
+from shared_ui.type_scale import SIZE_BODY, in_pixels
 
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.gallery_tree import PATH_SEPARATOR, PathStep
@@ -22,7 +23,8 @@ class FolderPathHeader(QWidget):
         self._keys: tuple[str | None, ...] = ()
         self._path = FolderPath(PATH_SEPARATOR)
         self._path.setWordWrap(True)
-        self._path.setStyleSheet("font-size: 15px; font-weight: 600; padding: 2px;")
+        self._path.setStyleSheet(
+            f"font-size: {in_pixels(SIZE_BODY)}px; font-weight: bold; padding: {GAP_SMALL}px;")
         self._path.step_clicked.connect(lambda step: self.folder_chosen.emit(self._keys[step]))
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)

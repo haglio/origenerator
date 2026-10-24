@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui.colors import AMBER, BG_SECONDARY, GREEN, RED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from shared_ui.icons import marked_text
+from shared_ui.spacing import BUTTON_RADIUS, MARGIN_DIALOG, MARGIN_STANDARD
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 
@@ -69,7 +70,7 @@ class NoticeOverlay(QLabel):
         self.setStyleSheet(
             f"background-color: {BG_SECONDARY.name()};"
             f" color: {ink}; border: 1px solid {ink};"
-            " padding: 8px 16px; border-radius: 4px;"
+            f" padding: {MARGIN_STANDARD}px {MARGIN_DIALOG}px; border-radius: {BUTTON_RADIUS}px;"
         )
         set_marked_text(self, text, mark=mark, color=_INK[kind])
         self.show()

@@ -25,6 +25,7 @@ from shared_ui.colors import (
 )
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
+from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.stylesheet import build_stylesheet, dress_application
 
@@ -361,11 +362,11 @@ def test_a_preview_hands_the_app_its_letter_in_the_preview_ink(qapp):
         qapp.setWindowIcon(before)
 
 
-def test_a_radio_keeps_its_word_close_to_its_own_circle(qapp):
+def test_a_radio_keeps_its_word_the_familys_small_gap_from_its_own_circle(qapp):
     """At the stock six pixels each word sat nearer the next circle than its
-    own, which reads as labelling the wrong one."""
+    own, which reads as labeling the wrong one."""
     qapp.setStyleSheet(build_stylesheet())
     radio = QRadioButton("Kino")
 
     assert radio.style().pixelMetric(
-        QStyle.PixelMetric.PM_RadioButtonLabelSpacing, None, radio) == 3
+        QStyle.PixelMetric.PM_RadioButtonLabelSpacing, None, radio) == GAP_SMALL

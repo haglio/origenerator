@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import glyph_icon, marked_text
 from shared_ui.orientation import orientation_of_size
-from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator import evolver_export, outside_videos, recipe_match
 from origenerator.comfyui_client import ComfyUIClient
@@ -405,7 +405,7 @@ class GenerateConfigPanel(QWidget):
         # also stops them running under the scroll bar.
         body.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
                                 MARGIN_STANDARD, 0)
-        body.setSpacing(8)
+        body.setSpacing(GAP_MEDIUM)
         self._scroll.setWidget(body_host)
         return body
 
@@ -447,7 +447,7 @@ class GenerateConfigPanel(QWidget):
         # pane open and putting a horizontal scroll bar under the whole form.
         header = QFormLayout()
         header.setContentsMargins(0, 0, 0, 0)
-        header.setHorizontalSpacing(8)
+        header.setHorizontalSpacing(GAP_MEDIUM)
         header.setLabelAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )

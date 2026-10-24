@@ -16,6 +16,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_SUBTLE
+from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
 from origenerator.gui import grid_card
 from origenerator.gui.grayscale import grayscale_pixmap
@@ -46,16 +47,16 @@ class SourceTile(QWidget):
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(4)
+        column.setSpacing(GAP_SMALL)
         self._heading = QLabel(_DEFAULT_HEADING)
-        self._heading.setStyleSheet("font-weight: 600;")
+        self._heading.setStyleSheet("font-weight: bold;")
         column.addWidget(self._heading, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self._thumb = QLabel()
         self._thumb.setFixedSize(THUMBNAIL_BOX)
         self._thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._thumb.setStyleSheet(
-            f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: 3px;"
+            f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: {BUTTON_RADIUS}px;"
         )
         column.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignHCenter)
         # A photo (or play) badge in the thumbnail's top-left corner, like the

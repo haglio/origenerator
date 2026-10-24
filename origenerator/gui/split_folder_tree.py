@@ -25,6 +25,7 @@ from shared_ui.spacing import (
     BUTTON_MARK,
     BUTTON_ROW_GAP,
     GAP_MEDIUM,
+    GAP_SMALL,
 )
 
 from origenerator.gallery.sides import (
@@ -42,6 +43,8 @@ from origenerator.gui.stylesheet import CHOSEN
 
 _MIN_SECTION_HEIGHT = 90
 _GAP_UNDER_THE_CHOICES = 2
+_UNDER_A_WORDS_INK = 5  # clear rows under a heading's word, on Segoe UI and the offscreen font
+_HEADING_FOOT = GAP_MEDIUM - _UNDER_A_WORDS_INK  # its line the medium gap under the word
 
 _SEPARATE_WORD = "Separate"
 _TOGETHER_WORD = "Together"
@@ -80,8 +83,8 @@ def _heading(side: str) -> QFrame:
                        f"library. A slideshow started here plays {side} pictures alone.")
 
     row = QHBoxLayout(heading)
-    row.setContentsMargins(0, 0, 0, 0)  # the stylesheet's padding insets this
-    row.setSpacing(6)
+    row.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, _HEADING_FOOT)
+    row.setSpacing(GAP_MEDIUM)
 
     mark = QLabel()
     mark.setObjectName("treeSectionMark")
@@ -210,7 +213,7 @@ class SplitFolderTree(QWidget):
         else:
             column.addSpacing(GAP_MEDIUM - _GAP_UNDER_THE_CHOICES)
         column.addWidget(_rule())
-        column.addSpacing(2)
+        column.addSpacing(GAP_SMALL)
 
         tree = FolderTree(group_role, takes_item=self._takes_item,
                           takes_folder=self._takes_folder)

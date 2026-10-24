@@ -17,10 +17,19 @@ from shared_ui.colors import (
 )
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
-from shared_ui.spacing import BUTTON_RADIUS
+from shared_ui.spacing import (
+    BUTTON_MARK_INSET,
+    BUTTON_PAD_H_TIGHT,
+    BUTTON_PAD_V,
+    BUTTON_RADIUS,
+    GAP_MEDIUM,
+    GAP_SMALL,
+    MARGIN_STANDARD,
+)
 
 from origenerator.config import PROJECT_DIR
 from origenerator.gui import drop_style
+from origenerator.gui.eliding_tab_bar import EDGE
 from origenerator.gui.panes import BORDER_NAME, BORDERED_SET
 from origenerator.gui.tooltip_shape import shape_long_tooltips
 from origenerator.spin_arrows import arrow_paths
@@ -39,6 +48,10 @@ COMMITTING_CONTROL = f'QPushButton[{COMMITS}="true"]'
 def _h(color) -> str:
     return color.name()
 
+
+_ARROW_ROOM = 16
+_RADIO_MARK = 14
+_RING = 1
 
 _STEP_BUTTONS = ("QSpinBox::up-button", "QDoubleSpinBox::up-button",
                  "QSpinBox::down-button", "QDoubleSpinBox::down-button")
@@ -91,14 +104,14 @@ def build_stylesheet() -> str:
        a section's header is, so a story reads as scenes and not as more keys. */
     QLabel#sceneTitle {{
         color: {_h(TEXT_PRIMARY)};
-        font-weight: 600;
+        font-weight: bold;
     }}
     /* Fields that belong together -- a scene's texts and its length, a fix's
        edit button, checkbox, name and value -- bordered, so each set reads as
        one thing rather than as loose fields. */
     QFrame#{BORDERED_SET} {{
         border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 3px;
+        border-radius: {BUTTON_RADIUS}px;
     }}
     /* A prompt the run would ignore and its label (prompt_field.set_in_use marks
        both "inert"): dim, so a field you cannot type into doesn't read as one
@@ -118,7 +131,7 @@ def build_stylesheet() -> str:
 {field_rules()}
     QSpinBox, QDoubleSpinBox {{
         /* Room for the step buttons, so the value never runs under them. */
-        padding-right: 18px;
+        padding-right: {_ARROW_ROOM + GAP_SMALL}px;
     }}
     /* Styling a spinner at all hands Qt the whole widget, step buttons
        included — and the default it falls back to for them has no size, so the
@@ -126,12 +139,12 @@ def build_stylesheet() -> str:
        drawn arrow and they work again. */
     {", ".join(_STEP_BUTTONS)} {{
         subcontrol-origin: border;
-        width: 16px;
+        width: {_ARROW_ROOM}px;
         border-left: 1px solid {_h(BORDER_SUBTLE)};
     }}
     QSpinBox::up-button, QDoubleSpinBox::up-button {{
         subcontrol-position: top right;
-        border-top-right-radius: 3px;
+        border-top-right-radius: {BUTTON_RADIUS}px;
     }}
     /* No placement: Qt's own default for a down-button is the low right corner,
        which is where this one goes. The radius is uniform because a QSS radius
@@ -139,7 +152,7 @@ def build_stylesheet() -> str:
        is the outer one, where the field's own rounding is. */
     QSpinBox::down-button, QDoubleSpinBox::down-button {{
         border-top: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 3px;
+        border-radius: {BUTTON_RADIUS}px;
     }}
 {control_ground(palette.BG_BUTTON, *_STEP_BUTTONS)}
     QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed,
@@ -151,8 +164,8 @@ def build_stylesheet() -> str:
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_PRIMARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 3px;
-        padding: 4px 8px;
+        border-radius: {BUTTON_RADIUS}px;
+        padding: {BUTTON_PAD_V}px {MARGIN_STANDARD}px;
     }}
     QComboBox QAbstractItemView {{
         background-color: {_h(BG_TERTIARY)};
@@ -160,7 +173,7 @@ def build_stylesheet() -> str:
         selection-background-color: {_h(BLUE)};
     }}
     QComboBox QAbstractItemView::item:disabled {{
-        /* The rule above colours every item, disabled ones included, so an
+        /* The rule above colors every item, disabled ones included, so an
            unpickable entry would look exactly as pickable as the rest. Mute it. */
         color: {_h(TEXT_MUTED)};
     }}
@@ -174,16 +187,17 @@ def build_stylesheet() -> str:
        (see _drawn_arrow_rules above); a gradient also stays crisp at any screen
        scale, and its two stops sit a hair apart rather than hard against each
        other so the disc's edge reads smooth instead of stepped. */
-    /* Half the stock six pixels: at six, each word sat nearer the next
-       circle than its own, which reads as labelling the wrong one. */
+    /* The family's small gap, short of the stock six pixels: at six, each word
+       sat nearer the next circle than its own, which reads as labeling the wrong
+       one. */
     QRadioButton {{
-        spacing: 3px;
+        spacing: {GAP_SMALL}px;
     }}
     QRadioButton::indicator {{
-        width: 14px;
-        height: 14px;
-        border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 8px;
+        width: {_RADIO_MARK}px;
+        height: {_RADIO_MARK}px;
+        border: {_RING}px solid {_h(BORDER_SUBTLE)};
+        border-radius: {_RADIO_MARK // 2 + _RING}px;
         background-color: {_h(BG_SECONDARY)};
     }}
     QRadioButton::indicator:checked {{
@@ -224,7 +238,7 @@ def build_stylesheet() -> str:
     }}
     QComboBox#howMany::drop-down {{
         border: none;
-        width: 16px;
+        width: {_ARROW_ROOM}px;
     }}
     /* Generate grays out while it cannot launch; the id selector above
        out-specifies the base :disabled rule, so restate it here. */
@@ -243,8 +257,8 @@ def build_stylesheet() -> str:
         border-width: 0 0 1px 0;
         border-radius: 0;
         text-align: left;
-        font-weight: 600;
-        padding: 4px 2px;
+        font-weight: bold;
+        padding: {BUTTON_PAD_V}px {GAP_SMALL}px;
     }}
     QPushButton#foldingSectionHeader:hover {{
         background-color: {_h(BG_SECONDARY)};
@@ -256,7 +270,7 @@ def build_stylesheet() -> str:
     /* The derived-size padlock: a compact toggle floating between the width and
        height rows. Its own blue comes from the rule below. */
     QToolButton#dimensionUnlock {{
-        padding: 2px 4px;
+        padding: {BUTTON_MARK_INSET}px {GAP_SMALL}px;
     }}
     /* The one exception to the on-ground rule above: a control whose ON state
        means a choice has been made wears the blue every other selection does,
@@ -265,7 +279,7 @@ def build_stylesheet() -> str:
     QProgressBar {{
         background-color: {_h(BG_SECONDARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 3px;
+        border-radius: {BUTTON_RADIUS}px;
         text-align: center;
         color: {_h(TEXT_PRIMARY)};
     }}
@@ -288,18 +302,6 @@ def build_stylesheet() -> str:
     QSplitter::handle:hover {{
         background-color: {_h(BLUE)};
     }}
-    QGroupBox {{
-        color: {_h(TEXT_PRIMARY)};
-        border: 1px solid {_h(BORDER_PANEL)};
-        border-radius: 4px;
-        margin-top: 12px;
-        padding-top: 16px;
-    }}
-    QGroupBox::title {{
-        subcontrol-origin: margin;
-        left: 8px;
-        padding: 0 4px;
-    }}
     QTabBar::tab {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
@@ -307,7 +309,7 @@ def build_stylesheet() -> str:
            sets the gap in front of its mark. It matches the one the cross leaves at
            the other end (eliding_tab_bar.EDGE), or a tab reads as two separate
            decisions rather than one row. */
-        padding: 8px 10px;
+        padding: {GAP_MEDIUM}px {EDGE}px;
         /* A hairline between tabs, so it reads which cross belongs to which, over a
            rule the selected tab alone colors in. One declaration each way round,
            since the two edges differ in width and in color: top, right, low,
@@ -338,7 +340,7 @@ def build_stylesheet() -> str:
        offer rather than an accident. */
     QWidget#queueRow {{
         background-color: transparent;
-        border-radius: 3px;
+        border-radius: {BUTTON_RADIUS}px;
     }}
     QWidget#queueRow:hover {{
         background-color: {_h(BG_SECONDARY)};
@@ -349,12 +351,12 @@ def build_stylesheet() -> str:
     }}
     /* Compact enough to ride inside a queue row, which is barely taller. */
     QPushButton#queueCancelBtn {{
-        padding: 0 8px;
+        padding: 0 {BUTTON_PAD_H_TIGHT}px;
     }}
     QLabel#combineHeading {{
         color: {_h(TEXT_MUTED)};
         font-weight: bold;
-        padding: 2px 0;
+        padding: {GAP_SMALL}px 0;
     }}
     /* The fold header over each model+LoRA band of search results, and the
        time heading over each batch of tiles. Brighter
@@ -368,7 +370,7 @@ def build_stylesheet() -> str:
         background: transparent;
         border: none;
         border-top: 1px solid {_h(BORDER_SUBTLE)};
-        padding: 6px 0 2px 0;
+        padding: {GAP_MEDIUM}px 0 {GAP_SMALL}px 0;
         text-align: left;
     }}
     QPushButton#tileGroupHeading:hover {{
@@ -385,11 +387,9 @@ def build_stylesheet() -> str:
     }}
     /* The standing label over each half of the TOC pane, naming the shape that
        half holds. Outside the tree rather than a row in it, so it is still on
-       screen when the rows under it have scrolled. The frame carries the
-       padding because its proportion mark and its word both sit inside it. */
+       screen when the rows under it have scrolled. */
     QFrame#treeSectionLabel {{
         background: transparent;
-        padding: 4px 2px 3px 2px;
     }}
     QFrame#treeSectionRule {{
         border-style: solid;
@@ -406,7 +406,7 @@ def build_stylesheet() -> str:
         border: 1px dashed {_h(BORDER_PANEL)};
         border-radius: {drop_style.RADIUS}px;
         color: {_h(TEXT_MUTED)};
-        padding: 8px;
+        padding: {MARGIN_STANDARD}px;
     }}
     QLabel#dropSlot[{drop_style.LIT}="true"], QLabel#dropSlot[{drop_style.AIMED}="true"] {{
         border: 1px solid {_h(drop_style.EDGE)};

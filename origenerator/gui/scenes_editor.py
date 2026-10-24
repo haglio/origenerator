@@ -41,6 +41,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
 
 from origenerator.gui import diff_text
 from origenerator.gui.eliding import ElidingLabel
@@ -89,7 +90,7 @@ class _Scene(QFrame):
         self._shut_down = shut_down
         column = QVBoxLayout(self)
         border_as_a_set(self, column)
-        column.setSpacing(4)
+        column.setSpacing(GAP_SMALL)
         # Kept narrow: this row sits beside the form's label column, so it is
         # the row that would push the pane's floor past its cap (see
         # GenerateConfigPanel.minimumSizeHint). The title gives way first, and
@@ -183,9 +184,9 @@ class ScenesEditor(QWidget):
         self._scenes: list[_Scene] = []
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(6)
+        column.setSpacing(GAP_MEDIUM)
         self._cards = QVBoxLayout()
-        self._cards.setSpacing(6)
+        self._cards.setSpacing(GAP_MEDIUM)
         column.addLayout(self._cards)
         self._add = QPushButton("Add scene")
         self._add.setToolTip("Another scene, run after this one from its last frame")

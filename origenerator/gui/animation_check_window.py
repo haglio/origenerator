@@ -57,7 +57,7 @@ class AnimationCheckWindow(QWidget):
         self.setWindowTitle("Origenerator — how should this be animated?")
 
         self._heading = QLabel(objectName=HEADING)
-        self._heading.setStyleSheet("font-weight: 600;")
+        self._heading.setStyleSheet("font-weight: bold;")
         self._counted = QLabel(objectName=COUNTED)
         self._counted.setToolTip(
             "Every animation that can be asked for — each act, in each lane, from each "

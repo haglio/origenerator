@@ -3,26 +3,24 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import QApplication, QLabel
+from shared_ui.fonts import FONT_UI, SIZE_TINY
 
 from origenerator.gui import grid_card
 
 
-def test_the_caption_is_set_a_step_below_the_app_s_own_font():
-    # Not far below: the first pass went small enough to fit a whole twenty-digit
-    # seed on one line, and came out too small to read comfortably.
-    assert grid_card.scaled_point_size(13.5) == 11.0
-    assert grid_card.scaled_point_size(10.0) == 8.0
+def test_the_caption_is_set_in_the_familys_tiny_type(qtbot):
+    font = grid_card.caption_font()
+
+    assert (font.family(), font.pointSize()) == (FONT_UI, SIZE_TINY)
 
 
-def test_a_caption_is_never_shrunk_past_reading():
-    assert grid_card.scaled_point_size(2.0) == 7.0
+def test_a_folders_count_and_breadcrumb_are_each_a_whole_line_of_the_caption(qtbot):
+    width, height = grid_card.card_size()
+    line = QFontMetrics(grid_card.caption_font()).height()
 
-
-def test_sizes_land_on_the_half_point():
-    # Qt renders between the half points, but a caption asked for 10.8pt and one
-    # asked for 10.5 measure the same — so the family picks a size it can predict.
-    for base in (11.0, 12.0, 13.0, 14.0, 15.0, 16.0):
-        assert grid_card.scaled_point_size(base) % 0.5 == 0
+    assert grid_card.folder_card_size() == (width, height + grid_card.CARD_SPACING + line)
+    assert grid_card.folder_card_size(breadcrumb=True) == (
+        width, height + 2 * (grid_card.CARD_SPACING + line))
 
 
 def test_the_band_holds_two_whole_lines_of_the_caption(qtbot):

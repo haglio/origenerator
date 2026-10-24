@@ -25,6 +25,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.gui import grid_card, palette
 from origenerator.gui.blurred import blurred_backdrop
@@ -68,7 +69,7 @@ class InFlightCard(QWidget):
         self._image.setFixedSize(*_IMAGE_SIZE)
         self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._image.setStyleSheet(
-            f"background-color: transparent; border: {_BORDER}; border-radius: 3px;"
+            f"background-color: transparent; border: {_BORDER}; border-radius: {BUTTON_RADIUS}px;"
         )
         self._caption = QLabel()
         self._caption.setAlignment(Qt.AlignmentFlag.AlignCenter)

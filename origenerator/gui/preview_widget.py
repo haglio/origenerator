@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
+from shared_ui.spacing import BUTTON_RADIUS, MARGIN_DIALOG, MARGIN_STANDARD
 
 from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
@@ -58,7 +59,8 @@ from origenerator.media import MediaType
 _PLACEHOLDER = "Select a generation to preview"
 
 _NOTICE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
-                 " padding: 6px 12px; border-radius: 4px;")
+                 f" padding: {MARGIN_STANDARD}px {MARGIN_DIALOG}px;"
+                 f" border-radius: {BUTTON_RADIUS}px;")
 _NOTICE_MARGIN = 12  # how far the plate floats from the media's top-left corner
 
 

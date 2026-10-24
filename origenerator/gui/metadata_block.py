@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
+from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_DIALOG, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import (
     BASIC_TITLE,
@@ -93,8 +94,8 @@ class MetadataBlock(QWidget):
             self._container.deleteLater()
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(2, 2, 2, 2)
-        layout.setSpacing(14)
+        layout.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, GAP_SMALL)
+        layout.setSpacing(GAP_DIALOG)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._block = None
         if section is not None or self._go_to_folder is not None:
@@ -129,7 +130,7 @@ def _build_section(section: MetaSection | None, go_to_folder: QAction | None = N
     rows = QWidget()
     layout = QVBoxLayout(rows)
     layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(4)
+    layout.setSpacing(GAP_SMALL)
     if go_to_folder is not None:
         layout.addWidget(_folder_button(go_to_folder), 0, Qt.AlignmentFlag.AlignLeft)
     label_width = label_column_width(items)
@@ -175,7 +176,7 @@ def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
     row = QWidget()
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(8)
+    layout.setSpacing(GAP_MEDIUM)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
     label, value, *buttons = meta_cells(item, label_width)
     layout.addWidget(label)
@@ -188,7 +189,7 @@ def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
 
 def _dressed(btn: QPushButton, name: str) -> QPushButton:
     btn.setObjectName(name)
-    btn.setStyleSheet("padding: 2px 6px;")
+    btn.setStyleSheet(f"padding: {BUTTON_PAD_V}px {BUTTON_PAD_H_TIGHT}px;")
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     return btn
 

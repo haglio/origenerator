@@ -62,6 +62,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
 
 from origenerator.gui import icons
 from origenerator.gui.combination import Combination
@@ -188,7 +189,7 @@ class RunningPreview(OpensAFolder, QWidget):
         # No margins: the frame is meant to reach the strip's edges, and the
         # column beside it centers itself in the same height.
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(GAP_MEDIUM)
         self._frame = QLabel()
         self._frame.setFixedSize(_STRIP_HEIGHT, _STRIP_HEIGHT)  # kept square: resizeEvent
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -198,7 +199,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
         column = QVBoxLayout()
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(3)
+        column.setSpacing(GAP_SMALL)
         column.addStretch(1)
         # How far along the run is, how long it has been going and how much longer
         # it has — written across the bar those numbers measure, so the reading and
@@ -429,8 +430,8 @@ class QueueRow(OpensAFolder, QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(self.INSET, 3, 6, 3)
-        layout.setSpacing(6)
+        layout.setContentsMargins(self.INSET, GAP_SMALL, GAP_MEDIUM, GAP_SMALL)
+        layout.setSpacing(GAP_MEDIUM)
         # They lead the row: a button anywhere after a line that can elide was
         # pushed out of sight at the right-hand end.
         self._shield = fill_square_with_mark(QPushButton(), size=self.HEIGHT - 12)
@@ -604,7 +605,7 @@ class GenerationQueue(QWidget):
         layout = QHBoxLayout()
         # Flush at the left and both ends, so the live frame fills the strip's
         # lower-left corner; only the far right is held off the window edge.
-        layout.setContentsMargins(0, 0, 4, 0)
+        layout.setContentsMargins(0, 0, GAP_SMALL, 0)
         layout.setSpacing(_HALVES_GAP)
         outer.addLayout(layout, 1)
         self._running = RunningPreview()

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtWidgets import QFrame, QLayout, QSplitter, QVBoxLayout, QWidget
-from shared_ui.spacing import MARGIN_STANDARD
+from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
 BORDER_WIDTH = 6
 BORDER_NAME = "paneBorder"
@@ -19,7 +19,7 @@ def pane() -> tuple[QWidget, QVBoxLayout]:
 
 def border_as_a_set(frame: QFrame, layout: QLayout) -> None:
     frame.setObjectName(BORDERED_SET)
-    layout.setContentsMargins(6, 4, 6, 6)
+    layout.setContentsMargins(MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD, MARGIN_STANDARD)
 
 
 def pane_border() -> QFrame:

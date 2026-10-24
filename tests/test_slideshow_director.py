@@ -669,7 +669,8 @@ def _shaped(prompt_id, params):
 
 
 def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
-        slideshows, *, side=PORTRAIT, shapes=(TALL, TALL), monitor=PORTRAIT_MONITOR):
+        slideshows, *, side=PORTRAIT, shapes=(TALL, TALL), monitor=PORTRAIT_MONITOR,
+        standing=SlideshowState(order=("g2", "g1"), current="g1", locked=True)):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
     rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes, start=1)]
@@ -678,7 +679,7 @@ def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
                    for row in rows], rows=rows, side=side, location="collection/a")
     watched = made[0]
     watched.shown.monitor = monitor
-    watched.state_at_close = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
+    watched.state_at_close = standing
     watched.filters = SlideshowFilters(favorites=True)
     director.become_hosted(FakeSession())
     return director, watched
@@ -699,8 +700,6 @@ def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_a
 @pytest.mark.parametrize(("side", "shapes", "monitor", "carried_to", "the_other", "its_library"), [
     (LANDSCAPE, (WIDE, WIDE), PORTRAIT_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
     (PORTRAIT, (TALL, TALL), LANDSCAPE_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
-    (BOTH, (TALL, WIDE, TALL), LANDSCAPE_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
-    (BOTH, (WIDE, TALL, WIDE), PORTRAIT_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
 ])
 def test_a_slideshow_taken_over_opens_on_the_funestra_of_its_shape_whatever_monitor_it_was_on(
         slideshows, side, shapes, monitor, carried_to, the_other, its_library):
@@ -712,6 +711,33 @@ def test_a_slideshow_taken_over_opens_on_the_funestra_of_its_shape_whatever_moni
     assert ([slide[2] for slide in director.region_slideshow(carried_to).items]
             == [f"g{n}" for n in range(1, len(shapes) + 1)])
     assert [slide[2] for slide in director.region_slideshow(the_other).items] == its_library
+
+
+@pytest.mark.parametrize(("shapes", "monitor", "carried_to", "the_other", "its_library"), [
+    ((TALL, WIDE, TALL), LANDSCAPE_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
+    ((WIDE, TALL, WIDE), PORTRAIT_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
+])
+def test_a_slideshow_of_both_shapes_taken_over_plays_only_its_pictures_of_its_funestras_shape(
+        slideshows, shapes, monitor, carried_to, the_other, its_library):
+    director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
+        slideshows, side=BOTH, shapes=shapes, monitor=monitor)
+
+    open_both_sides(director)
+
+    assert [slide[2] for slide in director.region_slideshow(carried_to).items] == ["g1", "g3"]
+    assert [slide[2] for slide in director.region_slideshow(the_other).items] == its_library
+
+
+def test_a_slideshow_taken_over_on_an_item_of_the_other_shape_goes_on_from_the_next_of_its_own(
+        slideshows):
+    director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
+        slideshows, side=BOTH, shapes=(TALL, WIDE, TALL), standing=SlideshowState(
+            order=("g1", "g2", "g3"), current="g2", locked=True, level_index=1))
+
+    open_both_sides(director)
+
+    assert director.region_slideshow(PORTRAIT).resumed == SlideshowState(
+        order=("g1", "g3"), current="g3", location="collection/a")
 
 
 @pytest.mark.parametrize(("side", "monitor"), [(PORTRAIT, PORTRAIT_MONITOR),

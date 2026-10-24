@@ -195,6 +195,16 @@ def _monitor_shaped(shape: str):
                                         screen.geometry().height()) == shape), None)
 
 
+def _place_among(kept, state: SlideshowState) -> SlideshowState:
+    order = tuple(prompt_id for prompt_id in state.order if prompt_id in kept)
+    if state.current in kept:
+        return replace(state, order=order)
+    after = state.order.index(state.current) + 1 if state.current in state.order else 0
+    following = next((prompt_id for prompt_id in (*state.order[after:], *state.order[:after])
+                      if prompt_id in kept), None)
+    return SlideshowState(order=order, current=following, location=state.location)
+
+
 def _shape_of_the_set(side: str, rows, items) -> str:
     if (shape := the_one_shape_on(side)) is not None:
         return shape
@@ -991,12 +1001,17 @@ class SlideshowDirector:
         held = self.held_slideshow()
         if held is None:
             return None
-        return replace(held, side=self._standalone_shape)
+        shape = self._standalone_shape
+        of_its_shape = {row["prompt_id"] for row in filter_rows(self._rows_of(held.items), shape)}
+        items = tuple(slide for slide in held.items if slide.prompt_id in of_its_shape)
+        return replace(held, side=shape, items=items, state=_place_among(of_its_shape, held.state))
+
+    def _rows_of(self, slides) -> list[dict]:
+        ids = (slide.prompt_id for slide in slides if slide.prompt_id is not None)
+        return [row for row in map(self._host.row_for, ids) if row is not None]
 
     def put_back(self, held: HeldSlideshow):
-        ids = (item.prompt_id for item in held.items if item.prompt_id is not None)
-        return self.open(list(held.items),
-                         rows=[row for row in map(self._host.row_for, ids) if row is not None],
+        return self.open(list(held.items), rows=self._rows_of(held.items),
                          location=held.state.location, side=held.side, resume=held.state,
                          filters=held.filters,
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,

@@ -1537,7 +1537,8 @@ def test_a_gallery_taken_into_a_session_opens_its_next_slideshow_on_a_region(qtb
 
 def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_shapes_side(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(FakeDB([_row(f"id-tall-{n}", "sdxl_t2i", {"width": 832, "height": 1216},
+                                    f"tall{n}.png") for n in range(2)]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=2)
     qtbot.addWidget(view._slideshows.showing.shown)
@@ -1551,6 +1552,28 @@ def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_
     assert carried is not None
     qtbot.addWidget(carried.shown)
     assert [slide.prompt_id for slide in carried.whole_set()] == ["id-tall-0", "id-tall-1"]
+    assert view.region_slideshow("landscape") is None
+
+
+def test_a_slideshow_moved_onto_a_set_of_the_other_shape_goes_on_as_that_set_in_a_session(
+        qtbot, tmp_path, monkeypatch):
+    sizes = {"wide": {"width": 1216, "height": 832}, "tall": {"width": 832, "height": 1216}}
+    view = GalleryView(FakeDB([_row(f"id-{name}-{n}", "sdxl_t2i", size, f"{name}{n}.png")
+                               for name, size in sizes.items() for n in range(2)]))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100, count=2)
+    qtbot.addWidget(view._slideshows.showing.shown)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=2)
+
+    view.become_hosted(_session())
+    monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
+    open_both_sides(view._slideshows)
+
+    carried = view.region_slideshow("portrait")
+    assert carried is not None
+    qtbot.addWidget(carried.shown)
+    assert [slide.prompt_id for slide in carried.whole_set()] == ["id-tall-0", "id-tall-1"]
+    assert carried.state().current in {"id-tall-0", "id-tall-1"}
     assert view.region_slideshow("landscape") is None
 
 

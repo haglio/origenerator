@@ -22,6 +22,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Callable
 from typing import NamedTuple
 
 from origenerator.comfyui_inputs import ComfyFolders, within_reach
@@ -193,11 +194,15 @@ class ComfyUIApi:
     """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
-                 client_id: str | None = None, folders: ComfyFolders | None = None):
+                 client_id: str | None = None, folders: ComfyFolders | None = None, *,
+                 clock: Callable[[], float] = time.monotonic,
+                 sleep: Callable[[float], None] = time.sleep):
         self.host = host
         self.port = port
         self.client_id = client_id or str(uuid.uuid4())
         self.folders = folders
+        self._clock = clock
+        self._sleep = sleep
 
     @property
     def base_url(self) -> str:
@@ -239,21 +244,21 @@ class ComfyUIApi:
         POST, which it received first, to land; after that the prompt is not
         there and the submit failed.
         """
-        deadline = time.monotonic() + _ACCEPTANCE_WAIT_S
+        deadline = self._clock() + _ACCEPTANCE_WAIT_S
         absent_since = None
         while True:
             try:
                 if self._lists_prompt(prompt_id):
                     return True
-                absent_since = absent_since if absent_since is not None else time.monotonic()
+                absent_since = absent_since if absent_since is not None else self._clock()
             except Exception as e:  # a stalled server answers none of these
                 logger.debug("Still waiting on ComfyUI to list %s: %s", prompt_id, e)
-            now = time.monotonic()
+            now = self._clock()
             if now >= deadline:
                 return False
             if absent_since is not None and now - absent_since >= _ACCEPTANCE_GRACE_S:
                 return False
-            time.sleep(_ACCEPTANCE_POLL_S)
+            self._sleep(_ACCEPTANCE_POLL_S)
 
     def _lists_prompt(self, prompt_id: str) -> bool:
         """Whether the server has ``prompt_id`` queued, running, or finished."""

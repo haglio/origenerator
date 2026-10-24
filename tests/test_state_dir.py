@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import _winapi
+import json
 import os
 from pathlib import Path
+
+from app_support import haglio_settings
 
 from origenerator import config
 from tests.children import run_python
@@ -17,19 +21,34 @@ _PROBE = (
 )
 
 
-def _paths(state_dir: str | None, *, branch_session: bool = False) -> list[Path]:
+def _paths(state_dir: str | None, *, branch_session: bool = False,
+           settings: Path | None = None) -> list[Path]:
     env = {k: v for k, v in os.environ.items()
            if k not in ("ORIGENERATOR_STATE_DIR", "ORIGENERATOR_BRANCH_SESSION")}
     if state_dir is not None:
         env["ORIGENERATOR_STATE_DIR"] = state_dir
     if branch_session:
         env["ORIGENERATOR_BRANCH_SESSION"] = "1"
+    if settings is not None:
+        env[haglio_settings.SETTINGS_ENV] = str(settings)
     result = run_python(["-c", _PROBE], env=env, check=True)
     return [Path(line) for line in result.stdout.splitlines()]
 
 
-def test_the_app_keeps_its_state_in_its_own_checkout_and_its_pictures_files_in_the_library():
-    state, db, thumbs, ui, project, trash, _primary, records, production = _paths(None)
+def _settings_naming_this_checkout_the_production_one(tmp_path: Path) -> Path:
+    roots = tmp_path / "roots"
+    roots.mkdir()
+    _winapi.CreateJunction(str(config.PROJECT_DIR), str(roots / "origenerator"))
+    settings = tmp_path / "settings.json"
+    settings.write_text(json.dumps({**haglio_settings.EXAMPLE, "project_roots": [str(roots)]}),
+                        encoding="utf-8")
+    return settings
+
+
+def test_the_production_app_keeps_its_state_in_its_checkout_and_its_pictures_files_in_the_library(
+        tmp_path):
+    state, db, thumbs, ui, project, trash, _primary, records, production = _paths(
+        None, settings=_settings_naming_this_checkout_the_production_one(tmp_path))
     assert state == project / "state"
     assert production == project
     assert db == state / "origenerator.db"
@@ -37,6 +56,12 @@ def test_the_app_keeps_its_state_in_its_own_checkout_and_its_pictures_files_in_t
     assert trash == records / "trash"
     assert ui == state / "ui_state.json"
     assert records == config.LIBRARY_ROOT / "app_data" / "origenerator"
+
+
+def test_another_checkout_started_without_the_preview_flag_keeps_its_trash_beside_its_own_database():
+    state, db, thumbs, _ui, project, trash, _primary, _records, _production = _paths(None)
+    assert db == project / "state" / "origenerator.db"
+    assert (thumbs, trash) == (state / "thumbnails", state / "trash")
 
 
 def test_a_process_told_where_its_state_is_keeps_every_path_there(tmp_path):

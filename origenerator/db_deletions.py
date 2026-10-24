@@ -13,15 +13,17 @@ deleted, which is why the row travels here rather than staying gated by a flag.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from origenerator.db_connection import Store
 from origenerator.db_generations import library_paths_in
 from origenerator.db_schema import as_read
 from origenerator.generation_state import GenerationSource, source_of
+from origenerator.trash import TrashedBatch
 
 
 class DeletionStore(Store):
-    """The four queries over the `deletions` table."""
+    """The queries over the `deletions` table."""
 
     def record_deletion(self, prompt_id: str, row: dict, batch: dict):
         """Hold a just-deleted ``row`` and its trash ``batch`` for recovery.
@@ -60,6 +62,13 @@ class DeletionStore(Store):
             ).fetchone()
             deletion = _deletion(record) if record else None
             return deletion if deletion is not None and _of_a_known_source(deletion) else None
+
+    def trashed_file(self, original: Path) -> Path | None:
+        with self._connect() as conn:
+            batches = conn.execute("SELECT batch_json FROM deletions"
+                                   " ORDER BY deleted_at DESC, rowid DESC").fetchall()
+        held = (TrashedBatch.from_record(json.loads(batch[0])).holding(original) for batch in batches)
+        return next((file for file in held if file is not None and file.is_file()), None)
 
     def binned_library_paths(self) -> set[str]:
         with self._connect() as conn:

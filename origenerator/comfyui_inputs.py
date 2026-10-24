@@ -7,20 +7,26 @@ import hashlib
 import os
 import shutil
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
-from origenerator.file_refs import OUTPUT_TAG, TEMP_TAG, reference_path, split_annotation
+from origenerator.file_refs import OUTPUT_TAG, TEMP_TAG, reference_place, split_annotation
 from origenerator.output_places import OutputPlaces
 
 HANDED_OVER = "origenerator"
 FILE_INPUTS = {"LoadImage": "image", "LoadVideo": "file", "LoadAudio": "audio"}
 
 
+def _nothing_trashed(_place: Path) -> Path | None:
+    return None
+
+
 class ComfyFolders(NamedTuple):
     input: Path
     places: OutputPlaces
     temp: Path
+    trashed: Callable[[Path], Path | None] = _nothing_trashed
 
 
 def within_reach(payload: dict, folders: ComfyFolders) -> dict:
@@ -36,11 +42,18 @@ def _with_its_file_in_reach(node: dict, folders: ComfyFolders) -> dict:
 
 
 def reachable(ref: str, folders: ComfyFolders) -> str:
-    file = reference_path(ref, places=folders.places, input_dir=folders.input, temp_dir=folders.temp)
+    file = _file_named_by(ref, folders)
     if file is None or _inside(file, _folder_named_by(ref, folders)):
         return ref
     copy = _copied_in(file, folders.temp / HANDED_OVER)
     return f"{copy.relative_to(folders.temp).as_posix()} {TEMP_TAG}"
+
+
+def _file_named_by(ref: str, folders: ComfyFolders) -> Path | None:
+    place = reference_place(ref, places=folders.places, input_dir=folders.input, temp_dir=folders.temp)
+    if place is None or place.is_file():
+        return place
+    return folders.trashed(place)
 
 
 def _folder_named_by(ref: str, folders: ComfyFolders) -> Path:

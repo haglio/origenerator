@@ -113,10 +113,8 @@ def _trashed_output_files(record: dict, row: dict) -> str:
 def _trashed_path(record: dict, original: str) -> str:
     """Where ``original`` sits now that it has been trashed — or the path itself,
     unchanged, when the delete moved nothing (a branch session takes no files)."""
-    for moved_from, moved_to in (record.get("batch") or {}).get("moves") or []:
-        if Path(moved_from) == Path(original):
-            return moved_to
-    return original
+    held = TrashedBatch.from_record(record.get("batch") or {}).holding(Path(original))
+    return str(held) if held is not None else original
 
 
 def restore(db, record: dict) -> str:

@@ -199,6 +199,9 @@ class Database:
     def forget_deletion(self, prompt_id: str):
         return self.deletions.forget_deletion(prompt_id)
 
+    def trashed_file(self, original: Path) -> Path | None:
+        return self.deletions.trashed_file(original)
+
     def binned_library_paths(self) -> set[str]:
         return self.deletions.binned_library_paths()
 

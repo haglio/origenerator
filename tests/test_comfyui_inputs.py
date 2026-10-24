@@ -9,6 +9,7 @@ from pathlib import Path
 
 from origenerator import config
 from origenerator.comfyui_inputs import HANDED_OVER, ComfyFolders, within_reach
+from origenerator.db import Database
 from origenerator.output_places import OutputPlaces
 
 
@@ -117,6 +118,17 @@ def test_the_same_picture_handed_over_twice_is_copied_once(tmp_path):
     assert len(_handed_over(folders)) == 1
 
 
+def test_an_image_in_the_trash_goes_to_comfyui_as_a_copy_in_its_temp_folder(tmp_path):
+    folders = _folders(tmp_path)
+    trashed = _picture(tmp_path / "trash" / "batch" / "1_alpha_t2i_00007_.png")
+    folders = folders._replace(trashed={folders.places.file("image/alpha_t2i_00007_.png"): trashed}.get)
+
+    posted = within_reach(_load_image("image/alpha_t2i_00007_.png [output]"), folders)
+
+    assert posted["1"]["inputs"]["image"].endswith("/1_alpha_t2i_00007_.png [temp]")
+    assert [copy.read_bytes() for copy in _handed_over(folders)] == [trashed.read_bytes()]
+
+
 def test_a_reference_to_a_file_that_is_not_there_is_left_for_comfyui_to_refuse(tmp_path):
     folders = _folders(tmp_path)
     payload = _load_image(str(tmp_path / "elsewhere" / "gone.png"))
@@ -141,5 +153,16 @@ def test_only_the_loading_nodes_file_inputs_are_touched(tmp_path):
 
 
 def test_the_apps_folders_are_comfyuis_input_and_temp_and_the_places_outputs_are_kept():
-    assert ComfyFolders(
-        input=config.COMFYUI_INPUT_DIR, places=config.OUTPUT_PLACES, temp=config.COMFYUI_TEMP_DIR) == config.COMFYUI_FOLDERS
+    assert config.COMFYUI_FOLDERS[:3] == (config.COMFYUI_INPUT_DIR, config.OUTPUT_PLACES, config.COMFYUI_TEMP_DIR)
+
+
+def test_the_app_finds_an_image_gone_from_its_place_in_the_librarys_trash(tmp_path):
+    db = Database(config.DB_PATH)
+    original = config.OUTPUT_PLACES.file("image/alpha_t2i_00007_.png")
+    held = _picture(tmp_path / "1_alpha_t2i_00007_.png")
+    db.record_deletion("held-for-this-test", {"prompt_id": "held-for-this-test"},
+                       {"moves": [[str(original), str(held)]], "subdir": str(tmp_path)})
+    try:
+        assert config.COMFYUI_FOLDERS.trashed(original) == held
+    finally:
+        db.forget_deletion("held-for-this-test")

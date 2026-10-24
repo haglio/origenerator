@@ -26,7 +26,7 @@ from typing import NamedTuple, Protocol
 
 from PyQt6.QtWidgets import QMessageBox
 
-from origenerator import config, fix_training, gallery
+from origenerator import config, enhance_presets, fix_training, gallery
 from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
@@ -125,6 +125,11 @@ class EnhanceController:
         self.panel.enhance_requested.connect(self.enhance_the_selection)
         self.panel.fix_training_requested.connect(self._train_fix)
         self.panel.show_settings(self._settings)
+        self.panel.show_presets(enhance_presets.load(self._db.list_generations))
+        self.panel.preset_saved.connect(lambda name: self.panel.show_presets(
+            enhance_presets.save(name, self._settings.params)))
+        self.panel.preset_renamed.connect(lambda index, name: self.panel.show_presets(
+            enhance_presets.rename(index, name)))
         self._training: FixTrainingRun | None = None
 
     # --- training a fix's LoRA --------------------------------------------------

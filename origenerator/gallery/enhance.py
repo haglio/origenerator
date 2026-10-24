@@ -41,6 +41,7 @@ from origenerator.gallery.enhance_settings import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
     describe_enhance_params,
+    full_settings,
     level_settings,
 )
 from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
@@ -342,17 +343,6 @@ def _enhances_in_flight(rows) -> tuple[set[str], set[str]]:
     return ids, names
 
 
-def _settings(params: dict) -> dict:
-    """One enhancement's identity as every recorded setting, defaults filling the
-    gaps — the parts its detail pass redrew included, since a targeted fix and
-    a plain enhancement differ by nothing else."""
-    defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
-    base = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
-    base["checkpoint"] = MATCH_SOURCE_MODEL
-    base.update(level_settings(params))
-    return base
-
-
 def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int | None:
     """The position in :func:`enhance_levels` of the version this row already
     holds at ``settings``, or ``None`` when it holds none.
@@ -381,9 +371,9 @@ def level_matching_params(row: dict, wanted: dict | None) -> int | None:
     directly (a spoken targeted fix) rather than from folder settings."""
     if wanted is None:
         return None
-    settings = _settings(wanted)
+    settings = full_settings(wanted)
     for position, level in enumerate(enhance_levels(row)):
-        if level.params and _settings(level.params) == settings:
+        if level.params and full_settings(level.params) == settings:
             return position
     return None
 

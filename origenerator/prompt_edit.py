@@ -35,10 +35,10 @@ from __future__ import annotations
 import json
 import logging
 import re
-import urllib.request
 from dataclasses import dataclass
 from functools import partial
 
+from origenerator import local_llm
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT, VOICE_REWRITE_SYSTEM_PROMPT
 from origenerator.voice.rewrite import rewrite_prompt
@@ -288,6 +288,20 @@ def _without_nothing_weighted(prompt: str) -> str:
     return prompt if len(kept) == len(segments) else _tidy(",".join(kept))
 
 
+_ELLIPSIS = re.compile(r"\.\.\.|\u2026")
+
+
+def _said(old: str, new: str) -> str:
+    """``new``, unless it has no words in it -- the dots a model stands in for a
+    prompt it means to leave as it was."""
+    return new if re.search(r"\w", new) else old
+
+
+def _leaves_out(old: str, new: str) -> bool:
+    """Whether ``new`` stands dots in for some of ``old`` that it left out."""
+    return bool(_ELLIPSIS.search(new)) and not _ELLIPSIS.search(old)
+
+
 def _plus(prompt: str, term: str) -> str:
     """``prompt`` with ``term`` appended as a new segment."""
     kept = _tidy(prompt)
@@ -374,14 +388,17 @@ def _revised(positive: str, negative: str, request: str, parsed: tuple,
         if rewrite is None:
             return None
         try:
-            new_positive, new_negative = map(_without_nothing_weighted,
-                                             rewrite(positive, negative, request))
+            new_positive, new_negative = (
+                _said(old, _without_nothing_weighted(new))
+                for old, new in zip((positive, negative), rewrite(positive, negative, request)))
         except Exception as exc:  # model down / unreadable: the rules' own edit stands
             logger.warning("prompt_edit: could not rewrite the prompts for a request (%s)",
                            type(exc).__name__)
             return None
         if (new_positive, new_negative) == (positive, negative):
             return None  # it did nothing, which is no answer to a request
+        if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
+            return None
         return made(new_positive, new_negative, REWRITTEN)
 
     if polarity == REMOVE:
@@ -440,14 +457,10 @@ def parse_match(data: dict, count: int) -> int | None:
     model invented is not a term the speaker meant, and acting on it would edit
     a part of the prompt nobody mentioned.
     """
-    content = data["choices"][0]["message"]["content"]
     try:
-        obj = json.loads(content)
+        obj = local_llm.answer_of(data)
     except json.JSONDecodeError:
-        start, end = content.find("{"), content.rfind("}")  # tolerate fences/preamble
-        if start == -1 or end <= start:
-            return None
-        obj = json.loads(content[start:end + 1])
+        return None
     choice = obj.get("choice")
     if not isinstance(choice, int) or not 0 <= choice < count:
         return None
@@ -470,21 +483,10 @@ def smart_match(terms: list[str], term: str, *, base_url: str, model: str,
     """
     if not terms:
         return None
-    url = base_url.rstrip("/") + "/chat/completions"
-    payload = {
-        "model": model,
-        "messages": build_match_messages(terms, term, system_prompt),
-        "temperature": 0.1,  # a lookup, not brainstorming
-        "stream": False,
-        "response_format": {"type": "json_object"},
-    }
-    request = urllib.request.Request(
-        url, data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}, method="POST",
-    )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            chosen = parse_match(json.loads(response.read()), len(terms))
+        chosen = parse_match(local_llm.ask_json(
+            build_match_messages(terms, term, system_prompt),
+            base_url=base_url, model=model, temperature=0.1, timeout=timeout), len(terms))
     except Exception as exc:  # model down / unparseable: the words stand alone
         logger.warning("prompt_edit: could not match the request against the "
                        "prompt's %d terms (%s)", len(terms), exc)

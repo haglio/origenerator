@@ -393,7 +393,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # what only the old window slideshow used went with it.
 # 16471 when a picture's requests and Modifies came to link both ways, each in
 # a section of its own, taken down to what the tree measured.
-MAX_PROSE_LINES = 16471
+# 16469 when a request's rewrite came to be asked for its answer with no dots to
+# copy back.
+MAX_PROSE_LINES = 16469
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

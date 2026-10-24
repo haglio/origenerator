@@ -72,7 +72,7 @@ def _corner(view) -> str:
 def test_the_note_that_says_the_app_is_still_working_does_not_fade(qtbot):
     view = _view(qtbot)
 
-    view.note_request(_WORKING, _ASKED, working=True)
+    view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
     assert _corner(view) == _WORKING
     assert not view._note_timer.isActive()  # nothing counting down to a blank corner
@@ -82,9 +82,9 @@ def test_the_note_that_says_the_app_is_still_working_does_not_fade(qtbot):
 
 def test_the_answer_takes_the_corner_back_and_fades_as_notes_do(qtbot):
     view = _view(qtbot)
-    view.note_request(_WORKING, _ASKED, working=True)
+    view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
-    view.note_request("🎤 dropped “hat” — generating", _ASKED)
+    view.slideshow.note_request("🎤 dropped “hat” — generating", _ASKED)
 
     assert "generating" in _corner(view)
     _fade(view)
@@ -96,10 +96,10 @@ def test_an_answer_to_one_request_leaves_another_still_being_worked_out(qtbot):
     answer coming back must not blank the corner while the second is still out
     at the model — that is the same defect, one request later."""
     view = _view(qtbot)
-    view.note_request(_WORKING, _ASKED, working=True)
-    view.note_request(_ALSO_WORKING, _ASKED_AGAIN, working=True)
+    view.slideshow.note_request(_WORKING, _ASKED, working=True)
+    view.slideshow.note_request(_ALSO_WORKING, _ASKED_AGAIN, working=True)
 
-    view.note_request("🎤 didn't catch what to change in “no hat”", _ASKED)
+    view.slideshow.note_request("🎤 didn't catch what to change in “no hat”", _ASKED)
 
     assert "didn't catch" in _corner(view)
     _fade(view)
@@ -111,9 +111,9 @@ def test_a_flash_while_the_work_goes_on_falls_back_to_the_work(qtbot):
     Those are still flashes — and the corner comes back to the work, not to
     nothing, which is the same defect one utterance smaller."""
     view = _view(qtbot)
-    view.note_request(_WORKING, _ASKED, working=True)
+    view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
-    view.note_voice_command("🎤 heard: “no hat”")
+    view.slideshow.note_voice_command("🎤 heard: “no hat”")
     assert "heard" in _corner(view)
     _fade(view)
 
@@ -125,13 +125,13 @@ def test_a_line_keeps_its_color_and_the_corner_falls_back_to_white(qtbot):
     warning reads yellow and an error red, and once the flash fades the work
     under it is plain news again."""
     view = _view(qtbot)
-    view.note_request(_WORKING, _ASKED, working=True)
+    view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
-    view.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
+    view.slideshow.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
     assert AMBER.name() in view._note.styleSheet()
-    view.note_voice_run(None, "🎤 couldn't launch the enhance — see the log", kind=ERROR)
+    view.slideshow.note_voice_run(None, "🎤 couldn't launch the enhance — see the log", kind=ERROR)
     assert RED.name() in view._note.styleSheet()
-    view.note_request("🎤 didn't catch what to change in “no beard”", _ASKED_AGAIN,
+    view.slideshow.note_request("🎤 didn't catch what to change in “no beard”", _ASKED_AGAIN,
                       kind=WARNING)
     assert AMBER.name() in view._note.styleSheet()
     _fade(view)
@@ -141,25 +141,25 @@ def test_a_line_keeps_its_color_and_the_corner_falls_back_to_white(qtbot):
 
 
 def test_the_app_says_it_is_working_for_as_long_as_it_is(qtbot, tmp_path, monkeypatch):
-    slideshow = _mid_request(qtbot, tmp_path, monkeypatch)._slideshows.showing
-    assert "working out" in _corner(slideshow)
+    window = _mid_request(qtbot, tmp_path, monkeypatch)._slideshows.showing.shown
+    assert "working out" in _corner(window)
 
-    _fade(slideshow)
+    _fade(window)
 
-    assert "working out" in _corner(slideshow)
+    assert "working out" in _corner(window)
 
 
 def test_the_mic_going_on_hearing_does_not_empty_the_corner(qtbot, tmp_path, monkeypatch):
     """Whisper keeps transcribing while the request is worked out, and the app
     says what it heard. That line is a flash; the work under it is not."""
     view = _mid_request(qtbot, tmp_path, monkeypatch)
-    slideshow = view._slideshows.showing
+    window = view._slideshows.showing.shown
 
     view._voice.listener.heard.emit("something else entirely")
 
-    assert "heard" in _corner(slideshow)
-    _fade(slideshow)
-    assert "working out" in _corner(slideshow)
+    assert "heard" in _corner(window)
+    _fade(window)
+    assert "working out" in _corner(window)
 
 
 def test_the_pane_says_it_is_working_too_when_no_slideshow_is_up(qtbot, tmp_path,

@@ -184,14 +184,14 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
     _select_first_leaf(win._gallery_view)
     win._gallery_view._slideshows.start()
     slideshow = win._gallery_view._slideshows.showing
-    qtbot.addWidget(slideshow)
-    slideshow.activateWindow()
-    qtbot.waitActive(slideshow)
+    qtbot.addWidget(slideshow.shown)
+    slideshow.shown.activateWindow()
+    qtbot.waitActive(slideshow.shown)
 
-    gestures.press_key(slideshow, Qt.Key.Key_Q, _CTRL_ALT)
+    gestures.press_key(slideshow.shown, Qt.Key.Key_Q, _CTRL_ALT)
 
     assert not win.isVisible()
-    assert not slideshow.isVisible()
+    assert not slideshow.shown.isVisible()
 
 
 def test_saying_no_hands_comfyui_nothing(qtbot, tmp_path, monkeypatch):
@@ -569,7 +569,7 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     first._gallery_view.refresh()
     _select_first_leaf(first._gallery_view)
     first._gallery_view._slideshows.start()
-    qtbot.addWidget(first._gallery_view._slideshows.showing)
+    qtbot.addWidget(first._gallery_view._slideshows.showing.shown)
     first._gallery_view._slideshows.showing.toggle_enhanced_mode()
 
     first.close()
@@ -578,7 +578,7 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     second._gallery_view._slideshows.start()
 
     slideshow = second._gallery_view._slideshows.showing
-    qtbot.addWidget(slideshow)
+    qtbot.addWidget(slideshow.shown)
     assert slideshow.hud_enhanced_mode
 
 

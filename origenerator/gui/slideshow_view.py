@@ -1,20 +1,12 @@
-"""The full-screen slideshow -- the one way this app fills the screen with a picture.
+"""The full-screen slideshow window -- the one way this app fills the screen with a picture.
 
-It plays a set of generations: a folder's, a collection's, or the one folder a
-double-clicked picture came from, which is why there is no second fullscreen
-viewer with its own keys.  The set is not frozen at the opening: a run joins it
-on its first frame, which is what a slideshow of a filling folder is watched for.
-
-The Slideshow runs on a Funestra, the one this app activates for it
-(:mod:`origenerator.gui.funestra_pane`): the Funestra plays the pass it is
-handed, holds a picture for the pace and creeps over it, plays a clip to its
-end and rolls onto the next, repeats what it is locked onto, draws the one
-panel the slideshow wears over the picture and places the presses on it.  What
-this view answers for is the set, the pass dealt from it and the slide on
-screen: it hands the pass over, follows the Funestra as it walks the pass,
-and answers every press and key.  A slideshow on one of a session's Funestras
-(:mod:`origenerator.gui.funestra_slideshow`) keeps the same set and drives its
-Funestra through files instead.
+The slideshow in it is the one every Funestra runs
+(:class:`~origenerator.gui.funestra_slideshow.FunestraSlideshow`), driving the
+Funestra in this window's pane through the pane's channel exactly as it drives
+one of a session's through its files.  What the window answers for is what
+only a window has: the screen it fills, the keys pressed on it, the panel's
+place and the block at its foot, the OSR2 this app drives standalone, the lines
+it flashes over the picture, and the room's pause.
 
 What every key does, what the lock takes with it, what a filter narrows and
 where a closing slideshow leaves you are `tests/test_slideshow_view.py`'s to state:
@@ -22,19 +14,16 @@ each is a test named for the claim.
 """
 from __future__ import annotations
 
-import logging
 import time
 from dataclasses import replace
-from pathlib import Path
 
 from funestra.console import ModeHud
 from funestra.file_channel import append_command
+from funestra.funestra_verbs import SPEED_DOWN, SPEED_UP
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_placement import HudCorner
-from funestra.playback_rate import RATE_STEP
-from funestra.playlist import PlaylistItem
 from funestra.pointer import OMNIPAUSE_TOGGLE
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
@@ -49,53 +38,25 @@ from origenerator.gui.console import (
 )
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_pane import FunestraPane
+from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
+from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import QueuePointer, queue_section
-from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.notice_overlay import NOTICE, WARNING, NoticeOverlay
-from origenerator.gui.slideshow_map import SEED_AXIS
-from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.notice_overlay import NOTICE, NoticeOverlay
 from origenerator.gui.slideshow_panel import (
     COLLAPSES,
     OPENS_IN,
     THE_SLIDESHOWS_OWN,
     slideshow_hud_model,
 )
-from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
-from origenerator.gui.slideshow_set import (
-    GENERATING,
-    LOOP_IS_A_LOCK,
-    LOOP_OFF,
-    SlideshowSet,
-    item_note,
-    looping_note,
-    narrow_to_acts,
-    narrow_to_the_act_on_screen,
-)
 from origenerator.gui.slideshow_wiring import SlideshowActions
-from origenerator.media import MediaType
-from origenerator.osr2_driver import drive_target_for
-from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
 from origenerator.slideshow_buttons import answer
-
-logger = logging.getLogger(__name__)
-
-# What the map's chrome says when it does what it says, in the Funestras' own
-# words, and the three ways it can have nothing to do.
-_MORE_SEEDS = "More seeds"
-_WIDENING_FAILED = "Widening net failed"
-_NOTHING_TO_LOOP = "Nothing to loop"
-_NOTHING_THAT_WAY = "Nothing that way"
-
-# The run a slideshow follows full screen, as its frames are filed.
-_FOLLOWED = "followed"
 
 # How often the panel is rebuilt: on its own beat, and faster while something
 # on it is moving -- the drive's trace.
 _REFRESH_MS = 300
 _FOOT_VERBS = frozenset({FOOT_PRESS, FOOT_DRAG, FOOT_RELEASE, FOOT_WHEEL})
-_RATE_STEPS = {"speed_up": RATE_STEP, "speed_down": -RATE_STEP}
+_RATE_STEPS = {"speed_up": SPEED_UP, "speed_down": SPEED_DOWN}
 
 _PANEL_MOVES = {
     Qt.Key.Key_Left: "left",
@@ -112,43 +73,17 @@ _WASD_AS_ARROWS = {
 
 
 class SlideshowView(QWidget):
-    # Enter on an item: leave the slideshow for that generation's own folder.
-    open_requested = pyqtSignal(str)
-    # The slideshow was dismissed (a double-click, Enter out, or culled empty) — the gallery
-    # keeps voice-command listening tied to a fullscreen surface being up.
-    closed = pyqtSignal()
-    # A different item (or version) is on screen — re-aim the OSR2 drive.
-    media_changed = pyqtSignal()
-
-    def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
+    def __init__(self, items, *, side: str = "", start=None, image_dwell_ms=None,
                  shuffle=None, actions=None, hud=None, engine=None, motion=None,
                  pace=None, frames=None, radio=None, volume=None,
                  clock=time.monotonic, parent=None):
         super().__init__(parent)
-        # What a press here asks the gallery to do on its behalf — the half of
-        # each gesture that lands on the generation rather than on the slide.
-        # None of it, for a slideshow standing on its own (see SlideshowActions).
+        # The half of each press that is a window's rather than a slideshow's: the
+        # queue's three, the room's pause, the panel's place and the OSR2 switch.
         self._actions = actions if actions is not None else SlideshowActions()
         self._motion = motion  # the gallery's app-global motion driver, or None
-        # How long a slide holds the screen is app-wide, because the console
-        # that sets it is: turned up here or in the main window, it is the
-        # same number. An explicit dwell (a test's) wins until the console
-        # next moves the pace.
-        self._pace = pace if pace is not None else SlideshowPace(parent=self)
-        self._pace.changed.connect(self._on_pace_changed)
         self._clock = clock
-        self._frames = frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")
-        # The file the Funestra was last stood on, and what it is of: a slide,
-        # one of its versions, or nothing while a run's frames are up.
-        self._showing: Path | None = None
-        self._showing_media: tuple | None = None
-        self._frame_on_funestra: Path | None = None
-        self._frames_on_screen = False
-        self._loads_seen: int | None = None
-        self._refusal_checked = True
-        # The panel this slideshow wears: which side's it is, who draws it, and
-        # where it sits — settled when the slideshow is dressed (see wear_the_hud).
-        self._hud_side = ""
+        self._hud_side = side
         self._dashboard_cmd_file = None
         self._label_for = None
         self._corner = HudCorner.UPPER_LEFT
@@ -158,13 +93,11 @@ class SlideshowView(QWidget):
         self._panel_model = None
         self._panel_built_at = float("-inf")
         self._panel_stale = True
-        # What is in flight, for the block the panel hangs at its foot, and the
-        # pointer on that block.
         self._queue_items: list = []
         self._foreign_queued = 0
         self._queue_pointer = QueuePointer(self)
-        self._take_set(items, frame=frame, start=start,
-                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
+        self._paused = False
+        self._closing = False
         self.setWindowTitle("Slideshow")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround under the media
@@ -172,296 +105,34 @@ class SlideshowView(QWidget):
         palette.setColor(QPalette.ColorRole.Window, QColor("black"))
         self.setPalette(palette)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        # It plays sound, unlike the muted inline pane.
-        self._pane = FunestraPane(
-            self, user=self._as_the_funestra_sees_it, panel=self._hud_model,
-            on_open=self._the_funestra_opened,
-            engine_for=None if engine is None else (lambda _window_id: engine),
-            radio=radio, volume=volume, on_volume_moved=self._volume_moved)
-        layout.addWidget(self._pane, 1)
-
-        # A note about the item on screen: which of its versions this is, that an
-        # enhancement of it is being made, and for a beat whatever a switch or a
-        # spoken fix just did — the only way to tell, in a view with no panels,
-        # that a press did anything. It is a Fun Time notice, at the top center
-        # where Fun Time flashes the same kind of line over a Funestra, because
-        # this surface wears the Funestras' own HUD and had no business saying
-        # things in a second dialect at the other end of the screen.
+        # A Fun Time notice, at the top center where Fun Time flashes the same
+        # kind of line over a Funestra.
         self._note = NoticeOverlay(self)
-        # What the corner reads while a spoken request pauses the slideshow; empty
-        # whenever nothing is being dictated.
+        # What the corner reads while a spoken request pauses the slideshow, and
+        # afterwards while the request said is still being worked out -- held
+        # rather than flashed, and cleared by that request's own answer.
         self._request_note = ""
-        # And what it reads afterwards, while the request said is still being
-        # worked out — held rather than flashed, and cleared by that request's
-        # own answer, which is why the request it is about is kept beside it.
         self._working_note = ""
         self._working_request = None
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
 
-        # The room's pause, held here so it survives navigation: a step lands on
-        # a NEW slide (the freeze does not un-aim the transport), but the slide
-        # must arrive frozen — no dwell armed, its video paused — rather than
-        # playing out from under the freeze.
-        self._paused = False
-
-        self._show_current()
-
-    # --- the set, and the pass dealt from it --------------------------------
-
-    def play(self, items, *, frame=None, start=None, image_dwell_ms=None,
-             shuffle=None, hud=None, actions=None) -> None:
-        """Take a new set into this window and start it on that set.
-
-        Standalone the monitor holds one slideshow, so a second set asked for while
-        this one is up arrives here rather than in a window of its own (see
-        :meth:`~origenerator.gui.slideshow_director.SlideshowDirector._open_a_window`) —
-        the same re-pointing a region's Funestra gets when the set it is showing
-        changes.  It takes the set exactly as construction does, so a window
-        re-pointed cannot drift from one freshly opened.
-        """
-        if actions is not None:
-            self._actions = actions
-        self._take_set(items, frame=frame, start=start,
-                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
-        self._show_current()
-
-    def _take_set(self, items, *, frame, start, image_dwell_ms, shuffle, hud) -> None:
-        # Following a generation still in flight: no items of its own, so the pane
-        # that opened this feeds the frames and hands over the file that lands.
-        self._live = not items
-        self._frame = frame  # the frame the double-click landed on, if any
-        # The item to hand the gallery on the way out, once there is one: Enter
-        # names it outright, and a lock names it by being the slide the slideshow
-        # ended on. Read in :meth:`closeEvent`, which is where every way out of
-        # the slideshow meets.
-        self._land_on: str | None = None
-        # The versions of each item that has any, and the place within the one
-        # being stepped: Shift+Left/Right moves there rather than along the set.
-        self._levels = LevelStepper()
-        if image_dwell_ms is None:
-            image_dwell_ms = self._pace.dwell_ms
-        self._dwell_s = image_dwell_ms // 1000
-        # The set this slideshow plays, the pass dealt from it, and what its two
-        # switches keep of it — all of it the same whether a window or one of
-        # a session's Funestras is showing the slides (see SlideshowSet).  What this
-        # view answers for is the slide on screen, so a re-dealt pass comes
-        # back here as :meth:`_pass_changed`.
-        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, actions=self._actions,
-                                 shuffle=shuffle, start=start, hud=hud,
-                                 on_pass_change=self._pass_changed)
-
-    @property
-    def _playlist(self):
-        """The pass this slideshow is playing — the set's, since the set deals it."""
-        return self._set.playlist
-
-    def _pass_changed(self, kept: bool) -> None:
-        """A fresh pass was dealt over the set: show whatever is on it now.
-
-        *kept* says the slide that was on screen survived into it — a switch
-        narrowing what you are looking through — so the picture stays and the
-        Funestra is handed the new pass around it.  Without it the pass has
-        stood somewhere else up, and the view follows.
-        """
-        if kept:
-            self._hand_over(land=False)
-        else:
-            self._show_current()
-
-    # --- what the Funestra plays --------------------------------------------
-
-    def _show_current(self):
-        """Stand the Funestra on the current item, which holds a picture for
-        the pace and ends it the way it ends a finished clip."""
-        if self._live:
-            # Nothing on disk yet: the run's own frames stand in for a slide.
-            if self._frame is not None:
-                self._put_the_followed_run_up(self._frame)
-            else:
-                self._pane.show_message(GENERATING)  # opened before the first one
-            return
-        slide = self._playlist.current()
-        if slide is None:
-            return
-        self._levels.restart()  # a new item, so its own versions from the top
-        self._hand_over(land=True)
-        self._show_what_is_being_made()
-        self._hold_what_is_being_made_for_half()
-        self._refresh_note()  # the note belongs to whatever is on screen now
-        self._apply_freeze()  # a slide arrived at under a freeze arrives frozen
-        self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
-
-    def _hand_over(self, *, land: bool) -> None:
-        """Give the Funestra this pass to play, turned onto the slide this slideshow
-        stands on; *land* opens that slide afresh, where a pass handed over
-        around the slide already up leaves it playing."""
-        current = self._playlist.current()
-        rotated = rotated_onto(self._playlist.in_play_order(), current)
-        items = [self._funestra_item(slide) for slide in rotated]
-        if land and current is not None:
-            self._showing = self._file_of(current)
-            self._showing_media = None if current.is_live else (current.path, current.media_type)
-            self._frames_on_screen = False
-            self._frame_on_funestra = None
-        if self._pane.playback is not None:
-            self._hand_the_pace_over(self._pane.playback)  # read as a file opens
-        self._pane.hand_over(items, land=self._showing if land else None)
-        self._settle()
-
-    def _settle(self) -> None:
-        """Hand the Funestra the pace and the hold, and take its reading of
-        the pass as the one this slideshow stands on."""
-        playback = self._pane.playback
-        if playback is None:
-            return
-        self._hand_the_pace_over(playback)
-        self._loads_seen = playback.loads
-        self._refusal_checked = False
-
-    def _hand_the_pace_over(self, playback) -> None:
-        pace = self._levels.pace(self._dwell_s)
-        playback.set_pace(pace)
-        # A lock is repeat-one, as it is on a Fun Time satellite; a slideshow
-        # following a run holds its frames the same way, and so does a pace
-        # of nought, since nought means nothing moves on its own -- a finished
-        # clip included.
-        playback.set_locked(self._playlist.locked or self._live or not pace)
-
-    def _the_funestra_opened(self) -> None:
-        self._settle()
-        self._show_what_is_being_made()
-        self._apply_freeze()
-
-    def _funestra_item(self, slide) -> PlaylistItem:
-        if slide.is_live:
-            return PlaylistItem(self._file_of(slide))
-        return slide_item(slide, self._levels.points_of_interest(self._file_of(slide)))
-
-    def _file_of(self, slide) -> Path:
-        if slide.is_live:
-            return self._frames.first_of(slide.prompt_id)
-        return Path(str(slide.path))
-
-    def _as_the_funestra_sees_it(self, playback):
-        return SlideshowOnAFunestra(self)
-
-    def follow_the_funestra(self) -> None:
-        """The pass of this slideshow's own the Funestra gives it each frame: stand
-        the set on whatever the Funestra moved onto by itself -- a picture's
-        pace ran out, a clip ended -- and step past an item it would not open."""
-        playback = self._pane.playback
-        if playback is None:
-            return
-        if playback.loads != self._loads_seen:
-            self._loads_seen = playback.loads
-            self._refusal_checked = False
-            video = playback.current_video
-            if video != self._showing:
-                self._showing = video
-                self._follow(video)
-        if not self._refusal_checked and playback.idle:
-            self._refusal_checked = True
-            self._on_media_unplayable()
-
-    def _follow(self, video: Path) -> None:
-        """Stand the pass on the item the Funestra just moved to: how the map,
-        the star and every word about "this one" find out which item that is."""
-        for index, item in enumerate(self._playlist.items):
-            if self._file_of(item) == video:
-                self._playlist.jump_to(index)
-                self._levels.restart()
-                self._frames_on_screen = False
-                self._frame_on_funestra = None
-                self._showing_media = None if item.is_live else (item.path, item.media_type)
-                self._show_what_is_being_made()
-                self._hold_what_is_being_made_for_half()
-                self._refresh_note()
-                self._apply_freeze()
-                self.media_changed.emit()
-                return
-
-    def _hold_what_is_being_made_for_half(self) -> None:
-        """A picture something better is being made of holds the screen for
-        half the pace, its move still made at the whole: the Funestra moves on
-        from it early, and its scrubber counts that half down.  Any other
-        holds for the pace."""
-        playback, current = self._pane.playback, self._playlist.current()
-        if playback is None or current is None:
-            return
-        pace = self._levels.pace(self._dwell_s)
-        held_for = self._set.pace_for(current, pace)
-        early = held_for < pace and not self._playlist.locked
-        playback.hold_picture_for(held_for if early else None)
-
-    def _apply_freeze(self) -> None:
-        """Hand the Funestra whatever is holding the slideshow still.
-
-        The room's freeze stops everything.  A spoken request stops the slideshow
-        moving on rather than stopping the clip: it is about what is on screen,
-        and a clip that stopped mid-sentence would be answering a question
-        nobody asked.  A picture under one holds where its move had got to,
-        since the alternative is its dwell running out and starting over under
-        the speaker.
-        """
-        request_stills_a_picture = self._playlist.paused and not self._showing_a_video()
-        held = self._paused or request_stills_a_picture
-        playback = self._pane.playback
-        if playback is not None:
-            playback.set_paused(held)
-
-    def _showing_a_video(self) -> bool:
-        return (self._showing_media is not None and not self._frames_on_screen
-                and self._showing_media[1] == MediaType.VIDEO)
-
-    def _current_video_path(self):
-        """The clip on screen, or None for a picture -- what a funscript lookup
-        and the device drive key off."""
-        return self._showing_media[0] if self._showing_a_video() else None
-
-    def set_playlist(self, items, index: int) -> None:
-        """Re-seed the set this slideshow plays, on ``index``.
-
-        What a double-clicked picture's slideshow is armed with once the gallery has
-        worked out the folder under it: the view comes up on the one item the
-        pane had, and this hands it the rest in the browser's own order. A view
-        still following a generation keeps its frames — it has no place among
-        those files until an arrow leaves them for one.
-        """
-        self._set.reseed(items, start=index, shuffle=in_order)
-        if not self._live:
-            self._show_current()
-
-    def whole_set(self) -> list[Slide]:
-        return self._set.whole_set()
-
-    @property
-    def filters(self) -> SlideshowFilters:
-        return self._set.filters
-
-    def take_up(self, filters: SlideshowFilters, *, keep_the_slide: bool = False) -> None:
-        if not self._live:
-            self._set.take_up(filters, keep_the_slide=keep_the_slide)
-
-    def set_levels(self, levels_by_path: dict) -> None:
-        """Arm Shift+Left/Right to step an item's versions.
-
-        ``levels_by_path`` maps the file the set shows an item under to that
-        item's versions, newest first, as ``(path, media_type, label)``. Plain
-        Left/Right still steps the set; the shifted pair moves within the one
-        item — its own axis, because a version is not a neighbor.
-        """
-        if self._levels.arm(levels_by_path):
-            self._hand_over(land=False)
-        self.refresh_panel()
-
-    def add_levels(self, levels_by_path: dict) -> None:
-        if self._levels.add(levels_by_path):
-            self._hand_over(land=False)
-        self.refresh_panel()
+        channel = PaneChannel()
+        self.slideshow = FunestraSlideshow(
+            items, side=side, channel=channel, shown=self,
+            frames=frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen"),
+            actions=self._actions, hud=hud, pace=pace, image_dwell_ms=image_dwell_ms,
+            start=start, shuffle=shuffle, parent=self)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._pane = FunestraPane(
+            self, channel=channel, user=lambda _playback: _TheWindowsPresses(self),
+            panel=self._hud_model,
+            engine_for=None if engine is None else (lambda _window_id: engine),
+            radio=radio, volume=volume, on_volume_moved=self._volume_moved)
+        layout.addWidget(self._pane, 1)
+        self.slideshow.tick()  # a Funestra that opened with the pane is followed from the first
 
     # --- the panel this slideshow wears -------------------------------------
 
@@ -500,6 +171,9 @@ class SlideshowView(QWidget):
         no signal of its own: the next frame rebuilds it rather than the beat."""
         self._panel_stale = True
 
+    def panel_changed(self) -> None:
+        self.refresh_panel()
+
     def _hud_model(self):
         """The panel as the Funestra draws it, rebuilt on its own beat -- and
         faster while the drive's trace is moving across it."""
@@ -511,7 +185,7 @@ class SlideshowView(QWidget):
             return self._panel_model
         self._panel_stale = False
         self._panel_built_at = now
-        model = slideshow_hud_model(self._hud_side, self,
+        model = slideshow_hud_model(self._hud_side, self.slideshow,
                                     hosted=self._dashboard_cmd_file is not None,
                                     device=self.hud_device, foot=self._queue())
         if model is not None:
@@ -526,7 +200,7 @@ class SlideshowView(QWidget):
     def item_label(self) -> str:
         """The muted line under the status: what is on screen right now, by the
         name its tile and its tab wear, not "image / ComfyUI_00123_" off the path."""
-        prompt_id = self.hud_prompt_id
+        prompt_id = self.slideshow.hud_prompt_id
         if not prompt_id or self._label_for is None:
             return ""
         try:
@@ -538,15 +212,20 @@ class SlideshowView(QWidget):
         """Route one press on the panel, as the Funestra hands it over: the
         block at the foot takes the pointer, what the slideshow answers for itself
         lands on it, the session's transport goes out on the dashboard channel
-        — or, with no session under this slideshow, onto the slideshow as well
-        (:meth:`_act_here`) — and the device's own verbs land on this window
-        either way, the OSR2 being this app's to drive wherever the slideshow is
-        drawn.  A press on the picture asks for the pause, and a double-click there leaves.
+        — or, with no session under this slideshow, onto the slideshow as well —
+        and the device's own verbs land on this window either way, the OSR2
+        being this app's to drive wherever the slideshow is drawn.  A press on
+        the picture asks for the pause, and a double-click there leaves.
         """
+        if not self._route(command):
+            return False
+        self._answered()
+        return True
+
+    def _route(self, command: str) -> bool:
         verb, _, payload = command.partition("|")
         if verb in _FOOT_VERBS:
             self._press_the_queue(verb, payload)
-            self.refresh_panel()
             return True
         if verb == OMNIPAUSE_TOGGLE:
             self._press_on_the_picture()
@@ -556,19 +235,12 @@ class SlideshowView(QWidget):
             self._place_here_or_out_there(command, action, path)
             return True
         if action in THE_SLIDESHOWS_OWN:
-            # The two filters, reset, the loops, the expand mark and the map's
-            # own clicks mean on a slideshow what they mean on a Funestra, and the
-            # slideshow owns what each is — so they land here, hosted or not.
-            answer(self, action, path)
-            self.refresh_panel()
+            answer(self.slideshow, action, path)
             return True
         if self.press_console(verb):
-            self.refresh_panel()
             return True
         if action in _RATE_STEPS:
-            playback = self._pane.playback
-            if playback is not None:
-                playback.set_speed(playback.speed + _RATE_STEPS[action])
+            self._pane.channel.send(_RATE_STEPS[action])
             return True
         if self._dashboard_cmd_file is None:
             return self._act_here(action)
@@ -601,13 +273,9 @@ class SlideshowView(QWidget):
             self._collapse(COLLAPSES[action])
 
     def _act_here(self, action: str) -> bool:
-        """A press with no session under it: the slideshow answers it itself.
-
-        Standalone there is no command file to take the round trip a hosted
-        press takes, so the press lands on the slideshow through the same answers
-        that round trip would have ended at.
-        """
-        if answer(self, action):
+        """A press with no session under it: the slideshow answers it itself,
+        through the same answers a session's round trip would have ended at."""
+        if answer(self.slideshow, action):
             self.refresh_panel()  # the readout answers the press without waiting for the beat
             return True
         return False
@@ -623,8 +291,6 @@ class SlideshowView(QWidget):
 
     @property
     def hud_queue(self) -> tuple[list, int]:
-        """What is in flight, and how much of ComfyUI's queue is another app's —
-        what the panel draws at its foot."""
         return self._queue_items, self._foreign_queued
 
     def _queue(self):
@@ -635,19 +301,14 @@ class SlideshowView(QWidget):
 
     def requeue(self, keys) -> None:
         """Re-line the queue in this order — a row dragged somewhere else on the
-        panel.
-
-        Re-listed here and then, rather than waiting for the poll that confirms
-        it: the queue's agreement is a second and a half away, and a row that
-        springs back to where it was reads as a failure.
-        """
+        panel, re-listed at once rather than a poll later, since a row that
+        springs back to where it was reads as a failure."""
         by_key = {item.key: item for item in self._queue_items}
         self._queue_items = [by_key[key] for key in keys if key in by_key]
         if self._actions.requeue is not None:
             self._actions.requeue(list(keys))
 
     def clear_foreign_queue(self) -> None:
-        """Drop another app's work off ComfyUI, as the block's Clear asks."""
         if self._actions.clear_queue is not None:
             self._actions.clear_queue()
 
@@ -655,441 +316,7 @@ class SlideshowView(QWidget):
         if self._actions.start_now is not None:
             self._actions.start_now()
 
-    # --- picking a closed slideshow back up ---------------------------------
-
-    def state(self) -> SlideshowState:
-        """Where this slideshow is, in the terms a later one can be opened at."""
-        return self._set.state(locked=self._playlist.locked, level_index=self._levels.index)
-
-    def resume(self, state: SlideshowState, *, opened_on_it: bool = False) -> bool:
-        """Open where a closed slideshow left off rather than at the top of a fresh
-        shuffle, and say whether the place carried.
-
-        Closing a slideshow is usually a detour, so coming back is coming back to
-        that picture: the slide it ended on, its lock, its loop, and the version
-        it had been stepped to -- which is why this is called after
-        :meth:`set_levels`.  It carries only while that slide is among these
-        items or the loop it was left in.
-        """
-        if self._live or not self._set.resume(state, lead=not opened_on_it):
-            return False
-        self._playlist.set_locked(state.locked)
-        self._show_current()
-        if state.level_index and self._current_prompt_id() == state.current:
-            # A fresh slide sits at its top version, so the remembered index is
-            # exactly the number of steps down to the one that was on screen.
-            self.slideshow_step_version(state.level_index)
-        return True
-
-    def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
-                   favorite: bool = False, enhanced: bool = False) -> None:
-        """A generation that belongs to what this slideshow is playing has landed:
-        it joins the set, queued to come up next, so a slideshow of a folder that is
-        auto-generating reaches the items being made while it runs.
-        ``favorited`` and ``enhanced`` are what the gallery knows of its row.
-
-        The slide on screen is left alone; one the slideshow has been watching being
-        made keeps its place in the pass and simply becomes the file.
-        """
-        if favorite:
-            self._set.favorite_ids.add(prompt_id)
-        if enhanced:
-            self._set.enhanced_ids.add(prompt_id)
-        slide = Slide(path, media_type, prompt_id, still)
-        self._set.remember(slide)
-        if self._playlist.replace_live(prompt_id, path, media_type, still):
-            if self._current_prompt_id() == prompt_id:
-                self._show_current()  # the file itself now
-            else:
-                self._hand_over(land=False)
-            self._frames.forget(prompt_id)
-            return
-        # Into the pass only past the switches: a slideshow narrowed to its favorites
-        # must not fill back up with every unfavorited thing the loop makes.  The
-        # whole set remembers it either way, for when the switch comes off.
-        if self._set.passes(slide) and self._playlist.add(slide):
-            self._hand_over(land=False)
-
-    def note_generating(self, prompt_id: str, frame: bytes) -> None:
-        """A generation that belongs to what this slideshow is playing has started to
-        look like something: it joins the set on that first frame, and keeps
-        whichever is newest from there.
-
-        The wait is not worth a slide, but the first iterations arriving are the
-        best thing in a folder that is filling — so the slideshow puts them up as soon
-        as there is anything to see, queued to come up next like any other
-        arrival, rather than waiting out the minutes to the finished file.
-
-        Offered once. A run taken off the slideshow (its Up key) does not come back on
-        its next frame, which would make that key mean nothing at all.
-        """
-        if self._live:
-            return  # already following one run full-screen; this is that job
-        if self._playlist.update_live(prompt_id, frame):
-            if self._current_prompt_id() == prompt_id:
-                self._put_a_frame_up(self._frames.write(prompt_id, frame))
-            return
-        if (self._set.first_offer_of(prompt_id) and self._frames.write(prompt_id, frame)
-                and self._set.join_live(prompt_id, frame)):
-            self._hand_over(land=False)
-
-    def _put_a_frame_up(self, path) -> None:
-        playback = self._pane.playback
-        if path is None or playback is None or path == self._frame_on_funestra:
-            return
-        self._frame_on_funestra = path
-        playback.show_frame(path)
-
-    def note_in_flight(self, prompt_ids) -> None:
-        """Which runs are still being made, so a slide that has stopped being one
-        leaves rather than holding the pass with the half-finished frame it got
-        to. Cancelled and failed runs are what this is for; a finished one is out
-        of this set too, but by then it is a file (:meth:`note_added`) and no
-        longer a live slide to drop.
-        """
-        for prompt_id in [pid for pid in self._set.live_ids() if pid not in prompt_ids]:
-            showing = self._current_prompt_id() == prompt_id
-            self._playlist.drop(prompt_id)
-            self._set.forget_id(prompt_id)
-            self._frames.forget(prompt_id)
-            if self._playlist.is_empty():
-                self.close()  # a slideshow of nothing but that run has nothing left
-                return
-            if showing:
-                self._show_current()
-            else:
-                self._hand_over(land=False)
-
-    def holds(self, prompt_id: str) -> bool:
-        """Whether this slideshow already has a slide for that generation — what the
-        gallery asks before working out whether a run belongs in here at all."""
-        return self._playlist.holds(prompt_id)
-
-    def release_media(self, paths):
-        """Let go of any of ``paths`` on screen — a file about to be deleted (its
-        own Up key condemns the item it's playing): the Funestra holds an open
-        handle on whatever it is playing."""
-        wanted = {str(path) for path in paths}
-        if self._showing is None or str(self._showing) not in wanted:
-            return
-        playback = self._pane.playback
-        if playback is not None:
-            playback.let_go()
-        self._showing = None
-        self._showing_media = None
-
-    def _delete_current(self):
-        """Up, the Funestras' "weird": a favorite loses its star and the slideshow
-        moves on; anything else is deleted (if a deleter is wired) and the slideshow
-        moves on.
-
-        Two things on one key, as on a satellite, and the star on screen says
-        which: locking a slide starred it, so the first press takes that back
-        and only the second condemns it.  A slide still being made has nothing
-        to condemn, so Up takes it off the slideshow and leaves the run alone --
-        calling one off is the Cancel on that run's own row of the panel.
-        """
-        self._playlist.unlock()  # the locked slide is the one being culled
-        item = self._playlist.current()
-        if item is None:
-            return
-        if self._set.unfavorite_current(self._actions.unfavorite):
-            self._flash_note("Unfavorited")
-            self._step(1)
-            return
-        if (self._actions.delete is not None
-                and item.prompt_id is not None and not item.is_live):
-            self._actions.delete(item.prompt_id)
-        # Out of the whole set too, so widening a switch back cannot resurrect it.
-        self._set.forget(item)
-        self._playlist.remove_current()
-        self._frames.forget(item.prompt_id)
-        if self._playlist.is_empty():
-            self.close()
-            return
-        if self._set.end_a_loop_of_one():
-            self._lock_what_the_cull_left()
-        self._show_current()
-
-    def _lock_what_the_cull_left(self) -> None:
-        """A row worn down to one picture plays that picture over and over,
-        which is the lock — so the cull that wore it down ends the loop and
-        locks what is left, as a satellite's does.  The lock is the state and
-        nothing else: none of what a pressed lock also does — the star, the
-        better version, the gallery — happened, because nobody pressed one.
-        The flip is a lock because the cull released it three lines up."""
-        self._playlist.toggle_lock()
-        self._flash_note("Locked")
-
-    def _step(self, delta: int):
-        """Manual stepping — an arrow, or the console's transport: moving off a
-        slide releases its lock, so the way out of a lock is the same key that
-        got you anywhere else, not a second press of the one that set it."""
-        if self._live and self._playlist.is_empty():
-            return  # a run with no folder armed under it: nowhere to step to
-        self._playlist.unlock()
-        self._live = False  # stepped off a live generation: its frames stop landing
-        self._set.step(delta)
-        self._show_current()
-
-    @property
-    def has_other_versions(self) -> bool:
-        """Whether the item on screen was filed more than once — what draws the
-        band's versions button live rather than faded."""
-        return len(self._levels.levels(base=self._current_base())) > 1
-
-    def slideshow_step_version(self, delta: int) -> None:
-        """Step ``delta`` versions within the item on screen: an image's
-        enhancement levels, or a video's Evolver upscale and the video itself.
-
-        A no-op for an item with one version — there is nothing to compare it
-        against, and silently doing nothing is better than stepping the set
-        when the shift was the whole point.
-        """
-        version = self._levels.step(delta, base=self._current_base())
-        if version is None:
-            return
-        self._live = False
-        self._frames_on_screen = False
-        self._put_up(version.path, version.media_type, version.points_of_interest)
-        self.media_changed.emit()
-
-    def _put_up(self, path, media_type: str, points_of_interest: tuple = ()) -> None:
-        """Open a file on the Funestra in the slide's place -- one of the
-        slide's own versions -- as the one it is standing on."""
-        item = playlist_item(path, media_type, points_of_interest)
-        self._showing = item.path
-        self._showing_media = (path, media_type)
-        self._frame_on_funestra = None
-        playback = self._pane.playback
-        if playback is not None:
-            self._hand_the_pace_over(playback)
-            playback.play_file(item.path, item.funscript, item.points_of_interest)
-            self._loads_seen = playback.loads
-
-    # --- opened over a generation still being made --------------------------
-
-    def is_live(self) -> bool:
-        """Whether this slideshow is still following a generation in flight — the pane
-        that opened it checks before feeding it another frame or its result."""
-        return self._live
-
-    def show_frame(self, data: bytes) -> None:
-        """One more streamed frame of the generation being followed. Ignored once
-        it has landed (or the slideshow has stepped away), which is no longer this run."""
-        if self._live:
-            self._frame = data
-            self._put_the_followed_run_up(data)
-
-    def _put_the_followed_run_up(self, data: bytes) -> None:
-        """The run's newest frame in the place of a slide: on the Funestra's
-        move while it holds the screen, opened on it where nothing is up yet."""
-        path = self._frames.write(_FOLLOWED, data)
-        if path is None:
-            return
-        self._showing_media = None
-        if self._pane.playback is None:
-            self._showing = path
-            self._pane.hand_over([PlaylistItem(path)])
-            self._settle()
-            self._apply_freeze()
-            return
-        self._put_a_frame_up(path)
-
-    def show_landed(self, media: tuple, generation: str | None) -> None:
-        """The followed generation finished: its saved file takes the place of
-        its frames, at the head of the folder the slideshow was armed with."""
-        if not self._live:
-            return
-        self._live = False
-        folder = [slide for slide in self._set.all_items if slide.prompt_id != generation]
-        self._set.reseed([Slide(*media, generation), *folder], shuffle=in_order)
-        self._frames.forget(_FOLLOWED)
-        self._show_current()
-
-    # --- what Genau's console acts on here ---------------------------------
-    # Its transport steps Genau's flicks and its flick-seconds pace how long an
-    # unlocked one stays up. Here the slides take the flicks' place, so the same
-    # four buttons step, lock and cull them, and the same pair sets the dwell.
-
-    @property
-    def dwell_s(self) -> int:
-        """The seconds this slideshow leaves an unlocked slide up; nought holds it."""
-        return self._dwell_s
-
-    @property
-    def locked(self) -> bool:
-        """Whether what is on screen is locked — the console's padlock."""
-        return self._playlist.locked
-
-    @property
-    def locked_on(self) -> str | None:
-        return self._current_prompt_id() if self.locked else None
-
-    # --- the transport, for whoever is driving: a key, the console, a word ---
-
-    def step(self, delta: int) -> None:
-        """Move a slide either way — what the arrows do, for a caller with no
-        keyboard to press them with."""
-        self._step(delta)
-
-    def toggle_lock(self) -> None:
-        """Lock the slide on screen, or let it go — Down's whole gesture."""
-        self._lock_current()
-
-    def cull(self) -> None:
-        """Take the slide on screen away and move on — Up's."""
-        self._delete_current()
-
-    def slideshow_reset(self) -> None:
-        """Put the side back how it started, the Funestras' own reset: both
-        switches dropped, the lock released, and the base set on screen again.
-
-        Hosted, "how it started" is the REGION's base state, not this slideshow's
-        own: a Funestra's reset drops its filter and leaves it browsing its whole
-        library again, so a slideshow started on one folder goes back to the library
-        too rather than restarting that folder.  The gallery owns that set, so
-        it comes in as a hook.  Standalone there is no such state and a slideshow's
-        defaults are simply its own set from the beginning.
-        """
-        if self._actions.reset is not None:
-            self._actions.reset(self)
-            return
-        self.reset_in_place()
-
-    def slideshow_order(self, *, latest: bool) -> None:
-        if self._actions.reorder is not None:
-            self._actions.reorder(self, latest)
-
-    def reset_in_place(self) -> None:
-        """This slideshow's own reset: both switches dropped, the lock released, and
-        the top of the set it is already playing back on screen."""
-        self._playlist.unlock()
-        if self._set.drop_the_filters():
-            return  # the fresh pass is on screen already (see _pass_changed)
-        self._playlist.restart()
-        self._show_current()
-
-    def retune(self, items, *, enhanced_ids=None) -> None:
-        """Point this slideshow at the region's base set instead -- what a hosted
-        reset does, with the window left up because a region that blinks black
-        between two slideshows is what the base state exists to avoid.
-
-        A base state is always the same kind of set: a fresh shuffle of that
-        side's whole library, no loop, both switches and the lock off, the
-        favorited ids it had kept.  ``enhanced_ids`` is which of the new items
-        carry an enhancement.
-        """
-        self._live = not items
-        self._set.retune(items, enhanced_ids=enhanced_ids)
-
-    def reorder(self, items, *, latest: bool, enhanced_ids=(),
-                keep_slide: bool = False) -> None:
-        self._live = not items
-        self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids,
-                          keep_slide=keep_slide)
-
-    @property
-    def hud_order_label(self) -> str:
-        """How the set is ordered, in the Funestras' words — read off this view
-        by the slideshow's own panel (see
-        :class:`~origenerator.gui.slideshow_host.SlideshowHost`)."""
-        return self._set.order_label
-
-    # --- the map, and the loops along it -----------------------------------
-
-    def hud_map(self):
-        """The map the HUD draws around the slide on screen."""
-        return self._set.map()
-
-    def pass_size(self) -> int:
-        """How many slides the pass on screen holds — what a narrowing is
-        answered with."""
-        return len(self._playlist)
-
-    def slideshow_loop(self, axis: str) -> None:
-        """Loop the map's *axis* around the slide on screen, or end the loop
-        for "" — the map's two loop buttons, and the session's spoken loops.
-        An axis holding only the slide on screen is held rather than looped
-        (:meth:`_lock_instead_of_looping`)."""
-        if not axis:
-            if self._set.end_loop(self._browse_it_all):
-                self._flash_note("Loop off")
-            return
-        if self._set.start_loop(axis):
-            self._flash_note(looping_note(self._set))
-        else:
-            self._lock_instead_of_looping()
-
-    def _lock_instead_of_looping(self) -> None:
-        """Lock the slide on screen: the answer a loop asked of a row of one
-        gets on a Funestra, where the loop button of a group holding one clip
-        locks that clip.  A row that size is the slide itself, so the press
-        means "this one" rather than nothing; and a lock is not a loop, so a
-        loop that was running is dropped."""
-        self._set.end_loop()
-        self.set_locked(True)
-        self._flash_note("Locked")
-
-    def _browse_it_all(self) -> bool:
-        if self._actions.browse_all is None:
-            return False
-        return bool(self._actions.browse_all(self))
-
-    def slideshow_loop_cycle(self) -> None:
-        """The loop key, as on a Funestra: seeds, then actions, then off — and
-        the lock when there is nothing on either axis to loop, which is Down's
-        whole gesture here."""
-        stepped = self._set.step_loop(self._browse_it_all)
-        if stepped == LOOP_IS_A_LOCK:
-            self._lock_current()
-            self._flash_note("Locked" if self._playlist.locked else "Unlocked")
-        elif stepped == LOOP_OFF:
-            self._flash_note("Loop off")
-        else:
-            self._flash_note(looping_note(self._set))
-
-    def slideshow_more_seeds(self) -> None:
-        """Widen the seed row past what exactly matches and loop it — the
-        map's expand mark."""
-        if self._set.more_seeds():
-            self._flash_note(_MORE_SEEDS)
-        else:
-            self._flash_note(_WIDENING_FAILED, kind=WARNING)
-
-    def slideshow_filter(self, query: str) -> None:
-        """The button at the head of a map row, and the session's spoken acts.
-
-        A configuration's row is gone to and its seeds looped, the way it was
-        before the acts joined the column; an act's narrows the slideshow to it.
-        """
-        row = self._set.configuration_row(query)
-        if row is not None:
-            if row is not self._playlist.current():
-                self._jump_to(row)
-            self.slideshow_loop(SEED_AXIS)
-            return
-        said, narrowed = narrow_to_acts(self._set, query)
-        self._flash_note(said, kind=NOTICE if narrowed else WARNING)
-
-    def slideshow_filter_to_the_act_on_screen(self) -> None:
-        said, narrowed = narrow_to_the_act_on_screen(self._set)
-        self._flash_note(said, kind=NOTICE if narrowed else WARNING)
-
-    @property
-    def hud_act_filter(self) -> str:
-        """The act(s) the set is narrowed to — what lights the map's row
-        buttons (see :class:`~origenerator.gui.slideshow_host.SlideshowHost`)."""
-        return self._set.filters.act
-
-    def slideshow_nav(self, direction: str) -> None:
-        """Step to the map cell one *direction* from the lit one, the way a
-        thumbnail click lands on it."""
-        target = self._set.nav_target(direction)
-        if target is None:
-            self._flash_note(_NOTHING_THAT_WAY, kind=WARNING)
-            return
-        self._jump_to(target)
+    # --- the OSR2, which this app drives standalone --------------------------
 
     @property
     def hud_device(self):
@@ -1099,7 +326,7 @@ class SlideshowView(QWidget):
             return None
         control = self._actions.osr2_control
         return slideshow_device(
-            self._motion, pace_s=self.dwell_s, device=osr2_device.device_mode(),
+            self._motion, pace_s=self.slideshow.dwell_s, device=osr2_device.device_mode(),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None)
 
@@ -1110,7 +337,11 @@ class SlideshowView(QWidget):
             return False
         return (post_device_action(action, motion=self._motion,
                                    control=self._actions.osr2_control)
-                or post_pace_action(action, self))
+                or post_pace_action(action, self.slideshow))
+
+    @property
+    def player(self):
+        return self._pane
 
     def _volume_moved(self, volume) -> None:
         if self._actions.volume_moved is not None:
@@ -1121,139 +352,14 @@ class SlideshowView(QWidget):
         to a slideshow landing on a satellite region."""
         self._pane.set_audio_muted(muted)
 
-    def set_locked(self, locked: bool) -> bool:
-        """Lock the slide on screen or let it go, saying which way rather than
-        flipping; ``True`` when that moved it.
+    # --- the room's pause ----------------------------------------------------
 
-        Spoken "lock" and "unlock" are two words for a reason: someone talking
-        to a picture is asking for a state, not for the other one — and cannot
-        see the counter's padlock to know which the flip would give them.
-        Locking is Down's whole gesture here, star and enhance included, because
-        that is what locking means in this view and a spoken lock must not
-        quietly mean less than a pressed one.
-        """
-        if locked == self._playlist.locked:
-            return False
-        self._lock_current() if locked else self._flip_lock()
-        return True
-
-    def favorite(self) -> bool:
-        """Bookmark the slide on screen; ``False`` when there is nothing to
-        bookmark — a live generation has no row of its own yet."""
-        item = self._playlist.current()
-        if self._actions.favorite is None or item is None or item.prompt_id is None:
-            return False
-        self._actions.favorite(item.prompt_id)
-        self._set.favorite_ids.add(item.prompt_id)  # the star readout and F-mode follow it
-        return True
-
-    # The motion console reaches the three above by its own names: it drives this
-    # view through a host protocol the main window's console shares.
-    def slideshow_step(self, delta: int) -> None:
-        self.step(delta)
-
-    def slideshow_toggle_lock(self) -> None:
-        self.toggle_lock()
-
-    def slideshow_cull(self) -> None:
-        self.cull()
-
-    def set_dwell_s(self, seconds: int) -> None:
-        """Take a new pace, and hand it on: the number is app-wide, so a slideshow
-        opened at nought that is turned up sets the pace for the next one too.
-
-        Applied here as well as posted to the pace, rather than only waiting for
-        the signal back — a slideshow sitting at nought while the app-wide pace already
-        reads one gets no signal from a step up to one, and would stay frozen.
-        """
-        self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
-        self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
-
-    def is_showing(self) -> bool:
-        """Whether this slideshow is on screen — what says a region is occupied."""
-        return self.isVisible()
-
-    # --- what this slideshow's HUD says, in the Funestras' vocabulary --------
-
-    @property
-    def hud_prompt_id(self) -> str:
-        """The generation on screen, by id — what names it on the HUD.
-
-        The id rather than the file, because what the panel prints is this
-        app's own name for the item (its folder and its seed), and only the
-        row under the id carries either.
-        """
-        current = self._playlist.current()
-        return current[2] if current and len(current) > 2 else ""
-
-    @property
-    def hud_is_favorite(self) -> bool:
-        """Whether the item on screen is a favorite (favorited) — the Funestras'
-        star readout, over the same items the Favorites collection lists."""
-        return self._set.is_favorite
-
-    @property
-    def hud_favorites_filter(self) -> bool:
-        return self._set.filters.favorites
-
-    @property
-    def hud_enhanced_mode(self) -> bool:
-        """Whether the slideshow is narrowed to the pictures that have been enhanced
-        — the switch beside F-mode on its HUD."""
-        return self._set.filters.enhanced
-
-    def toggle_favorites_filter(self) -> bool:
-        """Narrow the set to the favorites, or widen it back — the Funestras' own
-        F-mode, over the favorited items.  ``True`` when the switch moved."""
-        return self.set_favorites_filter(not self._set.filters.favorites)
-
-    def toggle_enhanced_mode(self) -> bool:
-        """Narrow the set to the pictures that have been enhanced, or widen it
-        back — the HUD's switch beside F-mode.  ``True`` when the switch moved."""
-        return self.set_enhanced_mode(not self._set.filters.enhanced)
-
-    def set_favorites_filter(self, on: bool) -> bool:
-        return self._set.set_filters(replace(self._set.filters, favorites=bool(on)))
-
-    def set_enhanced_mode(self, on: bool) -> bool:
-        """Said which way rather than flipped — a speaker mid-show is not
-        looking at the HUD to see which way it stands."""
-        return self._set.set_filters(replace(self._set.filters, enhanced=bool(on)))
-
-    def clear_modes(self) -> bool:
-        """Every switch off at once — what "clear filter" has to mean once
-        there is more than one to clear."""
-        return self._set.set_filters(SlideshowFilters())
-
-    def show_item(self, path, *, lock: bool = False) -> None:
-        """Jump to the item the HUD map named — a thumbnail click, the same
-        jump a satellite's map makes; *lock* keeps it there (the double-click),
-        exactly as it locks a Funestra's clip."""
-        slide = self._set.slide_for_path(path)
-        if slide is None:
-            return
-        self._jump_to(slide)
-        if lock and not self._playlist.locked:
-            self._flip_lock()
-
-    def _jump_to(self, slide) -> None:
-        """Stand the slideshow on *slide*, wherever the map found it: the lock
-        comes off, the way any step off a locked slide takes it off."""
-        self._playlist.unlock()
-        self._live = False
-        self._set.jump_to(slide)
-        self._show_current()
-
-    def set_paused(self, paused: bool) -> None:
-        """Freeze or resume the slideshow whole, with the room.
-
-        Distinct from the lock: a lock holds one slide by choice and replays
-        its clip; this stops time itself.  The Funestra's clock is the slideshow's,
-        so a frozen picture stops counting down its dwell and a frozen clip
-        stops playing, and a slide stepped to while frozen arrives frozen too.
-        """
+    def room_paused(self, paused: bool) -> None:
+        """Freeze or resume the Funestra here whole, with the room: a frozen
+        picture stops counting down its pace, a frozen clip stops, and a slide
+        stepped to while frozen arrives frozen too."""
         self._paused = paused
-        self._apply_freeze()
+        self._pane.set_paused(paused)
 
     def _press_on_the_picture(self) -> None:
         self._toggle_pause()
@@ -1264,316 +370,105 @@ class SlideshowView(QWidget):
         if self._actions.omnipause is not None:
             self._actions.omnipause()
         else:
-            self.set_paused(not self._paused)
+            self.room_paused(not self._paused)
 
-    def _on_pace_changed(self, seconds: int) -> None:
-        """The pace moved — here or in another window — so the slide on screen
-        takes the new one rather than waiting out the old."""
-        self._apply_dwell(seconds)
+    # --- the lines it flashes over the picture --------------------------------
 
-    def _apply_dwell(self, seconds: int) -> None:
-        seconds = max(0, int(seconds))
-        if seconds == self._dwell_s:
-            return
-        self._dwell_s = seconds
-        self._playlist.image_dwell_ms = seconds * 1000
-        if self._live or self._levels.stepping:
-            return
-        # The engine takes the new pace on the picture it has up, so the picture
-        # keeps its place on its move and on its scrubber.
-        self._settle()
-        self._hold_what_is_being_made_for_half()
+    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 1500) -> None:
+        """Say something for a moment, then fall back to whatever the note would
+        otherwise be saying."""
+        self._note.say(text, kind=kind)
+        self._note_timer.start(ms)
 
-    def _on_media_unplayable(self):
-        """A file the Funestra will not open: step past it, whatever holds it.
-
-        Unlike a clip that ended, this one never will, so the replay a lock or
-        a pace of nought asks for would hold a black screen for the rest of the
-        session.  The item stays in the set — the fault is the backend's, not
-        the file's — but the slideshow moves on.
-
-        A pause is the one stop this yields to: the slideshow is frozen, and a slideshow
-        that walked its set looking for something playable would be moving.
-        The black rectangle waits for the resume.
-        """
-        if self._paused or self._live:
-            return
-        logger.warning("Slideshow: a clip would not play; stepping past it")
-        self._playlist.unlock()
-        self._set.step(1)
-        self._show_current()
-
-    # --- the pause a spoken request puts on the slideshow ------------------
-
-    def pause_for_request(self, paused: bool, note: str = "") -> None:
-        """Stop (or release) the advance while a request is being spoken.
-
-        Not the user's lock: a slide they had locked is still locked when the
-        request ends, and one they hadn't goes back to its dwell. ``note`` is
-        what the corner should say while the slideshow waits — the only sign, in a view
-        with no panels, that the mic is taking a sentence.
-        """
-        self._playlist.set_paused(paused)
-        if paused:
+    def dictating(self, note: str) -> None:
+        """Hold *note* while a spoken request pauses the slideshow, or let it go for
+        nothing -- the only sign, in a view with no panels, that the mic is
+        taking a sentence."""
+        if note:
             self._note_timer.stop()  # it holds, rather than fading after a beat
-            self._request_note = note
-        else:
-            self._request_note = ""
+        self._request_note = note
         self._refresh_note()
-        self._apply_freeze()
 
-    def note_request(self, message: str, request=None, *,
-                     working: bool = False, kind: str = NOTICE) -> None:
+    def request_line(self, message: str, request=None, *, working: bool = False,
+                     kind: str = NOTICE) -> None:
         """Say what the spoken *request* did, where the speaker is looking.
 
         *working* means it has not done it yet, so the corner holds that line
-        rather than flashing it: working out what a request changes can mean
-        asking the local LLM, which outlasts a flash.  It comes down only for
-        the request that put it up -- a second request said over the first
-        would otherwise blank the corner while that one is still out -- and any
-        other answer flashes over it and leaves it standing.
+        rather than flashing it, and it comes down only for the request that
+        put it up -- a second request said over the first would otherwise blank
+        the corner while that one is still out.
         """
         if working:
             self._working_note, self._working_request = message, request
-            self._note_timer.stop()  # it holds, rather than fading after a beat
+            self._note_timer.stop()
             self._refresh_note()
             return
         if request is self._working_request:
             self._working_note, self._working_request = "", None
-        self._flash_note(message, ms=3000, kind=kind)
-
-    def _lock_current(self):
-        """Down: lock the slide, favorite it, and ask for it to be enhanced.
-
-        Stopping on a picture is the gesture that says you want it, so it is
-        also the one that favorites it and the one that asks for the better version
-        — nothing extra to press, and the run happens while you keep looking at
-        it. Releasing the lock asks for nothing; only stopping does, and only on
-        a picture that has never been enhanced (the gallery's call).
-        """
-        locked = self._flip_lock()
-        if locked:
-            self._enhance_current()
-
-    def _enhance_current(self):
-        """Ask the gallery to enhance the slide on screen, if it wants one.
-
-        The gallery decides whether it does — it is the one that knows whether
-        this image has already been enhanced or has a run on its way, which the
-        lock makes first.  ``True`` back means a run started, and the HUD says
-        so until the finished version arrives.
-        """
-        if self._actions.enhance is None:
-            return
-        if self._playlist.current_is_live():
-            return  # no file yet to make a better version of; the lock still holds
-        prompt_id = self._current_prompt_id()
-        if prompt_id is None:
-            return
-        if self._actions.enhance(prompt_id):
-            self._set.note_enhancement_asked(prompt_id)
-            self.refresh_panel()
-
-    def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,
-                      still=None) -> None:
-        """An enhancement of one of these items landed: the slideshow points at it
-        from here on, wherever that item sits in the running order.
-
-        Not only while it is the one on screen. It was asked for minutes ago and
-        the slideshow may have paged on since; and the playlist is the fixed set the
-        slideshow opened with — nothing re-reads the folder — so a swap confined to the
-        current slide would leave every later pass replaying the version this
-        one replaced. What is on screen changes only when the upgraded item is
-        what's on it: it carries on the move the picture was on, as the frames
-        of its making did.
-        """
-        self._set.note_enhancement_landed(prompt_id)
-        upgraded = self._set.upgrade(prompt_id, path, media_type, still)
-        if self._playlist.replace_item(prompt_id, path, media_type, still):
-            if self._current_prompt_id() == prompt_id:
-                self._levels.back_to_the_top()
-                self._frames_on_screen = False
-                self._swap_in(path, media_type)
-                self._hold_what_is_being_made_for_half()
-            self._hand_over(land=False)
-        elif upgraded is not None and self._set.passes(upgraded) and self._playlist.add(upgraded):
-            # Kept out of an enhanced-only pass until now, being unenhanced; the
-            # better version is exactly what that pass plays, so in it goes.
-            self._hand_over(land=False)
-        self.refresh_panel()
-
-    def _swap_in(self, path, media_type: str) -> None:
-        """A better file of the item on screen, in the place of the one up,
-        on the move that one was making."""
-        item = playlist_item(path, media_type)
-        self._put_a_frame_up(item.path)
-        self._showing = item.path
-        self._showing_media = (path, media_type)
-
-    def note_enhancing(self, statuses: dict, frames=None) -> None:
-        self._set.note_enhancing(statuses, frames)
-        current = self._playlist.current()
-        if current is None or self._live or self._levels.stepping:
-            return
-        self._show_what_is_being_made()
-        self.refresh_panel()
-
-    def _show_what_is_being_made(self) -> None:
-        """The frames of the enhancement being made of the slide on screen, in
-        its place while they come in -- and the picture itself back when they
-        stop, on the move it was making."""
-        current = self._playlist.current()
-        playback = self._pane.playback
-        if current is None or playback is None or current.is_live:
-            return
-        frame = (self._set.frame_being_made_of(current)
-                 if self._file_of(current) == self._showing else None)
-        if frame is not None:
-            self._frames_on_screen = True
-            self._put_a_frame_up(self._frames.write(current.prompt_id, frame))
-        elif self._frames_on_screen:
-            self._frames_on_screen = False
-            self._frame_on_funestra = None
-            self._frames.forget(current.prompt_id)
-            playback.clear_frame()
-            self._hold_what_is_being_made_for_half()
-
-    def lead_with_what_is_being_made(self) -> None:
-        if self._set.lead_with_what_is_being_made():
-            self._show_current()
-
-    def _current_prompt_id(self):
-        """The id of the item on screen, or ``None`` — a playlist assembled
-        without ids (a test's) names nothing.
-
-        Read off the playlist item rather than off the file showing, so it is
-        still the right answer while Shift+Left/Right has stepped onto one of
-        that item's other versions.
-        """
-        return self._set.current_prompt_id()
-
-    def _current_base(self) -> str:
-        """The file the set lists the item on screen under — what its versions
-        are keyed by. Empty for one still being made: its slide is frames rather
-        than a file, and nothing is keyed off those."""
-        item = self._playlist.current()
-        if item is None or item.is_live:
-            return ""
-        return str(item.path)
-
-    def voice_target(self):
-        """The generation a spoken order or request is about: the slide on
-        screen — what the speaker is looking at while saying it."""
-        return self._current_prompt_id()
-
-    def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
-        if prompt_id is not None:
-            self._set.note_enhancement_asked(prompt_id)
-            self.refresh_panel()
-        self.note_voice_command(message, kind=kind)
-
-    def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
-        """Say what a spoken command did. Here rather than in the gallery's own
-        caption because the speaker is looking at this — the window under it is
-        covered by the very slideshow being talked to."""
-        self._flash_note(message, ms=2500, kind=kind)
+        self.flash(message, ms=3000, kind=kind)
 
     def _refresh_note(self):
         if self._request_note:
-            self._show_note(self._request_note)
+            self._note.say(self._request_note, kind=NOTICE)
         elif self._working_note:
-            self._show_note(self._working_note)
+            self._note.say(self._working_note, kind=NOTICE)
         else:
             self._note.hide()
 
-    @property
-    def hud_item_note(self) -> str:
-        return item_note(self._set, levels=self._levels.levels(base=self._current_base()),
-                         level_index=self._levels.index)
-
-    def _show_note(self, text: str, *, kind: str = NOTICE) -> None:
-        self._note.say(text, kind=kind)
-
-    def _flash_note(self, text: str, ms: int = 1500, *, kind: str = NOTICE):
-        """Say something for a moment, then fall back to whatever the note would
-        otherwise be saying."""
-        self._show_note(text, kind=kind)
-        self._note_timer.start(ms)
-
-    def _flip_lock(self) -> bool:
-        """Flip the lock; returns whether the slide is now locked.
-
-        Locking also stars what is on screen: locking a slide is how the user says
-        this one is worth keeping, and having said it they should not have to say
-        it twice in two ways.
-        """
-        if self._playlist.toggle_lock():
-            self.favorite()
-            self._settle()
-            self.refresh_panel()
-            if self._actions.lock is not None:
-                prompt_id = self._current_prompt_id()
-                if prompt_id is not None:
-                    self._actions.lock(prompt_id)
-            return True
-        self._show_current()  # released: it finishes its round, and the set goes on
-        return False
-
-    def _open_current(self):
-        """Enter: leave the slideshow and hand its item to the gallery, which
-        opens the folder it lives in — the way out of a collection's slideshow, where
-        what you're watching came from folders all over the tree."""
-        self._land_on = self._current_prompt_id()
-        self.close()  # the handover is closeEvent's, so it happens exactly once
-
-    def osr2_drive_target(self):
-        """``(video_path, player, actions)`` for the video on screen, or ``None`` for
-        an image or a video with no funscript — mirrors the config panel's target so
-        the gallery can point its one driver at whichever surface is foreground."""
-        return drive_target_for(self._current_video_path(), self._pane)
-
-    def video_on_screen(self) -> str | None:
-        return self._current_prompt_id() if self._showing_a_video() else None
+    # --- keys -----------------------------------------------------------------
 
     def _move_the_panel(self, key) -> None:
         direction = _PANEL_MOVES.get(key)
         if direction is not None and self._actions.move_hud is not None:
             self._actions.move_hud(direction)
 
-    # --- Qt events ---------------------------------------------------------
-
     def keyPressEvent(self, event):
         key = _WASD_AS_ARROWS.get(event.key(), event.key())
         shifted = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+        slideshow = self.slideshow
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self._move_the_panel(key)
         elif key == Qt.Key.Key_Escape:
             self._toggle_pause()
         elif key == Qt.Key.Key_Left:
-            answer(self, "cycle_version_back") if shifted else self._step(-1)
+            answer(slideshow, "cycle_version_back") if shifted else slideshow.slideshow_step(-1)
         elif key == Qt.Key.Key_Right:
-            answer(self, "cycle_version") if shifted else self._step(1)
+            answer(slideshow, "cycle_version") if shifted else slideshow.slideshow_step(1)
         elif key == Qt.Key.Key_Up:
-            self.slideshow_nav("up") if shifted else self._delete_current()
+            slideshow.slideshow_nav("up") if shifted else slideshow.slideshow_cull()
         elif key == Qt.Key.Key_Down:
-            self.slideshow_nav("down") if shifted else self._lock_current()
+            slideshow.slideshow_nav("down") if shifted else slideshow.slideshow_toggle_lock()
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             # The loop key, on both of the keys a session gives its two
             # satellites: seeds, then actions, then off.
-            self.slideshow_loop_cycle()
+            slideshow.slideshow_loop_cycle()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self._open_current()    # out of the slideshow, into its folder
+            self.close()    # out of the slideshow, into the folder of what is on screen
         elif apply_motion_key(self._motion, key,
                               on_drive_toggle=self._actions.drive_toggle):
-            # The panel redraws on its own beat, and this is the one moment the
-            # answer can have changed under a driver that emits no signal.
-            self.refresh_panel()
+            pass
         else:
             super().keyPressEvent(event)
+            return
+        self._answered()
+
+    def _answered(self) -> None:
+        """A key or a press was taken: the Funestra here has already answered it,
+        so the slideshow reads it now rather than at its next look, and the panel
+        is drawn afresh rather than on its beat."""
+        self.slideshow.tick()
+        self.refresh_panel()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._note.reposition()
+
+    # --- leaving ---------------------------------------------------------------
+
+    def gone(self) -> None:
+        """The slideshow is over: the window goes with it."""
+        if not self._closing:
+            self.close()
 
     def closeEvent(self, event):
         """Leave, handing the gallery the slide that was on screen.
@@ -1581,51 +476,34 @@ class SlideshowView(QWidget):
         However the slideshow is left — a double-click, Enter, the spoken
         "close", or ending on a locked slide — the picture you were looking at is
         the one you want to find afterwards, so the gallery picks it where the
-        slideshow was playing. Only a slideshow with nothing on screen hands nothing over,
-        which is a slideshow whose last item was culled.
+        slideshow was playing.
         """
+        self._closing = True
         self.hide()
         self._pane.close_engine()  # lets go of every held file, so it can be deleted
-        self._showing = None
-        self._showing_media = None
-        self._frames.forget_all()
-        landing = self._land_on or self._current_prompt_id()
-        # Both cleared before a second close could read them, so the handover
-        # happens once. The lock outlives the first emit because the gallery
-        # reads this slideshow's state there, and a slide closed under a lock is one
-        # a reopened slideshow locks.
-        self._land_on = None
-        self.closed.emit()
-        self._playlist.unlock()
-        if landing is not None:
-            self.open_requested.emit(landing)
+        self.slideshow.close()
         super().closeEvent(event)
 
 
-class SlideshowOnAFunestra:
-    """The Slideshow as the Funestra sees it: what runs on the window.
+class _TheWindowsPresses:
+    """The window as the Funestra sees it: what a press on the panel it wears is
+    asked of, and what heads that panel.  The window is the slideshow's own, so
+    closing the Funestra closes nothing here."""
 
-    The Funestra asks it about every press on the panel it wears and every
-    verb, gives it a pass of its own each frame, and heads the panel with what
-    it says it is playing.  The window is the slideshow's own, so closing the
-    Funestra closes nothing here: the slideshow closes the Funestra, not the other
-    way round.
-    """
-
-    def __init__(self, slideshow: SlideshowView) -> None:
-        self._slideshow = slideshow
+    def __init__(self, window: SlideshowView) -> None:
+        self._window = window
 
     def apply_command(self, command: str) -> bool:
-        return self._slideshow.press(command)
+        return self._window.press(command)
 
     def tick(self) -> None:
-        self._slideshow.follow_the_funestra()
+        pass
 
     def status_fields(self) -> dict[str, str]:
         return {}
 
     def top_block(self) -> ModeHud:
-        return ModeHud(video=self._slideshow.item_label())
+        return ModeHud(video=self._window.item_label())
 
     def set_showing(self, showing: bool) -> None:
         pass

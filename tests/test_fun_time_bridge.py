@@ -30,7 +30,7 @@ from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 from origenerator.slideshow_buttons import answer
-from tests.slideshow_hud_support import open_both_sides
+from tests.slideshow_hud_support import funestra_of, open_both_sides
 from tests.test_gallery_view import (
     _REROLL_HISTORY,
     FakeDB,
@@ -43,18 +43,8 @@ from tests.test_gallery_view import (
     _row,
     _running_reroll,
     _seeded_db,
+    _will_move_on,
 )
-
-
-def _will_move_on(view) -> bool:
-    """Whether the slideshow pages on by itself when the item on screen runs out.
-
-    The engine holds a picture for the pace and ends it the way it ends a
-    finished clip, so there is no clock of the view's own to ask: what decides
-    is the same three things that decided whether one was armed -- the room is
-    not frozen, the slide is not locked, and the pace is not nought."""
-    return (not view._paused and not view._playlist.locked_or_paused()
-            and bool(view._dwell_s))
 
 
 def _session(tmp_path):
@@ -86,28 +76,32 @@ def _view_with_bridge(qtbot, tmp_path, rows=()):
 
 
 def _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path, count=3):
-    still = tmp_path / "tall.png"
-    Image.new("RGB", (100, 200)).save(still)
-    items = [(str(still), "image", f"id{n}", str(still)) for n in range(count)]
+    items = []
+    for n in range(count):  # a file each, since a Funestra says what it shows by its file
+        still = tmp_path / f"tall{n}.png"
+        Image.new("RGB", (100, 200)).save(still)
+        items.append((str(still), "image", f"id{n}", str(still)))
     monkeypatch.setattr(view, "rows_to_play",
                         lambda: [{"prompt_id": item[2]} for item in items])
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
     view._slideshows.start()
     slideshow = view.region_slideshow("portrait")
-    qtbot.addWidget(slideshow)
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
     return slideshow
 
 
 def test_side_verbs_drive_the_slideshow_holding_that_region(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    before = slideshow._playlist.index
+    before = slideshow._set.playlist.index
 
     (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_NEXT\n", encoding="utf-8")
     bridge._tick()
+    slideshow.tick()  # it reads its Funestra, as its poll does a moment later
 
-    assert slideshow._playlist.index == (before + 1) % 3
+    assert slideshow._set.playlist.index == (before + 1) % 3
 
 
 def test_a_verb_for_an_empty_region_is_dropped(qtbot, tmp_path):
@@ -153,15 +147,15 @@ def test_reset_verb_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypat
     releases and the top of the set comes back."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    slideshow._playlist.jump_to(2)
-    slideshow._flip_lock()
+    slideshow._set.playlist.jump_to(2)
+    slideshow.slideshow_toggle_lock()
     assert slideshow.locked
 
     (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_RESET\n", encoding="utf-8")
     bridge._tick()
 
     assert not slideshow.locked
-    assert slideshow._playlist.index == 0
+    assert slideshow._set.playlist.index == 0
 
 
 def test_the_order_verbs_play_the_side_newest_first_or_shuffled(qtbot, tmp_path, monkeypatch):
@@ -178,7 +172,7 @@ def test_the_order_verbs_play_the_side_newest_first_or_shuffled(qtbot, tmp_path,
     for verb in ("PORTRAIT_LATEST", "PORTRAIT_SHUFFLE"):
         (tmp_path / "origenerator_cmd.txt").write_text(f"{verb}\n", encoding="utf-8")
         bridge._tick()
-        orders.append((slideshow.hud_order_label, slideshow._playlist.current()[2].split("-")[0]))
+        orders.append((slideshow.hud_order_label, slideshow._set.playlist.current()[2].split("-")[0]))
 
     assert orders == [("Latest", "__recents__::portrait"),
                       ("Shuffle", "__all__::portrait")]
@@ -259,7 +253,7 @@ def test_close_slideshows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     (tmp_path / "origenerator_cmd.txt").write_text("CLOSE_SLIDESHOWS\n", encoding="utf-8")
     bridge._tick()
 
-    assert not slideshow.isVisible()
+    assert not slideshow.shown.isVisible()
     assert view.region_slideshow("portrait") is None
 
 
@@ -269,11 +263,11 @@ def test_a_side_taken_back_on_its_own_closes_that_sides_slideshow_alone(qtbot, t
 
     (tmp_path / "origenerator_cmd.txt").write_text("landscape_close_slideshow\n", encoding="utf-8")
     bridge._tick()
-    assert slideshow.isVisible()
+    assert slideshow.shown.isVisible()
 
     (tmp_path / "origenerator_cmd.txt").write_text("portrait_close_slideshow\n", encoding="utf-8")
     bridge._tick()
-    assert not slideshow.isVisible()
+    assert not slideshow.shown.isVisible()
     assert view.region_slideshow("portrait") is None
 
 
@@ -300,7 +294,7 @@ def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
     open_both_sides(view)
     slideshows = [view.region_slideshow(side) for side in ("portrait", "landscape")]
     for slideshow in slideshows:
-        qtbot.addWidget(slideshow)
+        qtbot.addWidget(slideshow.shown)
     return slideshows
 
 
@@ -458,12 +452,13 @@ def test_a_step_while_paused_lands_on_a_slide_that_stays_frozen(qtbot, tmp_path,
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
-    before = slideshow._playlist.index
+    before = slideshow._set.playlist.index
 
     (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_NEXT\n", encoding="utf-8")
     bridge._tick()
+    slideshow.tick()  # it reads its Funestra, as its poll does a moment later
 
-    assert slideshow._playlist.index == (before + 1) % 3  # the step still lands
+    assert slideshow._set.playlist.index == (before + 1) % 3  # the step still lands
     assert not _will_move_on(slideshow)                # but the slide stays frozen
 
 
@@ -716,7 +711,7 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
         else (row["thumbnail_path"], "image", row["prompt_id"], row["thumbnail_path"])
         for row in rows])
 
-    view._slideshows.open_on_preview((clicked[0], "image"), None, clicked[2])
+    view._slideshows.open_on_preview((clicked[0], "image"), clicked[2])
 
     played = [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")]
     assert played == [clicked[0], folder[0][0]]
@@ -733,7 +728,7 @@ def test_a_double_click_over_frames_of_no_run_in_flight_leaves_the_funestras_alo
     view = _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     playing = (tmp_path / "landscape.tsv").read_text(encoding="utf-8")
 
-    assert view._slideshows.open_on_preview(None, b"a frame of the run", None) is None
+    assert view._slideshows.open_on_preview(None, None) is None
 
     assert (tmp_path / "landscape.tsv").read_text(encoding="utf-8") == playing
     assert _told(tmp_path, "landscape") == []

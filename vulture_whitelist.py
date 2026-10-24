@@ -25,16 +25,15 @@ _.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.mouseDoubleClickEvent  # noqa  # origenerator/gui/funestra_pane.py:283, origenerator/gui/generation_queue.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/thumbnail_widget.py:392
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
-_.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:263, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
+_.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:290, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219
 
 # --- funestra's Funestra asks these of what runs on it, through its User protocol ---
-_.apply_command  # noqa  # origenerator/gui/slideshow_view.py:1617
-_.status_fields  # noqa  # origenerator/gui/slideshow_view.py:1623
-_.top_block  # noqa  # origenerator/gui/slideshow_view.py:1626
-_.set_showing  # noqa  # origenerator/gui/slideshow_view.py:1629
+_.apply_command  # noqa  # origenerator/gui/slideshow_view.py:490
+_.top_block  # noqa  # origenerator/gui/slideshow_view.py:499
+_.set_showing  # noqa  # origenerator/gui/slideshow_view.py:502
 
 # --- reached by name, from the table a spoken word is dispatched through ---
 # `voice_router._MOTION` maps the spoken on and off words for human inspired to

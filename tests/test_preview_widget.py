@@ -358,8 +358,8 @@ def _arm(preview):
     Returns a list the built slideshows land in."""
     built = []
 
-    def make(media, frame, generation):
-        slideshow = _FakeSlideshow(media, frame=frame, generation=generation)
+    def make(media, generation):
+        slideshow = _FakeSlideshow(media, generation=generation)
         built.append(slideshow)
         return slideshow
 
@@ -376,7 +376,7 @@ def test_double_click_opens_fullscreen_on_the_shown_generation(make_preview, tmp
     w.mouseDoubleClickEvent(None)
 
     assert (built[0].media, built[0].generation) == ((png, "image"), "gen1")
-    assert w._fullscreen is built[0]  # kept alive here, and fed from here
+    assert w._fullscreen is built[0]  # kept alive here
 
 
 def test_a_pane_with_nothing_wired_opens_nothing(make_preview, tmp_path):
@@ -413,12 +413,9 @@ class _FakeSlideshow:
     """Stands in for the slideshow a double-click opens, which is a window of this
     app's or one of a session's Funestras -- so nothing of a window is on it."""
 
-    def __init__(self, media, *, frame=None, generation=None):
+    def __init__(self, media, *, generation=None):
         self.media = media
         self.generation = generation
-        self.frames = [frame] if frame is not None else []
-        self.landed = None
-        self._live = media is None
         self._showing = True
 
     def is_showing(self):
@@ -426,16 +423,6 @@ class _FakeSlideshow:
 
     def close(self):
         self._showing = False
-
-    def is_live(self):
-        return self._live
-
-    def show_frame(self, data):
-        self.frames.append(data)
-
-    def show_landed(self, media, generation):
-        self.landed = (media, generation)
-        self._live = False
 
 
 @pytest.fixture
@@ -455,81 +442,12 @@ def test_a_live_frame_opens_fullscreen_over_the_generation(live_preview):
 
     assert win is not None
     assert win.media is None          # no file under it yet — it follows the run
-    assert win.frames == [_png_bytes()]  # seeded with the frame that was on screen
 
 
 def test_fullscreen_opens_over_the_wait_before_the_first_frame(live_preview):
     live_preview.show_message("Waiting for preview…", live=True)
     win = live_preview.open_fullscreen()
-    assert win is not None and win.frames == []  # nothing to seed it with yet
-
-
-def test_the_generation_streams_on_into_the_open_view(live_preview):
-    # Opened over the wait, it fills in as the run's frames arrive.
-    live_preview.show_message("Waiting for preview…", live=True)
-    win = live_preview.open_fullscreen()
-
-    live_preview.show_frame(_png_bytes())
-
-    assert win.frames == [_png_bytes()]
-
-
-def test_blanking_between_rebuilds_keeps_the_view_on_the_generation(live_preview):
-    # Every gallery rebuild clears the pane to its placeholder while a run streams;
-    # that must not take the fullscreen view off the generation it's watching.
-    live_preview.show_frame(_png_bytes())
-    win = live_preview.open_fullscreen()
-
-    live_preview.clear()             # the rebuild's blank
-    live_preview.show_frame(_png_bytes())  # the frames resume
-
-    assert win.frames == [_png_bytes(), _png_bytes()]
-    assert win.landed is None        # and it was never told the run had landed
-
-
-def test_a_blank_before_the_result_still_lands_the_view(live_preview, tmp_path):
-    # The finish path blanks the pane (that same rebuild) a beat before the saved
-    # file reaches it, so the hand-off can't key off the pane still looking live.
-    live_preview.show_frame(_png_bytes())
-    win = live_preview.open_fullscreen()
-
-    live_preview.clear()
-    png = _make_png(tmp_path / "done.png")
-    live_preview.show_image(png, "done")
-
-    assert win.landed == ((png, "image"), "done")
-
-
-def test_the_finished_file_takes_over_from_the_frames(live_preview, tmp_path):
-    live_preview.show_frame(_png_bytes())
-    win = live_preview.open_fullscreen()
-
-    png = _make_png(tmp_path / "done.png")
-    live_preview.show_image(png, "done")  # the run landed: the pane swaps to the saved file
-
-    assert win.landed == ((png, "image"), "done")  # named, so its slideshow knows whose it is
-
-
-def test_a_dismissed_view_stops_being_fed(live_preview, tmp_path):
-    live_preview.show_frame(_png_bytes())
-    win = live_preview.open_fullscreen()
-    win.close()
-
-    live_preview.show_frame(_png_bytes())
-    live_preview.show_image(_make_png(tmp_path / "done.png"))
-
-    assert win.frames == [_png_bytes()]  # only the frame it was opened with
-    assert win.landed is None
-
-
-def test_a_landed_view_is_not_hijacked_by_the_next_run(live_preview, tmp_path):
-    live_preview.show_frame(_png_bytes())
-    win = live_preview.open_fullscreen()
-    live_preview.show_image(_make_png(tmp_path / "done.png"))  # this run landed
-
-    live_preview.show_frame(_png_bytes())  # a later run starts streaming
-
-    assert win.frames == [_png_bytes()]  # the view still shows what it landed on
+    assert win is not None and win.media is None
 
 
 def _slideshow_on_a_sessions_funestra(tmp_path):
@@ -548,7 +466,7 @@ def test_a_pane_whose_picture_went_to_a_sessions_funestra_goes_on_taking_runs_an
         make_preview, tmp_path):
     slideshow = _slideshow_on_a_sessions_funestra(tmp_path)
     preview = make_preview()
-    preview.set_fullscreen_factory(lambda media, frame, generation: slideshow)
+    preview.set_fullscreen_factory(lambda media, generation: slideshow)
     preview.show_image(_make_png(tmp_path / "a.png"))
     assert preview.open_fullscreen() is slideshow
     handed_over = slideshow.channel.command_file.read_text(encoding="utf-8")
@@ -1210,7 +1128,7 @@ def test_showing_an_image_puts_down_all_the_pane_was_holding(make_preview, tmp_p
     assert w._notice.isHidden()             # the notice about the last picture
     assert w._actions_id is None            # and its corners
     assert w._media == (path, "image")
-    assert (w._live, w._live_frame) == (False, None)
+    assert w._live is False
     assert w._movie is None                 # the animation it replaced
     assert w._generation is None            # the generation of the one it replaced
 
@@ -1225,7 +1143,7 @@ def test_showing_a_video_puts_down_all_the_pane_was_holding(make_preview, tmp_pa
     assert w._notice.isHidden()
     assert w._actions_id is None
     assert w._media == (path, "video")
-    assert (w._live, w._live_frame) == (False, None)
+    assert w._live is False
     assert w._movie is None
     assert w._generation is None            # the generation of the one it replaced
 
@@ -1241,7 +1159,7 @@ def test_showing_a_live_frame_puts_down_all_the_pane_was_holding(make_preview,
     assert w._notice.isHidden()
     assert w._actions_id is None
     assert w._media is None                 # a frame is no file to open fullscreen
-    assert (w._live, w._live_frame) == (True, data)
+    assert w._live is True
     assert w._movie is None
     assert w._generation is None            # nor a saved generation to drag out
 
@@ -1256,7 +1174,7 @@ def test_showing_a_combination_puts_down_all_the_pane_was_holding(make_preview,
     assert w._notice.isHidden()
     assert w._actions_id is None
     assert w._media is None
-    assert (w._live, w._live_frame) == (False, None)
+    assert w._live is False
     assert w._movie is None
     assert w._generation is None
 
@@ -1271,7 +1189,7 @@ def test_showing_a_message_puts_down_all_the_pane_was_holding(make_preview,
     assert w._notice.isHidden()
     assert w._actions_id is None
     assert w._media is None
-    assert (w._live, w._live_frame) == (False, None)
+    assert w._live is False
     assert w._movie is None
     assert w._generation is None
 
@@ -1284,7 +1202,7 @@ def test_a_message_marked_live_leaves_the_pane_following_the_run(make_preview,
 
     w.show_message("Generating…", live=True)
 
-    assert (w._live, w._live_frame) == (True, None)
+    assert w._live is True
 
 
 def test_frames_of_the_picture_itself_keep_the_notice_they_are_about(make_preview,
@@ -1318,7 +1236,7 @@ def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,
     assert w._notice.isHidden()
     assert w._actions_id is None            # a wall of pictures is not a row
     assert w._media is None
-    assert (w._live, w._live_frame) == (False, None)
+    assert w._live is False
     assert w._movie is None
     assert w._generation is None
 

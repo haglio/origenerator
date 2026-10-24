@@ -363,7 +363,7 @@ class SlideshowDirector:
                 "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
                                 favorite_ids=self._favorite_prompt_ids())}
 
-    def open_on_preview(self, media, frame, generation):
+    def open_on_preview(self, media, generation):
         """A double-click on a tab's preview: open the folder of the generation
         it shows as a slideshow standing on that generation.
 
@@ -371,8 +371,8 @@ class SlideshowDirector:
         the order Latest plays.
 
         ``media`` is the file the pane is showing, or ``None`` while a generation
-        is still running under it — in which case the slideshow opens over ``frame``,
-        that run's latest, and goes on following it until it lands.
+        is still running under it — in which case the slideshow opens on that run
+        and goes on following it until it lands.
         """
         listed = self._folder_rows()
         folder_items = None
@@ -386,8 +386,7 @@ class SlideshowDirector:
             if start is None:
                 items, start = [(media[0], media[1], generation, None)], 0
                 rows = [row for row in [self._host.row_for(generation)] if row is not None]
-        return self.open(items, rows=rows, start=start, frame=frame,
-                         shuffle=in_order,
+        return self.open(items, rows=rows, start=start, shuffle=in_order,
                          folder_items=folder_items,
                          hud=HudFacts(
                              order_label=LATEST_LABEL,
@@ -430,14 +429,13 @@ class SlideshowDirector:
         # the run it is opened over, else the one its set's own shape belongs on.
         # Standalone it names nothing but the panel's own verbs, since the monitor is
         # the whole screen.
-        run = (self._run_being_made_at(location)
-               if self._fun_time is not None and not items else None)
+        run = self._run_being_made_at(location) if not items else None
         where = side or (row_orientation(run) if run is not None
                          else region_for_items(items or folder_items or []))
         # And what that side IS: one of the session's Funestras, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None
-        follows_a_run = channel is not None and not items
+        follows_a_run = not items
         if follows_a_run and not folder_items and run is None:
             return None
         if (channel is not None and where not in self._regions_wanted
@@ -448,7 +446,7 @@ class SlideshowDirector:
             ask_for_the_funestra(self._session_channel, where)
             return None
         if follows_a_run:
-            items, kwargs["start"] = folder_items, None
+            items, kwargs["start"] = folder_items or [], None
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
@@ -464,8 +462,7 @@ class SlideshowDirector:
                                             hud=hud, levels=levels, **kwargs)
         else:
             slideshow = self._open_a_window(items, where, actions=actions, hud=hud,
-                                       levels=levels,
-                                       folder_items=folder_items, **kwargs)
+                                            levels=levels, **kwargs)
         self._slideshow = slideshow
         self._picked_as_the_slideshow_up_opened = tuple(self._host.selected_prompt_ids())
         already_live = any(live is slideshow for live, _where in self._live_slideshows)
@@ -568,7 +565,6 @@ class SlideshowDirector:
                             levels, **kwargs):
         """A slideshow on one of the session's Funestras: the set goes to the Funestra
         and the panel this app publishes goes with it — no window of ours."""
-        kwargs.pop("frame", None)
         occupant = self.region_slideshow(side)
         if occupant is not None:
             occupant.play(items, hud=hud, **kwargs)
@@ -586,8 +582,7 @@ class SlideshowDirector:
             slideshow.set_paused(True)
         return slideshow
 
-    def _open_a_window(self, items, side: str, *, actions, hud, levels,
-                       folder_items=None, **kwargs):
+    def _open_a_window(self, items, side: str, *, actions, hud, levels, **kwargs):
         """A slideshow in a window of this app's: over the whole monitor standalone,
         or over one of the session's regions.
 
@@ -597,29 +592,26 @@ class SlideshowDirector:
         (:meth:`_hand_to_the_funestra`).  Inside a session the regions do their
         own replacing (:meth:`_present_surface`).
         """
-        view = self._window_up() if self._fun_time is None else None
+        up = self._window_up() if self._fun_time is None else None
+        view = up.shown if up is not None else None
         if self._fun_time is None:
             self._standalone_side = side
         built = view is None
         if built:
-            view = SlideshowView(items, actions=actions,
+            view = SlideshowView(items, side=side, actions=actions,
                                  pace=self._pace, motion=self._motion, hud=hud,
                                  **self._the_sound_standing_on_its_own(), **kwargs)
         else:
-            view.play(items, actions=actions, hud=hud, **kwargs)
-        if folder_items and view.is_live():
-            # Watching something render is no reason to lose the folder it is
-            # being made in: the first arrow leaves the live frames for it.
-            view.set_playlist(folder_items, 0)
+            view.slideshow.play(items, actions=actions, hud=hud, **kwargs)
         # Shift+Left/Right gets its own axis, so a level can be compared against
         # the one below it at full size rather than in a thumbnail.
-        view.set_levels(levels)
+        view.slideshow.set_levels(levels)
         if built:
             self._present_surface(view, side)
             view.set_queue(*self._host.queue_now())
         elif view.isMinimized():
             view.showFullScreen()
-        return view
+        return view.slideshow
 
     def items_of(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
@@ -805,12 +797,12 @@ class SlideshowDirector:
         # window over the topmost Funestras it shares the region with.
         view.raise_()
         view.activateWindow()
-        self._region_slideshows[side] = view
+        self._region_slideshows[side] = view.slideshow
         # A slideshow opened while the hosting session is frozen opens frozen: the
         # room's OmniPause holds everything, this surface included, from its
         # first frame — not from whenever the flag next changes.
         if self._room_paused:
-            view.set_paused(True)
+            view.slideshow.set_paused(True)
         self._wear_the_hud(view, side)
 
     def hud_place(self, side: str) -> tuple[HudCorner, bool]:
@@ -840,8 +832,8 @@ class SlideshowDirector:
 
     def _tell_the_slideshow_wearing_it(self, side: str) -> None:
         for surface in self.surfaces():
-            if getattr(surface, "hud_side", "") == side:
-                surface.set_hud_place(*self.hud_place(side))
+            if getattr(surface.shown, "hud_side", "") == side:
+                surface.shown.set_hud_place(*self.hud_place(side))
 
     def _wear_the_hud(self, view, side: str) -> None:
         """Put the Funestras' own HUD on *view* — the same panel, rendered by the
@@ -913,9 +905,7 @@ class SlideshowDirector:
 
     def _place_left(self) -> SlideshowState:
         up = _still_up(self._slideshow)
-        if up is not None and not up.is_live():
-            return self._where_it_stands(up)
-        return self._slideshow_state
+        return self._where_it_stands(up) if up is not None else self._slideshow_state
 
     def _place_coming_back_to(self, location, items) -> SlideshowState | None:
         place = self._place_left()
@@ -949,15 +939,11 @@ class SlideshowDirector:
                                                     HudCorner.UPPER_LEFT)
                 self._hud_minimized[side] = place.get("minimized") is True
 
-    def _slideshow_to_hold(self):
-        slideshow = self._slideshow
-        return None if slideshow is None or slideshow.is_live() else slideshow
-
     def shows_a_slideshow(self) -> bool:
-        return self._slideshow_to_hold() is not None
+        return self._slideshow is not None
 
     def held_slideshow(self) -> HeldSlideshow | None:
-        slideshow = self._slideshow_to_hold()
+        slideshow = self._slideshow
         if slideshow is None:
             return None
         return HeldSlideshow(items=tuple(slideshow.whole_set()),
@@ -975,13 +961,6 @@ class SlideshowDirector:
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,
                          hud=HudFacts(order_label=held.order_label,
                                       favorite_ids=self._favorite_prompt_ids()))
-
-    def close_live(self):
-        """Dismiss a slideshow that was watching a generation which ended with
-        nothing to show — left up, it would sit on a stale partial frame forever."""
-        slideshow = self._slideshow
-        if slideshow is not None and slideshow.is_live():
-            slideshow.close()
 
     def close_the_slideshows(self) -> None:
         """Give every slideshow back -- the session leaving origenerator mode, or
@@ -1214,7 +1193,7 @@ class SlideshowDirector:
         which reads to a slideshow still holding the frames as a run that stopped."""
         if row is None:
             return
-        for slideshow, _location in self._slideshows_open_to_runs():
+        for slideshow, _location in self._live_slideshows:
             if slideshow.holds(row["prompt_id"]):
                 self._hand_the_file_to(slideshow, row)
 
@@ -1237,13 +1216,9 @@ class SlideshowDirector:
         asked again on its next frame, since the folder lists a new run a poll
         after it starts.
         """
-        for slideshow, location in self._slideshows_open_to_runs():
+        for slideshow, location in self._live_slideshows:
             if slideshow.holds(prompt_id) or self._would_play(prompt_id, location):
                 slideshow.note_generating(prompt_id, frame)
-
-    def _slideshows_open_to_runs(self) -> list[tuple]:
-        return [(slideshow, location) for slideshow, location in self._live_slideshows
-                if not slideshow.is_live()]
 
     def _would_play(self, prompt_id: str, location=None) -> bool:
         """Whether a slideshow opened at *location* would be playing a generation
@@ -1304,7 +1279,7 @@ class SlideshowDirector:
         and a run that was cancelled or failed sends nothing ever again, leaving
         the half-rendered frame it got to in the pass forever.
         """
-        for slideshow, location in self._slideshows_open_to_runs():
+        for slideshow, location in self._live_slideshows:
             self._offer_the_frames(slideshow, location, items)
             slideshow.note_in_flight({item.key for item in items})
 
@@ -1355,7 +1330,7 @@ class SlideshowDirector:
         its foot — the same line as the window's lower strip, saying the same
         thing."""
         if self._slideshow is not None:
-            self._slideshow.set_queue(items, foreign_total)
+            self._slideshow.shown.set_queue(items, foreign_total)
 
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
         """Put a spoken line in the slideshow's own corner, if a slideshow is up."""
@@ -1510,10 +1485,10 @@ class SlideshowDirector:
         slideshow = self._slideshow
         kind = NOTICE
         if command is AppCommand.BACK:
-            slideshow.step(-1)
+            slideshow.slideshow_step(-1)
             said = "🎤 back"
         elif command is AppCommand.FORWARD:
-            slideshow.step(1)
+            slideshow.slideshow_step(1)
             said = "🎤 next"
         elif command is AppCommand.CULL:
             slideshow.cull()

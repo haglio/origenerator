@@ -72,7 +72,7 @@ class SlideshowSet:
     """Everything a slideshow has been handed, the pass dealt from what the
     switches keep of it, and the map around the slide on screen."""
 
-    def __init__(self, items, *, image_dwell_ms: int, actions: SlideshowActions,
+    def __init__(self, items, *, actions: SlideshowActions,
                  shuffle=None, start=None, hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None) -> None:
         # Kept so a re-dealt pass is laid out the way this slideshow's was: a
@@ -103,37 +103,21 @@ class SlideshowSet:
         # it; the pass is dealt from what survives them (:meth:`set_filters`).
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
-        self.playlist = self._deal(items, image_dwell_ms=image_dwell_ms, start=start)
+        self.playlist = self._deal(items, start=start)
         if start is None:
             self.lead_with_what_is_being_made()
         self._a_row_played_whole_is_its_loop()
 
     # --- the pass ----------------------------------------------------------
 
-    def _deal(self, items, *, image_dwell_ms: int, start=None,
-              shuffle=None) -> SlideshowPlaylist:
+    def _deal(self, items, *, start=None, shuffle=None) -> SlideshowPlaylist:
         shuffle = self._shuffle if shuffle is None else shuffle
         if shuffle is not None:
-            return SlideshowPlaylist(items, image_dwell_ms=image_dwell_ms,
-                                     shuffle=shuffle, start=start)
-        shuffled = SlideshowPlaylist(items, image_dwell_ms=image_dwell_ms)
+            return SlideshowPlaylist(items, shuffle=shuffle, start=start)
+        shuffled = SlideshowPlaylist(items)
         if start is not None and 0 <= start < len(shuffled):
             shuffled.lead_with(start)
         return shuffled
-
-    def reseed(self, items, *, start=None, shuffle=None) -> None:
-        """Play *items* instead, from the top or from *start*.
-
-        The set itself is replaced, not narrowed: what a slideshow armed with its
-        folder once the gallery has worked out which folder that is takes, and
-        what a slideshow following one generation takes when the file lands.
-        """
-        self.all_items = [Slide.of(item) for item in items]
-        self.loop = None
-        self._library_moved()
-        self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
-                                   start=start, shuffle=shuffle)
-        self._a_row_played_whole_is_its_loop()
 
     def _a_row_played_whole_is_its_loop(self) -> None:
         current = self.playlist.current()
@@ -153,8 +137,8 @@ class SlideshowSet:
 
     def replace_items(self, items, *, keep_slide: bool, shuffle=None,
                       new_set: bool = False) -> bool:
-        """Stand a fresh pass up over *items*, keeping the pace and the pause;
-        say whether the slide on screen survived into it.
+        """Stand a fresh pass up over *items*; say whether the slide on screen
+        survived into it.
 
         *keep_slide* keeps the slide on screen when it is among them: a switch
         is a narrowing of what you are looking through, not a new slideshow, and
@@ -167,10 +151,7 @@ class SlideshowSet:
         keep_id = current.prompt_id if keep_slide and current is not None else None
         start = next((index for index, item in enumerate(items)
                       if keep_id is not None and item.prompt_id == keep_id), None)
-        paused = self.playlist.paused
-        self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
-                                   start=start, shuffle=shuffle)
-        self.playlist.set_paused(paused)
+        self.playlist = self._deal(items, start=start, shuffle=shuffle)
         if new_set:
             self.lead_with_what_is_being_made()
             self._a_row_played_whole_is_its_loop()
@@ -408,16 +389,6 @@ class SlideshowSet:
             return False
         return self.end_loop()
 
-    def step(self, delta: int) -> None:
-        """Walk the pass one either way — the browse, or the loop's own row —
-        except forward out of a loop of one, which ends it first
-        (:meth:`end_a_loop_of_one`) and steps into the browse instead."""
-        if delta < 0:
-            self.playlist.back()
-            return
-        self.end_a_loop_of_one()
-        self.playlist.advance()
-
     def start_loop(self, axis: str, pool=None) -> bool:
         """Play *pool* — *axis*'s row or column around the slide on screen, by
         default — round and round, in its own order, the slide on screen
@@ -610,7 +581,7 @@ class SlideshowSet:
         playlist = self.playlist
         index = next((index for index, item in enumerate(playlist.items)
                       if self.being_made(item)), None)
-        if index is None or playlist.locked or playlist.order[playlist.index] == index:
+        if index is None or playlist.order[playlist.index] == index:
             return False
         playlist.lead_with(index)
         return True

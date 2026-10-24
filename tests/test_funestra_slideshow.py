@@ -1,4 +1,4 @@
-"""A slideshow handed to one of a session's Funestras rather than drawn in a window.
+"""The slideshow, driving a Funestra over its channel.
 
 What this covers is the channel between the two: the list the Funestra is handed,
 the verbs a press sends it, the panel this app publishes for it, and the slide
@@ -6,6 +6,7 @@ on screen — which is the Funestra's answer, read back, not this app's own.
 """
 from __future__ import annotations
 
+import ast
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -35,12 +36,9 @@ _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
 FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
-# A window has a picture of its own to put a run's frames on and a panel it
-# wears -- which it is told where to wear; a Funestra has neither, and the
-# session draws its panel wherever its own keys have put it.
-ONLY_A_WINDOW = {"wear_the_hud", "hud_side", "set_hud_place", "set_playlist",
-                 "show_frame", "show_landed", "press", "follow_the_funestra",
-                 "item_label", "refresh_panel"}
+ROOT = Path(__file__).resolve().parent.parent
+DRIVERS = ("origenerator/gui/slideshow_panel.py", "origenerator/fun_time_bridge.py",
+           "origenerator/gui/console.py")
 
 
 def _channel(tmp_path: Path) -> FunestraChannel:
@@ -102,11 +100,60 @@ def _held_open_for(path: Path, seconds: float):
         release.join()
 
 
-def test_a_slideshow_on_a_funestra_answers_whatever_a_window_slideshow_is_asked_but_a_windows_own():
-    asked = {name for name in vars(SlideshowView)
-             if not name.startswith("_") and not name.endswith("Event")}
+def _public(cls) -> set[str]:
+    return {name for name in vars(cls) if not name.startswith("_") and not name.endswith("Event")}
 
-    assert asked - set(dir(FunestraSlideshow)) == ONLY_A_WINDOW
+
+def test_the_window_answers_only_what_a_window_has_and_the_slideshow_in_it_the_rest():
+    assert _public(SlideshowView) & _public(FunestraSlideshow) == set()
+
+
+def _probes_in(relative_path: str) -> list[str]:
+    tree = ast.parse((ROOT / relative_path).read_text(encoding="utf-8"))
+    names = _public(FunestraSlideshow)
+    return [
+        f"{relative_path}:{node.lineno} {node.func.id}(…, {node.args[1].value!r})"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id in ("hasattr", "getattr") and len(node.args) >= 2
+        and isinstance(node.args[1], ast.Constant) and node.args[1].value in names
+    ]
+
+
+@pytest.mark.parametrize("driver", DRIVERS)
+def test_no_driver_asks_the_slideshow_what_it_can_do_by_probing_for_it(driver):
+    assert _probes_in(driver) == []
+
+
+def test_a_locked_slide_is_not_taken_off_the_screen_for_what_is_being_made(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow.note_enhancing({"id-3": "running"})
+
+    slideshow.lead_with_what_is_being_made()
+
+    assert slideshow._set.current_prompt_id() == "id-1"
+
+
+def test_a_request_and_the_lock_each_let_go_only_of_themselves(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+
+    slideshow.pause_for_request(True, "🎤 listening…")
+    slideshow.pause_for_request(False)
+    assert slideshow.locked is True and "LOCK_OFF" not in _sent(slideshow)
+
+    slideshow.pause_for_request(True, "🎤 listening…")
+    slideshow.slideshow_step(1)
+    assert slideshow._funestra_pace() == 0  # a step lets go of the lock, not of the request
+
+
+def test_a_funestra_that_says_nothing_leaves_the_slideshow_as_it_was(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
+    slideshow.channel.status_file.unlink()
+
+    slideshow.tick()
+
+    assert slideshow.locked is True
+    assert _sent(slideshow) == []
 
 
 def test_a_file_the_funestra_would_not_open_is_stepped_past(qtbot, tmp_path):

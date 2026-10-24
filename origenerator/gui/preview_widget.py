@@ -87,7 +87,6 @@ class PreviewWidget(QWidget):
         # from here: later frames, then the finished file. Without it, watching a
         # generation had to wait for it to land.
         self._live = False
-        self._live_frame: bytes | None = None
         self._fullscreen = None  # the slideshow a double-click here opened, kept alive here
         self._open_fullscreen_view = None
         self._generation: str | None = None
@@ -193,7 +192,7 @@ class PreviewWidget(QWidget):
 
     def _take_the_pane(self, media, *, generation: str | None = None,
                        stop_player: bool = True, enhancing: bool = False,
-                       live: bool = False, live_frame: bytes | None = None) -> None:
+                       live: bool = False) -> None:
         """Put down everything the pane is holding, ready for new content.
 
         This is what showing anything means, said once: the movie and the still
@@ -202,8 +201,7 @@ class PreviewWidget(QWidget):
         the notice and the corner controls — both of which are about the picture
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
-        anything that is not a file on disk) and hands a fullscreen view opened
-        over a running generation the file it landed as.
+        anything that is not a file on disk).
 
         The two switches are the deliberate exceptions, one caller each.
         ``stop_player`` — a clip does not stop the player it is about to hand a
@@ -220,9 +218,7 @@ class PreviewWidget(QWidget):
             self.set_notice(None)
             self.set_actions(None)
         self._media, self._generation = media, generation
-        self._end_live(media)
-        if live:
-            self._live, self._live_frame = True, live_frame
+        self._live = live
 
     def show_media(self, path, media_type: str, generation: str | None = None) -> None:
         """Display ``path`` as an image or video per ``media_type``."""
@@ -276,12 +272,9 @@ class PreviewWidget(QWidget):
         pixmap = QPixmap()
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
-        self._take_the_pane(None, enhancing=enhancing, live=True, live_frame=data)
+        self._take_the_pane(None, enhancing=enhancing, live=True)
         self._show_picture(pixmap)
         self._raise_notice()  # a kept notice, back over the frame that just landed
-        win = self._following_fullscreen()
-        if win is not None:
-            win.show_frame(data)  # keep a view watching this generation up to date
 
     def show_combination(self, combination) -> None:
         """Show a combination waiting to be run: the frame on the left, a plus,
@@ -369,33 +362,6 @@ class PreviewWidget(QWidget):
         """A stacked layout raises the widget it switches to above every sibling
         it has, the notice included."""
         self._notice.raise_()
-
-    def _end_live(self, media: tuple | None) -> None:
-        """Stop mirroring a running generation, handing ``media`` — the file it
-        landed as, if any — to a fullscreen slideshow opened over its live frames, so
-        watching a generation fullscreen ends on the finished image rather than the
-        last low-res frame.
-
-        What decides the hand-off is the *view's* own liveness, never this pane's:
-        the pane blanks to its placeholder on every gallery rebuild while a run
-        streams — including the one that lands it, moments before the saved file
-        arrives here — so its own flag is already off by then."""
-        self._live, self._live_frame = False, None
-        if media is None:
-            return
-        win = self._following_fullscreen()
-        if win is not None:
-            win.show_landed(media, self._generation)
-
-    def _following_fullscreen(self):
-        """The fullscreen slideshow this pane opened over a running generation and is
-        still feeding, or ``None``. One that's been dismissed — or that already
-        landed on a file, and so is an ordinary slideshow of it now — follows
-        nothing."""
-        win = self._fullscreen
-        if win is None or not win.is_showing() or not win.is_live():
-            return None
-        return win
 
     def clear(self) -> None:
         self.show_message(_PLACEHOLDER)
@@ -592,9 +558,9 @@ class PreviewWidget(QWidget):
         return label_thumbnail(self._image_label)
 
     def set_fullscreen_factory(self, make) -> None:
-        """Wire what a double-click here opens: ``make(media, frame)`` returns the
-        slideshow it put up -- a slideshow of the folder this pane's generation sits
-        in, which only the gallery knows -- or ``None``."""
+        """Wire what a double-click here opens: ``make(media, generation)`` returns
+        the slideshow it put up -- a slideshow of the folder this pane's generation
+        sits in, which only the gallery knows -- or ``None``."""
         self._open_fullscreen_view = make
 
     def mouseDoubleClickEvent(self, event) -> None:
@@ -605,16 +571,14 @@ class PreviewWidget(QWidget):
         a slideshow of this generation's folder, held on this one.
 
         That's the current file, or — while a generation is running under this pane —
-        its live frames, in a view that goes on following the run from here and swaps
-        to the finished file when it lands. A no-op when nothing has wired
+        the run, which the slideshow follows until it lands. A no-op when nothing has wired
         :meth:`set_fullscreen_factory`, or when there's nothing to watch at all:
         the idle placeholder or a plain message."""
         if self._media is None and not self._live:
             return None
         if self._open_fullscreen_view is None:
             return None
-        self._fullscreen = self._open_fullscreen_view(self._media, self._live_frame,
-                                                      self._generation)
+        self._fullscreen = self._open_fullscreen_view(self._media, self._generation)
         return self._fullscreen
 
     def _stop_playback(self) -> None:

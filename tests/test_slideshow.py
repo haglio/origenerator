@@ -98,46 +98,6 @@ def test_index_tracks_the_current_position():
     assert playlist.index == 2  # wrapped to the last
 
 
-def test_lock_toggles_and_releases():
-    playlist = _playlist()
-    assert not playlist.locked
-    assert playlist.toggle_lock() is True
-    assert playlist.locked
-    assert playlist.toggle_lock() is False
-    playlist.toggle_lock()
-    playlist.unlock()
-    assert not playlist.locked
-
-
-def test_images_dwell_on_a_timer_but_videos_do_not():
-    playlist = _playlist()  # starts on an image
-    assert playlist.dwell_ms() == playlist.image_dwell_ms
-    playlist.advance()  # -> the video
-    assert playlist.dwell_ms() is None  # a video advances when it ends, not on a timer
-
-
-def test_a_locked_or_empty_playlist_has_no_dwell():
-    playlist = _playlist()
-    playlist.toggle_lock()
-    assert playlist.dwell_ms() is None
-    assert SlideshowPlaylist([]).dwell_ms() is None
-
-
-def test_a_pace_of_nought_means_never_move_on():
-    # What a double-clicked picture opens at: the slide holds the screen until an
-    # arrow moves it, rather than advancing the instant the timer is armed with 0.
-    playlist = _playlist(image_dwell_ms=0)
-    assert playlist.dwell_ms() is None
-
-
-def test_turning_the_pace_up_off_nought_starts_it_moving():
-    playlist = _playlist(image_dwell_ms=0)
-    playlist.image_dwell_ms = 3000
-    assert playlist.dwell_ms() == 3000
-
-
-# --- opening on a chosen item -----------------------------------------------
-
 def test_a_pass_can_start_on_a_named_item():
     # A double-clicked picture opens on *that* picture, not on whatever the set
     # happens to lead with.
@@ -174,33 +134,6 @@ def test_in_order_leaves_the_set_exactly_as_handed_over():
     # A folder played from a double-click is the browser's own listing, not a pass.
     playlist = _playlist(shuffle=in_order)
     assert playlist.order == [0, 1, 2]
-
-def test_a_paused_playlist_has_no_dwell_either():
-    # What a spoken request puts on the slideshow while the sentence is being said.
-    playlist = _playlist()
-    playlist.set_paused(True)
-    assert playlist.dwell_ms() is None
-    assert playlist.locked_or_paused()
-
-    playlist.set_paused(False)
-    assert playlist.dwell_ms() == playlist.image_dwell_ms
-
-
-def test_the_pause_and_the_lock_are_independent():
-    # Releasing one must not release the other: a slide the user locked stays
-    # locked when a request ends, and stepping (which drops the lock) must not
-    # quietly resume a slideshow that is still listening.
-    playlist = _playlist()
-    playlist.toggle_lock()
-    playlist.set_paused(True)
-
-    playlist.set_paused(False)
-    assert playlist.locked and playlist.locked_or_paused()
-
-    playlist.set_paused(True)
-    playlist.unlock()
-    assert playlist.paused and playlist.locked_or_paused()
-
 
 def test_remove_current_drops_the_item_and_advances():
     playlist = SlideshowPlaylist(
@@ -309,7 +242,6 @@ def test_an_upgraded_item_takes_the_new_thumbnail_when_one_comes_with_it():
     assert playlist.current()[3] == "a_better_thumb.png"
 
 
-
 # --- picking a closed slideshow's pass back up ------------------------------
 
 def _four(**kw):
@@ -364,18 +296,6 @@ def test_a_set_with_no_ids_names_no_pass():
     playlist = _playlist()
     assert playlist.order_ids() == [None, None, None]
     assert playlist.resume([None], None) is False
-
-
-def test_the_lock_can_be_put_back_where_a_closed_slideshow_left_it():
-    playlist = _four()
-    playlist.set_locked(True)
-    assert playlist.locked
-    assert playlist.dwell_ms() is None     # locked, so nothing moves it on
-    playlist.set_locked(False)
-    assert not playlist.locked
-
-
-# --- a generation still being made, as a slide of its own frames -------------
 
 
 def test_a_run_being_made_joins_as_a_slide_of_its_frames():
@@ -518,12 +438,12 @@ def test_an_item_that_was_never_live_is_not_replaced_as_one():
     assert playlist.current() == Slide("a.png", "image", "id-a")
 
 
-def test_a_live_slide_dwells_like_an_image():
-    # It is a picture, however far along: only a video advances on its own end.
-    playlist = SlideshowPlaylist([(b"frame-1", LIVE, "id-new")], shuffle=in_order)
-    assert playlist.dwell_ms() == 4000
-    assert not playlist.current_is_video()
+def test_a_slide_of_a_runs_frames_is_live_and_a_file_is_not():
+    playlist = SlideshowPlaylist([(b"frame-1", LIVE, "id-new"), ("a.png", "image", "id-a")],
+                                 shuffle=in_order)
     assert playlist.current_is_live()
+    playlist.advance()
+    assert not playlist.current_is_live()
 
 
 def test_a_run_that_stopped_being_made_is_dropped_wherever_it_sits():

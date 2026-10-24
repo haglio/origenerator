@@ -20,6 +20,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
 from shared_ui.icons import marked_text
+from shared_ui.notice_shape import NOTICE_TOP_MARGIN
 
 from origenerator.funscript import (
     synthesize_actions,
@@ -27,7 +28,6 @@ from origenerator.funscript import (
 )
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.notice_overlay import ERROR, FAVORITE, HEARD_MARK, WARNING, NoticeOverlay
-from origenerator.gui.notice_overlay import TOP_MARGIN as NOTICE_TOP_MARGIN
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView

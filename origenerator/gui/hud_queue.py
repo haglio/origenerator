@@ -37,7 +37,7 @@ from shared_ui.palette import (
     TEXT_MUTED,
     TEXT_PRIMARY,
 )
-from shared_ui.spacing import BUTTON_RADIUS_HUD
+from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_RADIUS_HUD, GAP_MEDIUM, HAIRLINE
 from shared_ui.type_scale import SIZE_TINY
 
 from origenerator.gui.inflight import (
@@ -81,14 +81,14 @@ ROWS = 4
 # click that opens the job's folder.
 _DRAG_START = 6
 
-_WORD_PAD = 6           # the room a word button keeps either side of its word
-_GAP = 6                # between the things on one row
+_WORD_PAD = BUTTON_PAD_H_TIGHT           # the room a word button keeps either side of its word
+_GAP = GAP_MEDIUM                # between the things on one row
 _ROW_H = CTRL_BTN + BLOCK_GAP
 _BAR_H = CTRL_BTN
-_BAR_PAD = 6            # the clock's breathing room at each end of its bar
+_BAR_PAD = GAP_MEDIUM            # the clock's breathing room at each end of its bar
 _BAND_H = 4             # the pass band along the bar's foot
 _CELL = CTRL_BTN        # one picture cell on a row
-_CELL_GAP = 1
+_CELL_GAP = HAIRLINE
 _BLOCK_W = FOLDER_CELLS * _CELL + (FOLDER_CELLS - 1) * _CELL_GAP
 # The head's picture: a map cell's own height, so the run being made is worth
 # looking at beside the bar measuring it and the two blocks read at one scale.

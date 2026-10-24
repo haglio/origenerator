@@ -6,12 +6,13 @@ from PyQt6.QtCore import QEvent, QRectF, Qt
 from PyQt6.QtGui import QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BG_TERTIARY, BLUE, hovered
+from shared_ui.spacing import BUTTON_RADIUS
 
 LIT = "dragActive"
 AIMED = "dropTarget"
 GROUNDS = {LIT: BG_TERTIARY, AIMED: hovered(BG_TERTIARY)}
 EDGE = BLUE
-RADIUS = 4
+RADIUS = BUTTON_RADIUS
 
 
 def ground_rules() -> str:

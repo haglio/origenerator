@@ -15,12 +15,12 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import marked_text
 from shared_ui.palette import TEXT_MUTED, as_hex
-from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL
+from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL, HAIRLINE
 
 from origenerator.gui import grid_card, palette
 
 # The collage's four cells fill the card's picture area, a gap apart.
-_CELL_GAP = 2
+_CELL_GAP = HAIRLINE
 _CELL_SIZE = ((grid_card.PICTURE_SIZE[0] - _CELL_GAP) // 2,
               (grid_card.PICTURE_SIZE[1] - _CELL_GAP) // 2)
 _INNER_WIDTH = grid_card.CARD_WIDTH - 2 * grid_card.CARD_MARGIN

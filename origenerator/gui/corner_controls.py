@@ -24,7 +24,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QObject, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import QPushButton, QWidget
 from shared_ui.palette import BLACK, as_rgba
-from shared_ui.spacing import BUTTON_RADIUS
+from shared_ui.spacing import BUTTON_GAP, BUTTON_RADIUS, BUTTON_SIZE, GAP_SMALL
 
 from origenerator import gallery
 from origenerator.gui import icons
@@ -37,12 +37,12 @@ ENHANCE = "enhance"
 # re-rolls, a review collection's keep/reject) already use, shared so the star can sit
 # in a row with them along the top of a tile and read as one bank rather than as
 # a stray chip beside two matching ones.
-CORNER_SIZE = 28
-CORNER_GAP = 4
+CORNER_SIZE = BUTTON_SIZE
+CORNER_GAP = BUTTON_GAP
 # How far a control sits inside the picture it is laid over. Small: the corners
 # of the picture are what these mark, and a control floated well inside one
 # reads as sitting ON the image rather than as belonging to its corner.
-CORNER_INSET = 2
+CORNER_INSET = GAP_SMALL
 _GLYPH_SIZE = CORNER_SIZE - 8
 
 # The translucent chip every hover control sits on, so white or colored line art

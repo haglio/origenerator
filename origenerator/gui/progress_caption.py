@@ -39,8 +39,9 @@ from PyQt6.QtWidgets import (
     QStylePainter,
 )
 from shared_ui.colors import BG_PRIMARY, BLUE_LIGHT
+from shared_ui.spacing import BUTTON_RADIUS, GAP_DIALOG, GAP_MEDIUM
 
-_TEXT_MARGIN = 6  # breathing room at each end before the caption has to move
+_TEXT_MARGIN = GAP_MEDIUM  # breathing room at each end before the caption has to move
 # The scroll a caption too wide for its bar is read by: how often it steps, how
 # far each step takes it, the blank between the end of one lap and the start of
 # the next, and how long it waits at the top of a lap before setting off. The
@@ -48,10 +49,10 @@ _TEXT_MARGIN = 6  # breathing room at each end before the caption has to move
 # rather than something that only ever goes past.
 _SCROLL_MS = 33
 _SCROLL_PX = 1.0
-_SCROLL_GAP = 48
+_SCROLL_GAP = GAP_DIALOG
 _HOLD_TICKS = 45
 _BAND_PX = 6      # the current pass's band, along the foot of a 26px bar
-_BAND_RADIUS = 3  # the stylesheet's corner radius, so the band's ends match
+_BAND_RADIUS = BUTTON_RADIUS  # the stylesheet's corner radius, so the band's ends match
 # The band reads as a groove cut into the bar rather than a second fill of the
 # same blue: darkest ground beneath, the palette's lighter blue over it. Same
 # blue family as the run's own fill, a shade up, so which is which is legible

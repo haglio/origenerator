@@ -33,14 +33,14 @@ from __future__ import annotations
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon
 from PyQt6.QtWidgets import QAbstractItemView, QMenu, QStyledItemDelegate, QTreeWidget
-from shared_ui.spacing import BUTTON_ICON
+from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
 from origenerator.gui import drop_style, icons
 from origenerator.gui.drags import carry, under_way
 from origenerator.gui.generation_drag import dragged_generation
 
 _ICON = BUTTON_ICON   # on-screen size of each action
-_PAD = 4     # gap between the label and the icons, and between the two icons
+_PAD = GAP_SMALL     # gap between the label and the icons, and between the two icons
 _DOT = 6     # diameter of the lately-worked-in mark
 
 # A row carrying its own key here collects dropped folders (Favorites, a custom

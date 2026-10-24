@@ -10,9 +10,10 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtGui import QColor, QPixmap, QTextDocumentFragment
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
 from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.icons import inline_mark
 
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
@@ -2149,10 +2150,13 @@ def _video_of_a_workflow_the_app_lacks(db, workflow_name, prompt_id="old1"):
 def _note(panel):
     """What the settings say under the Workflow dropdown, or "" when they say nothing."""
     note = panel._cannot_remake_note
-    return "" if note.isHidden() else note.text().replace("\u200b", "")
+    if note.isHidden():
+        return ""
+    words = QTextDocumentFragment.fromHtml(note.text()).toPlainText()
+    return words.replace("\u200b", "").lstrip("\ufffc\xa0 ")
 
 
-_RETIRED_NOTE = ("⚠ This was made with WAN 2.1 I2V (Motion-Tracked), which has been "
+_RETIRED_NOTE = ("This was made with WAN 2.1 I2V (Motion-Tracked), which has been "
                  "retired, so no new ones can be made. Select a workflow above to make something new.")
 
 
@@ -2164,6 +2168,16 @@ def test_a_video_from_a_retired_workflow_says_so_under_the_workflow_dropdown(sav
 
     assert _note(panel) == _RETIRED_NOTE
     assert _notice(panel) == ""
+
+
+def test_the_note_under_the_workflow_dropdown_leads_with_the_familys_warning(saved_panel):
+    panel, db = saved_panel
+    video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
+
+    panel.show_saved_generation(video, [])
+
+    note = panel._cannot_remake_note
+    assert note.text().startswith(inline_mark("warning", color=AMBER, size=note.fontMetrics().height()))
 
 
 def test_a_retired_workflows_video_leaves_no_settings_from_before(saved_panel):
@@ -2195,7 +2209,7 @@ def test_an_import_from_a_workflow_the_app_never_had_says_so(saved_panel):
 
     panel.show_saved_generation(video, [])
 
-    assert _note(panel) == ("⚠ This was made with a workflow Origenerator doesn't have, so no new "
+    assert _note(panel) == ("This was made with a workflow Origenerator doesn't have, so no new "
                             "ones can be made. Select a workflow above to make something new.")
 
 
@@ -2255,7 +2269,7 @@ def test_a_picture_made_with_a_model_that_is_not_installed_says_so_under_the_wor
 
     panel.show_saved_generation(picture, [picture])
 
-    assert _note(panel) == ("⚠ This was made with retired_checkpoint, which isn't installed "
+    assert _note(panel) == ("This was made with retired_checkpoint, which isn't installed "
                             "anymore, so no new ones can be made with it until an installed one "
                             "is picked in its place.")
     assert _notice(panel) == ""
@@ -2365,7 +2379,7 @@ def test_a_video_made_with_two_models_that_are_not_installed_names_both(installe
 
     panel.show_saved_generation(video, [])
 
-    assert _note(panel) == ("⚠ This was made with retired_high and retired_low, which aren't "
+    assert _note(panel) == ("This was made with retired_high and retired_low, which aren't "
                             "installed anymore, so no new ones can be made with them until "
                             "installed ones are picked in their place.")
 

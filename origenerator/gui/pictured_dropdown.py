@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED
 from shared_ui.icons import draw_glyph_filling
+from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.looping_preview import looping_movie
@@ -32,8 +33,8 @@ from origenerator.gui.queue_thumbs import fitted_picture
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
 
 PICTURES_ROLE = Qt.ItemDataRole.UserRole
-_ROW_INSET = QMargins(3, 3, 3, 3)
-_BRACE_GAP = 4
+_ROW_INSET = QMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, GAP_SMALL)
+_BRACE_GAP = GAP_SMALL
 _BRACE_WIDTH = 10
 _BRACE_COLUMN = 2 * _BRACE_GAP + _BRACE_WIDTH
 _LIT = (QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_MouseOver

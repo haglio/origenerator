@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.spacing import MARGIN_DIALOG
+from shared_ui.spacing import GAP_DIALOG, GAP_MEDIUM, MARGIN_DIALOG
 
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
@@ -76,7 +76,7 @@ from origenerator.orientation import base_of, filter_rows, key_holds, split_key
 REROLL_VIDEO = "video"
 REROLL_IMAGE = "image"
 
-_TILE_SPACING = 8   # gap between tiles in the flowing main view
+_TILE_SPACING = GAP_MEDIUM   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
 # The Recents collection lists every generation ever made, so it draws a page of tiles
 # at a time and adds the next once scrolled within _RECENTS_REACH pixels of the
@@ -87,7 +87,7 @@ _NEIGHBORS_PAST_A_REVEAL = 12  # three rows at the pane's widest, six at its nar
 _RECENTS_REACH = 600
 # Room above a search section's heading, so the headings read as the dividers
 # they are rather than as captions stuck to the row of tiles above them.
-_SECTION_SPACING = 14
+_SECTION_SPACING = GAP_DIALOG
 # The most result tiles a search draws at once. A one-word query over a full
 # library can match most of it, and building thousands of thumbnails in a single
 # pass locks the window for seconds — the Recents collection pages for the same

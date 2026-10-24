@@ -48,6 +48,7 @@ from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import QLabel
 from shared_ui.colors import BORDER_SUBTLE
+from shared_ui.spacing import HAIRLINE
 
 from origenerator.gui.combination import Combination, draw_plus, draw_recipe, plus_width
 from origenerator.gui.grayscale import grayscale_pixmap
@@ -55,7 +56,7 @@ from origenerator.gui.thumbnail_box import centered_in_square, fitted_in
 
 # The gap between cells, in pixels. One is enough to read as separate pictures;
 # two at this size is a visible stripe between them.
-_GAP = 1
+_GAP = HAIRLINE
 # How many cells the block has, and so how many of a folder's thumbnails are
 # worth carrying. Four is what fits across without the line's text starting
 # halfway along the strip.

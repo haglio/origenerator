@@ -3,19 +3,18 @@ from __future__ import annotations
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPalette, QPixmap
 from PyQt6.QtWidgets import QProxyStyle, QStyle, QTabBar, QToolButton
+from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator.gallery.item_numbers import widest_item_name
 from origenerator.gui.icons import tab_close_icon
 
 # How much wider than its mark a tab's close button sits, so the ✕ isn't flush
 # against the tab's right edge.
-_CLOSE_PADDING = 12
+_CLOSE_PADDING = GAP_MEDIUM
 
-# How far a tab's marks sit from its edges, and from the label between them.
-# Taken from where the ✕ already lands: half of _CLOSE_PADDING, the pixel Qt
-# insets the button by, and the margin inside the style's own ✕ glyph come to
-# this — so a tab's two ends are one spacing rather than two.
-EDGE = 10
+# How far a tab's marks sit from its edges, and from the label between them:
+# the same at both ends, so a tab's two ends are one spacing rather than two.
+EDGE = MARGIN_STANDARD
 
 # The square a tab's mark is drawn in, whatever shape the picture is, and the
 # canvas it rides on. The canvas is wider than the square by the gap the label

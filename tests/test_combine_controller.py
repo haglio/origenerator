@@ -84,8 +84,8 @@ class FakePanel:
     def set_available_categories(self, categories):
         self.available = list(categories)
 
-    def setVisible(self, visible):
-        self.visible = visible
+    def hide(self):
+        self.visible = False
 
     def note_folder_generating(self, generating):
         self.folder_generating = generating

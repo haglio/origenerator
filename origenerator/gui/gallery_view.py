@@ -732,7 +732,8 @@ class GalleryView(QWidget):
         # section comes and goes with it, rather than standing empty while the
         # mic is shut.
         listening_column.addWidget(self._voice.status)
-        listening.setVisible(not self._voice.status.isHidden())
+        if self._voice.status.isHidden():
+            listening.hide()
         self._voice.caption_shown.connect(listening.setVisible)
         finding, toc_column = pane()
         # The gallery search: its field over the tree, its results bar over the
@@ -743,7 +744,8 @@ class GalleryView(QWidget):
         combining_column.addWidget(self._combine.panel)
         # With no ComfyUI there is nothing to combine, and the panel says so by
         # hiding; its section says the same rather than framing the gap.
-        combining.setVisible(not self._combine.panel.isHidden())
+        if self._combine.panel.isHidden():
+            combining.hide()
         sections = [listening, finding, combining]
         self._motion_panel = None
         self._motion_pane = None

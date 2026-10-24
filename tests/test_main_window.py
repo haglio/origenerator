@@ -13,9 +13,9 @@ from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
 from funestra.robot_hand import WaveformShape
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.preview import Preview
 
 from origenerator import app_link, gallery, notice_toast, recipe_match, ui_scale
@@ -64,6 +64,30 @@ def test_a_preview_on_its_own_is_titled_for_the_feature_it_demos(qtbot, tmp_path
     win = _window(qtbot, tmp_path, preview=Preview(feature="the new seed row"))
 
     assert win.windowTitle() == "Origenerator \u2014 preview of the new seed row"
+
+
+class _ShownAsWindows(QObject):
+    def __init__(self):
+        super().__init__()
+        self.names = []
+
+    def eventFilter(self, watched, event):  # noqa: N802 -- Qt's name
+        if (event.type() == QEvent.Type.Show and isinstance(watched, QWidget)
+                and watched.isWindow()):
+            self.names.append(type(watched).__name__)
+        return False
+
+
+def test_no_part_of_the_window_flashes_up_as_a_window_of_its_own_while_it_is_built(
+        qtbot, tmp_path):
+    shown = _ShownAsWindows()
+    QApplication.instance().installEventFilter(shown)
+    try:
+        _window(qtbot, tmp_path)
+    finally:
+        QApplication.instance().removeEventFilter(shown)
+
+    assert shown.names == []
 
 
 def _quit_shortcut(win):

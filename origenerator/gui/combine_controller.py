@@ -156,7 +156,8 @@ class CombineController(QObject):
         # for the moment one lands rather than only when the lane changes.
         self.panel.image_slot.changed.connect(self.picture_dropped)
         self.panel.video_slot.changed.connect(self.reconcile_generating)
-        self.panel.setVisible(client is not None)
+        if client is None:
+            self.panel.hide()
 
     def _on_animation_settings(self) -> None:
         from origenerator.own_window import show_or_say  # noqa: PLC0415 -- Qt only

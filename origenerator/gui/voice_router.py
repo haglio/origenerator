@@ -22,7 +22,6 @@ part of it, make a Genau flick of it -- stay with the seams that run them.
 from __future__ import annotations
 
 import logging
-from functools import partial
 from typing import Protocol
 
 from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
@@ -30,7 +29,6 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, prompt_edit
 from origenerator.animate_command import AnimateRequest
-from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
@@ -41,17 +39,12 @@ from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
 from origenerator.gallery.collection import (
-    REQUESTS_KEY as _REQUESTS_KEY,
-)
-from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
-from origenerator.prompt_edit import apply_request
-from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
 )
@@ -107,7 +100,6 @@ _COLLECTIONS = {
     AppCommand.RECENTS: _RECENTS_KEY,
     AppCommand.FAVORITES: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
-    AppCommand.REQUESTS: _REQUESTS_KEY,
     AppCommand.TRASH: _TRASH_KEY,
 }
 
@@ -224,16 +216,9 @@ class VoiceRouter(QObject):
         self.listener.edited.connect(self._on_edited)
         self.listener.error.connect(self._on_error)
         self.listener.request.connect(self.on_spoken_request)
-        # A finished request is worked out on the pool: the prompt may not
-        # contain the words the speaker used ("no earrings" against a prompt
-        # that says "silver ear studs"), and finding out which of its own terms
-        # they meant is a call to the local LLM.
-        self._revision = RevisionWorker(partial(
-            apply_request,
-            match=partial(prompt_edit.smart_match,
-                          base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-                          system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
-        ), parent=self)
+        # A finished request is worked out on the pool, since that can be a call
+        # to the local LLM (prompt_edit.work_out).
+        self._revision = RevisionWorker(prompt_edit.work_out, parent=self)
         self._revision.revised.connect(self._on_revised)
         # The folder whose loop an open mic is steering the prompt of, or None
         # with no loop to steer.
@@ -462,27 +447,26 @@ class VoiceRouter(QObject):
         app's own vocabulary: the session cannot know which collections this tree
         has or which detail parts have detectors installed.
 
-        The order is this app's own mic's (``VoiceSteering._meaning``).  A
-        whole-utterance word is that command first — "landscape enhanced only"
-        turns the slideshow's switch, and left to the looser picture matcher it
-        would read as "enhance" with a word after it — so long as no request
-        is being said.  Then the request, which has first refusal over the
-        rest: "Request … over" runs to as many utterances as the speaker takes
-        breaths, so a matcher that only ever saw one at a time could not hear a
-        sentence said in three; while one is open the dictation swallows what
-        it hears, which is what keeps the words of a request from also matching
-        a command.  The side is split off for the dictation — it rides every
-        utterance the session posts, and fed in it would become the first word
-        of the request instead of the region the request is about.
+        The order is this app's own mic's (``VoiceSteering._meaning``).  The
+        request first, which has first refusal: "Request … over" runs to as many
+        utterances as the speaker takes breaths, so a matcher that only ever saw
+        one at a time could not hear a sentence said in three; while one is open
+        the dictation swallows what it hears, which is what keeps the words of a
+        request from also matching a command.  Then a whole-utterance word —
+        "landscape enhanced only" turns the slideshow's switch, and left to the
+        looser picture matcher it would read as "enhance" with a word after it.
+        The side is split off for the dictation — it rides every utterance the
+        session posts, and fed in it would become the first word of the request
+        instead of the region the request is about.
         """
-        bare = self.listener.bare_command(text)
-        if bare is not None:
-            self.on_command(bare)
-            return True
         side, rest = split_side(text)
         spoken = self.listener.push_dictation(rest)
         if spoken is not None:
             self.on_spoken_request(spoken, side=side)
+            return True
+        bare = self.listener.bare_command(text)
+        if bare is not None:
+            self.on_command(bare)
             return True
         matched = match_voice_command(text)
         if matched is None:
@@ -730,11 +714,12 @@ class VoiceRouter(QObject):
         """Pause (or release) the slideshow while the sentence is being said, and say
         so — in the slideshow's own corner when one is up, since that is where the
         speaker is looking, and in this pane's voice caption otherwise."""
-        note = f"🎤 Request: {spoken.text}…" if spoken.listening else ""
+        note = (f"🎤 Request: {spoken.text}… — say “over” to submit"
+                if spoken.listening else "")
         if slideshow is not None:
             slideshow.pause_for_request(spoken.listening, note)
         elif spoken.listening:
-            self._show(note or "🎤 Request…", transient=False)
+            self._show(note, transient=False)
 
     def _answer_request(self, slideshow, message: str, spoken, *,
                         working: bool = False, kind: str = NOTICE) -> None:

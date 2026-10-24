@@ -581,11 +581,27 @@ def test_a_spoken_fix_accumulates_onto_a_level_recorded_the_old_way(
         "teeth": 0.45, "eyes": DEFAULT_FIX_DENOISE}
 
 
-def test_a_repeated_spoken_fix_reads_as_the_duplicate_it_is(tmp_path, monkeypatch):
+def test_asking_again_for_a_part_already_fixed_fixes_it_harder(tmp_path, monkeypatch):
+    # "Request, fix hands, over" over mangled fingers that a fix has already
+    # been at: the same fix again would draw the same hands.
+    _install_detectors(monkeypatch, "hand_yolov8s.pt")
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    _add_and_fold(db, "e1", "image_enhance_00001_.png",
+                  enhance_detail_fixes={"hands": 0.45})
+
+    params = fix_params_for(db.get_generation("src"), _spoken("fix hands"))
+
+    assert params["enhance_detail_fixes"] == {"hands": 0.55}
+
+
+def test_a_part_fixed_as_hard_as_a_fix_goes_reads_as_the_duplicate_it_is(
+        tmp_path, monkeypatch):
     _install_detectors(monkeypatch, "eyes_yolov8n.pt", "teeth_yolov8n.pt")
     db = Database(tmp_path / "t.db")
     _seed_source(db)
     first = fix_params_for(db.get_generation("src"), _spoken("fix teeth"))
+    first["enhance_detail_fixes"] = {"teeth": 1.0}
     _add_and_fold(db, "e1", "image_enhance_00001_.png",
                   **{k: first[k] for k in gallery.ENHANCE_SETTING_KEYS})
     row = db.get_generation("src")

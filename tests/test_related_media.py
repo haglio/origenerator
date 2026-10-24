@@ -16,6 +16,7 @@ from PyQt6.QtGui import QColor, QMouseEvent, QPixmap
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.related_media import RelatedMedia
+from origenerator.gui.source_tile import SourceTile
 
 
 def _image_row(prompt_id="img1", filename="sdxl_t2i_img1.png"):
@@ -57,16 +58,34 @@ def _combined_row(prompt_id="made1", recipe_video_id="vid0"):
     return {**_video_row(prompt_id), "recipe_video_id": recipe_video_id}
 
 
+def _request(prompt_id, source_prompt_id, asked=""):
+    """The record a request leaves, with its words, or a folder's Modify, with none."""
+    return {"prompt_id": prompt_id, "source_prompt_id": source_prompt_id,
+            "heard": "", "asked": asked}
+
+
+def _links(section):
+    """(heading, prompt id) for each link a section shows, in its order."""
+    return [(tile._heading.text(), tile._prompt_id)
+            for tile in section.findChildren(SourceTile) if not tile.isHidden()]
+
+
 @pytest.fixture
 def make_related(qtbot):
-    """Build a RelatedMedia over a given set of the library's videos, counting
-    every time it asks for them."""
-    def _make(*videos):
-        by_id = {video["prompt_id"]: video for video in videos}
+    """Build a RelatedMedia over a given set of the library's videos, any other
+    rows and the request records it can look up, counting every time it asks for
+    the videos."""
+    def _make(*videos, rows=(), requests=()):
+        by_id = {row["prompt_id"]: row for row in (*videos, *rows)}
+        by_made = {record["prompt_id"]: record for record in requests}
         widget = RelatedMedia(video_rows=lambda: (asks.append(True), videos)[1],
                               row_of=lambda prompt_id: (looked_up.append(prompt_id),
                                                         by_id.get(prompt_id))[1],
-                              name_of={"img1": "3FA9C0D2 004", "vid0": "77B2E1A0 012"}.get)
+                              name_of={"img1": "3FA9C0D2 004", "vid0": "77B2E1A0 012"}.get,
+                              request_of=by_made.get,
+                              requests_about=lambda prompt_id: [
+                                  record for record in requests
+                                  if record["source_prompt_id"] == prompt_id])
         asks: list = []
         looked_up: list = []
         widget.asks = asks
@@ -158,16 +177,119 @@ def test_a_hidden_starting_frame_lists_only_the_videos_made_from_it_here(make_re
         "vid2"]
 
 
-def test_a_requested_row_points_at_the_item_it_was_asked_about(related):
-    # A requested image has no start frame and a requested video's is the one it
-    # already had, so the same tile carries the same relation under its own word.
+def test_a_requested_row_points_at_the_item_it_was_asked_about_under_requests(make_related):
+    related = make_related(rows=[_image_row()],
+                           requests=[_request("img2", "img1", asked="two dogs")])
+
+    related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [])
+
+    section = related._requests_section
+    assert section._title == "Requests"
+    assert not section.isHidden()
+    assert _links(section) == [("Requested from", "img1")]
+    assert related._source_section.isHidden()
+
+
+def test_a_picture_points_at_what_was_requested_of_it_under_requests(make_related):
+    related = make_related(
+        rows=[_image_row("img2", "sdxl_t2i_img2.png"), _image_row("img3", "sdxl_t2i_img3.png")],
+        requests=[_request("img3", "img1", asked="two cats"),
+                  _request("img2", "img1", asked="two dogs")])
+
+    related.show_row(_image_row(), [])
+
+    assert not related._requests_section.isHidden()
+    assert _links(related._requests_section) == [
+        ("Requested into", "img3"), ("Requested into", "img2")]
+
+
+def test_a_picture_points_at_what_a_folders_modify_made_of_it_under_modifications(make_related):
+    related = make_related(rows=[_image_row("img2", "sdxl_t2i_img2.png")],
+                           requests=[_request("img2", "img1")])
+
+    related.show_row(_image_row(), [])
+
+    assert _links(related._modifications_section) == [("Modified into", "img2")]
+    assert related._requests_section.isHidden()
+
+
+def test_a_request_whose_picture_is_gone_leaves_no_link_to_it(make_related):
+    related = make_related(requests=[_request("gone", "img1", asked="two dogs")])
+
+    related.show_row(_image_row(), [])
+
+    assert related._requests_section.isHidden()
+
+
+def _left_press():
+    return QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress, QPoint(1, 1).toPointF(),
+        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier)
+
+
+def test_a_click_on_a_requested_into_link_names_that_picture(make_related):
+    related = make_related(rows=[_image_row("img2", "sdxl_t2i_img2.png")],
+                           requests=[_request("img2", "img1", asked="two dogs")])
+    related.show_row(_image_row(), [])
+    named = []
+    related.link_clicked.connect(named.append)
+
+    tile, = related._requests_section.findChildren(SourceTile)
+    tile.mousePressEvent(_left_press())
+
+    assert named == ["img2"]
+
+
+def test_a_click_that_shows_the_picture_it_names_outlives_its_own_link(make_related, qtbot):
+    # Following the link shows that picture, whose links replace the one clicked
+    # while its click is still being handled.
+    made = _image_row("img2", "sdxl_t2i_img2.png")
+    related = make_related(rows=[_image_row(), made],
+                           requests=[_request("img2", "img1", asked="two dogs")])
+    related.show_row(_image_row(), [])
+    related.link_clicked.connect(lambda _prompt_id: related.show_row(made, []))
+
+    tile, = related._requests_section.findChildren(SourceTile)
+    tile.mousePressEvent(_left_press())
+    qtbot.wait(1)
+
+    assert _links(related._requests_section) == [("Requested from", "img1")]
+
+
+def test_a_picture_a_folders_modify_made_points_at_the_one_it_was_modified_from(make_related):
+    related = make_related(rows=[_image_row()], requests=[_request("img2", "img1")])
+
+    related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [])
+
+    section = related._modifications_section
+    assert section._title == "Modifications"
+    assert not section.isHidden()
+    assert _links(section) == [("Modified from", "img1")]
+    assert related._source_section.isHidden()
+    assert related._requests_section.isHidden()
+
+
+def test_the_animations_sit_in_a_section_headed_animations(make_related):
     image = _image_row()
+    related = make_related(_video_row())
 
-    related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [],
-                     request={"source_row": image})
+    related.show_row(image, [image])
 
-    assert not related._source_tile.isHidden()
-    assert related._source_tile._prompt_id == "img1"
+    section = related._animations_section
+    assert section._title == "Animations"
+    assert not section.isHidden()
+    assert section.isAncestorOf(related._animated_strip)
+
+
+def test_a_row_animated_into_nothing_shows_no_animations_section(make_related):
+    image = _image_row()
+    related = make_related(_video_row())
+    related.show_row(image, [image])
+
+    related.show_row(_video_row(), [image])
+
+    assert related._animations_section.isHidden()
 
 
 def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
@@ -175,7 +297,7 @@ def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
     related = make_related(_video_row())
     related.show_row(image, [image])
     named = []
-    related.animated_activated.connect(named.append)
+    related.link_clicked.connect(named.append)
 
     tile, = related._animated_strip.findChildren(_VideoTile)
     tile.mousePressEvent(QMouseEvent(
@@ -226,7 +348,7 @@ def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
     image = _image_row()
     related.show_row(_video_row(), [image])
     named = []
-    related.source_activated.connect(named.append)
+    related.link_clicked.connect(named.append)
 
     related._source_tile.activated.emit("img1")
 
@@ -290,7 +412,7 @@ def test_a_click_on_the_source_video_names_that_video(make_related):
     related = make_related(_video_row("vid0"))
     related.show_row(_combined_row(), [_image_row()])
     named = []
-    related.source_activated.connect(named.append)
+    related.link_clicked.connect(named.append)
 
     related._source_video_tile.activated.emit("vid0")
 
@@ -315,7 +437,7 @@ def test_clearing_puts_both_links_down(make_related):
     related.clear()
 
     assert related._source_tile.isHidden()
-    assert related._animated_strip.isHidden()
+    assert related._animations_section.isHidden()
 
 
 def test_clearing_puts_the_source_video_down_too(make_related):

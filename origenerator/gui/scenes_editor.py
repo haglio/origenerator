@@ -54,6 +54,7 @@ from origenerator.workflows.base import (
     chained_frames,
     chained_to,
     scene_prompts,
+    scene_text,
     story_of,
 )
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
@@ -257,6 +258,12 @@ class ScenesEditor(QWidget):
         """Every field on every card, in reading order: what a find searches."""
         return [field for scene in self._scenes for field in scene.fields.values()]
 
+    def fields_beside_their_texts(self, stored: dict) -> list[tuple[PromptField, str | None]]:
+        return [(field, scene_text(scene_prompts(stored[key]), index)
+                 if isinstance(stored.get(key), str) else None)
+                for index, scene in enumerate(self._scenes)
+                for key, field in scene.fields.items()]
+
     def story(self, key: str) -> str:
         """The one prompt that stores every scene's ``key`` text."""
         return story_of([diff_text.live_text(field) for field in self.fields(key)])
@@ -272,7 +279,7 @@ class ScenesEditor(QWidget):
             self._resize_to(len(texts))
         for index, field in enumerate(self.fields(key)):
             diff_text.forget(field)
-            field.setPlainText(texts[min(index, len(texts) - 1)])
+            field.setPlainText(scene_text(texts, index))
 
     def scene_frames(self) -> list[int]:
         return [scene.frames() for scene in self._scenes]

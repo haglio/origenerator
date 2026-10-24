@@ -72,7 +72,7 @@ FRAME_TOOLTIP = "Open the folder this run will land in"
 # How many rows the block draws at once. The strip opens about this tall in the
 # main window, and a line longer than this is scrolled through rather than drawn
 # whole: a panel that grew a row per queued job would run off the screen the
-# first time a folder-wide request filled it.
+# first time a folder's Modify (all seeds) filled it.
 ROWS = 4
 # How far a press on a row has to travel before it is a drag rather than the
 # click that opens the job's folder.

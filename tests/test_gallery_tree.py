@@ -146,16 +146,16 @@ def _children(item):
     return [item.child(i) for i in range(item.childCount())]
 
 
-_COLLECTIONS = ["Latest", "Favorites", "Experiments", "Requests", "Trash"]
+_COLLECTIONS = ["Latest", "Favorites", "Experiments", "Trash"]
 
 
 def _leads_with_the_collections(folder) -> bool:
-    *collections, _first_folder = _children(folder)[:6]
+    *collections, _first_folder = _children(folder)[:len(_COLLECTIONS) + 1]
     return ([row.text(0) for row in collections] == _COLLECTIONS
             and all(row.data(0, GROUP_ROLE) is None for row in collections))
 
 
-def test_all_leads_with_its_five_collections_then_images_then_videos(qtbot):
+def test_all_leads_with_its_collections_then_images_then_videos(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
 
@@ -163,14 +163,14 @@ def test_all_leads_with_its_five_collections_then_images_then_videos(qtbot):
     assert _leads_with_the_collections(all_row)
 
 
-def test_images_and_videos_each_lead_with_five_collections_then_their_workflows(qtbot):
+def test_images_and_videos_each_lead_with_their_collections_then_their_workflows(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
 
-    for kind in _children(all_row)[5:]:
+    for kind in _children(all_row)[len(_COLLECTIONS):]:
         assert _leads_with_the_collections(kind)
         assert [isinstance(row.data(0, GROUP_ROLE), gallery.WorkflowGroup)
-                for row in _children(kind)[5:]] == [True]
+                for row in _children(kind)[len(_COLLECTIONS):]] == [True]
 
 
 def test_images_wear_the_photo_and_videos_the_play_mark_and_say_which_they_are(qtbot):

@@ -157,11 +157,11 @@ def test_the_model_is_offered_one_video_per_recipe_and_its_pick_is_used(monkeypa
     ]
     seen = {}
 
-    def fake_post(base_url, model, messages, timeout):
+    def fake_post(messages, **_asked):
         seen["user"] = messages[1]["content"]
         return {"choices": [{"message": {"content": '{"choice": 0}'}}]}
 
-    monkeypatch.setattr(recipe_match, "_post_chat", fake_post)
+    monkeypatch.setattr(recipe_match.local_llm, "ask_json", fake_post)
     got = recipe_match.smart_recipe(
         "alpha", "a prominent anchor in the frame", rows,
         base_url="x", model="m", system_prompt="S", timeout=1,
@@ -173,7 +173,7 @@ def test_the_model_is_offered_one_video_per_recipe_and_its_pick_is_used(monkeypa
 
 
 def test_an_act_no_video_does_is_not_put_to_the_model_at_all(monkeypatch):
-    monkeypatch.setattr(recipe_match, "_post_chat",
+    monkeypatch.setattr(recipe_match.local_llm, "ask_json",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call the model")))
     rows = [_scene_video("h1", "beta", "her hand on it", "2026-01-01", lora_high="Z")]
     assert recipe_match.smart_recipe("alpha", "x", rows,
@@ -185,7 +185,7 @@ def test_smart_recipe_ignores_rows_lacking_a_start_scene(monkeypatch):
         _scene_video("x1", "alpha", "", "2026-01-01", lora_high="X"),          # no scene to match on
         _scene_video("y1", "alpha", "anchor in frame", "2026-01-02", lora_high="Y"),
     ]
-    monkeypatch.setattr(recipe_match, "_post_chat",
+    monkeypatch.setattr(recipe_match.local_llm, "ask_json",
                         lambda *a, **k: {"choices": [{"message": {"content": '{"choice": 0}'}}]})
     assert recipe_match.smart_recipe("alpha", "x", rows,
                                      base_url="x", model="m", system_prompt="S", timeout=1) == "y1"
@@ -193,7 +193,7 @@ def test_smart_recipe_ignores_rows_lacking_a_start_scene(monkeypatch):
 
 def test_a_model_that_finds_no_fit_leaves_the_recipe_unchosen(monkeypatch):
     rows = [_scene_video("x1", "alpha", "she kneels", "2026-01-01", lora_high="X")]
-    monkeypatch.setattr(recipe_match, "_post_chat",
+    monkeypatch.setattr(recipe_match.local_llm, "ask_json",
                         lambda *a, **k: {"choices": [{"message": {"content": '{"choice": -1}'}}]})
     assert recipe_match.smart_recipe("alpha", "x", rows,
                                      base_url="x", model="m", system_prompt="S", timeout=1) is None
@@ -201,7 +201,7 @@ def test_a_model_that_finds_no_fit_leaves_the_recipe_unchosen(monkeypatch):
 
 def test_a_model_that_fails_leaves_the_recipe_unchosen(monkeypatch):
     rows = [_scene_video("x1", "alpha", "she kneels", "2026-01-01", lora_high="X")]
-    monkeypatch.setattr(recipe_match, "_post_chat",
+    monkeypatch.setattr(recipe_match.local_llm, "ask_json",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("model down")))
     assert recipe_match.smart_recipe("alpha", "x", rows,
                                      base_url="x", model="m", system_prompt="S", timeout=1) is None
@@ -249,11 +249,11 @@ def test_the_two_curated_tables_are_independent():
 def test_smart_recipe_offers_the_genau_lane_onlyloops(monkeypatch):
     seen = {}
 
-    def _fake_post(base_url, model, messages, timeout):
+    def _fake_post(messages, **_asked):
         seen["user"] = messages[1]["content"]
         return {"choices": [{"message": {"content": '{"choice": 0}'}}]}
 
-    monkeypatch.setattr(recipe_match, "_post_chat", _fake_post)
+    monkeypatch.setattr(recipe_match.local_llm, "ask_json", _fake_post)
     rows = [
         _scene_video("v1", "beta", "a long-form scene", "2026-01-01", lora_high="Z"),
         {**_loop("l1", "beta", "2026-01-02", lora_high="Z"), "start_scene": "a looping scene"},

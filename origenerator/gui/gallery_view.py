@@ -55,9 +55,6 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
-from origenerator.gallery.collection import (
-    REQUESTS_KEY as _REQUESTS_KEY,
-)
 from origenerator.gallery.sides import (
     LANDSCAPE as _LANDSCAPE,
 )
@@ -98,8 +95,8 @@ from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.deferred import defer
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import EnhanceController, Offer
+from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.folder_path_header import FolderPathHeader
-from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.folder_tree import offer_collapse_and_expand
 from origenerator.gui.gallery_navigation import NavigationController
@@ -903,7 +900,7 @@ class GalleryView(QWidget):
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder and navigate there, its generating tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
-        self._info_tabs.changes_requested.connect(self._on_changes_requested)
+        self._info_tabs.modify_requested.connect(self._on_modify_requested)
         # ...and its right-click's "Go to folder" goes the other way: from a
         # tab's settings across to the pictures they have made.
         self._info_tabs.folder_requested.connect(self._go_to_folder)
@@ -972,8 +969,7 @@ class GalleryView(QWidget):
         its preview opens the folder under it as a slideshow standing on it,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
-        panel.source_activated.connect(self.follow_link)
-        panel.animated_activated.connect(self.follow_link)
+        panel.link_clicked.connect(self.follow_link)
         panel.go_to_folder_requested.connect(self.follow_link)
         panel.set_folder_check(self._can_open_containing_folder)
         # Its preview's corners and its right-click are the same acts, on the same
@@ -1451,12 +1447,18 @@ class GalleryView(QWidget):
             # from, whether they were launched as opened or edited first — that
             # mark is the only thing telling the queue what act a video is of.
             category, video_id, intent = launching.recipe_source()
+            asked = launching.asked()
             for prompt_id in launched:
                 if category or video_id:
                     self._db.set_recipe_source(prompt_id, category=category,
                                                video_prompt_id=video_id)
                 if video_id and not category:
                     self._db.record_combine_video_use(intent, video_id, prompt_id)
+                if asked is not None:
+                    self._db.record_request(
+                        prompt_id=prompt_id, heard="",
+                        new_positive=batch[0].get("positive_prompt", ""),
+                        new_negative=batch[0].get("negative_prompt", ""), **asked)
                 launching.note_launched(prompt_id)
         self._stand_on_the_run_in(key, rebuild=True)
 
@@ -1695,7 +1697,6 @@ class GalleryView(QWidget):
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_folders))
         requests = self._db.list_requests()
-        requested = gallery.requested_generations(requests, rows)  # the Requests collection
         bumped = gallery.enhancement_recency(rows)
         self._browser.set_model(
             gallery.recent_generations(rows, bumped=bumped),
@@ -1703,7 +1704,6 @@ class GalleryView(QWidget):
             rows,
             unreviewed,
             held,
-            requested,
             image_index=start_frames,
         )
         self._tree_view.populate(
@@ -2082,8 +2082,6 @@ class GalleryView(QWidget):
         self._avg_label.setText("")
         self._clear_metadata()
         self._browser.show_collection(collection.key, side)
-        if collection.which == _REQUESTS_KEY:
-            self._re_aim()
         self._navigation.record()
 
     def _collection_steps(self, collection: FolderCollection, item) -> list[PathStep]:
@@ -2425,8 +2423,8 @@ class GalleryView(QWidget):
         plus.add_requested.connect(lambda: self._start_reroll(group.key))
         return LeadTiles(
             reroll=plus,
-            request=(self._folder_request_tile_for(group)
-                     if self._can_request_changes(group) else None),
+            modify=(self._folder_modify_tile_for(group)
+                     if self._can_modify(group) else None),
             generating=None if job is None else self._generating_tile_for(group.key, job))
 
     def _forget_generating_tile(self):
@@ -2476,19 +2474,19 @@ class GalleryView(QWidget):
             self._auto.stop(key)
             self._cancel_reroll(key)
 
-    # --- the folder-wide request: same seeds, changed words ----------------
+    # --- Modify (all seeds): same seeds, changed words --------------------
 
-    def _can_request_changes(self, group) -> bool:
+    def _can_modify(self, group) -> bool:
         """True when this folder can be run again with its prompt rewritten.
 
         Everything a re-roll needs, plus at least one image to rewrite: the
         request reproduces the folder seed for seed, so a folder holding nothing
         finished yet has nothing to reproduce.
         """
-        return self._can_reroll(group) and bool(self._folder_request_rows(group))
+        return self._can_reroll(group) and bool(self._folder_modify_rows(group))
 
     @staticmethod
-    def _folder_request_rows(group) -> list[dict]:
+    def _folder_modify_rows(group) -> list[dict]:
         """The generations a request over ``group`` would re-run: the ones that
         actually produced an image.
 
@@ -2501,21 +2499,21 @@ class GalleryView(QWidget):
             return []
         return [row for row in group.rows if gallery.produced_output(row)]
 
-    def _folder_request_tile_for(self, group) -> FolderRequestTile:
-        tile = FolderRequestTile()
-        tile.clicked.connect(lambda g=group: self._open_folder_request(g))
+    def _folder_modify_tile_for(self, group) -> FolderModifyTile:
+        tile = FolderModifyTile()
+        tile.clicked.connect(lambda g=group: self._open_folder_modify(g))
         return tile
 
-    def _open_folder_request(self, group):
+    def _open_folder_modify(self, group):
         """Open this folder's prompt in a tab, ready to be rewritten.
 
         Nothing is launched: the card is the start of an edit made by hand, which
         is the whole reason it is typed rather than spoken. The tab carries the
         folder's settings, its prompts marked against themselves, and its images
         tiled in the preview — see
-        :meth:`GenerateConfigPanel.open_folder_request`.
+        :meth:`GenerateConfigPanel.open_folder_modify`.
         """
-        rows = self._folder_request_rows(group)
+        rows = self._folder_modify_rows(group)
         workflow = WORKFLOW_REGISTRY.get(rows[0].get("workflow_name") or "") if rows else None
         if workflow is None or self._client is None:
             return
@@ -2523,11 +2521,11 @@ class GalleryView(QWidget):
         # in the hover is the number of images and not of readable files.
         pictures = [row.get("thumbnail_path") for row in rows]
         self._clear_reroll_selection()  # the tab is about the folder, not a live run
-        self._info_tabs.open_folder_request(group.key, group.label, workflow.name,
+        self._info_tabs.open_folder_modify(group.key, group.label, workflow.name,
                                       filled_params(rows[0], workflow), pictures)
 
-    def _on_changes_requested(self, folder_key: str, workflow_name: str, params: dict):
-        """A request tab's Generate: run every image of ``folder_key`` again with
+    def _on_modify_requested(self, folder_key: str, workflow_name: str, params: dict):
+        """A Modify tab's Generate: run every image of ``folder_key`` again with
         its own seed and the rewritten prompt, and land on the folder they make.
 
         One job per image, all of them into the one new settings folder — the
@@ -2546,7 +2544,7 @@ class GalleryView(QWidget):
         # the key a tab carries is the folder's own, with no side on it.
         item = self._tree_item_for(folder_key)
         group = item.data(0, _GROUP_ROLE) if item is not None else None
-        rows = self._folder_request_rows(group) if group is not None else []
+        rows = self._folder_modify_rows(group) if group is not None else []
         if self._client is None or wf is None or not rows:
             return
         params = {**wf.default_params(), **params}  # form values win over defaults
@@ -2586,9 +2584,9 @@ class GalleryView(QWidget):
         """A file showing what ``job`` came from, for the tile to stand blurred
         under the wait until the run streams a frame of its own.
 
-        The image it was requested of first — a folder-wide request queues a run
-        per image and none of them animates anything, so what it was asked about
-        is the only picture it has — then the start frame an i2v or an enhance is
+        The image it was requested or modified from first — a folder's Modify
+        queues a run per image and none of them animates anything, so what it
+        rewrites is the only picture it has — then the start frame an i2v or an enhance is
         built on. ``None`` for a run that came from nothing, which keeps the
         plain plate: a queued image looks like every other queued image because
         it genuinely is.
@@ -3045,13 +3043,14 @@ class GalleryView(QWidget):
                     revision.action, job.prompt_id)
         self._db.record_request(
             prompt_id=job.prompt_id, source_prompt_id=row["prompt_id"],
-            heard=spoken.heard, term=revision.term, polarity=revision.polarity,
+            heard=spoken.heard, asked=spoken.text, term=revision.term,
+            polarity=revision.polarity,
             action=revision.action, old_positive=revision.old_positive,
             old_negative=revision.old_negative, new_positive=revision.positive,
             new_negative=revision.negative,
         )
-        self.refresh()  # the collection shows the request the moment it is spoken
-        return f"🎤 {revision.describe()} — generating", NOTICE
+        self.refresh()  # the queue marks the job as a request the moment it is spoken
+        return "🎤 Request submitted", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
         """Bin some of one image's versions, from the info pane's version list.
@@ -4201,22 +4200,6 @@ class GalleryView(QWidget):
             return row
         return next((r for r in self._held_rows if r["prompt_id"] == prompt_id), None)
 
-    def _request_for(self, prompt_id: str) -> dict | None:
-        """The spoken request that made this generation, with the item it was
-        asked about resolved onto it — or ``None`` when nothing asked for it.
-
-        Read off the collection's own listing rather than the database, so the tab's
-        link and the collection's card can never disagree about what a request was
-        about.
-        """
-        return next((item for item in self._request_items()
-                     if item["prompt_id"] == prompt_id), None)
-
-    def _request_items(self) -> list[dict]:
-        """Every spoken request paired with what it made, newest first."""
-        return gallery.requested_generations(self._db.list_requests(),
-                                             self._db.list_generations())
-
     def _on_thumbnail_clicked(self, prompt_id: str):
         """A generation was picked, wherever it was picked — in a folder, on a
         collection, among a search's hits, through a followed link, by a step Back.
@@ -4247,8 +4230,7 @@ class GalleryView(QWidget):
         if not row:
             return False
         self._select_saved_generation(row)
-        self._info_tabs.load_selection(row, self._image_rows,
-                                       request=self._request_for(prompt_id))
+        self._info_tabs.load_selection(row, self._image_rows)
         return True
 
     def _select_saved_generation(self, row: dict):

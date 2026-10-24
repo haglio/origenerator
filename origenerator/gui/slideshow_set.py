@@ -486,9 +486,10 @@ class SlideshowSet:
                     None)
 
     def slide_for_path(self, path) -> Slide | None:
-        """The slide playing *path* — in the pass, or drawn on the map — or ``None``."""
+        """The slide playing *path* — in the pass, on the map or anywhere in the set."""
         shown = self.map()
-        cells = (*self.playlist.items, *(shown.cells() if shown is not None else ()))
+        cells = (*self.playlist.items, *(shown.cells() if shown is not None else ()),
+                 *self.all_items)
         return next((slide for slide in cells if str(slide.path) == str(path)), None)
 
     def jump_to(self, slide: Slide) -> bool:

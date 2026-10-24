@@ -1,19 +1,15 @@
 """What else in the library a shown generation is tied to.
 
-The links under a config tab's settings form: a section headed Source holding
-the item this row was built from and, beside it, the video whose settings
-Combine ran on it, then the videos an image was animated into. A video has a
-Source and no animations, an image the other way round.
+The links under a config tab's settings form, a section per relation: Source,
+the item this row was built from and the video whose settings Combine ran on
+it; Requests and Modifications, both ways; and Animations, the videos an image
+was animated into.
 
-"Built from" is one slot answering three relations, because they are one
-question: a video's start frame, the item a spoken request revised, and — for the
-single cycle the Genau lane cuts out of a clip — the clip it was cut out of.
-
-Fed one row at a time and nothing else: the panel that owns it reads the library
-and hands over the rows this needs, so this touches no database and can be stood
-up on its own. It is deliberately not the whole of what a tab says about the row
-on display: the File/Created block is the rest, and it sits ABOVE the form,
-where what the settings made is named before the settings themselves.
+Fed one row at a time, asking the library only through the calls it is handed,
+so it can be stood up on its own. It is deliberately not the whole of what a tab
+says about the row on display: the File/Created block is the rest, and it sits
+ABOVE the form, where what the settings made is named before the settings
+themselves.
 """
 
 from __future__ import annotations
@@ -34,9 +30,11 @@ from origenerator.gallery import (
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
+from origenerator.voice.dictation import words_of
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +43,60 @@ logger = logging.getLogger(__name__)
 ANIMATED_STRIP_LIMIT = 8
 
 
+def _is_request(record: dict | None) -> bool:
+    """A request and a folder's Modify leave the same record; a Modify's has no words."""
+    return bool(words_of(record))
+
+
+class _BothWays(CollapsibleSection):
+    """One relation's links both ways: the item the row on display was made
+    from, then each item made from it, newest first -- and no section at all
+    for a row with neither."""
+
+    activated = pyqtSignal(str)
+
+    def __init__(self, title: str, from_heading: str, into_heading: str):
+        super().__init__(title)
+        self._from_heading, self._into_heading = from_heading, into_heading
+        host = QWidget()
+        self._flow = FlowLayout(host, spacing=GAP_MEDIUM)
+        self.content_form().addRow(host)
+        self._tiles: list[SourceTile] = []
+        self.hide()
+
+    def show_links(self, made_from: dict | None, made_into: list[dict],
+                   name_of: Callable[[str], str]) -> None:
+        for tile in self._tiles:
+            self._flow.removeWidget(tile)
+            tile.setParent(None)
+            tile.deleteLater()  # it may be the tile whose click is showing this row
+        links = ([(self._from_heading, made_from)] if made_from is not None else []) + [
+            (self._into_heading, row) for row in made_into]
+        self._tiles = [self._tile(heading, row, name_of) for heading, row in links]
+        for tile in self._tiles:
+            self._flow.addWidget(tile)
+        self.setVisible(bool(self._tiles))
+
+    def _tile(self, heading: str, row: dict, name_of) -> SourceTile:
+        tile = SourceTile()
+        tile.activated.connect(self.activated)
+        tile.show_source(row["prompt_id"], row.get("thumbnail_path"),
+                         name_of(row["prompt_id"]), heading=heading,
+                         media_type=media_type_of_row(row))
+        return tile
+
+
 class RelatedMedia(QWidget):
     """The links under a tab's form, about the row on display."""
 
-    source_activated = pyqtSignal(str)     # a source tile was clicked (prompt_id)
-    animated_activated = pyqtSignal(str)   # an animation tile was clicked (prompt_id)
+    link_clicked = pyqtSignal(str)
 
     def __init__(self, parent=None, *, video_rows=None,
                  row_of: Callable[[str], dict | None],
                  name_of: Callable[[str], str],
-                 previews: MovingPreviews | None = None):
+                 previews: MovingPreviews | None = None,
+                 request_of: Callable[[str], dict | None],
+                 requests_about: Callable[[str], list[dict]]):
         """``video_rows`` answers the library's videos, and is asked only for a
         row that could have animations, or is a cycle cut out of one of them —
         which is why it is a call rather than a list. Reading it is a whole-table
@@ -69,25 +111,36 @@ class RelatedMedia(QWidget):
         self._previews.made.connect(self._show_made_preview)
         self._shown: dict | None = None
         self._in_strip: set[str] = set()
+        self._request_of = request_of
+        self._requests_about = requests_about
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)
         self._source_tile = SourceTile()
         self._source_video_tile = SourceTile()
-        self._source_section = self._section_holding(self._source_tile,
-                                                     self._source_video_tile)
+        self._source_section = self._source_section_of(self._source_tile,
+                                                       self._source_video_tile)
         layout.addWidget(self._source_section)
+        self._requests_section = _BothWays("Requests", "Requested from", "Requested into")
+        self._modifications_section = _BothWays(
+            "Modifications", "Modified from", "Modified into")
+        for section in (self._requests_section, self._modifications_section):
+            section.activated.connect(self.link_clicked)
+            layout.addWidget(section)
         self._animated_strip = AnimatedVideoStrip()
-        self._animated_strip.video_activated.connect(self.animated_activated)
-        layout.addWidget(self._animated_strip)
+        self._animated_strip.video_activated.connect(self.link_clicked)
+        self._animations_section = CollapsibleSection("Animations")
+        self._animations_section.content_form().addRow(self._animated_strip)
+        self._animations_section.hide()
+        layout.addWidget(self._animations_section)
 
-    def _section_holding(self, *tiles: SourceTile) -> CollapsibleSection:
+    def _source_section_of(self, *tiles: SourceTile) -> CollapsibleSection:
         side_by_side = QWidget()
         row = QHBoxLayout(side_by_side)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_MEDIUM)
         for tile in tiles:
-            tile.activated.connect(self.source_activated)
+            tile.activated.connect(self.link_clicked)
             row.addWidget(tile)
         row.addStretch(1)
         section = CollapsibleSection("Source")
@@ -95,28 +148,36 @@ class RelatedMedia(QWidget):
         section.hide()
         return section
 
-    def show_row(self, row: dict, image_rows: list[dict], request=None) -> None:
+    def show_row(self, row: dict, image_rows: list[dict]) -> None:
         """Point at what ``row`` is tied to, and at nothing the last one was.
 
         ``image_rows`` is the pool a video's start frame is matched against —
-        the owner's, because the owner is what holds the library. ``request`` is
-        the spoken request that made this row, when one did.
+        the owner's, because the owner is what holds the library.
         """
-        self._show_source_tile(row, image_rows, request)
+        self._show_source_tile(row, image_rows)
         self._show_source_video_tile(row)
         self._source_section.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
+        self._show_requests_and_modifications(row.get("prompt_id"))
         # Hides itself when empty, which for anything but an animated image it is.
         self._shown = row
         items = self._animated_items(row)
         self._in_strip = {item[0] for item in items}
         self._animated_strip.show_videos(items)
+        self._animations_section.setVisible(not self._animated_strip.isHidden())
 
-    def is_source_folded(self) -> bool:
-        return self._source_section.is_collapsed()
+    def folds(self) -> dict[str, bool]:
+        return {section.title(): section.is_collapsed() for section in self._sections()}
 
-    def set_source_folded(self, folded: bool) -> None:
-        self._source_section.set_collapsed(folded)
+    def set_folds(self, saved: dict) -> None:
+        for section in self._sections():
+            folded = saved.get(section.title())
+            if isinstance(folded, bool):
+                section.set_collapsed(folded)
+
+    def _sections(self) -> tuple[CollapsibleSection, ...]:
+        return (self._source_section, self._requests_section,
+                self._modifications_section, self._animations_section)
 
     def clear(self) -> None:
         """Put every link down — the tab has no generation on display."""
@@ -124,14 +185,16 @@ class RelatedMedia(QWidget):
         self._source_tile.clear()
         self._source_video_tile.clear()
         self._source_section.hide()
+        self._show_requests_and_modifications(None)
         self._animated_strip.hide()
+        self._animations_section.hide()
 
-    def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
+    def _show_source_tile(self, row: dict, image_rows: list[dict]):
         """Reveal the source tile for whatever this row was built from, else hide
         it. The tile shows that item's thumbnail and name and names it on
         click, for the owner to navigate to.
         """
-        source_row, heading, media_type = self._built_from(row, image_rows, request)
+        source_row, heading, media_type = self._built_from(row, image_rows)
         if not source_row:
             self._source_tile.clear()
             return
@@ -140,6 +203,19 @@ class RelatedMedia(QWidget):
             self._name_of(source_row["prompt_id"]),
             heading=heading, media_type=media_type,
         )
+
+    def _show_requests_and_modifications(self, prompt_id: str | None) -> None:
+        request = self._request_of(prompt_id) if prompt_id else None
+        made_from = self._row_of(request["source_prompt_id"]) if request else None
+        made_into = [(record, made)
+                     for record in (self._requests_about(prompt_id) if prompt_id else [])
+                     if (made := self._row_of(record["prompt_id"])) is not None]
+        for section, is_request in ((self._requests_section, True),
+                                    (self._modifications_section, False)):
+            section.show_links(
+                made_from if _is_request(request) == is_request else None,
+                [made for record, made in made_into if _is_request(record) == is_request],
+                self._name_of)
 
     def _show_source_video_tile(self, row: dict) -> None:
         video_id = row.get("recipe_video_id")
@@ -153,19 +229,9 @@ class RelatedMedia(QWidget):
             heading="From source video", media_type=MediaType.VIDEO, gray=True,
         )
 
-    def _built_from(self, row: dict, image_rows: list[dict], request):
-        """``(the row this was built from, what to head the tile, its kind)``.
-
-        Three relations, most particular first. A cycle the Genau lane cut is
-        the only one whose source is a VIDEO, and it has to be asked about first:
-        a cut carries its source clip's params, start frame included, so asking
-        for a start frame would answer with the picture the ORIGINAL was animated
-        from and quietly point the link past the clip the user is looking for. A
-        video that is not a cut links to its start frame; something a spoken
-        request made links to the item the request was asked about — a requested
-        image has no start frame, and a requested video's start frame is the one
-        it already had.
-        """
+    def _built_from(self, row: dict, image_rows: list[dict]):
+        """``(the row this was built from, what to head the tile, its kind)``:
+        the clip a cut was cut out of, else a video's start frame."""
         cut_from = row.get("trimmed_from")
         if cut_from:
             clip = next((v for v in self._video_rows()
@@ -175,9 +241,6 @@ class RelatedMedia(QWidget):
         frame = source_image_of(row, image_rows)
         if frame is not None and was_made_from(row, frame):
             return frame, None, MediaType.IMAGE
-        if request is not None and request.get("source_row"):
-            asked_about = request["source_row"]
-            return asked_about, "Requested from", media_type_of_row(asked_about)
         return None, None, None
 
     def _animated_items(self, row: dict) -> list[tuple]:

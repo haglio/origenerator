@@ -20,6 +20,7 @@ from origenerator.animate_command import AnimateRequest
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import combine_controller as module
+from origenerator.gui import file_pick
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
@@ -28,6 +29,7 @@ from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
+from tests.pictured_rows import square
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
@@ -48,11 +50,15 @@ class FakePanel:
             self.item = prompt_id
             self.changed.emit()
 
-    def __init__(self, image_lent_by, video_lent_by, preview, history):
+    def __init__(self, image_lent_by, video_lent_by, preview, history, *,
+                 named=None, name_of=None, browse_picture=None):
         self.image_lent_by = image_lent_by
         self.video_lent_by = video_lent_by
         self.preview = preview
         self.history = history
+        self.named = named
+        self.name_of = name_of
+        self.browse_picture = browse_picture
         self.image_slot = self._Slot()
         self.video_slot = self._Slot()
         self.intent = recipe_match.VIDEO
@@ -1113,3 +1119,45 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
     controller.panel._defaults_btn.click()
 
     assert made.isVisible()
+
+
+def test_a_picture_browsed_from_outside_runs_the_recipe_on_that_file(combine, tmp_path):
+    photo = square(tmp_path, "red")
+    controller, _host = combine(db=FakeDB([_video("clip")]))
+    controller.panel.image_slot.set_item(photo)
+    controller.panel.video_slot.set_item("clip")
+
+    workflow, params, video_row, image_row = controller._combined_params(photo, "clip")
+
+    assert params["input_image"] == photo
+    assert image_row is None
+    assert controller._accepts_image(photo) is True
+    assert controller._accepts_image(str(tmp_path / "nowhere.png")) is False
+    assert controller._state_of(photo) == ""
+    assert controller._slot_preview(photo) == (photo, None)
+    assert controller.panel.name_of(photo) == "made-red.png"
+
+
+def test_browsing_a_picture_puts_the_file_in_the_image_zone(combine, monkeypatch, tmp_path):
+    photo = square(tmp_path, "blue")
+    monkeypatch.setattr(file_pick.QFileDialog, "getOpenFileName",
+                        lambda *_args: (photo, ""))
+    controller, _host = combine()
+
+    controller.panel.browse_picture()
+
+    assert controller.panel.image_slot.current_id() == photo
+
+
+def test_a_picked_act_runs_its_pinned_recipe_on_a_browsed_picture(combine, tmp_path, monkeypatch):
+    photo = square(tmp_path, "green")
+    monkeypatch.setattr(recipe_match, "curated_recipe",
+                        lambda category, intent: {"workflow": VIDEO_WORKFLOW,
+                                                  "params": {"steps": 7}})
+    controller, _host = combine(db=FakeDB([_video("clip")]))
+
+    built = controller._curated_combination(photo, "gamma")
+
+    assert built is not None
+    workflow, params = built
+    assert (params["input_image"], params["steps"]) == (photo, 7)

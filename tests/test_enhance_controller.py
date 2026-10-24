@@ -841,14 +841,25 @@ def test_train_with_no_photos_makes_the_fixs_folder_and_says_to_put_them_there(
 
     controller.panel.fix_training_requested.emit("hands")
 
-    assert (photos / "Hands").is_dir()
-    assert str(photos / "Hands") in told[0]
+    assert (photos / "hands").is_dir()
+    assert str(photos / "hands") in told[0]
     assert _training_runs == []
 
 
+def test_train_with_photos_in_the_shared_folder_alone_trains_that_fix(enhance, photos):
+    (photos / "shared").mkdir()
+    (photos / "shared" / "everyone.jpg").write_bytes(b"")
+    controller, _host = enhance()
+
+    controller.panel.fix_training_requested.emit("hands")
+
+    (run,) = _training_runs
+    assert run.job["photos"] == [str(photos / "shared" / "everyone.jpg")]
+
+
 def test_train_with_photos_trains_that_fix_for_the_enhancements_model(enhance, photos):
-    (photos / "Hands").mkdir()
-    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    (photos / "hands").mkdir()
+    (photos / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.restore_settings(json.dumps({"params": {"checkpoint": "sample_xl.safetensors"}}))
 
@@ -861,8 +872,8 @@ def test_train_with_photos_trains_that_fix_for_the_enhancements_model(enhance, p
 
 
 def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
-    (photos / "Hands").mkdir()
-    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    (photos / "hands").mkdir()
+    (photos / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.panel.fix_training_requested.emit("hands")
     (run,) = _training_runs
@@ -883,8 +894,8 @@ def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start
         enhance, photos, monkeypatch):
     told = []
     monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: told.append(args))
-    (photos / "Hands").mkdir()
-    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    (photos / "hands").mkdir()
+    (photos / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.panel.fix_training_requested.emit("hands")
     (run,) = _training_runs
@@ -898,8 +909,8 @@ def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start
 
 
 def test_going_to_a_training_from_the_queue_opens_its_fixs_prompts(enhance, photos):
-    (photos / "Hands").mkdir()
-    (photos / "Hands" / "one.jpg").write_bytes(b"")
+    (photos / "hands").mkdir()
+    (photos / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.panel.fix_training_requested.emit("hands")
     (run,) = _training_runs

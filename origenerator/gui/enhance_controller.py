@@ -158,7 +158,7 @@ class EnhanceController:
         part = part_named(name)
         folder = fix_training.photos_folder(part)
         folder.mkdir(parents=True, exist_ok=True)
-        if not fix_training.photo_files(folder):
+        if not fix_training.training_photos(part):
             QMessageBox.information(self.panel, "Train",
                                     f"Put photos of {name} in {folder}, then press Train again.")
             return

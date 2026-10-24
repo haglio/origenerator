@@ -18,26 +18,30 @@ def _picture(size=(64, 48)) -> bytes:
     return written.getvalue()
 
 
-def _job(tmp_path, photos: dict) -> dict:
-    folder = tmp_path / "Hands"
-    folder.mkdir()
-    for name, data in photos.items():
-        (folder / name).write_bytes(data)
+def _job(tmp_path, photos: dict, shared: dict | None = None) -> dict:
+    folders = {tmp_path / "hands": photos, tmp_path / "shared": shared or {}}
+    for folder, these in folders.items():
+        folder.mkdir()
+        for name, data in these.items():
+            (folder / name).write_bytes(data)
     work = tmp_path / "work"
-    return {"part": "hands", "photos": [str(folder / name) for name in photos],
-            "photos_folder": str(folder), "caption": "close-up photo of hands",
+    return {"part": "hands",
+            "photos": [str(folder / name) for folder, these in folders.items() for name in these],
+            "photos_folders": [str(folder) for folder in folders],
+            "caption": "close-up photo of hands",
             "detector": str(tmp_path / "hand_yolov8s.pt"), "work": str(work),
             "status": str(work / "status.json"), "log": str(work / "training.log")}
 
 
-def test_a_photo_that_is_no_picture_stops_the_cropping_and_says_which_to_take_out(tmp_path):
-    job = _job(tmp_path, {"broken.jpg": b"not a picture"})
+def test_a_photo_that_is_no_picture_stops_the_cropping_and_says_which_to_take_out_of_where(
+        tmp_path):
+    job = _job(tmp_path, {"fine.png": _picture()}, shared={"broken.jpg": b"not a picture"})
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.crop(job, find=lambda image: None)
 
+    assert f"Take it out of {tmp_path / 'shared'}" in str(stopped.value)
     assert "broken.jpg" in str(stopped.value)
-    assert job["photos_folder"] in str(stopped.value)
 
 
 def test_photos_the_detector_finds_the_part_in_none_of_stop_the_training_and_say_so(tmp_path):
@@ -47,7 +51,7 @@ def test_photos_the_detector_finds_the_part_in_none_of_stop_the_training_and_say
         fix_lora_trainer.crop(job, find=lambda image: None)
 
     assert "any of the 2 photos" in str(stopped.value)
-    assert job["photos_folder"] in str(stopped.value)
+    assert all(folder in str(stopped.value) for folder in job["photos_folders"])
 
 
 def test_each_photo_the_part_is_found_in_becomes_a_square_crop_with_the_fixs_caption(tmp_path):

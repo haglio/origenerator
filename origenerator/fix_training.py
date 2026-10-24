@@ -26,7 +26,11 @@ _IN_THE_BACKGROUND = _NO_WINDOW | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLA
 
 
 def photos_folder(part) -> Path:
-    return config.FIX_PHOTOS_DIR / part.name.capitalize()
+    return config.FIX_PHOTOS_DIR / part.name.lower()
+
+
+def shared_photos_folder() -> Path:
+    return config.FIX_PHOTOS_DIR / "shared"
 
 
 def photo_files(folder: Path) -> list[Path]:
@@ -35,14 +39,21 @@ def photo_files(folder: Path) -> list[Path]:
     return sorted(path for path in folder.iterdir() if path.suffix.lower() in _PHOTO_SUFFIXES)
 
 
+def training_folders(part) -> list[Path]:
+    return [photos_folder(part)] + ([shared_photos_folder()] if part.shared_photos else [])
+
+
+def training_photos(part) -> list[Path]:
+    return [photo for folder in training_folders(part) for photo in photo_files(folder)]
+
+
 def training_job(part, checkpoint: str, now: datetime) -> dict:
     models = config.COMFYUI_DIR / "models"
     work = config.FIX_TRAINING_DIR / part.name
-    folder = photos_folder(part)
     return {
         "part": part.name,
-        "photos": [str(path) for path in photo_files(folder)],
-        "photos_folder": str(folder),
+        "photos": [str(path) for path in training_photos(part)],
+        "photos_folders": [str(folder) for folder in training_folders(part)],
         "detector": str(config.COMFYUI_DIR / detector_folder(part) / detector_for_part(part)),
         "caption": f"close-up photo of {part.name}",
         "base_model": str(models / "checkpoints" / checkpoint),

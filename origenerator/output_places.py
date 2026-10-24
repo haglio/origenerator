@@ -62,12 +62,12 @@ class OutputPlaces:
 
     def video_folders(self) -> list[Path]:
         named = self._named().values()
-        return [child for child in _folders_in(self.videos)
+        return [child for child in folders_in(self.videos)
                 if child not in named and child != self.working]
 
     def files(self) -> Iterator[tuple[Path, str]]:
         for home in [*self._named().values(), *self.video_folders()]:
-            for folder, names in _walk(home):
+            for folder, names in files_under(home):
                 subfolder = self.subfolder_of(folder)
                 yield from ((folder / name, subfolder) for name in names)
         yield from ((path, "") for path in _files_in(self.comfyui))
@@ -94,7 +94,7 @@ def _parts_within(folder: Path, home: Path) -> tuple[str, ...] | None:
         return None
 
 
-def _folders_in(folder: Path) -> list[Path]:
+def folders_in(folder: Path) -> list[Path]:
     if not folder.is_dir():
         return []
     return sorted(child for child in folder.iterdir()
@@ -107,8 +107,8 @@ def _files_in(folder: Path) -> list[Path]:
     return sorted(child for child in folder.iterdir() if child.is_file())
 
 
-def _walk(home: Path) -> Iterator[tuple[Path, list[str]]]:
-    for dirpath, dirnames, filenames in os.walk(home):
+def files_under(top: Path) -> Iterator[tuple[Path, list[str]]]:
+    for dirpath, dirnames, filenames in os.walk(top):
         dirnames[:] = sorted(name for name in dirnames
                              if not os.path.isjunction(os.path.join(dirpath, name)))
         yield Path(dirpath), sorted(filenames)

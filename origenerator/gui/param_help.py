@@ -135,16 +135,19 @@ PARAM_HELP: dict[str, str] = {
     ),
     "cfg": (
         "How strictly the model obeys the prompt (the CFG scale underneath). Too low "
-        "drifts off it; too high burns contrast and flattens detail."
+        "drifts off it; too high burns contrast and flattens detail. At 1 the Negative "
+        "Prompt is ignored; any lower and it works backwards."
     ),
     "cfg_high": (
         "Prompt strength for the first pass (high noise; the CFG scale underneath), "
         "where the motion is settled. A LoRA's author often publishes a different "
-        "number for each pass; where they publish one, put it in both."
+        "number for each pass; where they publish one, put it in both. At 1 this pass "
+        "ignores the Negative Prompt; any lower and it works backwards."
     ),
     "cfg_low": (
         "Prompt strength for the second pass (low noise; the CFG scale underneath), "
-        "where the texture is settled."
+        "where the texture is settled. At 1 this pass ignores the Negative Prompt; "
+        "any lower and it works backwards."
     ),
     "split_step": (
         "The step where the first pass (high noise) hands over to the second (low "

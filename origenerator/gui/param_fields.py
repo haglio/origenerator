@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 
-from origenerator.gui import diff_text
+from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.drop_slot import DropSlot, placeholder_for
 from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
@@ -160,8 +160,7 @@ class _Prompt(FieldKind):
         return diff_text.live_text(widget)
 
     def write(self, pd, widget, value):
-        diff_text.forget(widget)
-        widget.setPlainText(str(value))
+        tracked_prompt.write(widget, str(value))
 
 
 class _Tick(FieldKind):

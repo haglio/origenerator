@@ -391,7 +391,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # model by its title, taken down to what the tree measured.
 # 16535 when this app's own slideshow became the one its satellites use, and
 # what only the old window slideshow used went with it.
-MAX_PROSE_LINES = 16535
+# 16487 when Origenerator came to draw in shared_ui's colors, marks, type and spacing
+# alone, taken down to what the tree measured: the icons it drew by hand went with
+# their docstrings, and so did the notes on matching Fun Time's numbers by hand.
+MAX_PROSE_LINES = 16487
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

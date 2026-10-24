@@ -26,7 +26,6 @@ from origenerator.prompt_edit import (
     build_rewrite_messages,
     parse_match,
     parse_request,
-    parse_rewrite,
     rewrite_prompt,
     smart_match,
 )
@@ -173,6 +172,23 @@ def test_a_term_the_rewrite_weights_at_nothing_is_taken_out():
                                  "a woman, (makeup:0.0), beach", "blurry, (glare:0)"))
 
     assert (revision.positive, revision.negative) == ("a woman, beach", "blurry")
+
+
+def test_a_rewrite_that_stands_dots_in_for_a_prompt_leaves_that_prompt_as_it_was():
+    revision = apply_request("A dog sits on a porch at sunset.", "", "bigger ears",
+                             rewrite=lambda positive, negative, words: (
+                                 "A dog with big ears sits on a porch at sunset.", "..."))
+
+    assert (revision.positive, revision.negative) == (
+        "A dog with big ears sits on a porch at sunset.", "")
+
+
+def test_a_rewrite_that_leaves_part_of_the_prompt_out_with_dots_is_no_answer():
+    revision = apply_request("A dog sits on a porch at sunset, warm light", "", "bigger ears",
+                             rewrite=lambda positive, negative, words: (
+                                 "A dog with bigger ears ... warm light", ""))
+
+    assert revision.positive == "A dog sits on a porch at sunset, warm light, bigger ears"
 
 
 def test_a_phrase_that_is_the_whole_term_is_dropped_by_the_rules_alone():
@@ -431,14 +447,10 @@ def test_build_rewrite_messages_carries_both_prompts_and_the_instruction():
     assert "a woman, tan" in content and "blurry" in content and "no tan lines" in content
 
 
-def test_parse_rewrite_extracts_the_json_object():
-    data = {"choices": [{"message": {"content": '{"positive": "a woman", "negative": "tan lines"}'}}]}
-    assert parse_rewrite(data) == {"positive": "a woman", "negative": "tan lines"}
+def test_the_answer_asked_for_shows_no_dots_a_model_could_copy_back_as_a_prompt():
+    content = build_rewrite_messages("a woman, tan", "", "no tan lines", "SYSTEM")[1]["content"]
 
-
-def test_parse_rewrite_tolerates_fenced_or_wrapped_json():
-    data = {"choices": [{"message": {"content": 'Sure —\n```json\n{"positive": "a", "negative": "b"}\n```'}}]}
-    assert parse_rewrite(data) == {"positive": "a", "negative": "b"}
+    assert "..." not in content and "…" not in content
 
 
 def test_a_rewrite_sends_both_prompts_and_answers_with_both():

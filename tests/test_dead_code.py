@@ -427,7 +427,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # take them, and the note tying the gallery's menu to a hidden Cancel went.
 # 16081 when an image's requests and Modifies came to link both ways, each in
 # a section of its own, taken down to what the tree measured.
-MAX_PROSE_LINES = 16081
+# 16079 when a request's rewrite came to be asked for its answer with no dots to
+# copy back.
+MAX_PROSE_LINES = 16079
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

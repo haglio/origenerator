@@ -129,6 +129,7 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, key_holds, oriented_key
 from origenerator.output_places import OutputPlaces
@@ -140,7 +141,7 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.commands import match_voice_command as match
 from origenerator.voice.dictation import RequestDictation
-from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
+from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts, offered_workflows
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import gestures
 from tests.drop_style_seen import worn
@@ -10839,6 +10840,18 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
     assert config.workflow_name == "wan22_i2v"
     assert config.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
     assert config.seed_is_random                                     # a new take of the motion
+
+
+def test_the_tab_edit_individual_opens_lists_only_the_video_workflows(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._combine._open_combination("img", "vid")
+
+    combo = view._info_tabs.current_config_panel()._workflow_combo
+    assert [combo.itemData(i) for i in range(combo.count())] == [
+        workflow.name for workflow in offered_workflows(makes=MediaType.VIDEO)]
 
 
 def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):

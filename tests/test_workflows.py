@@ -16,7 +16,8 @@ from origenerator import config
 from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params
 from origenerator.gui.param_fields import clamped_number
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
-from origenerator.workflows import WORKFLOW_REGISTRY, base
+from origenerator.media import MediaType
+from origenerator.workflows import WORKFLOW_REGISTRY, base, offered_workflows
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     RIFE_CHECKPOINT,
@@ -967,6 +968,17 @@ def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
                 assert f"wan_{other}_noise.safetensors" not in pd.options, f"{name}.{pd.key}"
                 checked += 1
     assert checked, "no high/low slots were exercised"
+
+
+def test_each_workflow_a_person_picks_is_offered_for_the_kind_it_makes_and_no_other():
+    for name, wf in WORKFLOW_REGISTRY.items():
+        offered_for = {kind for kind in MediaType if wf in offered_workflows(makes=kind)}
+        assert offered_for == ({wf.output_type} if wf.selectable else set()), name
+
+
+def test_a_tab_that_makes_nothing_yet_is_offered_the_workflows_of_both_kinds():
+    assert set(offered_workflows(makes=None)) == {
+        *offered_workflows(makes=MediaType.IMAGE), *offered_workflows(makes=MediaType.VIDEO)}
 
 
 def test_enhance_keys_cover_every_param_only_the_tail_reads():

@@ -43,7 +43,7 @@ from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
 
@@ -402,7 +402,7 @@ def test_switching_workflow_detaches_the_old_form_at_once(panel):
     # Changing workflow must remove the previous form from the host immediately, not
     # leave it parented (and painting) under the new form until deleteLater runs.
     old_form = panel._param_form
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
 
     assert panel._param_form is not old_form   # a new form is installed
     assert old_form.parent() is None           # the old one is detached at once
@@ -411,12 +411,13 @@ def test_switching_workflow_detaches_the_old_form_at_once(panel):
     assert live == [panel._param_form]         # exactly one form in the host
 
 
-def test_switching_workflow_carries_over_the_users_edits(panel):
+def test_switching_workflow_carries_over_the_users_edits(blank_panel):
     # Changing workflow must not wipe what the user already set up: any value
     # they EDITED away from the departing workflow's defaults carries into the
     # new form wherever the new workflow shares the param. Values still at the
     # old defaults don't leak — flf2v's 4-step lightning default must not
     # follow the user into a workflow tuned for 20.
+    panel = blank_panel
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_flf2v_loop"))
     panel._param_form.set_values({
         "positive_prompt": "slow beta",
@@ -438,9 +439,10 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
     assert values["cfg_high"] == i2v_defaults["cfg_high"]
 
 
-def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
+def test_i2v_workflow_form_gets_the_derived_size_deriver(blank_panel):
     # Selecting an i2v workflow hands its form the size deriver, so the Dimensions
     # section shows the input-image size in a locked, unlockable field.
+    panel = blank_panel
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     form = panel._param_form
     assert form._size_deriver is not None
@@ -449,11 +451,11 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
     assert form._unlock_btn is not None
 
 
-def test_i2v_form_shows_the_measured_size_of_a_real_input_image(panel, tmp_path, monkeypatch):
+def test_i2v_form_shows_the_measured_size_of_a_real_input_image(blank_panel, tmp_path,
+                                                               monkeypatch):
     # End to end: the panel hands the real derived_display_size to the form, which
     # measures the picked image and shows its scaled size in the locked field.
-
-
+    panel = blank_panel
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     Image.new("RGB", (1920, 1080), (128, 128, 128)).save(tmp_path / "wide.png")
 
@@ -551,17 +553,20 @@ def test_a_tabs_seed_drops_down_every_seed_the_library_used_newest_first(panel):
     assert _seeds_listed(panel, "seed") == ["20", "10"]
 
 
-def test_a_tabs_seed_dropdown_lists_only_the_seeds_of_the_kind_it_makes(panel):
+def test_a_tabs_seed_dropdown_lists_only_the_seeds_of_the_kind_it_makes(panel, qtbot):
     _image_row(panel._db)
     _video_row(panel._db, noise_seed=30)
+    video_tab = GenerateConfigPanel(ComfyUIClient(), panel._db)
+    qtbot.addWidget(video_tab)
+    video_tab._workflow_combo.setCurrentIndex(_combo_index(video_tab, "wan22_i2v"))
 
     assert _seeds_listed(panel, "seed") == ["1"]
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
-    assert _seeds_listed(panel, "noise_seed") == ["30"]
+    assert _seeds_listed(video_tab, "noise_seed") == ["30"]
 
 
-def test_a_video_tabs_seed_dropdown_plays_the_videos_it_lists(panel, qtbot, monkeypatch,
+def test_a_video_tabs_seed_dropdown_plays_the_videos_it_lists(blank_panel, qtbot, monkeypatch,
                                                               tmp_path):
+    panel = blank_panel
     _video_row(panel._db, noise_seed=30)
     clip = looping_clip(tmp_path)
     monkeypatch.setattr(gcp_module, "animated_preview_path",
@@ -817,6 +822,56 @@ def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
     assert combo.currentData() == "image_enhance"
 
 
+def _listed_workflows(panel):
+    combo = panel._workflow_combo
+    return [combo.itemData(i) for i in range(combo.count())]
+
+
+def _offered(kind):
+    return [wf.name for wf in offered_workflows(makes=kind)]
+
+
+def test_a_new_generation_tab_lists_the_workflows_of_both_kinds(blank_panel):
+    assert set(_listed_workflows(blank_panel)) == {
+        *_offered(MediaType.IMAGE), *_offered(MediaType.VIDEO)}
+
+
+@pytest.mark.parametrize("picked, kind", [("wan22_i2v", MediaType.VIDEO),
+                                          ("sdxl_t2i", MediaType.IMAGE)])
+def test_a_workflow_picked_in_a_new_generation_tab_leaves_only_its_kind_listed(
+        blank_panel, qtbot, picked, kind):
+    combo = blank_panel._workflow_combo
+    combo.showPopup()
+    view = combo.view()
+    row = combo.model().index(_combo_index(blank_panel, picked), 0)
+
+    qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
+                     pos=view.visualRect(row).center())
+
+    assert combo.currentData() == picked
+    assert _listed_workflows(blank_panel) == _offered(kind)
+
+
+def test_a_tab_showing_a_video_lists_only_the_video_workflows(saved_panel):
+    panel, db = saved_panel
+
+    panel.show_saved_generation(_video_row(db), [])
+
+    assert _listed_workflows(panel) == _offered(MediaType.VIDEO)
+
+
+def test_a_tab_that_showed_a_video_lists_only_the_image_workflows_once_it_shows_an_image(
+        saved_panel):
+    panel, db = saved_panel
+    panel.show_saved_generation(_video_row(db), [])
+    image = _image_row(db)
+
+    panel.show_saved_generation(image, [image])
+
+    assert _listed_workflows(panel) == _offered(MediaType.IMAGE)
+    assert panel._workflow_combo.currentData() == "sdxl_t2i"
+
+
 def _wiz_params():
     return dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a wizard")
 
@@ -983,8 +1038,9 @@ def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
     assert panel._param_form.seed_is_random() is True
 
 
-def test_a_pinned_seed_stays_pinned_across_a_switch_to_a_video_workflow(panel):
-    panel.prefill("wan22_t2i", {"noise_seed": 99})
+def test_a_pinned_seed_stays_pinned_across_a_switch_between_video_workflows(panel):
+    panel.prefill("wan22_flf2v_loop", {})
+    panel._param_form.put_seeds({"noise_seed": 99}, is_random=False)
 
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
 
@@ -2101,6 +2157,17 @@ def test_a_retired_workflows_video_leaves_no_settings_from_before(saved_panel):
     assert panel._param_form is None
 
 
+def test_a_retired_workflows_video_lists_the_video_workflows_to_make_another_with(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
+
+    panel.show_saved_generation(video, [image])
+
+    assert _listed_workflows(panel) == _offered(MediaType.VIDEO)
+
+
 def test_an_import_from_a_workflow_the_app_never_had_says_so(saved_panel):
     panel, db = saved_panel
     video = _video_of_a_workflow_the_app_lacks(db, "unknown")
@@ -2141,7 +2208,8 @@ def test_selecting_a_workflow_after_such_a_video_clears_the_note_and_brings_gene
     video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
     panel.show_saved_generation(video, [])
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_t2i"))
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._param_form.set_values({"input_image": "frame.png [output]"})
 
     assert _note(panel) == ""
     assert panel._generate_pair.isEnabled()
@@ -2355,8 +2423,9 @@ def test_switching_workflow_leaves_no_stale_mark(saved_panel):
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
     _set_prompt(panel, "a dog")
+    assert _notice(panel) != ""
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
 
     assert _notice(panel) == ""
 
@@ -2777,7 +2846,7 @@ def test_ending_the_request_gives_the_prompts_their_undo_back(requesting):
 
 
 def test_picking_another_workflow_ends_the_request(requesting):
-    requesting._workflow_combo.setCurrentIndex(_combo_index(requesting, "wan22_i2v"))
+    requesting._workflow_combo.setCurrentIndex(_combo_index(requesting, "flux_t2i_upscaled"))
 
     assert requesting._generate_btn.text() == "Generate"
 

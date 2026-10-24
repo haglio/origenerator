@@ -175,14 +175,7 @@ _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
 def _will_move_on(slideshow) -> bool:
-    """Whether the slideshow pages on by itself when the item on screen runs out.
-
-    The engine holds a picture for the pace and ends it the way it ends a
-    finished clip, so there is no clock of the slideshow's own to ask: what decides
-    is the same three things that decided whether one was armed -- the room is
-    not frozen, the slide is not locked, and the pace is not nought."""
-    return (not slideshow.shown._paused and not slideshow.locked
-            and bool(slideshow._funestra_pace()))
+    return not slideshow.shown._paused and not slideshow._keeps() and bool(slideshow.dwell_s)
 
 
 class FakeActions:
@@ -16213,11 +16206,11 @@ def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeyp
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak("Request.")
-    assert view._slideshows.showing._funestra_pace() == 0
+    assert view._slideshows.showing._keeps()
     assert "Request" in words(view._slideshows.showing.shown._note)
 
     view._voice.listener.speak("no hat. Over.")
-    assert view._slideshows.showing._funestra_pace() != 0
+    assert not view._slideshows.showing._keeps()
 
 
 def test_a_finished_request_queues_the_revision_with_the_same_seed(
@@ -16332,7 +16325,7 @@ def test_a_request_that_never_hears_over_says_so_and_resumes(
     view._voice.listener.speak("Request.")
     view._voice.listener.speak("no hat")
 
-    assert view._slideshows.showing._funestra_pace() != 0
+    assert not view._slideshows.showing._keeps()
     assert "never heard" in words(view._slideshows.showing.shown._note)
     assert view._live_jobs == {}
 

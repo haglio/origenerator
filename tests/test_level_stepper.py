@@ -132,16 +132,16 @@ def test_versions_gone_a_level_deeper_are_stepped_from_their_new_top_still_stepp
     assert armed.step(1, base="a-v4.png") == Version("a-v3.png", "image", "Level 3")
 
 
-def test_the_slideshow_waits_at_a_pace_of_nought_until_another_picture_comes_up(armed):
-    paces = [armed.pace(6)]
+def test_the_versions_hold_the_slide_until_another_picture_comes_up(armed):
+    held = [armed.stepping]
     armed.step(1, base="a.png")
-    paces.append(armed.pace(6))
+    held.append(armed.stepping)
     armed.back_to_the_top()
-    paces.append(armed.pace(6))
+    held.append(armed.stepping)
     armed.restart()
-    paces.append(armed.pace(6))
+    held.append(armed.stepping)
 
-    assert paces == [6, 0, 0, 6]
+    assert held == [False, True, True, False]
 
 
 FACE = ((0.4, 0.1, 0.6, 0.3),)

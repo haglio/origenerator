@@ -158,8 +158,9 @@ def test_a_request_and_the_lock_each_let_go_only_of_themselves(qtbot, tmp_path):
     assert slideshow.locked is True and "LOCK_OFF" not in _sent(slideshow)
 
     slideshow.pause_for_request(True, "🎤 listening…")
+    _sent(slideshow)
     slideshow.slideshow_step(1)
-    assert slideshow._funestra_pace() == 0  # a step lets go of the lock, not of the request
+    assert (slideshow.locked, "LOCK_OFF" in _sent(slideshow)) == (False, False)
 
 
 def test_a_funestra_that_says_nothing_leaves_the_slideshow_as_it_was(qtbot, tmp_path):
@@ -260,13 +261,11 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
     assert slideshow.video_on_screen() is None
 
 
-def test_the_funestra_is_told_to_read_the_list_and_how_long_a_picture_holds(qtbot, tmp_path):
-    """Two verbs make the hand-over: read this list, and hold each picture for
-    the pace this app's console sets — the Funestra owning the advance from
-    there, as it does for its own clips."""
+def test_the_funestra_is_told_how_long_a_picture_holds_that_nothing_holds_it_and_to_read_the_list(
+        qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, image_dwell_ms=6000)
 
-    assert _sent(slideshow) == ["SET_PACE 6", "RELOAD_PLAYLIST"]
+    assert _sent(slideshow) == ["SET_PACE 6", "LOCK_OFF", "RELOAD_PLAYLIST"]
 
 
 def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
@@ -353,7 +352,7 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
     slideshow.slideshow_cull()
 
     assert deleted == ["id-1"]
-    assert queued_at_delete[:2] == ["LOCK_OFF", "TRASH"]
+    assert queued_at_delete[:1] == ["TRASH"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["two.png", "three.png"]  # and it is off the list
 
@@ -591,7 +590,8 @@ def test_a_slideshow_picked_back_up_on_another_version_plays_that_version_locked
     slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1",
                                     locked=True, level_index=1))
 
-    assert _sent(slideshow)[-2:] == ["PLAY_FILE one_original.png", "LOCK_ON"]
+    sent = _sent(slideshow)
+    assert ("PLAY_FILE one_original.png" in sent, _locks(sent)[-1]) == (True, "LOCK_ON")
     assert slideshow.state().level_index == 1
 
 
@@ -630,7 +630,7 @@ def test_a_slideshow_opened_on_a_slide_lands_the_funestra_on_it(qtbot, tmp_path)
 
     slideshow = _slideshow(qtbot, tmp_path, start=2)
 
-    assert _sent(slideshow)[:2] == [f"SET_PACE {slideshow.dwell_s}", "PLAY_FILE three.png"]
+    assert _sent(slideshow)[:3] == [f"SET_PACE {slideshow.dwell_s}", "LOCK_OFF", "PLAY_FILE three.png"]
     assert slideshow.hud_prompt_id == "id-3"
 
 
@@ -710,13 +710,13 @@ class TestVersions:
     """Stepping an item's own versions on the Funestra, the axis the shifted keys
     and the band's versions button share with a slideshow in a window."""
 
-    def test_a_step_holds_the_funestra_and_opens_the_other_version_still(self, qtbot, tmp_path):
+    def test_a_step_holds_the_funestra_on_the_other_version_still_moving(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_levels(_LEVELS)
 
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one.png"]
+        assert _sent(slideshow) == ["LOCK_ON", "PLAY_FILE one.png"]
 
     @pytest.mark.parametrize(("move", "verb"), [
         (lambda slideshow: slideshow.slideshow_step(1), "NEXT"),
@@ -753,7 +753,7 @@ class TestVersions:
             ("one_enhanced.png", "image", "Enhancement 1/2"),
             ("one.png", "image", "Original")]})
 
-        assert f"SET_PACE {slideshow.dwell_s}" not in _sent(slideshow)
+        assert "LOCK_OFF" not in _sent(slideshow)
         assert _panel(slideshow).item_note == "Enhancement 2/2"
 
     def test_a_videos_other_version_is_played_with_its_script(
@@ -834,7 +834,7 @@ class TestVersions:
         _sent(slideshow)
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE two.png"]
+        assert _sent(slideshow) == ["LOCK_ON", "PLAY_FILE two.png"]
 
 
 # --- the map, and the loops along it ------------------------------------------
@@ -946,7 +946,7 @@ def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qt
 
     slideshow.show_item("one-x.png")
 
-    assert _sent(slideshow) == ["PLAY_FILE one-x.png", "LOCK_OFF"]
+    assert _sent(slideshow) == ["PLAY_FILE one-x.png"]
     assert slideshow.hud_prompt_id == "id-1x"
 
 
@@ -1171,7 +1171,7 @@ def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     slideshow.slideshow_cull()
 
     assert (unfavorited, deleted) == (["id-1"], [])
-    assert _sent(slideshow) == ["LOCK_OFF", "NEXT"]
+    assert _sent(slideshow) == ["NEXT"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["one.png", "two.png", "three.png"]   # still in the list
 
@@ -1332,13 +1332,24 @@ def test_an_item_being_made_under_a_pace_of_nought_is_held_like_any_other(qtbot,
     assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
 
 
+def test_a_request_spoken_over_a_picture_keeps_it_on_the_funestra_still_moving(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+
+    slideshow.pause_for_request(True)
+    while_said = _sent(slideshow)
+    slideshow.pause_for_request(False)
+
+    assert (while_said, _sent(slideshow), slideshow.locked) == (["LOCK_ON"], ["LOCK_OFF"], False)
+
+
 def test_a_slide_a_request_is_spoken_over_stays_held_through_a_new_list(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.pause_for_request(True)
+    _sent(slideshow)
 
     slideshow.note_added("four.png", "image", "id-4")
 
-    assert _paces(_sent(slideshow))[-1] == "SET_PACE 0"
+    assert "LOCK_OFF" not in _sent(slideshow)
 
 
 def _following_a_run(qtbot, tmp_path) -> FunestraSlideshow:
@@ -1356,14 +1367,21 @@ def _slideshow_following_a_run(qtbot, tmp_path) -> FunestraSlideshow:
     return slideshow
 
 
-def test_a_run_the_slideshow_follows_is_held_on_the_funestra_while_it_is_made(qtbot, tmp_path):
+def test_a_run_the_slideshow_follows_is_held_on_the_funestra_while_it_is_made_still_moving(
+        qtbot, tmp_path):
     slideshow = _following_a_run(qtbot, tmp_path)
 
-    assert _paces(_sent(slideshow))[-1] == "SET_PACE 0"
+    sent = _sent(slideshow)
+
+    assert (_locks(sent)[-1], set(_paces(sent))) == ("LOCK_ON", {f"SET_PACE {slideshow.dwell_s}"})
 
 
 def _paces(sent: list[str]) -> list[str]:
     return [verb for verb in sent if verb.startswith("SET_PACE")]
+
+
+def _locks(sent: list[str]) -> list[str]:
+    return [verb for verb in sent if verb.startswith("LOCK_")]
 
 
 def test_a_run_the_slideshow_follows_that_stops_leaves_it_paging_at_its_pace(qtbot, tmp_path):
@@ -1371,7 +1389,7 @@ def test_a_run_the_slideshow_follows_that_stops_leaves_it_paging_at_its_pace(qtb
 
     slideshow.note_in_flight(set())
 
-    assert _paces(_sent(slideshow))[-1] == f"SET_PACE {slideshow.dwell_s}"
+    assert _locks(_sent(slideshow)) == ["LOCK_OFF"]
 
 
 def test_a_run_the_slideshow_follows_lets_go_once_the_funestra_is_stepped_off_it(
@@ -1382,7 +1400,7 @@ def test_a_run_the_slideshow_follows_lets_go_once_the_funestra_is_stepped_off_it
     _says(slideshow, video="one.png")
     slideshow.tick()
 
-    assert _paces(_sent(slideshow)) == [f"SET_PACE {slideshow.dwell_s}"]
+    assert _locks(_sent(slideshow)) == ["LOCK_OFF"]
 
 
 def test_a_slideshow_told_to_lead_with_what_is_being_made_sends_the_funestra_there(qtbot, tmp_path):
@@ -1415,7 +1433,7 @@ def test_a_picture_enhanced_during_the_slideshow_steps_its_versions_on_the_funes
                                                ("one.png", "image", "Original")]})
     slideshow.slideshow_step_version(1)
 
-    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one.png"]
+    assert _sent(slideshow) == ["LOCK_ON", "PLAY_FILE one.png"]
 
 
 def test_a_run_being_made_joins_the_funestras_list_on_its_first_frame(qtbot, tmp_path):
@@ -1641,4 +1659,4 @@ def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
 
     slideshow.slideshow_step_version(1)
 
-    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one-v1.png\t\t0,0,0.5,0.5"]
+    assert _sent(slideshow) == ["LOCK_ON", "PLAY_FILE one-v1.png\t\t0,0,0.5,0.5"]

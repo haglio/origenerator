@@ -116,15 +116,7 @@ def _time_passes(view, seconds: float):
 
 
 def _will_move_on(view) -> bool:
-    """Whether the slideshow pages on by itself when the item on screen runs out.
-
-    The engine holds a picture for the pace and ends it the way it ends a
-    finished clip, so there is no clock of the view's own to ask any more:
-    what decides is the same three things that decided whether one was armed
-    — the room is not frozen, the slide is not locked, and the pace is not
-    nought."""
-    return (not view._paused and not view.slideshow.locked
-            and bool(view.slideshow._funestra_pace()))
+    return not view._paused and not view.slideshow._keeps() and bool(view.slideshow.dwell_s)
 
 
 def _wired(kw: dict) -> dict:
@@ -1555,16 +1547,16 @@ def test_a_slideshow_reopened_on_a_locked_slide_opens_it_locked(qtbot):
     assert not _will_move_on(reopened)
 
 
-def test_a_request_holds_the_picture_where_its_move_had_got_to_and_its_release_lets_it_go(qtbot):
+def test_a_request_keeps_the_picture_on_screen_still_moving_and_its_release_lets_it_go(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
     view.slideshow.pause_for_request(True, "listening…")
     _settle(view)
-    assert _engine(view).pace_s == 0
-
+    while_said = (_engine(view).loop_file, _engine(view).pace_s)
     view.slideshow.pause_for_request(False)
     _settle(view)
-    assert _engine(view).pace_s == 4
+
+    assert (while_said, _engine(view).loop_file) == ((True, 4), False)
 
 
 def test_the_rooms_freeze_holds_it_and_its_resume_lets_it_go(qtbot):
@@ -1577,16 +1569,15 @@ def test_the_rooms_freeze_holds_it_and_its_resume_lets_it_go(qtbot):
     assert _engine(view).paused is False
 
 
-def test_a_locked_slide_is_stilled_again_by_a_request_and_by_the_rooms_freeze(qtbot):
+def test_a_locked_slide_stays_locked_through_a_request_and_is_stilled_by_the_rooms_freeze(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Down)
 
     view.slideshow.pause_for_request(True, "listening…")
     _settle(view)
-    assert _engine(view).pace_s == 0
     view.slideshow.pause_for_request(False)
     _settle(view)
-    assert _engine(view).pace_s == 4
+    assert _engine(view).loop_file is True
 
     view.slideshow.set_paused(True)
     assert _engine(view).paused is True
@@ -1764,13 +1755,7 @@ def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
     assert named == ["Enhancement 1/2", "Original", "Enhancement 1/2", "Enhancement 2/2"]
 
 
-def _opened_still(view) -> bool:
-    """Whether the Funestra opened the file now up at a pace of nought: the
-    engine's standstill, with no move over a picture and nothing to end it."""
-    return _engine(view).opened_at_pace[-1] == 0
-
-
-def test_a_version_shift_stepped_to_comes_up_still_and_holds_the_slideshow(qtbot, tmp_path):
+def test_a_version_shift_stepped_to_comes_up_moving_and_holds_the_slideshow(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a"), ("b.png", "image", "id-b")],
                  image_dwell_ms=4000)
@@ -1780,7 +1765,7 @@ def test_a_version_shift_stepped_to_comes_up_still_and_holds_the_slideshow(qtbot
     _shift(view, Qt.Key.Key_Right)
     _runs_out(view)
 
-    assert _opened_still(view)
+    assert (_engine(view).opened_at_pace[-1], _engine(view).loop_file) == (4, True)
     assert _media_on_screen(view) == original
 
 
@@ -1813,10 +1798,10 @@ def test_a_pace_set_while_versions_are_compared_waits_for_the_arrow_that_moves_o
 
     view.slideshow.set_dwell_s(9)
     _settle(view)
-    held = (_engine(view).pace_s, list(_engine(view).opened))
+    held = (_engine(view).loop_file, list(_engine(view).opened))
     _press(view, Qt.Key.Key_Right)
 
-    assert held == (0, opened)
+    assert held == (True, opened)
     assert _engine(view).opened_at_pace[-1] == 9
 
 
@@ -1833,7 +1818,7 @@ def test_a_version_landing_while_versions_are_compared_keeps_the_slideshow_held(
     _settle(view)
     _runs_out(view)
 
-    assert (_engine(view).pace_s, _media_on_screen(view)) == (0, better)
+    assert (_engine(view).loop_file, _media_on_screen(view)) == (True, better)
 
 
 def test_comparing_a_videos_versions_holds_the_slideshow_on_them_too(qtbot):
@@ -1965,7 +1950,7 @@ def test_opens_over_a_running_generation_showing_its_frame(qtbot):
     view = _following(qtbot)
     assert _media_on_screen(view) == ""               # no file under it yet
     assert _showing_a_picture(view)  # the streamed frame shows
-    assert _engine(view).pace_s == 0  # and held there
+    assert _engine(view).loop_file is True  # and held there
 
 
 def test_a_run_whose_first_frame_comes_after_the_slideshow_opened_joins_it(qtbot):

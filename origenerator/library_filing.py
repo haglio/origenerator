@@ -70,7 +70,7 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
     run = _run_subfolder(places, prompt_id)
     filed: dict[tuple[str, str], tuple[str, str]] = {}
     for record in files:
-        subfolder, name = record.get("subfolder") or "", record.get("filename") or ""
+        subfolder, name = _key(record)
         if (subfolder, name) in filed or not subfolder.startswith(f"{run}/"):
             continue
         kind = subfolder.removeprefix(f"{run}/")
@@ -164,8 +164,12 @@ def _next_number(home: Path, stem: str) -> int:
     return max(numbers, default=0) + 1
 
 
+def _key(record: dict) -> tuple[str, str]:
+    return (record.get("subfolder") or "").replace("\\", "/"), record.get("filename") or ""
+
+
 def _as_filed(record: dict, filed: dict[tuple[str, str], tuple[str, str]]) -> dict:
-    kind_and_name = filed.get((record.get("subfolder") or "", record.get("filename") or ""))
+    kind_and_name = filed.get(_key(record))
     if kind_and_name is None:
         return record
     kind, name = kind_and_name

@@ -242,3 +242,15 @@ def test_a_number_some_other_file_already_wears_is_passed_over(tmp_path):
 
     assert filed[0]["filename"] == "beta_i2v_00006-audio.mp4"
     assert (places.folder("video") / "beta_i2v_00006.png").read_bytes() == b"new"
+
+
+def test_a_run_comfyui_reports_with_windows_separators_is_filed_all_the_same(tmp_path):
+    places = _places(tmp_path)
+    _saved_by_comfyui(places, "run-thirteen", "image", "alpha_t2i_00001_.png")
+    reported = {"filename": "alpha_t2i_00001_.png",
+                "subfolder": r"origenerator\run-thirteen\image", "type": "output"}
+
+    filed = file_into_library([reported], places, "run-thirteen")
+
+    assert (filed[0]["subfolder"], filed[0]["filename"]) == ("image", "alpha_t2i_00001_.png")
+    assert (places.pictures / "alpha_t2i_00001_.png").is_file()

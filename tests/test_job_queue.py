@@ -16,6 +16,7 @@ from origenerator import config, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
+from origenerator.gui import generation_job
 from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
 from origenerator.run_notice import RunOutcome
@@ -663,6 +664,60 @@ def test_a_bring_up_that_breaks_fails_what_waits_rather_than_holding_it_forever(
     qtbot.waitUntil(lambda: bool(said), timeout=5000)
 
     assert said == [("k1", COMFYUI_DID_NOT_START)]
+
+
+def _a_voice_that_answers_when_told(monkeypatch):
+    """Every job's lines unspoken, and each asking voice's ``done`` handed to the test."""
+    spoken = []
+
+    class _Voice:
+        def __init__(self, client):
+            pass
+
+        def speak(self, params, done, failed):
+            spoken.append(done)
+
+    monkeypatch.setattr(generation_job, "ThreadedSpeaker", _Voice)
+    monkeypatch.setattr(generation_job.speech, "missing_speech", lambda params, input_dir: True)
+    return spoken
+
+
+def test_a_story_whose_lines_were_spoken_while_comfyui_went_down_waits_for_it_too(
+        qtbot, tmp_path, monkeypatch):
+    spoken = _a_voice_that_answers_when_told(monkeypatch)
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    coming_up = _ComfyUIComingUp()
+    queue = JobQueue(db, client, bring_up_comfyui=coming_up)
+    job = _launch_video(queue, "k1", seed=1)
+    client.submit_job = MagicMock(side_effect=_comfyui_down())
+    said = []
+    queue.failed.connect(lambda key, message: said.append(message))
+
+    spoken[0]()
+
+    assert db.get_generation(job.prompt_id)["status"] == "pending"
+    assert queue.queue_order == [job.prompt_id] and not queue.making_something()
+    coming_up.finish.set()
+    qtbot.waitUntil(lambda: len(spoken) == 2, timeout=5000)
+    assert said == []
+
+
+def test_with_nothing_to_start_comfyui_a_story_it_never_heard_fails_like_any_refusal(
+        qtbot, tmp_path, monkeypatch):
+    spoken = _a_voice_that_answers_when_told(monkeypatch)
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    job = _launch_video(queue, "k1", seed=1)
+    client.submit_job = MagicMock(side_effect=_comfyui_down())
+    said = []
+    queue.failed.connect(lambda key, message: said.append(message))
+
+    spoken[0]()
+
+    assert len(said) == 1 and "10061" in said[0]
+    assert db.get_generation(job.prompt_id)["status"] == "error"
 
 
 def test_a_queue_given_no_bring_up_brings_up_the_comfyui_this_machine_runs(

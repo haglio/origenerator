@@ -13,7 +13,7 @@ import origenerator.workflows.lora_choice as lora_choice_module
 import origenerator.workflows.sdxl_pose_transfer as pose
 import origenerator.workflows.sdxl_t2i as t2i
 import origenerator.workflows.wan_experts as experts
-from origenerator import config
+from origenerator import config, points_of_interest
 from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params
 from origenerator.gui.param_fields import clamped_number
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
@@ -820,10 +820,10 @@ def test_the_places_the_fixes_found_ride_with_the_picture_they_were_found_in_in_
 
     files = WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history)
 
-    assert files == [{**ENHANCED, "points_of_interest": [FACE_PLACE, HAND_PLACE]}]
+    assert files == [{**ENHANCED, **points_of_interest.kept([FACE_PLACE, HAND_PLACE])}]
 
 
-def test_the_places_say_which_part_found_them_and_eyes_found_together_are_one():
+def test_the_places_say_which_part_found_them_and_each_eye_is_kept_as_it_was_found():
     history = {
         "prompt": [3, "run", {"fix0_detector": {"class_type": "UltralyticsDetectorProvider",
                                                  "inputs": {"model_name": "bbox/eye_finder.pt"}}}, {}, []],
@@ -836,14 +836,15 @@ def test_the_places_say_which_part_found_them_and_eyes_found_together_are_one():
     files = WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history)
 
     assert files[0]["points_of_interest"] == [
-        {"left": 0.1, "top": 0.1, "right": 0.45, "bottom": 0.52, "part": "eyes"}]
+        {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.5, "part": "eyes"},
+        {"left": 0.25, "top": 0.12, "right": 0.45, "bottom": 0.52, "part": "eyes"}]
 
 
 def test_an_enhancement_whose_fixes_found_nothing_says_it_looked_and_found_no_places():
     history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {"text": [WHOLE_PICTURE]}}}
 
     assert WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history) == [
-        {**ENHANCED, "points_of_interest": []}]
+        {**ENHANCED, **points_of_interest.kept([])}]
 
 
 def test_an_enhancement_that_fixed_no_part_carries_no_places_at_all():

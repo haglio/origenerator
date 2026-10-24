@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from origenerator import gallery, places_backfill
+from origenerator import gallery, places_backfill, points_of_interest
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -65,7 +65,7 @@ def _looked_over(db) -> list[tuple[str, str]]:
 def test_a_picture_enhanced_before_its_places_were_kept_is_one_to_look_over(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "old", _file("enhanced_old.png"))
-    _enhanced(db, "kept", _file("enhanced_kept.png", points_of_interest=[]))
+    _enhanced(db, "kept", _file("enhanced_kept.png", **points_of_interest.kept([])))
 
     assert _looked_over(db) == [("old", "enhanced_old.png")]
 
@@ -74,9 +74,17 @@ def test_a_picture_whose_places_were_kept_before_they_named_their_part_is_looked
     db = Database(tmp_path / "t.db")
     unnamed = {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.3}
     _enhanced(db, "early", _file("enhanced_early.png", points_of_interest=[unnamed]))
-    _enhanced(db, "named", _file("enhanced_named.png", points_of_interest=[{**unnamed, "part": "faces"}]))
+    _enhanced(db, "named", _file("enhanced_named.png", **points_of_interest.kept([{**unnamed, "part": "faces"}])))
 
     assert _looked_over(db) == [("early", "enhanced_early.png")]
+
+
+def test_a_picture_whose_eyes_were_kept_already_joined_is_looked_over_again(tmp_path):
+    db = Database(tmp_path / "t.db")
+    joined = {"left": 0.1, "top": 0.1, "right": 0.6, "bottom": 0.3, "part": "eyes"}
+    _enhanced(db, "joined", _file("enhanced_joined.png", points_of_interest=[joined]))
+
+    assert _looked_over(db) == [("joined", "enhanced_joined.png")]
 
 
 def test_a_picture_is_looked_over_by_its_own_enhancements_detectors_and_nothing_is_redrawn(tmp_path):

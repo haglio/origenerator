@@ -86,6 +86,7 @@ from origenerator.slideshow_buttons import PANEL_CORNER
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from origenerator.win32 import place_window_in_device_pixels
+from origenerator.workflows.detail_parts import parts_framed_together
 
 logger = logging.getLogger(__name__)
 
@@ -643,6 +644,7 @@ class SlideshowDirector:
         plays -- the axis Shift+Left/Right steps along. One with a single version
         has nothing to step between and is left out."""
         upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
+        framed_together = parts_framed_together()
         playlists = {}
         for row in rows:
             media_type = gallery.media_type_of_row(row)
@@ -653,7 +655,8 @@ class SlideshowDirector:
             if len(levels) < 2:
                 continue
             entries = [Version(gallery.output_file_path(level.file, OUTPUT_PLACES),
-                               media_type, level.label, points_of_interest.boxes_of(level.file))
+                               media_type, level.label,
+                               points_of_interest.boxes_of(level.file, framed_together=framed_together))
                        for level in levels]
             playlists[str(entries[0][0])] = entries
         return playlists

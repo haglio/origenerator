@@ -78,8 +78,8 @@ class Database:
     def set_params_json(self, prompt_id: str, params_json: str):
         return self.generations.set_params_json(prompt_id, params_json)
 
-    def set_recipe(self, prompt_id: str, *, params_json: str, workflow_json: str):
-        return self.generations.set_recipe(
+    def set_params_and_workflow(self, prompt_id: str, *, params_json: str, workflow_json: str):
+        return self.generations.set_params_and_workflow(
             prompt_id, params_json=params_json, workflow_json=workflow_json)
 
     def set_recipe_source(self, prompt_id: str, *, category: str | None = None,

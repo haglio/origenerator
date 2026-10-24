@@ -148,6 +148,10 @@ def _timed_out(error: BaseException) -> bool:
     return isinstance(error, urllib.error.URLError) and isinstance(error.reason, TimeoutError)
 
 
+def unreachable(error: BaseException) -> bool:
+    return isinstance(error, urllib.error.URLError) and isinstance(error.reason, ConnectionRefusedError)
+
+
 def _queue_prompt_id(item):
     """The prompt id of a ``/queue`` entry — element 1 of its tuple — or ``None``."""
     if isinstance(item, (list, tuple)) and len(item) > 1:

@@ -24,7 +24,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from origenerator import provenance, speech
+from origenerator import comfyui_api, provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, SPEECH_PYTHON, THUMB_DIR
 from origenerator.generation_state import GenerationSource
@@ -113,6 +113,7 @@ class GenerationJob(QObject):
     preview = pyqtSignal(bytes)                 # live preview frame (encoded image)
     finished = pyqtSignal(list, object, object)  # output_files, thumb_path|None, duration|None
     failed = pyqtSignal(str)                     # error message
+    unreachable = pyqtSignal(str)                # error message; idle, to be sent again
 
     def __init__(self, client, workflow, params, *, source=GenerationSource.GENERATED,
                  places=OUTPUT_PLACES, thumb_dir=THUMB_DIR, input_dir=COMFYUI_INPUT_DIR,
@@ -414,6 +415,9 @@ class GenerationJob(QObject):
         try:
             self._submit(submit)
         except Exception as e:
+            if comfyui_api.unreachable(e):
+                self.unreachable.emit(str(e))
+                return
             self._state = JobState.FAILED
             self.failed.emit(str(e))
 

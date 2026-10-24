@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 import threading
 import time
+import urllib.error
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import QTimer
@@ -84,6 +85,27 @@ def test_a_voice_that_fails_fails_the_job_before_comfyui_hears_of_it(qtbot, tmp_
     assert failed == ["No voice is set up"]
     assert job.state == "failed"
     client.submit_job.assert_not_called()
+
+
+def test_a_story_spoken_while_comfyui_is_down_says_so_and_can_be_sent_again(qtbot, tmp_path):
+    client, speaker = _client(), _Speaker()
+    client.submit_job = MagicMock(side_effect=[urllib.error.URLError(ConnectionRefusedError(
+        10061, "No connection could be made because the target machine actively refused it")),
+        "comfy-A"])
+    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
+    said = []
+    job.unreachable.connect(said.append)
+    job.failed.connect(said.append)
+    job.start()
+    (params, done, _failed), = speaker.asked
+
+    _spoken_file(params, tmp_path)
+    done()
+    assert len(said) == 1 and "10061" in said[0]
+    job.start()
+
+    assert job.state == "queued"
+    assert client.submit_job.call_count == 2
 
 
 def test_a_job_canceled_while_its_lines_are_spoken_is_not_sent(qtbot, tmp_path):

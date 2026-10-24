@@ -90,6 +90,7 @@ from origenerator.workflows.detail_parts import (
     part_named,
     part_table,
 )
+from origenerator.workflows.lora_choice import lora_strength
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import NO_LORA, list_lora_files
 
@@ -758,10 +759,12 @@ class FixPromptsDialog(QDialog):
         self.lora = NoWheelComboBox()
         offer_options(self.lora, loras)
         choose_option(self.lora, current["lora"] or NO_LORA)
+        strength = lora_strength("lora_strength", current["strength"])
         self.strength = NoWheelDoubleSpinBox()
-        self.strength.setRange(0.0, 2.0)
-        self.strength.setSingleStep(0.05)
-        self.strength.setValue(current["strength"])
+        self.strength.setRange(strength.min_val, strength.max_val)
+        self.strength.setSingleStep(strength.step)
+        self.strength.setValue(strength.default)
+        self.strength.setToolTip(definition_help(strength))
         self.train = QPushButton()
         self.train.setToolTip(_train_tooltip(part))
         self._training: str | None = None

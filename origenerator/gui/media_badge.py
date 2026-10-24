@@ -19,10 +19,11 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
+from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.gui import icons
 
-_INSET = 10  # px from the tile's top-left corner, so the badge sits over the thumbnail
+_INSET = MARGIN_STANDARD  # px from the tile's top-left corner, so the badge sits over the thumbnail
 
 
 class MediaBadge(QLabel):

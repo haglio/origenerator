@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import TEXT_PRIMARY
+from shared_ui.colors import AMBER, TEXT_PRIMARY
 from shared_ui.icons import glyph_icon, marked_text
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
@@ -79,6 +79,7 @@ from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.metadata_block import MetadataBlock, wrappable
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.notice_overlay import set_marked_text
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
@@ -151,7 +152,7 @@ def _lost_workflow_note(workflow_name: str) -> str:
     retired = RETIRED_WORKFLOW_NAMES.get(workflow_name)
     made_with = (f"{retired}, which has been retired," if retired
                  else "a workflow Origenerator doesn't have,")
-    return (f"⚠ This was made with {made_with} so no new ones can be made. "
+    return (f"This was made with {made_with} so no new ones can be made. "
             "Select a workflow above to make something new.")
 
 
@@ -169,9 +170,9 @@ def _named_models(names: list[str]) -> str:
 def _not_installed_note(names: list[str]) -> str:
     shown = _named_models(names)
     if len(names) == 1:
-        return (f"⚠ This was made with {shown}, which isn't installed anymore, so no new ones "
+        return (f"This was made with {shown}, which isn't installed anymore, so no new ones "
                 "can be made with it until an installed one is picked in its place.")
-    return (f"⚠ This was made with {shown}, which aren't installed anymore, so no new ones "
+    return (f"This was made with {shown}, which aren't installed anymore, so no new ones "
             "can be made with them until installed ones are picked in their place.")
 
 
@@ -608,7 +609,8 @@ class GenerateConfigPanel(QWidget):
         if blocked:
             self._generate_btn.setToolTip(blocked)
         note = self._why_the_item_cannot_be_remade()
-        self._cannot_remake_note.setText(wrappable(note or ""))
+        set_marked_text(self._cannot_remake_note, wrappable(note or ""), mark="warning" if note else "",
+                        color=AMBER)
         self._cannot_remake_note.setVisible(note is not None)
 
     def _why_generate_is_blocked(self) -> str | None:

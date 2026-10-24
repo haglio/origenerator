@@ -37,8 +37,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.notice_shape import NOTICE_PAD_H, NOTICE_PAD_V, NOTICE_RADIUS, NOTICE_TOP_MARGIN
 from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
-from shared_ui.spacing import BUTTON_RADIUS, MARGIN_DIALOG, MARGIN_STANDARD
 
 from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
@@ -59,9 +59,9 @@ from origenerator.media import MediaType
 _PLACEHOLDER = "Select a generation to preview"
 
 _NOTICE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
-                 f" padding: {MARGIN_STANDARD}px {MARGIN_DIALOG}px;"
-                 f" border-radius: {BUTTON_RADIUS}px;")
-_NOTICE_MARGIN = 12  # how far the plate floats from the media's top-left corner
+                 f" padding: {NOTICE_PAD_V}px {NOTICE_PAD_H}px;"
+                 f" border-radius: {NOTICE_RADIUS}px;")
+_NOTICE_MARGIN = NOTICE_TOP_MARGIN  # how far the plate floats from the media's top-left corner
 
 
 def _path_key(path) -> str:

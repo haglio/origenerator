@@ -30,6 +30,7 @@ from PyQt6.QtGui import QMovie, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 from shared_ui.colors import TEXT_MUTED
 from shared_ui.icons import glyph_pixmap
+from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.gui.combination import (
     Combination,
@@ -47,7 +48,7 @@ from origenerator.gui.queue_thumbs import fitted_cell
 # How much of the pane's height a picture takes, leaving room for the plus sign
 # to breathe between them and the pane's own margins around them.
 _HEIGHT_SHARE = 0.8
-_MARGIN = 8
+_MARGIN = MARGIN_STANDARD
 
 
 def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:

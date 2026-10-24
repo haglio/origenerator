@@ -17,15 +17,15 @@ from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import QLabel
 from shared_ui.fonts import FONT_UI, SIZE_TINY, make_font
-from shared_ui.spacing import BUTTON_RADIUS
+from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
 # The picture a card gives to its content, and the frame around it. The picture
 # is what the grid is for, so the card's height is what gives when the caption
 # needs more room, never this.
 CARD_WIDTH = 180
 PICTURE_SIZE = (172, 160)
-CARD_MARGIN = 4
-CARD_SPACING = 2
+CARD_MARGIN = GAP_SMALL
+CARD_SPACING = GAP_SMALL
 
 def caption_font() -> QFont:
     """The family's tiny type, which a card's caption, count and breadcrumb are

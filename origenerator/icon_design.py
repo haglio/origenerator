@@ -14,14 +14,11 @@ from __future__ import annotations
 from PIL import Image
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QGuiApplication, QImage, QPainter, QPainterPath
+from shared_ui.app_icon import CANVAS, GRID, INSET, UNIT
 from shared_ui.colors import MAGENTA
 
 from origenerator.config import PROJECT_DIR
 
-CANVAS = 256  # icon master size
-INSET = 31  # the letter grid's offset within the canvas
-GRID = CANVAS - 2 * INSET  # 194 -- the letter grid, shared across the suite
-UNIT = GRID / 5  # 38.8 -- one cell == pen width ("1/5-based")
 CORNER_RADIUS = 5  # renders to a ~3px outer corner, matching the suite
 ICON_SIZES = (16, 32, 48, 256)  # frames stored in the .ico
 

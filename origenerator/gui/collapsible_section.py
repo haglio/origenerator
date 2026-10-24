@@ -25,7 +25,7 @@ from origenerator.gui.warning_mark import WarningMark
 
 # Drawn before the header title so the fold state reads at a glance.
 FOLD = {False: "chevron_down", True: "chevron_right"}
-_MARK_GAP = 6
+_MARK_GAP = GAP_SMALL
 
 
 class FoldHeader(ElidingButton):

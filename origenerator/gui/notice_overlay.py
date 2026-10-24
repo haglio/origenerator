@@ -9,11 +9,9 @@ spoken word just did. A plate of its own down at the foot of the slideshow would
 a second dialect for the same job, said in the same room, on a surface that
 already wears the Funestras' own HUD.
 
-Matched through the tokens rather than by eye. The color and the face come out
-of :mod:`shared_ui`, which is where Fun Time takes them from too, so a palette
-change moves both at once instead of leaving one of them stale. Only the
-geometry is spelled out here, because that is all Fun Time's own overlay spells
-out: the padding, the corner radius, and the gap from the top edge.
+Matched through the tokens rather than by eye: the color, the face and the
+shape come out of :mod:`shared_ui` (its ``notice_shape``), which is where Fun
+Time takes them from too, so a change moves both at once.
 
 A child of the surface rather than a window of its own — Fun Time's is a
 top-level because it flashes over a *foreign* Funestra's window, and here the
@@ -25,16 +23,17 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui.colors import AMBER, BG_SECONDARY, GREEN, RED, TEXT_PRIMARY
-from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
+from shared_ui.fonts import FONT_UI, make_font
 from shared_ui.icons import marked_text
-from shared_ui.spacing import BUTTON_RADIUS, MARGIN_DIALOG, MARGIN_STANDARD
+from shared_ui.notice_shape import (
+    NOTICE_PAD_H,
+    NOTICE_PAD_V,
+    NOTICE_RADIUS,
+    NOTICE_TOP_MARGIN,
+    NOTICE_TYPE_SIZE,
+)
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
-
-# The gap from the top edge of the surface, matching
-# ``fun_time.notice_overlay.NOTICE_TOP_MARGIN`` — the two land on the same line
-# when a Fun Time Funestra and a slideshow are side by side.
-TOP_MARGIN = 28
 
 NOTICE = "notice"
 WARNING = "warning"
@@ -59,7 +58,7 @@ class NoticeOverlay(QLabel):
 
     def __init__(self, host: QWidget):
         super().__init__(host)
-        self.setFont(make_font(FONT_UI, SIZE_HEADING, bold=True))
+        self.setFont(make_font(FONT_UI, NOTICE_TYPE_SIZE, bold=True))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         float_over_media(self)
         self.hide()
@@ -70,7 +69,7 @@ class NoticeOverlay(QLabel):
         self.setStyleSheet(
             f"background-color: {BG_SECONDARY.name()};"
             f" color: {ink}; border: 1px solid {ink};"
-            f" padding: {MARGIN_STANDARD}px {MARGIN_DIALOG}px; border-radius: {BUTTON_RADIUS}px;"
+            f" padding: {NOTICE_PAD_V}px {NOTICE_PAD_H}px; border-radius: {NOTICE_RADIUS}px;"
         )
         set_marked_text(self, text, mark=mark, color=_INK[kind])
         self.show()
@@ -80,5 +79,5 @@ class NoticeOverlay(QLabel):
         host = self.parentWidget()
         self.adjustSize()
         x = (host.width() - self.width()) // 2
-        self.move(max(0, x), TOP_MARGIN)
+        self.move(max(0, x), NOTICE_TOP_MARGIN)
         raise_over_media(self)

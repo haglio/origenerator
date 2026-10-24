@@ -101,7 +101,7 @@ _STRIP_HEIGHT = 88
 # narrower than its caption elides the countdown away. The queue's names are
 # long, so the rest of the strip still goes to the line.
 _BAR_WIDTH = 290
-_HALVES_GAP = 8
+_HALVES_GAP = GAP_MEDIUM
 # Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
 # (which carries its own type) can't be dropped into the queue as a reorder.
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
@@ -415,7 +415,7 @@ class QueueRow(OpensAFolder, QWidget):
     # margins, so the pictures are as big as a row that still reads as a row can
     # make them. The block itself is four of these across.
     THUMB = HEIGHT - 6
-    INSET = 4
+    INSET = GAP_SMALL
 
     def __init__(self, item, *, movable=True, parent=None):
         super().__init__(parent)

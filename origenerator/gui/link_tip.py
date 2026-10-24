@@ -42,7 +42,7 @@ _APPEAR_MS = 500
 _LINGER_MS = 400
 # The gap under the watched widget, wide enough that the pointer travelling down
 # to the tip doesn't leave the widget before the tip is under it.
-_GAP = 2
+_GAP = GAP_SMALL
 
 
 class LinkTip(QObject):

@@ -233,6 +233,7 @@ class WorkflowTemplate(ABC):
     # of the Generate tab's workflow dropdown but remain registered — payloads
     # still build, in-flight rows still reconnect and caption themselves.
     selectable: bool = True
+    generates_here: bool = True
     # The param key(s) whose values identify which model produced an output.
     # The gallery groups a workflow's generations into model folders by these.
     model_keys: tuple[str, ...] = ()
@@ -298,6 +299,9 @@ class WorkflowTemplate(ABC):
     def _image_params(self) -> tuple[tuple[str, str], ...]:
         return tuple((pd.key, pd.label) for pd in self.param_definitions()
                      if pd.type == ParamType.IMAGE)
+
+    def starts_from_a_picture(self) -> bool:
+        return "input_image" in self.default_params()
 
     def pins_reused_seed(self) -> bool:
         """Whether loading a past generation's settings into a config tab pins its

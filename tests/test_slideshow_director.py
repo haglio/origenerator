@@ -24,6 +24,7 @@ from PyQt6.QtCore import Qt
 
 from origenerator import gallery
 from origenerator.gallery.collection import FAVORITES_KEY, RECENTS_KEY, FolderCollection
+from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_director import SlideshowDirector
@@ -1772,6 +1773,18 @@ def test_a_video_sits_under_its_pictures_seed_with_the_picture_down_its_column(s
     assert [row.slide.prompt_id for row in around.column] == ["g1", "v3"]
     assert (around.label, tuple(row.label for row in around.column)) == (
         "alpha", ("Source image", "beta"))
+
+
+def test_a_hidden_starting_frame_stays_off_the_map_of_a_video_made_from_it(slideshows, tmp_path):
+    frame = {**_fox("h1", seed=1), "source": GenerationSource.STARTING_FRAME}
+    rows = [frame, _animation("v1", frame="h1.png", act="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="h1.png", act="beta", tmp_path=tmp_path)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("v1", side="portrait")
+
+    mapped = [*around.seeds, *(row.slide for row in around.column), *around.group]
+    assert "h1" not in [slide.prompt_id for slide in mapped]
 
 
 def test_the_library_says_what_each_generation_an_act_filter_asks_about_is_named_for(slideshows, tmp_path):

@@ -23,7 +23,23 @@ class GenerationSource(StrEnum):
     EXPERIMENT = "experiment"
     BASE_RENDER = "base_render"
     STROKE_TRIM = "stroke_trim"
+    OUTSIDE = "outside"
+    STARTING_FRAME = "starting_frame"
+    LEFT_OUT = "left_out"
+
+
+MADE_ELSEWHERE = (GenerationSource.OUTSIDE, GenerationSource.STARTING_FRAME,
+                  GenerationSource.LEFT_OUT)
+OUT_OF_SIGHT = (GenerationSource.STARTING_FRAME, GenerationSource.LEFT_OUT)
 
 
 def source_of(row: dict) -> str:
     return row.get("source") or GenerationSource.GENERATED
+
+
+def made_here(row: dict) -> bool:
+    return source_of(row) not in MADE_ELSEWHERE
+
+
+def in_sight(row: dict) -> bool:
+    return source_of(row) not in OUT_OF_SIGHT

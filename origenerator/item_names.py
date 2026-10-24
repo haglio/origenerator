@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from origenerator import gallery
 from origenerator.gallery.item_numbers import item_name, number_items
-from origenerator.gallery.tree import placeable_rows
+from origenerator.gallery.tree import rows_with_a_folder
 from origenerator.recovery import bin_items
 
 
@@ -40,6 +40,6 @@ class ItemNames:
 
 
 def _items_oldest_first(rows: list[dict], held_rows: list[dict]) -> list[dict]:
-    items = [row for row in placeable_rows([*reversed(rows), *held_rows])
+    items = [row for row in rows_with_a_folder([*reversed(rows), *held_rows])
              if gallery.produced_output(row)]
-    return sorted(items, key=lambda row: row.get("id") or 0)
+    return sorted(items, key=lambda row: (row.get("created_at") or "", row.get("id") or 0))

@@ -22,7 +22,7 @@ from origenerator.gallery.signatures import READINGS_KEPT, workflow_output_type
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.output_places import OutputPlaces
-from origenerator.thumbnail import generate_animated_thumbnail
+from origenerator.thumbnail import animated_thumbnail_path, generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)
 
@@ -101,16 +101,20 @@ def output_file_path(file: dict, places: OutputPlaces) -> Path:
     """Where one recorded output file actually sits on disk.
 
     Normally in the place its subfolder names, under the name it was filed
-    under. A file the recovery bin has re-pointed carries an absolute ``path`` of
-    its own — its place inside the trash — so a deleted item's row resolves to
-    the files it still has rather than to where they used to be, and every
-    surface that shows a generation follows it there without having to know the
-    bin exists (see :func:`origenerator.recovery.bin_items`).
+    under. A file with a place of its own carries it whole: a ``path`` where the
+    recovery bin re-pointed it into the trash, or where a starting frame is kept,
+    and a ``library_path`` for another source's video, which this app shows and
+    never moves -- so every surface that shows a generation finds its file
+    without knowing which of those it is (see :func:`origenerator.recovery.bin_items`).
     """
-    moved = file.get("path")
-    if moved:
-        return Path(moved)
+    placed = place_of_its_own(file)
+    if placed:
+        return Path(placed)
     return places.folder(file.get("subfolder") or "") / (file.get("filename") or "")
+
+
+def place_of_its_own(file: dict) -> str | None:
+    return file.get("path") or file.get("library_path")
 
 
 _COPY_COUNTER = re.compile(r" \(\d+\)$")
@@ -124,10 +128,21 @@ def _stem_before_the_library_renamed_it(stem: str) -> str:
         stem = earlier
 
 
+def stem_as_made(path) -> str:
+    return _stem_before_the_library_renamed_it(Path(frame_name(str(path))).stem)
+
+
+def generations_by_stem(rows: list[dict]) -> dict[str, str]:
+    by_stem: dict[str, str] = {}
+    for row in rows:
+        for file in row_output_files(row):
+            if stem := Path(frame_name(file.get("filename"))).stem:
+                by_stem.setdefault(stem, row["prompt_id"])
+    return by_stem
+
+
 def generation_of_file(path, rows: list[dict]) -> str | None:
-    stem = _stem_before_the_library_renamed_it(Path(frame_name(str(path))).stem)
-    return next((row["prompt_id"] for row in rows for file in row_output_files(row)
-                 if Path(frame_name(file.get("filename"))).stem == stem), None)
+    return generations_by_stem(rows).get(stem_as_made(path))
 
 
 def resolve_preview(row: dict, places: OutputPlaces) -> tuple[Path, str] | None:
@@ -155,24 +170,35 @@ def resolve_preview(row: dict, places: OutputPlaces) -> tuple[Path, str] | None:
     return None
 
 
-def animated_preview_path(row: dict, places: OutputPlaces, thumb_dir: Path) -> str | None:
-    """A cached looping-WebP preview of a video ``row``, generated on first need.
+def make_animated_preview(row: dict, places: OutputPlaces, thumb_dir: Path) -> str | None:
+    """A cached looping-WebP preview of a video ``row``, made if it is not yet.
 
     ``None`` for a non-video row, or when the video file is missing or unreadable
     — the caller then falls back to the row's static thumbnail. The WebP is cached
     on disk (keyed by the row's ``prompt_id``), so only the first request pays the
-    frame-sampling cost; every gallery surface that shows a video tile resolves
-    its moving preview through here.
+    frame-sampling cost, which is seconds per video and never the window's to pay.
     """
-    preview = resolve_preview(row, places)
-    if preview is None or preview[1] != MediaType.VIDEO:
+    video = _video_of(row, places)
+    if video is None:
         return None
     try:
-        result = generate_animated_thumbnail(preview[0], thumb_dir, name=row["prompt_id"])
+        result = generate_animated_thumbnail(video, thumb_dir, name=row["prompt_id"])
     except Exception as e:
         logger.warning("Animated preview failed for %s: %s", row.get("prompt_id"), e)
         return None
     return str(result) if result is not None else None
+
+
+def animated_preview_if_made(row: dict, places: OutputPlaces, thumb_dir: Path) -> str | None:
+    if _video_of(row, places) is None:
+        return None
+    made = animated_thumbnail_path(thumb_dir, row["prompt_id"])
+    return str(made) if made.exists() else None
+
+
+def _video_of(row: dict, places: OutputPlaces) -> Path | None:
+    preview = resolve_preview(row, places)
+    return preview[0] if preview is not None and preview[1] == MediaType.VIDEO else None
 
 
 def output_disk_files(row: dict, places: OutputPlaces,
@@ -191,7 +217,7 @@ def output_disk_files(row: dict, places: OutputPlaces,
     paths: list[Path] = []
     for f in row_output_files(row):
         filename = f.get("filename")
-        if not filename or (names is not None and filename not in names):
+        if not filename or f.get("library_path") or (names is not None and filename not in names):
             continue
         full = output_file_path(f, places)
         if not full.exists():
@@ -213,6 +239,8 @@ def output_file_reference(files: list[dict]) -> str | None:
         filename = f.get("filename")
         if not filename:
             continue
+        if f.get("path"):
+            return f["path"]
         subfolder = f.get("subfolder") or ""
         path = f"{subfolder}/{filename}" if subfolder else filename
         return f"{path} [{f.get('type') or 'output'}]"

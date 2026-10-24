@@ -18,6 +18,7 @@ from origenerator.funscript import (
     synthesize_funscript,
 )
 from origenerator.gallery import media_type_of_row, resolve_preview
+from origenerator.generation_state import made_here
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 
@@ -32,7 +33,7 @@ def backfill(db, places: OutputPlaces | None = None, *, hz: float | None = None,
     result = {"written": 0, "rewritten": 0, "skipped": 0, "missing": 0, "failed": 0}
     videos = []
     for row in db.list_generations():
-        if media_type_of_row(row) != MediaType.VIDEO:
+        if media_type_of_row(row) != MediaType.VIDEO or not made_here(row):
             continue
         preview = resolve(row, places)
         if preview is None or preview[1] != MediaType.VIDEO:

@@ -43,6 +43,17 @@ def test_each_item_is_named_by_its_folder_and_the_order_it_was_made_in_there(db)
         f"{_code(first)} 000", f"{_code(first)} 001", f"{_code(elsewhere)} 000"]
 
 
+def test_items_brought_in_after_they_were_made_are_numbered_by_when_they_were_made(db):
+    made_last = _picture("gen-one", 1, created_at="2025-06-01 00:00:00")
+    made_first = _picture("gen-two", 2, created_at="2025-01-01 00:00:00")
+    names = ItemNames(db)
+
+    names.take([made_first, made_last], [], {})
+
+    assert (names.of("gen-two"), names.of("gen-one")) == (
+        f"{_code(made_first)} 000", f"{_code(made_first)} 001")
+
+
 def test_an_item_keeps_its_name_after_an_older_one_is_deleted_for_good(db):
     first, second = _picture("gen-one", 1), _picture("gen-two", 2)
     ItemNames(db).take([second, first], [], {})

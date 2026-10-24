@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
 
-from origenerator import evolver_export
+from origenerator import evolver_export, outside_videos, recipe_match
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     EVOLVER_SOURCE,
@@ -32,7 +32,6 @@ from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery import (
     EnhanceSettings,
-    animated_preview_path,
     config_folder_key,
     config_folder_name,
     describe_enhance_params,
@@ -53,7 +52,9 @@ from origenerator.generation_config import (
     merge_denormalized,
     would_reproduce_a_completed_run,
 )
+from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.gui import icons
+from origenerator.gui.action_picker import ActionPicker
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.eliding import ElidingLabel
@@ -74,10 +75,10 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.metadata_block import MetadataBlock, wrappable
+from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
-from origenerator.gui.picture_state_picker import PictureStatePicker
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.warning_mark import WarningMark
@@ -98,7 +99,7 @@ from origenerator.setting_advice import (
     spoken_list,
 )
 from origenerator.timing import estimate_label
-from origenerator.workflows import RETIRED_WORKFLOW_NAMES, WORKFLOW_REGISTRY, offered_workflows
+from origenerator.workflows import RETIRED_WORKFLOW_NAMES, offered_workflows, workflow_named
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,8 @@ _WAITING_NOTE = "Waiting for preview…"
 _REQUEST_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
+
+_MADE_ELSEWHERE_TIP = "Another site made this — Origenerator can't remake it"
 
 
 def _nothing_to_start_from(missing_images: list[str]) -> str:
@@ -223,7 +226,8 @@ class GenerateConfigPanel(QWidget):
                  *, fun_time=None, heights=None,
                  inbox: evolver_export.EvolverInbox | None = None,
                  library: LibraryViews | None = None,
-                 names: ItemNames | None = None):
+                 names: ItemNames | None = None,
+                 previews: MovingPreviews | None = None):
         super().__init__(parent)
         self._heights = heights  # the window's prompt heights, for its forms
         # Where a clip is handed to Evolver. Asked for rather than performed
@@ -235,6 +239,7 @@ class GenerateConfigPanel(QWidget):
         self._db = db
         self._library = library or LibraryViews(db)
         self._names = names or ItemNames(db)
+        self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
         self._folder_generating = False
@@ -415,14 +420,20 @@ class GenerateConfigPanel(QWidget):
         self._metadata_block = MetadataBlock(go_to_folder=self._go_to_folder)
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
-        self._picture_state = PictureStatePicker(state_names())
-        self._picture_state.chosen.connect(self._on_picture_state_chosen)
-        body.addWidget(self._picture_state)
+        self._action = ActionPicker(state_names(), recipe_match.CATEGORIES)
+        self._action.chosen.connect(self._on_action_chosen)
+        body.addWidget(self._action)
 
-    def _on_picture_state_chosen(self, prompt_id: str, state: str) -> None:
-        """Record what the picture on display shows — the same column the
-        sorting window writes, so a picture answered here is answered there."""
-        self._db.set_picture_state(prompt_id, state or None)
+    def _on_action_chosen(self, prompt_id: str, said: str) -> None:
+        """Record what the item on display shows: a picture's in the column the
+        sorting window writes, so it is answered there too, a video's as its act."""
+        row = self._displayed_row or {}
+        if media_type_of_row(row) != MediaType.VIDEO:
+            self._db.set_picture_state(prompt_id, said or None)
+        elif source_of(row) == GenerationSource.OUTSIDE and (places := outside_videos.places_here()):
+            outside_videos.pick_act(self._db, places, row, said)
+        else:
+            self._db.set_act(prompt_id, said or None)
 
     def _build_workflow_header(self, body: QVBoxLayout) -> None:
         """The editable half: the workflow picker, its typical-time estimate, and
@@ -483,7 +494,7 @@ class GenerateConfigPanel(QWidget):
         """
         self._related = RelatedMedia(video_rows=self._video_rows,
                                      row_of=self._db.get_generation,
-                                     name_of=self._names.of)
+                                     name_of=self._names.of, previews=self._previews)
         self._related.source_activated.connect(self.source_activated)
         self._related.animated_activated.connect(self.animated_activated)
         body.addWidget(self._related)
@@ -585,8 +596,7 @@ class GenerateConfigPanel(QWidget):
 
     def _can_generate(self) -> bool:
         return (self._client is not None
-                and self._workflow_combo.currentData() is not None
-                and not self._folder_generating
+                and workflow_named(self._workflow_combo.currentData()) is not None
                 and self._why_generate_is_blocked() is None)
 
     def _sync_generate(self) -> None:
@@ -599,13 +609,17 @@ class GenerateConfigPanel(QWidget):
         self._cannot_remake_note.setVisible(note is not None)
 
     def _why_generate_is_blocked(self) -> str | None:
+        workflow = workflow_named(self._workflow_combo.currentData())
+        if workflow is not None and not workflow.generates_here:
+            return _MADE_ELSEWHERE_TIP
         lost = self._lost_workflow()
         if lost is not None:
             return _select_a_workflow_first(lost)
         models = list(self._models_not_installed().values())
         images = self._missing_images()
         return ((_pick_installed_ones_first(models) if models else None)
-                or (_nothing_to_start_from(images) if images else None))
+                or (_nothing_to_start_from(images) if images else None)
+                or (ALREADY_MAKING_ONE_TIP if self._folder_generating else None))
 
     def _why_the_item_cannot_be_remade(self) -> str | None:
         lost = self._lost_workflow()
@@ -622,10 +636,10 @@ class GenerateConfigPanel(QWidget):
         if shown is None or self._workflow_combo.currentData() is not None:
             return None
         workflow_name = shown.get("workflow_name") or ""
-        return None if workflow_name in WORKFLOW_REGISTRY else workflow_name
+        return None if workflow_named(workflow_name) is not None else workflow_name
 
     def _models_not_installed(self) -> dict[str, str]:
-        wf = WORKFLOW_REGISTRY.get(self._form_workflow_key or "")
+        wf = workflow_named(self._form_workflow_key)
         if wf is None or self._param_form is None:
             return {}
         return not_installed(self._param_form.get_values(), self._param_form.definitions(),
@@ -640,7 +654,7 @@ class GenerateConfigPanel(QWidget):
         self.refresh_generate_caption()
 
     def _missing_images(self) -> list[str]:
-        wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData() or "")
+        wf = workflow_named(self._workflow_combo.currentData())
         if wf is None or self._param_form is None:
             return []
         return wf.missing_images(self._param_form.get_values())
@@ -658,8 +672,8 @@ class GenerateConfigPanel(QWidget):
         self._end_folder_request()
         self._fresh_form = False
         key = self._workflow_combo.currentData()
-        if key and key in WORKFLOW_REGISTRY:
-            wf = WORKFLOW_REGISTRY[key]
+        wf = workflow_named(key)
+        if wf is not None:
             self._offer_workflows(makes=wf.output_type, holding=key)
             edited = self._edited_form_values()
             # An i2v workflow derives its output size from the input image; hand
@@ -706,7 +720,7 @@ class GenerateConfigPanel(QWidget):
         workflows carries these over (where the new workflow shares the param), so
         a typed prompt or picked image survives the switch — while the departing
         form's own starting values never leak into the next one's."""
-        prior = WORKFLOW_REGISTRY.get(self._form_workflow_key or "")
+        prior = workflow_named(self._form_workflow_key)
         if self._param_form is None or prior is None:
             return {}
         values = self._param_form.get_values()
@@ -726,7 +740,7 @@ class GenerateConfigPanel(QWidget):
             self._rebase_on_the_model(before, self._form_checkpoint)
 
     def _rebase_on_the_model(self, before, after, keep=()):
-        defaults = WORKFLOW_REGISTRY[self._form_workflow_key].default_params()
+        defaults = workflow_named(self._form_workflow_key).default_params()
         old, new = fresh_settings(defaults, before), fresh_settings(defaults, after)
         following = {k: new[k] for k, v in self._param_form.get_values().items()
                      if k in old and k not in keep and v == old[k] != new[k]}
@@ -739,7 +753,7 @@ class GenerateConfigPanel(QWidget):
             values = form.get_values()
             definitions = form.definitions()
             missing = self._models_not_installed()
-            defaults = (WORKFLOW_REGISTRY[self._form_workflow_key].default_params()
+            defaults = (workflow_named(self._form_workflow_key).default_params()
                         if missing else {})
             form.set_warnings({**setting_advice(values, definitions),
                                **not_installed_advice(missing, definitions, defaults)})
@@ -810,9 +824,9 @@ class GenerateConfigPanel(QWidget):
         workflow, and "no runs yet" over an unanswered picker reads as a fact
         about the app rather than about the question still being asked.
         """
-        wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
-        self._estimate_label.setVisible(wf is not None)
-        if wf is not None:
+        wf = workflow_named(self._workflow_combo.currentData())
+        self._estimate_label.setVisible(wf is not None and wf.generates_here)
+        if wf is not None and wf.generates_here:
             self._estimate_label.setText(
                 f"Typical time: {estimate_label(self._db.recent_durations(wf.name))}"
             )
@@ -834,7 +848,7 @@ class GenerateConfigPanel(QWidget):
             self._generate_btn.set_caption(self._folder_request.caption())
             self._generate_btn.setToolTip(self._folder_request.tooltip())
             return
-        wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
+        wf = workflow_named(self._workflow_combo.currentData())
         config = self.current_config()
         duplicate = (
             wf is not None and self._can_generate()
@@ -849,9 +863,7 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn.set_caption(
             RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
         self._generate_btn.setToolTip(
-            self._why_generate_is_blocked()
-            or (ALREADY_MAKING_ONE_TIP if self._folder_generating
-                else _RANDOM_SEED_TIP if duplicate else ""))
+            self._why_generate_is_blocked() or (_RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder,
@@ -859,8 +871,6 @@ class GenerateConfigPanel(QWidget):
         if not self._can_generate():
             return  # no server, no workflow picked yet, or no picture to start from
         key = self._workflow_combo.currentData()
-        if key not in WORKFLOW_REGISTRY:
-            return
         params = self._param_form.get_values()
         if self._folder_request is not None:
             # A request that asked for nothing would re-run every seed in the
@@ -911,7 +921,7 @@ class GenerateConfigPanel(QWidget):
         return self._recipe_source
 
     def _recipe_prompts_differ(self) -> bool:
-        workflow = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
+        workflow = workflow_named(self._workflow_combo.currentData())
         return (self._recipe_row is not None and workflow is not None
                 and self._param_form is not None
                 and prompts_differ_from(self._param_form.get_values(),
@@ -996,7 +1006,7 @@ class GenerateConfigPanel(QWidget):
 
     def _looping_preview(self, item: str) -> str | None:
         row = self._db.get_generation(item)
-        return animated_preview_path(row, OUTPUT_PLACES, THUMB_DIR) if row else None
+        return self._previews.of(row) if row else None
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)
@@ -1019,7 +1029,7 @@ class GenerateConfigPanel(QWidget):
         ``None`` when no workflow is selected.
         """
         key = self._workflow_combo.currentData()
-        wf = WORKFLOW_REGISTRY.get(key)
+        wf = workflow_named(key)
         if wf is None or self._param_form is None:
             return None
         params_json = json.dumps(self._param_form.get_values())
@@ -1214,12 +1224,12 @@ class GenerateConfigPanel(QWidget):
             self._fresh_form = False
             self._end_folder_request()
             self._forget_watch()
-            if workflow_name in WORKFLOW_REGISTRY:
-                self._offer_workflows(makes=WORKFLOW_REGISTRY[workflow_name].output_type,
-                                      holding=workflow_name)
+            workflow = workflow_named(workflow_name)
+            if workflow is not None:
+                self._offer_workflows(makes=workflow.output_type, holding=workflow_name)
                 self._workflow_combo.setCurrentIndex(self._workflow_combo.findData(workflow_name))
             if self._param_form:
-                self._param_form.set_values(params)
+                self._param_form.replace_values(params)
             # Now that the settings match a real folder, show its newest result (the
             # workflow may not have changed above, so this doesn't ride on that signal).
             self.show_recent_preview()
@@ -1236,7 +1246,7 @@ class GenerateConfigPanel(QWidget):
         try:
             combo.clear()
             for name in listed:
-                combo.addItem(WORKFLOW_REGISTRY[name].display_name, name)
+                combo.addItem(workflow_named(name).display_name, name)
             combo.setCurrentIndex(combo.findData(current) if current is not None else -1)
         finally:
             combo.blockSignals(blocked)
@@ -1332,8 +1342,8 @@ class GenerateConfigPanel(QWidget):
         was asked about.
 
         The form is seeded first, with the newest-result autoshow held back while
-        it is, so nothing but the selection is ever put up. A workflow the app
-        can't rebuild leaves no form at all. Whatever the tab was about before
+        it is, so nothing but the selection is ever put up. A workflow the tab
+        cannot lay out leaves no form at all. Whatever the tab was about before
         it lets go of (:meth:`_point_elsewhere`).
         """
         self._point_elsewhere(row)
@@ -1368,11 +1378,11 @@ class GenerateConfigPanel(QWidget):
         self.forget_launched()
         self._forget_watch()
         self._forget_recipe_source()
-        self._end_folder_request()  # a workflow this app can't rebuild never reaches prefill
+        self._end_folder_request()  # a workflow this tab cannot lay out never reaches prefill
         workflow_name = row.get("workflow_name", "")
         self._autoshow_held = True
         try:
-            if workflow_name in WORKFLOW_REGISTRY:
+            if workflow_named(workflow_name) is not None:
                 self.prefill(workflow_name, merge_denormalized(row))
             else:
                 with self._loading():
@@ -1614,7 +1624,7 @@ class GenerateConfigPanel(QWidget):
         the state of a tab with none on display: blank, following a run still
         being made, or holding a whole folder's rewrite."""
         self._metadata_block.hide()
-        self._picture_state.clear()
+        self._action.clear()
         self._related.clear()
         self._versions.hide()
         self._pending_enhancement = None  # nothing on display to be enhancing
@@ -1632,7 +1642,7 @@ class GenerateConfigPanel(QWidget):
         self.reread_folder_buttons()
         self._metadata_block.setVisible(
             self._metadata_block.show_row(row, self._upscale_of(row), self._item_name()))
-        self._picture_state.show_row(row)
+        self._action.show_row(row)
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()
         self._show_request_diff(request)
@@ -1838,14 +1848,14 @@ class GenerateConfigPanel(QWidget):
     def _update_lane_button(self, preview):
         """Offer the displayed generation to the one app :func:`lane_for` picks.
 
-        Shown only for a video with a file on disk — every lane carries clips,
-        and Evolver is a video pipeline — so an image or a missing file hides it.
+        Shown only for a video of this app's with a file on disk, since Evolver holds
+        every other source's: an image, a missing file or another source's video hides it.
         One already sent says so beside Unsend instead, read from the row rather
         than from the button's own state so it survives a restart.
         ``preview`` is the resolved ``(path, media_type)``, or ``None``.
         """
-        is_video = preview is not None and preview[1] == MediaType.VIDEO
         row = self._displayed_row or {}
+        is_video = preview is not None and preview[1] == MediaType.VIDEO and made_here(row)
         lane = self._offered_lane = lane_for(row) if is_video else None
         sent = is_video and bool(row.get(lane.flag))
         self._lane_button.setVisible(is_video and not sent)

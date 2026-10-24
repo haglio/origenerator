@@ -107,9 +107,10 @@ from origenerator.gallery.labels import (
     model_label,
 )
 from origenerator.gallery.output import (
-    animated_preview_path,
+    animated_preview_if_made,
     generation_of_file,
     is_in_progress,
+    make_animated_preview,
     media_type_of_row,
     output_disk_files,
     output_file_path,
@@ -134,9 +135,13 @@ from origenerator.gallery.signatures import (
 from origenerator.gallery.source_image import (
     build_image_config_index,
     find_source_image_id,
+    landing_for,
+    rebuildable_source_image,
     source_image_id_for,
     source_image_id_in,
+    source_image_of,
     videos_from_source_image,
+    was_made_from,
 )
 from origenerator.gallery.time_sections import new_work_opens_a_section, section_headings
 from origenerator.gallery.tree import (
@@ -196,7 +201,7 @@ __all__ = [
     "SourceImageGroup",
     "WorkflowGroup",
     "all_group",
-    "animated_preview_path",
+    "animated_preview_if_made",
     "build_custom_folders",
     "build_gallery_tree",
     "build_image_config_index",
@@ -243,6 +248,7 @@ __all__ = [
     "is_image_conditioned",
     "is_in_progress",
     "job_kind_label",
+    "landing_for",
     "legacy_parentless_folder_key",
     "legacy_preenhance_settings_folder_keys",
     "legacy_preframe_settings_folder_key",
@@ -252,6 +258,7 @@ __all__ = [
     "level_matching_settings",
     "lora_label",
     "lora_signature",
+    "make_animated_preview",
     "match_command",
     "media_type_of_row",
     "model_label",
@@ -265,6 +272,7 @@ __all__ = [
     "parse_params",
     "produced_output",
     "prompts_differ_from",
+    "rebuildable_source_image",
     "recent_generations",
     "recently_worked_folders",
     "recognized_spelling",
@@ -282,8 +290,10 @@ __all__ = [
     "settings_signature",
     "source_image_id_for",
     "source_image_id_in",
+    "source_image_of",
     "start_frame_index",
     "unreviewed_experiments",
     "videos_from_source_image",
+    "was_made_from",
     "workflow_output_type",
 ]

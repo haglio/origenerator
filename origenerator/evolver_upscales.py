@@ -20,13 +20,8 @@ class EvolverUpscales:
 
     @classmethod
     def scan(cls, upscaled_dir, source: str) -> EvolverUpscales:
-        found = {}
-        for orientation in ORIENTATIONS:
-            folder = Path(upscaled_dir) / orientation / source
-            if folder.is_dir():
-                found.update((stem, path) for path in folder.iterdir()
-                             if (stem := original_stem(path)) is not None)
-        return cls(found)
+        return cls({stem: path for filed_under, path in filed_upscales(upscaled_dir)
+                    if filed_under == source and (stem := original_stem(path)) is not None})
 
     def upscale_of(self, video) -> Path | None:
         video = Path(video)
@@ -35,6 +30,16 @@ class EvolverUpscales:
                 or not _predates(video, upscale)):
             return None
         return upscale
+
+
+def filed_upscales(upscaled_dir) -> list[tuple[str, Path]]:
+    filed = []
+    for orientation in ORIENTATIONS:
+        folder = Path(upscaled_dir) / orientation
+        sources = sorted(p for p in folder.iterdir() if p.is_dir()) if folder.is_dir() else []
+        for source in sources:
+            filed.extend((source.name, path) for path in sorted(source.iterdir()))
+    return filed
 
 
 def original_stem(path) -> str | None:

@@ -12,17 +12,22 @@ from __future__ import annotations
 import json
 
 import pytest
+from PIL import Image
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import evolver_export, gallery, recipe_match
 from origenerator.animate_command import AnimateRequest
+from origenerator.db import Database
+from origenerator.generation_state import GenerationSource
 from origenerator.gui import combine_controller as module
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.export_lane import GENAU
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
+from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
@@ -329,6 +334,25 @@ def test_a_video_lends_the_image_slot_the_picture_it_was_made_from(combine):
         db=FakeDB([picture, _video("clip", source_image="images/frame.png [output]")]))
 
     assert controller._picture_lent_by("clip") == "img"
+
+
+def test_a_video_made_from_words_alone_lends_the_image_slot_its_starting_frame(combine, tmp_path):
+    db = Database(tmp_path / "test.db")
+    file = tmp_path / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
+    file.parent.mkdir(parents=True)
+    file.write_bytes(b"not really a video")
+    db.insert_rows(rows_bringing_in(
+        OutsideVideo(file, "a-site"), Record(), frames_dir=tmp_path / "frames",
+        thumb_dir=tmp_path / "thumbs", grab=lambda _path: Image.new("RGB", (64, 96))))
+    rows = db.list_generations()
+    [shown] = [row for row in rows if gallery.media_type_of_row(row) == MediaType.VIDEO]
+    controller, _host = combine(
+        FakeHost(rows=[row for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE]),
+        db=db)
+
+    lent = controller._picture_lent_by(shown["prompt_id"])
+
+    assert db.get_generation(lent)["source"] == GenerationSource.STARTING_FRAME
 
 
 def test_a_video_made_from_a_picture_the_gallery_lacks_lends_the_image_slot_nothing(combine):

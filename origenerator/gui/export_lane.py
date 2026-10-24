@@ -87,12 +87,13 @@ class ExportLane:
         self.mark(db, prompt_id)
         return landed
 
-EVOLVER = ExportLane(
-    name="Evolver", source_key="evolver", source=EVOLVER_SOURCE,
+KINO = ExportLane(
+    name="Kino", source_key="evolver", source=EVOLVER_SOURCE,
     mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
     unmark=lambda db, prompt_id: db.mark_evolver_unsent(prompt_id),
     noun="video",
-    tooltip="Copy this video into Evolver's inbox for sorting and upscaling.",
+    tooltip="Send this video down the Kino lane: Evolver sorts and upscales it on its usual "
+            "schedule, then files it where Kino plays it.",
     unsend_tooltip="Delete the copy Evolver holds, wherever it has filed it by "
                    "now. It goes on Evolver's next run.",
     withdrawn_tooltip="An earlier copy of this video is down for deletion in "
@@ -116,7 +117,7 @@ GENAU = ExportLane(
     carries_loops=True,
 )
 
-EXPORT_LANES = (EVOLVER, GENAU)
+EXPORT_LANES = (KINO, GENAU)
 
 UNSEND_CAPTION = "✕ Unsend"
 

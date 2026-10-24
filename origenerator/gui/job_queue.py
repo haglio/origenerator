@@ -373,12 +373,9 @@ class JobQueue(QObject):
         """The image generation ``row``'s input image came from, paired with its
         workflow, when the app can rebuild it — so an i2v re-roll can regenerate a
         fresh start frame first. ``None`` when there's no reusable source image."""
-        source_id = gallery.find_source_image_id(row, image_rows)
-        if source_id is None:
-            return None
-        source = self._db.get_generation(source_id)
-        workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
-        return (source, workflow) if workflow is not None else None
+        picked = gallery.rebuildable_source_image(row, image_rows)
+        source = self._db.get_generation(picked["prompt_id"]) if picked is not None else None
+        return (source, WORKFLOW_REGISTRY[source["workflow_name"]]) if source is not None else None
 
     def _launch(self, key, workflow, params, on_finished, *, origin=None, run_media_type=None,
                 shielded=False):

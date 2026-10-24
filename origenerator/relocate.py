@@ -25,8 +25,8 @@ where its row says, by name, across every place outputs are kept:
   one is this row's. Broken is visible; repointed at another generation's file
   is not.
 
-A record the recovery bin re-pointed carries an absolute ``path`` of its own and
-is skipped: its file is in the trash, which is none of those places.
+A record with a place of its own -- a file the bin moved to the trash, a starting
+frame, a video in the library -- is skipped: none of them is in the output tree.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from origenerator.funscript import funscript_path_for
-from origenerator.gallery.output import parse_file_list
+from origenerator.gallery.output import parse_file_list, place_of_its_own
 from origenerator.output_places import OutputPlaces
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def _followed(files: list, index: dict[str, set[str]], places: OutputPlaces) -> 
     """Repoint each record in *files* whose file has moved; how many, in place."""
     moved = 0
     for record in files:
-        if not isinstance(record, dict) or record.get("path"):
+        if not isinstance(record, dict) or place_of_its_own(record):
             continue
         name = record.get("filename") or ""
         holders = index.get(name, set())

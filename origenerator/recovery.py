@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from origenerator.gallery.output import parse_file_list
+from origenerator.outside_videos import leave_out_for_good
 from origenerator.trash import TrashedBatch
 
 _SECONDS_PER_DAY = 86400
@@ -136,6 +137,7 @@ def purge(db, record: dict) -> None:
     """
     TrashedBatch.from_record(record.get("batch") or {}).purge()
     db.forget_deletion(record["prompt_id"])
+    leave_out_for_good(db, record["row"])
 
 
 def reclaim_orphans(db, trash) -> int:

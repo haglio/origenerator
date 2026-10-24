@@ -74,12 +74,13 @@ from origenerator.gallery.signatures import (
     folder_signature,
     is_image_conditioned,
     lora_signature,
+    made_from_a_picture,
     model_signature,
     parse_params,
     settings_only,
 )
 from origenerator.gallery.source_image import build_image_config_index
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.media import MediaType
 
 
@@ -148,7 +149,7 @@ def folder_chain(row: dict, image_index: dict | None = None) -> tuple[str, ...]:
 
 
 def _grows_source_images(media_type: str, workflow_name: str) -> bool:
-    return media_type == MediaType.VIDEO and is_image_conditioned(workflow_name)
+    return media_type == MediaType.VIDEO and made_from_a_picture(workflow_name)
 
 
 def _lora_place(workflow_name: str, params_json: str | None) -> str:
@@ -349,7 +350,7 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
     """
     listed = [
         row for row in rows
-        if source_of(row) != GenerationSource.EXPERIMENT
+        if source_of(row) != GenerationSource.EXPERIMENT and in_sight(row)
         and produced_output(row)
     ]
     if bumped is None:
@@ -594,7 +595,7 @@ def _build_source_image_groups(tier: _Tier, rows: list[dict]) -> list[SourceImag
 
 def placeable_rows(rows: list[dict]) -> list[dict]:
     """The rows a tree has somewhere to put — what :func:`build_gallery_tree`
-    nests, and what :func:`start_frame_index` reads the start frames out of.
+    nests.
 
     A row is included once it has something to place: it either
     :func:`produced_output` (a finished result) or :func:`is_in_progress` (a
@@ -614,6 +615,10 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
     target and vanishes, so it never earns a tile — least of all a duplicate one
     beside what it repairs.
     """
+    return [row for row in rows_with_a_folder(rows) if in_sight(row)]
+
+
+def rows_with_a_folder(rows: list[dict]) -> list[dict]:
     return [
         row for row in rows
         if (produced_output(row) or is_in_progress(row))
@@ -641,7 +646,7 @@ def start_frame_index(rows: list[dict]) -> dict:
     queue row for a job in it finds no row and does nothing at all.
     """
     return build_image_config_index(
-        [row for row in placeable_rows(rows)
+        [row for row in rows_with_a_folder(rows)
          if media_type_of_row(row) == MediaType.IMAGE and produced_output(row)]
     )
 
@@ -676,9 +681,9 @@ def build_gallery_tree(
     holding pen outside the tree.
     """
     folder_meta = folder_meta or {}
-    rows = placeable_rows(rows)
     if image_index is None:
         image_index = start_frame_index(rows)
+    rows = placeable_rows(rows)
     by_kind = dict(_group_by_creation(rows, media_type_of_row))
     return [_media_folder(media_type, by_kind[media_type], folder_meta, image_index,
                           name_of or _unnamed)

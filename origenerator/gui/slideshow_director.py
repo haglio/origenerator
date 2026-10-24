@@ -51,7 +51,7 @@ from origenerator.gallery.collection import folder_collection
 from origenerator.gallery.sides import (
     ORIENTATIONS as _ORIENTATIONS,
 )
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
@@ -670,7 +670,7 @@ class SlideshowDirector:
         """The generations a slideshow on *side* is mapped against: the whole
         library of that side's shape — what the Satellite Funestras map their
         clips against too, each over its own sources."""
-        return filter_rows(self._db.list_generations(), side)
+        return filter_rows([row for row in self._db.list_generations() if in_sight(row)], side)
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))

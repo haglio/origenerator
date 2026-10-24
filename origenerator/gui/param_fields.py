@@ -29,6 +29,8 @@ from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds
 # U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+2060 word-joiner, U+FEFF BOM.
 _INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
 
+NOT_KNOWN = "—"
+
 
 class FieldKind(ABC):
     copyable = False
@@ -74,20 +76,22 @@ class _Seed(FieldKind):
     def make(self, pd):
         widget = SeedComboBox(lambda: self._history.uses(pd.key), self._history.looping_preview)
         widget.lineEdit().setPlaceholderText("64-bit integer seed")
-        widget.setEditText(str(pd.default))
+        self.write(pd, widget, pd.default)
         return widget
 
     def change_signal(self, widget):
         return widget.editTextChanged
 
     def read(self, pd, widget):
+        if widget.currentText() == NOT_KNOWN:
+            return None
         try:
             return int(widget.currentText())
         except ValueError:
             return 0
 
     def write(self, pd, widget, value):
-        widget.setEditText(str(int(value)))
+        widget.setEditText(NOT_KNOWN if value is None else str(int(value)))
 
 
 class _ImagePath(_Line):

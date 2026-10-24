@@ -45,14 +45,15 @@ SECTIONS: tuple[Section, ...] = (
         "checkpoint", "unet", "lora", "lora_strength", "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",
         "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
-        "upscale_model",
+        "upscale_model", "model", "style",
     ), collapsed=True),
     Section("Calibration", (
         "steps", "split_step", "cfg", "cfg_high", "cfg_low",
         "guidance", "sampler_name", "scheduler",
-        "shift_high",
+        "shift_high", "creativity",
     ), collapsed=True),
-    Section("Size", ("width", "height"), collapsed=True),
+    Section("Size", ("width", "height", "resolution", "aspect_ratio", "quality"),
+            collapsed=True),
     Section("Video", ("frame_count", "frame_rate"), collapsed=True),
     Section("Sound", (
         "audio_prompt", "audio_negative_prompt", "audio_seed",

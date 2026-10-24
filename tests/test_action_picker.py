@@ -1,4 +1,4 @@
-"""The row on a config tab saying what the picture it is showing shows.
+"""The row on a config tab saying what the item it is showing shows.
 
 States are the committed example overlay's own (see CLAUDE.md).
 """
@@ -9,28 +9,30 @@ import json
 import pytest
 from PyQt6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QWidget
 
-from origenerator.gui import picture_state_picker
-from origenerator.gui.picture_state_picker import (
+from origenerator.gui import action_picker
+from origenerator.gui.action_picker import (
     ACTION_LABEL,
     SORT_BUTTON,
-    PictureStatePicker,
+    ActionPicker,
 )
 
 _STATES = ("state one", "state two", "state three")
+_ACTS = ("act one", "act two")
 
 
-def _row(prompt_id="img", *, filename="scene_00001_.png", state=None):
+def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, act=None):
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "output_files": json.dumps([{"filename": filename}]),
         "picture_state": state,
+        "recipe_category": act,
     }
 
 
 @pytest.fixture
 def picker(qtbot):
-    made = PictureStatePicker(_STATES)
+    made = ActionPicker(_STATES, _ACTS)
     qtbot.addWidget(made)
     return made
 
@@ -39,21 +41,21 @@ def test_a_picture_offers_every_state_and_opens_on_the_one_it_was_sorted_as(pick
     picker.show_row(_row(state="state two"))
 
     assert not picker.isHidden()
-    assert picker.chosen_state() == "state two"
+    assert picker.picked() == "state two"
     assert picker.offered() == ["", *_STATES]
 
 
 def test_a_picture_nobody_has_sorted_yet_opens_on_nothing(picker):
     picker.show_row(_row())
 
-    assert picker.chosen_state() == ""
+    assert picker.picked() == ""
 
 
 def test_a_picture_sorted_as_a_state_the_list_no_longer_offers_opens_on_nothing(picker):
     picker.show_row(_row(state="a state taken off the list"))
 
     assert not picker.isHidden()
-    assert picker.chosen_state() == ""
+    assert picker.picked() == ""
 
 
 def test_picking_a_state_says_which_picture_it_is_for(picker, qtbot):
@@ -83,10 +85,48 @@ def test_taking_the_answer_back_says_so_rather_than_saying_nothing(picker, qtbot
     assert caught.args == ["img-7", ""]
 
 
-def test_a_video_has_no_state_to_pick_and_the_row_stays_away(picker):
-    picker.show_row(_row(filename="scene_00001_.mp4"))
+def test_a_video_offers_every_act_and_opens_on_the_one_it_shows(picker):
+    picker.show_row(_row(filename="scene_00001_.mp4", act="act two"))
 
-    assert picker.isHidden()
+    assert not picker.isHidden()
+    assert picker.picked() == "act two"
+    assert picker.offered() == ["", *_ACTS]
+
+
+def test_an_act_the_list_lacks_shows_as_itself_at_its_foot(picker):
+    picker.show_row(_row(filename="scene_00001_.mp4", act="an act from elsewhere"))
+
+    assert picker.picked() == "an act from elsewhere"
+    assert picker.offered() == ["", *_ACTS, "an act from elsewhere"]
+
+
+def test_an_act_spelled_like_one_on_the_list_but_for_case_and_spacing_is_that_act(picker):
+    picker.show_row(_row(filename="scene_00001_.mp4", act="  ACT   two "))
+
+    assert picker.picked() == "act two"
+    assert picker.offered() == ["", *_ACTS]
+
+
+def test_only_a_picture_offers_the_button_that_sorts_pictures(picker):
+    sort = picker.findChild(QPushButton, SORT_BUTTON)
+
+    picker.show_row(_row(filename="scene_00001_.mp4"))
+    on_a_video = sort.isHidden()
+    picker.show_row(_row())
+
+    assert (on_a_video, sort.isHidden()) == (True, False)
+
+
+def test_the_list_says_whether_it_is_a_pictures_or_a_videos(picker):
+    combo = picker.findChild(QComboBox)
+
+    picker.show_row(_row(filename="scene_00001_.mp4"))
+    on_a_video = combo.toolTip()
+    picker.show_row(_row())
+
+    assert (on_a_video, combo.toolTip()) == (
+        "What this video shows — the act it was made as",
+        "What this picture already shows — which decides what it can be animated as")
 
 
 def test_a_tab_showing_nothing_shows_no_row(picker):
@@ -119,7 +159,7 @@ def test_a_button_beside_the_list_opens_the_window_that_answers_for_them_all(
     said = []
     monkeypatch.setattr(QMessageBox, "information",
                         lambda parent, title, text: said.append(text))
-    monkeypatch.setattr(picture_state_picker, "the_sorting_window",
+    monkeypatch.setattr(action_picker, "the_sorting_window",
                         lambda: "Every picture already says what it shows.")
 
     picker.findChild(QPushButton, SORT_BUTTON).click()
@@ -137,7 +177,7 @@ def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second
         made.append(window)
         return window
 
-    monkeypatch.setattr(picture_state_picker, "the_sorting_window", one_window)
+    monkeypatch.setattr(action_picker, "the_sorting_window", one_window)
     button = picker.findChild(QPushButton, SORT_BUTTON)
 
     button.click()

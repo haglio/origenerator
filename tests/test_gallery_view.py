@@ -68,6 +68,7 @@ from origenerator import (
     gallery,
     motion_engine,
     osr2_driver,
+    outside_videos,
     recipe_match,
     search,
 )
@@ -1260,6 +1261,28 @@ def test_starring_a_picture_counts_it_on_the_favorites_of_every_folder_above_it(
 
     assert _shown(_collection_row(_at(_image_workflow(view._tree), 0), "Favorites")) == "(1) Favorites"
     assert _shown(_collection_row(_video_workflow(view._tree), "Favorites")) == "Favorites"
+
+
+def test_starring_another_sources_video_tells_fun_time_through_the_journal(qtbot, tmp_path,
+                                                                          monkeypatch):
+    video = {"prompt_id": "o1", "source": GenerationSource.OUTSIDE,
+             "workflow_name": "outside:a-site", "workflow_version": "outside",
+             "status": "completed", "params_json": "{}", "starred": 0,
+             "output_files": json.dumps([{"filename": "c1_topaz.mp4",
+                                          "library_path": str(tmp_path / "outbox" / "c1_topaz.mp4")}])}
+    journal = tmp_path / "journals" / "origenerator.jsonl"
+    monkeypatch.setattr(outside_videos, "places_here", lambda: outside_videos.Places(
+        upscaled_dir=tmp_path / "outbox", records_folder=tmp_path / "records",
+        frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
+        skip_sources=frozenset(), library_root=tmp_path, journal=journal))
+    view = GalleryView(FakeDB([video]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.set_items_favorite(["o1"], True)
+
+    [line] = journal.read_text(encoding="utf-8").splitlines()
+    assert json.loads(line)["event"] == "favorite"
 
 
 def test_the_trash_collection_searches_what_it_is_holding(qtbot):
@@ -3652,7 +3675,7 @@ def test_recents_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, mo
         calls.append((row["prompt_id"], places, thumb_dir))
         return str(webp) if gallery.media_type_of_row(row) == "video" else None
 
-    monkeypatch.setattr(gallery, "animated_preview_path", fake_anim)
+    monkeypatch.setattr(gallery, "animated_preview_if_made", fake_anim)
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
@@ -3669,7 +3692,7 @@ def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
     rows = [_row("v1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4")]
     monkeypatch.setattr(
-        gallery, "animated_preview_path",
+        gallery, "animated_preview_if_made",
         lambda row, o, t: str(webp) if gallery.media_type_of_row(row) == "video" else None,
     )
     view = GalleryView(FakeDB(rows))
@@ -3678,6 +3701,27 @@ def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
 
     view._tree.setCurrentItem(view._leaf_by_id["v1"])  # the video's settings folder
     assert view._browser._thumb_widgets["v1"].findChildren(QMovie)  # its grid tile loops
+
+
+def test_a_videos_moving_preview_is_made_off_the_window_thread_while_its_tile_shows_its_still(
+        qtbot, tmp_path, monkeypatch):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    rows = [_row("v1", "wan22_i2v",
+                 {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4")]
+    made_on = []
+    monkeypatch.setattr(gallery, "animated_preview_if_made",
+                        lambda row, o, t: str(webp) if made_on else None)
+    monkeypatch.setattr(gallery, "make_animated_preview",
+                        lambda row, o, t: made_on.append(threading.current_thread()) or str(webp))
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["v1"])
+
+    assert view._browser._thumb_widgets["v1"].findChildren(QMovie) == []
+    qtbot.waitUntil(lambda: bool(view._browser._thumb_widgets["v1"].findChildren(QMovie)))
+    assert made_on and threading.main_thread() not in made_on
 
 
 def test_recents_tiles_are_badged_image_or_video(qtbot):
@@ -4735,6 +4779,27 @@ def test_following_a_source_link_lands_on_the_image_itself(qtbot):
     assert view.selected_prompt_ids() == ["i7"]
     assert view._browser._thumb_widgets["i7"].is_selected()
     assert _in_view(view, "i7")
+
+
+def test_following_a_link_to_a_word_made_videos_hidden_frame_lands_on_that_video(qtbot, tmp_path):
+    frame_file = tmp_path / "frames" / "f1.jpg"
+    frame = {"prompt_id": "f1", "source": GenerationSource.STARTING_FRAME,
+             "workflow_name": "outside picture:a-site", "workflow_version": "outside",
+             "status": "completed", "params_json": "{}",
+             "output_files": json.dumps([{"filename": "f1.jpg", "path": str(frame_file)}])}
+    video = {"prompt_id": "o1", "source": GenerationSource.OUTSIDE,
+             "workflow_name": "outside:a-site", "workflow_version": "outside",
+             "status": "completed", "params_json": json.dumps({"input_image": str(frame_file)}),
+             "output_files": json.dumps([{"filename": "c1_topaz.mp4",
+                                          "library_path": str(tmp_path / "outbox" / "c1_topaz.mp4")}])}
+    view = GalleryView(FakeDB([video, frame]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.follow_link("f1")
+
+    assert view.selected_prompt_ids() == ["o1"]
+    assert view._selected["prompt_id"] == "o1"
 
 
 def test_a_followed_link_puts_the_picture_on_screen_in_the_same_turn(qtbot):
@@ -9580,6 +9645,21 @@ def test_i2v_item_with_a_handpicked_frame_offers_only_the_video_seed(qtbot, tmp_
     _select_leaf_of(view, "vid")
 
     # The frame can't be re-rolled, so only the video-seed control is offered.
+    assert _tooltips(view, "vid") == ["Randomize video seed"]
+
+
+def test_i2v_item_made_from_a_hidden_starting_frame_offers_only_the_video_seed(qtbot, tmp_path):
+    frame = tmp_path / "frames" / "f1.jpg"
+    db = _single_i2v_db(tmp_path, str(frame))
+    db.insert_rows([{"prompt_id": "f1", "source": GenerationSource.STARTING_FRAME,
+                     "workflow_name": "outside:a-site", "workflow_version": "outside",
+                     "status": "completed", "params_json": "{}", "workflow_json": "{}",
+                     "output_files": json.dumps([{"filename": "f1.jpg", "path": str(frame)}])}])
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "vid")
+
     assert _tooltips(view, "vid") == ["Randomize video seed"]
 
 
@@ -17199,7 +17279,7 @@ def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_
     actions are handed both at construction."""
     asked = []
     monkeypatch.setattr(
-        gallery, "animated_preview_path",
+        gallery, "animated_preview_if_made",
         lambda row, places, thumb_dir: asked.append((places, thumb_dir)))
     view = GalleryView(_bin_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(tmp_path / "output"),
                                                  thumb_dir=tmp_path / "thumbs"))

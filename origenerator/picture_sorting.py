@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from origenerator import gallery
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationStatus, in_sight
 from origenerator.media import MediaType
 
 
 def _wants_sorting(row: dict) -> bool:
     return (row.get("status") == GenerationStatus.COMPLETED
+            and in_sight(row)
             and not row.get("picture_state")
             and gallery.produced_output(row)
             and gallery.media_type_of_row(row) == MediaType.IMAGE

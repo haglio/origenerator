@@ -8,6 +8,7 @@ from typing import NamedTuple
 from origenerator.gallery.keys import FOLDER_ID_CHARS, folder_id
 
 _DIGITS_SHOWN = 3
+_HIGHEST_SHOWN = 10 ** _DIGITS_SHOWN - 1
 
 
 class ItemNumber(NamedTuple):
@@ -28,7 +29,7 @@ def widest_item_name(width_of: Callable[[str], int]) -> str:
 
 
 def _named(code: str, number: int) -> str:
-    return f"{code} {number:0{_DIGITS_SHOWN}d}"
+    return f"{code} {min(number, _HIGHEST_SHOWN):0{_DIGITS_SHOWN}d}"
 
 
 def number_items(folders: Mapping[str, Sequence[str]],

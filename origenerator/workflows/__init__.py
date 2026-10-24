@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from functools import cache
+
 from origenerator.media import MediaType
 from origenerator.workflows.base import WorkflowTemplate
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
 from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
+from origenerator.workflows.outside import OutsideWorkflow, VideoKind, outside_parts
 from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
@@ -35,3 +38,15 @@ def offered_workflows(*, makes: MediaType | None) -> list[WorkflowTemplate]:
 RETIRED_WORKFLOW_NAMES: dict[str, str] = {
     "wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)",
 }
+
+
+def workflow_named(name: str | None) -> WorkflowTemplate | None:
+    if name in WORKFLOW_REGISTRY:
+        return WORKFLOW_REGISTRY[name]
+    parts = outside_parts(name)
+    return _outside(*parts) if parts is not None else None
+
+
+@cache
+def _outside(source: str, made: MediaType, kind: VideoKind | None) -> OutsideWorkflow:
+    return OutsideWorkflow(source, made, kind)

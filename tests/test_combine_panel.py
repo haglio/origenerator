@@ -10,10 +10,10 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 
 from origenerator import animation_paths, recipe_match
+from origenerator.gui.action_picker import ACTION_LABEL
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.gui.pictured_dropdown import PICTURES_ROLE
 from origenerator.gui.stylesheet import build_stylesheet
 

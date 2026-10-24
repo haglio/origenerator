@@ -6,6 +6,7 @@ import json
 import pytest
 
 from origenerator import search
+from origenerator.generation_state import GenerationSource
 
 
 def _row(prompt_id, positive, *, negative="", seed=1, workflow="sdxl_t2i",
@@ -230,6 +231,12 @@ def test_only_generations_that_produced_something_are_searchable():
     # Search is a way of finding something to look at; a failed or still-running
     # run has nothing to show.
     rows = [_row("g1", "a red lamp"), _row("g2", "a red lamp", output=False)]
+    assert _hits(_index(rows), "lamp") == ["g1"]
+
+
+def test_a_hidden_starting_frame_is_never_found():
+    rows = [_row("g1", "a red lamp"),
+            {**_row("f1", "a red lamp"), "source": GenerationSource.STARTING_FRAME}]
     assert _hits(_index(rows), "lamp") == ["g1"]
 
 

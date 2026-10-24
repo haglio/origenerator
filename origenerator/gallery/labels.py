@@ -22,7 +22,6 @@ from origenerator.gallery.signatures import (
     _basename,
     _frame_name,
     _named_loras,
-    _registered,
     _unannotated,
     settings_only,
     workflow_lora_keys,
@@ -31,14 +30,14 @@ from origenerator.gallery.signatures import (
 )
 from origenerator.media import MediaType
 from origenerator.model_titles import model_title
-from origenerator.workflows import RETIRED_WORKFLOW_NAMES
+from origenerator.workflows import RETIRED_WORKFLOW_NAMES, workflow_named
 
 MEDIA_LABELS = {MediaType.IMAGE: "Images", MediaType.VIDEO: "Videos"}
 
 
 def workflow_label(workflow_name: str | None) -> str:
     """Human-facing folder name for a workflow: its display name, else the key."""
-    wf = _registered(workflow_name)
+    wf = workflow_named(workflow_name)
     if wf:
         return wf.display_name
     return RETIRED_WORKFLOW_NAMES.get(workflow_name or "") or workflow_name or "unknown"

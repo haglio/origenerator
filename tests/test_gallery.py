@@ -15,7 +15,7 @@ from origenerator.gallery import (
     SourceImageGroup,
     WorkflowGroup,
     all_group,
-    animated_preview_path,
+    animated_preview_if_made,
     build_gallery_tree,
     build_image_config_index,
     child_groups,
@@ -37,6 +37,7 @@ from origenerator.gallery import (
     legacy_settings_folder_key,
     lora_label,
     lora_signature,
+    make_animated_preview,
     media_type_of_row,
     model_label,
     model_signature,
@@ -157,7 +158,7 @@ def _row(**kw):
     return base
 
 
-def test_animated_preview_path_generates_a_cached_webp_for_a_video(tmp_path, monkeypatch):
+def test_make_animated_preview_generates_a_cached_webp_for_a_video(tmp_path, monkeypatch):
     """A video row resolves to its looping WebP, generated from the on-disk file."""
     video = tmp_path / "wan22_i2v_v1.mp4"
     video.write_bytes(b"fake video")
@@ -171,13 +172,13 @@ def test_animated_preview_path_generates_a_cached_webp_for_a_video(tmp_path, mon
 
     monkeypatch.setattr(gallery_output, "generate_animated_thumbnail", fake_generate)
 
-    result = animated_preview_path(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
+    result = make_animated_preview(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert result == str(tmp_path / "thumbs" / "v1_anim.webp")
     assert calls == [(video, tmp_path / "thumbs", "v1")]  # generated from the real file
 
 
-def test_animated_preview_path_is_none_for_an_image(tmp_path, monkeypatch):
+def test_make_animated_preview_is_none_for_an_image(tmp_path, monkeypatch):
     """An image row has nothing to animate, so no WebP is generated."""
     image = tmp_path / "sdxl_t2i_i1.png"
     image.write_bytes(b"fake image")
@@ -185,11 +186,11 @@ def test_animated_preview_path_is_none_for_an_image(tmp_path, monkeypatch):
     generate = MagicMock()
     monkeypatch.setattr(gallery_output, "generate_animated_thumbnail", generate)
 
-    assert animated_preview_path(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs") is None
+    assert make_animated_preview(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs") is None
     generate.assert_not_called()
 
 
-def test_animated_preview_path_is_none_when_the_video_yields_no_frames(tmp_path, monkeypatch):
+def test_make_animated_preview_is_none_when_the_video_yields_no_frames(tmp_path, monkeypatch):
     """An unreadable video yields no WebP, so the caller falls back to the still."""
     video = tmp_path / "wan22_i2v_v1.mp4"
     video.write_bytes(b"fake video")
@@ -198,7 +199,23 @@ def test_animated_preview_path_is_none_when_the_video_yields_no_frames(tmp_path,
     monkeypatch.setattr(gallery_output, "generate_animated_thumbnail",
                         lambda *a, **k: None)
 
-    assert animated_preview_path(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs") is None
+    assert make_animated_preview(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs") is None
+
+
+def test_a_made_moving_preview_is_found_without_decoding_anything(tmp_path, monkeypatch):
+    video = tmp_path / "wan22_i2v_v1.mp4"
+    video.write_bytes(b"fake video")
+    row = _row(prompt_id="v1", workflow_name="wan22_i2v",
+               output_files=json.dumps([{"filename": "wan22_i2v_v1.mp4"}]))
+    monkeypatch.setattr(gallery_output, "generate_animated_thumbnail", MagicMock())
+    places = OutputPlaces.in_one_folder(tmp_path)
+
+    assert animated_preview_if_made(row, places, tmp_path / "thumbs") is None
+    (tmp_path / "thumbs").mkdir()
+    (tmp_path / "thumbs" / "v1_anim.webp").write_bytes(b"made before")
+    assert animated_preview_if_made(row, places, tmp_path / "thumbs") == str(
+        tmp_path / "thumbs" / "v1_anim.webp")
+    gallery_output.generate_animated_thumbnail.assert_not_called()
 
 
 def test_a_rows_kind_is_read_out_of_its_stored_files_once(monkeypatch):

@@ -33,6 +33,7 @@ from origenerator.gallery import (
     row_output_files,
     workflow_output_type,
 )
+from origenerator.gallery.output import place_of_its_own
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
@@ -182,6 +183,9 @@ def first_frames_filed_apart_from_their_videos(rows: list[dict]) -> list[dict]:
 
 
 def _sidecar_key(file_entry: dict) -> tuple[str, str]:
+    placed = place_of_its_own(file_entry)
+    if placed:
+        return str(Path(placed).parent), Path(placed).stem
     return (file_entry.get("subfolder", ""), Path(file_entry.get("filename", "")).stem)
 
 

@@ -65,7 +65,7 @@ def the_animation_window():
         row = db.get_generation(source) if source else None
         still = gallery.resolve_preview(row, OUTPUT_PLACES) if row else None
         return (str(still[0]) if still and still[1] == MediaType.IMAGE else None,
-                gallery.animated_preview_path(sample, OUTPUT_PLACES, THUMB_DIR))
+                gallery.make_animated_preview(sample, OUTPUT_PLACES, THUMB_DIR))
 
     return AnimationCheckWindow(
         AnimationCheckSession(

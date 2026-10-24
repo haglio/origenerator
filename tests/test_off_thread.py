@@ -111,3 +111,16 @@ def test_each_call_carries_its_own_answer(qtbot, owner):
     qtbot.waitUntil(lambda: len(got) == 2, timeout=5000)
 
     assert sorted(got) == ["a", "b"]
+
+
+def test_a_call_that_may_wait_minutes_holds_neither_the_pool_nor_the_apps_exit(qtbot, owner):
+    got = []
+
+    def where():
+        thread = threading.current_thread()
+        return type(thread) is threading.Thread, thread.daemon
+
+    run_off_thread(where, got.append, owner=owner, waits_long=True)
+    _wait_for(qtbot, got)
+
+    assert got == [(True, True)]

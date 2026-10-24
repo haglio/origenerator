@@ -1315,3 +1315,24 @@ def test_a_file_with_no_embedded_graph_still_says_how_big_it_is(tmp_path):
     Image.new("RGB", (832, 480)).save(path)
 
     assert imp._extract_metadata(path, ".png")["params"] == {"width": 832, "height": 480}
+
+
+def test_an_imported_performance_gains_the_video_it_performed(tmp_path):
+    db = Database(tmp_path / "t.db")
+    graph = {
+        "12": {"class_type": "VHS_LoadVideoPath",
+               "inputs": {"video": "C:/library/videos/videos/scene one.mp4", "force_rate": 16,
+                          "skip_first_frames": 32, "frame_load_cap": 81}},
+        "19": {"class_type": "WanAnimateToVideo", "inputs": {"length": 81}},
+    }
+    db.insert_generation(
+        prompt_id="performed", workflow_name="wan22_animate", workflow_version="imported",
+        params_json=json.dumps({"positive_prompt": "a person", "seed": 1}),
+        workflow_json=json.dumps(graph), source="imported",
+    )
+
+    assert backfill_import_params(db, tmp_path) == 1
+
+    params = json.loads(db.get_generation("performed")["params_json"])
+    assert params["video"] == "C:/library/videos/videos/scene one.mp4"
+    assert params["video_start"] == 2.0

@@ -5,6 +5,7 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, Qt
 from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
+from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import hovered
 from shared_ui.testing import ground
 
@@ -18,9 +19,10 @@ from tests.drop_style_seen import worn
 
 
 def _slot(qtbot, kind="image", lent_by=lambda pid: pid,
-          preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False):
+          preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False,
+          named=lambda name: None, name_of=lambda held: "", browse=None):
     slot = DropSlot(kind=kind, lent_by=lent_by, preview=preview, placeholder=placeholder,
-                    grayscale=grayscale)
+                    grayscale=grayscale, named=named, name_of=name_of, browse=browse)
     qtbot.addWidget(slot)
     return slot
 
@@ -290,3 +292,48 @@ def test_the_kind_badge_appears_only_once_filled(qtbot, kind):
 
     slot.clear()
     assert badge.isHidden()              # back to a bare drop zone
+
+
+def _actions(slot) -> dict:
+    return {action.text(): action for action in slot.menu().actions()}
+
+
+def test_the_menu_pastes_the_item_the_clipboard_names(qtbot):
+    QApplication.clipboard().setText("AB12CD34 007")
+    slot = _slot(qtbot, lent_by=_pictures_only, named={"AB12CD34 007": "img7"}.get)
+    paste = _actions(slot)["Paste Origenerator name"]
+    assert paste.isEnabled()
+
+    paste.trigger()
+
+    assert slot.current_id() == "img7"
+
+
+@pytest.mark.parametrize("on_the_clipboard", ["", "a sentence copied elsewhere", "AB12CD34 007"])
+def test_paste_is_grayed_while_the_clipboard_names_nothing_the_slot_takes(qtbot, on_the_clipboard):
+    QApplication.clipboard().setText(on_the_clipboard)
+    slot = _slot(qtbot, lent_by=_pictures_only, named={"AB12CD34 007": "vid7"}.get)
+
+    paste = _actions(slot)["Paste Origenerator name"]
+
+    assert not paste.isEnabled()
+
+
+def test_browse_is_offered_only_to_a_slot_that_can_take_a_file(qtbot):
+    browsed = []
+    with_browse = _slot(qtbot, browse=lambda: browsed.append("asked"))
+    without = _slot(qtbot)
+
+    assert "Browse..." not in _actions(without)
+    _actions(with_browse)["Browse..."].trigger()
+
+    assert browsed == ["asked"]
+    assert list(_actions(with_browse)) == ["Paste Origenerator name", "Browse..."]
+
+
+def test_a_held_item_is_named_in_the_slots_tooltip(qtbot):
+    slot = _slot(qtbot, name_of={"img1": "AB12CD34 001"}.get)
+
+    _drop(slot, "img1")
+
+    assert slot.toolTip() == "AB12CD34 001"

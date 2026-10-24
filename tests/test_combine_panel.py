@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
 from shared_ui.colors import BG_SECONDARY, BLUE, hovered
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
@@ -915,3 +915,26 @@ def test_the_two_radios_are_further_apart_than_a_circle_is_from_its_own_word(qtb
         QStyle.PixelMetric.PM_RadioButtonLabelSpacing, None, panel._video_radio)
 
 
+
+
+def test_both_zones_paste_a_name_and_only_the_image_zone_browses(qtbot):
+    browsed = []
+    panel = CombinePanel(
+        image_lent_by=lambda pid: pid, video_lent_by=lambda pid: pid,
+        preview=lambda pid: (None, None), history=lambda intent: [],
+        named={"AB12CD34 001": "img1"}.get, name_of={"img1": "AB12CD34 001"}.get,
+        browse_picture=lambda: browsed.append("asked"))
+    qtbot.addWidget(panel)
+    image_actions = {action.text(): action for action in panel.image_slot.menu().actions()}
+    assert list(image_actions) == ["Paste Origenerator name", "Browse..."]
+    assert [action.text() for action in panel.video_slot.menu().actions()] == [
+        "Paste Origenerator name"]
+
+    image_actions["Browse..."].trigger()
+    QApplication.clipboard().setText("AB12CD34 001")
+    {action.text(): action for action in panel.image_slot.menu().actions()}[
+        "Paste Origenerator name"].trigger()
+
+    assert browsed == ["asked"]
+    assert panel.image_slot.current_id() == "img1"
+    assert panel.image_slot.toolTip() == "AB12CD34 001"

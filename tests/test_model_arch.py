@@ -6,7 +6,17 @@ import struct
 import pytest
 
 from origenerator.workflows import model_arch
-from origenerator.workflows.model_arch import FLUX, KREA2, LTX, QWEN, SD15, SDXL, WAN, WAN_ANIMATE, WAN_S2V
+from origenerator.workflows.model_arch import (
+    FLUX,
+    KREA2,
+    LTX,
+    QWEN,
+    SD15,
+    SDXL,
+    WAN,
+    WAN_ANIMATE,
+    WAN_S2V,
+)
 
 
 def _write(path, tensor_names):

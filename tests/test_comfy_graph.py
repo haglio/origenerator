@@ -3,6 +3,7 @@ from __future__ import annotations
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
+    driving_video_params,
     dual_sampler_model_files,
     follow,
     graph_model_params,
@@ -168,3 +169,23 @@ def test_input_image_name_none_without_a_string_source():
     assert input_image_name({"5": {"class_type": "KSampler", "inputs": {}}}) is None
     linked = {"1": {"class_type": "LoadImage", "inputs": {"image": ["9", 0]}}}
     assert input_image_name(linked) is None
+
+
+def test_the_video_a_graph_performed_is_read_back_with_the_second_it_started_at():
+    graph = {
+        "12": {"class_type": "VHS_LoadVideoPath",
+               "inputs": {"video": "C:/library/videos/videos/scene one.mp4", "force_rate": 16,
+                          "skip_first_frames": 40, "frame_load_cap": 81}},
+        "19": {"class_type": "WanAnimateToVideo", "inputs": {"pose_video": ["18", 0]}},
+    }
+
+    assert driving_video_params(graph) == {"video": "C:/library/videos/videos/scene one.mp4",
+                                           "video_start": 2.5}
+
+
+def test_a_graph_that_performs_no_video_states_none():
+    assert driving_video_params({"5": {"class_type": "KSampler", "inputs": {}}}) == {}
+    at_its_own_rate = {"12": {"class_type": "VHS_LoadVideoPath",
+                              "inputs": {"video": "scene one.mp4", "force_rate": 0,
+                                         "skip_first_frames": 40}}}
+    assert driving_video_params(at_its_own_rate) == {"video": "scene one.mp4"}

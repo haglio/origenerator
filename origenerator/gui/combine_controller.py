@@ -38,6 +38,7 @@ from origenerator import (
 from origenerator.animate_command import what_to_animate
 from origenerator.check_animations import the_animation_window
 from origenerator.config import (
+    COMFYUI_INPUT_DIR,
     LOCAL_LLM_BASE_URL,
     LOCAL_LLM_MODEL,
     OUTPUT_PLACES,
@@ -48,10 +49,13 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
+from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
-from origenerator.media import MediaType
+from origenerator.gui.zone_items import FilesOnly
+from origenerator.item_names import ItemNames
+from origenerator.media import MediaType, media_type_from_filename
 from origenerator.prompts import VIDEO_SCENE_MATCH_SYSTEM_PROMPT
 from origenerator.video_history import video_history
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -111,11 +115,14 @@ class CombineController(QObject):
     """The combine panel, and every way a recipe reaches a dropped picture."""
 
     def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
-                 info_tabs_of, slideshows, inbox: evolver_export.EvolverInbox | None = None):
+                 info_tabs_of, slideshows, inbox: evolver_export.EvolverInbox | None = None,
+                 names: ItemNames | None = None):
         super().__init__(parent)
         self._host = host
         self._db = db
         self._jobs = jobs
+        self._names = names or ItemNames(db)
+        self._files = FilesOnly(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
         # Where a clip is handed to Evolver. Asked for rather than performed
         # here: the destination is one object's to know, and a test points it at
         # a directory of its own instead of patching a constant this module
@@ -140,7 +147,8 @@ class CombineController(QObject):
         # recipe on the image. Needs a client to generate, so it hides without one.
         self.panel = CombinePanel(
             self._picture_lent_by, self._recipe_lent_by, self._slot_preview,
-            self._video_history)
+            self._video_history, named=self._names.prompt_id_of, name_of=self._name_of,
+            browse_picture=self._browse_picture)
         self.panel.video_used.connect(self._db.record_combine_video_use)
         # Both Generate paths go through a wrapper that puts a stand-in row in the
         # line first: the work between the press and a real job is seconds long,
@@ -148,7 +156,7 @@ class CombineController(QObject):
         self.panel.combine_requested.connect(self._on_request)
         self._animation_settings = None
         self.panel.animation_settings_requested.connect(self._on_animation_settings)
-        self.panel.item_activated.connect(self._host.follow_link)
+        self.panel.item_activated.connect(self._go_to)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
         self.panel.intent_changed.connect(self._on_intent_changed)
@@ -172,15 +180,41 @@ class CombineController(QObject):
 
     # --- what the slots take, and what the session keeps ---------------------
 
-    def _accepts_image(self, prompt_id: str) -> bool:
-        """Whether a generation is a picture the image slot can hold: an image with
-        a file to seed an i2v from (not merely anything that produced a file — a
-        video's clip would satisfy that and can't be a start frame)."""
-        row = self._db.get_generation(prompt_id)
-        return bool(
-            row and gallery.media_type_of_row(row) == MediaType.IMAGE
-            and gallery.output_file_reference(gallery.row_output_files(row)) is not None
-        )
+    def _accepts_image(self, image_id: str) -> bool:
+        """Whether the image slot can hold this: a generation that is a picture
+        with a file to seed an i2v from (a video's clip can't be a start frame),
+        or a picture file from outside the gallery."""
+        return self._picture_reference(image_id) is not None
+
+    def _picture_reference(self, image_id: str) -> str | None:
+        """What a graph loads the held picture by, ``None`` for what is no picture."""
+        row = self._db.get_generation(image_id)
+        if row is not None:
+            if gallery.media_type_of_row(row) != MediaType.IMAGE:
+                return None
+            return gallery.output_file_reference(gallery.row_output_files(row))
+        path = self._files.path_of(image_id)
+        if path is None or media_type_from_filename(path.name) != MediaType.IMAGE:
+            return None
+        return str(path)
+
+    def _picture_still(self, image_id: str) -> str | None:
+        row = self._db.get_generation(image_id)
+        return self._still_path(row) if row is not None else self._picture_reference(image_id)
+
+    def _name_of(self, held: str) -> str:
+        if self._db.get_generation(held) is not None:
+            return self._names.of(held)
+        return self._files.name_of(held)
+
+    def _browse_picture(self) -> None:
+        path = pick_a_file(self.panel, "Image", FILE_FILTERS[MediaType.IMAGE])
+        if path:
+            self.panel.image_slot.set_item(path)
+
+    def _go_to(self, held: str) -> None:
+        if self._db.get_generation(held) is not None:
+            self._host.follow_link(held)
 
     def _picture_lent_by(self, prompt_id: str) -> str | None:
         row = self._db.get_generation(prompt_id)
@@ -209,7 +243,7 @@ class CombineController(QObject):
         loops its clip, an image shows its still. Either may be ``None`` when absent."""
         row = self._db.get_generation(prompt_id)
         if row is None:
-            return (None, None)
+            return self._files.preview(prompt_id)
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
     def _video_history(self, intent: str) -> list[str]:
@@ -359,7 +393,6 @@ class CombineController(QObject):
         offers no Cancel: there is nothing on the server to stop yet."""
         self._launch_seq += 1
         key = f"launching-{self._launch_seq}"
-        image_row = self._db.get_generation(image_id) or {}
         video_row = self._db.get_generation(video_id) if video_id else None
         built = (self._combined_params(image_id, video_id, intent)
                  if video_id and not category else None)
@@ -379,8 +412,7 @@ class CombineController(QObject):
             # the text, and only a dropped video is shown.
             recipe_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
             recipe_prompt_edited=edited,
-            source_image=gallery.output_file_reference(
-                gallery.row_output_files(image_row)),
+            source_image=self._picture_reference(image_id),
             starting=True,
         )
         self._host.queue_changed()
@@ -403,7 +435,8 @@ class CombineController(QObject):
                          intent: str = recipe_match.VIDEO, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s recipe on ``image_id`` — the video's workflow and settings,
-        fresh seeds, and the dropped picture as the input image.
+        fresh seeds, and the dropped picture as the input image; ``image_row``
+        is ``None`` for a picture browsed from outside the gallery.
 
         Under ``GENAU`` the recipe is then re-cut to hold one cycle and smoothed
         back out (:func:`~origenerator.gallery.combine.cycle_shaped`). The lane
@@ -412,21 +445,21 @@ class CombineController(QObject):
         needs of a clip is a property of the clip's own length, and the past clip
         being mined was made before anyone knew that.
 
-        ``None`` when the pair can't be combined: either row is gone, the video
-        isn't a rebuildable image-conditioned recipe, or the image has no output
-        file to seed from. Shared by the Generate and Open-in-generator paths.
+        ``None`` when the pair can't be combined: the video row is gone or isn't
+        a rebuildable image-conditioned recipe, or there is no picture file to
+        seed from. Shared by the Generate and Open-in-generator paths.
         """
         image_row = self._db.get_generation(image_id)
         video_row = self._db.get_generation(video_id)
-        if not image_row or not video_row:
+        if not video_row:
             return None
         workflow_name = video_row.get("workflow_name") or ""
         workflow = WORKFLOW_REGISTRY.get(workflow_name)
         if workflow is None or not gallery.is_image_conditioned(workflow_name):
             return None  # the video must be a rebuildable, image-conditioned recipe
-        params = gallery.combined_params(video_row, image_row, workflow)
+        params = gallery.combined_params(video_row, self._picture_reference(image_id), workflow)
         if params is None:
-            return None  # the dropped image has no output file to seed from
+            return None  # no picture file to seed from
         if intent == recipe_match.GENAU:
             params = gallery.cycle_shaped(params, workflow, category)
         return workflow, params, video_row, image_row
@@ -440,11 +473,11 @@ class CombineController(QObject):
         built = self._combined_params(image_id, video_id, intent, category)
         if built is None:
             return
-        workflow, params, video_row, image_row = built
-        self._open_prepared(workflow, params, image_row, video_row, category, video_id,
-                            intent)
+        workflow, params, video_row, _image_row = built
+        self._open_prepared(workflow, params, self._picture_still(image_id), video_row,
+                            category, video_id, intent)
 
-    def _open_prepared(self, workflow, params, image_row, video_row,
+    def _open_prepared(self, workflow, params, still: str | None, video_row,
                        category: str, video_id: str | None, intent: str) -> None:
         """Hand a built combination to a generate tab: its settings on the form, its
         two halves in the preview, and the mark saying where they came from,
@@ -460,9 +493,7 @@ class CombineController(QObject):
             return
         panel.set_recipe_source(category, video_id, intent)
         panel.show_combination(Combination(
-            self._still_path(image_row),
-            self._host.animated_preview(video_row) if video_row is not None else None,
-        ))
+            still, self._host.animated_preview(video_row) if video_row is not None else None))
 
     def _still_path(self, row: dict) -> str | None:
         """The best picture of ``row`` for a pane to show: its full-size output
@@ -544,21 +575,22 @@ class CombineController(QObject):
         thread touches neither the database nor a widget.
         """
         image_row = self._db.get_generation(image_id)
-        if image_row is None:
+        if image_row is None and self._picture_reference(image_id) is None:
             then(None)  # nothing to match against, and the caller stops waiting
             return
         image_prompts = {r.get("prompt_id"): r.get("positive_prompt") or ""
                          for r in self._host.image_rows()}
         candidates = [{**row, "start_scene": self._start_scene(row, image_prompts)}
                       for row in self._category_candidates()]
-        scene = image_row.get("positive_prompt") or ""
+        scene = (image_row or {}).get("positive_prompt") or ""
 
         def match():
-            return recipe_match.smart_recipe(
+            fitting = image_row is not None and recipe_match.smart_recipe(  # no scene outside
                 category, scene, candidates,
                 base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
                 system_prompt=VIDEO_SCENE_MATCH_SYSTEM_PROMPT, intent=intent,
-            ) or recipe_match.best_recipe(category, candidates, intent)
+            )
+            return fitting or recipe_match.best_recipe(category, candidates, intent)
 
         def resolved(video_id):
             logger.info("combine: category=%s intent=%s image=%s -> recipe from %s",
@@ -597,16 +629,15 @@ class CombineController(QObject):
         non-image-conditioned workflow, or the image row is gone or has no
         output file to seed from.
         """
-        image_row = self._db.get_generation(image_id)
-        if image_row is None:
+        reference = self._picture_reference(image_id)
+        if reference is None:
             return None
         # The settings accepted for this act FROM THIS PICTURE'S OWN STATE come
         # first: the same act started from two different situations is two
         # different runs, and the overlay's per-act pin can only ever be right
         # for one of them. It stays as the answer for a picture nobody has
         # sorted, and for an animation nobody has accepted settings for yet.
-        spec = (animation_recipes.recipe_for(intent, category,
-                                             image_row.get("picture_state") or "")
+        spec = (animation_recipes.recipe_for(intent, category, self._state_of(image_id))
                 or recipe_match.curated_recipe(category, intent))
         if spec is None:
             return None
@@ -615,7 +646,7 @@ class CombineController(QObject):
             logger.warning("combine: category=%s curated workflow %r not usable",
                            category, spec.get("workflow"))
             return None
-        params = gallery.curated_params(spec, image_row, workflow)
+        params = gallery.curated_params(spec, reference, workflow)
         if params is None:
             return None
         if intent == recipe_match.GENAU:
@@ -711,10 +742,8 @@ class CombineController(QObject):
         built = self._curated_combination(image_id, category, intent)
         if built is not None:
             workflow, params = built
-            image_row = self._db.get_generation(image_id)
-            if image_row is not None:
-                self._open_prepared(workflow, params, image_row, None, category, None,
-                                    intent)
+            self._open_prepared(workflow, params, self._picture_still(image_id), None,
+                                category, None, intent)
             return
         self._resolve_category(
             image_id, category, intent,

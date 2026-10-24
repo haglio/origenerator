@@ -42,7 +42,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
 from origenerator import animation_paths
 from origenerator.content import genau_flick_word
 from origenerator.gui.action_picker import ACTION_LABEL
-from origenerator.gui.drop_slot import DropSlot, DropZone
+from origenerator.gui.drop_slot import DROP_A_VIDEO, DROP_AN_IMAGE, DropSlot, DropZone
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.generate_button import (
     DEFAULT_CAPTION,
@@ -56,7 +56,6 @@ from origenerator.recipe_match import GENAU, VIDEO
 
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "(custom)"
-_DROP_PLACEHOLDER = "Drop a video"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
 _NEEDS_RECIPE = "Pick an act or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
@@ -108,16 +107,21 @@ class CombinePanel(QWidget):
         preview: Callable[[str], tuple[str | None, str | None]],
         history: Callable[[str], list[str]],
         parent=None,
+        *,
+        named: Callable[[str], str | None] = lambda name: None,
+        name_of: Callable[[str], str] = lambda held: "",
+        browse_picture: Callable[[], None] | None = None,
     ):
         super().__init__(parent)
         self._preview = preview
         self._history = history
-        self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, "Drop an image")
+        self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, DROP_AN_IMAGE,
+                                   named=named, name_of=name_of, browse=browse_picture)
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
         # the image, which is the one thing it is not.
-        self.video_slot = DropSlot(MediaType.VIDEO, video_lent_by, preview, _DROP_PLACEHOLDER,
-                                   grayscale=True)
+        self.video_slot = DropSlot(MediaType.VIDEO, video_lent_by, preview, DROP_A_VIDEO,
+                                   grayscale=True, named=named, name_of=name_of)
         _keep_its_room_when_hidden(self.video_slot)
         self._between = DropZone((self.image_slot, self.video_slot))
         self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)

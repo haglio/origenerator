@@ -18,7 +18,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
 
@@ -29,6 +29,15 @@ from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
+
+DROP_AN_IMAGE = "Drop an image"
+DROP_A_VIDEO = "Drop a video"
+PASTE_NAME = "Paste Origenerator name"
+BROWSE = "Browse..."
+
+
+def placeholder_for(kind: str) -> str:
+    return DROP_A_VIDEO if kind == "video" else DROP_AN_IMAGE
 
 
 class DropZone(QWidget):
@@ -97,11 +106,17 @@ class DropSlot(DropZone):
         placeholder: str,
         parent=None,
         grayscale: bool = False,
+        named: Callable[[str], str | None] = lambda name: None,
+        name_of: Callable[[str], str] = lambda held: "",
+        browse: Callable[[], None] | None = None,
     ):
         super().__init__(parent=parent)
         self._lent_by = lent_by
         self._preview = preview    # (prompt_id) -> (thumb_path, movie_path)
         self._placeholder = placeholder
+        self._named = named        # an Origenerator name -> the prompt_id wearing it
+        self._name_of = name_of    # what is held -> the name its tooltip says
+        self._browse = browse      # picks a file into the slot; None where only items go
         self._go_to_tip = f"Click to go to this {kind}"
         # Whether what lands here is held for its settings rather than shown as a
         # result — drawn gray if so, however it previews.
@@ -180,7 +195,7 @@ class DropSlot(DropZone):
                                                TEXT_PRIMARY))
         self._badge.setVisible(True)
         self._badge.raise_()  # keep the kind chip above the preview
-        self.setToolTip(self._go_to_tip)
+        self.setToolTip(self._name_of(self._current_id) or self._go_to_tip)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     # --- drag & drop ------------------------------------------------------
@@ -206,3 +221,23 @@ class DropSlot(DropZone):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._current_id is not None:
             self.activated.emit(self._current_id)
+
+    # --- the right-click menu ---------------------------------------------
+
+    def menu(self) -> QMenu:
+        menu = QMenu(self)
+        pasted = self._pasted()
+        paste = menu.addAction(PASTE_NAME)
+        paste.setEnabled(pasted is not None)
+        paste.triggered.connect(lambda: self.set_item(pasted))
+        if self._browse is not None:
+            menu.addAction(BROWSE).triggered.connect(lambda: self._browse())
+        return menu
+
+    def _pasted(self) -> str | None:
+        name = QApplication.clipboard().text().strip()
+        prompt_id = self._named(name) if name else None
+        return self.lent_by(prompt_id) if prompt_id else None
+
+    def contextMenuEvent(self, event):
+        self.menu().exec(event.globalPos())

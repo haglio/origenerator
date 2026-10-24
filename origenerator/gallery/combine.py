@@ -11,7 +11,6 @@ stays unit-testable.
 from __future__ import annotations
 
 from origenerator.content import load_content
-from origenerator.gallery.output import output_file_reference, row_output_files
 from origenerator.generation_config import filled_params, randomize_seeds
 from origenerator.workflows.derived_size import without_an_explicit_size
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
@@ -51,24 +50,14 @@ CYCLE_FRAMES = 29
 _CYCLE_WORDS: dict = _CONTENT.get("genau_flick_prompts") or {}
 
 
-def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
-    """The video's recipe readied to run on a new input image, with fresh seeds.
+def combined_params(video_row: dict, input_image: str | None, workflow) -> dict | None:
+    """The video's recipe readied to run on ``input_image`` -- what the graph
+    loads the new picture by -- with fresh seeds. ``None`` with no picture.
 
-    ``None`` when the image produced no file to reference.
-
-    A size-deriving workflow's stored ``width``/``height`` are dropped on the way
-    through: they size the recipe's OWN frame, and swapping the frame is the one
-    thing this function does. Left in, they read as a deliberate override
-    (:func:`~origenerator.workflows.derived_size.override_size`) and the graph
-    scales the dropped image to that exact size with cropping disabled — a
-    non-uniform stretch, which is precisely what "animate this image" must not
-    do. Both ways a row comes by them are stale here: an import records whatever
-    its graph's conditioning node said (``importer._extract_metadata``), and a
-    generated row records an unlocked Dimensions override chosen for that other
-    image. Dropped, the size re-derives from the dropped image and the new video
-    keeps its proportions.
+    A size-deriving recipe's stored ``width``/``height`` sized its OWN frame,
+    so they are dropped: left in, they would stretch the new picture to them.
     """
-    params = _run_on(image_row, filled_params(video_row, workflow), workflow)
+    params = _run_on(input_image, filled_params(video_row, workflow), workflow)
     return None if params is None else without_an_explicit_size(params, workflow)
 
 
@@ -88,19 +77,17 @@ def _words(prompt):
     return " ".join(str(prompt or "").split())
 
 
-def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
-    """The overlay's hand-tuned act recipe readied to run on ``image_row``'s
-    frame, with fresh seeds. ``None`` when the image produced no file to reference.
-    """
+def curated_params(spec: dict, input_image: str | None, workflow) -> dict | None:
+    """The overlay's hand-tuned act recipe readied to run on ``input_image``,
+    with fresh seeds. ``None`` with no picture."""
     params = {**workflow.default_params(), **(spec.get("params") or {})}
-    return _run_on(image_row, params, workflow)
+    return _run_on(input_image, params, workflow)
 
 
-def _run_on(image_row: dict, params: dict, workflow) -> dict | None:
-    ref = output_file_reference(row_output_files(image_row))
-    if ref is None:
+def _run_on(input_image: str | None, params: dict, workflow) -> dict | None:
+    if not input_image:
         return None
-    return {**randomize_seeds(params, workflow.seed_keys()), "input_image": ref}
+    return {**randomize_seeds(params, workflow.seed_keys()), "input_image": input_image}
 
 
 def cycle_words(category: str = "") -> tuple[str, str]:

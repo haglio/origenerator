@@ -17,6 +17,7 @@ from shared_ui.orientation import orientation_of_size
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
+    driving_video_params,
     empty_latent,
     follow,
     graph_model_params,
@@ -711,6 +712,7 @@ def _graph_params(graph: dict) -> dict:
     return {
         **_size_params(graph),
         **_input_image_params(graph),
+        **driving_video_params(graph),
         **sampler_params,
         **guidance_params(graph),
         **graph_model_params(graph),

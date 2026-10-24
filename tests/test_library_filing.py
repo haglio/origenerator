@@ -164,6 +164,34 @@ def test_what_another_program_saved_in_a_folder_of_comfyuis_is_filed_where_that_
     assert not (places.comfyui / "video").exists()
 
 
+def test_a_file_saved_there_without_comfyuis_number_is_filed_under_its_own_name(tmp_path):
+    places = _places(tmp_path)
+    left = places.comfyui / "sketches" / "delta.png"
+    left.parent.mkdir(parents=True)
+    left.write_bytes(b"theirs")
+
+    assert file_what_comfyui_left(places, in_flight=set()) == 1
+
+    assert (places.folder("sketches") / "delta.png").read_bytes() == b"theirs"
+    assert not (places.comfyui / "sketches").exists()
+
+
+def test_a_file_without_comfyuis_number_stays_put_when_its_name_is_taken_in_the_library(
+        tmp_path):
+    places = _places(tmp_path)
+    taken = places.folder("sketches") / "delta.png"
+    taken.parent.mkdir(parents=True)
+    taken.write_bytes(b"already there")
+    left = places.comfyui / "sketches" / "delta.png"
+    left.parent.mkdir(parents=True)
+    left.write_bytes(b"theirs")
+
+    assert file_what_comfyui_left(places, in_flight=set()) == 0
+
+    assert taken.read_bytes() == b"already there"
+    assert left.read_bytes() == b"theirs"
+
+
 def test_a_run_still_in_flight_is_left_waiting_in_comfyuis_folder(tmp_path):
     places = _places(tmp_path)
     waiting = _saved_by_comfyui(places, "run-nine", "image", "alpha_t2i_00001_.png")

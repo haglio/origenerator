@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from origenerator.file_refs import OUTPUT_TAG, split_annotation
-from origenerator.output_places import OutputPlaces
+from origenerator.output_places import OutputPlaces, files_under, folders_in
 
 _NUMBERED = re.compile(r"^(?P<stem>.+)_(?P<counter>\d+)(?P<rest>\D*\.[^.]+)$")
 READS = "reads"
@@ -74,7 +74,7 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
         if (subfolder, name) in filed or not subfolder.startswith(f"{run}/"):
             continue
         kind = subfolder.removeprefix(f"{run}/")
-        moved = _file_with_its_numbered_siblings(places.comfyui / subfolder, name,
+        moved = _file_into_its_home(places.comfyui / subfolder, name,
                                                  places.folder(kind))
         filed.update({(subfolder, was): (kind, now) for was, now in moved.items()})
     forget_the_runs_copies(places, prompt_id)
@@ -83,13 +83,13 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
 
 def file_what_comfyui_left(places: OutputPlaces, *, in_flight: set[str]) -> int:
     filed = 0
-    for run in _folders_in(places.working):
+    for run in folders_in(places.working):
         if run.name not in in_flight:
             forget_the_runs_copies(places, run.name)
             filed += _file_everything_under(run, run, places)
     if places.keeps_outputs_in_comfyuis_folder():
         return filed
-    for top in _folders_in(places.comfyui):
+    for top in folders_in(places.comfyui):
         if top != places.working and top.name not in ADD_ON_SCRATCH:
             filed += _file_everything_under(top, places.comfyui, places)
     return filed
@@ -97,29 +97,13 @@ def file_what_comfyui_left(places: OutputPlaces, *, in_flight: set[str]) -> int:
 
 def _file_everything_under(top: Path, kinds_from: Path, places: OutputPlaces) -> int:
     filed = 0
-    for folder, names in _walk_files(top):
+    for folder, names in files_under(top):
         home = places.folder(folder.relative_to(kinds_from).as_posix())
-        if home == folder:
-            continue
         for name in names:
             if (folder / name).is_file():
-                filed += len(_file_with_its_numbered_siblings(folder, name, home))
+                filed += len(_file_into_its_home(folder, name, home))
     _remove_what_is_left_empty(top)
     return filed
-
-
-def _folders_in(folder: Path) -> list[Path]:
-    if not folder.is_dir():
-        return []
-    return [child for child in sorted(folder.iterdir())
-            if child.is_dir() and not os.path.isjunction(child)]
-
-
-def _walk_files(top: Path):
-    for dirpath, dirnames, filenames in os.walk(top):
-        dirnames[:] = sorted(name for name in dirnames
-                             if not os.path.isjunction(os.path.join(dirpath, name)))
-        yield Path(dirpath), sorted(filenames)
 
 
 def forget_the_runs_copies(places: OutputPlaces, prompt_id: str) -> None:
@@ -139,19 +123,23 @@ def _run_subfolder(places: OutputPlaces, prompt_id: str) -> str:
     return places.run(prompt_id).relative_to(places.comfyui).as_posix()
 
 
-def _file_with_its_numbered_siblings(waiting: Path, name: str, home: Path) -> dict[str, str]:
+def _file_into_its_home(waiting: Path, name: str, home: Path) -> dict[str, str]:
+    home.mkdir(parents=True, exist_ok=True)
+    filed_as = _names_in_its_home(waiting, name, home)
+    for was, now in filed_as.items():
+        os.rename(waiting / was, home / now)
+    return filed_as
+
+
+def _names_in_its_home(waiting: Path, name: str, home: Path) -> dict[str, str]:
     match = _NUMBERED.match(name)
     if match is None:
-        return {}
-    siblings = [sibling for sibling in os.listdir(waiting)
-                if (other := _NUMBERED.match(sibling))
-                and (other["stem"], other["counter"]) == (match["stem"], match["counter"])]
-    home.mkdir(parents=True, exist_ok=True)
+        return {} if os.path.lexists(home / name) else {name: name}
     number = _next_number(home, match["stem"])
-    filed_as = {sibling: _numbered(sibling, match["stem"], number) for sibling in siblings}
-    for sibling, new_name in filed_as.items():
-        os.rename(waiting / sibling, home / new_name)
-    return filed_as
+    return {sibling: _numbered(sibling, match["stem"], number)
+            for sibling in os.listdir(waiting)
+            if (other := _NUMBERED.match(sibling))
+            and (other["stem"], other["counter"]) == (match["stem"], match["counter"])}
 
 
 def _numbered(name: str, stem: str, number: int) -> str:

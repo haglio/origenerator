@@ -175,7 +175,7 @@ _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
 def _will_move_on(slideshow) -> bool:
-    return not slideshow.shown._paused and not slideshow._keeps() and bool(slideshow.dwell_s)
+    return not slideshow.shown._paused and not slideshow._keeps()
 
 
 class FakeActions:
@@ -16041,22 +16041,6 @@ def test_a_double_clicked_pictures_slideshow_opens_at_the_clip_seconds_set(
     slideshow = _double_click_slideshow(view, qtbot)
 
     assert slideshow.dwell_s == 7
-    assert _will_move_on(slideshow)
-    slideshow.close()
-
-
-def test_start_slideshow_sets_a_held_slideshow_going(qtbot, tmp_path, monkeypatch):
-    # A slideshow held at nought is set going by this, and there is no separate
-    # resume to learn.
-    view = _voiceable(qtbot, tmp_path, monkeypatch)
-    view._pace.set_seconds(0)
-    slideshow = _double_click_slideshow(view, qtbot)
-    assert slideshow.dwell_s == 0
-
-    view._voice.listener.speak_command("start slideshow")
-
-    assert view._slideshows.showing is slideshow          # the open one, not a second window
-    assert slideshow.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
     assert _will_move_on(slideshow)
     slideshow.close()
 

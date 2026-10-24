@@ -4,10 +4,6 @@ Genau's console carries a clip-seconds pair, and here the clips are the slides,
 so that pair on a slideshow's panel sets this. It is app-wide rather than
 per-slideshow: set it while one is running and that one changes pace under you,
 and the next slideshow opens at it.
-
-Nought is a pace like any other here, and it means never: the slide holds the
-screen until an arrow moves it. Genau's own floor is one second because a
-Genau flick is a fraction of one, but a picture is happy to sit there.
 """
 
 from __future__ import annotations
@@ -18,7 +14,7 @@ from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 
 # The console's pair steps by this, and will not walk past these ends.
 STEP_S = 1
-MIN_S, MAX_S = 0, 60
+MIN_S, MAX_S = 1, 60
 
 
 class SlideshowPace(QObject):

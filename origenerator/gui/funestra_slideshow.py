@@ -206,12 +206,6 @@ class FunestraSlideshow(QObject):
         self._apply_dwell(seconds)
 
     def _apply_dwell(self, seconds: int) -> None:
-        """Tell the Funestra how long to hold a picture, when the number moved.
-
-        The pace is the Funestra's to keep from there: it holds the frame that
-        long and then ends the file, which is how a picture moves on at all.
-        """
-        seconds = max(0, int(seconds))
         if seconds == self._dwell_s:
             return
         self._dwell_s = seconds
@@ -257,8 +251,8 @@ class FunestraSlideshow(QObject):
         from it early, and its scrubber counts that half down.  Any other, and
         one under the lock, holds for the pace."""
         current, pace = self._set.playlist.current(), self._dwell_s
-        held_for = self._set.pace_for(current, pace) if current is not None and pace else pace
-        if pace and held_for < pace and not self._keeps():
+        held_for = self._set.pace_for(current, pace) if current is not None else pace
+        if held_for < pace and not self._keeps():
             self._send(f"{HOLD_PICTURE} {held_for:g}")
             self._held_short = True
         elif self._held_short:

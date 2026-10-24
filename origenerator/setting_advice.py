@@ -25,6 +25,9 @@ GOOD_STEP_SPACING = {
     "lcm": ("sgm_uniform", "simple"),
 }
 _PASSES = ("high", "low")
+_STRENGTHS = ("cfg", "cfg_high", "cfg_low")
+STRENGTH_BELOW_ONE = ("Below 1 the Negative Prompt works backwards: what you get is pulled toward "
+                      "what it names, and at 0 the Positive Prompt is ignored altogether.")
 
 
 def _shown(value) -> str:
@@ -95,7 +98,16 @@ class _Choices(NamedTuple):
 def setting_advice(params: dict, definitions=()) -> dict[str, Advice]:
     rules = {**_good_ranges(params, definitions), **_recommended(params)}
     found = {key: rule.advice(params.get(key)) for key, rule in rules.items()}
+    for key in _STRENGTHS:
+        if params.get(key) is not None and float(params[key]) < 1.0:
+            found[key] = _backwards(params[key], found.get(key))
     return {key: advice for key, advice in found.items() if advice is not None}
+
+
+def _backwards(strength, usual: Advice | None) -> Advice:
+    if usual is None:
+        return Advice(STRENGTH_BELOW_ONE, strength, 1.0)
+    return usual._replace(text=f"{STRENGTH_BELOW_ONE} {usual.text}")
 
 
 def recommendations(params: dict) -> dict[str, str]:

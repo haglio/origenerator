@@ -4,6 +4,7 @@ import pytest
 
 import origenerator.setting_advice as advice_module
 from origenerator.setting_advice import (
+    STRENGTH_BELOW_ONE,
     fresh_settings,
     not_installed,
     not_installed_advice,
@@ -160,6 +161,32 @@ def test_a_number_outside_its_definitions_good_range_is_advised_against():
     steps = ParamDef("steps", "Steps", ParamType.INT, 30, good=(20, 40))
     advice = setting_advice({"steps": 50}, [steps])
     assert (advice["steps"].text, advice["steps"].fix) == ("Good range: 20–40.", 40)
+
+
+def test_a_prompt_strength_below_one_is_warned_about_before_its_good_range():
+    cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 7.5, good=(3, 8))
+    found = setting_advice({"cfg": 0.5}, [cfg])["cfg"]
+    assert (found.text, found.fix) == (f"{STRENGTH_BELOW_ONE} Good range: 3–8.", 3)
+
+
+def test_a_prompt_strength_of_exactly_one_gets_no_warning():
+    cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 1.0, good=(1.0, 3.5))
+    assert setting_advice({"cfg": 1.0}, [cfg]) == {}
+
+
+def test_only_the_pass_whose_strength_is_below_one_is_warned_about():
+    passes = [
+        ParamDef("cfg_high", "Prompt Strength (First Pass)", ParamType.FLOAT, 3.5, good=(3, 4)),
+        ParamDef("cfg_low", "Prompt Strength (Second Pass)", ParamType.FLOAT, 3.5, good=(3, 4)),
+    ]
+    advice = setting_advice({"cfg_high": 0.5, "cfg_low": 3.0}, passes)
+    assert {key: (found.text, found.fix) for key, found in advice.items()} == {
+        "cfg_high": (f"{STRENGTH_BELOW_ONE} Good range: 3–4.", 3)}
+
+
+def test_a_prompt_strength_below_one_is_warned_about_even_with_no_range_to_hold_it_to():
+    found = setting_advice({"cfg": 0.5})["cfg"]
+    assert (found.text, found.value, found.fix) == (STRENGTH_BELOW_ONE, 0.5, 1.0)
 
 
 def test_a_number_its_models_page_judges_is_not_held_to_its_definitions_range():

@@ -50,9 +50,15 @@ for one thing cost four. So:
   a real collision -- `GenerateConfigPanel.settings_key()` returning the *pair*
   a folder key is built from, one word from its own `settings_folder_key()`
   returning the key -- is `workflow_and_signature()`.
-- **Settings**, **config** and **recipe** are three things and keep three
-  words: the settings are what the form holds, a `ConfigSnapshot` is one
-  reading of them, and a recipe is the workflow a generation ran on.
+- **Settings** and **config** are two things and keep two words: the
+  settings are what the form holds, and a `ConfigSnapshot` is one reading of
+  them. **Recipe** is no word of the user's, though the code still says it
+  (`recipe_category`, `recipe_match`, `animation_recipes`, the overlay's
+  `combine_recipes`) and Combine still shows it: never say it to him or put it
+  in anything new. Say what the thing is -- the workflow a generation ran on,
+  the settings a video was made with, the act it was launched as. Taking it
+  out of those names and off those screens is a change of its own, and the
+  words that replace it on screen are his to choose.
 - **The code's word is the one the app shows.** What the gallery shows as a
   video is a video in the code, an image is an image, and either one is an
   item. "Clip", said consistently all through the source, is a word the
@@ -280,8 +286,8 @@ would be lost. `tests/test_launcher_contract.py` holds both to that.
   of the overlay's `animation_paths` entries runs, one at a time, against a video
   the user already kept. `animation_samples` finds and orders them,
   `animation_check_session` is the walk, `gui/animation_check_window.py` is the
-  window, and what is accepted goes to `animation_recipes` -- one recipe per
-  (lane, act, picture state) in a file of its own beside the library, which
+  window, and what is accepted goes to `animation_recipes` -- one set of
+  settings per (lane, act, picture state) in a file of its own beside the library, which
   `CombineController._curated_combination` asks before the overlay's per-act pin.
 
   That per-act pin is on its way out, by the user's decision: it answered for a

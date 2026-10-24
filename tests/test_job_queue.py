@@ -835,6 +835,25 @@ def test_a_submit_refused_as_the_app_closes_is_reported_like_any_other(qtbot, tm
     assert db.get_generation(waiting.prompt_id)["status"] == "error"
 
 
+def test_what_waits_when_comfyui_does_not_answer_as_the_app_closes_stays_for_the_next_launch(
+        qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    _launch_video(queue, "v1", seed=1)
+    second = _launch_video(queue, "v2", seed=2)
+    third = _launch_video(queue, "v3", seed=3)
+    client.submit_job = MagicMock(side_effect=_comfyui_down())
+    said = []
+    queue.failed.connect(lambda key, message: said.append(key))
+
+    assert queue.flush_to_server() == 0
+    assert said == []
+    assert [db.get_generation(job.prompt_id)["status"] for job in (second, third)] == [
+        "pending", "pending"]
+    client.submit_job.assert_called_once()
+
+
 def test_flush_with_nothing_waiting_is_harmless(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)

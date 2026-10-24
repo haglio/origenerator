@@ -31,7 +31,9 @@ def tabs(qtbot, tmp_path):
 
 def _pick_workflow(panel, key="sdxl_t2i"):
     """Answer a fresh tab's workflow picker, so it has a param form to poke at."""
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData(key))
+    index = panel._workflow_combo.findData(key)
+    assert index >= 0, f"{key} is not in the Workflow dropdown"
+    panel._workflow_combo.setCurrentIndex(index)
     return panel
 
 
@@ -947,7 +949,7 @@ def test_changing_the_workflow_takes_the_italic_off(tabs):
     tabs.load_selection(cat, [cat])
     preview = tabs.current_config_panel()
 
-    _pick_workflow(preview, "wan22_i2v")
+    _pick_workflow(preview, "flux_t2i_upscaled")
 
     assert tabs._preview_panel is None
     assert tabs.tabBar()._preview_index == -1

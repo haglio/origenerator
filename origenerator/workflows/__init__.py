@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.media import MediaType
 from origenerator.workflows.base import WorkflowTemplate
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
@@ -24,6 +25,12 @@ WORKFLOW_REGISTRY: dict[str, WorkflowTemplate] = {
     "wan22_flf2v_loop": Wan22Flf2vLoopWorkflow(),
     "wan22_i2v": Wan22I2vWorkflow(),
 }
+
+
+def offered_workflows(*, makes: MediaType | None) -> list[WorkflowTemplate]:
+    return [wf for wf in WORKFLOW_REGISTRY.values()
+            if wf.selectable and makes in (None, wf.output_type)]
+
 
 RETIRED_WORKFLOW_NAMES: dict[str, str] = {
     "wan21_ati_i2v": "WAN 2.1 Image-to-Video (Motion-Tracked)",

@@ -98,7 +98,7 @@ from origenerator.setting_advice import (
     spoken_list,
 )
 from origenerator.timing import estimate_label
-from origenerator.workflows import RETIRED_WORKFLOW_NAMES, WORKFLOW_REGISTRY
+from origenerator.workflows import RETIRED_WORKFLOW_NAMES, WORKFLOW_REGISTRY, offered_workflows
 
 logger = logging.getLogger(__name__)
 
@@ -442,18 +442,8 @@ class GenerateConfigPanel(QWidget):
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
         self._workflow_combo = NoWheelComboBox()
-        # Machinery workflows (the standalone image enhancer) stay out of the
-        # picker: they're launched by gallery buttons, and their results fold
-        # into existing images rather than forming generations of their own.
-        for key, wf in WORKFLOW_REGISTRY.items():
-            if wf.selectable:
-                self._workflow_combo.addItem(wf.display_name, key)
-        # Open on no workflow at all, so a fresh tab asks which one to run rather
-        # than presenting whichever happens to be registered first as a choice
-        # already made. Set before the signal is connected: nothing below the
-        # picker is built yet at this point in the layout.
         self._workflow_combo.setPlaceholderText("Select a workflow…")
-        self._workflow_combo.setCurrentIndex(-1)
+        self._offer_workflows(makes=None, holding=None)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
         # Picking a workflow is an edit as much as typing in a field is, and on a
         # form with nothing to carry over it is the only signal there is.
@@ -670,6 +660,7 @@ class GenerateConfigPanel(QWidget):
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
+            self._offer_workflows(makes=wf.output_type, holding=key)
             edited = self._edited_form_values()
             # An i2v workflow derives its output size from the input image; hand
             # the form that deriver so it can show the size in a locked, unlockable
@@ -1223,23 +1214,32 @@ class GenerateConfigPanel(QWidget):
             self._fresh_form = False
             self._end_folder_request()
             self._forget_watch()
-            # Switch to the matching workflow. A registered workflow the picker
-            # normally hides (machinery, selectable False) is added on demand, so
-            # reusing such a row still lands on the right form instead of silently
-            # applying its params to whatever workflow was already selected.
-            index = self._workflow_combo.findData(workflow_name)
-            if index < 0 and workflow_name in WORKFLOW_REGISTRY:
-                self._workflow_combo.addItem(
-                    WORKFLOW_REGISTRY[workflow_name].display_name, workflow_name
-                )
-                index = self._workflow_combo.findData(workflow_name)
-            if index >= 0:
-                self._workflow_combo.setCurrentIndex(index)
+            if workflow_name in WORKFLOW_REGISTRY:
+                self._offer_workflows(makes=WORKFLOW_REGISTRY[workflow_name].output_type,
+                                      holding=workflow_name)
+                self._workflow_combo.setCurrentIndex(self._workflow_combo.findData(workflow_name))
             if self._param_form:
                 self._param_form.set_values(params)
             # Now that the settings match a real folder, show its newest result (the
             # workflow may not have changed above, so this doesn't ride on that signal).
             self.show_recent_preview()
+
+    def _offer_workflows(self, *, makes: MediaType | None, holding: str | None) -> None:
+        combo = self._workflow_combo
+        current = combo.currentData()
+        listed = [workflow.name for workflow in offered_workflows(makes=makes)]
+        if holding is not None and holding not in listed:
+            listed.append(holding)
+        if listed == [combo.itemData(index) for index in range(combo.count())]:
+            return
+        blocked = combo.blockSignals(True)
+        try:
+            combo.clear()
+            for name in listed:
+                combo.addItem(WORKFLOW_REGISTRY[name].display_name, name)
+            combo.setCurrentIndex(combo.findData(current) if current is not None else -1)
+        finally:
+            combo.blockSignals(blocked)
 
     def restore_config(self, snapshot: ConfigSnapshot):
         """Reapply a snapshot captured by :meth:`current_config`.
@@ -1377,6 +1377,7 @@ class GenerateConfigPanel(QWidget):
             else:
                 with self._loading():
                     self._workflow_combo.setCurrentIndex(-1)
+                    self._offer_workflows(makes=media_type_of_row(row), holding=None)
         finally:
             self._autoshow_held = False
 

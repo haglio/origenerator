@@ -385,7 +385,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # handed over as a copy in its temp folder.
 # 17151 when every output came to be found through the places its kind is
 # kept in, and the docstrings about one output folder went with it.
-MAX_PROSE_LINES = 17151
+# 17140 when a tab's Workflow dropdown came to list only the workflows that make
+# what the tab makes, taken down to what the tree measured.
+MAX_PROSE_LINES = 17140
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

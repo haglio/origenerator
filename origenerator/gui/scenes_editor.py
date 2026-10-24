@@ -48,7 +48,7 @@ from origenerator.gui.icons import tab_close_icon
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_field import PromptField
+from origenerator.gui.prompt_field import PromptField, set_in_use
 from origenerator.workflows.base import (
     ParamDef,
     chained_frames,
@@ -83,9 +83,10 @@ class _Scene(QFrame):
     remove_requested = pyqtSignal(object)
 
     def __init__(self, pd: ParamDef, prepare_length: Callable[[PresetComboBox], None],
-                 lines: bool = True, parent=None):
+                 shut_down: dict[str, str], lines: bool = True, parent=None):
         super().__init__(parent)
         self._pd = pd
+        self._shut_down = shut_down
         column = QVBoxLayout(self)
         border_as_a_set(self, column)
         column.setSpacing(4)
@@ -131,39 +132,26 @@ class _Scene(QFrame):
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
             # Every path that fills a line -- typing, loading a recipe, a voice
             # edit -- ends in textChanged, so the card follows all of them.
-            self.fields["scene_lines"].textChanged.connect(self._reflect_speech)
-            self._reflect_speech()
+            self.fields["scene_lines"].textChanged.connect(self.reflect_use)
+        self.reflect_use()
         self.length.editTextChanged.connect(self.changed)
         self.length.edited.connect(self._settle)
-
-    def show_text(self, key: str, shown: bool) -> None:
-        if key in self.fields:
-            self.captions[key].setVisible(shown)
-            self.fields[key].setVisible(shown)
 
     def speaking(self) -> bool:
         """Whether this scene has a line, and so renders as her speaking."""
         field = self.fields.get("scene_lines")
         return field is not None and bool(diff_text.live_text(field).strip())
 
-    def _reflect_speech(self) -> None:
-        """Show which of the two a scene is. With a line, its prompts are read-
-        only, dim and captioned as unused; without one they are ordinary fields
-        again (see the module docstring for why the line wins)."""
+    def reflect_use(self) -> None:
         speaking = self.speaking()
         for key in SPOKEN_OVER:
-            field = self.fields[key]
-            field.setReadOnly(speaking)
-            field.setProperty("inert", speaking)
-            # A stylesheet property selector is only re-read on a repolish, so
-            # the dimming would otherwise land only on cards built while spoken.
-            field.style().unpolish(field)
-            field.style().polish(field)
-            help_text = SPEAKING_HELP if speaking else param_help(key)
-            field.setToolTip(help_text)
-            self.captions[key].setToolTip(help_text)
-            self.captions[key].setText(
-                TEXT_CAPTIONS[key] + (SPEAKING_NOTE if speaking else ""))
+            if speaking:
+                help_text, note = SPEAKING_HELP, SPEAKING_NOTE
+            else:
+                help_text, note = self._shut_down.get(key, param_help(key)), ""
+            set_in_use(self.fields[key], self.captions[key],
+                       not speaking and key not in self._shut_down, help_text)
+            self.captions[key].setText(TEXT_CAPTIONS[key] + note)
 
     def frames(self) -> int:
         seconds = self.length.value()
@@ -191,7 +179,7 @@ class ScenesEditor(QWidget):
         self._prepare_length = prepare_length
         # Whether the workflow speaks: a card of one that cannot has no lines field.
         self._lines = lines
-        self._hidden_texts: set[str] = set()
+        self._shut_down: dict[str, str] = {}
         self._scenes: list[_Scene] = []
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
@@ -211,13 +199,11 @@ class ScenesEditor(QWidget):
         """Another scene after the last, at the workflow's default length. It
         starts out keeping out what the scene before it keeps out: a negative
         mostly holds across a story, so blank would mean typing it again."""
-        scene = _Scene(self._pd, self._prepare_length, lines=self._lines)
+        scene = _Scene(self._pd, self._prepare_length, self._shut_down, lines=self._lines)
         if self._scenes:
             scene.fields["negative_prompt"].setPlainText(
                 diff_text.live_text(self._scenes[-1].fields["negative_prompt"]))
         scene.set_frames(int(self._pd.default[0]))
-        for key in self._hidden_texts:
-            scene.show_text(key, False)
         scene.changed.connect(self.changed)
         scene.remove_requested.connect(self.remove_scene)
         self._scenes.append(scene)
@@ -225,13 +211,13 @@ class ScenesEditor(QWidget):
         self._renumber()
         self.changed.emit()
 
-    def show_text(self, key: str, shown: bool) -> None:
-        if shown:
-            self._hidden_texts.discard(key)
+    def set_text_in_use(self, key: str, shut_down_help: str | None) -> None:
+        if shut_down_help is None:
+            self._shut_down.pop(key, None)
         else:
-            self._hidden_texts.add(key)
+            self._shut_down[key] = shut_down_help
         for scene in self._scenes:
-            scene.show_text(key, shown)
+            scene.reflect_use()
 
     def remove_scene(self, which) -> None:
         """Take a scene out, by index or by card; the last one stays."""

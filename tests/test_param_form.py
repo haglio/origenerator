@@ -21,7 +21,12 @@ from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gui import icons, param_sections, pictured_dropdown
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.eliding import ElidingLabel
-from origenerator.gui.param_form import ParamForm
+from origenerator.gui.param_form import (
+    BOTH_STRENGTHS_ONE_HELP,
+    EVERY_SCENE_SPEAKS_HELP,
+    STRENGTH_ONE_HELP,
+    ParamForm,
+)
 from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
@@ -1889,7 +1894,7 @@ def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
     assert all(_row_visible(form, key) for key in speaking_rows)
 
 
-def test_the_sound_prompts_hide_while_every_scene_speaks(qtbot):
+def test_the_sound_prompts_are_shut_down_while_every_scene_speaks(qtbot):
     form = ParamForm(_scene_defs() + [
         ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True),
         ParamDef("audio_negative_prompt", "Negative Prompt", "str", "", multiline=True),
@@ -1898,28 +1903,44 @@ def test_the_sound_prompts_hide_while_every_scene_speaks(qtbot):
     editor = form._widgets["scene_frames"]
     editor.add_scene()
     editor.fields("scene_lines")[0].setPlainText("Come in.")
-    assert _row_visible(form, "audio_prompt")
+    assert _in_use_with(form, "audio_prompt", param_help("audio_prompt"))
 
     editor.fields("scene_lines")[1].setPlainText("Sit down.")
 
-    assert not _row_visible(form, "audio_prompt")
-    assert not _row_visible(form, "audio_negative_prompt")
+    assert _shut_down_with(form, "audio_prompt", EVERY_SCENE_SPEAKS_HELP)
+    assert _shut_down_with(form, "audio_negative_prompt", EVERY_SCENE_SPEAKS_HELP)
+
+    editor.fields("scene_lines")[1].setPlainText("")
+
+    assert _in_use_with(form, "audio_negative_prompt", param_help("audio_negative_prompt"))
 
 
-def test_the_things_to_avoid_hide_while_prompt_strength_is_one(qtbot):
+def _shut_down_with(form, key, tip):
+    field, label = form._widgets[key], form._labels[key]
+    return (_row_visible(form, key) and field.isReadOnly() and field.property("inert") is True
+            and field.toolTip() == label.toolTip() == tip)
+
+
+def _in_use_with(form, key, tip):
+    field, label = form._widgets[key], form._labels[key]
+    return (_row_visible(form, key) and not field.isReadOnly() and field.property("inert") is False
+            and field.toolTip() == label.toolTip() == tip)
+
+
+def test_the_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):
     form = ParamForm([
         ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
         ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
     ])
     qtbot.addWidget(form)
-    assert not _row_visible(form, "negative_prompt")
+    assert _shut_down_with(form, "negative_prompt", STRENGTH_ONE_HELP)
 
     form._widgets["cfg"].setValue(3.5)
 
-    assert _row_visible(form, "negative_prompt")
+    assert _in_use_with(form, "negative_prompt", param_help("negative_prompt"))
 
 
-def test_the_things_to_avoid_show_while_either_pass_pushes_the_prompt(qtbot):
+def test_the_things_to_avoid_are_shut_down_until_either_pass_pushes_the_prompt(qtbot):
     form = ParamForm([
         ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
         ParamDef("cfg_high", "Prompt Strength (First Pass)", "float", 1.0,
@@ -1928,30 +1949,69 @@ def test_the_things_to_avoid_show_while_either_pass_pushes_the_prompt(qtbot):
                  min_val=0.0, max_val=30.0, step=0.1),
     ])
     qtbot.addWidget(form)
-    assert not _row_visible(form, "negative_prompt")
+    assert _shut_down_with(form, "negative_prompt", BOTH_STRENGTHS_ONE_HELP)
 
     form._widgets["cfg_low"].setValue(2.0)
 
-    assert _row_visible(form, "negative_prompt")
+    assert _in_use_with(form, "negative_prompt", param_help("negative_prompt"))
 
 
-def test_a_scenes_things_to_avoid_hide_while_prompt_strength_is_one(qtbot):
-    form = ParamForm(_scene_defs() + [
+def _scene_text_state(scene, key):
+    field, caption = scene.fields[key], scene.captions[key]
+    return (field.isHidden(), field.isReadOnly(), field.property("inert"),
+            field.toolTip(), caption.toolTip(), caption.text())
+
+
+def _scene_form_at_strength_one():
+    return ParamForm(_scene_defs() + [
         ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
     ])
+
+
+_SHUT_DOWN_AVOID = (False, True, True, STRENGTH_ONE_HELP, STRENGTH_ONE_HELP, "Negative Prompt")
+_IN_USE_AVOID = (False, False, False, param_help("negative_prompt"), param_help("negative_prompt"),
+                 "Negative Prompt")
+
+
+def test_a_scenes_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):
+    form = _scene_form_at_strength_one()
     qtbot.addWidget(form)
-    editor = form._widgets["scene_frames"]
-    editor.add_scene()
-
-    def avoid_parts_hidden():
-        return [(scene.fields["negative_prompt"].isHidden(),
-                 scene.captions["negative_prompt"].isHidden()) for scene in editor._scenes]
-
-    assert avoid_parts_hidden() == [(True, True), (True, True)]
+    scene = form._widgets["scene_frames"]._scenes[0]
+    assert _scene_text_state(scene, "negative_prompt") == _SHUT_DOWN_AVOID
+    assert not scene.fields["positive_prompt"].isReadOnly()
 
     form._widgets["cfg"].setValue(3.5)
 
-    assert avoid_parts_hidden() == [(False, False), (False, False)]
+    assert _scene_text_state(scene, "negative_prompt") == _IN_USE_AVOID
+
+
+def test_a_scene_added_at_prompt_strength_one_comes_up_with_its_things_to_avoid_shut_down(qtbot):
+    form = _scene_form_at_strength_one()
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+
+    editor.add_scene()
+
+    assert [_scene_text_state(scene, "negative_prompt") for scene in editor._scenes] == [
+        _SHUT_DOWN_AVOID, _SHUT_DOWN_AVOID]
+
+
+def test_a_speaking_scene_keeps_the_speaking_help_at_prompt_strength_one(qtbot):
+    form = _scene_form_at_strength_one()
+    qtbot.addWidget(form)
+    scene = form._widgets["scene_frames"]._scenes[0]
+
+    scene.fields["scene_lines"].setPlainText("Come in.")
+
+    for key, caption in (("positive_prompt", "Positive Prompt"),
+                         ("negative_prompt", "Negative Prompt")):
+        assert _scene_text_state(scene, key) == (
+            False, True, True, SPEAKING_HELP, SPEAKING_HELP, caption + SPEAKING_NOTE)
+
+    scene.fields["scene_lines"].setPlainText("")
+
+    assert not scene.fields["positive_prompt"].isReadOnly()
+    assert _scene_text_state(scene, "negative_prompt") == _SHUT_DOWN_AVOID
 
 
 def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot):

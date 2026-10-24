@@ -25,8 +25,9 @@ import time
 
 from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, pyqtSignal
 
-from origenerator import gallery, queue_line
+from origenerator import comfyui_api, comfyui_launcher, gallery, queue_line
 from origenerator.completion import mark_generation_completed
+from origenerator.config import COMFYUI_DIR, COMFYUI_HOST, COMFYUI_PORT
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.generation_job import (
@@ -35,6 +36,7 @@ from origenerator.gui.generation_job import (
     insert_generation_row,
     record_unfinished_run,
 )
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.media import MediaType
 from origenerator.run_notice import RunOutcome
 from origenerator.seed_history import SeedUseKind
@@ -47,6 +49,15 @@ logger = logging.getLogger(__name__)
 # progress ticks fire per sampler step (sub-second for images); the persisted value
 # only needs to be recent enough that a restart resumes the bar near where it was.
 _PROGRESS_PERSIST_INTERVAL_S = 1.0
+
+COMFYUI_DID_NOT_START = "Origenerator couldn't start ComfyUI."
+
+
+def bring_up_the_comfyui_here() -> bool:
+    return comfyui_launcher.bring_up(logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR)
+
+
+BRING_UP_COMFYUI = bring_up_the_comfyui_here
 
 
 def _outcome_of(db, job, *, ok: bool, seconds: float | None = None) -> RunOutcome:
@@ -170,11 +181,13 @@ class JobQueue(QObject):
     # there is no tile left to write the news on.
     run_ended = pyqtSignal(object)
 
-    def __init__(self, db, client, parent=None, *, clock=time.monotonic):
+    def __init__(self, db, client, parent=None, *, clock=time.monotonic, bring_up_comfyui=None):
         super().__init__(parent)
         self._db = db
         self._client = client
         self._clock = clock
+        self._bring_up_comfyui = bring_up_comfyui or BRING_UP_COMFYUI
+        self._awaiting_comfyui = False
         self._picture_asked_at: float | None = None
         self._videos_wait = QTimer(self)
         self._videos_wait.setSingleShot(True)
@@ -477,7 +490,8 @@ class JobQueue(QObject):
         return self._clock() + wait if wait > 0 else None
 
     def _free_for_the_next_job(self) -> bool:
-        return not (self._on_server or self._in_flight is not None or self._training is not None)
+        return not (self._on_server or self._in_flight is not None or self._training is not None
+                    or self._awaiting_comfyui)
 
     def _wait_at_the_front(self) -> float:
         since = (None if self._picture_asked_at is None
@@ -501,12 +515,11 @@ class JobQueue(QObject):
         except Exception as e:
             if self._key_of(job) is None:
                 return False  # canceled while out, and never taken: nothing to undo
+            if self._bring_up_comfyui is not None and comfyui_api.unreachable(e) and not closing:
+                self._wait_for_comfyui(job)
+                return False
             logger.warning("Re-roll submission failed for %s: %s", key, e)
-            self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
-                                       error_message=str(e))
-            self._drop(key, job)
-            if _the_users_own(job.source):
-                self.failed.emit(key, str(e))
+            self._refuse(key, job, str(e))
             return False
         finally:
             self._in_flight = None
@@ -521,6 +534,34 @@ class JobQueue(QObject):
         self._on_server.append(job)
         self._db.update_generation(job.prompt_id, status=GenerationStatus.RUNNING)
         return True
+
+    def _wait_for_comfyui(self, job: GenerationJob) -> None:
+        self._waiting.insert(0, job)
+        if self._awaiting_comfyui:
+            return
+        self._awaiting_comfyui = True
+        logger.info("ComfyUI did not answer the submit of %s; holding the line until it does",
+                    job.prompt_id)
+        run_off_thread(self._bring_up_comfyui, self._bring_up_ended, owner=self,
+                       waits_long=True)
+
+    def _bring_up_ended(self, came_up) -> None:
+        self._awaiting_comfyui = False
+        if came_up:
+            self._pump()
+            return
+        logger.warning("ComfyUI could not be brought up; the %d job(s) waiting for it fail",
+                       len(self._waiting))
+        for job in list(self._waiting):
+            self._refuse(self._key_of(job), job, COMFYUI_DID_NOT_START)
+        self.changed.emit()
+
+    def _refuse(self, key: str, job: GenerationJob, reason: str) -> None:
+        self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
+                                   error_message=reason)
+        self._drop(key, job)
+        if _the_users_own(job.source):
+            self.failed.emit(key, reason)
 
     def flush_to_server(self) -> int:
         """Hand ComfyUI everything still waiting, and say how much went.

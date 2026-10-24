@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+import urllib.error
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -11,12 +12,12 @@ from unittest.mock import MagicMock
 from PIL import Image
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from origenerator import gallery
+from origenerator import config, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import job_queue as job_queue_module
-from origenerator.gui.job_queue import JobQueue, _parse_progress_state
+from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -588,6 +589,97 @@ def test_background_work_the_server_refuses_is_recorded_but_not_announced(qtbot,
 
     assert said == []
     assert [row["status"] for row in db.list_generations()] == ["error"]
+
+
+def _comfyui_down():
+    return urllib.error.URLError(ConnectionRefusedError(
+        10061, "No connection could be made because the target machine actively refused it"))
+
+
+class _ComfyUIComingUp:
+    """Bringing ComfyUI up, held until the test lets it finish."""
+
+    def __init__(self, comes_up=True):
+        self.comes_up = comes_up
+        self.times = 0
+        self.finish = threading.Event()
+
+    def __call__(self):
+        self.times += 1
+        self.finish.wait(5)
+        return self.comes_up
+
+
+def test_a_press_while_comfyui_is_down_waits_as_queued_until_comfyui_answers(qtbot, tmp_path):
+    client = _client()
+    client.submit_job = MagicMock(side_effect=[_comfyui_down(), "comfy-X"])
+    db = Database(tmp_path / "test.db")
+    coming_up = _ComfyUIComingUp()
+    queue = JobQueue(db, client, bring_up_comfyui=coming_up)
+    said = []
+    queue.failed.connect(lambda key, message: said.append(message))
+
+    job = _launch_video(queue, "k1", seed=1)
+
+    assert db.get_generation(job.prompt_id)["status"] == "pending"
+    assert queue.queue_order == [job.prompt_id]
+    coming_up.finish.set()
+    qtbot.waitUntil(lambda: db.get_generation(job.prompt_id)["status"] == "running", timeout=5000)
+    assert said == []
+
+
+def test_everything_waiting_on_comfyui_fails_together_when_it_cannot_be_brought_up(
+        qtbot, tmp_path):
+    client = _client()
+    client.submit_job = MagicMock(side_effect=_comfyui_down())
+    db = Database(tmp_path / "test.db")
+    coming_up = _ComfyUIComingUp(comes_up=False)
+    queue = JobQueue(db, client, bring_up_comfyui=coming_up)
+    said = []
+    queue.failed.connect(lambda key, message: said.append((key, message)))
+    first = _launch_video(queue, "k1", seed=1)
+    second = _launch_video(queue, "k2", seed=2)
+
+    coming_up.finish.set()
+    qtbot.waitUntil(lambda: len(said) == 2, timeout=5000)
+
+    assert said == [("k1", COMFYUI_DID_NOT_START), ("k2", COMFYUI_DID_NOT_START)]
+    assert {db.get_generation(job.prompt_id)["status"] for job in (first, second)} == {"error"}
+    assert queue.all_jobs == []
+    assert (coming_up.times, client.submit_job.call_count) == (1, 1)
+
+
+def test_a_bring_up_that_breaks_fails_what_waits_rather_than_holding_it_forever(qtbot, tmp_path):
+    def no_comfyuiapp_here():
+        raise FileNotFoundError("comfyui_server.py")
+
+    client = _client()
+    client.submit_job = MagicMock(side_effect=_comfyui_down())
+    queue = JobQueue(Database(tmp_path / "test.db"), client, bring_up_comfyui=no_comfyuiapp_here)
+    said = []
+    queue.failed.connect(lambda key, message: said.append((key, message)))
+
+    _launch_video(queue, "k1", seed=1)
+    qtbot.waitUntil(lambda: bool(said), timeout=5000)
+
+    assert said == [("k1", COMFYUI_DID_NOT_START)]
+
+
+def test_a_queue_given_no_bring_up_brings_up_the_comfyui_this_machine_runs(
+        qtbot, tmp_path, monkeypatch):
+    brought_up = []
+    monkeypatch.setattr(job_queue_module, "BRING_UP_COMFYUI", job_queue_module.bring_up_the_comfyui_here)
+    monkeypatch.setattr(job_queue_module.comfyui_launcher, "bring_up",
+                        lambda logger, host, port, comfyui_dir: brought_up.append(
+                            (host, port, comfyui_dir)) or True)
+    client = _client()
+    client.submit_job = MagicMock(side_effect=[_comfyui_down(), "comfy-X"])
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+
+    _launch_video(queue, "k1", seed=1)
+    qtbot.waitUntil(lambda: client.submit_job.call_count == 2, timeout=5000)
+
+    assert brought_up == [(config.COMFYUI_HOST, config.COMFYUI_PORT, config.COMFYUI_DIR)]
 
 
 class _UnbuildableWorkflow:

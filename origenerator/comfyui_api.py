@@ -24,6 +24,8 @@ import urllib.request
 import uuid
 from typing import NamedTuple
 
+from origenerator.comfyui_inputs import ComfyFolders, within_reach
+
 logger = logging.getLogger(__name__)
 
 # Every HTTP call to ComfyUI carries this timeout. Without one, a wedged or
@@ -191,10 +193,11 @@ class ComfyUIApi:
     """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
-                 client_id: str | None = None):
+                 client_id: str | None = None, folders: ComfyFolders | None = None):
         self.host = host
         self.port = port
         self.client_id = client_id or str(uuid.uuid4())
+        self.folders = folders
 
     @property
     def base_url(self) -> str:
@@ -212,6 +215,8 @@ class ComfyUIApi:
         A POST the server answers too late is followed up rather than failed:
         see :meth:`_await_acceptance`.
         """
+        if self.folders is not None:
+            workflow_payload = within_reach(workflow_payload, self.folders)
         try:
             self._post_prompt(workflow_payload, prompt_id)
         except Exception as e:

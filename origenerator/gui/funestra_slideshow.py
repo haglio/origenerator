@@ -506,15 +506,16 @@ class FunestraSlideshow(QObject):
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump
-        it makes on a Funestra's own map; *lock* keeps it there."""
+        it makes on a Funestra's own map; *lock* gives it the Lock button's lock."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
         self._jump_to(slide)
-        self._lock(lock)
+        if lock:
+            self.set_locked(True)
 
     def _jump_to(self, slide) -> None:
-        """Stand the pass on *slide* and send the Funestra there.
+        """Let go of the lock, stand the pass on *slide* and send the Funestra there.
 
         One verb either way: the Funestra jumps to a file already in its list
         and splices one that is not in after what it is showing — which is
@@ -522,6 +523,7 @@ class FunestraSlideshow(QObject):
         loop re-deals the pass, and that hands the Funestra the browse first
         (see :meth:`_pass_changed`).
         """
+        self._unlock()
         self._set.jump_to(slide)
         self._leave_the_versions()
         self._send(play_file(self._funestra_item(slide)))
@@ -590,7 +592,6 @@ class FunestraSlideshow(QObject):
         row = self._set.configuration_row(query)
         if row is not None:
             if row is not self._set.playlist.current():
-                self._unlock()
                 self._jump_to(row)
             self.slideshow_loop(SEED_AXIS)
             return
@@ -606,7 +607,6 @@ class FunestraSlideshow(QObject):
         if target is None:
             self._flash("Nothing that way", kind=WARNING)
             return
-        self._unlock()
         self._jump_to(target)
 
     # --- the two switches, and what the panel reads off the set --------------

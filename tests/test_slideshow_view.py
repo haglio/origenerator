@@ -1343,14 +1343,18 @@ def test_double_clicking_the_picture_leaves_the_slideshow(qtbot):
     assert closes == [True]  # the dismissal reaches the gallery, like Escape's
 
 
-def test_double_clicking_a_thumbnail_on_the_map_locks_the_slideshow_on_it(qtbot):
-    view = _on_screen_wearing_its_panel(
-        qtbot, _view(qtbot, _KEYED, actions=SlideshowActions(neighbors=_around)))
+def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_lock(qtbot):
+    asked = []
+    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot, _KEYED, actions=SlideshowActions(
+        neighbors=_around, favorite=lambda pid: asked.append(("star", pid)),
+        enhance=lambda pid: asked.append(("enhance", pid)) or True,
+        lock=lambda pid: asked.append(("lock", pid)))))
 
     gestures.double_click(view._pane._window, thumbnail_on_screen(view, "b.png"))
 
     assert view.isVisible()
     assert (_media_on_screen(view), view.slideshow.locked) == ("b.png", True)
+    assert asked == [("star", "id-b"), ("enhance", "id-b"), ("lock", "id-b")]
 
 
 def test_two_quick_clicks_on_next_step_on_twice_and_leave_the_slideshow_up(qtbot):

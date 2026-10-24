@@ -92,7 +92,7 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
         return real_move(s, d)
 
     monkeypatch.setattr(trash_mod.shutil, "move", flaky_move)
-    monkeypatch.setattr(trash_mod.time, "sleep", lambda _s: None)
+    monkeypatch.setattr("app_support.file_channel.time.sleep", lambda _s: None)
 
     batch = trash.store([src])
 

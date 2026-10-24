@@ -11,12 +11,15 @@ from typing import NamedTuple
 
 _COND_NODES = ("WanImageToVideo", "WanFirstLastFrameToVideo")
 _LORA_LOADERS = ("LoraLoaderModelOnly", "LoraLoader")
+# The title an H3 graph gives the LoRA loader its Turbo tick adds.
+TURBO_TITLE = "Turbo"
 
 
 class ModelChain(NamedTuple):
     unet: str | None
     lora: str | None
     lora_strength: float | None
+    turbo: bool = False
 
 
 def follow(graph: dict, ref) -> dict | None:
@@ -53,13 +56,16 @@ def _model_chain(graph: dict, model_ref) -> ModelChain:
     capturing the first LoRA loader's name and model strength on the way.
     """
     unet = lora = strength = None
+    turbo = False
     node = follow(graph, model_ref)
     seen: set[int] = set()
     while node is not None and id(node) not in seen:
         seen.add(id(node))
         inputs = node.get("inputs", {})
         class_type = node.get("class_type", "")
-        if class_type in _LORA_LOADERS and lora is None:
+        if class_type in _LORA_LOADERS and node.get("_meta", {}).get("title") == TURBO_TITLE:
+            turbo = True
+        elif class_type in _LORA_LOADERS and lora is None:
             name = inputs.get("lora_name")
             if isinstance(name, str):
                 lora = name
@@ -70,7 +76,7 @@ def _model_chain(graph: dict, model_ref) -> ModelChain:
                 unet = name
             break
         node = follow(graph, inputs.get("model"))
-    return ModelChain(unet, lora, strength)
+    return ModelChain(unet, lora, strength, turbo)
 
 
 def _number(value) -> float | None:
@@ -83,6 +89,18 @@ def _base_sampler_models(graph: dict) -> dict:
     return {key: value for key, value in (("unet", chain.unet), ("lora", chain.lora),
                                           ("lora_strength", chain.lora_strength))
             if value is not None}
+
+
+def guided_model_files(graph: dict) -> dict:
+    """The model, LoRA and Turbo tick behind a graph's ``BasicGuider``."""
+    guider = next((n for n in graph.values() if n.get("class_type") == "BasicGuider"), None)
+    if guider is None:
+        return {}
+    chain = _model_chain(graph, guider.get("inputs", {}).get("model"))
+    found = {key: value for key, value in (("unet", chain.unet), ("lora", chain.lora),
+                                           ("lora_strength", chain.lora_strength))
+             if value is not None}
+    return {**found, "turbo": chain.turbo}
 
 
 def dual_sampler_model_files(graph: dict) -> dict:
@@ -126,6 +144,8 @@ def graph_model_params(graph: dict) -> dict:
       ``KSampler``'s model chain leads back to (Krea 2), with any LoRA on the way.
     * ``unet_high``/``unet_low`` (and any ``lora_high``/``lora_low``) — WAN's
       dual-noise samplers, paired to their stage by :func:`dual_sampler_model_files`.
+    * ``unet``, ``lora``/``lora_strength`` and ``turbo`` — the one model under a
+      ``BasicGuider`` (MiniMax H3), by :func:`guided_model_files`.
 
     Returns only the keys it resolves; empty for a graph with no model loaders.
     """
@@ -139,6 +159,7 @@ def graph_model_params(graph: dict) -> dict:
             params["unet"] = inputs["unet_name"]
     params.update(_base_sampler_models(graph))
     params.update(dual_sampler_model_files(graph))
+    params.update(guided_model_files(graph))
     return params
 
 

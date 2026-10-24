@@ -25,6 +25,11 @@ WAN = "wan"
 WAN_S2V = "wan_s2v"
 LTX = "ltx"
 KREA2 = "krea2"
+MINIMAX_H3 = "minimax_h3"
+# H3's two tasks. Their checkpoints carry identical tensor names, so like WAN
+# 2.2's experts the task lives only in the name, and a slot asks for its own.
+FL2VA = "fl2va"
+REF2VA = "ref2va"
 
 # No real header comes near this (the largest installed is under 500 KB). A
 # length past it means a corrupt or misidentified file, and honoring it would
@@ -71,6 +76,11 @@ _KREA2_BLOCK = re.compile(r"blocks[._]\d+[._](?:attn[._]w[qkvo]|mlp[._](?:gate|u
 # where SD1.5 has one, so a second block tells the two apart without the encoders.
 _SD_UNET_LORA = re.compile(r"^lora_unet_(?:input|output|middle)_block")
 _SDXL_STACKED_BLOCKS = re.compile(r"transformer_blocks_[1-9]")
+# H3's task as its files spell it: ``fl2va`` on a checkpoint, ``fl2v`` on a LoRA.
+_H3_TASK = re.compile(r"(?<![A-Za-z])(fl2v|ref2v)a?(?![A-Za-z])", re.IGNORECASE)
+# H3's fused attention projection, in the comfy spelling and kohya's: what an
+# H3 LoRA still carries when it touches the blocks alone.
+_H3_BLOCK_MARKERS = ("attn.qkv_proj", "attn_qkv_proj")
 
 
 @dataclass(frozen=True)
@@ -85,6 +95,7 @@ class ModelFile:
     is_lora: bool
     expert: str | None   # "high" / "low" when the name says so, else None
     is_shard: bool
+    mode: str | None = None   # H3's "fl2va" / "ref2va" when the name says so
 
 
 # What each model file turned out to be, kept between launches: a header is a
@@ -127,7 +138,7 @@ def _read_remembered(path: Path) -> dict[tuple[str, int, int], ModelFile]:
         try:
             remembered[(entry["path"], entry["size"], entry["mtime_ns"])] = ModelFile(
                 arch=entry["arch"], is_lora=entry["is_lora"], expert=entry["expert"],
-                is_shard=entry["is_shard"])
+                is_shard=entry["is_shard"], mode=entry["mode"])
         except (KeyError, TypeError):
             continue
     return remembered
@@ -151,13 +162,15 @@ def _describe(path: Path) -> ModelFile:
         return ModelFile(arch=None, is_lora=False, expert=None, is_shard=True)
     keys = _tensor_names(path)
     expert = _expert_from_name(path.name)
+    mode = _mode_from_name(path.name)
     if keys is None:
-        return ModelFile(arch=None, is_lora=False, expert=expert, is_shard=False)
+        return ModelFile(arch=None, is_lora=False, expert=expert, is_shard=False, mode=mode)
     return ModelFile(
         arch=_arch_from(keys),
         is_lora=any(marker in key for key in keys for marker in _LORA_MARKERS),
         expert=expert,
         is_shard=False,
+        mode=mode,
     )
 
 
@@ -172,6 +185,12 @@ def _expert_from_name(name: str) -> str | None:
         for match in (*_EXPERT_BOUNDED.finditer(name), *_EXPERT_CAMEL.finditer(name))
     }
     found = {word for word in found if word in ("high", "low")}
+    return found.pop() if len(found) == 1 else None
+
+
+def _mode_from_name(name: str) -> str | None:
+    """Which H3 task the filename claims, ``FL2VA`` or ``REF2VA``, or ``None``."""
+    found = {match.group(1).lower() + "a" for match in _H3_TASK.finditer(name)}
     return found.pop() if len(found) == 1 else None
 
 
@@ -232,6 +251,11 @@ def _arch_from(keys: list[str]) -> str | None:
     # on the blocks alone shows what only its blocks hold.
     if has("txtfusion") or any(_KREA2_BLOCK.search(key) for key in keys):
         return KREA2
+    # MiniMax H3 before WAN: `blocks.N` again, with its own layers around them
+    # or, in a LoRA touching the blocks alone, its fused qkv inside them.
+    if (has("token_refiner", "video_patch_proj", "audio_patch_proj", "adaln_t_table")
+            or any(marker in key for key in keys for marker in _H3_BLOCK_MARKERS)):
+        return MINIMAX_H3
     # WAN S2V before WAN: it is WAN's `blocks.N` with the audio injector beside
     # them, and the injector is what only it has.
     if has("audio_injector"):

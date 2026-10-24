@@ -205,13 +205,9 @@ def output_disk_files(row: dict, output_dir: Path,
 
 
 def output_file_reference(files: list[dict]) -> str | None:
-    """A ``LoadImage``-resolvable reference to a generation's first output file.
-
-    A saved file lives in ComfyUI's output dir, so the reference carries its
-    subfolder and an ``[output]`` tag (LoadImage validates by file existence via
-    that annotation, not by which input folder it is in). Feeds a re-rolled i2v its
-    freshly generated start frame. ``None`` when no file has a name to reference.
-    """
+    """A ``LoadImage`` reference to a generation's first output file -- its
+    subfolder and name under an ``[output]`` tag -- or ``None`` when no file has
+    a name to reference."""
     for f in files:
         filename = f.get("filename")
         if not filename:

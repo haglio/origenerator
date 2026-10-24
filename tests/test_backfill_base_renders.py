@@ -503,7 +503,7 @@ def test_the_tool_reports_what_it_would_do_and_touches_nothing(tmp_path, capsys)
 
 def test_the_tool_folds_each_repair_into_the_row_it_belongs_to(tmp_path, monkeypatch):
     db = _repairable_db(tmp_path)
-    monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda: object())
+    monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda folders: object())
     monkeypatch.setattr(backfill_tool, "render_base_now",
                         lambda client, workflow, params: [_file("base.png")])
 
@@ -519,7 +519,7 @@ def test_the_tool_reports_a_repair_that_produced_nothing_rather_than_folding_it(
     # A wedged ComfyUI must not leave the row looking repaired, and the exit
     # code has to say so: this is run unattended over a long backlog.
     db = _repairable_db(tmp_path)
-    monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda: object())
+    monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda folders: object())
     monkeypatch.setattr(backfill_tool, "render_base_now",
                         lambda client, workflow, params: [])
 

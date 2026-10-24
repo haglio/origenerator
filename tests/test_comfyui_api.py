@@ -24,6 +24,7 @@ import pytest
 
 from origenerator.comfyui_api import ComfyUIApi, comfyui_responding, format_prompt_error
 from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
+from origenerator.comfyui_inputs import ComfyFolders
 
 
 def _mock_response(status: int, body: bytes):
@@ -499,3 +500,46 @@ def test_free_memory_asks_comfyui_to_unload_its_models():
     req = mock_urlopen.call_args[0][0]
     assert req.full_url.endswith("/free")
     assert json.loads(req.data) == {"unload_models": True, "free_memory": True}
+
+
+def _folders(tmp_path):
+    folders = ComfyFolders(input=tmp_path / "input", output=tmp_path / "output", temp=tmp_path / "temp")
+    for folder in folders:
+        folder.mkdir()
+    return folders
+
+
+def _picture_elsewhere(tmp_path):
+    picture = tmp_path / "elsewhere" / "jane_doe.png"
+    picture.parent.mkdir()
+    picture.write_bytes(b"fabricated picture bytes")
+    return picture
+
+
+def _posted_prompt(mock_urlopen) -> dict:
+    return json.loads(mock_urlopen.call_args[0][0].data)["prompt"]
+
+
+def test_submit_job_hands_comfyui_a_run_it_can_open(tmp_path):
+    picture = _picture_elsewhere(tmp_path)
+    client = ComfyUIApi(client_id="test-client", folders=_folders(tmp_path))
+    payload = {"1": {"class_type": "LoadImage", "inputs": {"image": str(picture)}}}
+
+    with patch("urllib.request.urlopen",
+               return_value=_mock_response(200, b'{"prompt_id": "our-id"}')) as mock_urlopen:
+        client.submit_job(payload, "our-id")
+
+    assert _posted_prompt(mock_urlopen)["1"]["inputs"]["image"].endswith("/jane_doe.png [temp]")
+    assert payload["1"]["inputs"]["image"] == str(picture), "the run keeps the name it was given"
+
+
+def test_a_client_told_no_folders_posts_a_run_as_it_was_given(tmp_path):
+    picture = _picture_elsewhere(tmp_path)
+    client = ComfyUIApi(client_id="test-client")
+    payload = {"1": {"class_type": "LoadImage", "inputs": {"image": str(picture)}}}
+
+    with patch("urllib.request.urlopen",
+               return_value=_mock_response(200, b'{"prompt_id": "our-id"}')) as mock_urlopen:
+        client.submit_job(payload, "our-id")
+
+    assert _posted_prompt(mock_urlopen) == payload

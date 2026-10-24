@@ -63,15 +63,12 @@ _AUDIO_STEP_SECONDS_PER_SECOND = 0.03
 _IMAGE_STEP_SECONDS = 0.5
 _DETAIL_STEP_SECONDS = 0.15
 
-# The inputs every latent builder that measures a clip carries together —
-# WanImageToVideo, WanFirstLastFrameToVideo,
-# EmptyHunyuanLatentVideo. Matched on that shape rather than on a list of class
-# names, so a video workflow written next year is sized as one without anyone
-# remembering to add it here; a name list that goes stale sizes a clip's samplers
-# as stills, which is the exact mistake this module exists to undo.
-# ``ImageFromBatch`` carries a ``length`` too and is not one of these, which is
-# why the match needs all four.
-_LATENT_SIZE_INPUTS = ("length", "width", "height", "batch_size")
+# The inputs every latent builder that measures a clip carries together (the
+# Wan conditioning nodes, EmptyHunyuanLatentVideo, MiniMaxH3ImageToVideo).
+# Matched on that shape rather than on a list of class names, so a video
+# workflow written next year is sized as one without anyone remembering to add
+# it here; ``ImageFromBatch`` carries a ``length`` too, hence the canvas.
+_LATENT_SIZE_INPUTS = ("length", "width", "height")
 
 
 def _ksampler_steps(inputs: dict) -> int:
@@ -119,6 +116,20 @@ _SAMPLER_STEPS = {
     "HunyuanFoleySampler": _ksampler_steps,
     "DetailerForEach": _detailer_steps,
 }
+
+# A sampler whose steps live on the schedule node wired into the named input.
+_SCHEDULED_SAMPLERS = {"SamplerCustomAdvanced": "sigmas"}
+
+
+def _sampler_steps(payload: dict, node: dict) -> int | None:
+    """The steps ``node`` reports, or ``None`` for a node that is no sampler."""
+    class_type = node.get("class_type")
+    inputs = node.get("inputs", {})
+    if class_type in _SCHEDULED_SAMPLERS:
+        schedule = payload.get(str((inputs.get(_SCHEDULED_SAMPLERS[class_type]) or [None])[0]), {})
+        return _ksampler_steps(schedule.get("inputs", {}))
+    sizer = _SAMPLER_STEPS.get(class_type)
+    return None if sizer is None else sizer(inputs)
 
 
 def _literal(value, fallback: float) -> float:
@@ -196,9 +207,12 @@ _STAGE_NAMES = {
     "WanImageToVideo": "Preparing the clip",
     "WanFirstLastFrameToVideo": "Preparing the clip",
     "EmptyHunyuanLatentVideo": "Preparing the clip",
+    "MiniMaxH3ImageToVideo": "Preparing the clip",
+    "MiniMaxH3ReferenceToVideo": "Preparing the clip",
     "VAEEncode": "Preparing",
     "ImageUpscaleWithModel": "Upscaling",
     "VAEDecode": "Decoding frames",
+    "VAEDecodeAudio": "Decoding sound",
     "RIFE VFI": "Smoothing the motion",
     "VHS_VideoCombine": "Writing the video",
     "SaveImage": "Saving the image",
@@ -240,7 +254,7 @@ def stage_names(payload: dict) -> dict[str, str]:
     names = {}
     for node_id, node in payload.items():
         class_type = node.get("class_type")
-        if class_type in _SAMPLER_STEPS:
+        if class_type in _SAMPLER_STEPS or class_type in _SCHEDULED_SAMPLERS:
             names[str(node_id)] = _sampler_stage(class_type, node.get("inputs", {}),
                                                  node.get("_meta", {}).get("title", ""))
         elif class_type in _STAGE_NAMES:
@@ -260,12 +274,11 @@ def sampler_costs(payload: dict) -> dict[str, tuple[int, float]]:
     frames = _video_latent_frames(payload)
     costs = {}
     for node_id, node in payload.items():
-        sizer = _SAMPLER_STEPS.get(node.get("class_type"))
-        if sizer is None:
+        steps = _sampler_steps(payload, node)
+        if steps is None:
             continue
-        inputs = node.get("inputs", {})
         costs[str(node_id)] = (
-            sizer(inputs), _step_seconds(node["class_type"], inputs, frames),
+            steps, _step_seconds(node["class_type"], node.get("inputs", {}), frames),
         )
     return costs
 

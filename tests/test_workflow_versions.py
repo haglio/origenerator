@@ -91,6 +91,7 @@ def test_float_noise_past_the_sixth_decimal_moves_no_fingerprint():
 
 _PINNED = {
     "audio_encoder_name": "an_audio_encoder.safetensors",
+    "audio_vae_name": "an_audio_vae.safetensors",
     "audio_negative_prompt": "hiss",
     "audio_prompt": "waves on shingle",
     "audio_seed": 103,
@@ -134,6 +135,9 @@ _PINNED = {
     "negative_prompt": "blurry",
     "noise_seed": 102,
     "pose_bbox_detector": "a_person_detector.onnx",
+    "ref_audios": [],
+    "ref_images": [],
+    "ref_videos": [],
     "pose_estimator": "a_pose_estimator.pt",
     "positive_prompt": "a lighthouse at dusk",
     "sampler_name": "dpmpp_2m",
@@ -145,6 +149,8 @@ _PINNED = {
     "shift_low": 5.5,
     "split_step": 10,
     "steps": 24,
+    "turbo": True,
+    "turbo_lora": "a_turbo_lora.safetensors",
     "unet": "a_unet.safetensors",
     "unet_high": "a_high_unet.safetensors",
     "unet_low": "a_low_unet.safetensors",
@@ -178,6 +184,10 @@ _VARIATIONS = {
     },
     "with both LoRAs bypassed": {"lora_high": "None", "lora_low": "None"},
     "with a picture's LoRA": {"lora": "a_lora.safetensors"},
+    "from a person's pictures, a video of her and her voice": {
+        "ref_images": ["her_too.png"], "ref_videos": ["her_talking.mp4"],
+        "ref_audios": ["her_voice.wav"],
+    },
     "sized by hand": {"width": 832, "height": 480},
     "posed from a skeleton, through a union ControlNet": {
         "control_mode": "pose",
@@ -194,6 +204,8 @@ GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "25f811aa4de86d7b",
     ("image_enhance", "v004"): "a4009a11a944a1ca",
     ("krea2_t2i", "v001"): "e8a60d6e6b2b03ab",
+    ("minimax_h3_i2v", "v001"): "a43cb927d9890730",
+    ("minimax_h3_ref2v", "v001"): "ba848892c8b14335",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
     ("wan22_flf2v_loop", "v009"): "ad7bd431c5c33f40",

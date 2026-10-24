@@ -49,7 +49,7 @@ from functools import lru_cache
 
 from origenerator import gallery
 from origenerator.content import load_content
-from origenerator.gallery.item_numbers import names_in, without_names
+from origenerator.gallery.item_numbers import name_starts_in, without_name_starts
 from origenerator.gallery.signatures import READINGS_KEPT
 from origenerator.generation_state import in_sight
 
@@ -153,6 +153,7 @@ _RELATED = 0.6
 _POSITIVE_WEIGHT = 1.0
 _FOLDER_WEIGHT = 1.0
 _RECIPE_WEIGHT = 0.7
+_SHORTEST_NAME_START = 4
 
 
 def _words(text) -> list[str]:
@@ -282,14 +283,14 @@ class _Entry:
     # re-index rather than carried over with the cached stems — a folder made a
     # moment ago has to be findable by its name now.
     folders: frozenset[str] = frozenset()
-    name_keys: frozenset[str] = frozenset()
+    name: str = ""
 
 
 def query_words(query: str) -> tuple[str, ...]:
     """The words a query actually searches on: its non-stop words, in order,
     each counted once. A query of nothing but stop words keeps them — better to
     search for "the" than to answer a typed query with everything."""
-    words = _words(without_names(query))
+    words = _words(without_name_starts(query))
     kept = [word for word in words if word not in _STOP_WORDS] or words
     seen: set[str] = set()
     ordered = []
@@ -308,7 +309,8 @@ def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm
     deterministic search that runs while the user types.
     """
     synonyms = _SYNONYMS if synonyms is None else synonyms
-    terms = [QueryTerm(text=name, stem=name.lower()) for name in dict.fromkeys(names_in(query))]
+    terms = [QueryTerm(text=start, stem=start.lower())
+             for start in dict.fromkeys(name_starts_in(query))]
     for word in query_words(query):
         stem = _stem(word)
         table = set(synonyms.get(stem, ())) - {stem}
@@ -335,7 +337,7 @@ def _field_score(term: QueryTerm, stems: frozenset[str]) -> float:
 
 def _term_score(term: QueryTerm, entry: _Entry) -> float:
     """The best any part of ``entry`` satisfies ``term``, field weighting applied."""
-    if term.stem in entry.seeds or term.stem in entry.name_keys:
+    if term.stem in entry.seeds or _starts_the_name(term.stem, entry.name):
         return _EXACT
     return max(
         _field_score(term, entry.positive) * _POSITIVE_WEIGHT,
@@ -379,9 +381,8 @@ def _folder_stems(names) -> frozenset[str]:
     return frozenset().union(*(_stems(name) for name in names))
 
 
-def _name_keys(name: str) -> frozenset[str]:
-    whole = name.lower()
-    return frozenset({whole, whole.partition(" ")[0]} - {""})
+def _starts_the_name(typed: str, name: str) -> bool:
+    return len(typed) >= _SHORTEST_NAME_START and name.startswith(typed)
 
 
 def _positive_stems(row: dict, params: dict) -> frozenset[str]:
@@ -448,15 +449,21 @@ class GallerySearch:
                     or not gallery.produced_output(row) or not in_sight(row):
                 continue
             folders = _folder_stems(folder_names.get(prompt_id, ()))
-            name_keys = _name_keys(item_name(prompt_id) if item_name else "")
+            name = (item_name(prompt_id) if item_name else "").lower()
             known = self._entries.get(prompt_id)
             entries[prompt_id] = replace(
                 known if known is not None else _build_entry(row),
-                row=row, folders=folders, name_keys=name_keys,
+                row=row, folders=folders, name=name,
             )
             order.append(prompt_id)
         self._entries = entries
         self._order = order
+
+    def widens(self, query: str) -> bool:
+        return any(not self._starts_a_name(word) for word in query_words(query))
+
+    def _starts_a_name(self, word: str) -> bool:
+        return any(_starts_the_name(word, entry.name) for entry in self._entries.values())
 
     def search(self, query: str, *, expansions=None, within=None) -> SearchOutcome:
         """Every generation satisfying every word of ``query``, newest first.
@@ -473,6 +480,8 @@ class GallerySearch:
         under them each time the LLM tier landed. The score decides what is in,
         not what order.
         """
+        expansions = {word: related for word, related in (expansions or {}).items()
+                      if not self._starts_a_name(word)}
         terms = parse_query(query, expansions=expansions, synonyms=self._synonyms)
         if not terms:
             return SearchOutcome((), ())

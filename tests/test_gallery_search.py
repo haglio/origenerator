@@ -130,6 +130,15 @@ def test_a_search_for_a_name_alone_has_finished_once_it_is_drawn(controller):
     assert not found.field.working()
 
 
+def test_a_search_for_the_start_of_a_name_has_finished_once_it_is_drawn(controller):
+    found = controller()
+    found.index.update([_row("g1", "a tabby on a wall")], item_name={"g1": "79BB46F1 000"}.get)
+
+    _type(found, "79BB")
+
+    assert not found.field.working()
+
+
 def test_leaving_a_search_stops_the_circle(controller):
     found = controller([_row("g1", "a tabby on a wall")])
     _type(found, "kitten")

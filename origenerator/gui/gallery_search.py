@@ -294,7 +294,7 @@ class GallerySearchController(QObject):
         if query != self._query:
             self._expansions = None  # last query's widening isn't this one's
         self._query = query
-        self._widening_awaited = self._expander.unanswered(query)
+        self._widening_awaited = self._index.widens(query) and self._expander.unanswered(query)
         self._timer.start()
         self._expand_timer.start()
         self.field.set_working(True)
@@ -328,7 +328,7 @@ class GallerySearchController(QObject):
         an answer lands, and the table-widened results the user is already
         looking at stand if one never does.
         """
-        if self._query:
+        if self._widening_awaited:
             self._expander.request(self._query)
 
     def _on_expanded(self, query: str, expansions) -> None:

@@ -54,7 +54,7 @@ from shared_ui.colors import (
 )
 from shared_ui.icons import glyph_icon
 from shared_ui.mark_button import fill_square_with_mark
-from shared_ui.spacing import BUTTON_SIZE_HUD
+from shared_ui.spacing import BUTTON_SIZE_HUD, GAP_SMALL
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -207,7 +207,7 @@ class _FieldGrid(QGridLayout):
         self._pickers = pickers
         self._numbers = numbers
         self.setContentsMargins(0, 0, 0, 0)
-        self.setSpacing(4)
+        self.setSpacing(GAP_SMALL)
         self._stacked: bool | None = None
         self._arrange(stacked=False)
 
@@ -327,7 +327,7 @@ class EnhancePanel(QWidget):
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(4)
+        column.setSpacing(GAP_SMALL)
         # The title row, with the auto switch at its far right — a bare switch,
         # the way a panel's power is a switch on its corner rather than a line
         # of prose among its settings. What it does is in its tooltip; the
@@ -335,7 +335,7 @@ class EnhancePanel(QWidget):
         title_row = QHBoxLayout()
         title_row.setContentsMargins(0, 0, 0, 0)
         heading = QLabel("Enhance")
-        heading.setStyleSheet("font-weight: 600;")
+        heading.setStyleSheet("font-weight: bold;")
         title_row.addWidget(heading)
         title_row.addStretch(1)
         self._auto = ToggleSwitch()
@@ -347,7 +347,7 @@ class EnhancePanel(QWidget):
         settings = QWidget()
         settings_column = QVBoxLayout(settings)
         settings_column.setContentsMargins(0, 0, 0, 0)
-        settings_column.setSpacing(4)
+        settings_column.setSpacing(GAP_SMALL)
         self._model = NoWheelComboBox()
         # The default leaves the refining model to whatever made the image, which
         # is what keeps an enhanced image in its own style; picking a checkpoint
@@ -479,7 +479,7 @@ class EnhancePanel(QWidget):
         column = QFrame()
         grid = QGridLayout(column)
         border_as_a_set(column, grid)
-        grid.setSpacing(2)
+        grid.setSpacing(GAP_SMALL)
         grid.addWidget(prompts_button, 0, 0, Qt.AlignmentFlag.AlignCenter)
         grid.addWidget(check, 0, 1, Qt.AlignmentFlag.AlignCenter)
         grid.addWidget(label, 1, 0)
@@ -733,10 +733,10 @@ class FixPromptsDialog(QDialog):
         self.setWindowTitle(f"{part.name.capitalize()} fix prompts")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(GAP_SMALL)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         heading = QLabel(self.windowTitle())
-        heading.setStyleSheet("font-weight: 600;")
+        heading.setStyleSheet("font-weight: bold;")
         layout.addWidget(heading)
         self.positive = QPlainTextEdit(current["prompt"])
         self.negative = QPlainTextEdit(current["avoid"])

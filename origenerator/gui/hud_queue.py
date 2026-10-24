@@ -37,6 +37,8 @@ from shared_ui.palette import (
     TEXT_MUTED,
     TEXT_PRIMARY,
 )
+from shared_ui.spacing import BUTTON_RADIUS_HUD
+from shared_ui.type_scale import SIZE_TINY
 
 from origenerator.gui.inflight import (
     CLEAR_TEXT,
@@ -79,14 +81,12 @@ ROWS = 4
 # click that opens the job's folder.
 _DRAG_START = 6
 
-_TINY_PT = 8            # the panel's own small face, as its own painters size it
 _WORD_PAD = 6           # the room a word button keeps either side of its word
 _GAP = 6                # between the things on one row
 _ROW_H = CTRL_BTN + BLOCK_GAP
 _BAR_H = CTRL_BTN
 _BAR_PAD = 6            # the clock's breathing room at each end of its bar
 _BAND_H = 4             # the pass band along the bar's foot
-_RADIUS = 3             # the family's own button corner, which the bar shares
 _CELL = CTRL_BTN        # one picture cell on a row
 _CELL_GAP = 1
 _BLOCK_W = FOLDER_CELLS * _CELL + (FOLDER_CELLS - 1) * _CELL_GAP
@@ -108,12 +108,12 @@ _SLOT_ALPHA = 110       # a cell with nothing in it reads as a slot, not a pictu
 
 @cache
 def _tiny():
-    return load_font(_TINY_PT)
+    return load_font(SIZE_TINY)
 
 
 @cache
 def _glyphs():
-    return load_font(_TINY_PT, SYMBOL_FONT)
+    return load_font(SIZE_TINY, SYMBOL_FONT)
 
 
 def _line_height() -> int:
@@ -295,12 +295,12 @@ class QueueSection:
         :class:`~origenerator.gui.progress_caption.ProgressCaption` draws in the
         strip, and empty rather than at nought for a run ComfyUI has not started."""
         leader = self.leader
-        draw.rounded_rectangle([x, y, x + width - 1, y + _BAR_H - 1], radius=_RADIUS,
+        draw.rounded_rectangle([x, y, x + width - 1, y + _BAR_H - 1], radius=BUTTON_RADIUS_HUD,
                                fill=(*BORDER_SUBTLE, 90), outline=(*BORDER_SUBTLE, 255))
         done = _fraction(leader.progress)
         if done:
-            draw.rounded_rectangle([x, y, x + max(_RADIUS, int(width * done)) - 1,
-                                    y + _BAR_H - 1], radius=_RADIUS, fill=(*BLUE, 255))
+            draw.rounded_rectangle([x, y, x + max(BUTTON_RADIUS_HUD, int(width * done)) - 1,
+                                    y + _BAR_H - 1], radius=BUTTON_RADIUS_HUD, fill=(*BLUE, 255))
         band = _fraction(leader.pass_progress)
         if band is not None:
             foot = y + _BAR_H - 1 - _BAND_H

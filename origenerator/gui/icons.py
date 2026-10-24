@@ -31,7 +31,7 @@ from __future__ import annotations
 from functools import cache
 
 from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from shared_ui import palette
 from shared_ui.colors import (
     AMBER,
@@ -46,6 +46,8 @@ from shared_ui.colors import (
     WHITE,
 )
 from shared_ui.icons import CANVAS, draw_glyph, glyph_icon, glyph_pixmap
+from shared_ui.spacing import BUTTON_ICON
+from shared_ui.type_scale import FONT_UI, SIZE_TINY, in_pixels
 
 from origenerator.gallery.collection import (
     COLLECTION_LABELS,
@@ -82,6 +84,7 @@ _LEVEL_BADGES = {
 _BADGE_CHIP = QColor(*palette.BLACK, 160)
 _BADGE_GLYPH = WHITE
 _BADGE_DISPLAY = 22  # the badge's on-screen size, in px
+_BADGE_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
 
 # Every chip carries its mark at one size, whichever mark it is. A star badge and
 # a media badge can sit on the same tile, and the two only read as one system if
@@ -533,9 +536,9 @@ def _render_badge(letter: str, color) -> QPixmap:
     """A chip with ``letter`` centered in readable contrast — dark on a light
     chip, light on a saturated one."""
     def draw(painter: QPainter):
-        font = painter.font()
+        font = QFont(FONT_UI)
         font.setBold(True)
-        font.setPixelSize(30)
+        font.setPixelSize(_BADGE_LETTER)
         painter.setFont(font)
         painter.setPen(_readable_on(color))
         painter.drawText(QRectF(0, 0, _SIZE, _SIZE),

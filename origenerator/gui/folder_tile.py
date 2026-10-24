@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 
 from PyQt6.QtCore import QPoint, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QFontMetrics, QPixmap
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import marked_text
 from shared_ui.palette import TEXT_MUTED, as_hex
+from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL
 
 from origenerator.gui import grid_card, palette
 
@@ -37,7 +38,7 @@ class FolderTile(QFrame):
     clicked = pyqtSignal(str)
     context_requested = pyqtSignal(str, QPoint)
 
-    _BADGE = 16  # on-tile size of the recipe-level chip
+    _BADGE = BUTTON_ICON  # on-tile size of the recipe-level chip
 
     def __init__(self, key, text, preview_paths, count, favorite=False,
                  context="", badge=None, parent=None):
@@ -66,8 +67,9 @@ class FolderTile(QFrame):
             # same-named one elsewhere. Elided from the left to keep the tail — the
             # folder's own parent — visible; the whole path sits in the tooltip.
             crumb = QLabel()
-            crumb.setStyleSheet(f"color: {as_hex(TEXT_MUTED)}; font-size: 10px;")
-            crumb.setFixedHeight(grid_card.BREADCRUMB_HEIGHT)
+            crumb.setStyleSheet(f"color: {as_hex(TEXT_MUTED)};")
+            crumb.setFont(grid_card.caption_font())
+            crumb.setFixedHeight(grid_card.line_height())
             crumb.setText(crumb.fontMetrics().elidedText(
                 context, Qt.TextElideMode.ElideLeft, _INNER_WIDTH))
             crumb.setToolTip(context)
@@ -75,7 +77,7 @@ class FolderTile(QFrame):
 
         caption_row = QHBoxLayout()
         caption_row.setContentsMargins(0, 0, 0, 0)
-        caption_row.setSpacing(4)
+        caption_row.setSpacing(GAP_SMALL)
         if badge is not None:
             caption_row.addWidget(self._badge(*badge), 0, Qt.AlignmentFlag.AlignTop)
         self._text = text
@@ -92,8 +94,9 @@ class FolderTile(QFrame):
         layout.addLayout(caption_row)
 
         count_label = QLabel(f"{count} item{'s' if count != 1 else ''}")
-        count_label.setStyleSheet(f"color: {as_hex(TEXT_MUTED)}; font-size: 10px;")
-        count_label.setFixedHeight(grid_card.COUNT_HEIGHT)
+        count_label.setStyleSheet(f"color: {as_hex(TEXT_MUTED)};")
+        count_label.setFont(grid_card.caption_font())
+        count_label.setFixedHeight(grid_card.line_height())
         layout.addWidget(count_label)
 
     @property
@@ -117,10 +120,7 @@ class FolderTile(QFrame):
         if not favorite:
             return html.escape(self._text, quote=False)
         return marked_text("star", self._text, color=TEXT_PRIMARY,
-                           size=self._caption_mark_side())
-
-    def _caption_mark_side(self) -> int:
-        return QFontMetrics(grid_card.caption_font()).height()
+                           size=grid_card.line_height())
 
     def _badge(self, icon, name: str) -> QLabel:
         badge = QLabel()
@@ -141,7 +141,8 @@ class FolderTile(QFrame):
             placeholder = QLabel("empty")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setStyleSheet(
-                f"color: {as_hex(TEXT_MUTED)}; background: {palette.EMPTY_PLATE}; border-radius: 2px;")
+                f"color: {as_hex(TEXT_MUTED)}; background: {palette.EMPTY_PLATE};"
+                f" border-radius: {BUTTON_RADIUS}px;")
             placeholder.setFixedSize(grid_card.picture_size())
             grid.addWidget(placeholder, 0, 0)
             return collage
@@ -150,7 +151,7 @@ class FolderTile(QFrame):
             cell.setFixedSize(*_CELL_SIZE)
             cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
             cell.setStyleSheet(
-                f"background: {palette.EMPTY_PLATE}; border-radius: 2px;")
+                f"background: {palette.EMPTY_PLATE}; border-radius: {BUTTON_RADIUS}px;")
             if idx < len(previews):
                 pm = QPixmap(str(previews[idx]))
                 if not pm.isNull():

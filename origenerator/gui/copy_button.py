@@ -11,6 +11,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QPushButton
 from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.icons import CANVAS, glyph_pixmap
+from shared_ui.spacing import BUTTON_MARK_INSET, BUTTON_PAD_H_TIGHT
 
 
 class CopyButton(QPushButton):
@@ -24,7 +25,7 @@ class CopyButton(QPushButton):
         self.setIcon(_copy_icon())
         self.setIconSize(QSize(14, 14))
         self.setToolTip("Copy to clipboard")
-        self.setStyleSheet("padding: 2px 6px;")
+        self.setStyleSheet(f"padding: {BUTTON_MARK_INSET}px {BUTTON_PAD_H_TIGHT}px;")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._source = source
         self.clicked.connect(self._copy)

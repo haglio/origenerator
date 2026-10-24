@@ -10,6 +10,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.looping_preview import play_in
@@ -48,9 +49,9 @@ class AnimatedVideoStrip(QWidget):
         super().__init__(parent)
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(4)
+        column.setSpacing(GAP_SMALL)
         self._heading = QLabel("Animated in")
-        self._heading.setStyleSheet("font-weight: 600;")
+        self._heading.setStyleSheet("font-weight: bold;")
         column.addWidget(self._heading)
         self._host = QWidget()
         FlowLayout(self._host, spacing=6)

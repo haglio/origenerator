@@ -54,6 +54,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import AMBER, BG_PRIMARY, TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
+from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui import palette
@@ -88,11 +89,11 @@ _FACT_KEYS = ("Enhancement", "File", "Created")
 # would otherwise appear only in the gaps between them.
 _ROW_CSS = "#levelRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
-    f"#levelRow {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}"
+    f"#levelRow {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}"
     + _ROW_CSS
 )
 _PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
-_ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: 3px;"
+_ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: {BUTTON_RADIUS}px;"
 _ARROW_STEPS = {Qt.Key.Key_Up: -1, Qt.Key.Key_Left: -1,
                 Qt.Key.Key_Down: 1, Qt.Key.Key_Right: 1}
 _ENHANCE_ROW = -1  # where the arrows stand on the row above the top level
@@ -175,11 +176,11 @@ class _Row(QWidget):
         # side would be the widest thing in the tab, and would decide how narrow
         # the whole pane could be dragged before its settings scrolled sideways.
         self._column = QVBoxLayout(self)
-        self._column.setContentsMargins(2, 2, 2, 2)
-        self._column.setSpacing(6)
+        self._column.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, GAP_SMALL)
+        self._column.setSpacing(GAP_MEDIUM)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(8)
+        row.setSpacing(GAP_MEDIUM)
         self._column.addLayout(row)
         self._beside = row
         self._wrapped = False
@@ -198,11 +199,11 @@ class _Row(QWidget):
         # line the keys up across the facts for free.
         facts = QGridLayout()
         facts.setContentsMargins(0, 0, 0, 0)
-        facts.setHorizontalSpacing(8)
-        facts.setVerticalSpacing(3)
+        facts.setHorizontalSpacing(GAP_MEDIUM)
+        facts.setVerticalSpacing(GAP_SMALL)
         facts.setColumnStretch(_VALUE_COLUMN, 1)
         self._title = QLabel(title)
-        self._title.setStyleSheet("font-weight: 600; background: transparent;")
+        self._title.setStyleSheet("font-weight: bold; background: transparent;")
         _pass_mouse_through(self._title)
         facts.addWidget(self._title, 0, 0, 1, -1)
         self._facts = facts
@@ -343,7 +344,7 @@ class _LevelRow(_Row):
         """Light this level's picture — what the ``+ Enhance`` row points at
         when it is dimmed because this is the version it would duplicate."""
         self._picture.setStyleSheet(
-            f"border: {_MATCH_BORDER}; border-radius: 3px;" if on else ""
+            f"border: {_MATCH_BORDER}; border-radius: {BUTTON_RADIUS}px;" if on else ""
         )
 
     def mousePressEvent(self, event):
@@ -375,7 +376,7 @@ class _PendingRow(_Row):
         super().__init__("Enhancing", parent)
         self._picture.setStyleSheet(
             f"background-color: transparent; border: {_PENDING_BORDER};"
-            " border-radius: 3px;"
+            f" border-radius: {BUTTON_RADIUS}px;"
         )
         # The settings row a finished level carries, in the same place: what is
         # being made is as much a question of "at what" as the levels already
@@ -473,7 +474,7 @@ class EnhanceVersions(QWidget):
         super().__init__(parent)
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(4)
+        column.setSpacing(GAP_SMALL)
         # A foldable section like the form's above it: this pane is one column
         # of collapsible groups, and a heading that cannot fold reads as the one
         # thing you are not allowed to put away.
@@ -529,7 +530,7 @@ class EnhanceVersions(QWidget):
         self._host = QWidget()
         column = QVBoxLayout(self._host)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(6)
+        column.setSpacing(GAP_MEDIUM)
         self._pending = None
         self._enhance_row = None
         self._rows = []

@@ -10,7 +10,7 @@ from shared_ui.icons import draw_glyph
 # The plus, as a fraction of a picture's side — big enough to read as the operator
 # joining them rather than as a mark on one of the pictures.
 _PLUS_SHARE = 0.28
-_MIN_PLUS_PT = 12
+_MIN_PLUS_SIDE = 12
 _PAREN_SHARE = 0.25
 _PAREN_HEIGHT_SHARE = 0.8
 
@@ -27,7 +27,7 @@ def pair_side(size: QSize, both: bool, enclosed: bool) -> int:
 
 
 def plus_width(side: int) -> int:
-    return max(_MIN_PLUS_PT, int(side * _PLUS_SHARE))
+    return max(_MIN_PLUS_SIDE, int(side * _PLUS_SHARE))
 
 
 def paren_width(side: int) -> int:
@@ -37,7 +37,7 @@ def paren_width(side: int) -> int:
 def paren_font(font: QFont, side: int) -> QFont:
     enclosing = QFont(font)
     enclosing.setPixelSize(max(1, int(side * _PAREN_HEIGHT_SHARE)))
-    enclosing.setWeight(QFont.Weight.Light)
+    enclosing.setWeight(QFont.Weight.Normal)
     return enclosing
 
 

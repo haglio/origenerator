@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.icons import glyph_icon
 from shared_ui.orientation import orientation_of_size
-from shared_ui.spacing import BUTTON_ICON
+from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
 from origenerator.config import COMFYUI_INPUT_DIR
@@ -265,7 +265,7 @@ class ParamForm(QWidget):
     def _build(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(10)
+        outer.setSpacing(GAP_MEDIUM)
 
         specs = [(s.title, s.collapsed) for s in param_sections.SECTIONS]
         specs.append((param_sections.OTHER_TITLE, param_sections.OTHER_COLLAPSED))
@@ -586,7 +586,7 @@ class ParamForm(QWidget):
         if form.contentsMargins().left() != gutter:
             # Push the labels over to open the gutter; the relayout re-invokes us
             # with the rows in their new positions.
-            form.setContentsMargins(gutter, 2, 0, 4)
+            form.setContentsMargins(gutter, GAP_SMALL, 0, GAP_SMALL)
             return
         top, lower = top_row.geometry(), lower_row.geometry()
         y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2

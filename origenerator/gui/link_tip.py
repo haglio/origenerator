@@ -22,6 +22,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui.colors import BG_SECONDARY, BLUE, BORDER_PANEL, TEXT_PRIMARY
+from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL, MARGIN_STANDARD
 
 
 def link(href: str, text: str) -> str:
@@ -136,11 +137,11 @@ class _TipPopup(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setStyleSheet(
             f"QFrame {{ background-color: {BG_SECONDARY.name()};"
-            f" border: 1px solid {BORDER_PANEL.name()}; border-radius: 4px; }}"
+            f" border: 1px solid {BORDER_PANEL.name()}; border-radius: {BUTTON_RADIUS}px; }}"
             f" QLabel {{ color: {TEXT_PRIMARY.name()}; border: none; }}"
         )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 5, 8, 5)
+        layout.setContentsMargins(MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD, GAP_SMALL)
         self.label = QLabel()
         self.label.setTextFormat(Qt.TextFormat.RichText)
         # Links only: selecting the text would swallow the click that follows one.

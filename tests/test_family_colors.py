@@ -1,12 +1,6 @@
-"""No color in this app is a hand-typed copy of one the family already owns.
-
-This app keeps a small palette of its own (``gui/palette.py``): the greys its
-cards and rows share and nothing else does.  That is fine and deliberate.  What
-is not fine is a hex literal whose value is a shared_ui token -- the family's
-one blue written out as ``#3080e0``, its one green as ``#30a030`` -- because a
-copy is a thing that drifts, and this family has already watched one do it: Fun
-Time's reference page mirrored seven shared_ui colors by hand and its border
-ended up three points off the token it was copied from.
+"""No test spells out a family color by hand: one that asserts on a color reads
+it from ``shared_ui.palette``, as the app's own code must
+(``tests/test_family_look.py``), because a copy is a thing that drifts.
 
 Only hex literals are checked.  ``(255, 255, 255)`` is white to anything that
 draws, and refusing every triple that happens to equal a token would refuse
@@ -22,7 +16,7 @@ from pathlib import Path
 from shared_ui import palette
 
 _ROOT = Path(__file__).resolve().parent.parent
-_TREES = (_ROOT / "origenerator", _ROOT / "tools", _ROOT / "tests")
+_TESTS = _ROOT / "tests"
 
 # "#abc" and "#aabbcc" -- how a color reaches a Qt stylesheet or an HTML page
 # when it did not come from a token.
@@ -41,8 +35,7 @@ def _family_hex() -> dict[str, str]:
 
 
 def _sources() -> list[Path]:
-    files = sorted(path for tree in _TREES if tree.is_dir()
-                   for path in tree.rglob("*.py"))
+    files = sorted(_TESTS.rglob("*.py"))
     assert files, f"no modules found under {_ROOT}"
     return files
 
@@ -67,9 +60,9 @@ def _painted_strings(tree: ast.AST):
             yield node
 
 
-def test_no_color_in_this_app_is_a_hand_copy_of_a_family_token():
+def test_no_test_spells_out_a_family_color_by_hand():
     # Parsed rather than grepped, so a "#" in a comment or a path is not a hit --
-    # only text the app actually paints with, or a test asserts on.
+    # only text a test asserts on.
     family = _family_hex()
     offenders = []
     for path in _sources():

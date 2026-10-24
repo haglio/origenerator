@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.spacing import MARGIN_DIALOG
 
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
@@ -1138,7 +1139,7 @@ class BrowserPane(QObject):
         label.setObjectName("estimateLabel")
         label.setWordWrap(True)
         label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        label.setContentsMargins(16, 24, 16, 16)
+        label.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
         return label
 
     # --- what the open collection gathers (the slideshow plays it) ----------

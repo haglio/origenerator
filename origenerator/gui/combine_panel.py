@@ -37,7 +37,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
 
 from origenerator import animation_paths
 from origenerator.content import genau_flick_word
@@ -209,7 +209,7 @@ class CombinePanel(QWidget):
         self._defaults_btn.clicked.connect(self.animation_settings_requested)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 4, 0, 0)
+        layout.setContentsMargins(0, GAP_SMALL, 0, 0)
         layout.setSpacing(BUTTON_GAP)  # rows of one group sit a group's gap apart
         heading = QLabel("Combine")
         heading.setObjectName("combineHeading")

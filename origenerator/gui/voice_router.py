@@ -29,6 +29,7 @@ from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui import colors
 from shared_ui.palette import BG_PRIMARY, WHITE, as_hex, as_rgba
+from shared_ui.spacing import BUTTON_RADIUS, MARGIN_STANDARD
 
 from origenerator import gallery, prompt_edit
 from origenerator.animate_command import AnimateRequest
@@ -254,7 +255,7 @@ class VoiceRouter(QObject):
         self.status.setWordWrap(True)  # a long utterance grows down, not sideways
         self.status.setStyleSheet(
             f"#voiceStatus {{ color: {as_hex(WHITE)}; background: {as_rgba(BG_PRIMARY, 0.88)};"
-            " padding: 6px 10px; border-radius: 6px; }"
+            f" padding: {MARGIN_STANDARD}px; border-radius: {BUTTON_RADIUS}px; }}"
         )
         self.status.hide()
         self._flash_timer = QTimer(self)

@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.icons import draw_glyph
+from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL, MARGIN_DIALOG
 
 from origenerator.gui.eliding import ElidingButton
 from origenerator.gui.warning_mark import WarningMark
@@ -134,7 +135,7 @@ class CollapsibleSection(QWidget):
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(2)
+        outer.setSpacing(GAP_SMALL)
 
         # Elides its title rather than propping the whole form open at the
         # title's own width; it also handles the "&" in "Models & LoRAs".
@@ -150,8 +151,8 @@ class CollapsibleSection(QWidget):
         self._form = QFormLayout(self._content)
         # Indent the rows under the header, and let the label column size to its
         # widest label with the inputs taking the rest — matching the form's look.
-        self._form.setContentsMargins(12, 2, 0, 4)
-        self._form.setSpacing(6)
+        self._form.setContentsMargins(MARGIN_DIALOG, GAP_SMALL, 0, GAP_SMALL)
+        self._form.setSpacing(GAP_MEDIUM)
         self._form.setLabelAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
         )

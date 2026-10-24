@@ -76,6 +76,7 @@ from origenerator.gui.no_wheel import (
     NoWheelSpinBox,
 )
 from origenerator.gui.panes import border_as_a_set
+from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help
 from origenerator.reveal import open_in_explorer
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -161,23 +162,14 @@ _ENHANCE_BUTTON_CSS = f"""
 def _read(widget):
     """What one field reads as, in the type its param is stored as."""
     if isinstance(widget, NoWheelComboBox):
-        return widget.currentText()
+        return widget.currentData()
     return widget.value()
 
 
 def _fill(widget, value) -> None:
-    """Put a stored value into one field, coercing what JSON handed back.
-
-    A picker offered a name it no longer has an option for keeps it anyway: a
-    folder configured against a since-removed model must come back reading as
-    that model rather than silently snapping to whatever sorts first.
-    """
+    """Put a stored value into one field, coercing what JSON handed back."""
     if isinstance(widget, NoWheelComboBox):
-        index = widget.findText(str(value))
-        if index < 0:
-            widget.addItem(str(value))
-            index = widget.findText(str(value))
-        widget.setCurrentIndex(index)
+        choose_option(widget, str(value))
     elif isinstance(widget, NoWheelSpinBox):
         widget.setValue(int(value))
     else:
@@ -359,8 +351,7 @@ class EnhancePanel(QWidget):
         # The default leaves the refining model to whatever made the image, which
         # is what keeps an enhanced image in its own style; picking a checkpoint
         # here overrides that for every enhance this folder runs.
-        self._model.addItem(MATCH_SOURCE_MODEL)
-        self._model.addItems(self._options("checkpoint"))
+        offer_options(self._model, [MATCH_SOURCE_MODEL, *self._options("checkpoint")])
         self._model.currentIndexChanged.connect(self._emit)
         self._model.setToolTip(
             "Which model does the refining. Left at "
@@ -370,7 +361,7 @@ class EnhancePanel(QWidget):
         self._widgets["checkpoint"] = self._model
 
         self._upscaler = NoWheelComboBox()
-        self._upscaler.addItems(self._options("upscale_model"))
+        offer_options(self._upscaler, self._options("upscale_model"))
         self._upscaler.currentIndexChanged.connect(self._emit)
         self._upscaler.setToolTip(param_help("upscale_model"))
         self._widgets["upscale_model"] = self._upscaler
@@ -761,8 +752,8 @@ class FixPromptsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         self.lora = NoWheelComboBox()
-        self.lora.addItems(loras)
-        self.lora.setCurrentText(current["lora"] or NO_LORA)
+        offer_options(self.lora, loras)
+        choose_option(self.lora, current["lora"] or NO_LORA)
         self.strength = NoWheelDoubleSpinBox()
         self.strength.setRange(0.0, 2.0)
         self.strength.setSingleStep(0.05)
@@ -802,14 +793,12 @@ class FixPromptsDialog(QDialog):
         return super().event(event)
 
     def choose_lora(self, lora: str) -> None:
-        if self.lora.findText(lora) < 0:
-            self.lora.addItem(lora)
-        self.lora.setCurrentText(lora)
+        choose_option(self.lora, lora)
 
     def prompts(self) -> dict:
         return fix_prompts_of(self._part, {
             "prompt": self.positive.toPlainText(), "avoid": self.negative.toPlainText(),
-            "lora": self.lora.currentText(), "strength": self.strength.value()})
+            "lora": self.lora.currentData(), "strength": self.strength.value()})
 
     def show_over_parent(self) -> None:
         for watched in (self.parentWidget(), self.parentWidget().window()):

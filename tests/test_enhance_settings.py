@@ -314,14 +314,16 @@ def test_describe_names_each_part_the_pass_redrew_at_its_own_denoise():
         "enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0}}) == "2x"
 
 
-def test_describe_names_a_pinned_model_but_not_the_source_matching_default():
+def test_describe_names_a_pinned_model_by_its_title_but_not_the_source_matching_default(
+        titled_models):
+    titled_models({"driftwood_v1": "Driftwood v1"})
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "checkpoint": MATCH_SOURCE_MODEL,
     }) == "2x · 20 steps · 0.15 redraw"
     assert describe_enhance_params({
         "enhance_scale": 2.0, "checkpoint": "driftwood_v1.safetensors",
-    }) == "2x · driftwood_v1.safetensors"
+    }) == "2x · Driftwood v1"
     assert describe_enhance_params({}) == ""
 
 

@@ -46,7 +46,6 @@ from origenerator.gallery import (
     settings_signature,
     workflow_output_type,
 )
-from origenerator.gallery.labels import model_file_name
 from origenerator.gallery.sides import PORTRAIT
 from origenerator.generation_config import (
     ConfigSnapshot,
@@ -85,6 +84,7 @@ from origenerator.gui.warning_mark import WarningMark
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
+from origenerator.model_titles import model_title
 from origenerator.osr2_driver import drive_target_for
 from origenerator.picture_states import state_names
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
@@ -158,7 +158,7 @@ def _select_a_workflow_first(workflow_name: str) -> str:
 
 
 def _named_models(names: list[str]) -> str:
-    return spoken_list(map(model_file_name, names), "and")
+    return spoken_list(map(model_title, names), "and")
 
 
 def _not_installed_note(names: list[str]) -> str:

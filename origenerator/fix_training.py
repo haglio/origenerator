@@ -15,6 +15,7 @@ from app_support.win32 import process_started
 
 from origenerator import comfyui_launcher, config, timing
 from origenerator.gallery import JobKind
+from origenerator.model_titles import FIX_LORA_FOLDER, fix_lora_name
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part
 
@@ -46,8 +47,8 @@ def training_job(part, checkpoint: str, now: datetime) -> dict:
         "caption": f"close-up photo of {part.name}",
         "base_model": str(models / "checkpoints" / checkpoint),
         "sd_scripts": str(config.LORA_TRAINING_SCRIPTS),
-        "output_dir": str(models / "loras" / "fixes"),
-        "output_name": f"{part.name} {now:%Y-%m-%d %H%M}",
+        "output_dir": str(models / "loras" / FIX_LORA_FOLDER),
+        "output_name": fix_lora_name(part.name, now),
         "work": str(work),
         "status": str(work / "status.json"),
         "log": str(work / "training.log"),
@@ -147,7 +148,7 @@ def outcome_of(job: dict, *, ok: bool, seconds: float | None) -> RunOutcome:
 
 
 def lora_of(status: dict) -> str:
-    return str(PureWindowsPath("fixes") / status["lora"])
+    return str(PureWindowsPath(FIX_LORA_FOLDER) / status["lora"])
 
 
 def untaken_lora(job: dict) -> str | None:

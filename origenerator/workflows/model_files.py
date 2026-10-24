@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 
 from origenerator import config
+from origenerator.model_titles import model_title
 from origenerator.workflows import model_arch
 
 # The suffixes ComfyUI loads as models — LoRAs and checkpoints alike live under
@@ -48,17 +49,9 @@ ANY = "any"
 
 
 def _model_paths(directory: Path) -> list[Path]:
-    """The model files under *directory*, subfolders included, in picker order.
-
-    Sorted by the name the picker shows (the path relative to the category dir),
-    not by the absolute path, so a nested model sorts where it is listed.
-    """
     if not directory.exists():
         return []
-    return sorted(
-        (f for f in directory.rglob("*") if f.is_file() and f.suffix in _MODEL_SUFFIXES),
-        key=lambda f: str(f.relative_to(directory)),
-    )
+    return [f for f in directory.rglob("*") if f.is_file() and f.suffix in _MODEL_SUFFIXES]
 
 
 _catalogued: dict[str, tuple[tuple, list[tuple[str, model_arch.ModelFile]]]] = {}
@@ -104,8 +97,9 @@ def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
 
 def _listing(category: str, fallback: list[str], accepts, expert, want_lora) -> list[str]:
     directory = config.COMFYUI_DIR / "models" / category
-    found = [name for name, described in _catalogue(directory)
-             if _offer(described, accepts, expert, want_lora)]
+    found = sorted((name for name, described in _catalogue(directory)
+                    if _offer(described, accepts, expert, want_lora)),
+                   key=lambda name: (model_title(name).casefold(), name))
     return found or list(fallback)
 
 

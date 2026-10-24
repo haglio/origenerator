@@ -1098,6 +1098,23 @@ def test_combo_default_absent_from_options_is_still_selected(qtbot):
     assert form.get_values()["lora"] == "default.safetensors"
 
 
+def test_a_model_dropdown_shows_each_files_title_and_the_form_keeps_its_name(
+        qtbot, titled_models):
+    titled_models({"example_model": "Example Model v2"})
+    form = ParamForm([ParamDef("checkpoint", "Model", "combo", "example_model.safetensors",
+                               options=["example_model.safetensors",
+                                        "example_other.safetensors"])])
+    qtbot.addWidget(form)
+    field = form._widgets["checkpoint"]
+
+    assert [field.itemText(row) for row in range(field.count())] == [
+        "Example Model v2", "example_other"]
+    assert form.get_values()["checkpoint"] == "example_model.safetensors"
+    form.set_values({"checkpoint": "example_other.safetensors"})
+    assert (field.currentText(), form.get_values()["checkpoint"]) == (
+        "example_other", "example_other.safetensors")
+
+
 def test_a_fresh_form_shows_the_seed_its_first_generate_will_use(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 12345)])
     qtbot.addWidget(form)
@@ -1947,7 +1964,8 @@ def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot):
     qtbot.addWidget(form)
     assert not _row_visible(form, "lora_strength_high")
 
-    form._widgets["lora_high"].setCurrentText("example_style_high.safetensors")
+    lora = form._widgets["lora_high"]
+    lora.setCurrentIndex(lora.findData("example_style_high.safetensors"))
     assert _row_visible(form, "lora_strength_high")
 
     form.set_values({"lora_high": "None"})

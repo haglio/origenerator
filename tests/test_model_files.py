@@ -32,6 +32,19 @@ def test_lists_sorted_model_files_from_the_category_dir(tmp_path, monkeypatch):
     ]
 
 
+def test_a_picker_lists_its_files_in_the_order_of_their_titles(tmp_path, monkeypatch,
+                                                              titled_models):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    loras = tmp_path / "models" / "loras"
+    loras.mkdir(parents=True)
+    (loras / "a_style.safetensors").touch()
+    (loras / "b_style.safetensors").touch()
+    titled_models({"a_style": "Zebra Style", "b_style": "apple style"})
+
+    assert list_model_files("loras", [], accepts=ANY) == [
+        "b_style.safetensors", "a_style.safetensors"]
+
+
 def test_lists_gguf_models(tmp_path, monkeypatch):
     # Flux runs on GGUF-quantized diffusion models (loaded by UnetLoaderGGUF), so
     # the Model picker must list them alongside the .safetensors it already finds.

@@ -784,6 +784,17 @@ def test_lora_label_treats_the_none_sentinel_as_no_lora():
     assert label == "styleA-high"
 
 
+def test_a_model_folder_and_a_lora_folder_are_named_by_their_files_titles(titled_models):
+    titled_models({"example_high": "Example Video (High)", "example_low": "Example Video (Low)",
+                   "example_style": "Example Style v1"})
+    params = {"unet_high": r"split_files\example_high.safetensors",
+              "unet_low": "example_low.safetensors",
+              "lora_high": "example_style.safetensors", "lora_low": NO_LORA}
+
+    assert model_label("wan22_i2v", params) == "Example Video (High) / Example Video (Low)"
+    assert lora_label("wan22_i2v", params) == "Example Style v1"
+
+
 def test_lora_signature_merges_the_none_sentinel_with_no_lora():
     # A run generated with "None" LoRAs and a no-LoRA import (whose graph carried
     # no LoRA node, so no lora_* keys) are the same "no LoRA" bucket: one folder.

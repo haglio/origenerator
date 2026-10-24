@@ -93,6 +93,12 @@ def test_the_handoff_says_when_to_move_it_off_halfway():
     assert "motion" in PARAM_HELP["split_step"] and "detail" in PARAM_HELP["split_step"]
 
 
+def test_the_prompt_strength_help_says_what_one_and_below_do_to_the_negative_prompt():
+    assert "At 1 the Negative Prompt is ignored; any lower and it works backwards." in PARAM_HELP["cfg"]
+    for key in ("cfg_high", "cfg_low"):
+        assert "At 1 this pass ignores the Negative Prompt; any lower and it works backwards." in PARAM_HELP[key]
+
+
 def test_help_calls_a_lora_a_lora():
     loras = ("lora_high", "lora_low", "lora_strength_high", "lora_strength_low")
     assert all("LoRA" in PARAM_HELP[key] for key in loras)

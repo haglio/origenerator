@@ -402,7 +402,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the job, and the take-back constructor and its notes went.
 # 16395 when the app came to reach the OSR2 through the broker's one slot, taken
 # down to what the tree measured: the notes on its UDP sink went with the sink.
-MAX_PROSE_LINES = 16395
+# 16391 when a lock's star, better version and gallery came to wait for the
+# Funestra to say it had locked, and set_locked's account of them went to the
+# tests that state it.
+MAX_PROSE_LINES = 16391
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

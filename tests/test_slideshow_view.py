@@ -1228,9 +1228,11 @@ def test_asking_for_a_lock_locks_and_asking_again_changes_nothing(qtbot):
     view = _view(qtbot, items=items, actions=SlideshowActions(favorite=favorite.append))
 
     assert view.slideshow.set_locked(True) is True
+    _settle(view)
     assert view.slideshow.locked and favorite == ["gen-a"]
 
     assert view.slideshow.set_locked(True) is False   # already locked: nothing moved
+    _settle(view)
     assert view.slideshow.locked and favorite == ["gen-a"]
 
 

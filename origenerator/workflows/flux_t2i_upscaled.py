@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
-from origenerator.workflows.lora_choice import lora_choice
+from origenerator.workflows.lora_rows import lora_choice, picked_loras
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_files import NO_LORA, list_model_files
 
@@ -91,8 +91,9 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        lora, model_ref, clip_ref = self.lora_model_and_clip_input(
-            "13", ["1", 0], ["2", 0], params["lora"], params["lora_strength"])
+        loras = self.lora_chain("13", ["1", 0], picked_loras(params, ("lora",)),
+                                clip_ref=["2", 0])
+        model_ref, clip_ref = loras.model, loras.clip
         if params.get("enhance"):
             # The tail's own upscale is this workflow's namesake 4x, so the
             # plain output stays reachable either way — it is what the base save
@@ -133,7 +134,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},
             },
-            **lora,
+            **loras.nodes,
             "4": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": clip_ref, "text": params["positive_prompt"]},

@@ -91,7 +91,7 @@ from origenerator.workflows.detail_parts import (
     part_named,
     part_table,
 )
-from origenerator.workflows.lora_choice import lora_strength
+from origenerator.workflows.lora_rows import lora_strength
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import NO_LORA, list_lora_files
 

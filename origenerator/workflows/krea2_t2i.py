@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
-from origenerator.workflows.lora_choice import lora_choice
+from origenerator.workflows.lora_rows import lora_choice, picked_loras
 from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_files import NO_LORA, list_model_files
 
@@ -77,8 +77,8 @@ class Krea2T2iWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        lora, model_ref = self.lora_model_input(
-            "4", ["1", 0], params["lora"], params["lora_strength"])
+        loras = self.lora_chain("4", ["1", 0], picked_loras(params, ("lora",)))
+        model_ref = loras.model
         tail: dict = {}
         saved_ref = ["9", 0]
         if params.get("enhance"):
@@ -98,7 +98,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},
             },
-            **lora,
+            **loras.nodes,
             "5": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": ["2", 0], "text": params["positive_prompt"]},

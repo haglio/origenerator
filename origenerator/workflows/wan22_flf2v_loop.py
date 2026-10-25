@@ -11,6 +11,7 @@ from origenerator.workflows.base import (
     scene_prompts,
 )
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
+from origenerator.workflows.lora_rows import picked_loras
 from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import (
     wan_expert_lora_params,
@@ -104,14 +105,8 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        # Each LoRA is optional: "None" adds no LoraLoader for that stage, so its
-        # sampler runs the base UNET unmodified (WorkflowTemplate.lora_model_input).
-        lora_high, model_high = self.lora_model_input(
-            "5", ["3", 0], params["lora_high"], params["lora_strength_high"]
-        )
-        lora_low, model_low = self.lora_model_input(
-            "6", ["4", 0], params["lora_low"], params["lora_strength_low"]
-        )
+        loras_high = self.lora_chain("5", ["3", 0], picked_loras(params, ("lora_high",)))
+        loras_low = self.lora_chain("6", ["4", 0], picked_loras(params, ("lora_low",)))
         # Size the loop off the input image: derived in-graph by default, or scaled
         # to the user's explicit WxH when the derived size was unlocked. Both
         # endpoints read the same scaled image.
@@ -238,15 +233,15 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                     "weight_dtype": "default",
                 },
             },
-            **lora_high,
-            **lora_low,
+            **loras_high.nodes,
+            **loras_low.nodes,
             "7": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": model_high, "shift": params["shift_high"]},
+                "inputs": {"model": loras_high.model, "shift": params["shift_high"]},
             },
             "8": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": model_low, "shift": params["shift_low"]},
+                "inputs": {"model": loras_low.model, "shift": params["shift_low"]},
             },
             "9": {
                 "class_type": "CLIPTextEncode",

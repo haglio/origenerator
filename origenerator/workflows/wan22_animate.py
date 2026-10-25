@@ -17,7 +17,7 @@ from origenerator.workflows.base import (
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.driving_video import driven_actions, frames_within, start_frame
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
-from origenerator.workflows.lora_choice import lora_choice
+from origenerator.workflows.lora_rows import lora_choice, picked_loras
 from origenerator.workflows.model_arch import WAN, WAN_ANIMATE
 from origenerator.workflows.model_files import NO_LORA, list_model_files
 from origenerator.workflows.video_writer import video_writer
@@ -124,7 +124,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
         plan = self.scene_plan(params)
         offsets = [chained_frames([length for length, _ in plan[:index]]) if index else 0
                    for index in range(len(plan))]
-        lora, model = self.lora_model_input("6", ["5", 0], params["lora"], params["lora_strength"])
+        loras = self.lora_chain("6", ["5", 0], picked_loras(params, ("lora",)))
         sized = self.image_size_nodes(["13", 0], params)
         width, height = sized.width, sized.height
 
@@ -197,8 +197,8 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
                 "class_type": "LoraLoaderModelOnly",
                 "inputs": {"model": ["4", 0], "lora_name": DISTILL_LORA, "strength_model": 1.0},
             },
-            **lora,
-            "7": {"class_type": "ModelSamplingSD3", "inputs": {"model": model, "shift": params["shift"]}},
+            **loras.nodes,
+            "7": {"class_type": "ModelSamplingSD3", "inputs": {"model": loras.model, "shift": params["shift"]}},
             "8": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 0], "text": params["positive_prompt"]}},
             "9": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 0], "text": params["negative_prompt"]}},
             "10": {"class_type": "LoadImage", "inputs": {"image": params["input_image"]}},

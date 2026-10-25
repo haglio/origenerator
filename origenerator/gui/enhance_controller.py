@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 from origenerator import config, enhance_presets, fix_training, gallery
 from origenerator.generation_config import randomize_seeds
+from origenerator.generation_state import GenerationSource
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
 from origenerator.gui.fix_training_run import FixTrainingRun
@@ -57,7 +58,8 @@ def _folder_of(workflow, params: dict, image_index: dict) -> str:
     )
 
 
-def launch_enhancements(jobs, db, asks, image_index) -> list[tuple[dict, dict, str, str | None]]:
+def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.GENERATED
+                        ) -> list[tuple[dict, dict, str, str | None]]:
     workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
     by_folder: dict[str, list[tuple[dict, dict]]] = {}
     for row, params in asks:
@@ -65,7 +67,8 @@ def launch_enhancements(jobs, db, asks, image_index) -> list[tuple[dict, dict, s
     launched = []
     for key, entries in by_folder.items():
         batch = [randomize_seeds(params, workflow.seed_keys()) for _row, params in entries]
-        for (row, params), prompt_id in zip(entries, jobs.start_batch(key, workflow, batch)):
+        for (row, params), prompt_id in zip(entries, jobs.start_batch(key, workflow, batch,
+                                                                      source=source)):
             if prompt_id:
                 # Which image the run is of, by id: the params name only the file
                 # it reads, and a file name can belong to more than one row.

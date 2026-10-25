@@ -9,6 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
 from PIL import Image
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
@@ -352,6 +353,21 @@ def test_an_experiment_launch_never_preempts(qtbot, tmp_path):
     queue.start_prepared("exp-1", _I2V, _params(), source="experiment")
 
     queue.start_prepared("exp-2", _I2V, _params(seed=5), source="experiment")
+
+    client.interrupt.assert_not_called()
+    client.cancel_prompt.assert_not_called()
+    assert queue.has("exp-1")
+
+
+@pytest.mark.parametrize("source", ["base_render", "backfill"])
+def test_other_work_nobody_asked_for_never_preempts_an_experiment_either(qtbot, tmp_path,
+                                                                        source):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.start_prepared("exp-1", _I2V, _params(), source="experiment")
+
+    queue.start_prepared("other", _I2V, _params(seed=5), source=source)
 
     client.interrupt.assert_not_called()
     client.cancel_prompt.assert_not_called()

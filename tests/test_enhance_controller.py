@@ -124,7 +124,7 @@ class FakeReroll:
         (launched,) = self.start_batch(key, workflow, [params])
         return launched
 
-    def start_batch(self, key, workflow, batch):
+    def start_batch(self, key, workflow, batch, *, source="generated"):
         self.asks.append((key, len(batch)))
         self.prepared.extend((key, dict(params)) for params in batch)
         if self.launches:

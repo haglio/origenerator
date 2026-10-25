@@ -16,6 +16,7 @@ from origenerator.app_state import AppState
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
 from origenerator.branch_session import is_branch_session
+from origenerator.enhanced_start_backfill import queue_backfill
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.generation_state import GenerationSource
@@ -101,6 +102,26 @@ def _comfyui_busy(client) -> bool:
         return False
 
 
+def queue_the_backfill(jobs, db, rows: list[dict], *, enhance_settings) -> int:
+    from origenerator.gui.enhance_controller import launch_enhancements  # noqa: PLC0415
+
+    def launch(video: dict, workflow, params: dict) -> str | None:
+        prompt_id = jobs.start_prepared(f"backfill/{video['prompt_id']}", workflow, params,
+                                        source=GenerationSource.BACKFILL)
+        if prompt_id is not None:
+            db.set_backfill_of(prompt_id, video["prompt_id"])
+        return prompt_id
+
+    def enhance(images: list[dict]) -> None:
+        asks = [(image, params) for image in images
+                if (params := gallery.enhance_params_for(image, enhance_settings)) is not None]
+        index = gallery.build_image_config_index(
+            [row for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE])
+        launch_enhancements(jobs, db, asks, index, source=GenerationSource.BACKFILL)
+
+    return queue_backfill(rows, launch, enhance=enhance)
+
+
 def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
     from PyQt6.QtCore import QCoreApplication  # noqa: PLC0415
 
@@ -108,10 +129,13 @@ def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
 
     _app = QCoreApplication.instance() or QCoreApplication([])
     jobs = JobQueue(db, client)
-    queued = queue_the_work_left(jobs, db.list_generations(),
-                                 experiments_on=ui.get("experiments_enabled") is True,
-                                 policy=ExperimentPolicy(registry=WORKFLOW_REGISTRY,
-                                                         rng=random.Random()))
+    queued = queue_the_backfill(
+        jobs, db, db.list_generations(),
+        enhance_settings=gallery.EnhanceSettings.parse(ui.get("enhance_settings")))
+    queued += queue_the_work_left(jobs, db.list_generations(),
+                                  experiments_on=ui.get("experiments_enabled") is True,
+                                  policy=ExperimentPolicy(registry=WORKFLOW_REGISTRY,
+                                                          rng=random.Random()))
     queued += places_backfill.queue_finding_for_the_absence(db, client)
     jobs.flush_to_server()
     forget_work_left()

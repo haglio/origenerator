@@ -203,6 +203,23 @@ def _follow_moved_files(library: Library):
     return relocate_moved_outputs(library.db, library.places)
 
 
+def _put_the_backfill_in_place(library: Library):
+    from origenerator import config, enhanced_start_backfill, evolver_agreement
+
+    evolver = enhanced_start_backfill.Evolver(
+        inbox=library.inbox, places=library.places, upscaled_dir=config.EVOLVER_UPSCALED_DIR,
+        records_folder=evolver_agreement.records_folder(evolver_agreement.evolver_checkout(),
+                                                        config.LIBRARY_ROOT))
+
+    def trash(rows: list[dict]) -> None:
+        _scrap(library, rows)
+
+    enhanced_start_backfill.cancel_backfill(library.db, library.client)
+    folded = enhanced_start_backfill.fold_completed_backfill(library.db, evolver, trash=trash)
+    enhanced_start_backfill.trash_what_the_backfill_replaced(library.db, evolver, trash=trash)
+    return folded
+
+
 def _import_new_files(library: Library):
     from origenerator.importer import import_comfyui_output
 
@@ -350,6 +367,9 @@ MAINTENANCE = (
     BootPass("Finding files that moved...", _follow_moved_files,
              counted="Followed %d output file(s) to where they moved",
              failure="Relocating moved output files failed: %s"),
+    BootPass(None, _put_the_backfill_in_place,
+             counted="Put %d backfilled video(s) in the place of the videos they replace",
+             failure="Putting backfilled videos in place failed: %s"),
     BootPass("Scanning for new images...", _import_new_files,
              counted="Imported %d existing files from ComfyUI output",
              failure="Import failed: %s"),

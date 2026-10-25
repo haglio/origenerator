@@ -13,6 +13,7 @@ output Evolver delivers to Genau's flicks folder.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +45,11 @@ class EvolverInbox:
         if not source:
             raise ValueError("that lane has no folder to send to")
         return export_video(video, Path(self.inbox_dir) / source, funscript=funscript)
+
+    def holds(self, video: Path, source: str) -> bool:
+        folder = Path(self.inbox_dir) / source
+        return folder.is_dir() and any(_a_copy_of(Path(video), waiting.name)
+                                       for waiting in folder.iterdir())
 
 
 def default_inbox() -> EvolverInbox:
@@ -103,3 +109,8 @@ def _unique_path(path: Path) -> Path:
         candidate = path.with_name(f"{path.stem} ({n}){path.suffix}")
         n += 1
     return candidate
+
+
+def _a_copy_of(video: Path, name: str) -> bool:
+    return name == video.name or re.fullmatch(
+        rf"{re.escape(video.stem)} \(\d+\){re.escape(video.suffix)}", name) is not None

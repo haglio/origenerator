@@ -111,6 +111,15 @@ class Database:
     def set_shielded(self, prompt_id: str, shielded: bool):
         return self.generations.set_shielded(prompt_id, shielded)
 
+    def set_backfill_of(self, prompt_id: str, video_prompt_id: str):
+        return self.generations.set_backfill_of(prompt_id, video_prompt_id)
+
+    def set_source(self, prompt_id: str, source: str):
+        return self.generations.set_source(prompt_id, source)
+
+    def owe_a_fun_time_favorite(self, prompt_id: str):
+        return self.generations.owe_a_fun_time_favorite(prompt_id)
+
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)
 
@@ -143,6 +152,9 @@ class Database:
 
     def insert_rows(self, rows: list[dict]):
         return self.generations.insert_rows(rows)
+
+    def replaced_generations(self) -> list[dict]:
+        return self.generations.replaced_generations()
 
     def library_paths(self) -> set[str]:
         return self.generations.library_paths()

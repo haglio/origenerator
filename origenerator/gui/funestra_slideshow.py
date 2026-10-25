@@ -68,7 +68,6 @@ _POLL_MS = 200
 READER_HOLD_BUDGET_S = 1.0
 _RETRY_SPACING_S = 0.005
 
-
 class FunestraSlideshow(QObject):
     """A slideshow driving one of the session's Funestras."""
 
@@ -101,8 +100,10 @@ class FunestraSlideshow(QObject):
         # What the Funestra last said it was showing: a picture that has moved on
         # by itself is news that arrives this way and no other.
         self._showing = ""
+        self._funestra_locked = False
         self._locked = False
         self._keep_told: bool | None = None
+        self._gesture_owed = False
         self._refusal_checked = False
         self._loads_seen: str | None = None
         self._levels = LevelStepper()
@@ -224,6 +225,7 @@ class FunestraSlideshow(QObject):
 
     def _follow_the_funestra(self, fields: dict) -> None:
         status = parse_status(fields)
+        self._funestra_locked = status.locked
         if status.video and status.video != self._showing:
             self._showing = status.video
             self._follow(status.video)
@@ -233,6 +235,7 @@ class FunestraSlideshow(QObject):
             self._show_what_is_being_made()
         self._step_past_a_file_that_would_not_open(fields, status)
         self._tell_the_keep()
+        self._give_the_lock_its_gesture()
 
     def _hold_what_is_being_made_for_half(self) -> None:
         """An item something better is being made of holds the Funestra for
@@ -372,26 +375,29 @@ class FunestraSlideshow(QObject):
 
     def set_locked(self, locked: bool) -> bool:
         """Lock the item on screen or let it go, saying which way rather than
-        flipping; ``True`` when that moved it.
-
-        Locking is the whole gesture it is in a window: the Funestra repeats the
-        item, and the slideshow favorites it, asks for a better version of it, and — in
-        a session — hands it to the gallery to open.
-        """
+        flipping; ``True`` when that moved it."""
         if locked == self.locked:
             return False
         self._lock(locked)
-        if not locked:
-            return True
+        if locked:
+            self._gesture_owed = True
+            self._give_the_lock_its_gesture()
+        return True
+
+    def _give_the_lock_its_gesture(self) -> None:
+        if not (self._gesture_owed and self._funestra_locked):
+            return
+        self._gesture_owed = False
         self.favorite()
         self._enhance_current()
         prompt_id = self._set.current_prompt_id()
         if self._actions.lock is not None and prompt_id is not None:
             self._actions.lock(prompt_id)
-        return True
 
     def _lock(self, on: bool) -> None:
         self._locked = on
+        if not on:
+            self._gesture_owed = False
         self._tell_the_keep()
         self._publish()
 

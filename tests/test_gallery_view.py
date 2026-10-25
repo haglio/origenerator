@@ -7815,10 +7815,12 @@ def test_locking_a_picture_makes_its_waiting_enhancement_the_next_one_made(
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
     on_screen = slideshow.voice_target()
     view.enhance_items([on_screen, *({"g0", "g1", "g2"} - {on_screen})])
 
     slideshow.slideshow_toggle_lock()
+    slideshow.tick()
 
     (wanted,) = view._enhance.jobs_targeting([view.row_for(on_screen)])
     assert view._jobs.queue_order[0] == wanted.prompt_id
@@ -9321,6 +9323,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     view._poll()  # the tick that lists the run as in flight
     slideshow = _preview_of(view).open_fullscreen()
     qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
@@ -12871,6 +12874,7 @@ def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_pa
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
 
     slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
 
@@ -13759,6 +13763,7 @@ def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
 
     slideshow = _preview_of(view).open_fullscreen()
     qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == \
         view.visible_prompt_ids()

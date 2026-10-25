@@ -901,8 +901,10 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
 
     slideshow.slideshow_toggle_lock()
+    slideshow.tick()
 
     # The item held, not a sibling of it: every seed of one set of settings shares a
     # settings folder, so a tab picked by folder came up on the wrong picture.
@@ -921,9 +923,12 @@ def test_a_lock_on_a_hosted_slideshow_asks_the_room_to_show_this_app_once(
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
 
     slideshow.slideshow_toggle_lock()
+    slideshow.tick()
     slideshow.slideshow_toggle_lock()
+    slideshow.tick()
 
     told = tmp_path / "dashboard_cmd.txt"
     lines = told.read_text(encoding="utf-8").split() if told.exists() else []
@@ -940,9 +945,13 @@ def test_a_standalone_slideshow_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(view._info_tabs, "load_selection",
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
+    slideshow = view._slideshows.showing
+    funestra_of(slideshow.shown)
 
-    view._slideshows.showing.slideshow_toggle_lock()
+    slideshow.slideshow_toggle_lock()
+    slideshow.tick()
 
+    assert slideshow.hud_is_favorite
     assert opened == []
 
 

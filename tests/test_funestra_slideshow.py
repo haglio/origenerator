@@ -328,8 +328,108 @@ def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path
     slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
 
     slideshow.slideshow_toggle_lock()
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
 
     assert asked == _the_whole_lock_on("id-1")
+
+
+def test_a_lock_the_funestra_took_after_moving_on_gives_the_item_it_locked_the_whole_lock(
+        qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+
+    slideshow.set_locked(True)
+    _says(slideshow, video="two.png", locked=True)
+    slideshow.tick()
+    slideshow.tick()
+
+    assert asked == _the_whole_lock_on("id-2")
+
+
+def test_a_lock_asked_for_after_the_funestra_said_it_locked_gets_the_whole_lock_at_once_and_once(
+        qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+    _says(slideshow, video="two.png", locked=True)
+    slideshow.tick()
+
+    first = slideshow.set_locked(True)
+    given_at_once = list(asked)
+    again = slideshow.set_locked(True)
+    slideshow.tick()
+
+    assert (first, again) == (True, False)
+    assert given_at_once == asked == _the_whole_lock_on("id-2")
+
+
+def test_a_lock_asked_for_twice_before_the_funestra_said_it_locked_is_given_once(
+        qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+
+    first, again = slideshow.set_locked(True), slideshow.set_locked(True)
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+    slideshow.tick()
+
+    assert (first, again) == (True, False)
+    assert asked == _the_whole_lock_on("id-1")
+
+
+def test_a_lock_pressed_while_a_request_holds_the_slide_gets_the_whole_lock_at_once(
+        qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+    slideshow.pause_for_request(True)
+    _says(slideshow, video="two.png", locked=True)
+    slideshow.tick()
+    _sent(slideshow)
+
+    slideshow.set_locked(True)
+
+    assert (_sent(slideshow), asked) == ([], _the_whole_lock_on("id-2"))
+
+
+def test_a_lock_let_go_of_and_pressed_again_gets_the_whole_lock_again(qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+    slideshow.set_locked(True)
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+    slideshow.set_locked(False)
+    _says(slideshow, video="one.png", locked=False)
+    slideshow.tick()
+    _sent(slideshow)
+
+    asked_again = slideshow.set_locked(True)
+    sent = _sent(slideshow)
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+
+    assert (asked_again, sent) == (True, ["LOCK_ON"])
+    assert asked == _the_whole_lock_on("id-1") * 2
+
+
+def test_a_step_off_a_lock_the_funestra_has_not_said_it_took_takes_the_lock_back(
+        qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+    slideshow.set_locked(True)
+    slideshow.tick()                                  # read before it took the lock
+    _sent(slideshow)
+
+    slideshow.slideshow_step(1)
+    sent = _sent(slideshow)
+    _says(slideshow, video="two.png", locked=True)    # had the lock gone with it
+    slideshow.tick()
+
+    assert sent == ["LOCK_OFF", "NEXT"]
+    assert asked == []
 
 
 def test_locking_an_item_whose_enhancement_is_waiting_still_asks_so_it_goes_first(
@@ -340,6 +440,8 @@ def test_locking_an_item_whose_enhancement_is_waiting_still_asks_so_it_goes_firs
     slideshow.note_enhancing({"id-1": "queued"})
 
     slideshow.slideshow_toggle_lock()
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
 
     assert asked == ["id-1"]
 
@@ -600,6 +702,8 @@ def test_a_lock_picked_back_up_is_the_lock_alone(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
 
     slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-2", locked=True))
+    _says(slideshow, video="two.png", locked=True)
+    slideshow.tick()
 
     assert asked == []
 
@@ -941,8 +1045,11 @@ def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):
     _sent(slideshow)
 
     slideshow.slideshow_cull()                             # weird the picture on screen
+    sent = _sent(slideshow)
+    _says(slideshow, video="one-b.png", locked=True)
+    slideshow.tick()
 
-    assert "LOCK_ON" in _sent(slideshow)
+    assert "LOCK_ON" in sent
     assert (slideshow.locked, slideshow.hud_map().loop) == (True, "")
     assert (asked, starred, opened) == ([], [], [])
 
@@ -1261,6 +1368,8 @@ def test_a_lock_that_asks_for_a_better_version_says_so_on_the_panel(qtbot, tmp_p
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(enhance=lambda pid: True))
 
     slideshow.slideshow_toggle_lock()
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
 
     assert _panel(slideshow).item_note == "Enhancement queued"
 

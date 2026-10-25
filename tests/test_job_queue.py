@@ -2005,6 +2005,22 @@ def test_a_video_held_over_a_restart_starts_from_the_enhancement_its_picture_gai
     assert json.loads(db.get_generation("video")["params_json"])["input_image"] == _ENHANCED_REF
 
 
+def test_a_video_held_over_a_restart_does_not_ask_again_for_the_enhance_a_newer_row_holds(
+        qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    _pending_row(db, "video", params=_params(input_image=_PICTURE))
+    _pending_row(db, "enhance", workflow_name=gallery.ENHANCE_WORKFLOW,
+                 params={**_ENHANCE.default_params(), "input_image": _PICTURE})
+    db.update_generation("enhance", status="running")
+    _picture(db)
+    enhanced = []
+    queue = _enhanced_into(JobQueue(db, _client()), enhanced)
+
+    queue.reconnect_running()
+
+    assert enhanced == []
+
+
 def test_a_video_waiting_on_an_enhancement_that_fails_fails_with_it(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")

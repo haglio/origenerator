@@ -745,11 +745,15 @@ class JobQueue(QObject):
         # Oldest first, against the newest-first listing: the line is rebuilt by
         # re-queuing each job in the order it was asked for, so the rules that
         # ordered it the first time order it the same way again.
+        readopted = []
         for row in reversed(self._db.list_generations()):
             if row.get("status") == GenerationStatus.RUNNING:
                 self._reconnect(row, index)
             elif row.get("status") == GenerationStatus.PENDING:
-                self._readopt(row, index)
+                readopted.append(self._readopt(row, index))
+        for job in filter(None, readopted):
+            if start_image := self._enhanced_start_image_of(job):
+                self._start_from(job, start_image)
         self._pump()
         self.changed.emit()
 
@@ -810,12 +814,10 @@ class JobQueue(QObject):
         except Exception as e:
             logger.warning("Dropping a queued generation we can no longer build: %s", e)
             self._db.delete_generation(row["prompt_id"])
-            return
-        start_image = self._enhanced_start_image_of(job)
-        if start_image:
-            self._start_from(job, start_image)
+            return None
         self._take_back(key, job, row)
         self._enqueue(job)
+        return job
 
     def _take_back(self, key: str, job: GenerationJob, row: dict):
         job.origin = job.prompt_id  # a resumed run's chain, if any, is already done

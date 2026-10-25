@@ -69,6 +69,31 @@ def test_starting_takes_the_device(qtbot):
     assert driver.tickers[0].started == 1  # and the clock is running
 
 
+def test_the_motion_holds_the_brokers_slot_while_it_drives_and_lets_go_when_stopped(qtbot):
+    driver, broker, _clock = _driver(qtbot)
+    driver.start()
+    driving = broker.wanted[-1]
+
+    driver.stop()
+
+    assert (driving, broker.wanted[-1]) == (True, False)
+
+
+def test_a_frozen_room_or_a_hold_lets_go_of_the_slot_and_driving_again_wants_it_afresh(qtbot):
+    driver, broker, _clock = _driver(qtbot)
+    driver.start()
+    driver.set_frozen(True)
+    frozen = broker.wanted[-1]
+    driver.set_frozen(False)
+    playing = broker.wanted[-1]
+    driver.hold(OSR2_PARKED)
+    held = broker.wanted[-1]
+
+    driver.release()
+
+    assert (frozen, playing, held, broker.wanted[-1]) == (False, True, False, True)
+
+
 def test_each_command_aims_as_far_ahead_as_the_time_it_gives(qtbot):
     # Aimed at where the motion already is, the device can only ever chase: by
     # the time the command lands the motion has moved on. Every command names

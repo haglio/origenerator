@@ -565,9 +565,9 @@ forced this flow into existence (2026-08-12):
 
 Device or UI work is not delivered because tests pass — three rounds of "it
 doesn't work" (2026-08-12) came from exactly that gap. Probes that settle it
-from a session, no hardware in view: send
-`origenerator.osr2.Osr2Broker.park()` and stat
-`../fun_time/state/osr2_serial_tx.txt` (its mtime moves iff UDP → broker →
+from a session, no hardware in view: have an
+`origenerator.osr2.Osr2Broker` `want(True)` and `send_position` a few times, then
+stat `../fun_time/state/osr2_serial_tx.txt` (its mtime moves iff slot → broker →
 serial happened; `broker_heartbeat.txt` is broker liveness); grep each state
 dir's `origenerator.log` for "OSR2 motion engaged" / "streaming" to see whether
 the app ever actually drove; lay a widget out offscreen and read its geometry

@@ -7,6 +7,10 @@ class FakeBroker:
     def __init__(self):
         self.positions = []
         self.asked = []
+        self.wanted = []
+
+    def want(self, wanted):
+        self.wanted.append(wanted)
 
     def send_position(self, pos, interval_ms):
         self.positions.append((pos, interval_ms))

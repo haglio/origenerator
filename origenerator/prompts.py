@@ -2,7 +2,7 @@
 
 Behavior, not configuration: every one of these is tuned by reading what the
 model does with it, and each changes for reasons that have nothing to do with
-where the media library sits or which UDP port the OSR2 broker listens on, so
+where the media library sits or which port the OSR2 broker listens on, so
 they share neither a file nor a blame history with those.
 
 All local: the prompts and everything sent under them go to an

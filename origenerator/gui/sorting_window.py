@@ -90,8 +90,7 @@ def one_scale_for_all(drawings, side: int) -> float:
 
 def on_a_white_square(source: QPixmap, side: int, scale: float,
                       above: int = 0) -> QPixmap:
-    """The drawing on a white square of *side*, under *above* pixels of clear
-    space: the strip carries the square and its name down, and shows nothing."""
+    """The drawing on a white square, under *above* pixels of clear space."""
     canvas = QPixmap(side, side + above)
     canvas.fill(Qt.GlobalColor.transparent)
     painter = QPainter(canvas)

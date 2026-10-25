@@ -8,8 +8,6 @@ from origenerator.content import load_content
 
 
 class Tile(NamedTuple):
-    """Where one action's button sits in the grid, and how far it reaches."""
-
     state: str
     row: int
     column: int
@@ -37,7 +35,6 @@ def _reach(entry) -> tuple[str, int, int]:
 
 
 def state_grid(content: dict | None = None) -> tuple[Tile, ...]:
-    """Where the sorting window puts each action's button, cell by cell."""
     if content is None:
         content = load_content()
     names = state_names(content)

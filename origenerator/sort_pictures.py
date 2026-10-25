@@ -16,7 +16,6 @@ def _picture_of(row: dict, places):
 
 
 def waiting_pictures(db, places, first: str = "") -> list[dict]:
-    """The line to answer for: *first* at its head, then the ones still waiting."""
     from origenerator.item_names import ItemNames
     from origenerator.picture_sorting import pictures_to_sort
 

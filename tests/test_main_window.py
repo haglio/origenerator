@@ -10,6 +10,7 @@ from unittest.mock import patch
 from xml.etree import ElementTree
 
 import pytest
+from app_support import loading_screen as launchers_screen
 from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
@@ -36,6 +37,7 @@ from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
+from origenerator.gui.window_monitor import the_window_on
 from origenerator.media import MediaType
 from origenerator.orientation import oriented_key
 from origenerator.run_notice import RunOutcome
@@ -48,7 +50,8 @@ from tests.test_hard_to_miss import _faded_backgrounds
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
 
 
-def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, taskbar=None):
+def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, taskbar=None,
+            next_launch=None):
     win = OrigeneratorWindow(
         ComfyUIClient(),
         Database(tmp_path / "t.db"),
@@ -56,6 +59,7 @@ def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, tas
         fun_time=fun_time,
         preview=preview,
         taskbar=taskbar,
+        next_launch=next_launch,
     )
     qtbot.addWidget(win)
     return win
@@ -1619,6 +1623,27 @@ def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, state, fun_time=_fun_time_session())
     win.close()
     assert AppState(path).get("window_geometry") == "c3RhbmRhbG9uZQ=="
+
+
+def test_saving_the_session_tells_the_next_launchs_loading_screen_the_monitor_the_window_is_on(
+        qtbot, tmp_path):
+    next_launch = launchers_screen.MeetingPlace(tmp_path / "screen", ())
+    win = _window(qtbot, tmp_path, next_launch=next_launch)
+    win.show()
+
+    win.close()
+
+    assert next_launch.where_the_app_comes_up() == the_window_on(win.screen())
+
+
+def test_a_fun_time_window_tells_the_next_launchs_loading_screen_nothing(qtbot, tmp_path):
+    next_launch = launchers_screen.MeetingPlace(tmp_path / "screen", ())
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session(), next_launch=next_launch)
+    win.show()
+
+    win.close()
+
+    assert next_launch.where_the_app_comes_up() is None
 
 
 def test_a_hosted_window_wires_the_sessions_channels_to_its_own_gallery(qtbot, tmp_path):

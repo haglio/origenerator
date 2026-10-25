@@ -17,12 +17,21 @@ from __future__ import annotations
 
 from origenerator.setting_advice import good_range_text
 from origenerator.workflows.base import ParamDef
+from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
 
 # Keyed by param name: what the setting does.
 _COMPOSITION_FOCUS = (
     "How the steps split between composition (the layout, the poses and, in a video, "
     "the motion) and fine detail. Higher keeps the result noisy for longer, so more "
     "of the steps decide composition; lower gives more of them to texture and detail."
+)
+_LORA = (
+    "A LoRA trained for a specific look or subject, applied to the model and "
+    "to the prompts. \"None\" leaves the model unmodified."
+)
+_LORA_STRENGTH = (
+    "How hard the LoRA pulls. 1.0 is its intended strength; much weaker and "
+    "it barely shows, much stronger and it tends to take over the result."
 )
 
 PARAM_HELP: dict[str, str] = {
@@ -119,14 +128,8 @@ PARAM_HELP: dict[str, str] = {
     ),
 
     # --- LoRAs ---
-    "lora": (
-        "A LoRA trained for a specific look or subject, applied to the model and "
-        "to the prompts. \"None\" leaves the model unmodified."
-    ),
-    "lora_strength": (
-        "How hard the LoRA pulls. 1.0 is its intended strength; much weaker and "
-        "it barely shows, much stronger and it tends to take over the result."
-    ),
+    **{key: _LORA for key in LORA_KEYS},
+    **{strength_key_of(key): _LORA_STRENGTH for key in LORA_KEYS},
     "lora_high": (
         "A LoRA trained for a specific look or subject, applied to the first "
         "pass (high noise). \"None\" leaves the model unmodified."

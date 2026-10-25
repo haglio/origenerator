@@ -6,6 +6,7 @@ import pytest
 
 from origenerator.gallery.tree import folder_chain
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.model_files import NO_LORA
 
 _STORED_VALUES = {
     "audio_encoder_name": "a_wav2vec.safetensors", "audio_negative_prompt": "hiss",
@@ -101,3 +102,116 @@ def _folders(name: str, params: dict) -> tuple[str, ...]:
 @pytest.mark.parametrize(("name", "picked", "folders"), _FOLDERS_RUNS_WERE_FILED_IN)
 def test_a_stored_run_keeps_the_folders_it_was_filed_in(name, picked, folders):
     assert _folders(name, _stored_run(name, picked)) == folders
+
+
+_THREE_LORA_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer", "krea2_t2i", "flux_t2i_upscaled",
+                         "wan22_animate")
+
+
+@pytest.mark.parametrize("name", _THREE_LORA_WORKFLOWS)
+def test_a_form_offers_three_loras_each_on_none_above_its_own_strength(name):
+    rows = [(pd.key, pd.label, pd.default, pd.good)
+            for pd in WORKFLOW_REGISTRY[name].param_definitions() if pd.key.startswith("lora")]
+
+    assert rows == [
+        ("lora", "LoRA 1", "None", None), ("lora_strength", "LoRA Strength 1", 1.0, (0.6, 1.2)),
+        ("lora_2", "LoRA 2", "None", None), ("lora_strength_2", "LoRA Strength 2", 1.0, (0.6, 1.2)),
+        ("lora_3", "LoRA 3", "None", None), ("lora_strength_3", "LoRA Strength 3", 1.0, (0.6, 1.2)),
+    ]
+
+
+@pytest.mark.parametrize("name", _THREE_LORA_WORKFLOWS)
+def test_a_forms_loras_come_right_after_its_model(name):
+    workflow = WORKFLOW_REGISTRY[name]
+    keys = [pd.key for pd in workflow.param_definitions()]
+    model = keys.index(workflow.model_keys[0])
+
+    assert keys[model + 1:model + 7] == [
+        "lora", "lora_strength", "lora_2", "lora_strength_2", "lora_3", "lora_strength_3"]
+
+
+_FAMILIES_A_GRAPH_RUNS = {
+    "sdxl_t2i": ("sd15", "sdxl"), "sdxl_pose_transfer": ("sd15", "sdxl"),
+    "krea2_t2i": ("krea2",), "flux_t2i_upscaled": ("flux",), "wan22_animate": ("wan",),
+}
+
+
+@pytest.mark.parametrize("name", _THREE_LORA_WORKFLOWS)
+def test_every_lora_on_a_form_offers_only_the_loras_its_graph_can_run(name, installed_models):
+    for family in ("sdxl", "sd15", "krea2", "flux", "wan"):
+        installed_models.add("loras", f"fam_{family}.safetensors", arch=family, lora=True)
+
+    offered = {pd.key: pd.options for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+
+    runnable = [NO_LORA, *(f"fam_{family}.safetensors" for family in _FAMILIES_A_GRAPH_RUNS[name])]
+    assert [offered[key] for key in ("lora", "lora_2", "lora_3")] == [runnable] * 3
+
+
+@pytest.mark.parametrize(("name", "picked", "folders"), _FOLDERS_RUNS_WERE_FILED_IN)
+def test_a_run_that_leaves_the_added_loras_on_none_joins_the_folders_runs_had_before(
+        name, picked, folders):
+    stored = _stored_run(name, picked)
+    added = {key: value for key, value in WORKFLOW_REGISTRY[name].default_params().items()
+             if key not in stored}
+    turned = {key: 0.5 for key in added if key.startswith("lora_strength")}
+
+    assert _folders(name, stored | added) == folders
+    assert _folders(name, stored | added | turned) == folders
+
+
+_LORA_LOADERS = ("LoraLoader", "LoraLoaderModelOnly")
+_THREADS_THE_TEXT_ENCODER = ("sdxl_t2i", "sdxl_pose_transfer", "flux_t2i_upscaled")
+
+
+def _sampler(payload: dict) -> dict:
+    return next(node for node in payload.values() if node["class_type"] == "KSampler")
+
+
+def _loras_behind(payload: dict, ref, through: str) -> list[tuple[str, float]]:
+    loras = []
+    node = payload.get(ref[0]) if isinstance(ref, list) else None
+    while node is not None:
+        if node["class_type"] in _LORA_LOADERS:
+            loras.append((node["inputs"]["lora_name"], node["inputs"]["strength_model"]))
+        ref = node["inputs"].get(through)
+        node = payload.get(ref[0]) if isinstance(ref, list) else None
+    return loras[::-1]
+
+
+def _users_loras(name: str, picked: dict) -> list[tuple[str, float]]:
+    workflow = WORKFLOW_REGISTRY[name]
+
+    def loras(params: dict) -> list[tuple[str, float]]:
+        payload = workflow.build_api_payload(params)
+        return _loras_behind(payload, _sampler(payload)["inputs"]["model"], "model")
+
+    return loras(workflow.default_params() | picked)[len(loras(workflow.default_params())):]
+
+
+@pytest.mark.parametrize("name", _THREE_LORA_WORKFLOWS)
+def test_two_loras_picked_together_both_reach_the_sampler_one_after_the_other(name):
+    picked = {"lora": "first_look.safetensors", "lora_strength": 0.7,
+              "lora_3": "second_look.safetensors", "lora_strength_3": 0.6}
+
+    assert _users_loras(name, picked) == [("first_look.safetensors", 0.7),
+                                          ("second_look.safetensors", 0.6)]
+
+
+@pytest.mark.parametrize("name", _THREADS_THE_TEXT_ENCODER)
+def test_two_loras_picked_together_both_reach_the_prompts_one_after_the_other(name):
+    workflow = WORKFLOW_REGISTRY[name]
+    payload = workflow.build_api_payload(workflow.default_params() | {
+        "lora_2": "first_look.safetensors", "lora_strength_2": 0.7,
+        "lora_3": "second_look.safetensors", "lora_strength_3": 0.6})
+
+    readers = [node["inputs"]["clip"] for node in payload.values()
+               if node["class_type"] == "CLIPTextEncode"]
+    assert readers and all(_loras_behind(payload, clip, "clip") == [
+        ("first_look.safetensors", 0.7), ("second_look.safetensors", 0.6)] for clip in readers)
+
+
+@pytest.mark.parametrize("name", _THREE_LORA_WORKFLOWS)
+def test_a_lora_left_on_none_adds_nothing_to_the_graph(name):
+    assert _users_loras(name, {}) == []
+    assert _users_loras(name, {"lora_2": "a_look.safetensors", "lora_strength_2": 0.8}) == [
+        ("a_look.safetensors", 0.8)]

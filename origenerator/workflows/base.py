@@ -250,6 +250,7 @@ class WorkflowTemplate(ABC):
     # in LoRA (same base model) split there. Empty for workflows with no LoRA; the
     # gallery then collapses that level to a single "(no LoRA)" folder.
     lora_keys: tuple[str, ...] = ()
+    loras_keyed_only_when_named: tuple[str, ...] = ()
     # Param keys the enhance tail reads that the ``enhance``/``enhance_*`` naming
     # doesn't already cover, so they join :meth:`enhance_keys` and stay out of the
     # gallery's grouping. The SDXL and WAN t2i workflows list ``upscale_model``

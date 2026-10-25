@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from origenerator.workflows.lora_rows import LORA_KEYS, keys_with_strengths
+
 
 @dataclass(frozen=True)
 class Section:
@@ -42,7 +44,7 @@ SECTIONS: tuple[Section, ...] = (
             collapsed=False),
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
     Section("Models & LoRAs", (
-        "checkpoint", "unet", "lora", "lora_strength", "unet_high", "unet_low", "unet_s2v",
+        "checkpoint", "unet", *keys_with_strengths(LORA_KEYS), "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",
         "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
         "upscale_model", "model", "style",

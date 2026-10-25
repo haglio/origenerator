@@ -44,7 +44,7 @@ def test_the_workflow_is_a_video_from_an_image_sized_off_its_inputs():
     assert wf.derives_size_from_input
     assert wf.derived_size_source == "video"
     assert wf.model_keys == ("unet",)
-    assert wf.lora_keys == ("lora",)
+    assert wf.lora_keys == ("lora", "lora_2", "lora_3")
     assert wf.seed_keys() == ("seed",)
     assert "animate" not in wf.display_name.lower()
 

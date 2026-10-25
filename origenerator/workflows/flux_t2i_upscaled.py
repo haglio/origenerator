@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
-from origenerator.workflows.lora_rows import lora_rows, picked_loras
+from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import FLUX
-from origenerator.workflows.model_files import NO_LORA, list_model_files
+from origenerator.workflows.model_files import list_model_files
 
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
@@ -35,7 +35,8 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     display_name = "Flux T2I"
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
-    lora_keys = ("lora",)
+    lora_keys = LORA_KEYS
+    loras_keyed_only_when_named = LORA_KEYS[1:]
     output_node_id = "12"
     base_output_node_id = "17"  # the plain 4x upscale, saved when the tail runs
 
@@ -54,8 +55,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             "scheduler": "simple",
             "denoise": 1.0,
             "unet": "ultrarealFineTune_v4_fp16.gguf",
-            "lora": NO_LORA,
-            "lora_strength": 1.0,
+            **lora_defaults(LORA_KEYS),
             "clip_name1": "clip_l.safetensors",
             "clip_name2": "t5xxl_fp16.safetensors",
             "vae": "ae.safetensors",
@@ -75,7 +75,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
-            *lora_rows(defaults, ("lora",), accepts=(FLUX,)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(FLUX,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=16),
@@ -91,7 +91,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        loras = self.lora_chain("13", ["1", 0], picked_loras(params, ("lora",)),
+        loras = self.lora_chain("13", ["1", 0], picked_loras(params, LORA_KEYS),
                                 clip_ref=["2", 0])
         model_ref, clip_ref = loras.model, loras.clip
         if params.get("enhance"):

@@ -16,6 +16,7 @@ from functools import cache, lru_cache
 from origenerator.file_refs import frame_name, reference_basename, unannotated
 from origenerator.media import MediaType
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY, workflow_named
+from origenerator.workflows.lora_rows import strength_key_of
 from origenerator.workflows.model_files import is_no_lora
 
 READINGS_KEPT = 20_000
@@ -170,6 +171,10 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
         for key, default in wf.default_params().items()
         if key not in ungrouped
     }
+    for key in wf.loras_keyed_only_when_named:
+        if is_no_lora(settings.get(key)):
+            settings.pop(key, None)
+            settings.pop(strength_key_of(key), None)
     if "scene_frames" in settings and len(settings["scene_frames"] or []) < 2:
         # A story of one scene is the whole clip and runs for the clip length
         # (WorkflowTemplate.scene_plan), so a row from before scenes and its
@@ -252,7 +257,10 @@ def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
     that bypassed a LoRA shares one signature with a no-LoRA import.
     """
     keys = workflow_lora_keys(workflow_name)
-    return _keyed_signature(keys, _named_loras(keys, parse_params(params_json)))
+    named = _named_loras(keys, parse_params(params_json))
+    wf = workflow_named(workflow_name)
+    unkeyed = set(wf.loras_keyed_only_when_named) - named.keys() if wf else set()
+    return _keyed_signature(tuple(key for key in keys if key not in unkeyed), named)
 
 
 # The reference-reading trio, under the names this module's callers grew up

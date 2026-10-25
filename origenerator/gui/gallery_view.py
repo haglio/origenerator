@@ -94,7 +94,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.drop_target import DropTarget
-from origenerator.gui.enhance_controller import EnhanceController, Offer
+from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS, EnhanceController, Offer
 from origenerator.gui.folder_path_header import FolderPathHeader
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
@@ -3660,14 +3660,18 @@ class GalleryView(QWidget):
         held_here = [row["prompt_id"] for row in rows if row["prompt_id"] in held]
         remove_action = (menu.addAction(f"Remove from “{open_custom.label}”")
                          if held_here else None)
-        enhanceable = [row["prompt_id"] for row in rows
-                       if gallery.is_enhanceable_row(row)]
+        enhanceable = [row for row in rows if gallery.is_enhanceable_row(row)]
+        to_enhance = [row["prompt_id"] for row in enhanceable if self._enhance.would_enhance(row)]
         enhance_action = None
         if enhanceable:
-            n = len(enhanceable)
+            n = len(to_enhance) or len(enhanceable)
             enhance_action = menu.addAction(
                 f"Enhance {n} image{'s' if n != 1 else ''}"
             )
+            if not to_enhance:
+                enhance_action.setEnabled(False)
+                enhance_action.setToolTip(ALREADY_AT_THESE_SETTINGS)
+                menu.setToolTipsVisible(True)
         in_flight = self._enhance.jobs_targeting(rows)
         cancel_action = None
         if in_flight:
@@ -3684,7 +3688,7 @@ class GalleryView(QWidget):
         elif remove_action is not None and chosen is remove_action:
             self._remove_from_custom_folder(open_custom, items=held_here)
         elif enhance_action is not None and chosen is enhance_action:
-            self._enhance.enhance_items(enhanceable)
+            self._enhance.enhance_items(to_enhance)
         elif cancel_action is not None and chosen is cancel_action:
             self._enhance.cancel_for(rows)
         elif chosen is delete_action:

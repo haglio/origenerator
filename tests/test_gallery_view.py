@@ -115,6 +115,7 @@ from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
+from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
@@ -3215,6 +3216,27 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
     _right_click(view, "i1")
 
     assert labels == ["Copy name", "", "Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
+
+
+def test_enhance_is_grayed_for_a_picture_that_already_has_that_enhancement(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    monkeypatch.setattr("origenerator.gui.enhance_controller.gallery.level_matching_settings",
+                        lambda row, settings: 0)
+    offered = {}
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec",
+        lambda menu, *a: offered.update(
+            {act.text(): (act.isEnabled(), act.toolTip(), menu.toolTipsVisible())
+             for act in menu.actions()}),
+    )
+
+    _right_click(view, "i1")
+
+    assert offered["Enhance 1 image"] == (False, ALREADY_AT_THESE_SETTINGS, True)
 
 
 def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(

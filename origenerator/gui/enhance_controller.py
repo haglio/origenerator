@@ -340,14 +340,13 @@ class EnhanceController:
         button comes back, which is what makes it read as "you have this one"
         rather than as "no".
         """
-        ids = []
-        for prompt_id in self._host.selected_prompt_ids():
-            row = self._db.get_generation(prompt_id)
-            if row is None or not gallery.is_enhanceable_row(row):
-                continue
-            if gallery.level_matching_settings(row, self._settings) is None:
-                ids.append(prompt_id)
-        return ids
+        return [prompt_id for prompt_id in self._host.selected_prompt_ids()
+                if (row := self._db.get_generation(prompt_id)) is not None
+                and self.would_enhance(row)]
+
+    def would_enhance(self, row: dict) -> bool:
+        return (gallery.is_enhanceable_row(row)
+                and gallery.level_matching_settings(row, self._settings) is None)
 
     def _selection_is_all_video(self) -> bool:
         """Whether every picked thumbnail is a video — which is why Enhance is

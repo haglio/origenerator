@@ -190,6 +190,9 @@ library holds. A file with no title is shown by its name, and a fix's LoRA by
 its fix and when it was trained. So an agent installing a model writes its title
 there in the same piece of work: the user asked for titles in place of
 filenames (2026-10-24), and a model added without one is the filename again.
+Installing a LoRA also writes down the trigger words it answers to, beside the
+titles in `trigger_words.json`, by running `tools/record_trigger_words.py`; a
+LoRA trained here gets its word written there by hand, from its training.
 
 ## What a generation shows is said by hand, never read off its prompt
 
@@ -419,6 +422,12 @@ is the two hooks that call the guard, below.
   that had raised it, and he wants toasts to open production. So a change to
   what this handler decides reaches a click only once it ships, and a preview
   shows only what an open copy does with the item it is handed.
+- `tools/record_trigger_words.py` — asks Civitai, by each file's SHA-256, for
+  the trigger words of every installed LoRA with none written down yet, and
+  writes them in `config.TRIGGER_WORDS_PATH` beside the titles: `[]` for one
+  Civitai does not know or lists none for, so a later run skips it, and a fix's
+  own LoRAs are left out. It prints counts, never a name or a word. Run it from
+  the production checkout, where that path is the library's file.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of

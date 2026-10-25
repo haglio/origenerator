@@ -62,9 +62,9 @@ def _first_output_file(files, places: OutputPlaces) -> Path | None:
 
 
 def _write_video_funscript(workflow, files, places: OutputPlaces, params: dict | None):
-    """ComfyUI gives a deleted video's filename to the next video it saves, and
-    the deleted one's script is still where the new one's goes, so the finished
-    video's own script is written over it."""
+    """A deleted video's filename goes to a later video once Trash lets it go,
+    and the deleted one's script is still where the new one's goes, so the
+    finished video's own script is written over it."""
     if workflow.output_type != MediaType.VIDEO:
         return
     source = _first_output_file(files, places)

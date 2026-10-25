@@ -180,9 +180,12 @@ from anything a link inside that folder points at (its realpath check, since
 the run reads reaches ComfyUI the way every file kept outside its folders
 does, as a copy in its temp folder, `comfyui_inputs`), and completion files
 each finished file into the library folder its kind is kept in (`file_into_library`; the kinds are `OutputPlaces`, read from
-the settings), numbered after the highest number already there, which is the
-name ComfyUI itself would have given it when it saved straight into the
-library. A record keeps naming its file by kind (`image`, `video`, ...), so
+the settings), numbered after the highest number already there or held in
+Trash. That last part is his rule (2026-10-24): a name another picture had is
+never given out while that picture can come back, and a skipped number is
+fine. A file put back from Trash whose name a newer file has anyway comes back
+under the next free number, and its item lists that name, so no two items ever
+list one file. A record keeps naming its file by kind (`image`, `video`, ...), so
 every row made before this resolves unchanged. At launch,
 `file_what_comfyui_left` files what a run nobody finished, or another program,
 left in ComfyUI's folder.
@@ -197,8 +200,9 @@ them is safe only once no checkout that old can be started.
 
 ## A video's filename is not the video
 
-A finished video is numbered after the highest number already in the folder it
-is filed in, so deleting the newest video gives its filename to the next one, and two videos
+A finished video is numbered after the highest number in the folder it is filed
+in or held in Trash, so a deleted video's filename goes to a later one once
+Trash has let the deleted one go, and two videos
 can share a name: in two folders, or in one folder as an mp4 and a webm. So a
 script is filed where its video is, under the video's whole filename
 (`funscript_path_for`), and moves with the video when the app follows a move;

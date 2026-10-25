@@ -125,6 +125,38 @@ def test_one_absence_hands_comfyui_no_more_pictures_than_it_is_allowed(tmp_path)
     assert places_backfill.queue_finding(db.list_generations(), FakeComfy(), tmp_path / "f.json", limit=1) == 1
 
 
+class _TheProcessEnded(BaseException):
+    pass
+
+
+class _ComfyEndedPartway(FakeComfy):
+    """The ComfyUI the closed app's turn was handing pictures to when that turn
+    was ended, as a turn that runs out of its time is."""
+
+    def __init__(self, ended_after: int) -> None:
+        super().__init__()
+        self._ended_after = ended_after
+
+    def submit_job(self, payload: dict, prompt_id: str) -> None:
+        if len(self.submitted) == self._ended_after:
+            raise _TheProcessEnded
+        super().submit_job(payload, prompt_id)
+
+
+def test_a_hand_over_ended_partway_leaves_a_note_of_every_picture_it_sent(tmp_path):
+    # The next launch takes back off ComfyUI what the note names, so a picture
+    # sent and not written down would be looked over while the app is open again.
+    db = Database(tmp_path / "t.db")
+    for name in ("a", "b", "c"):
+        _enhanced(db, name, _file(f"enhanced_{name}.png"))
+    comfy, record = _ComfyEndedPartway(ended_after=2), tmp_path / "finding.json"
+
+    with pytest.raises(_TheProcessEnded):
+        places_backfill.queue_finding(db.list_generations(), comfy, record)
+
+    assert set(comfy.submitted) <= set(json.loads(record.read_text(encoding="utf-8")))
+
+
 def test_a_picture_already_handed_to_comfyui_is_not_handed_over_again(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))

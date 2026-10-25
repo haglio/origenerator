@@ -26,10 +26,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import WHITE
+from shared_ui.fonts import SIZE_SMALL, make_font
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
-MARK = 48
-TILE_HEIGHT = MARK + 62
+# The room nine rows of buttons have on the shortest screen he works on, and
+# the drawing he asked for, which gives up pixels the rows cannot spare.
+ROOM_FOR_THE_GRID = 1260
+MARK = 96
+NAME_LINES = 2
 
 STATUS_LINE = "sorting.status"
 LAST_LINE = "sorting.last"
@@ -61,6 +65,10 @@ def wrapped_to_fit(text: str, room: int, width_of) -> str:
                 standing = tried
         lines.append(standing)
     return "\n".join(lines)
+
+
+def on_the_bottom_line(text: str, lines: int) -> str:
+    return "\n" * max(0, lines - text.count("\n") - 1) + text
 
 
 def _fitted(source: QPixmap, width: int, height: int) -> QPixmap:
@@ -103,6 +111,7 @@ class SortingWindow(QWidget):
         self._session = session
         self._marks = dict(marks)
         self._tiles: dict[str, QToolButton] = {}
+        self._name_font = make_font(size=SIZE_SMALL)
         # The picture at its own size, kept so a resize re-scales from the
         # original rather than from an already-shrunk copy.
         self._shown = QPixmap()
@@ -143,12 +152,17 @@ class SortingWindow(QWidget):
                     for tile in tiles if self._marks.get(tile.state)}
         scale = one_scale_for_all(drawings.values(), MARK)
         room = self._room_for_a_name(tiles)
+        named = {tile.state: wrapped_to_fit(one_term_to_a_line(tile.state), room,
+                                            QFontMetrics(self._name_font).horizontalAdvance)
+                 for tile in tiles}
+        lines = max(name.count("\n") + 1 for name in named.values())
         for tile in tiles:
             grid.addWidget(
-                self._state_tile(tile.state, drawings.get(tile.state), scale, room),
+                self._state_tile(tile.state, drawings.get(tile.state), scale,
+                                 on_the_bottom_line(named[tile.state], lines)),
                 tile.row, tile.column, tile.rows, tile.columns,
                 Qt.AlignmentFlag.AlignCenter)
-        self._make_every_tile_one_size(tiles)
+        self._make_every_tile_one_size(tiles, drawings, scale)
         column.addLayout(grid)
 
         divider = QFrame()
@@ -184,30 +198,41 @@ class SortingWindow(QWidget):
         panel.setFixedWidth(inside.sizeHint().width() + 28)  # room for the scrollbar
         return panel
 
-    def _make_every_tile_one_size(self, tiles) -> None:
+    def _make_every_tile_one_size(self, tiles, drawings, scale) -> None:
         buttons = list(self._tiles.values())
         if not buttons:
             return
+        rows = max((tile.row + tile.rows for tile in tiles), default=1)
+        allowed = (ROOM_FOR_THE_GRID - GAP_MEDIUM * (rows - 1)) // rows
+        tall = max(button.sizeHint().height() for button in buttons)
+        if tall > allowed:
+            self._draw_at(MARK - (tall - allowed), drawings, scale)
         widest = max(button.sizeHint().width() for button in buttons)
-        tallest = max(TILE_HEIGHT, *(button.sizeHint().height() for button in buttons))
+        tallest = max(button.sizeHint().height() for button in buttons)
         for tile in tiles:
             self._tiles[tile.state].setFixedSize(
-                widest, tallest * tile.rows + GAP_MEDIUM * (tile.rows - 1))
+                widest * tile.columns + GAP_MEDIUM * (tile.columns - 1),
+                tallest * tile.rows + GAP_MEDIUM * (tile.rows - 1))
 
     def _room_for_a_name(self, tiles) -> int:
-        metrics = QFontMetrics(self.font())
-        words = [word for tile in tiles
-                 for word in one_term_to_a_line(tile.state).replace("\n", " ").split()]
-        return max(MARK, *(metrics.horizontalAdvance(word) for word in words))
+        """The narrowest width that keeps every name to :data:`NAME_LINES` lines."""
+        metrics = QFontMetrics(self._name_font)
+        named = [one_term_to_a_line(tile.state) for tile in tiles]
+        widest = max(metrics.horizontalAdvance(word)
+                     for name in named for word in name.replace("\n", " ").split())
+        room = max(MARK, widest)
+        while any(wrapped_to_fit(name, room, metrics.horizontalAdvance).count("\n")
+                  >= NAME_LINES for name in named):
+            room += 1
+        return room
 
     def _state_tile(self, state: str, drawing: QPixmap | None,
-                    scale: float, room: int) -> QToolButton:
+                    scale: float, name: str) -> QToolButton:
         tile = QToolButton(objectName=state_button(state))
-        tile.setText(wrapped_to_fit(one_term_to_a_line(state), room,
-                                    QFontMetrics(self.font()).horizontalAdvance))
+        tile.setText(name)
+        tile.setFont(self._name_font)
         tile.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         tile.setIconSize(QSize(MARK, MARK))
-        tile.setMinimumHeight(TILE_HEIGHT)
         # Never the keyboard's: Space would otherwise re-fire whichever tile was
         # pressed last, and Escape has to go on closing the window.
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -216,6 +241,13 @@ class SortingWindow(QWidget):
         if drawing is not None and not drawing.isNull():
             tile.setIcon(QIcon(on_a_white_square(drawing, MARK, scale)))
         return tile
+
+    def _draw_at(self, mark: int, drawings, scale: float) -> None:
+        for state, tile in self._tiles.items():
+            tile.setIconSize(QSize(mark, mark))
+            drawing = drawings.get(state)
+            if drawing is not None and not drawing.isNull():
+                tile.setIcon(QIcon(on_a_white_square(drawing, mark, scale * mark / MARK)))
 
 
     def _on_state(self, state: str) -> None:

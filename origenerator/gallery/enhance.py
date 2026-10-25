@@ -482,11 +482,11 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
     return recency
 
 
-def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
+def rows_awaiting_enhancement(folder_rows, enhance_rows) -> list[dict]:
     """What a folder's Enhance All button targets: finished images
     that aren't enhanced and don't have an enhance already in flight (checked
-    against ``all_rows``, where the transient job rows live)."""
-    in_flight_ids, in_flight_names = _enhances_in_flight(all_rows)
+    against ``enhance_rows``, where the transient job rows live)."""
+    in_flight_ids, in_flight_names = _enhances_in_flight(enhance_rows)
     awaiting = []
     for row in folder_rows:
         if not is_enhanceable_row(row) or is_enhanced_row(row):

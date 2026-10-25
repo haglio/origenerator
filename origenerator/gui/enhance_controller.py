@@ -314,14 +314,17 @@ class EnhanceController:
                          else ALREADY_AT_THESE_SETTINGS)
         group = self._host.current_group()
         awaiting = (
-            gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
-            if isinstance(group, gallery.SettingsGroup) else []
+            self._awaiting(group.rows) if isinstance(group, gallery.SettingsGroup) else []
         )
         if not awaiting:
             return Offer(False, "Nothing here to enhance")
         return Offer(True, f"Enhance {len(awaiting)} not-yet-enhanced image"
                            f"{'s' if len(awaiting) != 1 else ''} in this folder "
                            f"{_WHAT_AN_ENHANCE_DOES}")
+
+    def _awaiting(self, rows) -> list[dict]:
+        return gallery.rows_awaiting_enhancement(
+            rows, self._db.rows_made_by(gallery.ENHANCE_WORKFLOW))
 
     def enhanceable_selection(self) -> list[str]:
         """The picked thumbnails this button would actually run on.
@@ -372,9 +375,7 @@ class EnhanceController:
         group = self._host.current_group()
         if not isinstance(group, gallery.SettingsGroup):
             return
-        self._enqueue(
-            gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
-        )
+        self._enqueue(self._awaiting(group.rows))
         self._host.enhance_offer_changed()
 
     def enhance_items(self, prompt_ids: list[str]) -> None:
@@ -445,7 +446,7 @@ class EnhanceController:
         from and arrives here already enhanced."""
         if row is None or not self._settings.auto:
             return
-        awaiting = gallery.rows_awaiting_enhancement([row], self._db.list_generations())
+        awaiting = self._awaiting([row])
         if awaiting:
             self._enqueue(awaiting)
 

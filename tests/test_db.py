@@ -590,6 +590,17 @@ def test_list_generations_ordered_newest_first(tmp_path):
     assert rows[2]["prompt_id"] == "list-000"
 
 
+def test_the_rows_one_workflow_made_are_read_newest_first_without_the_rest(tmp_path):
+    db = Database(tmp_path / "test.db")
+    for prompt_id, workflow_name in (("made-1", "image_enhance"), ("other", "sdxl_t2i"),
+                                     ("made-2", "image_enhance")):
+        db.insert_generation(prompt_id=prompt_id, workflow_name=workflow_name,
+                             workflow_version="v002", params_json="{}", workflow_json="{}")
+
+    assert [row["prompt_id"] for row in db.rows_made_by("image_enhance")] == [
+        "made-2", "made-1"]
+
+
 def _add_listed(db, prompt_id):
     db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json="{}", workflow_json="{}")

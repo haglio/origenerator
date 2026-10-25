@@ -268,6 +268,9 @@ class FakeDB:
     def list_generations(self):
         return list(self._rows)
 
+    def rows_made_by(self, workflow_name):
+        return [row for row in self._rows if row.get("workflow_name") == workflow_name]
+
     def library_version(self):
         return object()  # tests change the rows directly, so every look is fresh
 

@@ -148,6 +148,9 @@ class FakeDB:
     def list_generations(self):
         return [dict(row) for row in self.rows.values()]
 
+    def rows_made_by(self, workflow_name):
+        return [dict(row) for row in self.rows.values() if row["workflow_name"] == workflow_name]
+
     def set_enhance_target(self, prompt_id, target):
         self.targets.append((prompt_id, target))
 
@@ -346,6 +349,27 @@ def test_a_whole_folder_offer_says_what_the_enhance_does_in_plain_words(enhance,
 
     assert controller.offer() == (
         True, "Enhance 2 not-yet-enhanced images in this folder (upscale + light redraw)")
+
+
+def test_a_folders_offer_reads_what_the_enhance_runs_made_never_the_whole_library(enhance):
+    class CountsTheWholeLibrary(FakeDB):
+        reads = 0
+
+        def list_generations(self):
+            self.reads += 1
+            return super().list_generations()
+
+    in_flight = {**_image("e1"), "workflow_name": ENHANCE, "enhance_of": "i2"}
+    folder = gallery.SettingsGroup("k", "S", [_image("i1"), _image("i2")])
+    db = CountsTheWholeLibrary([_image("i1"), _image("i2"), in_flight])
+    controller, _host = enhance(FakeHost(group=folder), db=db)
+    read_while_building = db.reads
+
+    offer = controller.offer()
+
+    assert (offer, db.reads) == (
+        (True, "Enhance 1 not-yet-enhanced image in this folder (upscale + light redraw)"),
+        read_while_building)
 
 
 # --- what a launch carries ---------------------------------------------------

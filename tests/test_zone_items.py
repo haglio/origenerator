@@ -76,6 +76,15 @@ def test_a_held_item_is_known_by_its_file_and_shows_its_own_pictures(library):
     assert items.item_of(str(output_dir / "video" / "run_00002_.mp4")) == "gen-run"
 
 
+def test_an_image_handed_to_comfyui_as_a_copy_is_still_the_gallerys_item(library):
+    items, names, _output_dir, thumb = library
+    copy = "origenerator/0123456789ab/pic_00001_.png [temp]"
+
+    assert items.item_of(copy) == "gen-pic"
+    assert items.name_of(copy) == names.of("gen-pic")
+    assert items.preview(copy) == (thumb, None)
+
+
 def test_a_file_from_outside_is_named_by_its_file_and_shown_as_itself(library, tmp_path):
     items, _names, _output_dir, _thumb = library
     picture = square(tmp_path, "green")

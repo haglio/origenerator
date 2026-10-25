@@ -802,7 +802,7 @@ class JobQueue(QObject):
         """
         key = gallery.settings_folder_key(row, image_index)
         if self.job_for_prompt(row["prompt_id"]) is not None:
-            return  # already tracked
+            return None  # already tracked
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         try:
             if workflow is None:

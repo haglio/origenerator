@@ -241,6 +241,43 @@ def test_a_word_that_starts_a_name_is_never_widened():
     assert not index.widens("79bb")
 
 
+def test_quoted_words_find_only_prompts_that_have_them_side_by_side_in_that_order():
+    rows = [_row("g1", "two lamps on a bench"), _row("g2", "two cats near some lamps"),
+            _row("g3", "lamps, two of them")]
+
+    assert _hits(_index(rows), '"two lamps"') == ["g1"]
+
+
+def test_quoted_words_bring_in_no_related_words():
+    index = _index([_row("g1", "a pair of lamps on a bench")])
+
+    assert _hits(index, "two lamps") == ["g1"]
+    assert _hits(index, '"two lamps"') == []
+
+
+def test_quoted_words_never_reach_across_a_comma():
+    assert _hits(_index([_row("g1", "a red, car parked outside")]), '"red car"') == []
+
+
+def test_a_quote_still_being_typed_runs_to_the_end_of_the_query():
+    rows = [_row("g1", "two lamps on a bench"), _row("g2", "two cats near some lamps")]
+
+    assert _hits(_index(rows), '"two lamps') == ["g1"]
+
+
+def test_words_outside_the_quotes_keep_their_related_words():
+    rows = [_row("g1", "two lamps on a couch"), _row("g2", "two lamps on a bench")]
+
+    assert _hits(_index(rows), '"two lamps" sofa') == ["g1"]
+
+
+def test_quoted_words_find_a_folder_named_with_them():
+    index = _index([_row("a", "a cat"), _row("b", "a cat")],
+                   {"a": ["Keepers from the beach trip"], "b": ["Trip to the beach"]})
+
+    assert _hits(index, '"beach trip"') == ["a"]
+
+
 def test_a_search_can_be_held_to_a_set_of_generations():
     # The gallery's tree selection is the scope: standing in a folder asks the
     # question there, and a hit outside it is not an answer.
@@ -489,5 +526,14 @@ def test_an_items_name_is_never_sent_to_the_model_to_widen(monkeypatch):
 
     search.expand_query(
         "3FA9C0D2 004", base_url="http://localhost:1", model="m", system_prompt="R")
+
+    assert calls == []
+
+
+def test_quoted_words_are_never_sent_to_the_model_to_widen(monkeypatch):
+    calls = _calls_to_the_model(monkeypatch)
+
+    search.expand_query(
+        '"two lamps"', base_url="http://localhost:1", model="m", system_prompt="R")
 
     assert calls == []

@@ -67,6 +67,12 @@ def test_this_app_declares_every_line_a_room_writes(relied_on):
             if not any(re.fullmatch(pattern, line) for pattern in patterns)] == []
 
 
+def test_this_app_takes_when_a_line_was_said_in_the_field_fun_time_fills(relied_on):
+    field = relied_on.get("said_at_field")
+
+    assert not field or "{" + field + "}" in contract.declaration()["said_at_suffix"]
+
+
 def _is_read_by(written: str, reads: dict) -> bool:
     if "pattern" in reads:
         return re.fullmatch(reads["pattern"], written) is not None

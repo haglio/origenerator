@@ -13,10 +13,10 @@ from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.gui.sorting_window import (
     LAST_LINE,
+    ROOM_FOR_THE_GRID,
     SAME_BUTTON,
     SKIP_BUTTON,
     STATUS_LINE,
-    TILE_HEIGHT,
     UNDO_BUTTON,
     SortingWindow,
     on_a_white_square,
@@ -295,14 +295,15 @@ def _where(made, state):
     return layout.getItemPosition(layout.indexOf(tile))
 
 
-def test_a_tile_the_grid_merges_covers_both_columns_at_one_tile_wide(window):
-    """His words: "the merged cells can still be the same size, just shift them
-    over to be centered"."""
+def test_a_tile_the_grid_merges_fills_both_of_its_columns(window):
+    """His words: "I'd like them to be double-wide i.e. take up the whole space of
+    both columns"."""
     made, _ = window("gen-one", tiles=(Tile("state one", 0, 0, columns=2),
                                        Tile("state two", 0, 2)))
 
     assert _where(made, "state one") == (0, 0, 1, 2)
-    assert _tile(made, "state one").width() == _tile(made, "state two").width()
+    assert _tile(made, "state one").width() == (
+        _tile(made, "state two").width() * 2 + GAP_MEDIUM)
 
 
 def test_the_tile_down_every_row_is_as_tall_as_all_of_them_and_their_gaps(window):
@@ -317,14 +318,15 @@ def test_the_tile_down_every_row_is_as_tall_as_all_of_them_and_their_gaps(window
     assert _tile(made, "state three").height() == one.height() * 2 + GAP_MEDIUM
 
 
-def test_nine_rows_of_buttons_stand_in_the_room_the_window_has():
+def test_nine_rows_of_buttons_stand_in_the_room_the_window_has(window):
     """His words: "shrink the buttons", so that all nine rows of his sheet are
-    there to press without the strip of them scrolling. The shortest screen he
-    works on leaves a window 1410 pixels tall, and what is not the grid's -- the
-    controls under it, the margins, the window's own frame -- takes 150."""
-    rows, room = 9, 1260
+    there to press without the strip of them scrolling: the drawing gives up the
+    pixels the rows cannot spare."""
+    rows = 9
+    made, _ = window("gen-one", tiles=tuple(Tile(f"state {n}", n, 0) for n in range(rows)))
 
-    assert rows * TILE_HEIGHT + GAP_MEDIUM * (rows - 1) <= room
+    tall = _tile(made, "state 0").height()
+    assert rows * tall + GAP_MEDIUM * (rows - 1) <= ROOM_FOR_THE_GRID
 
 
 def test_a_term_too_wide_for_a_button_goes_on_to_the_next_line():

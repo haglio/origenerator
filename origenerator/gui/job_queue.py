@@ -672,15 +672,18 @@ class JobQueue(QObject):
             if (job is newcomer or job.prompt_id in self._first or job.shielded
                     or not job.defer()):
                 continue
-            self._on_server.remove(job)
-            self._waiting.insert(queue_line.rejoin_index(self._waiting, job, newcomer), job)
-            # Back to pending: a restart re-adopts a pending row into the line,
-            # where a running one is looked for on a server that no longer has it.
-            self._db.update_generation(job.prompt_id, status=GenerationStatus.PENDING,
-                                       progress_json=None)
+            self._back_in_the_line(job, queue_line.rejoin_index(self._waiting, job, newcomer))
             logger.info("Set aside %s for the user's image work; it starts over after",
                         job.prompt_id)
         queue_line.put_first(self._waiting, self._first)
+
+    def _back_in_the_line(self, job: GenerationJob, at: int) -> None:
+        self._on_server.remove(job)
+        self._waiting.insert(at, job)
+        # Back to pending: a restart re-adopts a pending row into the line,
+        # where a running one is looked for on a server that no longer has it.
+        self._db.update_generation(job.prompt_id, status=GenerationStatus.PENDING,
+                                   progress_json=None)
 
     def _preempt_experiments(self):
         """Clear the GPU for user work: cancel every in-flight background
@@ -756,9 +759,14 @@ class JobQueue(QObject):
         # re-queuing each job in the order it was asked for, so the rules that
         # ordered it the first time order it the same way again.
         readopted = []
+        making = self._what_comfyui_is_making()
         for row in reversed(self._db.list_generations()):
             if row.get("status") == GenerationStatus.RUNNING:
-                self._reconnect(row, index)
+                job = self._reconnect(row, index)
+                if (job is not None and making is not None and job.prompt_id not in making
+                        and not job.shielded and job.defer()):
+                    self._back_in_the_line(job, queue_line.insertion_index(self._waiting, job))
+                    logger.info("Took %s back from ComfyUI's queue into the line", job.prompt_id)
             elif row.get("status") == GenerationStatus.PENDING:
                 readopted.append(self._readopt(row, index))
         for job in filter(None, readopted):
@@ -777,13 +785,21 @@ class JobQueue(QObject):
         ]
         return gallery.build_image_config_index(image_rows)
 
+    def _what_comfyui_is_making(self) -> set[str] | None:
+        try:
+            return set(self._client.executing_prompts())
+        except Exception as e:
+            logger.warning("Left ComfyUI's queue as it was: could not read what it is making: %s",
+                           e)
+            return None
+
     def _reconnect(self, row: dict, image_index: dict):
         key = gallery.settings_folder_key(row, image_index)
         if self.job_for_prompt(row["prompt_id"]) is not None:
-            return  # already tracked
+            return None  # already tracked
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None:
-            return
+            return None
         params = gallery.parse_params(row.get("params_json"))
         try:
             # Carry the row's source onto the rebound job, so an experiment left
@@ -795,9 +811,10 @@ class JobQueue(QObject):
             )
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
-            return
+            return None
         self._take_back(key, job, row)
         self._on_server.append(job)  # it is ComfyUI's to finish, not ours to send
+        return job
 
     def _readopt(self, row: dict, image_index: dict):
         """Take a row the line was still holding back into the line.

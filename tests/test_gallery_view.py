@@ -15,6 +15,8 @@ from funestra.console import (
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
+from funestra.hud_osr2 import state_for
+from funestra.modes import Osr2State
 from funestra.volume import VolumeHud
 from PIL import Image
 from PIL import Image as _Image
@@ -14339,6 +14341,23 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
     assert omnipause.frozen() and radio.frozen
     assert view._slideshows.showing is slideshow and slideshow.shown.isVisible()
     assert view._bank.radio.isChecked()
+
+
+def test_esc_at_a_standalone_slideshow_has_its_osr2_line_say_parked_until_a_second_plays(
+        qtbot, tmp_path, monkeypatch):
+    view, _radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
+    view.osr2_control.setChecked(True)
+
+    gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
+    assert _osr2_line(slideshow) == OSR2_PARKED
+
+    gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
+    assert _osr2_line(slideshow) == Osr2State.ROBOT_HAND
+
+
+def _osr2_line(slideshow):
+    device = slideshow.shown.hud_device
+    return state_for(device.osr2, device.osr2_control, paused=device.paused)
 
 
 def _press_escape_at_the_gallery(view):

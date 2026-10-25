@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -211,3 +212,18 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         "model_recommendations", "lora_recommendations",
         "picture_states", "picture_state_grid", "animation_paths",
     }
+
+
+def test_the_pyproject_says_the_launch_needs_every_key_of_the_example_in_the_local_overlay():
+    declared = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "tool"]["haglio"]["opens-only-with"]
+
+    compared = _run_in_a_fresh_interpreter(
+        "import origenerator.content as content",
+        "print(content.EXAMPLE_CONTENT)",
+        "print(content.LOCAL_CONTENT)",
+    )
+
+    assert compared.returncode == 0, compared.stderr
+    assert [REPO_ROOT / declared["every-key-of"], REPO_ROOT / declared["in"]] == [
+        Path(line) for line in compared.stdout.splitlines()]

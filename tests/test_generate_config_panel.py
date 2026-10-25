@@ -830,7 +830,7 @@ def test_an_image_let_go_over_the_start_image_shows_there_by_its_name(qtbot, tmp
     assert not start_image._label.pixmap().isNull()
 
 
-def test_a_video_let_go_over_the_start_image_gives_it_the_picture_it_was_made_from(
+def test_a_video_let_go_over_the_start_image_gives_it_the_image_it_was_made_from(
         qtbot, tmp_path, monkeypatch):
     _panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
     _image_row(db, filename="sdxl_img1.png")
@@ -841,7 +841,7 @@ def test_a_video_let_go_over_the_start_image_gives_it_the_picture_it_was_made_fr
     assert start_image.current_id() == "image/sdxl_img1.png [output]"
 
 
-def test_a_video_made_from_a_picture_the_gallery_lacks_is_turned_away(qtbot, tmp_path,
+def test_a_video_made_from_an_image_the_gallery_lacks_is_turned_away(qtbot, tmp_path,
                                                                       monkeypatch):
     _panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
     _video_row(db, input_image="elsewhere.png")
@@ -852,7 +852,7 @@ def test_a_video_made_from_a_picture_the_gallery_lacks_is_turned_away(qtbot, tmp
     assert start_image.current_id() is None
 
 
-def test_the_start_image_lights_while_a_picture_it_would_take_is_dragged(qtbot, tmp_path,
+def test_the_start_image_lights_while_an_image_it_would_take_is_dragged(qtbot, tmp_path,
                                                                          monkeypatch):
     _panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
     _image_row(db)
@@ -870,7 +870,7 @@ def test_the_start_image_lights_while_a_picture_it_would_take_is_dragged(qtbot, 
     assert start_image._label.property(LIT) is False
 
 
-def test_a_picture_let_go_anywhere_on_the_tab_becomes_its_start_image(qtbot, tmp_path,
+def test_an_image_let_go_anywhere_on_the_tab_becomes_its_start_image(qtbot, tmp_path,
                                                                      monkeypatch):
     panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
     _image_row(db, filename="sdxl_img1.png")
@@ -881,7 +881,7 @@ def test_a_picture_let_go_anywhere_on_the_tab_becomes_its_start_image(qtbot, tmp
     assert start_image.current_id() == "image/sdxl_img1.png [output]"
 
 
-def test_a_picture_let_go_on_settings_with_no_picture_box_is_turned_away(panel):
+def test_an_image_let_go_on_settings_with_no_image_box_is_turned_away(panel):
     _image_row(panel._db)
 
     assert not drops.let_go_over(panel._workflow_combo, "img1").isAccepted()

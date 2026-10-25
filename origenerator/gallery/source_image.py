@@ -86,8 +86,8 @@ def source_image_id_in(row: dict, image_index: dict) -> str | None:
     return (entry.prompt_id or None) if entry is not None else None
 
 
-def picture_lent_by(prompt_id: str, row_of: Callable[[str], dict | None],
-                    image_index: dict) -> dict | None:
+def image_lent_by(prompt_id: str, row_of: Callable[[str], dict | None],
+                  image_index: dict) -> dict | None:
     row = row_of(prompt_id)
     if row is not None and media_type_of_row(row) == MediaType.VIDEO:
         source = source_image_id_in(row, image_index)

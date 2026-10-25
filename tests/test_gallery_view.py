@@ -3071,15 +3071,15 @@ def _click_tile(view, prompt_id):
     QTest.mouseClick(view._browser._thumb_widgets[prompt_id], Qt.MouseButton.LeftButton, _NO_MOD)
 
 
-def _two_pictures_on_screen(qtbot):
+def _two_images_on_screen(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
     _on_screen(qtbot, view, 1200, 900)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     return view, view._browser._thumb_widgets["i2"]
 
 
-def test_dragging_a_picture_lights_the_tabs_start_image_until_it_is_let_go(qtbot, monkeypatch):
-    view, tile = _two_pictures_on_screen(qtbot)
+def test_dragging_an_image_lights_the_tabs_start_image_until_it_is_let_go(qtbot, monkeypatch):
+    view, tile = _two_images_on_screen(qtbot)
     panel = view._info_tabs.current_config_panel()
     panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("wan22_i2v"))
     well = panel._param_form._widgets["input_image"]._label
@@ -3095,8 +3095,8 @@ def test_dragging_a_picture_lights_the_tabs_start_image_until_it_is_let_go(qtbot
     assert well.property(LIT) is False
 
 
-def test_pressing_a_picture_lights_it_up_and_leaves_the_tab_as_it_was(qtbot):
-    view, tile = _two_pictures_on_screen(qtbot)
+def test_pressing_an_image_lights_it_up_and_leaves_the_tab_as_it_was(qtbot):
+    view, tile = _two_images_on_screen(qtbot)
 
     gestures.press(tile, tile.rect().center())
 
@@ -3104,9 +3104,9 @@ def test_pressing_a_picture_lights_it_up_and_leaves_the_tab_as_it_was(qtbot):
     assert view.selected_generation() is None
 
 
-def test_dragging_a_picture_out_leaves_the_tab_as_it_was(qtbot, monkeypatch):
+def test_dragging_an_image_out_leaves_the_tab_as_it_was(qtbot, monkeypatch):
     monkeypatch.setattr(DragOut, "start", lambda self, *args, **kwargs: None)
-    view, tile = _two_pictures_on_screen(qtbot)
+    view, tile = _two_images_on_screen(qtbot)
     at = tile.rect().center()
     away = at + QPoint(40, 0)
 
@@ -12122,7 +12122,7 @@ def test_a_start_image_a_launch_puts_back_is_named_once_the_gallery_draws(qtbot,
     assert start._caption.text() == view._item_names.of("img") != ""
 
 
-def test_a_picture_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp_path):
+def test_an_image_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()

@@ -8,6 +8,7 @@
 # gallery in ahead of all four.
 from __future__ import annotations
 
+import os
 import sys
 import uuid
 from collections.abc import Callable
@@ -481,6 +482,18 @@ def boot_steps(maintenance) -> tuple[tuple[str, float], ...]:
     )
 
 
+def _say_where_the_window_comes_up(fun_time, ui_state_path: Path):
+    from app_support.loading_screen import meeting_place
+
+    from origenerator.app_state import AppState
+    from origenerator.gui.window_monitor import GEOMETRY_KEY, the_window_saved_in
+
+    next_launch = None if fun_time is not None else meeting_place(os.environ)
+    if next_launch is not None:
+        next_launch.say_where_the_app_comes_up(the_window_saved_in(AppState(ui_state_path).get(GEOMETRY_KEY)))
+    return next_launch
+
+
 def _open_the_loading(fun_time, app, logger, preview, taskbar):
     from origenerator.gui.loading_screen import Loading, loading_screen
 
@@ -509,11 +522,11 @@ def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
         logger.warning("Trash orphan reclaim failed: %s", e)
 
 
-def _build_window(client, db, app_state, fun_time, preview, taskbar):
+def _build_window(client, db, app_state, fun_time, preview, taskbar, next_launch):
     from origenerator.gui.main_window import OrigeneratorWindow
 
     window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time, preview=preview,
-                                taskbar=taskbar)
+                                taskbar=taskbar, next_launch=next_launch)
     if fun_time is not None and not fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -739,6 +752,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
 
+    next_launch = _say_where_the_window_comes_up(fun_time, UI_STATE_PATH)
     from origenerator.app_link import made_for_a_click
     from origenerator.single_instance import Copies, say_another_copy_is_running
     copies = Copies(LIBRARY_STATE_DIR)
@@ -815,7 +829,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         client.start()
 
         loading.say(BUILDING_THE_INTERFACE)
-        window = _build_window(client, db, app_state, fun_time, preview, taskbar)
+        window = _build_window(client, db, app_state, fun_time, preview, taskbar, next_launch)
         loading.stop_if_canceled()
     except LoadingCanceled:
         logger.info("Loading canceled from the loading screen")

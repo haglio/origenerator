@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import builtins
 import json
 import logging
@@ -15,6 +16,7 @@ from pathlib import Path
 from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
+from app_support import loading_screen as launchers_screen
 from app_support.win32 import TaskbarApp
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QWidget
@@ -33,6 +35,7 @@ from origenerator.app import (
     _merge_soundless_copies,
     _open_the_loading,
     _put_the_backfill_in_place,
+    _say_where_the_window_comes_up,
     _taskbar_identity,
     _the_preview_on_the_taskbar,
     _tidy_video_previews,
@@ -50,6 +53,7 @@ from origenerator.export_lane import GENAU
 from origenerator.fun_time_mode import OFFER_NAME
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui.window_monitor import the_window_on
 from origenerator.output_places import OutputPlaces
 from tests.children import run_python
 from tests.hosted_launch import hosted_launch
@@ -374,6 +378,60 @@ def test_a_loading_screen_with_no_taskbar_identity_to_wear_wears_none(qapp):
 def _real_loading_screens(screens):
     return {"origenerator.gui.loading_screen.loading_screen": loading_screen,
             "origenerator.gui.loading_screen.LoadingProcess.open": opened_here(screens)}
+
+
+def _saved_from(window: QWidget, tmp_path) -> AppState:
+    window.show()
+    state = AppState(tmp_path / "ui.json")
+    state.set("window_geometry", base64.b64encode(bytes(window.saveGeometry())).decode("ascii"))
+    window.close()
+    return state
+
+
+def test_a_launch_from_its_launcher_tells_its_loading_screen_the_monitor_its_window_comes_back_on(
+        qapp, tmp_path, monkeypatch):
+    place = launchers_screen.MeetingPlace(tmp_path / "screen", ())
+    monkeypatch.setenv(launchers_screen.FOLDER, str(place.folder))
+    window = QWidget()
+    state = _saved_from(window, tmp_path)
+
+    with _a_faked_boot([], **{"origenerator.app_state.AppState": lambda path: state}):
+        assert main([]) == 0
+
+    assert place.where_the_app_comes_up() == the_window_on(window.screen())
+
+
+def test_a_launch_with_no_window_saved_has_its_loading_screen_forget_the_monitor_said_before(
+        qapp, tmp_path, monkeypatch):
+    place = launchers_screen.MeetingPlace(tmp_path / "screen", ())
+    place.say_where_the_app_comes_up(launchers_screen.AppWindow(kept_on=(2560, 3, 1440, 3440)))
+    monkeypatch.setenv(launchers_screen.FOLDER, str(place.folder))
+
+    with _a_faked_boot([], **{"origenerator.app_state.AppState": lambda path: AppState(tmp_path / "ui.json")}):
+        assert main([]) == 0
+
+    assert place.where_the_app_comes_up() == launchers_screen.AppWindow()
+
+
+def test_the_window_is_handed_where_the_next_launchs_loading_screen_meets_it(qapp, tmp_path, monkeypatch):
+    place = launchers_screen.MeetingPlace(tmp_path / "screen", ())
+    monkeypatch.setenv(launchers_screen.FOLDER, str(place.folder))
+    window = MagicMock()
+
+    with _a_faked_boot([], **{"origenerator.gui.main_window.OrigeneratorWindow": window}):
+        assert main([]) == 0
+
+    assert window.call_args.kwargs["next_launch"] == place
+
+
+def test_a_launch_inside_a_fun_time_session_tells_no_loading_screen_anything(qapp, tmp_path, monkeypatch):
+    place = launchers_screen.MeetingPlace(tmp_path / "screen", ())
+    monkeypatch.setenv(launchers_screen.FOLDER, str(place.folder))
+    _saved_from(QWidget(), tmp_path).save()
+
+    next_launch = _say_where_the_window_comes_up(MagicMock(), tmp_path / "ui.json")
+
+    assert (next_launch, place.where_the_app_comes_up()) == (None, None)
 
 
 def test_a_finished_launch_takes_its_loading_screen_down(qapp):

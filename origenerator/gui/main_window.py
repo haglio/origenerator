@@ -4,6 +4,7 @@ import base64
 import logging
 from dataclasses import replace
 
+from app_support.loading_screen import MeetingPlace
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow, QMessageBox
@@ -26,6 +27,7 @@ from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
+from origenerator.gui.window_monitor import GEOMETRY_KEY, the_window_on
 from origenerator.win32 import (
     bring_back_into_sight,
     keep_out_of_sight,
@@ -87,7 +89,6 @@ SESSION_UI_STATE = (
 # are the window's own, and the prompt heights are a module-level store read
 # before the first form is built (see __init__), so none is a view getter and
 # none belongs in the table.
-_GEOMETRY_KEY = "window_geometry"
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
 _PANE_SIZES_KEY = "pane_sizes"
 _KEYS_THE_SESSION_OWNS = frozenset(
@@ -108,9 +109,11 @@ class OrigeneratorWindow(QMainWindow):
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
                  parent=None, *, fun_time: FunTimeSession | None = None,
-                 preview: Preview | None = None, taskbar: TaskbarIdentity | None = None):
+                 preview: Preview | None = None, taskbar: TaskbarIdentity | None = None,
+                 next_launch: MeetingPlace | None = None):
         super().__init__(parent)
         self._app_state = app_state
+        self._next_launch = next_launch
         self._fun_time = fun_time
         self._taskbar = taskbar
 
@@ -214,7 +217,7 @@ class OrigeneratorWindow(QMainWindow):
         Qt's ``saveGeometry`` blob is stored base64-encoded in the JSON state.
         A missing or corrupt value just leaves the window at its default size.
         """
-        blob = self._app_state.get(_GEOMETRY_KEY)
+        blob = self._app_state.get(GEOMETRY_KEY)
         if not isinstance(blob, str):
             return
         try:
@@ -432,7 +435,9 @@ class OrigeneratorWindow(QMainWindow):
             # Hosted, the geometry is the session's to decide, so remembering
             # this launch's would overwrite the window the user actually sizes.
             self._app_state.set(
-                _GEOMETRY_KEY,
+                GEOMETRY_KEY,
                 base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),
             )
+            if self._next_launch is not None:
+                self._next_launch.say_where_the_app_comes_up(the_window_on(self.screen()))
         self._app_state.save()

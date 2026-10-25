@@ -61,7 +61,7 @@ def test_a_dragged_video_lends_a_video_zone_its_own_path(library):
     assert items.lends("gen-run", MediaType.IMAGE) is None
 
 
-def test_a_dragged_video_lends_a_picture_zone_the_picture_it_was_made_from(library):
+def test_a_dragged_video_lends_an_image_zone_the_image_it_was_made_from(library):
     items, _names, _output_dir, _thumb = library
 
     assert items.lends("gen-made", MediaType.IMAGE) == "image/pic_00001_.png [output]"

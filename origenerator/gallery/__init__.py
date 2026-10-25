@@ -82,6 +82,7 @@ from origenerator.gallery.enhance_settings import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    full_settings,
 )
 from origenerator.gallery.groups import (
     AllGroup,
@@ -245,6 +246,7 @@ __all__ = [
     "folder_level",
     "folder_names_by_row",
     "folder_signature",
+    "full_settings",
     "generation_of_file",
     "generation_seed",
     "group_level",

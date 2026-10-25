@@ -1332,13 +1332,13 @@ class SlideshowDirector:
             self._slideshow.shown.set_queue(items, foreign_total)
 
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
-        """Put a spoken line in the slideshow's own corner, if a slideshow is up."""
+        """Put a spoken line in the slideshow's own notice, if a slideshow is up."""
         if self._slideshow is not None:
             self._slideshow.note_voice_command(message, kind=kind)
 
     def note_voice_run(self, prompt_id: str | None, message: str, *,
                        kind: str = NOTICE) -> None:
-        """Put a line about a launched run in the slideshow's own corner."""
+        """Put a line about a launched run in the slideshow's own notice."""
         if self._slideshow is not None:
             self._slideshow.note_voice_run(prompt_id, message, kind=kind)
 
@@ -1352,7 +1352,7 @@ class SlideshowDirector:
 
     def answer(self, message: str, *, kind: str = NOTICE) -> None:
         """Say what a spoken command did, where the speaker is looking — the
-        slideshow's own corner while one is up, since the window under it is covered
+        slideshow's own notice while one is up, since the window under it is covered
         by the very thing being talked to, and the gallery's caption otherwise."""
         slideshow = self._slideshow
         if slideshow is not None:

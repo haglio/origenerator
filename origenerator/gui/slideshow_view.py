@@ -109,7 +109,7 @@ class SlideshowView(QWidget):
         # A Fun Time notice, at the top center where Fun Time flashes the same
         # kind of line over a Funestra.
         self._note = NoticeOverlay(self)
-        # What the corner reads while a spoken request pauses the slideshow, and
+        # What the notice reads while a spoken request pauses the slideshow, and
         # afterwards while the request said is still being worked out -- held
         # rather than flashed, and cleared by that request's own answer.
         self._request_note = ""
@@ -395,10 +395,10 @@ class SlideshowView(QWidget):
                      kind: str = NOTICE) -> None:
         """Say what the spoken *request* did, where the speaker is looking.
 
-        *working* means it has not done it yet, so the corner holds that line
+        *working* means it has not done it yet, so the notice holds that line
         rather than flashing it, and it comes down only for the request that
         put it up -- a second request said over the first would otherwise blank
-        the corner while that one is still out.
+        the notice while that one is still out.
         """
         if working:
             self._working_note, self._working_request = message, request

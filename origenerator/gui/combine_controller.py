@@ -512,7 +512,7 @@ class CombineController(QObject):
 
         ``send`` hands the clip to Genau the moment it exists, as a spoken
         animation asks, and takes no dialog at all, because such a command is
-        answered in the show's corner. ``category`` names the act the dropdown was
+        answered in the slideshow's notice. ``category`` names the act the dropdown was
         set to, when one was picked.
         """
         built = self._combined_params(image_id, video_id, intent, category)
@@ -602,7 +602,7 @@ class CombineController(QObject):
         self._host.off_thread(match, resolved)
 
     def _say_no_past_video(self, category: str, intent: str) -> None:
-        """Say the act has no past video to take settings from — at the top of the
+        """Say the act has no past video to take settings from — in the notice of the
         fullscreen surface being spoken to when one is up, and in a dialog
         otherwise. A dialog thrown over a picture someone is looking at is the one
         place this must never appear."""

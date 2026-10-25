@@ -42,6 +42,15 @@ def test_a_change_to_the_library_is_read_at_once(tmp_path):
     assert [row["prompt_id"] for row in views.now().image_rows] == ["pic-2", "pic-1"]
 
 
+def test_a_reading_holds_what_the_trash_holds(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _picture(db, "pic-1", 1)
+    db.record_deletion("pic-1", db.get_generation("pic-1"), {"moves": [], "subdir": None})
+    db.delete_generation("pic-1")
+
+    assert [row["prompt_id"] for row in LibraryViews(db).now().held_rows] == ["pic-1"]
+
+
 def test_a_settings_folder_is_looked_up_once_for_each_reading(tmp_path, monkeypatch):
     db = Database(tmp_path / "test.db")
     _picture(db, "pic-1", 1)

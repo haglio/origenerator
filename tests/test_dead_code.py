@@ -398,7 +398,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # hears it went; the tests for Off and for the Broker's word say it.
 # 16443 when the work Origenerator does while closed came to be started by Evolver,
 # and the gallery's two close-time batches and their notes went with it.
-MAX_PROSE_LINES = 16415
+# 16400 when every send began asking after an earlier run, whichever copy started
+# the job, and the take-back constructor and its notes went.
+MAX_PROSE_LINES = 16400
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

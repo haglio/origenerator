@@ -1819,6 +1819,19 @@ def test_a_picture_the_tab_puts_up_itself_carries_its_own_file_row(
     assert names == ["copyButton", "revealButton"]
 
 
+def test_a_video_whose_start_image_is_in_the_trash_still_shows_its_source(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    video = _video_row(db, "vid1", input_image="sdxl_img1.png")
+    db.record_deletion("img1", image, {"moves": [], "subdir": None})
+    db.delete_generation("img1")
+
+    panel.show_saved_generation(video, [])
+
+    assert not panel._related._source_tile.isHidden()
+    assert panel._related._source_tile._prompt_id == "img1"
+
+
 def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, monkeypatch):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")

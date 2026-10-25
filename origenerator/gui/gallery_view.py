@@ -53,6 +53,9 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     REQUESTS_KEY as _REQUESTS_KEY,
 )
+from origenerator.gallery.collection import (
+    TRASH_KEY as _TRASH_KEY,
+)
 from origenerator.gallery.sides import (
     LANDSCAPE as _LANDSCAPE,
 )
@@ -152,6 +155,7 @@ from origenerator.orientation import (
     filter_rows,
     oriented_key,
     requested_orientation,
+    row_orientation,
 )
 from origenerator.orientation import (
     side_of as _side_of,
@@ -4231,8 +4235,9 @@ class GalleryView(QWidget):
 
     def _folder_row_for(self, prompt_id: str):
         """The tree row of the folder a generation lives in: its settings row, or
-        — for one the tree holds no row for, a generation that failed with no
-        file, or one held in the trash — the row its settings key names.
+        — for one the tree holds no row for, such as a generation that failed
+        with no file — the row its settings key names, and for one held in the
+        trash, the Trash.
 
         ``None`` only when the tree has nowhere at all to put it, which is the
         one case a move has no folder to open. Answering ``None`` for anything
@@ -4243,9 +4248,10 @@ class GalleryView(QWidget):
         leaf = self._leaf_by_id.get(prompt_id)
         if leaf is not None:
             return leaf
-        row = self.row_for(prompt_id)
+        row = self._db.get_generation(prompt_id)
         if row is None:
-            return None
+            held = self.row_for(prompt_id)
+            return self._tree_item_for(oriented_key(_TRASH_KEY, row_orientation(held))) if held else None
         key = self.folder_key_of(row)
         return self._tree_item_for(key) if key else None
 

@@ -1,17 +1,19 @@
 """What the config tabs read off the whole library, once for each state of it."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import cached_property
 
-from origenerator import gallery
+from origenerator import gallery, recovery
 from origenerator.media import MediaType
 
 
 class LibrarySnapshot:
     """The library as it stood at one moment, and what is read off all of it."""
 
-    def __init__(self, rows: list[dict]):
+    def __init__(self, rows: list[dict], deletions: Callable[[], list[dict]] = list):
         self.rows = rows
+        self._deletions = deletions
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
 
     @cached_property
@@ -21,6 +23,10 @@ class LibrarySnapshot:
     @cached_property
     def video_rows(self) -> list[dict]:
         return self._of_kind(MediaType.VIDEO)
+
+    @cached_property
+    def held_rows(self) -> list[dict]:
+        return recovery.bin_items(self._deletions())
 
     @cached_property
     def image_config_index(self) -> dict:
@@ -50,5 +56,6 @@ class LibraryViews:
         version = self._db.library_version()
         if self._snapshot is None or version != self._version:
             self._version = version
-            self._snapshot = LibrarySnapshot(self._db.list_generations())
+            self._snapshot = LibrarySnapshot(self._db.list_generations(),
+                                             lambda: self._db.list_deletions())
         return self._snapshot

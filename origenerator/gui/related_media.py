@@ -54,6 +54,7 @@ class RelatedMedia(QWidget):
     def __init__(self, parent=None, *, video_rows=None,
                  row_of: Callable[[str], dict | None],
                  name_of: Callable[[str], str],
+                 held_rows: Callable[[], list[dict]] = list,
                  previews: MovingPreviews | None = None):
         """``video_rows`` answers the library's videos, and is asked only for a
         row that could have animations, or is a cycle cut out of one of them —
@@ -65,6 +66,7 @@ class RelatedMedia(QWidget):
         self._video_rows = video_rows or (list)
         self._row_of = row_of
         self._name_of = name_of
+        self._held_rows = held_rows
         self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
         self._previews.made.connect(self._show_made_preview)
         self._shown: dict | None = None
@@ -143,7 +145,7 @@ class RelatedMedia(QWidget):
 
     def _show_source_video_tile(self, row: dict) -> None:
         video_id = row.get("source_video")
-        video = self._row_of(video_id) if video_id else None
+        video = self._row_of(video_id) or self._held_row(video_id) if video_id else None
         if video is None:
             self._source_video_tile.clear()
             return
@@ -169,16 +171,23 @@ class RelatedMedia(QWidget):
         cut_from = row.get("trimmed_from")
         if cut_from:
             clip = next((v for v in self._video_rows()
-                         if v.get("prompt_id") == cut_from), None)
+                         if v.get("prompt_id") == cut_from), None) or self._held_row(cut_from)
             if clip is not None:
                 return clip, "Trimmed from", MediaType.VIDEO
-        frame = source_image_of(row, image_rows)
+        frame = source_image_of(row, image_rows) or source_image_of(
+            row, self._held_of_kind(MediaType.IMAGE))
         if frame is not None and was_made_from(row, frame):
             return frame, None, MediaType.IMAGE
         if request is not None and request.get("source_row"):
             asked_about = request["source_row"]
             return asked_about, "Requested from", media_type_of_row(asked_about)
         return None, None, None
+
+    def _held_of_kind(self, kind: MediaType) -> list[dict]:
+        return [held for held in self._held_rows() if media_type_of_row(held) == kind]
+
+    def _held_row(self, prompt_id: str) -> dict | None:
+        return next((held for held in self._held_rows() if held["prompt_id"] == prompt_id), None)
 
     def _animated_items(self, row: dict) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video an image

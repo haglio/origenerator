@@ -61,11 +61,12 @@ def _combined_row(prompt_id="made1", source_video="vid0"):
 def make_related(qtbot):
     """Build a RelatedMedia over a given set of the library's videos, counting
     every time it asks for them."""
-    def _make(*videos):
+    def _make(*videos, held=()):
         by_id = {video["prompt_id"]: video for video in videos}
         widget = RelatedMedia(video_rows=lambda: (asks.append(True), videos)[1],
                               row_of=lambda prompt_id: (looked_up.append(prompt_id),
                                                         by_id.get(prompt_id))[1],
+                              held_rows=lambda: list(held),
                               name_of={"img1": "3FA9C0D2 004", "vid0": "77B2E1A0 012"}.get)
         asks: list = []
         looked_up: list = []
@@ -222,6 +223,25 @@ def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
     assert related._source_tile._badge.media_type == "image"
 
 
+def test_a_cut_whose_clip_is_in_the_trash_still_points_back_at_the_clip(make_related):
+    related = make_related(held=[_video_row()])
+
+    related.show_row(_trim_row(), [_image_row()])
+
+    assert related._source_tile._prompt_id == "vid1"
+    assert related._source_tile._heading.text() == "Trimmed from"
+
+
+def test_a_video_whose_start_image_is_in_the_trash_still_points_back_at_it(make_related):
+    related = make_related(held=[_image_row()])
+
+    related.show_row(_video_row(), [])
+
+    assert not related._source_tile.isHidden()
+    assert related._source_tile._prompt_id == "img1"
+    assert related._source_tile._heading.text() == "From source image"
+
+
 def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
     image = _image_row()
     related.show_row(_video_row(), [image])
@@ -336,11 +356,20 @@ def test_the_next_row_with_no_source_video_takes_that_link_away(make_related):
     assert related._source_video_tile.isHidden()
 
 
-def test_a_source_video_since_deleted_leaves_no_link_to_it(related):
+def test_a_source_video_deleted_for_good_leaves_no_link_to_it(related):
     related.show_row(_combined_row(source_video="deleted"), [_image_row()])
 
     assert related._source_video_tile.isHidden()
     assert related._source_tile._prompt_id == "img1"
+
+
+def test_a_source_video_in_the_trash_keeps_its_link(make_related):
+    related = make_related(held=[_video_row("vid0")])
+
+    related.show_row(_combined_row(), [_image_row()])
+
+    assert not related._source_video_tile.isHidden()
+    assert related._source_video_tile._prompt_id == "vid0"
 
 
 def test_a_long_list_of_animations_is_capped_and_says_so(make_related, caplog):

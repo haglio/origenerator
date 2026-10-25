@@ -234,7 +234,8 @@
       "file": "fun_time_showing.txt",
       "writes": [
         "4242 4343 portrait",
-        "4242 4343 landscape"
+        "4242 4343 landscape",
+        "4242 4343 both"
       ]
     },
     "session": {

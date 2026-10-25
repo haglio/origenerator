@@ -713,19 +713,19 @@ def test_a_slideshow_taken_over_opens_on_the_funestra_of_its_shape_whatever_moni
     assert [slide[2] for slide in director.region_slideshow(the_other).items] == its_library
 
 
-@pytest.mark.parametrize(("shapes", "monitor", "carried_to", "the_other", "its_library"), [
-    ((TALL, WIDE, TALL), LANDSCAPE_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
-    ((WIDE, TALL, WIDE), PORTRAIT_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
+@pytest.mark.parametrize(("shapes", "monitor", "tall", "wide"), [
+    ((TALL, WIDE, TALL), LANDSCAPE_MONITOR, ["g1", "g3"], ["g2"]),
+    ((WIDE, TALL, WIDE), PORTRAIT_MONITOR, ["g2"], ["g1", "g3"]),
 ])
-def test_a_slideshow_of_both_shapes_taken_over_plays_only_its_pictures_of_its_funestras_shape(
-        slideshows, shapes, monitor, carried_to, the_other, its_library):
+def test_a_slideshow_of_both_shapes_taken_over_plays_each_shape_on_the_funestra_of_that_shape(
+        slideshows, shapes, monitor, tall, wide):
     director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
         slideshows, side=BOTH, shapes=shapes, monitor=monitor)
 
     open_both_sides(director)
 
-    assert [slide[2] for slide in director.region_slideshow(carried_to).items] == ["g1", "g3"]
-    assert [slide[2] for slide in director.region_slideshow(the_other).items] == its_library
+    assert [slide[2] for slide in director.region_slideshow(PORTRAIT).items] == tall
+    assert [slide[2] for slide in director.region_slideshow(LANDSCAPE).items] == wide
 
 
 def test_a_slideshow_taken_over_on_an_item_of_the_other_shape_goes_on_from_the_next_of_its_own(
@@ -857,6 +857,16 @@ def test_a_director_names_the_shape_of_a_slideshow_it_could_hand_a_session(slide
 
     made[0].close()
     assert director.slideshow_showing_on() is None
+
+
+def test_a_director_names_both_shapes_for_a_slideshow_of_both(slideshows):
+    director, _host, _made = slideshows()
+    rows = [_shaped(f"g{n}", params) for n, params in enumerate((TALL, WIDE))]
+
+    director.open([(f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
+                   for row in rows], rows=rows, side=BOTH)
+
+    assert director.slideshow_showing_on() == BOTH
 
 
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slideshows):

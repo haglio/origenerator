@@ -43,6 +43,11 @@ def the_one_shape_on(side: str | None) -> str | None:
     return next(iter(shapes)) if len(shapes) == 1 else None
 
 
+def the_side_of(shapes: Iterable[str]) -> str | None:
+    held = frozenset(shapes)
+    return next((side for side in SIDES if _SHAPES_ON[side] == held), None)
+
+
 def side_holding(orientation: str | None, sides: Iterable[str]) -> str | None:
     return next((side for side in sides if side_holds(side, orientation)), None)
 

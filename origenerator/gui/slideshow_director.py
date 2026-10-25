@@ -52,7 +52,7 @@ from origenerator.gallery.collection import folder_collection
 from origenerator.gallery.sides import (
     ORIENTATIONS as _ORIENTATIONS,
 )
-from origenerator.gallery.sides import the_one_shape_on
+from origenerator.gallery.sides import side_holds, the_one_shape_on, the_side_of
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
@@ -211,6 +211,17 @@ def _item_opened_on(items, start: int | None, resume: SlideshowState | None) -> 
     return resume.current if resume is not None else None
 
 
+def _narrowed_to(held: HeldSlideshow, shape: str, ids) -> HeldSlideshow:
+    return replace(held, side=shape,
+                   items=tuple(slide for slide in held.items if slide.prompt_id in ids),
+                   state=_place_among(ids, held.state))
+
+
+def _side_of_the_set(rows, items) -> str | None:
+    ids = {item[2] for item in items}
+    return the_side_of(row_orientation(row) for row in rows if row["prompt_id"] in ids)
+
+
 def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
     if (row := next((row for row in rows if row["prompt_id"] == opened_on), None)) is not None:
         return row_orientation(row)
@@ -244,6 +255,7 @@ class SlideshowDirector:
         self._slideshow = None
         self._standalone_side: str | None = None
         self._standalone_shape: str | None = None
+        self._standalone_showing: str | None = None
         self._hud_corners: dict[str, HudCorner] = {}
         self._hud_minimized: dict[str, bool] = {}
         # Every slideshow currently up, each with the collection/folder key it opened
@@ -275,7 +287,7 @@ class SlideshowDirector:
         self._enhance_status: dict[str, str] = {}
         self._held_at_stamp = None
         self._held_at: dict[str, frozenset[str]] = {}
-        self._taken_into_the_session: HeldSlideshow | None = None
+        self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
 
     def become_hosted(self, session) -> None:
@@ -287,7 +299,7 @@ class SlideshowDirector:
         self._region_slideshows = dict.fromkeys(_ORIENTATIONS)
 
     def become_standalone(self, motion) -> None:
-        self._taken_into_the_session = None
+        self._taken_into_the_session = {}
         self.close_the_slideshows()
         self._fun_time = None
         self._motion = motion
@@ -504,6 +516,8 @@ class SlideshowDirector:
                      if self._fun_time is None else where)
             slideshow = self._open_a_window(items, where, shape=shape, actions=actions,
                                             hud=hud, levels=levels, **kwargs)
+            if self._fun_time is None:
+                self._standalone_showing = _side_of_the_set(rows, items) or shape
         self._slideshow = slideshow
         self._picked_as_the_slideshow_up_opened = tuple(self._host.selected_prompt_ids())
         already_live = any(live is slideshow for live, _where in self._live_slideshows)
@@ -996,7 +1010,7 @@ class SlideshowDirector:
                 self._hud_minimized[side] = place.get("minimized") is True
 
     def slideshow_showing_on(self) -> str | None:
-        return None if self._slideshow is None else self._standalone_shape
+        return None if self._slideshow is None else self._standalone_showing
 
     def held_slideshow(self) -> HeldSlideshow | None:
         slideshow = self._slideshow
@@ -1006,14 +1020,14 @@ class SlideshowDirector:
                         side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
                         state=self._where_it_stands(slideshow), filters=slideshow.filters)
 
-    def _held_for_the_session(self) -> HeldSlideshow | None:
+    def _held_for_the_session(self) -> dict[str, HeldSlideshow]:
         held = self.held_slideshow()
         if held is None:
-            return None
-        shape = self._standalone_shape
-        of_its_shape = {row["prompt_id"] for row in filter_rows(self._rows_of(held.items), shape)}
-        items = tuple(slide for slide in held.items if slide.prompt_id in of_its_shape)
-        return replace(held, side=shape, items=items, state=_place_among(of_its_shape, held.state))
+            return {}
+        rows = self._rows_of(held.items)
+        parts = ((shape, {row["prompt_id"] for row in filter_rows(rows, shape)})
+                 for shape in _ORIENTATIONS if side_holds(self._standalone_showing, shape))
+        return {shape: _narrowed_to(held, shape, ids) for shape, ids in parts if ids}
 
     def _rows_of(self, slides) -> list[dict]:
         ids = (slide.prompt_id for slide in slides if slide.prompt_id is not None)
@@ -1099,10 +1113,9 @@ class SlideshowDirector:
             logger.info("Nothing of %s shape to open on the %s region yet", side, side)
 
     def _put_back_what_was_taken_over(self, side: str) -> bool:
-        taken = self._taken_into_the_session
-        if taken is None or taken.side != side:
+        taken = self._taken_into_the_session.pop(side, None)
+        if taken is None:
             return False
-        self._taken_into_the_session = None
         if self.put_back(taken) is None:
             return False
         logger.info("The %s region takes up the slideshow that was up when the "

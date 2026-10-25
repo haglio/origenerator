@@ -87,17 +87,21 @@ def source_image_id_in(row: dict, image_index: dict) -> str | None:
     ``image_index`` (see :func:`build_image_config_index`) rather than searched
     for: what a walk of the whole library asks of every video in it. ``None``
     for a row with no input image, or one no indexed generation produced."""
-    entry = _start_frame_entry(row, image_index)
+    return source_image_id_of(_start_frame_of(row), image_index)
+
+
+def source_image_id_of(input_image: str | None, image_index: dict) -> str | None:
+    entry = image_index.get(_frame_name(input_image))
     return (entry.prompt_id or None) if entry is not None else None
 
 
 def rebuildable_source_image_id_in(row: dict, image_index: dict) -> str | None:
-    entry = _start_frame_entry(row, image_index)
+    entry = image_index.get(_frame_name(_start_frame_of(row)))
     return (entry.prompt_id or None) if entry is not None and entry.rebuildable else None
 
 
-def _start_frame_entry(row: dict, image_index: dict) -> _ImageConfig | None:
-    return image_index.get(_frame_name(parse_params(row.get("params_json")).get("input_image")))
+def _start_frame_of(row: dict) -> str | None:
+    return parse_params(row.get("params_json")).get("input_image")
 
 
 def image_lent_by(prompt_id: str, row_of: Callable[[str], dict | None],

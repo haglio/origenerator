@@ -89,11 +89,13 @@ class ZoneItems(FilesOnly):
         return super().preview(held)
 
     def _row_of(self, held: str) -> dict | None:
-        path = self.path_of(held)
-        kind = media_type_from_filename(path.name) if path is not None else None
-        if kind is None:
-            return None
-        prompt_id = gallery.generation_of_file(path, self._library.now().rows_of(kind))
+        library = self._library.now()
+        kind = media_type_from_filename(reference_basename(unannotated(held)))
+        if kind == MediaType.IMAGE:
+            prompt_id = gallery.source_image_id_of(held, library.image_config_index)
+        else:
+            path = self.path_of(held) if kind is not None else None
+            prompt_id = gallery.generation_of_file(path, library.rows_of(kind)) if path else None
         return self._db.get_generation(prompt_id) if prompt_id else None
 
     def _still_of(self, path: Path) -> str | None:

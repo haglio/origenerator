@@ -118,8 +118,8 @@ from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
     queue_wait_text,
-    stop_loop_text,
-    stop_loop_tooltip,
+    stop_auto_generate_text,
+    stop_auto_generate_tooltip,
 )
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.job_queue import JobQueue
@@ -383,9 +383,9 @@ class GalleryView(QWidget):
         self._poll_timer.start()
 
     def _build_the_queue_of_runs(self, db, client):
-        """The generation queue: the controller that owns the live jobs, the loop
-        that keeps one folder generating, and what each of those has to remember
-        between launches.
+        """The generation queue: the controller that owns the live jobs,
+        Auto-Generate, which keeps one folder generating, and what each of those
+        has to remember between launches.
         """
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
@@ -398,14 +398,14 @@ class GalleryView(QWidget):
         self._jobs.failed.connect(self._on_reroll_failed)
         self._jobs.run_ended.connect(self.run_ended)
         self._generation_failed = GenerationFailed(self)
-        # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
-        # the next variation each time one finishes, until stopped or one fails.
+        # Auto-Generate is that same re-roll, again and again: launch the next
+        # variation each time one finishes, until stopped or one fails.
         self._auto = AutoGenerateController(self._start_auto_reroll)
         self._auto.stopped.connect(self._on_auto_stopped)
         # The workflow and settings each folder's Auto-Generate runs on, read
         # from the folder as it starts.
         self._auto_generate_settings: dict = {}
-        # The runs the loop launched, by the id each began under. A loop is left
+        # The runs Auto-Generate launched, by the id each began under. It is left
         # running while the user works, so what it makes is the gallery's, not any
         # tab's: no tab shows its frames or its result (see :meth:`_start_auto_reroll`).
         self._auto_origins: set[str] = set()
@@ -775,7 +775,7 @@ class GalleryView(QWidget):
                 redo=self._redo,
                 start_slideshow=self._slideshows.start,
                 toggle_auto=self._toggle_auto,
-                go_to_looping_folder=self._go_to_looping_folder,
+                go_to_auto_generating_folder=self._go_to_auto_generating_folder,
                 favorite=self._favorite_selection,
                 enhance=self._enhance.enhance_the_selection,
                 group=self._group_selection,
@@ -1236,7 +1236,7 @@ class GalleryView(QWidget):
         A tab follows the *oldest still alive* of its own runs — the one nearest to
         being made, and so the one its button discards — across a chained i2v's
         hand-off, which is two prompts but one run. Launches from outside a tab —
-        the folder tile's "+", the auto loop — are claimed by the tab looking at
+        the folder tile's "+", Auto-Generate — are claimed by the tab looking at
         that same folder (:meth:`_claim_launch`), so they light it up too.
 
         Idempotent — driven by every re-roll lifecycle change and by switching the
@@ -1255,7 +1255,7 @@ class GalleryView(QWidget):
         self._combine.reconcile_generating()
 
     def _auto_generating(self, job) -> bool:
-        """Whether ``job``'s own folder is auto-looping — so the button that throws
+        """Whether ``job``'s own folder is auto-generating — so the button that throws
         the run away reads "Next seed" instead of "Cancel". Its folder, not the
         front tab's: the label has to match what pressing it actually does."""
         key = self._job_folder_key(job)
@@ -1271,8 +1271,8 @@ class GalleryView(QWidget):
                      if job in jobs), None)
 
     def _claim_launch(self, key: str):
-        """Give a run launched outside any tab — the folder tile's "+", the auto
-        loop — to the front config tab when that tab is showing the same folder.
+        """Give a run launched outside any tab — the folder tile's "+",
+        Auto-Generate — to the front config tab when that tab is showing the same folder.
 
         Unclaimed, such a run belonged to no tab at all, so the tab looking
         straight at it showed neither the discard button nor a filling Generate
@@ -1370,7 +1370,7 @@ class GalleryView(QWidget):
         saying whether the tree had a row to open at all.
 
         The ways here are one move — a Generate, a folder's prompt rewrite, a
-        combine's launch, the looping-folder link, a click on an in-flight card —
+        combine's launch, the Auto-Generate tip's link, a click on an in-flight card —
         and in all of them the open is a step on the way to that run's tile rather
         than somewhere browsed to. So it lands on no saved item of its own
         (:meth:`_land_on_the_first_item`): one loaded here would paint a picture
@@ -1625,7 +1625,7 @@ class GalleryView(QWidget):
         # not: a rebuild used to empty the front tab's preview outright and count on
         # that re-pick to paint it back, so a tab showing anything the gallery
         # wasn't pointed at went blank every time a generation landed — once per
-        # variation of a running loop. Only what has actually gone (a deleted or
+        # variation Auto-Generate makes. Only what has actually gone (a deleted or
         # trashed item) is taken off a tab now.
         self._selected_row = None
         self._info_tabs.reconcile_previews(self._live_ids)
@@ -1740,7 +1740,7 @@ class GalleryView(QWidget):
 
         The gallery's own selection only. The tabs keep what they were showing
         across a rebuild — one happens whenever anything lands, once per
-        variation of a running loop — and a tab is repainted only when the
+        variation Auto-Generate makes — and a tab is repainted only when the
         generation it shows changes under it or goes (see
         :meth:`InfoPaneTabs.refresh_displayed` and
         :meth:`InfoPaneTabs.reconcile_previews`). Painting the selection
@@ -2358,10 +2358,10 @@ class GalleryView(QWidget):
         about the same press.
 
         With one more entry the button has no room for: while the folder is
-        looping, that press is "Next seed" and nothing on the tile stops
+        auto-generating, that press is "Next seed" and nothing on the tile stops
         anything, so the menu carries the real stop too
-        (:func:`inflight.stop_loop_text`). The loop is ended first — a discard
-        while it is still on is the cue for the next seed.
+        (:func:`inflight.stop_auto_generate_text`). Auto-Generate is ended first — a
+        discard while it is still on is the cue for the next seed.
         """
         menu = QMenu(self)
         auto = self._auto.is_active(key)
@@ -2369,8 +2369,8 @@ class GalleryView(QWidget):
         discard.setToolTip(discard_run_tooltip(auto))
         stop = None
         if auto:
-            stop = menu.addAction(stop_loop_text())
-            stop.setToolTip(stop_loop_tooltip())
+            stop = menu.addAction(stop_auto_generate_text())
+            stop.setToolTip(stop_auto_generate_tooltip())
         chosen = menu.exec(global_pos)
         if chosen is discard:
             self._cancel_reroll(key)
@@ -2533,10 +2533,10 @@ class GalleryView(QWidget):
         return timing.estimate_seconds(self._db.recent_durations(job.workflow.name))
 
     def _start_auto_reroll(self, key: str) -> bool:
-        """The loop's own launch: the variation the tile's "+" would start, except
-        that nothing about it reaches a config tab.
+        """Auto-Generate's own launch: the variation the tile's "+" would start,
+        except that nothing about it reaches a config tab.
 
-        A loop is left running while the user works, so what it is making is not
+        Auto-Generate is left running while the user works, so what it is making is not
         what they are looking at. Its frames used to fill the info pane — that is,
         the preview of whichever tab was open, over the picture the user had put
         there — and its results landed in a tab too. Both belong to the folder's
@@ -2548,18 +2548,18 @@ class GalleryView(QWidget):
     def _start_reroll(self, key: str, *, from_auto: bool = False) -> bool:
         """Start a fresh variation for the folder ``key`` names and select it, so
         its live preview fills the info pane at once. Returns whether a variation
-        is now running for the folder — the auto-generate loop's cue that a launch
+        is now running for the folder — Auto-Generate's cue that a launch
         took hold, and its cue to stop when one can't.
 
-        The tile's "+" and the auto loop both come through here, and neither
+        The tile's "+" and Auto-Generate both come through here, and neither
         pressed a tab's Generate, so the run is offered to the tab showing that
         folder (:meth:`_claim_launch`) — otherwise it would run with no tab
         showing its progress or offering to discard it.
 
-        ``from_auto`` is the loop's launch (:meth:`_start_auto_reroll`), and the one
-        that goes up in no tab of its own: it takes the info pane only where the
-        user already had it on this folder's loop — watching one variation is
-        watching the next — and otherwise leaves there whatever they put there.
+        ``from_auto`` is Auto-Generate's launch (:meth:`_start_auto_reroll`), and the
+        one that goes up in no tab of its own: it takes the info pane only where the
+        user already had it on this folder's Auto-Generate — watching one variation
+        is watching the next — and otherwise leaves there whatever they put there.
 
         Skips a folder already re-rolling (or a missing client) without stealing
         the info pane — the same guard the controller enforces before launching.
@@ -2583,16 +2583,16 @@ class GalleryView(QWidget):
             # lands it.
             self._select_reroll(key)
         else:
-            self._note_auto_launch(key)  # its result is the loop's, not a tab's
+            self._note_auto_launch(key)  # its result is Auto-Generate's, not a tab's
             if self._selected_reroll_key == key:
-                # The lit tile stands for the loop: watching one variation is
+                # The lit tile stands for Auto-Generate: watching one variation is
                 # watching the next, and the tab following the folder gets the
                 # new run's frames by that key without being pointed at it again.
                 self._enter_reroll_selection(key)
         return self._jobs.has(key)
 
     def _note_auto_launch(self, key: str):
-        """Remember that the loop, not a tab, asked for the run just launched — so
+        """Remember that Auto-Generate, not a tab, asked for the run just launched — so
         no tab shows its result when it lands (:meth:`_on_reroll_finished`).
 
         Recorded by the id the run began under, the same name a tab knows its own
@@ -2609,12 +2609,12 @@ class GalleryView(QWidget):
     def _toggle_auto(self, checked: bool):
         """Start or stop auto-generating fresh variations.
 
-        Switching it on runs the open folder; switching it off stops the loop
+        Switching it on runs the open folder; switching it off stops Auto-Generate
         wherever it is running, since the lit switch means one is running rather
         than that this folder is the one running it (see :meth:`_sync_auto_button`).
         Cleanup runs in :meth:`_on_auto_stopped` either way.
         """
-        # The folder's own key, not the row's: a loop is filed with the jobs it
+        # The folder's own key, not the row's: Auto-Generate is filed with the jobs it
         # launches, and those are keyed by folder wherever it is being watched from.
         group = self.current_group()
         if not checked:
@@ -2645,11 +2645,11 @@ class GalleryView(QWidget):
                 workflow, filled_params(group.rows[0], workflow))
 
     def _on_auto_stopped(self, key: str):
-        """A folder's loop ended (toggled off or failed — a cancelled
+        """A folder's Auto-Generate ended (toggled off or failed — a cancelled
         variation doesn't end it): drop the settings it ran on."""
         self._auto_generate_settings.pop(key, None)
         if key == self._selected_reroll_key and key not in self._live_jobs:
-            # The pane was following this loop between variations; there is no next
+            # The pane was following this Auto-Generate between variations; there is no next
             # one to wait for now.
             self._clear_reroll_selection()
         self._re_aim()
@@ -2657,12 +2657,12 @@ class GalleryView(QWidget):
 
     def _sync_discard_buttons(self):
         """Re-label every button that throws a run away — the folder's live tile, the
-        lower strip's rows, each config tab's — after a loop started or ended.
+        lower strip's rows, each config tab's — after Auto-Generate started or ended.
 
         Nothing else repaints them at that moment: switching Auto on over a folder
         that is already generating launches nothing, so there is no re-roll change
         to ride, and the label would keep promising a stop that the press no longer
-        performs (or offering a next seed after the loop is off).
+        performs (or offering a next seed after Auto-Generate is off).
         """
         self._rerender_current_leaf()
         self._update_queue()
@@ -2699,10 +2699,10 @@ class GalleryView(QWidget):
     def drop_the_request(self) -> None:
         self._voice.drop_the_request()
 
-    def _go_to_looping_folder(self, _href: str):
-        """Follow the tip's link to whichever folder is looping right now.
+    def _go_to_auto_generating_folder(self, _href: str):
+        """Follow the tip's link to whichever folder Auto-Generate is running in.
 
-        Read at the click rather than baked into the link, so a loop that has
+        Read at the click rather than baked into the link, so an Auto-Generate that has
         since moved or ended takes the user to where it actually is, or nowhere.
         """
         key = self._auto.active_key()
@@ -2751,7 +2751,7 @@ class GalleryView(QWidget):
     def bank_state(self, enhance: Offer) -> BankState:
         """How the bank stands right now, gathered from the seams the buttons
         belong to: the trail, the undo stack, the tree's selection, the pictures
-        picked, the enhance settings, the slideshows, and the auto-generate loop.
+        picked, the enhance settings, the slideshows, and Auto-Generate.
 
         Assembled here because here is where those meet. Everything it reads is
         a question already asked by name, so the record can be written by hand in
@@ -2760,10 +2760,12 @@ class GalleryView(QWidget):
         can_go_back, can_go_forward = self._trail
         undo_label = self._actions.undo_label()
         redo_label = self._actions.redo_label()
-        looping = self._auto.active_key()
+        auto_generate_folder = self._auto.active_key()
         group = self.current_group()
-        loopable = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
-        elsewhere = looping is not None and looping != getattr(group, "key", None)
+        can_auto_generate = (isinstance(group, gallery.SettingsGroup)
+                             and self._can_reroll(group))
+        elsewhere = (auto_generate_folder is not None
+                     and auto_generate_folder != getattr(group, "key", None))
         return BankState(
             back=Button(enabled=can_go_back, tip="Back"),
             forward=Button(enabled=can_go_forward, tip="Forward"),
@@ -2783,27 +2785,28 @@ class GalleryView(QWidget):
             # yet, and a button that opens an empty slideshow is worse than no button.
             slideshow=Button(visible=self._slideshows.anything_to_play(),
                              tip=f"Play {self.slideshow_subject()} as a slideshow"),
-            # Lit means "a loop is running", in this folder or any other: clicking
-            # it off stops whichever folder has it, from wherever the user is.
-            # Greyed only when there is genuinely nothing to do. While the loop is
-            # elsewhere its clickable tip says so and the plain tooltip stands
+            # Lit means "Auto-Generate is running", in this folder or any other:
+            # clicking it off stops whichever folder has it, from wherever the user is.
+            # Grayed only when there is genuinely nothing to do. While Auto-Generate
+            # is elsewhere its clickable tip says so and the plain tooltip stands
             # down, so only one of the two ever appears.
-            auto=Button(enabled=loopable or looping is not None,
-                        tip="" if elsewhere else self._auto_tip(loopable, looping),
-                        checked=looping is not None),
+            auto=Button(enabled=can_auto_generate or auto_generate_folder is not None,
+                        tip="" if elsewhere else self._auto_tip(can_auto_generate,
+                                                                auto_generate_folder),
+                        checked=auto_generate_folder is not None),
             auto_tip=AUTO_ELSEWHERE_TIP if elsewhere else "",
         )
 
     @staticmethod
-    def _auto_tip(loopable: bool, looping: str | None) -> str:
-        """What the Auto toggle says it will do, for every case but the loop being
-        elsewhere — that one is the clickable tip's to say."""
-        if looping is not None:
+    def _auto_tip(can_auto_generate: bool, auto_generate_folder: str | None) -> str:
+        """What the Auto toggle says it will do, for every case but Auto-Generate
+        running elsewhere — that one is the clickable tip's to say."""
+        if auto_generate_folder is not None:
             return "Auto-generate is running in this folder — click to stop it"
         return (
             "Auto-generate: repeatedly generate variations of this folder "
             "until toggled off"
-            if loopable else
+            if can_auto_generate else
             "Auto-generate: open a settings folder to generate variations of it"
         )
 
@@ -3255,8 +3258,8 @@ class GalleryView(QWidget):
     def _cancel_reroll(self, key: str):
         """The live tile's button: drop the variation it leads with.
 
-        An auto loop survives it and launches the next seed at once — cancel
-        discards the run, only the Auto toggle stops the loop. Told *after* the
+        Auto-Generate survives it and launches the next seed at once — cancel
+        discards the run, only the Auto toggle stops Auto-Generate. Told *after* the
         drop, so the relaunch doesn't see the job it is replacing and no-op.
         """
         self._jobs.cancel(key)
@@ -3267,10 +3270,10 @@ class GalleryView(QWidget):
         """Throw away one named run — a queue row's button, and a config tab's.
 
         A folder can hold several runs at once, so the one to drop is named rather
-        than inferred from its folder; the redraw afterwards is the same. An auto
-        loop in that folder takes it as a discarded seed and launches the next —
+        than inferred from its folder; the redraw afterwards is the same.
+        Auto-Generate in that folder takes it as a discarded seed and launches the next —
         after the drop, and a no-op while another of the folder's runs is still
-        alive (:meth:`_start_reroll`), so the loop never doubles up.
+        alive (:meth:`_start_reroll`), so Auto-Generate never doubles up.
         """
         key = self._job_folder_key(self._jobs.job_for_prompt(prompt_id))
         self._jobs.cancel_job(prompt_id)
@@ -3288,7 +3291,7 @@ class GalleryView(QWidget):
         """A run in folder ``key`` ended with nothing to show (cancelled or
         failed): its tile stops being the selected item; and once the folder has
         no run left, the tabs following it put their own pictures back. While it
-        still has one — the next of a batch, the loop's next seed — they keep
+        still has one — the next of a batch, Auto-Generate's next seed — they keep
         following, since that run's frames are what comes next."""
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()
@@ -3305,7 +3308,7 @@ class GalleryView(QWidget):
         # Which tab that is, read now: the rebuild below reconciles the finish, and
         # a tab lets go of its runs as they end. A launch no tab made — the folder
         # tile's "+" — has no owner unless a tab on that very folder claimed it, and
-        # a variation the loop made has none at all: it is not what the user is
+        # a variation Auto-Generate made has none at all: it is not what the user is
         # working on, so it never takes a tab's preview over.
         run = origin or prompt_id
         launcher = (None if run in self._auto_origins
@@ -3316,7 +3319,7 @@ class GalleryView(QWidget):
                 and finished_row.get("source") == GenerationSource.EXPERIMENT):
             # A background experiment landed: it waits in the Experiments collection
             # for review rather than moving the user's view — no front-tab load,
-            # no slideshow feed, no auto-loop or combine bookkeeping.
+            # no slideshow feed, no Auto-Generate or combine bookkeeping.
             self.refresh()
             return
         folded = False
@@ -3333,8 +3336,8 @@ class GalleryView(QWidget):
                 # A slideshow that asked for this one swaps the slide for it.
                 self._slideshows.note_enhanced(finished_row)
         self._combine.send_to_genau_if_requested(finished_row)
-        # The tile stops being the selected item — unless a loop is running here,
-        # where the key stands for the loop rather than for this one variation:
+        # The tile stops being the selected item — unless Auto-Generate is running
+        # here, where the key stands for it rather than for this one variation:
         # someone watching it churn is watching what it does next, so the
         # selection waits for the variation after this one (see :meth:`_start_reroll`).
         if key == self._selected_reroll_key and not self._auto.is_active(key):
@@ -3360,7 +3363,7 @@ class GalleryView(QWidget):
                 self._tree.setCurrentItem(item)
         self._enhance.forget(prompt_id)  # a run that is over is nobody's enhance
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
-        self._auto.note_finished(key)  # if auto-looping this folder, launch the next
+        self._auto.note_finished(key)  # if auto-generating in this folder, launch the next
         self._enhance.enhance_when_wanted(finished_row)  # while the Auto switch is on
         self._re_aim()  # a landed enhance may retire the button
         self._enhance.reconcile()  # the live tile gives way to the level
@@ -3384,7 +3387,7 @@ class GalleryView(QWidget):
         """The run a tab was following has landed: put its picture where its live
         frames were, in every tab following folder ``key``.
 
-        Without this a tab watching a loop — or a fullscreen slideshow opened over
+        Without this a tab watching Auto-Generate — or a fullscreen slideshow opened over
         those frames — would sit on the last partial frame of a run that has
         finished. Only the preview changes: the tab holds no more of a run it
         didn't ask for. The ``launcher`` is skipped, having just been given the
@@ -3399,7 +3402,7 @@ class GalleryView(QWidget):
     def _on_reroll_failed(self, key: str, message: str = ""):
         """A re-roll failed (recorded by the controller): let go of it wherever it
         was being watched, redraw the folder without its tile, and SAY SO."""
-        self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
+        self._auto.note_failed(key)  # end Auto-Generate rather than spin on a broken workflow
         self._after_a_job_ended_unfinished(key)
         self._generation_failed.say(format_execution_error(message))
 

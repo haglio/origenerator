@@ -93,6 +93,12 @@ for one thing cost four. So:
   are other things, and keep their words. A folder with no folders inside
   it, and so no caret, is a **leaf folder**: the settings folders at the
   end of each path, which hold the items themselves.
+- **A running Auto-Generate is Auto-Generate, never a loop.** Loop is the
+  slideshow's word, for playing one row of its map over and over ("Loop
+  off" says it stopped). The code called a running Auto-Generate "the
+  loop", an agent repeated the word to the user, and he had to ask what it
+  meant. So the code names it after the button, and so does every message
+  to him.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 
@@ -422,8 +428,8 @@ console, and fails on one that neither a key of the table nor its short list
 of things that are no setting accounts for. So a new control is finished
 when it has its key, or its line there saying why it is no setting -- what is
 being searched for, what one picture shows, a nudge, and Auto-generate, which
-a restart leaves off, since a loop that came back on by itself could run
-unnoticed.
+a restart leaves off, since an Auto-Generate that came back on by itself
+could run unnoticed.
 
 Inside a Fun Time session the window draws what the session asks for -- one
 list per shape, its own borders held still, the room's device and sound --

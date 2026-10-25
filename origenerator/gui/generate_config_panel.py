@@ -986,7 +986,7 @@ class GenerateConfigPanel(QWidget):
         """Reflect whether a run of this config's folder is in flight.
 
         All it moves is the discard button. ``auto_generating`` says the run's
-        folder is auto-looping, which reads that button as "Next seed" rather than
+        folder is auto-generating, which reads that button as "Next seed" rather than
         "Cancel" (see :func:`inflight.discard_run_text`) — re-labeled ahead of the
         idempotence guard below, because the Auto toggle flips mid-run without the
         generating state ever changing.

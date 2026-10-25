@@ -2,7 +2,7 @@
 
 Not rendering, and it had grown into the pane's largest function by nearly three
 to one -- it joins the generations table, the requests table, the controller's
-live jobs and its queue order, the auto-generate loop, the folder tree and a
+live jobs and its queue order, Auto-Generate, the folder tree and a
 thumbnail index, and builds a twenty-field record per running row.
 The pane held it only because that is where the first consumer lived; three
 surfaces read these items now.
@@ -150,8 +150,8 @@ class InFlightItems:
                 cancel=cancel,
                 shield=shield,
                 shielded=shielded,
-                # Its folder auto-looping makes that button "Next seed": the press
-                # discards this run and the loop launches another. A menu can
+                # Its folder auto-generating makes that button "Next seed": the press
+                # discards this run and Auto-Generate launches another. A menu can
                 # offer the real stop beside it, which is what stop_auto is for.
                 auto_generating=self._auto.is_active(folder_key),
                 stop_auto=stop_auto,
@@ -239,7 +239,7 @@ class InFlightItems:
         settings, or an enhancement, whose product folds into the row it enhanced
         rather than landing anywhere) has no node in the tree at all and answers
         with nothing, which the row draws as no block rather than an empty grid.
-        ``cache`` memoizes for the length of one pass, since an auto-generate loop
+        ``cache`` memoizes for the length of one pass, since Auto-Generate
         fills the line with jobs from a single folder.
         """
         if folder_key not in cache:

@@ -401,7 +401,7 @@ class QueueRow(OpensAFolder, QWidget):
     line of text beside it starts at the same place on every row.
 
     The second button reads "Cancel", or "Next seed" for a job whose folder is
-    auto-generating — where the press discards the seed and the loop starts
+    auto-generating — where the press discards the seed and Auto-Generate starts
     another (:func:`inflight.discard_run_text`).
 
     A press-and-release opens the job's folder, and so does a double-click

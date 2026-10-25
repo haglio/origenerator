@@ -155,7 +155,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     landing on the generation that file copies is `go_to_file` -- the gallery's
     rows and a `follow_link`, which nothing outside it holds both of. 268 -> 267:
     a discarded seed's relaunch comes before the folder's redraw, so the tab
-    following the loop keeps following it, and the drop and the redraw that
+    following Auto-Generate keeps following it, and the drop and the redraw that
     `_drop_reroll` wrapped for its one caller are that caller's own lines. And the
     pane 77 -> 83: every folder of folders has its own five collections, so a collection's
     rows are asked for a folder as well as a side -- a side's placement of its
@@ -200,7 +200,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     and at each crossing. 275 -> 276: a folder Auto-Generate runs in takes a
     star, as a folder dropped onto Favorites does, so putting a folder's star
     where it is asked to be -- which the star's own toggle, that drop and the
-    loop all ask -- is one method. 276 -> 277: a spoken "animate as" is
+    Auto-Generate all ask -- is one method. 276 -> 277: a spoken "animate as" is
     Combine's to answer, through a forwarder of its own. 277 -> 276: "genau it"
     went with the prompt-read act it ran on, so that one forwarder answers every
     spoken animation. And the pane 88 -> 87: work in flight already sits in its

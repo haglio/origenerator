@@ -74,7 +74,7 @@ def test_a_queued_tile_says_waiting_over_the_picture(qtbot):
 
 
 def test_an_auto_generating_folders_tile_says_next_seed(qtbot):
-    # Pressing it there discards the seed and the loop starts another, so "Cancel"
+    # Pressing it there discards the seed and Auto-Generate starts another, so "Cancel"
     # would promise a stop that never comes.
     tile = GeneratingTile(FakeJob(state="running"), auto_generating=True)
     qtbot.addWidget(tile)

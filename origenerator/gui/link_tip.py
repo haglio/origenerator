@@ -72,7 +72,7 @@ class LinkTip(QObject):
         """What the tip says, as rich text — ``""`` to have no tip at all.
 
         Taking the text away closes an open one: the reason it was worth clicking
-        into (a loop running elsewhere, say) has ended, and a stale offer to go
+        into (Auto-Generate running elsewhere, say) has ended, and a stale offer to go
         somewhere is worse than none.
         """
         self._html = html or ""

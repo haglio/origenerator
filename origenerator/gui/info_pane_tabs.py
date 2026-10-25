@@ -525,10 +525,10 @@ class InfoPaneTabs(QTabWidget):
         """The tab that launched the run beginning at ``origin``, or ``None``.
 
         A run's result belongs to the tab that asked for it; every other tab is
-        left alone, including the pane's resting tab, which an auto-generate loop
+        left alone, including the pane's resting tab, which Auto-Generate
         used to fill with a picture nothing in it had asked for — leaving it no
-        longer blank, so the next clicked generation opened a tab beside it and a
-        loop running while the user browsed grew a row of them.
+        longer blank, so the next clicked generation opened a tab beside it, and
+        Auto-Generate running while the user browsed grew a row of them.
 
         Read *before* the finish is reconciled: a tab lets go of its runs as they
         end (see ``GalleryView._reconcile_generating``).

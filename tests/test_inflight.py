@@ -23,8 +23,8 @@ from origenerator.gui.inflight import (
     queue_wait_text,
     seconds_until_start,
     starting_row_text,
-    stop_loop_text,
-    stop_loop_tooltip,
+    stop_auto_generate_text,
+    stop_auto_generate_tooltip,
 )
 
 
@@ -97,7 +97,7 @@ def test_the_hover_names_who_asked_when_it_was_not_a_press_of_generate():
                                      act="beta")).splitlines()
     assert lines[1:] == [
         "The “beta” act, picked in Combine",
-        "Queued by its folder's auto-generate loop",
+        "Queued by its folder's Auto-Generate",
         "Queued by a request — spoken, or one image of a request made of a whole folder",
     ]
 
@@ -138,8 +138,9 @@ def test_the_discard_hover_says_which_of_the_two_the_press_will_do():
 
 
 def test_the_menu_carries_the_act_the_button_has_no_room_for():
-    assert stop_loop_text() == "Cancel and stop auto-generating"
-    assert stop_loop_tooltip() == "Throw this run away and switch the loop off"
+    assert stop_auto_generate_text() == "Cancel and stop auto-generating"
+    assert stop_auto_generate_tooltip() == (
+        "Throw this run away and switch Auto-Generate off")
 
 
 # --- the waits -----------------------------------------------------------

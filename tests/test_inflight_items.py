@@ -2,7 +2,7 @@
 
 Which is what the move buys: this is a join over four sources — the generations
 table, the requests table, the controller's live jobs with its queue order, the
-auto-generate loop, the folder tree — and it used to be the largest function
+Auto-Generate, the folder tree — and it used to be the largest function
 inside a 1,400-line rendering class, reachable only by building one.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
@@ -91,14 +91,14 @@ class FakeTraining:
 
 
 class FakeAuto:
-    def __init__(self, looping=()):
-        self._looping = set(looping)
+    def __init__(self, auto_generating=()):
+        self._auto_generating = set(auto_generating)
 
     def is_active(self, key):
-        return key in self._looping
+        return key in self._auto_generating
 
     def stop(self, key):
-        self._looping.discard(key)
+        self._auto_generating.discard(key)
 
 
 class FakeTree:
@@ -112,12 +112,12 @@ class FakeTree:
 @pytest.fixture
 def build():
     def make(rows=(), *, requests=(), jobs_by_folder=None, order=(),
-             looping=(), image_rows=(), groups=None, cancelled=None, revealed=None,
+             auto_generating=(), image_rows=(), groups=None, cancelled=None, revealed=None,
              went_to=None, shielded=None, training=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
             jobs=FakeJobQueue(jobs_by_folder, order, training),
-            auto=FakeAuto(looping),
+            auto=FakeAuto(auto_generating),
             tree=FakeTree(groups),
             image_rows=lambda: list(image_rows),
             on_cancel=(cancelled if cancelled is not None else lambda _p: None),
@@ -231,10 +231,10 @@ def test_a_trainings_row_offers_no_shield_since_nothing_is_sent_while_it_runs(bu
     assert (items[0].shield, items[0].shielded) == (None, False)
 
 
-def test_a_looping_folders_run_offers_next_seed_rather_than_stop(build):
+def test_an_auto_generating_folders_run_offers_next_seed_rather_than_stop(build):
     key = "image/sdxl_t2i/aaa"
     items = build([_row("g1", status="running")],
-                  jobs_by_folder={key: [FakeJob("g1")]}, looping=[key])
+                  jobs_by_folder={key: [FakeJob("g1")]}, auto_generating=[key])
 
     assert items[0].auto_generating
     assert items[0].stop_auto is not None

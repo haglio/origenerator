@@ -75,7 +75,7 @@ NO_SETTING = {
         view._search.field, *_within(view._find_bar), *_within(view._folder_path)],
     "what one item shows, which the library keeps with the item": lambda view: [
         widget for panel in _tabs(view) for widget in _within(panel._action)],
-    ("Auto-generate, which a restart leaves off, since a loop that came back on by itself"
+    ("Auto-Generate, which a restart leaves off, since one that came back on by itself"
      " could run unnoticed"): lambda view: [view._bank.auto],
 }
 

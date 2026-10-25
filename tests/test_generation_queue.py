@@ -488,14 +488,15 @@ def test_cancel_is_hidden_on_a_job_that_cannot_be_stopped_from_here(queue):
 
 
 def test_a_row_from_an_auto_generating_folder_says_next_seed(queue):
-    # The press discards that seed and its folder's loop starts another, so the
-    # row says what it gets you — one folder looping doesn't re-label the others.
+    # The press discards that seed and Auto-Generate in its folder starts another,
+    # so the row says what it gets you — one folder auto-generating doesn't
+    # re-label the others.
     queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True),
                      _item(key="b", status="queued", cancel=lambda: None)])
     assert [row._cancel.text() for row in queue.rows()] == ["Next seed", "Cancel"]
 
 
-def test_a_row_relabels_in_place_when_its_folders_loop_is_switched_off(queue):
+def test_a_row_relabels_in_place_when_its_folders_auto_generate_is_switched_off(queue):
     # Auto off with the run still in flight: the same row's press is a plain cancel
     # again, and rows are updated in place rather than rebuilt.
     queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True)])
@@ -1066,8 +1067,8 @@ def test_a_row_leads_with_what_the_job_costs_and_what_it_is(queue):
 
 
 def test_a_row_says_when_nobody_typed_its_prompt(queue):
-    # The two kinds of job that pile up without being noticed: an auto-generate
-    # loop makes one every few seconds, and a spoken request never touched a form.
+    # The two kinds of job that pile up without being noticed: Auto-Generate
+    # makes one every few seconds, and a spoken request never touched a form.
     queue.set_items([_item(typical_seconds=30.0, job_kind="Image",
                            auto_generating=True, requested=True)])
     assert queue.rows()[0]._lead.text() == "~30 sec · Image · Auto · Request"

@@ -518,8 +518,8 @@ def test_set_generating_offers_cancel_and_leaves_generate_to_the_folder(panel):
 
 
 def test_the_discard_button_says_next_seed_while_the_folder_auto_generates(panel):
-    # Same button, honest label: with the folder looping, the press discards this
-    # seed and the loop starts another — nothing stops.
+    # Same button, honest label: with the folder auto-generating, the press discards
+    # this seed and Auto-Generate starts another — nothing stops.
     panel.set_generating(True, auto_generating=True)
     assert panel._cancel_btn.text() == "Next seed"
 

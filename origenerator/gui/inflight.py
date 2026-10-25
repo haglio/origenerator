@@ -16,8 +16,8 @@ a click of its own already.
 :func:`queue_wait_text` is here for the same reason: how a wait reads is one
 wording, shared by every surface that has to say it — as is
 :func:`discard_run_text`, the label on the button that throws the run in flight
-away, which three panes each draw, and :func:`stop_loop_text`, the menu entry
-beside it that ends the loop as well as the run.
+away, which three panes each draw, and :func:`stop_auto_generate_text`, the menu entry
+beside it that ends Auto-Generate as well as the run.
 """
 from __future__ import annotations
 
@@ -43,9 +43,9 @@ class InFlightItem:
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     shield: Callable[[bool], None] | None = None  # put its shield on or off, where cancel can stop it
     shielded: bool = False
-    auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
-    # End the loop its folder is on. What a menu's real stop calls before
-    # :attr:`cancel`, since discarding the run under a live loop only starts the
+    auto_generating: bool = False  # its folder auto-generates, so :attr:`cancel` means "next seed"
+    # End Auto-Generate in its folder. What a menu's real stop calls before
+    # :attr:`cancel`, since discarding the run while Auto-Generate is on only starts the
     # next one. ``None`` alongside a ``None`` cancel — a run this session holds no
     # job for is not one this session can stop either.
     stop_auto: Callable[[], None] | None = None
@@ -57,7 +57,7 @@ class InFlightItem:
     # a different question: which settings, not what it costs to ask for.
     job_kind: str = ""
     # A spoken "Request … over" queued this one, rather than a press of Generate
-    # or an auto-generate loop. Worth its own mark: it is the one kind of job the
+    # or Auto-Generate. Worth its own mark: it is the one kind of job the
     # user launched without looking at a form, and so the one they are most
     # likely to find in the line without recognizing it.
     requested: bool = False
@@ -113,7 +113,7 @@ def queue_lead_text(item: InFlightItem) -> str:
     combination edited before launching still says what it was asked for.
 
     The two marks at the end are only ever *added*: a job nobody typed a prompt
-    for is the kind that piles up unnoticed (an auto-generate loop makes one
+    for is the kind that piles up unnoticed (Auto-Generate makes one
     every few seconds, a folder-wide request a run per image at once), and a
     request is the kind that is easy not to recognize later. A hand-launched job
     says neither, and needs to say neither.
@@ -148,7 +148,7 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     if item.act:
         lines.append(f"The “{item.act}” act, picked in Combine")
     if item.auto_generating:
-        lines.append("Queued by its folder's auto-generate loop")
+        lines.append("Queued by its folder's Auto-Generate")
     if item.requested:
         lines.append("Queued by a request — spoken, or one image of a "
                      "request made of a whole folder")
@@ -224,7 +224,7 @@ def discard_run_text(auto_generating: bool) -> str:
     """The label on the button that throws away the run being made — one wording
     for the folder's live tile, the lower strip's rows, and the config pane.
 
-    While the folder is auto-generating, that press ends nothing: the loop takes
+    While the folder is auto-generating, that press ends nothing: Auto-Generate takes
     it as a discarded seed and launches another at once (see
     :meth:`AutoGenerateController.note_canceled`). "Cancel" would be a promise of
     a stop that doesn't come — only the Auto toggle stops — so there it reads
@@ -249,25 +249,25 @@ def clear_queue_tooltip(foreign: int) -> str:
             " queued on ComfyUI")
 
 
-def stop_loop_text() -> str:
-    """The menu entry that ends an auto-generate loop and the run inside it.
+def stop_auto_generate_text() -> str:
+    """The menu entry that ends Auto-Generate and the run inside it.
 
-    A button carries one act, so while the loop is on it carries the one the
+    A button carries one act, so while Auto-Generate is on it carries the one the
     press performs — "Next seed" — and there is nowhere left on that surface to
     ask for a stop: the only one was the Auto switch, which is in the header
     rather than on the card you are looking at. A menu has room for both, and
     this is the other one.
 
-    It says the loop goes off rather than reading "Cancel", because switching a
+    It says Auto-Generate goes off rather than reading "Cancel", because switching a
     standing instruction off is a bigger act than throwing one seed away, and it
     is not something to discover afterwards.
     """
     return "Cancel and stop auto-generating"
 
 
-def stop_loop_tooltip() -> str:
-    """The hover line for :func:`stop_loop_text`'s entry."""
-    return "Throw this run away and switch the loop off"
+def stop_auto_generate_tooltip() -> str:
+    """The hover line for :func:`stop_auto_generate_text`'s entry."""
+    return "Throw this run away and switch Auto-Generate off"
 
 
 def queue_wait_text(foreign_ahead: int | None, starts_at: float | None = None, *,

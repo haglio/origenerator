@@ -49,7 +49,7 @@ def _lit(color: str) -> str:
 _LIT = _lit(as_hex(BLUE))
 _LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(AMBER))
 
-# What the Auto switch's clickable tip says while the loop it would stop is
+# What the Auto switch's clickable tip says while the Auto-Generate it would stop is
 # running in some other folder. Naming that folder is no use when a name is a
 # short code with no branch attached to it, so the tip offers to go there.
 AUTO_ELSEWHERE_TIP = (
@@ -89,7 +89,7 @@ class BankState(NamedTuple):
     slideshow: Button
     auto: Button
     # The Auto switch's clickable tip, which stands in for its tooltip while the
-    # loop is running somewhere else: only one of the two ever appears.
+    # Auto-Generate is running somewhere else: only one of the two ever appears.
     auto_tip: str = ""
 
 
@@ -107,7 +107,7 @@ class BankActs(NamedTuple):
     redo: Callable[[], None]
     start_slideshow: Callable[[], None]
     toggle_auto: Callable[[bool], None]
-    go_to_looping_folder: Callable[[str], None]
+    go_to_auto_generating_folder: Callable[[str], None]
     favorite: Callable[[], None]
     enhance: Callable[[], None]
     group: Callable[[], None]
@@ -183,17 +183,17 @@ class ToolbarBank(QWidget):
             acts.start_slideshow)
         self.slideshow.hide()
         self.auto = _tool_button(
-            icons.autoloop_icon(),
+            icons.auto_generate_icon(),
             "Auto-generate: repeatedly generate variations of this folder until "
             "toggled off",
             acts.toggle_auto, checkable=True,
         )
         self.auto.setStyleSheet(_LIT)
-        # Never hidden: a loop runs until it is stopped, and a switch that went
-        # away with its folder left one running with nothing on screen to say so.
-        # It greys instead when there is nothing to do.
+        # Never hidden: Auto-Generate runs until it is stopped, and a switch that went
+        # away with its folder left it running with nothing on screen to say so.
+        # It grays instead when there is nothing to do.
         self.auto_tip = LinkTip(self.auto)
-        self.auto_tip.link_activated.connect(acts.go_to_looping_folder)
+        self.auto_tip.link_activated.connect(acts.go_to_auto_generating_folder)
         # Favorite, enhance, delete: the three things you can do to what is in front
         # of you, each aimed the same way — the picked thumbnails, else the
         # folder on screen. Colored, and grouped, because they are one set: gold

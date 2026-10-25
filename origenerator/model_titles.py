@@ -15,7 +15,7 @@ _FIX_LORA = re.compile(r"^(?P<part>.+) (?P<when>\d{4}-\d{2}-\d{2} \d{4})$")
 _read: dict[str, tuple[tuple[int, int], object]] = {}
 
 
-def _stem(value) -> str:
+def model_stem(value) -> str:
     name = reference_basename(str(value))
     for extension in MODEL_EXTENSIONS:
         if name.lower().endswith(extension):
@@ -32,21 +32,23 @@ def option_title(option) -> str:
 
 
 def model_title(value) -> str:
-    stem = _stem(value)
-    return _titles().get(stem) or _fix_title(value, stem) or stem
+    stem = model_stem(value)
+    return kept_by_stem(config.MODEL_TITLES_PATH).get(stem) or _fix_title(value, stem) or stem
+
+
+def is_a_fixs_lora(value) -> bool:
+    return PurePosixPath(str(value).replace("\\", "/")).parent.name == FIX_LORA_FOLDER
 
 
 def _fix_title(value, stem: str) -> str | None:
-    folder = PurePosixPath(str(value).replace("\\", "/")).parent.name
-    fix = _FIX_LORA.match(stem) if folder == FIX_LORA_FOLDER else None
+    fix = _FIX_LORA.match(stem) if is_a_fixs_lora(value) else None
     if fix is None:
         return None
     when = datetime.strptime(fix["when"], _FIX_LORA_STAMP)
     return f"{fix['part'].capitalize()} fix ({when:%Y-%m-%d %H:%M})"
 
 
-def _titles() -> dict[str, str]:
-    path = config.MODEL_TITLES_PATH
+def kept_by_stem(path) -> dict:
     try:
         stat = path.stat()
         stamp = (stat.st_mtime_ns, stat.st_size)

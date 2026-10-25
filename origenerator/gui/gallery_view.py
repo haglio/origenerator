@@ -90,7 +90,6 @@ from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.copy_names import copy_names, offer_copy_names
-from origenerator.gui.deferred import defer
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import EnhanceController, Offer
 from origenerator.gui.folder_path_header import FolderPathHeader
@@ -1176,15 +1175,7 @@ class GalleryView(QWidget):
         reason. ComfyUI outlives it and works through the rest alone; the next
         launch picks up whatever finished. Returns how many jobs went.
         """
-        self._generation_failed.hold_for_next_launch()
         return self._jobs.flush_to_server()
-
-    def generations_failed_as_it_closed(self) -> list[str]:
-        return list(self._generation_failed.held)
-
-    def say_generations_failed_as_it_closed(self, reasons: list[str] | None) -> None:
-        if reasons:
-            defer(self, lambda: self._generation_failed.say_each(reasons))
 
     def _on_experiments_toggled(self, _checked: bool):
         self._sync_experiments_bar()

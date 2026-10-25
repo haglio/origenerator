@@ -80,8 +80,6 @@ SESSION_UI_STATE = (
     # of small friction that makes a control feel unfinished.
     ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
     ("slideshows", GalleryView.remembered_slideshows, GalleryView.remember_slideshows),
-    ("generations_failed_as_it_closed", GalleryView.generations_failed_as_it_closed,
-     GalleryView.say_generations_failed_as_it_closed),
     ("how_many", GalleryView.how_many, GalleryView.set_how_many),
 )
 

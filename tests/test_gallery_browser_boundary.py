@@ -250,8 +250,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     header sets in ahead of the step's name, so the method that typed the star into
     that name went. 280 -> 276: what the app does with the graphics card while it
     is closed is started by Evolver, so the two batches the closing gallery queued,
-    and their two launch adapters, went to origenerator.downtime.)"""
+    and their two launch adapters, went to origenerator.downtime. 276 -> 274: a run
+    ComfyUI refuses as the app closes waits for the next launch to send it, so the
+    pair that kept its message for then went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 276
+               for x in _class_def(VIEW, "GalleryView").body) == 274
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 84

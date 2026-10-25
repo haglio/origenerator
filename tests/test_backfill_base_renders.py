@@ -426,6 +426,7 @@ def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
     window._gallery_view.select_generation("xyz")
 
     window.close()
+    window.hand_comfyui_what_runs_while_closed()
 
     assert json.loads(state_path.read_text())["gallery_selection"] == "xyz"
 

@@ -40,7 +40,7 @@ from origenerator.app import (
     resolve_comfyui_client_id,
 )
 from origenerator.app_state import AppState
-from origenerator.branch_session import LAUNCHER
+from origenerator.branch_session import ENV_FLAG, LAUNCHER
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
 from origenerator.db import Database
@@ -108,14 +108,37 @@ def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
     what makes it impossible -- nothing left for the walk -- in a real launch and a
     real close, which only a process of its own can show."""
     said = tmp_path / "owned when the application went.json"
-    state = tmp_path / "state"
-    ran = run_python(["-m", "tests.real_close", str(said)],
-                     env=os.environ | {"QT_QPA_PLATFORM": "offscreen",
-                                       "ORIGENERATOR_STATE_DIR": str(state)},
-                     logs=[state / "origenerator.log", state / "origenerator_crash.log"])
 
-    assert ran.returncode == 0, ran.stdout + ran.stderr
+    _opened_and_closed_for_real("tests.real_close", said, tmp_path / "state")
+
     assert json.loads(said.read_text(encoding="utf-8")) == {}
+
+
+def _opened_and_closed_for_real(child: str, said: Path, state: Path) -> None:
+    """Run *child*, a module that opens the app and closes it, on a state folder
+    of its own -- never as a preview, whose library is the production app's."""
+    not_a_preview = {name: value for name, value in os.environ.items() if name != ENV_FLAG}
+    ran = run_python(["-m", child, str(said)],
+                     env=not_a_preview | {"QT_QPA_PLATFORM": "offscreen",
+                                          "ORIGENERATOR_STATE_DIR": str(state)},
+                     logs=[state / "origenerator.log", state / "origenerator_crash.log"])
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+
+
+def test_a_close_puts_the_window_away_before_comfyui_is_handed_the_queue(tmp_path):
+    """Closing hands ComfyUI what the queue was still holding, one request at a
+    time, which can take many seconds. A window still on screen meanwhile is a
+    window frozen solid, so the window goes first, and only then is ComfyUI
+    asked for anything."""
+    said = tmp_path / "when.json"
+
+    _opened_and_closed_for_real("tests.real_close_handing_over", said, tmp_path / "state")
+
+    when = json.loads(said.read_text(encoding="utf-8"))
+    (asked_to_close,), (went,) = when["asked_to_close"], when["went"]
+    asked_once_closing = [asked for asked in when["asked"] if asked > asked_to_close]
+    assert asked_once_closing
+    assert all(asked > went for asked in asked_once_closing)
 
 
 def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(tmp_path):
@@ -492,29 +515,64 @@ def test_a_window_built_while_the_launch_was_canceled_is_put_away_unseen_as_a_qu
     quit_through_the_loop.assert_called_once_with(qapp)
 
 
+def _a_freeze_watch_saying_what_it_arms(events):
+    freeze_watch = MagicMock()
+    freeze_watch.end_the_process_if_the_close_sticks.side_effect = (
+        lambda: events.append("armed to end the process"))
+    freeze_watch.end_the_process_if_the_hand_over_sticks.side_effect = (
+        lambda: events.append("armed to end the hand-over"))
+    return freeze_watch
+
+
+def _a_window_saying_when_it_hands_comfyui_its_work(events):
+    window = MagicMock()
+    window.hand_comfyui_what_runs_while_closed.side_effect = (
+        lambda: events.append("handed ComfyUI its work"))
+    return window
+
+
 def test_a_window_put_away_unseen_ends_the_process_if_its_quit_sticks(qapp, monkeypatch):
     crash_log = object()
     monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: crash_log)
     screens = []
     events = []
-    freeze_watch = MagicMock()
-    freeze_watch.end_the_process_if_the_close_sticks.side_effect = (
-        lambda: events.append("armed to end the process"))
 
     def built_as_the_cancel_comes_in(*args, **kwargs):
         screens[0].reject()
-        return MagicMock()
+        return _a_window_saying_when_it_hands_comfyui_its_work(events)
 
     with _a_faked_boot([], **_real_loading_screens(screens), **{
         "origenerator.gui.main_window.OrigeneratorWindow":
             MagicMock(side_effect=built_as_the_cancel_comes_in),
-        "origenerator.freeze_watch.watch_the_window": MagicMock(return_value=freeze_watch),
+        "origenerator.freeze_watch.watch_the_window":
+            MagicMock(return_value=_a_freeze_watch_saying_what_it_arms(events)),
         "origenerator.app._run_the_loop_only_to_quit":
             MagicMock(side_effect=lambda app: events.append("quitting")),
     }):
         assert main([]) == 0
 
-    assert events == ["armed to end the process", "quitting"]
+    assert events == ["armed to end the process", "quitting", "armed to end the hand-over",
+                      "handed ComfyUI its work", "armed to end the process"]
+
+
+def test_handing_comfyui_its_work_after_the_window_goes_has_a_deadline_of_its_own(
+        qapp, monkeypatch):
+    """The close's own deadline is armed as the last window goes and is far
+    shorter than handing ComfyUI its work can take, so the hand-over gets one of
+    its own, and the rest of the close the close's again."""
+    monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: object())
+    events = []
+
+    with _a_faked_boot([], **{
+        "origenerator.gui.main_window.OrigeneratorWindow":
+            MagicMock(return_value=_a_window_saying_when_it_hands_comfyui_its_work(events)),
+        "origenerator.freeze_watch.watch_the_window":
+            MagicMock(return_value=_a_freeze_watch_saying_what_it_arms(events)),
+    }):
+        assert main([]) == 0
+
+    assert events == ["armed to end the hand-over", "handed ComfyUI its work",
+                      "armed to end the process"]
 
 
 def test_the_loop_run_only_to_quit_lets_go_of_everything_that_waits_on_a_quit():

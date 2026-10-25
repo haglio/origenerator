@@ -11,18 +11,21 @@ logger = logging.getLogger(__name__)
 
 STALLED_AFTER_S = 10.0
 CLOSED_WITHIN_S = 10.0
+HANDED_OVER_WITHIN_S = 30.0
 BEAT_MS = 1000
 
 
 class FreezeWatch(QObject):
     def __init__(self, crash_log, *, stalled_after_s: float = STALLED_AFTER_S,
                  closed_within_s: float = CLOSED_WITHIN_S,
+                 handed_over_within_s: float = HANDED_OVER_WITHIN_S,
                  beat_ms: int = BEAT_MS, clock=time.monotonic,
                  arm=faulthandler.dump_traceback_later, parent=None) -> None:
         super().__init__(parent)
         self._crash_log = crash_log
         self._stalled_after_s = stalled_after_s
         self._closed_within_s = closed_within_s
+        self._handed_over_within_s = handed_over_within_s
         self._clock = clock
         self._arm = arm
         self._last_beat = clock()
@@ -40,12 +43,19 @@ class FreezeWatch(QObject):
         self._rearm()
 
     def end_the_process_if_the_close_sticks(self) -> None:
+        self._end_the_process_unless_done(f"closing at {_now()}; if still closing",
+                                          within_s=self._closed_within_s)
+
+    def end_the_process_if_the_hand_over_sticks(self) -> None:
+        self._end_the_process_unless_done(f"handing ComfyUI its work at {_now()}; if still at it",
+                                          within_s=self._handed_over_within_s)
+
+    def _end_the_process_unless_done(self, said: str, *, within_s: float) -> None:
         self._beats.stop()
-        self._crash_log.write(f"=== closing at {_now()}; if still closing "
-                              f"{self._closed_within_s:.0f} s later, the stacks follow "
+        self._crash_log.write(f"=== {said} {within_s:.0f} s later, the stacks follow "
                               f"and the process is ended ===\n")
         self._crash_log.flush()
-        self._arm(self._closed_within_s, repeat=False, file=self._crash_log, exit=True)
+        self._arm(within_s, repeat=False, file=self._crash_log, exit=True)
 
     def _rearm(self) -> None:
         self._arm(self._stalled_after_s, repeat=False, file=self._crash_log, exit=False)

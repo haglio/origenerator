@@ -1424,6 +1424,7 @@ class GalleryView(QWidget):
         self._poll_timer.stop()
         self._intercept_the_rooms_keys(False)
         self.close_the_slideshows()
+        self._jobs.close()
         super().closeEvent(event)
 
     # --- data loading & live update ---------------------------------------

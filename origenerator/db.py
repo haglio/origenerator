@@ -174,6 +174,9 @@ class Database:
     def library_version(self) -> int:
         return self.generations.library_version()
 
+    def rows_made_by(self, workflow_name: str) -> list[dict]:
+        return self.generations.rows_made_by(workflow_name)
+
     def seed_history_rows(self) -> list[dict]:
         return self.generations.seed_history_rows()
 

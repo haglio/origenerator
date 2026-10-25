@@ -434,6 +434,15 @@ class GenerationStore(Store):
                                 (GenerationSource.REPLACED,)).fetchall()
         return [dict(row) for row in rows]
 
+    def rows_made_by(self, workflow_name: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM generations WHERE workflow_name = ? AND {_OF_A_KNOWN_SOURCE}"
+                " AND source != ? ORDER BY id DESC",
+                (workflow_name, *_KNOWN_SOURCES, GenerationSource.LEFT_OUT),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def library_paths(self) -> set[str]:
         with self._connect() as conn:
             lists = conn.execute("SELECT output_files FROM generations"

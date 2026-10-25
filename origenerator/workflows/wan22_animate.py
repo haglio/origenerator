@@ -17,9 +17,9 @@ from origenerator.workflows.base import (
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.driving_video import driven_actions, frames_within, start_frame
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
-from origenerator.workflows.lora_rows import lora_rows, picked_loras
+from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import WAN, WAN_ANIMATE
-from origenerator.workflows.model_files import NO_LORA, list_model_files
+from origenerator.workflows.model_files import list_model_files
 from origenerator.workflows.video_writer import video_writer
 
 # Comfy's own Animate template runs the model under this LoRA: six steps, no guidance.
@@ -43,7 +43,8 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
     derives_size_from_input = True
     derived_size_source = "video"
     model_keys = ("unet",)
-    lora_keys = ("lora",)
+    lora_keys = LORA_KEYS
+    loras_keyed_only_when_named = LORA_KEYS[1:]
     output_node_id = "24"
 
     def default_params(self) -> dict:
@@ -67,8 +68,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
             "vae_name": "wan_2.1_vae.safetensors",
             "clip_vision_name": "clip_vision_h.safetensors",
             "unet": "Wan2_2-Animate-14B_fp8_scaled_e4m3fn_KJ_v2.safetensors",
-            "lora": NO_LORA,
-            "lora_strength": 1.0,
+            **lora_defaults(LORA_KEYS),
         }
 
     def param_definitions(self) -> list[ParamDef]:
@@ -92,7 +92,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
             ParamDef("shift", "Composition Focus", ParamType.FLOAT, defaults["shift"], min_val=0.0, max_val=20.0,
                      step=0.5, good=(5, 12)),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=models),
-            *lora_rows(defaults, ("lora",), accepts=(WAN,)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(WAN,)),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),
@@ -124,7 +124,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
         plan = self.scene_plan(params)
         offsets = [chained_frames([length for length, _ in plan[:index]]) if index else 0
                    for index in range(len(plan))]
-        loras = self.lora_chain("6", ["5", 0], picked_loras(params, ("lora",)))
+        loras = self.lora_chain("6", ["5", 0], picked_loras(params, LORA_KEYS))
         sized = self.image_size_nodes(["13", 0], params)
         width, height = sized.width, sized.height
 

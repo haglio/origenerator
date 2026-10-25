@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
-from origenerator.workflows.lora_rows import lora_rows, picked_loras
+from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import KREA2
-from origenerator.workflows.model_files import NO_LORA, list_model_files
+from origenerator.workflows.model_files import list_model_files
 
 
 def _negative_conditioning(negative_prompt: str) -> dict:
@@ -25,7 +25,8 @@ class Krea2T2iWorkflow(WorkflowTemplate):
     display_name = "Krea 2 T2I"
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
-    lora_keys = ("lora",)
+    lora_keys = LORA_KEYS
+    loras_keyed_only_when_named = LORA_KEYS[1:]
     extra_enhance_keys = ("upscale_model",)
     output_node_id = "10"
     base_output_node_id = "11"
@@ -43,8 +44,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
             "sampler_name": "euler",
             "scheduler": "simple",
             "unet": "krea2_turbo_fp8_scaled.safetensors",
-            "lora": NO_LORA,
-            "lora_strength": 1.0,
+            **lora_defaults(LORA_KEYS),
             "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
             "vae": "qwen_image_vae.safetensors",
             "enhance": False,
@@ -62,7 +62,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
-            *lora_rows(defaults, ("lora",), accepts=(KREA2,)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(KREA2,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=512, max_val=2048, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=512, max_val=2048, step=16),
@@ -77,7 +77,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        loras = self.lora_chain("4", ["1", 0], picked_loras(params, ("lora",)))
+        loras = self.lora_chain("4", ["1", 0], picked_loras(params, LORA_KEYS))
         model_ref = loras.model
         tail: dict = {}
         saved_ref = ["9", 0]

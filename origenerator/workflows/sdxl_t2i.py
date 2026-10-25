@@ -7,6 +7,7 @@ from origenerator.workflows.base import (
     WorkflowTemplate,
     sampler_params,
 )
+from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
@@ -35,6 +36,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     display_name = "SDXL T2I"
     output_type = MediaType.IMAGE
     model_keys = ("checkpoint",)
+    lora_keys = loras_keyed_only_when_named = LORA_KEYS
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "7"
     base_output_node_id = "15"  # the pre-enhance render, saved when the tail runs
@@ -53,6 +55,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "scheduler": "normal",
             "denoise": 1.0,
             "checkpoint": "reapony_v80.safetensors",
+            **lora_defaults(LORA_KEYS),
             "vae": "sdxl_vae.safetensors",
             "enhance": False,
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
@@ -81,6 +84,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
                      options=checkpoints),
+            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL, SD15)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=64),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=64),
@@ -98,11 +102,12 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
+        loras = self.lora_chain("16", ["1", 0], picked_loras(params, LORA_KEYS), clip_ref=["1", 1])
         enhance_nodes: dict = {}
         enhanced_ref = ["6", 0]  # enhance off: save the plain decode
         if params.get("enhance"):
             tail = self.enhance_image_nodes(
-                image_ref=["6", 0], model_ref=["1", 0],
+                image_ref=["6", 0], model_ref=loras.model,
                 positive_ref=["2", 0], negative_ref=["3", 0], vae_ref=["8", 0],
                 params=params,
             )
@@ -112,13 +117,14 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
+            **loras.nodes,
             "2": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["1", 1], "text": params["positive_prompt"]},
+                "inputs": {"clip": loras.clip, "text": params["positive_prompt"]},
             },
             "3": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["1", 1], "text": params["negative_prompt"]},
+                "inputs": {"clip": loras.clip, "text": params["negative_prompt"]},
             },
             "4": {
                 "class_type": "EmptyLatentImage",
@@ -131,7 +137,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "5": {
                 "class_type": "KSampler",
                 "inputs": {
-                    "model": ["1", 0],
+                    "model": loras.model,
                     "positive": ["2", 0],
                     "negative": ["3", 0],
                     "latent_image": ["4", 0],

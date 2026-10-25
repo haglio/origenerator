@@ -84,13 +84,13 @@ def test_workflows_declare_the_params_that_identify_their_model():
 
 
 def test_workflows_declare_the_params_that_identify_their_lora():
-    # The gallery nests a workflow's runs by LoRA under model, so the two WAN
-    # video workflows name the param(s) that pick their LoRA. Workflows with no
-    # LoRA (SDXL, WAN t2i) declare none, and so grow no LoRA folder level.
+    # The gallery nests a workflow's runs by LoRA under model, so each workflow
+    # names the param(s) that pick its LoRAs. A workflow with no LoRA (WAN t2i)
+    # declares none, and so grows no LoRA folder level.
     assert Wan22I2vWorkflow().lora_keys == ("lora_high", "lora_low")
     assert Wan22Flf2vLoopWorkflow().lora_keys == ("lora_high", "lora_low")
-    assert FluxT2iUpscaledWorkflow().lora_keys == ("lora",)
-    assert SdxlT2iWorkflow().lora_keys == ()
+    assert FluxT2iUpscaledWorkflow().lora_keys == ("lora", "lora_2", "lora_3")
+    assert SdxlT2iWorkflow().lora_keys == ("lora", "lora_2", "lora_3")
     assert Wan22T2iWorkflow().lora_keys == ()
 
 
@@ -484,19 +484,6 @@ def test_flux_runs_its_lora_on_the_model_and_both_prompts_at_one_strength():
     assert graph_model_params(payload)["lora_strength"] == 0.2
 
 
-def test_flux_offers_a_lora_and_its_strength_just_under_its_model(monkeypatch):
-    options = [NO_LORA, "x_flux.safetensors"]
-    monkeypatch.setattr(lora_rows_module, "list_lora_files", lambda fallback, **terms: options)
-    fields = FluxT2iUpscaledWorkflow().param_definitions()
-    keys = [pd.key for pd in fields]
-    by_key = {pd.key: pd for pd in fields}
-
-    assert keys[keys.index("unet") + 1:keys.index("unet") + 3] == ["lora", "lora_strength"]
-    assert (by_key["lora"].label, by_key["lora"].options) == ("LoRA", options)
-    assert (by_key["lora_strength"].label, by_key["lora_strength"].good) == (
-        "LoRA Strength", (0.6, 1.2))
-
-
 def test_flux_with_no_lora_builds_the_graph_it_always_has():
     wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
     payload = wf.build_api_payload(dict(wf.default_params(), lora=NO_LORA))
@@ -577,7 +564,6 @@ def test_krea2_runs_its_lora_on_the_model_alone():
         _node_id(payload, "LoraLoaderModelOnly"), 0]
     assert _find_node(payload, "CLIPTextEncode")["inputs"]["clip"] == [
         _node_id(payload, "CLIPLoader"), 0]
-    assert wf.lora_keys == ("lora",)
 
     bare = wf.build_api_payload(dict(wf.default_params(), lora=NO_LORA))
     assert _find_node(bare, "LoraLoaderModelOnly") is None

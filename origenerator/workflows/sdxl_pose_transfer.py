@@ -9,6 +9,7 @@ from origenerator.workflows.base import (
     sampler_params,
 )
 from origenerator.workflows.derived_size import measure_derived_size
+from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
@@ -61,6 +62,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     output_type = MediaType.IMAGE
     derives_size_from_input = True
     model_keys = ("checkpoint",)
+    lora_keys = loras_keyed_only_when_named = LORA_KEYS
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "14"
     # The pre-enhance render, saved when the tail runs. 21 is the union
@@ -80,6 +82,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "scheduler": "normal",
             "denoise": 1.0,
             "checkpoint": "reapony_v80.safetensors",
+            **lora_defaults(LORA_KEYS),
             "vae": "sdxl_vae.safetensors",
             "control_mode": "depth",
             "controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
@@ -120,6 +123,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                      browse_dir=CUSTOM_POSES_DIR),
             ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
                      options=checkpoints),
+            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL, SD15)),
             ParamDef("control_mode", "Structure From", ParamType.COMBO, defaults["control_mode"],
                      options=["depth", "pose"]),
             ParamDef("controlnet", "Structure Model", ParamType.COMBO, defaults["controlnet"],
@@ -205,13 +209,14 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "7", "21", controlnet=params["controlnet"],
             head="openpose" if params["control_mode"] == "pose" else "depth",
         )
+        loras = self.lora_chain("25", ["4", 0], picked_loras(params, LORA_KEYS), clip_ref=["4", 1])
         enhance_nodes: dict = {}
         enhanced_ref = ["13", 0]  # enhance off: save the plain decode
         if params.get("enhance"):
             # The enhance pass re-samples on the ControlNet-applied conditioning
             # (node 9), so the upscale can't drift off the structure map.
             tail = self.enhance_image_nodes(
-                image_ref=["13", 0], model_ref=["4", 0],
+                image_ref=["13", 0], model_ref=loras.model,
                 positive_ref=["9", 0], negative_ref=["9", 1], vae_ref=["12", 0],
                 params=params,
             )
@@ -228,13 +233,14 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
+            **loras.nodes,
             "5": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["4", 1], "text": params["positive_prompt"]},
+                "inputs": {"clip": loras.clip, "text": params["positive_prompt"]},
             },
             "6": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["4", 1], "text": params["negative_prompt"]},
+                "inputs": {"clip": loras.clip, "text": params["negative_prompt"]},
             },
             "9": {
                 "class_type": "ControlNetApplyAdvanced",
@@ -259,7 +265,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "11": {
                 "class_type": "KSampler",
                 "inputs": {
-                    "model": ["4", 0],
+                    "model": loras.model,
                     "positive": ["9", 0],
                     "negative": ["9", 1],
                     "latent_image": ["10", 0],

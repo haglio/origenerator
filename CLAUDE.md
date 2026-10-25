@@ -70,6 +70,14 @@ for one thing cost four. So:
   and the clipboard. Genau's own videos are flicks in the code, and on
   screen they take the word the settings all of Haglio share give them,
   genau_flick_words.
+- **An item is an image or a video, and neither is a picture or a record.**
+  This code says "picture" all through it where it means an image, and
+  "record" where it means an item or the row behind one. Neither is the
+  user's word, and an agent who reads them here says them to him: a
+  loading-screen line read "Leaving one record per picture...", and he could
+  not tell what it meant. So an agent says image, video and item, to him and
+  on the screen. The code's "picture" is being renamed to "image", and a
+  "picture" that is not an image gets the name he gives it.
 - **Where the screen names nothing, the code takes the user's word.** The
   list of folders down the left of the gallery is the **TOC** (table of
   contents), and the marks that open and shut its folders are its

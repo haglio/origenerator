@@ -1,6 +1,7 @@
 import _winapi
 from pathlib import Path
 
+from origenerator import config
 from origenerator.output_places import OutputPlaces
 
 
@@ -43,6 +44,10 @@ def test_scripts_and_sounds_with_no_folder_of_their_own_stay_with_the_videos(tmp
     videos = tmp_path / "library" / "videos"
     assert places.folder("funscript/video") == videos / "funscript" / "video"
     assert places.folder("audio") == videos / "audio"
+
+
+def test_the_apps_places_name_the_trash_its_deletes_go_to():
+    assert config.OUTPUT_PLACES.trash == config.TRASH_DIR
 
 
 def test_with_no_library_folders_every_output_stays_in_comfyuis_own_folder(tmp_path):

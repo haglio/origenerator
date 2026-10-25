@@ -23,7 +23,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from origenerator.gallery.output import parse_file_list
+from origenerator.gallery.output import parse_file_list, with_files_renamed
 from origenerator.outside_videos import leave_out_for_good
 from origenerator.trash import TrashedBatch
 
@@ -121,10 +121,11 @@ def _trashed_path(record: dict, original: str) -> str:
 
 def restore(db, record: dict) -> str:
     """Put one held deletion back: its files return to the paths they were taken
-    from and its row rejoins the gallery verbatim. Returns the restored
-    prompt_id, so a caller can navigate to what it brought back."""
-    TrashedBatch.from_record(record.get("batch") or {}).restore()
-    db.restore_generation(record["row"])
+    from, or beside them under a new number where that name is taken, and its
+    row rejoins the gallery naming them. Returns the restored prompt_id, so a
+    caller can navigate to what it brought back."""
+    renamed = TrashedBatch.from_record(record.get("batch") or {}).restore()
+    db.restore_generation(with_files_renamed(record["row"], renamed))
     db.forget_deletion(record["prompt_id"])
     return record["prompt_id"]
 

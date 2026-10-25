@@ -70,6 +70,18 @@ def test_undo_restores_the_row_and_its_file(tmp_path):
     assert not actions.can_undo()
 
 
+def test_undoing_a_delete_after_a_newer_picture_took_its_name_lists_its_new_name(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    actions.delete_rows([_completed_row(db, output_dir, "p1", "alpha_t2i_00005_.png")])
+    (output_dir / "alpha_t2i_00005_.png").write_bytes(b"newer")
+
+    actions.undo()
+
+    assert json.loads(db.get_generation("p1")["output_files"]) == [
+        {"filename": "alpha_t2i_00006_.png", "subfolder": ""}]
+    assert (output_dir / "alpha_t2i_00005_.png").read_bytes() == b"newer"
+
+
 def test_undoing_a_delete_says_which_generation_came_back(tmp_path):
     # The view uses it to navigate back to the folder the delete emptied.
     actions, db, output_dir = _actions(tmp_path)
@@ -455,6 +467,17 @@ def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
     assert (tmp_path / "thumbs" / "e1.jpg").exists()
 
 
+def test_undoing_a_rejection_after_a_newer_picture_took_its_name_lists_its_new_name(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    actions.reject_experiment(_completed_row(db, output_dir, "e1", "alpha_t2i_00005_.png"))
+    (output_dir / "alpha_t2i_00005_.png").write_bytes(b"newer")
+
+    actions.undo()
+
+    assert json.loads(db.get_generation("e1")["output_files"]) == [
+        {"filename": "alpha_t2i_00006_.png", "subfolder": ""}]
+
+
 # --- deleting some of one image's versions ---------------------------------
 
 def _enhanced_row(db, output_dir, pid="p1"):
@@ -544,6 +567,30 @@ def test_undoing_a_version_delete_puts_it_back(tmp_path):
     assert restored["original_files"] == row["original_files"]
     assert restored["enhance_history"] == row["enhance_history"]
     assert (output_dir / "image" / "enhanced.png").read_bytes() == b"better"
+
+
+def test_undoing_a_version_delete_after_a_newer_picture_took_its_name_lists_its_new_name(
+        tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    _completed_row(db, output_dir, "p1", "alpha_t2i_00004_.png", subfolder="image")
+    (output_dir / "image" / "alpha_t2i_00005_.png").write_bytes(b"better")
+    db.update_generation(
+        "p1",
+        output_files=json.dumps([{"filename": "alpha_t2i_00005_.png", "subfolder": "image"},
+                                 {"filename": "alpha_t2i_00004_.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "alpha_t2i_00004_.png", "subfolder": "image"}]),
+        enhance_history=json.dumps([{"filename": "alpha_t2i_00005_.png", "params": {}}]),
+    )
+    actions.delete_enhance_levels(db.get_generation("p1"), ["alpha_t2i_00005_.png"])
+    (output_dir / "image" / "alpha_t2i_00005_.png").write_bytes(b"newer")
+
+    actions.undo()
+
+    restored = db.get_generation("p1")
+    assert [f["filename"] for f in json.loads(restored["output_files"])] == [
+        "alpha_t2i_00006_.png", "alpha_t2i_00004_.png"]
+    assert json.loads(restored["enhance_history"])[0]["filename"] == "alpha_t2i_00006_.png"
+    assert (output_dir / "image" / "alpha_t2i_00005_.png").read_bytes() == b"newer"
 
 
 def test_a_version_delete_leaves_the_row_thumbnail_alone(tmp_path):

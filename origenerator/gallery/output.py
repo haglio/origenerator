@@ -43,6 +43,24 @@ def row_output_files(row: dict) -> list[dict]:
     return parse_file_list(row.get("output_files"))
 
 
+_FILE_LISTS = ("output_files", "original_files", "enhance_history")
+
+
+def with_files_renamed(row: dict, renamed: dict[str, str]) -> dict:
+    """``row`` naming each of its files by the new name ``renamed`` gives it."""
+    if not renamed:
+        return row
+    return {**row, **{column: json.dumps([_renamed(entry, renamed)
+                                          for entry in parse_file_list(row[column])])
+                      for column in _FILE_LISTS if row.get(column)}}
+
+
+def _renamed(entry, renamed: dict[str, str]):
+    if not isinstance(entry, dict) or entry.get("filename") not in renamed:
+        return entry
+    return {**entry, "filename": renamed[entry["filename"]]}
+
+
 @lru_cache(maxsize=READINGS_KEPT)
 def frame_names_of(output_files: str | None) -> tuple[str, ...]:
     names = (frame_name(f.get("filename")) for f in parse_file_list(output_files))

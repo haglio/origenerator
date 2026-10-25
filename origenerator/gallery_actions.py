@@ -34,6 +34,7 @@ from origenerator.gallery import (
     remove_enhance_levels,
     resolve_preview,
 )
+from origenerator.gallery.output import with_files_renamed
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.undo_stack import UndoEntry, UndoStack
@@ -102,8 +103,7 @@ class GalleryActions:
 
         def undo() -> str | None:
             for row, batch in batches:
-                batch.restore()
-                self._db.restore_generation(row)
+                self._db.restore_generation(with_files_renamed(row, batch.restore()))
                 self._db.forget_deletion(row["prompt_id"])
             return batches[0][0]["prompt_id"]  # a restored item to navigate back to
 
@@ -149,8 +149,7 @@ class GalleryActions:
         self._redraw_thumbnail(prompt_id)
 
         def undo() -> str | None:
-            batch.restore()
-            self._db.update_generation(prompt_id, **before)
+            self._db.update_generation(prompt_id, **with_files_renamed(before, batch.restore()))
             self._redraw_thumbnail(prompt_id)
             return prompt_id
 
@@ -313,12 +312,12 @@ class GalleryActions:
         )
 
         def undo() -> str | None:
-            batch.restore()
+            restored = with_files_renamed(row, batch.restore())
             self._db.set_experiment_verdict(prompt_id, None)
             self._db.update_generation(
                 prompt_id,
-                output_files=row.get("output_files"),
-                thumbnail_path=row.get("thumbnail_path"),
+                output_files=restored.get("output_files"),
+                thumbnail_path=restored.get("thumbnail_path"),
             )
             return None  # back in the review collection, not in any folder
 

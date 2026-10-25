@@ -75,7 +75,7 @@ def test_fix_all_asks_for_every_part_there_is(text):
     "",
     ". . . .",
 ])
-def test_anything_else_is_left_for_prompt_steering(text):
+def test_anything_else_is_no_fix(text):
     assert match_fix_command(text) == ()
 
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from typing import NamedTuple
 
@@ -403,21 +402,13 @@ class GalleryView(QWidget):
         # the next variation each time one finishes, until stopped or one fails.
         self._auto = AutoGenerateController(self._start_auto_reroll)
         self._auto.stopped.connect(self._on_auto_stopped)
-        # Auto-generate holds a mutable copy of a folder's params per active loop so
-        # voice can steer the prompt mid-loop; turning Auto on is voice's "on" and
-        # begins always-listening steering of the current folder.
-        self._auto_working: dict = {}
-        self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
+        # The workflow and settings each folder's Auto-Generate runs on, read
+        # from the folder as it starts.
+        self._auto_generate_settings: dict = {}
         # The runs the loop launched, by the id each began under. A loop is left
         # running while the user works, so what it makes is the gallery's, not any
         # tab's: no tab shows its frames or its result (see :meth:`_start_auto_reroll`).
         self._auto_origins: set[str] = set()
-        # The matcher rides along so a spoken "fix teeth" or "start slideshow" is
-        # executed as a command rather than steering a prompt; the dictation
-        # collects "Request … over" across as many utterances as it takes. The
-        # bias teaches whisper all three vocabularies, without which a quiet
-        # mic's "fix <part>" — or the marker words the whole request hangs on —
-        # transcribe as other words entirely.
         # The folder whose running re-roll is the gallery's selected item (its
         # tile lit in the middle column), and that tile. Which tab shows the
         # run's frames full size is the tabs' own affair: a tab follows the
@@ -2577,21 +2568,11 @@ class GalleryView(QWidget):
             return False
         if key in self._live_jobs:
             return True  # one is already running for this folder
-        working = self._auto_working.get(key)
-        if working is not None:
-            # A voice-steered auto loop launches its (possibly edited) working prompt
-            # with fresh seeds. If the edit moved it to a different settings folder,
-            # re-home the loop there and remember to open that folder once it exists.
-            target = self._working_folder_key(working)
-            if target != key:
-                self._auto_working[target] = self._auto_working.pop(key)
-                self._auto.rekey(key, target)
-                self._voice.re_home(key, target)
-                self._set_folder_favorite(target, True)
-                self._pending_auto_key = target
-                key, working = target, self._auto_working[target]
-            params = randomize_seeds(working["params"], working["workflow"].seed_keys())
-            self._jobs.start_prepared(key, working["workflow"], params)
+        settings = self._auto_generate_settings.get(key)
+        if settings is not None:
+            workflow, params = settings
+            self._jobs.start_prepared(key, workflow,
+                                      randomize_seeds(params, workflow.seed_keys()))
         else:
             self._jobs.start_reroll(key, self.group_for_key(key), self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
@@ -2632,10 +2613,6 @@ class GalleryView(QWidget):
         wherever it is running, since the lit switch means one is running rather
         than that this folder is the one running it (see :meth:`_sync_auto_button`).
         Cleanup runs in :meth:`_on_auto_stopped` either way.
-
-        It no longer touches the microphone. A running loop is what gives voice a
-        prompt to steer, so an open mic starts steering when one begins — but the
-        mic itself is the button's, and only the button's.
         """
         # The folder's own key, not the row's: a loop is filed with the jobs it
         # launches, and those are keyed by folder wherever it is being watched from.
@@ -2648,60 +2625,33 @@ class GalleryView(QWidget):
         self._sync_discard_buttons()  # Cancel ⇄ Next seed, on all three surfaces
 
     def _begin_auto(self, key: str):
-        """Capture the folder's settings as the loop's working params, start the
-        loop and star the folder, giving an open mic a prompt to steer."""
-        self._capture_working(key)
+        """Read the workflow and settings the folder's Auto-Generate will run on,
+        start it and star the folder."""
+        self._capture_auto_generate_settings(key)
         self._auto.start(key)
         if self._auto.is_active(key):
-            self._voice.steer(key)  # steers this folder's prompt, if the mic is on
             self._set_folder_favorite(key, True)
         else:
-            self._auto_working.pop(key, None)  # the launch didn't take
+            self._auto_generate_settings.pop(key, None)  # the launch didn't take
 
-    def _capture_working(self, key: str):
-        """Hold the folder's settings as the loop's working params."""
+    def _capture_auto_generate_settings(self, key: str):
         group = (self.current_group() if key == self.selected_folder_key()
                  else self.group_for_key(key))
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
         workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
         if workflow is not None:
-            self._auto_working[key] = {
-                "workflow": workflow, "params": filled_params(group.rows[0], workflow),
-                "row": group.rows[0],
-            }
-
-    def working_prompts(self, key: str) -> dict:
-        params = self._auto_working.get(key, {}).get("params", {})
-        return {"positive": params.get("positive_prompt", ""),
-                "negative": params.get("negative_prompt", "")}
-
-    def steer_prompts(self, key: str, new_prompts: dict):
-        """A voice command rewrote the prompts: the loop's next launches use them."""
-        working = self._auto_working.get(key)
-        if working is not None:
-            working["params"]["positive_prompt"] = new_prompts.get("positive", "")
-            working["params"]["negative_prompt"] = new_prompts.get("negative", "")
-
-    def _working_folder_key(self, working: dict) -> str:
-        """The settings-folder key the working params now belong to — recomputed as
-        voice edits the prompt, so a steered loop can re-home to the matching folder."""
-        row = {**working["row"], "params_json": json.dumps(working["params"])}
-        return self.folder_key_of(row)
+            self._auto_generate_settings[key] = (
+                workflow, filled_params(group.rows[0], workflow))
 
     def _on_auto_stopped(self, key: str):
         """A folder's loop ended (toggled off or failed — a cancelled
-        variation doesn't end it): drop its working params and, if it was the one
-        being steered, leave voice with nothing to steer. The mic stays as the
-        button has it."""
-        self._auto_working.pop(key, None)
+        variation doesn't end it): drop the settings it ran on."""
+        self._auto_generate_settings.pop(key, None)
         if key == self._selected_reroll_key and key not in self._live_jobs:
             # The pane was following this loop between variations; there is no next
             # one to wait for now.
             self._clear_reroll_selection()
-        if key == self._voice.steering:
-            self._voice.steer(None)
-            self._pending_auto_key = None
         self._re_aim()
         self._sync_discard_buttons()  # the in-flight run's button is a Cancel again
 
@@ -3084,10 +3034,8 @@ class GalleryView(QWidget):
         """Run one slow call away from the UI and hand its result back here.
 
         A seam as much as a call: the suite replaces this with a straight-through
-        version, so a test can poll or launch and inspect in one breath rather
-        than pumping an event loop for every one. The poll and the combine's
-        match of an act to a video are both slow for the same reason — something on the other
-        end of a socket thinks for seconds — and both answer through here.
+        version, so a test can poll and inspect in one breath rather than pumping
+        an event loop for every tick.
         """
         run_off_thread(work, done, owner=self)
 
@@ -3403,13 +3351,6 @@ class GalleryView(QWidget):
             # back.
             self._info_tabs.refresh_displayed(finished_row, self._image_rows)
         self._show_landed_to_watchers(key, finished_row, launcher)
-        # A voice-steered loop that re-homed to a new-prompt folder: open it now that
-        # its first generation has given the folder a node.
-        if self._pending_auto_key is not None:
-            item = self._tree_item_for(self._pending_auto_key)
-            if item is not None:
-                self._pending_auto_key = None
-                self._tree.setCurrentItem(item)
         # A combine whose brand-new folder we parked off (on Recents) now has a
         # finished row, so the rebuild above gave that folder a node: drill in.
         if key == self._pending_combine_key:

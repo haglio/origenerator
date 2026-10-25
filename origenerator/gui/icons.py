@@ -152,7 +152,7 @@ def enhance_icon() -> QIcon:
 
 
 def mic_icon() -> QIcon:
-    """A microphone — speak a prompt edit.
+    """A microphone — say a command or a request.
 
     The family's one microphone: Fun Time's dashboard paints this same drawing
     into its voice panel, so the two apps side by side show one control rather

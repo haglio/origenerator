@@ -30,7 +30,7 @@ PUBLISHED = {
     "build_custom_folders", "build_gallery_tree", "build_image_config_index",
     "child_groups", "combined_params", "command_phrases", "config_folder_key",
     "config_folder_name",
-    "config_tab_title", "curated_params", "custom_folder_id",
+    "config_tab_title", "custom_folder_id",
     "custom_folder_key", "default_enhance_params", "describe_enhance_params",
     "disown_foreign_runs",
     "displayed_levels", "enhance_levels", "enhance_params_for",
@@ -54,6 +54,7 @@ PUBLISHED = {
     "outermost", "output_disk_files",
     "output_file_path", "output_file_reference", "parse_params",
     "produced_output", "prompts_differ_from", "rebuildable_source_image",
+    "rebuildable_source_image_id_in",
     "recent_generations", "recently_worked_folders", "recognized_spelling",
     "remove_enhance_levels", "requested_generations", "rerollable", "resolve_preview",
     "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
@@ -63,7 +64,7 @@ PUBLISHED = {
     "favorite_folders", "favorite_generations", "start_frame_index",
     "cycle_shaped",
     "unreviewed_experiments",
-    "videos_from_source_image", "was_made_from", "workflow_output_type",
+    "videos_from_source_image", "was_made_from", "workflow_output_type", "written_params",
 }
 
 

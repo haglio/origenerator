@@ -19,8 +19,8 @@ the main window has the keyboard, so "the slideshow that is up" names nothing an
 collection command has no region to land on. Standalone there is one slideshow and no
 regions, so a side is accepted and ignored.
 
-Kept deliberately strict, because everything unmatched here falls through to a
-prompt rewrite: a command is a few words, and names something real.
+Kept deliberately strict, because the mic hears whole sentences too: a command
+is a few words, and names something real.
 """
 
 from __future__ import annotations
@@ -167,7 +167,7 @@ def _collection_named(words: list[str]) -> str | None:
     """The collection those words name, on their own — ``None`` for anything else.
 
     The whole utterance has to BE the name: "favorites" is the command, while
-    "put her in my favorites" is a prompt edit that mentions one.
+    "put her in my favorites" is a sentence that mentions one.
     """
     if not words or len(words) > _MAX_COLLECTION_WORDS:
         return None

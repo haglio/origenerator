@@ -1,10 +1,9 @@
 """Spoken control of the fullscreen slideshow: get it going, pause it, close it.
 
 Three things to say: **start** it, **pause** it, **stop** it. Each is a verb plus the word
-"slideshow", which is what keeps them clear of prompt steering — the same mic is
-often rewriting a prompt, and an utterance this doesn't claim falls through to
-become a prompt edit. "start slideshow" is not a sentence anyone types at an
-image generator, so the pairing is safe to match on.
+"slideshow", which is what keeps them clear of the sentences the same mic hears:
+"start slideshow" is not a sentence anyone says by chance, so the pairing is
+safe to match on.
 
 Whisper's own renderings are what these are matched against, so "slide show"
 arrives as two words about as often as one, and punctuation and case are its to
@@ -27,7 +26,7 @@ class SlideshowCommand(Enum):
 
 
 # The verbs, as said. Each maps to the one thing it asks for; anything else
-# beside "slideshow" is not a command and falls through to prompt steering.
+# beside "slideshow" is not a command.
 _VERBS = {
     "start": SlideshowCommand.START,
     "play": SlideshowCommand.START,
@@ -39,7 +38,7 @@ _VERBS = {
 }
 
 # A command is a few words — "start the slideshow, please" — while anything
-# sentence-shaped that happens to mention a slideshow is a prompt edit.
+# sentence-shaped that happens to mention a slideshow is no command.
 _MAX_COMMAND_WORDS = 6
 
 
@@ -57,7 +56,7 @@ def match_slideshow_command(text: str) -> SlideshowCommand | None:
 
     Both halves are required — a verb this table knows and the word "slideshow" —
     so "stop" alone (which could be anything) and "a slideshow of her" (which is
-    a prompt) are both left to fall through.
+    a sentence) are both left alone.
     """
     heard = words(text)
     if not heard or len(heard) > _MAX_COMMAND_WORDS or not _names_the_slideshow(heard):

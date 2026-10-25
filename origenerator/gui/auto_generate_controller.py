@@ -14,9 +14,8 @@ takes it as its cue to try another at once.
 
 One folder at a time. A loop is a standing instruction to spend the whole machine
 on one folder's settings, and two of them would only take turns at it — each folder waiting
-out the other's render, both crawling, and the voice steering (which follows the
-loop) with two prompts to answer to. So turning it on somewhere new is also how
-it is turned off where it was.
+out the other's render, both crawling. So turning it on somewhere new is also
+how it is turned off where it was.
 """
 from __future__ import annotations
 
@@ -49,8 +48,8 @@ class AutoGenerateController(QObject):
         The hand-off happens only once the new folder's first variation is away:
         a launch that doesn't take leaves the loop where it was rather than
         stopping one loop and starting none. The folder it displaces reports
-        through :attr:`stopped` exactly as a hand-stop would, so its switch and
-        its voice steering are cleaned up the one way.
+        through :attr:`stopped` exactly as a hand-stop would, so its switch is
+        cleaned up the one way.
         """
         if key in self._active:
             return  # already looping this folder
@@ -89,13 +88,6 @@ class AutoGenerateController(QObject):
         """End every running loop at once."""
         for key in list(self._active):
             self._end(key)
-
-    def rekey(self, old_key: str, new_key: str) -> None:
-        """Move a running loop to a new folder key — its prompt was voice-edited to
-        settings that belong in a different folder, so the loop follows it there."""
-        if old_key in self._active:
-            self._active.discard(old_key)
-            self._active.add(new_key)
 
     def _advance(self, key: str) -> None:
         """One variation ended without the user stopping the loop: launch the next

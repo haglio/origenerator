@@ -53,29 +53,17 @@ class FakeSignal:
 
 
 class FakeListener:
-    """A VoiceSteering reduced to what the router asks of one."""
+    """A CommandAndRequestListener reduced to what the router asks of one."""
 
     def __init__(self, **kwargs):
         self.built_with = kwargs
         self.heard = FakeSignal()
-        self.edited = FakeSignal()
         self.error = FakeSignal()
         self.request = FakeSignal()
-        self.started = False
         self.commands_on = False
-        self.stops = 0
         self.bare = None
         self.dictated = None
         self.on_command = None
-
-    def start(self, get_prompts, set_prompts):
-        self.started = True
-        self.get_prompts = get_prompts
-        self.set_prompts = set_prompts
-
-    def stop(self):
-        self.started = False
-        self.stops += 1
 
     def start_commands(self, handler):
         self.commands_on = True
@@ -232,19 +220,11 @@ class FakeHost:
     def __init__(self, *, collections=("__recents__",), selected=None):
         self.collections = set(collections)
         self.selected = selected
-        self.prompts = {"folder/a": {"positive": "a doll", "negative": "ugly"}}
-        self.steered = []
         self.stood_in = []
         self.enhanced = []
         self.fixed = []
         self.animated = []
         self.queued = []
-
-    def working_prompts(self, key):
-        return self.prompts.get(key, {})
-
-    def steer_prompts(self, key, new_prompts):
-        self.steered.append((key, new_prompts))
 
     def collection_label(self, key):
         return "Latest" if key == RECENTS_KEY else key.strip("_").title()
@@ -289,7 +269,7 @@ def router(qtbot, monkeypatch):
     """A router under a parent this fixture keeps alive: a QObject whose parent is
     collected takes its timers down with it. Its listener, bank and motion are
     all recorders."""
-    monkeypatch.setattr(module, "VoiceSteering", FakeListener)
+    monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
     built = []
 
     def build(host=None, *, slideshows=None, db=None, client=object(), motion=None,
@@ -334,7 +314,7 @@ def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
-    # It used to come on with the Auto loop and again with a slideshow, which left
+    # It used to come on with Auto-Generate and again with a slideshow, which left
     # "start slideshow" unhearable in the one state it is for.
     voice, _host, _slideshows = router(mic_on=False)
 
@@ -345,47 +325,6 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
                         mic=FakeButton(checked=True), enhance=None, actions={})
     voice.sync()
     assert voice.listener.commands_on is True
-
-
-def test_the_commands_hold_the_mic_open_with_no_loop_to_steer(router):
-    voice, _host, _slideshows = router()
-
-    voice.sync()
-
-    assert voice.listener.commands_on is True
-    assert voice.listener.started is False  # nothing to steer is not a second switch
-
-
-def test_a_loop_gives_the_open_mic_a_prompt_to_steer(router):
-    voice, host, _slideshows = router()
-
-    voice.steer("folder/a")
-
-    assert voice.listener.started is True
-    voice.listener.set_prompts({"positive": "a doll, no hat"})
-    assert host.steered == [("folder/a", {"positive": "a doll, no hat"})]
-
-
-def test_the_steered_folder_moving_does_not_re_open_the_listener(router):
-    # The steering reads the folder at each utterance, so following it there is
-    # a re-point and nothing more.
-    voice, _host, _slideshows = router()
-    voice.steer("folder/a")
-    stops = voice.listener.stops
-
-    voice.re_home("folder/a", "folder/b")
-
-    assert voice.steering == "folder/b"
-    assert voice.listener.stops == stops
-
-
-def test_a_folder_that_was_not_the_steered_one_moving_changes_nothing(router):
-    voice, _host, _slideshows = router()
-    voice.steer("folder/a")
-
-    voice.re_home("folder/z", "folder/b")
-
-    assert voice.steering == "folder/a"
 
 
 # --- the caption ------------------------------------------------------------

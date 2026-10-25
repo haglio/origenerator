@@ -259,8 +259,7 @@ class PaneHost:
     earlier would already be the old one.
     """
 
-    # Every image row of the current model — what places an untracked run and
-    # decides whether an i2v item's start frame can itself be re-drawn.
+    # Every image row of the current model — what places an untracked run.
     image_rows: Callable[[], list]
     # The looping-preview path for a video row, or None (the tile shows its still).
     animated_preview: Callable[[dict], str | None]
@@ -1292,7 +1291,7 @@ class BrowserPane(QObject):
             return []
         actions = [CornerAction(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
                                 "Randomize video seed")]
-        if gallery.rebuildable_source_image(row, self._host.image_rows()) is not None:
+        if gallery.rebuildable_source_image_id_in(row, self._image_index) is not None:
             actions.append(CornerAction(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
                                         "Randomize image seed"))
         return actions

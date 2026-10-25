@@ -1,9 +1,7 @@
 """The bare spoken vocabulary — a collection, a button, an order to the slide.
 
-One word is the whole utterance or it is nothing, because everything this
-matcher declines is rewritten into a prompt instead: a loose match here would
-spend a command on a sentence, and a loose miss would put a command word into
-the picture.
+One word is the whole utterance or it is nothing, because the mic hears whole
+sentences too: a loose match here would spend a command on a sentence.
 """
 from __future__ import annotations
 
@@ -200,7 +198,7 @@ def test_favorites_on_its_own_is_left_to_the_order_that_plays_the_collection():
     assert match_voice_command("favorites") == CollectionCommand(FAVORITES_KEY, None)
 
 
-# --- what must NOT match: everything else steers a prompt --------------------
+# --- what must NOT match: a sentence that holds a command word --------------
 
 def test_whispers_punctuation_and_case_are_ignored():
     assert match_app_command("Weird!") is AppCommand.CULL
@@ -214,9 +212,9 @@ def test_whispers_punctuation_and_case_are_ignored():
     "delete the harsh shadow",
     "she is standing on the trash heap",
 ])
-def test_a_sentence_holding_a_command_word_is_a_prompt(said):
-    # Every miss here is rewritten into the prompt instead, so the whole
-    # utterance has to be the phrase — no leading or trailing words at all.
+def test_a_sentence_holding_a_command_word_is_no_command(said):
+    # The whole utterance has to be the phrase — no leading or trailing words
+    # at all.
     assert match_app_command(said) is None
 
 

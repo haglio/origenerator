@@ -60,8 +60,8 @@ def test_a_request_spoken_across_pauses_is_collected_whole():
 
 
 def test_every_utterance_of_an_open_request_is_swallowed():
-    # Which is what keeps the words of a request out of the prompt steering and
-    # away from the "fix …" matcher: nothing in between falls through.
+    # Which is what keeps the words of a request away from the "fix …" matcher:
+    # nothing in between falls through.
     dictation = RequestDictation()
     dictation.push("Request.")
 

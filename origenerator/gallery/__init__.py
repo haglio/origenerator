@@ -35,9 +35,9 @@ from __future__ import annotations
 from origenerator.gallery.combine import (
     CYCLE_FRAMES,
     combined_params,
-    curated_params,
     cycle_shaped,
     prompts_differ_from,
+    written_params,
 )
 from origenerator.gallery.custom import (
     SELECTION_KEY,
@@ -139,6 +139,7 @@ from origenerator.gallery.source_image import (
     find_source_image_id,
     landing_for,
     rebuildable_source_image,
+    rebuildable_source_image_id_in,
     source_image_id_for,
     source_image_id_in,
     source_image_of,
@@ -214,7 +215,6 @@ __all__ = [
     "config_folder_key",
     "config_folder_name",
     "config_tab_title",
-    "curated_params",
     "custom_folder_id",
     "custom_folder_key",
     "cycle_shaped",
@@ -278,6 +278,7 @@ __all__ = [
     "produced_output",
     "prompts_differ_from",
     "rebuildable_source_image",
+    "rebuildable_source_image_id_in",
     "recent_generations",
     "recently_worked_folders",
     "recognized_spelling",
@@ -302,4 +303,5 @@ __all__ = [
     "videos_from_source_image",
     "was_made_from",
     "workflow_output_type",
+    "written_params",
 ]

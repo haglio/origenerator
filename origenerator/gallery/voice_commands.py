@@ -7,7 +7,7 @@ Three commands share one mic: "fix <part>"
 :func:`command_phrases` what the recognizer is asked to hear, and
 :func:`recognized_spelling` an utterance in the words it was understood as, for a
 caption saying it back. All three are strict about shape: an utterance that
-matches nothing here falls through to prompt steering.
+matches nothing here is no command.
 """
 from __future__ import annotations
 
@@ -29,8 +29,7 @@ from origenerator.workflows.detail_parts import (
 ENHANCE_COMMAND = "enhance"
 
 # The word itself, and the past tense whisper offers about as readily off a
-# quiet mic. Nothing looser: everything unmatched here is rewritten into the
-# prompt instead, and "enhanced" is a word a prompt edit may well open with.
+# quiet mic. Nothing looser: a sentence may well open with "enhanced".
 ENHANCE_PHRASES: tuple[str, ...] = ("enhance", "enhanced")
 
 # Anything past the phrase and a trailing "it" is a sentence that happens to

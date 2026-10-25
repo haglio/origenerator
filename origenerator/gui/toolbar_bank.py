@@ -226,9 +226,8 @@ class ToolbarBank(QWidget):
                 icons.mic_icon(),
                 "Listen: bare words for the collections and this bank (“experiments”, "
                 "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
-                "“weird”, “lock”), orders about the picture (“enhance”, “fix "
-                "hands”, “animate as kino”), and prompt steering while a folder is "
-                "auto-generating",
+                "“weird”, “lock”), and orders about the picture (“enhance”, “fix "
+                "hands”, “animate as kino”)",
                 acts.toggle_mic, checkable=True,
             )
             self.mic.setStyleSheet(_LIT)

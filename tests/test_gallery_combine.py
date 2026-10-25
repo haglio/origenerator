@@ -170,7 +170,7 @@ def test_the_words_the_genau_lane_adds_are_words_the_source_video_never_said():
 
     assert gallery.prompts_differ_from(gallery.cycle_shaped(params, _I2V), video, _I2V)
 
-# --- curated_params: the overlay's hand-tuned act settings on a dropped image ---
+# --- written_params: written-down settings on a dropped image ----------------
 
 
 _SPEC = {
@@ -180,10 +180,10 @@ _SPEC = {
 }
 
 
-def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
+def test_written_params_lays_the_spec_over_defaults_and_swaps_the_image():
     image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
-    params = gallery.curated_params(_SPEC, image, _I2V)
+    params = gallery.written_params(_SPEC, image, _I2V)
 
     assert params["input_image"] == "sdxl_new.png [output]"
     assert params["positive_prompt"] == "gamma form scene"          # from the spec
@@ -192,20 +192,20 @@ def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
     assert params["shift_high"] == _I2V.default_params()["shift_high"]  # unnamed → default
 
 
-def test_curated_params_rerolls_every_seed():
-    # Curated settings have no exemplar run to reproduce; a pinned seed would
+def test_written_params_rerolls_every_seed():
+    # Written-down settings have no exemplar run to reproduce; a pinned seed would
     # render the identical video for the same image every time.
     image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
-    params = gallery.curated_params(_SPEC, image, _I2V)
+    params = gallery.written_params(_SPEC, image, _I2V)
 
     for key in _I2V.seed_keys():
         assert params[key] != _I2V.default_params()[key]
 
 
-def test_a_picture_with_no_file_on_disk_cannot_be_curated():
-    assert gallery.curated_params(_SPEC, _picture([]), _I2V) is None
-    assert gallery.curated_params(_SPEC, _picture(None), _I2V) is None
+def test_a_picture_with_no_file_on_disk_runs_nothing():
+    assert gallery.written_params(_SPEC, _picture([]), _I2V) is None
+    assert gallery.written_params(_SPEC, _picture(None), _I2V) is None
 
 
 def test_settings_written_against_the_shared_strength_still_render_at_it():
@@ -215,7 +215,7 @@ def test_settings_written_against_the_shared_strength_still_render_at_it():
     spec = {"workflow": "wan22_i2v",
             "params": {"cfg": 1.0, "cfg_high": 0.0, "cfg_low": 0.0, "steps": 8}}
 
-    params = gallery.curated_params(spec, _picture([{"filename": "a.png", "subfolder": ""}]), _I2V)
+    params = gallery.written_params(spec, _picture([{"filename": "a.png", "subfolder": ""}]), _I2V)
     samplers = [n for n in _I2V.build_api_payload(params).values()
                 if n["class_type"] == "KSamplerAdvanced"]
 

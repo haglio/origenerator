@@ -1,15 +1,16 @@
 """Combine, driven with no gallery around it.
 
 The whole act used to be reachable only by building the app's central widget:
-which settings a picked act resolves to, what a stand-in row does while the model
-thinks, and what a spoken animation refuses. Here the host is a handful of recorded calls and the
-act's match answers inline.
+which settings a picked act resolves to, what a stand-in row does before there is
+a job, and what a spoken animation refuses. Here the host is a handful of
+recorded calls.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
 import json
+import urllib.request
 
 import pytest
 from PIL import Image
@@ -224,10 +225,6 @@ class FakeHost:
         self.queue_redraws = 0
         self.revealed = []
         self.told = []
-        self.off_thread_calls = []
-
-    def image_rows(self):
-        return self.rows
 
     def image_config_index(self):
         return gallery.build_image_config_index(self.rows)
@@ -240,10 +237,6 @@ class FakeHost:
 
     def folder_key_for(self, workflow_name, params, workflow_version=None):
         return f"folder-for-{workflow_name}-{workflow_version}"
-
-    def off_thread(self, work, done):
-        self.off_thread_calls.append((work, done))
-        done(work())
 
     def queue_changed(self):
         self.queue_redraws += 1
@@ -274,9 +267,10 @@ def _image(prompt_id="img", *, prompt="a doll on a couch", files=("one.png",),
 
 
 def _video(prompt_id="clip", *, workflow_name=VIDEO_WORKFLOW, status="completed",
-           requested=None, exported=None, source_image=None, files=None):
+           requested=None, exported=None, source_image=None, files=None, act=None):
     return {
         "prompt_id": prompt_id,
+        "act": act,
         "workflow_name": workflow_name,
         "positive_prompt": "a doll on a couch, waving",
         "status": status,
@@ -293,7 +287,7 @@ def _video(prompt_id="clip", *, workflow_name=VIDEO_WORKFLOW, status="completed"
 @pytest.fixture
 def combine(qtbot, monkeypatch):
     """A controller under a parent this fixture keeps alive, with a recorder for
-    a panel and the act's match answering inline."""
+    a panel."""
     monkeypatch.setattr(module, "CombinePanel", FakePanel)
     built = []
 
@@ -580,16 +574,34 @@ def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
 # --- finding the settings an act names --------------------------------------
 
 
+def test_an_act_with_nothing_assigned_runs_its_most_used_video_and_asks_no_model(
+        combine, monkeypatch):
+    sent = []
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: sent.append(a))
+    monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "combined_params",
+                        lambda video_row, image_row, wf: {"seed": 7})
+    controller, host = combine(
+        db=FakeDB([_image("img", state="state one"), _video("clip", act="waving")]))
+
+    controller.generate_category("img", "waving")
+
+    assert sent == []
+    assert host.revealed == ["folder-of-clip"]
+
+
 def test_pinned_settings_outrank_the_mining(combine, monkeypatch):
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.act_settings, "pinned_settings",
                         lambda category, intent: {"workflow": VIDEO_WORKFLOW})
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "curated_params",
-                        lambda spec, row, wf: {"seed": 3})
+    monkeypatch.setattr(module.gallery, "written_params",
+                        lambda settings, row, wf: {"seed": 3})
     mined = []
-    monkeypatch.setattr(module.act_settings, "scene_matched_video",
+    monkeypatch.setattr(module.act_settings, "most_used_video",
                         lambda *a, **k: mined.append(1))
     jobs = FakeReroll()
     controller, host = combine(db=FakeDB([_image("img")]), jobs=jobs)
@@ -604,7 +616,6 @@ def test_pinned_settings_outrank_the_mining(combine, monkeypatch):
 def test_an_act_with_no_past_video_says_so_and_launches_nothing(combine,
                                                                 monkeypatch):
     monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setattr(module.act_settings, "scene_matched_video", lambda *a, **k: None)
     monkeypatch.setattr(module.act_settings, "most_used_video", lambda *a, **k: None)
     jobs = FakeReroll()
     controller, host = combine(db=FakeDB([_image("img")]), jobs=jobs)
@@ -622,7 +633,6 @@ def test_that_hint_lands_in_the_slideshows_corner_rather_than_a_dialog(combine,
     # A dialog thrown over a picture someone is talking to is the one place this
     # must never appear.
     monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setattr(module.act_settings, "scene_matched_video", lambda *a, **k: None)
     monkeypatch.setattr(module.act_settings, "most_used_video", lambda *a, **k: None)
     slideshows = FakeSlideshows(showing=object())
     controller, host = combine(db=FakeDB([_image("img")]), slideshows=slideshows)
@@ -634,32 +644,8 @@ def test_that_hint_lands_in_the_slideshows_corner_rather_than_a_dialog(combine,
         (None, "no past looping “waving” flick to take settings from yet", WARNING)]
 
 
-def test_the_mined_video_is_matched_against_its_start_frames_scene(combine,
-                                                                   monkeypatch):
-    # Where the situation to match lives is the video's start frame, not the
-    # video's own prompt.
-    asked = {}
-
-    def smart(category, scene, candidates, **kwargs):
-        asked["scenes"] = [c["start_scene"] for c in candidates]
-
-    monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setattr(module.act_settings, "scene_matched_video", smart)
-    monkeypatch.setattr(module.act_settings, "most_used_video", lambda *a, **k: None)
-    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    image = _image("img", prompt="a doll on a couch", files=("frame.png",))
-    controller, _host = combine(
-        FakeHost(rows=[image]),
-        db=FakeDB([image, _video("clip", source_image="frame.png [output]")]))
-
-    controller.generate_category("img", "waving")
-
-    assert asked["scenes"] == ["a doll on a couch"]
-
-
 def test_the_stand_in_row_goes_whatever_the_match_answers(combine, monkeypatch):
     monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setattr(module.act_settings, "scene_matched_video", lambda *a, **k: None)
     monkeypatch.setattr(module.act_settings, "most_used_video", lambda *a, **k: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
@@ -683,10 +669,10 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
     tabs = FakeTabs(panel)
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]), tabs=tabs)
 
-    controller._open_combination("img", "clip", "waving")
+    controller._open_combination("img", "clip")
 
     assert tabs.opened == [(VIDEO_WORKFLOW, {"seed": 7})]
-    assert panel.source == ("waving", "clip", act_settings.VIDEO)
+    assert panel.source == ("", "clip", act_settings.VIDEO)
     assert panel.combination == Combination("img-thumb.png", "clip.webp")
 
 
@@ -696,7 +682,7 @@ def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "curated_params", lambda s, r, wf: {"seed": 3})
+    monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     panel = FakeConfigPanel()
     controller, _host = combine(db=FakeDB([_image("img")]), tabs=FakeTabs(panel))
@@ -704,6 +690,101 @@ def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
     controller._open_category("img", "waving")
 
     assert panel.combination == Combination("img-thumb.png")
+
+
+def _nothing_assigned(monkeypatch):
+    monkeypatch.setattr(module.animation_settings, "settings_for",
+                        lambda lane, act, state: None)
+    monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
+
+
+def _apart_from_the_picture_and_the_seeds(params, workflow):
+    rolled = {*workflow.seed_keys(), "input_image"}
+    return {key: value for key, value in params.items() if key not in rolled}
+
+
+@pytest.mark.parametrize("state", ["state one", None], ids=["sorted", "unsorted"])
+def test_an_act_with_no_settings_assigned_opens_the_lanes_workflow_as_it_starts(
+        combine, monkeypatch, state):
+    # A past video of the act is there, and its settings are not what opens.
+    _nothing_assigned(monkeypatch)
+    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
+    panel = FakeConfigPanel()
+    tabs = FakeTabs(panel)
+    controller, host = combine(
+        db=FakeDB([_image("img", state=state), _video("clip", act="waving")]), tabs=tabs)
+
+    controller._open_category("img", "waving")
+
+    (name, params), = tabs.opened
+    workflow = module.WORKFLOW_REGISTRY[name]
+    assert workflow.display_name == "WAN 2.2 I2V"
+    assert params["input_image"] == "one.png [output]"
+    assert (params["positive_prompt"], params["negative_prompt"]) == ("", "")
+    assert (_apart_from_the_picture_and_the_seeds(params, workflow)
+            == _apart_from_the_picture_and_the_seeds(workflow.default_params(), workflow))
+    assert panel.source == ("waving", None, act_settings.VIDEO)
+    assert panel.combination == Combination("img-thumb.png")
+    assert host.told == []
+
+
+def test_the_lanes_workflow_opens_with_its_prompts_empty_whatever_it_starts_with(
+        combine, monkeypatch):
+    class StartsWithWords(FakeWorkflow):
+        def default_params(self):
+            return {"positive_prompt": "scene one", "negative_prompt": "scene two",
+                    "steps": 20}
+
+    _nothing_assigned(monkeypatch)
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, StartsWithWords())
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
+    tabs = FakeTabs(FakeConfigPanel())
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]), tabs=tabs)
+
+    controller._open_category("img", "waving")
+
+    (_name, params), = tabs.opened
+    assert (params["positive_prompt"], params["negative_prompt"]) == ("", "")
+    assert params["steps"] == 20
+
+
+def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
+    monkeypatch.setattr(module.animation_settings, "settings_for", lambda *_: assigned)
+    monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
+    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
+    jobs, tabs = FakeReroll(), FakeTabs(FakeConfigPanel())
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]),
+                                jobs=jobs, tabs=tabs)
+
+    controller.panel.combine_requested.emit(CombineRequest(
+        image_id="img", category="waving", intent=lane, edit_first=edit_first))
+
+    ran = tabs.opened if edit_first else [
+        (name, params) for _key, name, params in jobs.prepared]
+    return [(name, _apart_from_the_picture_and_the_seeds(
+        params, module.WORKFLOW_REGISTRY[name])) for name, params in ran]
+
+
+@pytest.mark.parametrize("lane", [act_settings.VIDEO, act_settings.GENAU])
+@pytest.mark.parametrize("edit_first", [False, True],
+                         ids=["generate", "edit individual"])
+def test_settings_assigned_by_prompts_alone_run_as_if_they_named_the_lanes_own_workflow(
+        combine, monkeypatch, edit_first, lane):
+    # Assigned in Edit default… where no video was kept and the act had no
+    # settings of its own, so the record holds what he typed and no workflow.
+    prompts = {"positive_prompt": "scene one", "negative_prompt": "scene two"}
+    lanes_own = act_settings.starting_settings(lane)["workflow"]
+
+    ran = {workflow: _what_the_press_runs(
+               combine, monkeypatch, edit_first=edit_first, lane=lane,
+               assigned={"workflow": workflow, "params": prompts})
+           for workflow in ("", lanes_own)}
+
+    assert ran[""] == ran[lanes_own]
+    (_name, params), = ran[""]
+    assert params["positive_prompt"].startswith("scene one")
+    assert params["negative_prompt"].startswith("scene two")
 
 
 # --- a spoken animation over the picture on screen ---------------------------
@@ -724,33 +805,13 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(combine,
         "img", AnimateRequest(act_settings.GENAU, "waving"))[1] != ALREADY_GENAUD
 
 
-def test_one_said_while_the_video_is_still_being_chosen_is_refused_too(combine,
-                                                                       monkeypatch):
-    # The mined tier asks a local model that thinks for several seconds, which is
-    # exactly the silence a second command is said into.
-    _paths(monkeypatch)
-    _no_mining(monkeypatch)
-    said = []
-
-    def slow_match(work, done):
-        said.append(controller.animate_it(
-            "img", AnimateRequest(act_settings.GENAU, "waving")))  # said into the wait
-
-    controller, _host = combine(FakeHost(), db=FakeDB([_image("img", state="state one")]))
-    controller._host.off_thread = slow_match
-
-    controller.generate_category("img", "waving", act_settings.GENAU, send=True)
-
-    assert said == [(None, ALREADY_GENAUD, WARNING)]
-
-
 def test_a_spoken_launch_is_stamped_to_hand_its_clip_on(combine, monkeypatch):
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.act_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "curated_params", lambda s, r, wf: {"seed": 3})
+    monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     db = FakeDB([_image("img")])
     controller, _host = combine(db=db)
 
@@ -767,7 +828,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(combine, monkeypatch)
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "curated_params", lambda s, r, wf: {"seed": 3})
+    monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     db = FakeDB([_image("img")])
     controller, _host = combine(db=db)
 
@@ -882,7 +943,7 @@ def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine,
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "curated_params", lambda s, r, wf: {"seed": 3})
+    monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     slideshows = FakeSlideshows(showing="img")
     db = FakeDB([_image("img")])
     jobs = FakeReroll(launches=None, making={f"folder-for-{VIDEO_WORKFLOW}-3"})
@@ -911,7 +972,6 @@ def _no_mining(monkeypatch, available=("waving",)):
     monkeypatch.setattr(module.act_settings, "available_categories",
                         lambda rows, intent: list(available))
     monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setattr(module.act_settings, "scene_matched_video", lambda *a, **k: None)
     monkeypatch.setattr(module.act_settings, "most_used_video", lambda *a, **k: None)
 
 

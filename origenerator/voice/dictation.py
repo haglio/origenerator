@@ -8,11 +8,11 @@ one utterance at a time could not hear a sentence spoken in three.
 
 So :class:`RequestDictation` is a state machine over the transcriptions. Idle, it
 ignores everything that doesn't open with the lead word. Open, it swallows every
-utterance — which is what keeps the words of a request from also steering the
-loop's prompt or matching a "fix …" command — until one ends on the terminator.
+utterance — which is what keeps the words of a request from also matching a
+"fix …" command — until one ends on the terminator.
 
 Pure and text-driven: no mic, no Qt, no model. :class:`~origenerator.voice.
-steering.VoiceSteering` owns one and feeds it each transcription.
+listener.CommandAndRequestListener` owns one and feeds it each transcription.
 """
 from __future__ import annotations
 

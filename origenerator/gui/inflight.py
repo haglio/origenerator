@@ -296,11 +296,10 @@ def starting_row_text(starting: bool) -> str | None:
     """What a row that is not a job yet says in place of a wait.
 
     Pressing Generate in the Combine panel is not the same as queueing something:
-    an act has to be answered by settings first — a question put to a local model,
-    several seconds of it — and then the params built and the prompt submitted.
-    With nothing on screen for that stretch, the press reads as a press that did
-    nothing, which is indistinguishable from a wedged app. This row is the answer,
-    and it says outright that it is not in the line yet.
+    an act has to be answered by settings first, and then the params built and the
+    prompt submitted. With nothing on screen for that stretch, the press reads as a
+    press that did nothing, which is indistinguishable from a wedged app. This row
+    is the answer, and it says outright that it is not in the line yet.
 
     ``None`` once it is, which is every row that came off the database.
     """

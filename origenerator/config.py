@@ -181,17 +181,17 @@ CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"
 MOTION_DEFAULT_SPEED = 50
 MOTION_DEFAULT_HZ = bpm_for_speed(MOTION_DEFAULT_SPEED) / 60
 
-# --- Voice command → prompt edit ------------------------------------------
-# While a folder auto-generates, the mic listens (always-on); each spoken
-# instruction is heard locally (voice_core: vosk and faster-whisper, CPU) and a
-# local LLM rewrites that loop's prompt. All local — no audio or prompt text leaves
-# the machine. Point LOCAL_LLM_* at your own OpenAI-compatible chat server (Ollama's
-# /v1, LM Studio, llama.cpp, …). What the LLM is *told* is behavior rather than
-# configuration and lives in origenerator.prompts.
+# --- Voice, and the local LLM ----------------------------------------------
+# What is said is heard locally (voice_core: vosk and faster-whisper, CPU), and a
+# local LLM matches a spoken request's words to its prompt's and widens a search.
+# All local — no audio or prompt text leaves the machine. Point LOCAL_LLM_* at your
+# own OpenAI-compatible chat server (Ollama's /v1, LM Studio, llama.cpp, …). What
+# the LLM is *told* is behavior rather than configuration and lives in
+# origenerator.prompts.
 VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time listens with; cached under ~/.cache/vosk
 # A substring of the microphone's name, the one Evolver's backfill tool pins too: Windows has made
 # a dead headset microphone the default input before. None, or a name nothing answers to today,
 # listens to the liveliest input instead (`python -m sounddevice` lists the names).
 VOICE_DEVICE_NAME = "Brio"
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
-LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit edits
+LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit words

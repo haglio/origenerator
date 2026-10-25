@@ -1,8 +1,8 @@
 """What a spoken utterance over a fullscreen picture is taken to mean.
 
 Three commands share one mic, so the matcher has to keep them apart and keep all
-of them away from prompt steering — everything it does not match is rewritten
-into the prompt instead, which is why a loose match would be worse than a miss.
+of them away from the sentences the same mic hears, which is why a loose match
+would be worse than a miss.
 """
 from __future__ import annotations
 

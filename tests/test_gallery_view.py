@@ -4,6 +4,7 @@ import json
 import re
 import threading
 import time
+from functools import partial
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -106,11 +107,11 @@ from origenerator.gui import (
     icons,
     off_thread,
     omnipause,
+    voice_router,
 )
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import generating_tile as generating_tile_module
-from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.drags import under_way
@@ -149,9 +150,11 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.commands import match_voice_command as match
 from origenerator.voice.dictation import RequestDictation
+from origenerator.voice.listener import CommandAndRequestListener
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts, offered_workflows
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import gestures
+from tests.conftest import FakeHearing
 from tests.drop_style_seen import worn
 from tests.lit_switches import lit_in
 from tests.marked_words import words
@@ -6928,8 +6931,7 @@ def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
 
 def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_path):
     # One folder at a time: two loops would take turns on the machine, each
-    # waiting out the other's render, and the voice steering that follows the loop
-    # would have two prompts to answer to.
+    # waiting out the other's render.
     client = _reroll_client()
     db = _seeded_db(tmp_path)
     db.insert_generation(
@@ -7417,56 +7419,33 @@ def test_a_tabs_go_to_folder_puts_a_running_search_away(qtbot, tmp_path):
     assert view._search.field.text() == ""
 
 
-# --- voice steering: Auto is voice's "on"; utterances steer the loop's prompt --
+# --- the microphone, which its button alone opens and closes ----------------
 
-def test_a_steered_loop_rewrites_the_prompt_it_launches_from(qtbot, tmp_path):
+def test_words_that_are_no_command_leave_a_running_auto_generate_as_it_was(
+        qtbot, tmp_path, monkeypatch):
+    # Neither a command nor a request, a sentence does nothing while Auto-Generate
+    # runs, exactly as when it does not: its prompt and its folder stay as they were.
+    hearing = FakeHearing("make it a dog")
+    monkeypatch.setattr(voice_router, "CommandAndRequestListener",
+                        partial(CommandAndRequestListener, hearing=hearing))
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _select_first_leaf(view)
-    view._bank.mic.setChecked(True)  # the mic is the switch; the loop is what it steers
-
-    view._toggle_auto(True)
-    assert view._voice.listener.started
-    (launch_key,) = view._live_jobs.keys()  # the folder the first generation lands in
-
-    view._voice.listener.say({"positive": "a cat, no hat", "negative": "ugly"})  # rewritten pair
-    client.job_completed.emit(view._live_jobs[launch_key].prompt_id, _REROLL_HISTORY)
-
-    # the loop re-homed to the new-prompt folder, carrying both steered prompts
-    assert launch_key not in view._live_jobs
-    (new_key,) = view._live_jobs.keys()
-    assert new_key != launch_key and view._auto.is_active(new_key)
-    assert view._live_jobs[new_key].params["positive_prompt"] == "a cat, no hat"
-    assert view._live_jobs[new_key].params["negative_prompt"] == "ugly"
-
-    # completing the re-homed generation makes its folder exist -> the view follows
-    client.job_completed.emit(view._live_jobs[new_key].prompt_id, _REROLL_HISTORY)
-    assert _selected_folder(view) == new_key
-
-
-def test_a_steered_loop_favorites_the_folder_it_moves_to(qtbot, tmp_path):
-    client = _reroll_client()
-    db = _seeded_db(tmp_path)
-    view = GalleryView(db, client=client)
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
+    key = _select_first_leaf(view)
     view._bank.mic.setChecked(True)
     view._toggle_auto(True)
-    (launch_key,) = view._live_jobs.keys()
+    prompt = view._live_jobs[key].params["positive_prompt"]
 
-    view._voice.listener.say({"positive": "a cat, no hat", "negative": "ugly"})
-    client.job_completed.emit(view._live_jobs[launch_key].prompt_id, _REROLL_HISTORY)
-    (new_key,) = view._live_jobs.keys()
-    client.job_completed.emit(view._live_jobs[new_key].prompt_id, _REROLL_HISTORY)
+    hearing.hear()
+    client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
-    assert db.folder_meta_map()[new_key]["starred"] is True
-    assert view.group_for_key(new_key).favorite
+    assert list(view._live_jobs) == [key]
+    assert view._live_jobs[key].params["positive_prompt"] == prompt
+    assert words(view._voice.status) == "heard: “make it a dog”"
 
 
-def test_a_loop_ending_leaves_voice_with_nothing_to_steer(qtbot, tmp_path):
+def test_auto_generate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -7476,8 +7455,7 @@ def test_a_loop_ending_leaves_voice_with_nothing_to_steer(qtbot, tmp_path):
     view._toggle_auto(True)
     view._toggle_auto(False)
 
-    assert view._voice.listener.stopped        # steering stood down with the loop
-    assert view._voice.listener.commands_on    # but the mic is still the button's, still open
+    assert view._voice.listener.commands_on    # the mic is the button's, still open
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
@@ -7489,7 +7467,7 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     _select_first_leaf(view)
 
     view._toggle_auto(True)
-    assert not view._voice.listener.commands_on and not view._voice.listener.started
+    assert not view._voice.listener.commands_on
     view._toggle_auto(False)
 
     view._bank.mic.setChecked(True)
@@ -7497,18 +7475,6 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
 
     view._bank.mic.setChecked(False)
     assert not view._voice.listener.commands_on
-
-
-def test_arming_the_mic_mid_loop_picks_up_the_steering(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._toggle_auto(True)  # running, unheard
-
-    view._bank.mic.setChecked(True)
-
-    assert view._voice.listener.started  # it steers the loop already in flight
 
 
 def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path):
@@ -11046,37 +11012,32 @@ def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tm
     assert tabs.tabBar()._preview_index == tabs.indexOf(panel)
 
 
-def test_open_category_opens_the_resolved_video_without_launching(qtbot, tmp_path, monkeypatch):
+def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_starts(
+        qtbot, tmp_path, monkeypatch):
+    # A past looping video of the act is there, and its settings are not what opens;
+    # nor is the one-cycle cut the lane gives the settings it runs.
     db = _combine_db(tmp_path)
+    looping = _looping_video(db)
+    db.set_settings_source("loop", category="alpha")
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
-
-    view._combine._open_category("img", "dancing")  # the combine DB's one clip is a "dance"
-
-    assert view._live_jobs == {}                 # opened for editing, not launched
-    view._client.submit_job.assert_not_called()
-    config = view._info_tabs.current_config_panel().current_config()
-    assert config.workflow_name == "wan22_i2v"
-    assert config.params["input_image"] == "sdxl_pick.png [output]"  # settings on the dropped image
-
-
-def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon video exists
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
-    tabs_before = view._info_tabs.count()
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
-                        lambda *a, **k: shown.append(a))
+                        lambda *a, **k: shown.append(a[1:]))
 
-    view._combine._open_category("img", "epsilon")
+    view._combine._open_category("img", "alpha", act_settings.GENAU)
 
-    assert view._info_tabs.count() == tabs_before  # no settings to open: no tab forked
-    assert shown                                   # but tell the user why
+    assert view._live_jobs == {}
+    view._client.submit_job.assert_not_called()
+    assert shown == []
+    config = view._info_tabs.current_config_panel().current_config()
+    assert WORKFLOW_REGISTRY[config.workflow_name].display_name == (
+        "WAN 2.2 I2V (Looping)")
+    assert config.params["input_image"] == "sdxl_pick.png [output]"
+    assert (config.params["positive_prompt"], config.params["negative_prompt"]) == ("", "")
+    assert config.params["frame_count"] == looping.default_params()["frame_count"]
+    assert config.seed_is_random
 
 
 def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
@@ -11538,62 +11499,12 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
     assert view._live_jobs == {}
 
 
-def test_category_uses_the_scene_matched_video(qtbot, tmp_path, monkeypatch):
+def test_category_runs_the_acts_most_used_video(qtbot, tmp_path):
+    # The combine DB's one "dance" clip is the "dancing" act's most-used video.
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    seen = {}
-
-    def fake_smart(category, image_scene, candidates, **kw):
-        seen.update(category=category, image_scene=image_scene,
-                    scened=all("start_scene" in c for c in candidates),
-                    ids=[c.get("prompt_id") for c in candidates])
-        return "vid"  # the video whose starting scene fits this image
-
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", fake_smart)
-
-    view._combine.generate_category("img", "alpha")
-
-    assert seen["category"] == "alpha"
-    assert seen["image_scene"] == "a dog"   # the dropped image's own prompt is the scene to match
-    assert seen["scened"]                    # candidates enriched with each video's start scene
-    assert seen["ids"] == ["vid"]            # only the rebuildable i2v video is a candidate (not the image)
-    job = next(iter(view._live_jobs.values()))
-    assert job.workflow.name == "wan22_i2v"
-    assert job.params["input_image"] == "sdxl_pick.png [output]"  # settings run on the dropped image
-
-
-def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
-    called = {}
-
-    def fake_best(category, candidates, intent=act_settings.VIDEO):
-        called["category"] = category
-        called["intent"] = intent
-        return "vid"
-
-    monkeypatch.setattr(combine_controller.act_settings, "most_used_video", fake_best)
-
-    view._combine.generate_category("img", "alpha")
-
-    assert called["category"] == "alpha"   # model unavailable → the act's most-used video
-    job = next(iter(view._live_jobs.values()))
-    assert job.params["input_image"] == "sdxl_pick.png [output]"
-
-
-def test_category_launches_a_real_video_via_the_fallback(qtbot, tmp_path, monkeypatch):
-    # No live model in tests, so force the deterministic fallback: real most_used_video then
-    # finds the combine DB's one "dance" clip for the "dancing" act and runs it.
-    db = _combine_db(tmp_path)
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
 
     view._combine.generate_category("img", "dancing")
 
@@ -11625,7 +11536,7 @@ def test_category_prefers_the_overlays_pinned_settings_over_mining(qtbot, tmp_pa
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video",
+    monkeypatch.setattr(combine_controller.act_settings, "most_used_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
 
     view._combine.generate_category("img", "gamma")
@@ -11704,7 +11615,6 @@ def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, m
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
 
     view._combine._on_generate_category("img", "epsilon", act_settings.VIDEO)
@@ -11714,7 +11624,7 @@ def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, m
 
 
 def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, monkeypatch):
-    # _resolve_category gives up before it asks anything; the row must go with it.
+    # A picture that is gone has no settings looked up for it; the row must go too.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -11767,7 +11677,6 @@ def test_a_picked_act_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path,
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
 
     view._combine.generate_category("img", "dancing")
 
@@ -11795,27 +11704,25 @@ def test_open_in_generator_marks_the_tab_with_where_the_settings_came_from(qtbot
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid")
 
-    assert _front_panel(view).settings_source() == ("dancing", "vid", act_settings.VIDEO)
+    assert _front_panel(view).settings_source() == ("", "vid", act_settings.VIDEO)
 
 
-def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_path, monkeypatch):
+def test_a_generate_from_an_opened_combination_still_names_its_video(qtbot, tmp_path):
     # The whole point of the mark riding through the tab: a combination edited
-    # before launching is still that act, and the queue row is where it is read.
+    # before launching still runs that video's settings, and the queue row is where
+    # it is read.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
-    view._combine._open_category("img", "dancing")
+    view._combine._open_combination("img", "vid")
     panel = _front_panel(view)
     panel._param_form.set_values({"positive_prompt": "edited before running"})
 
     panel._on_generate()
 
-    row = _launched_row(view)
-    assert row["act"] == "dancing"
-    assert row["source_video"] == "vid"
+    assert _launched_row(view)["source_video"] == "vid"
 
 
 def test_a_generate_from_an_opened_dropped_video_notes_the_lane_it_was_opened_under(
@@ -11837,7 +11744,7 @@ def test_a_tab_pointed_at_another_generation_drops_the_settings_source(qtbot, tm
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._combine._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid")
     panel = _front_panel(view)
 
     panel.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
@@ -11851,7 +11758,7 @@ def test_a_tab_switched_to_another_workflow_drops_the_settings_source(qtbot, tmp
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._combine._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid")
     panel = _front_panel(view)
 
     panel.prefill("sdxl_t2i", _SDXL.default_params())
@@ -11867,7 +11774,7 @@ def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid")
 
     preview = _front_panel(view)._preview
     assert preview._stack.currentWidget() is preview._combination
@@ -11903,19 +11810,6 @@ def test_the_video_an_opened_combination_makes_keeps_both_links(qtbot, tmp_path)
     assert panel._related._source_tile._prompt_id == "img"
     assert panel._related._source_video_tile._prompt_id == "vid"
     assert not panel._related._source_video_tile.isHidden()
-
-
-def test_an_act_opened_links_to_the_past_video_its_settings_came_from(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
-
-    view._combine._open_category("img", "dancing")
-
-    related = _front_panel(view)._related
-    assert related._source_tile._prompt_id == "img"
-    assert related._source_video_tile._prompt_id == "vid"
 
 
 def test_an_act_whose_settings_came_from_no_video_links_to_the_picture_alone(qtbot, tmp_path):
@@ -12038,7 +11932,7 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video",
+    monkeypatch.setattr(combine_controller.act_settings, "most_used_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
     opened = []
     monkeypatch.setattr(view._info_tabs, "open_config",
@@ -12057,7 +11951,6 @@ def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monk
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))
@@ -16138,8 +16031,8 @@ def test_a_slideshow_command_with_no_slideshow_up_answers_in_the_gallery(
 
 def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
         qtbot, tmp_path, monkeypatch):
-    # The mic now hears commands during a steered loop too, so "fix teeth" is
-    # claimed even with nothing on screen — it must not disappear silently.
+    # The mic hears commands with nothing on screen too, so "fix teeth" is
+    # claimed there — it must not disappear silently.
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["teeth_yolov8n.pt"])
     view = _voiceable(qtbot, tmp_path, monkeypatch)
@@ -16154,7 +16047,7 @@ def test_start_slideshow_is_heard_with_no_slideshow_and_no_loop(qtbot, tmp_path,
                                                           monkeypatch):
     # The state the command is for: nothing playing, nothing generating, mic on.
     view = _voiceable(qtbot, tmp_path, monkeypatch)
-    assert view._slideshows.showing is None and view._voice._steering is None
+    assert view._slideshows.showing is None
 
     view._voice.listener.speak_command("start slideshow")
 
@@ -16163,12 +16056,6 @@ def test_start_slideshow_is_heard_with_no_slideshow_and_no_loop(qtbot, tmp_path,
     view._slideshows.showing.close()
 
 
-def test_a_loop_ending_leaves_the_commands_listening(qtbot, tmp_path, monkeypatch):
-    view = _voiceable(qtbot, tmp_path, monkeypatch)
-
-    view._on_auto_stopped("some-other-folder")  # a loop elsewhere ended
-
-    assert view._voice.listener.commands_on  # the button says listen, so it listens
 # --- spoken requests: "Request … over" over what's on screen -----------------
 
 
@@ -16487,16 +16374,15 @@ def _genau_db(tmp_path):
     return db
 
 
-def _genau_view(qtbot, tmp_path, monkeypatch):
+def _genau_view(qtbot, tmp_path):
     view = GalleryView(_genau_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     return view
 
 
 def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
 
     view._combine.generate_category("img", "alpha", act_settings.GENAU)
 
@@ -16507,7 +16393,7 @@ def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
 
 
 def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, monkeypatch):
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     asked = []
 
     def spy(category, candidates, intent=act_settings.VIDEO):
@@ -16525,7 +16411,7 @@ def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, mon
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
     # Someone at the keyboard can look at the loop first, so nothing leaves for
     # Evolver until Send-to-Genau is pressed.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
     sent = []
@@ -16548,7 +16434,7 @@ _SPOKEN_LOOP = AnimateRequest(act_settings.GENAU, "")
 
 def test_a_spoken_loop_takes_the_one_act_the_sorted_picture_leaves(qtbot, tmp_path,
                                                                    monkeypatch):
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
 
     # "img_act" is sorted, and its state leaves the Genau lane one act, so the
     # command needs none said.
@@ -16566,7 +16452,7 @@ def test_a_spoken_loop_takes_the_one_act_the_sorted_picture_leaves(qtbot, tmp_pa
 
 def test_a_spoken_loop_over_an_unsorted_picture_asks_for_its_action(qtbot, tmp_path,
                                                                     monkeypatch):
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
 
     prompt_id, message, kind = view.animate_it("img", _SPOKEN_LOOP)  # never sorted
 
@@ -16605,7 +16491,7 @@ def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_pat
 
 
 def test_a_spoken_loop_declines_a_video(qtbot, tmp_path, monkeypatch):
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
 
     prompt_id, message, kind = view.animate_it("loop", _SPOKEN_LOOP)
 
@@ -16616,7 +16502,7 @@ def test_a_spoken_loop_declines_a_video(qtbot, tmp_path, monkeypatch):
 
 def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
                                                                 monkeypatch):
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
 
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
@@ -16640,7 +16526,7 @@ def test_a_second_spoken_loop_over_the_same_picture_is_refused(qtbot, tmp_path, 
     # and it does appear to: the clip queues after whatever the machine is on
     # and the picture on screen doesn't change. Two identical runs would spend
     # minutes of the one GPU making a clip that is already coming.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
 
@@ -16651,48 +16537,13 @@ def test_a_second_spoken_loop_over_the_same_picture_is_refused(qtbot, tmp_path, 
 
     assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
     assert len(_spoken_genau_rows(view)) == 1
-
-
-def test_one_said_while_the_video_is_still_being_chosen_is_refused_too(
-        qtbot, tmp_path, monkeypatch):
-    # The mined tier asks the local model which video fits and that thinks for
-    # several seconds — the exact silence a second command is said into, and
-    # there is no row yet to notice it by.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
-    thinking = []
-    monkeypatch.setattr(view, "off_thread",
-                        lambda work, done: thinking.append((work, done)))
-    surface = _VoiceSurface("img_act")
-    view._slideshows._slideshow = surface
-
-    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
-    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
-
-    assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
-    assert len(thinking) == 1
-    work, done = thinking[0]
-    done(work())  # the match comes back, and the one run it was for goes out
-    assert len(_spoken_genau_rows(view)) == 1
-
-
-def test_the_picture_is_let_go_of_when_the_act_has_no_past_video(qtbot, tmp_path, monkeypatch):
-    # A match that found nothing leaves nothing to wait for, so the picture must
-    # not stay held — asking again is the whole point once a loop exists.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
-    monkeypatch.setattr(combine_controller.act_settings, "most_used_video",
-                        lambda *a, **k: None)
-    view._slideshows._slideshow = _VoiceSurface("img_act")
-
-    view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
-
-    assert view._combine._genau_resolving == set()
 
 
 def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
     # A clip that has arrived is still a clip of this picture — asking again
     # would only re-make it, so it is answered rather than run.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
 
@@ -16711,7 +16562,7 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
         qtbot, tmp_path, monkeypatch):
     # Asking again is the only way to get a clip after a failure, so a row that
     # produced nothing must not read as this picture having been Genau'd.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
@@ -16727,7 +16578,7 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
         qtbot, tmp_path, monkeypatch):
     # Only a spoken one is stamped, and only a spoken one can be said again into
     # the wait: someone at the keyboard can see the queue they just joined.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     view._combine.generate_category("img_act", "alpha", act_settings.GENAU)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
@@ -16853,7 +16704,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     assert match("animate as alpha").command.act == "alpha"
     assert [part.name for part in match("fix teeth").command] == ["teeth"]
     assert match("start slideshow") is not None
-    assert match("make her hair longer") is None    # steering, not a command
+    assert match("make her hair longer") is None    # a sentence, not a command
     # The bare words are not in this one: they match whole utterances only,
     # which is what lets them be asked ahead of an opening request instead.
     assert match("weird") is None
@@ -16862,7 +16713,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
 def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
     # The folder is read off the lane, so a spoken send and a pressed one cannot
     # differ about where a clip lands.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")   # as a spoken launch would have
     clip = Path("C:/out/flf2v_loop_1.mp4")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
@@ -16879,7 +16730,7 @@ def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
 
 
 def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch):
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")
     view._db.mark_genau_exported("loop")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
@@ -16896,7 +16747,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
     # The inbox copy is the only thing that failed; the clip itself is fine, and
     # Send-to-Genau is still there to retry with.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
@@ -16909,34 +16760,6 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     view._on_reroll_finished("k", "loop")  # must not raise
 
     assert view._db.get_generation("loop")["genau_exported_at"] is None
-
-
-@pytest.mark.real_thread_hop
-def test_the_settings_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypatch):
-    # What must hold is that a match taking real time does not hold the UI thread
-    # while it takes it.
-
-    # The override is off by the marker, not by undoing every monkeypatch the
-    # fixtures made -- which took the mic and OSR2 guards with it, so this one
-    # test built its view with a real VoiceSteering (bug 43).
-
-    assert voice_router_module.VoiceSteering.__name__ == "FakeVoiceSteering"
-    db = _genau_db(tmp_path)
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    asked_on = {}
-
-    def slow_match(*a, **k):
-        asked_on["thread"] = threading.current_thread().name
-
-    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", slow_match)
-
-    view._combine.generate_category("img", "alpha", act_settings.GENAU)
-
-    qtbot.waitUntil(lambda: bool(view._live_jobs), timeout=5000)
-    assert asked_on["thread"] != threading.main_thread().name
-    assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
 # --- the bare vocabulary: a collection, a bank button, a word over the slideshow ---
@@ -17193,9 +17016,9 @@ def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
     assert surface.said == view._osr2_motion.status_text()
 
 
-def test_a_sentence_holding_a_command_word_still_steers_the_prompt(qtbot, tmp_path):
-    # Every miss falls through to a prompt rewrite, which is why nothing in the
-    # bare vocabulary may match anything but the whole utterance.
+def test_a_sentence_holding_a_command_word_is_no_command(qtbot, tmp_path):
+    # Nothing in the bare vocabulary matches anything but the whole utterance,
+    # so a sentence holding one of its words asks for nothing.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface

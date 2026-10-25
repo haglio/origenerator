@@ -103,7 +103,7 @@ _AUTO_TOOLTIP = (
 
 def _train_tooltip(part) -> str:
     folders = (f"{part.name.lower()}, and in fixes\\shared," if part.shared_photos
-               else part.name.lower())
+               else f"{part.name.lower()},")
     return ("Trains this fix a LoRA from the photos in the library's "
             f"app_data\\origenerator\\fixes\\{folders} each cropped down to the part by the "
             "fix's own detector. Nothing generates while it trains.")

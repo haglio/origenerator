@@ -1,36 +1,27 @@
 """Talk to the OSR2 device through the broker sibling.
 
 The broker owns the device, on whichever serial port its USB socket is given, and
-forwards raw T-code sent to its UDP listener straight to it, suppressing
-MultiFunPlayer for a moment so the two don't fight. So origenerator drives the
-device simply by streaming T-code here in sync with a playing video.  The
-device's own auto mode wins over that: while it runs, the broker drops what
-arrives here.
+hands it the T-code of the one sender holding its slot (``app_support.osr2_slot``),
+so origenerator drives the device by holding that slot while a driver drives and
+streaming T-code into it in sync with a playing video. The device's own auto mode
+wins over that: while it runs, the broker drops what arrives.
 
-Everything is best-effort: UDP to nobody is a harmless no-op, so the app behaves
-the same whether or not the broker is running.
+Everything is best-effort: a slot nobody listens on is dialed again a moment
+later, so the app behaves the same whether or not the broker is running.
 """
 
 from __future__ import annotations
 
-import logging
-import socket
 from pathlib import Path
 
-from app_support import osr2_device, ports
+from app_support import osr2_device
 from app_support.osr2_hold import ask_the_broker
-from funestra.tcode import (
-    UdpTCodeSink,
-    format_tcode_command,
-    to_tcode_position,
-)
+from app_support.osr2_slot import Osr2Sender
+from funestra.tcode import format_tcode_command, to_tcode_position
 
 from origenerator.config import project_dir
 
-logger = logging.getLogger(__name__)
-
-BROKER_HOST = "127.0.0.1"
-TCODE_UDP_PORT = ports.TCODE_UDP
+SENDER = "origenerator"
 # Not this app's state directory and not the broker's own checkout: the one
 # directory all three apps meet at, which the broker -- whose files they are --
 # names in its published broker_contract.json. Spelled here as well because this
@@ -64,46 +55,22 @@ def format_position(pos_0_100: float, interval_ms: float) -> str:
 
 
 class Osr2Broker:
-    """A thin UDP client to the broker's T-code listener.
+    """The app's way to the OSR2: the broker's slot, held while a driver drives,
+    and the broker's command file for its holds."""
 
-    Holds one datagram socket for streaming motion positions.  ``sock_factory`` is
-    injectable for tests.
-    """
-
-    def __init__(self, host: str = BROKER_HOST, port: int = TCODE_UDP_PORT, *,
-                 sock_factory=None, state_dir: Path = SHARED_STATE_DIR):
-        self._host = host
-        self._port = port
+    def __init__(self, *, port: int | None = None, state_dir: Path = SHARED_STATE_DIR):
+        self._sender = Osr2Sender(SENDER, port=port)
         self._state_dir = Path(state_dir)
-        self._sock_factory = sock_factory or (
-            lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        )
-        self._sink: UdpTCodeSink | None = None
-        self._send_error_logged = False
+
+    def want(self, wanted: bool) -> None:
+        self._sender.want(wanted)
 
     def send_position(self, pos_0_100: float, interval_ms: float) -> None:
         """Move the motion axis to ``pos_0_100`` over ``interval_ms``."""
-        self._send(format_position(pos_0_100, interval_ms))
+        self._sender.send(format_position(pos_0_100, interval_ms))
 
     def ask(self, verb: str) -> None:
         ask_the_broker(self._state_dir, verb)
 
     def close(self) -> None:
-        if self._sink is not None:
-            try:
-                self._sink.close()
-            except OSError:
-                pass
-            self._sink = None
-
-    def _send(self, line: str) -> None:
-        # The family's datagram sink, over a socket made on first use so a
-        # broker built for a session that never drives opens nothing.
-        try:
-            if self._sink is None:
-                self._sink = UdpTCodeSink(self._host, self._port, sock=self._sock_factory())
-            self._sink.send(line)
-        except OSError as e:  # nobody listening / socket gone — harmless, but surface it once
-            if not self._send_error_logged:
-                self._send_error_logged = True
-                logger.warning("OSR2 UDP send to %s:%s failed: %s", self._host, self._port, e)
+        self._sender.close()

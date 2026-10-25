@@ -400,7 +400,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # and the gallery's two close-time batches and their notes went with it.
 # 16400 when every send began asking after an earlier run, whichever copy started
 # the job, and the take-back constructor and its notes went.
-MAX_PROSE_LINES = 16400
+# 16395 when the app came to reach the OSR2 through the broker's one slot, taken
+# down to what the tree measured: the notes on its UDP sink went with the sink.
+MAX_PROSE_LINES = 16395
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

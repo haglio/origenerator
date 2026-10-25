@@ -147,6 +147,38 @@ def test_a_frozen_room_stops_a_script_at_once_and_asks_the_broker_to_park_it(qap
     assert driver.active
 
 
+def test_a_script_driving_the_osr2_holds_the_brokers_slot_until_it_lets_go(qapp):
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+    holding = broker.wanted[-1]
+
+    driver.stop()
+
+    assert (holding, broker.wanted[-1]) == (True, False)
+
+
+def test_a_frozen_room_lets_go_of_the_slot_and_playing_again_wants_it_afresh(qapp):
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    driver.set_frozen(True)
+    driver.set_frozen(False)
+
+    assert broker.wanted == [True, False, True]
+
+
+def test_a_script_started_in_a_frozen_room_waits_to_want_the_slot(qapp):
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.set_frozen(True)
+
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    assert broker.wanted == [False]
+
+
 def test_a_script_played_again_hands_the_device_back_and_follows_the_playhead(qapp):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)

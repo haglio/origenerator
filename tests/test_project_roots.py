@@ -77,11 +77,6 @@ class TestTheValuesAnotherAppHoldsToo:
     hears nothing, with no error anywhere.
     """
 
-    def test_the_broker_takes_t_code_on_this_udp_port(self):
-        # osr2_broker/session.py binds the same number. A different one here is an
-        # OSR2 that never moves, with nothing on screen saying why.
-        assert osr2.TCODE_UDP_PORT == 50557
-
     def test_the_shared_osr2_state_lives_in_fun_times_checkout(self):
         # Not this app's state dir and not the broker's: fun_time's, which is
         # where all three look for these files.

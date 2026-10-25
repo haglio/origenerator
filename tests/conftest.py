@@ -343,6 +343,7 @@ def keep_off_the_device(setattr) -> None:
     default, so nothing is left reaching the hardware by accident.
     """
     class _NoDevice:
+        def want(self, wanted): pass
         def ask(self, verb): pass
         def send_position(self, pos, interval_ms): pass
         def close(self): pass

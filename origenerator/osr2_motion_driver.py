@@ -160,6 +160,7 @@ class Osr2MotionDriver(QObject):
         self._active = False
         self._state.state.playing = False
         self._stop_the_clock()
+        self._broker.want(False)
         self._ask_the_broker(PARK)
         logger.info("OSR2 motion released: parked")
         self.active_changed.emit(False)
@@ -172,6 +173,7 @@ class Osr2MotionDriver(QObject):
         return self._active and self._frozen and self._held is None
 
     def _run_the_clock_while_sending(self) -> None:
+        self._broker.want(self._sending())
         if self._sending():
             if self._ticker is None:
                 self._hand_the_device_back()

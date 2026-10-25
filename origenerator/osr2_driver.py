@@ -64,6 +64,7 @@ class Osr2Driver(QObject):
             return
         self._frozen = frozen
         if self._player is not None:
+            self._broker.want(not frozen)
             self._broker.ask(PARK if frozen else RESUME)
 
     @property
@@ -83,6 +84,7 @@ class Osr2Driver(QObject):
         self._script = Funscript(sorted((int(a["at"]), int(a["pos"])) for a in actions))
         self._duration_ms = self._script.actions[-1][0]
         self._streaming = False  # for a one-shot "first T-code sent" log line
+        self._broker.want(not self._frozen)
         self._broker.ask(PARK if self._frozen else RESUME)
         self._running_ahead.enter_context(ahead_while_playing())
         self._timer.start()
@@ -98,6 +100,7 @@ class Osr2Driver(QObject):
         self._player = None
         self._script = None
         self._duration_ms = 0
+        self._broker.want(False)
         if not self._frozen:
             self._broker.ask(PARK)
         logger.info("OSR2 drive released: parked")

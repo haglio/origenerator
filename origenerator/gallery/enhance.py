@@ -379,11 +379,14 @@ def level_matching_params(row: dict, wanted: dict | None) -> int | None:
     directly (a spoken targeted fix) rather than from folder settings."""
     if wanted is None:
         return None
-    settings = full_settings(wanted)
     for position, level in enumerate(enhance_levels(row)):
-        if level.params and full_settings(level.params) == settings:
+        if level.params and same_enhancement(level.params, wanted):
             return position
     return None
+
+
+def same_enhancement(params: dict, other: dict) -> bool:
+    return full_settings(params) == full_settings(other)
 
 
 def most_used_enhancements(rows, count: int) -> list[dict]:

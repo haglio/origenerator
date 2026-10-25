@@ -414,6 +414,34 @@ def test_a_launch_the_server_refused_is_logged_rather_than_dropped(enhance,
     assert "could not launch" in caplog.text
 
 
+def test_an_image_already_holding_an_enhancement_at_these_settings_is_not_enhanced_again(
+        enhance, monkeypatch):
+    params = {"input_image": "one.png"}
+    monkeypatch.setattr(module.gallery, "enhance_params_for", lambda row, settings: params)
+    asked = []
+    monkeypatch.setattr(module.gallery, "level_matching_params",
+                        lambda row, wanted: asked.append((row["prompt_id"], wanted)) or 0)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+
+    controller.enhance_items(["i1"])
+
+    assert jobs.prepared == []
+    assert asked == [("i1", params)]
+
+
+def test_an_image_with_an_enhancement_at_these_settings_on_its_way_is_not_enhanced_again(
+        enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": "one.png"})
+    jobs = FakeReroll(jobs=[FakeJob("run-0", input_image="one.png", state="queued")])
+    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+
+    controller.enhance_items(["i1"])
+
+    assert jobs.prepared == []
+
+
 def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
     # With it on the app turns out finished images rather than raw ones, without
     # pressing Enhance All after every run.

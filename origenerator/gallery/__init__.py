@@ -67,6 +67,7 @@ from origenerator.gallery.enhance import (
     original_files_of,
     remove_enhance_levels,
     rows_awaiting_enhancement,
+    same_enhancement,
 )
 from origenerator.gallery.enhance_fold import (
     disown_foreign_runs,
@@ -288,6 +289,7 @@ __all__ = [
     "rows_awaiting_enhancement",
     "rows_in_settings",
     "rows_under",
+    "same_enhancement",
     "section_headings",
     "selection_group",
     "settings_folder_key",

@@ -53,8 +53,8 @@ def _trim_row(prompt_id="cut1", trimmed_from="vid1", input_image="sdxl_t2i_img1.
     }
 
 
-def _combined_row(prompt_id="made1", recipe_video_id="vid0"):
-    return {**_video_row(prompt_id), "recipe_video_id": recipe_video_id}
+def _combined_row(prompt_id="made1", source_video="vid0"):
+    return {**_video_row(prompt_id), "source_video": source_video}
 
 
 @pytest.fixture
@@ -337,7 +337,7 @@ def test_the_next_row_with_no_source_video_takes_that_link_away(make_related):
 
 
 def test_a_source_video_since_deleted_leaves_no_link_to_it(related):
-    related.show_row(_combined_row(recipe_video_id="deleted"), [_image_row()])
+    related.show_row(_combined_row(source_video="deleted"), [_image_row()])
 
     assert related._source_video_tile.isHidden()
     assert related._source_tile._prompt_id == "img1"

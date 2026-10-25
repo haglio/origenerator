@@ -20,8 +20,8 @@ this are the live install's and a worktree's copy is a throwaway.
 Interrupting is safe: each row is folded as it lands, and a re-run — or the next
 absence — picks up whatever is left.
 
-Nothing about a repair is decided here. Which rows need one, what recipe
-reproduces it, how one is run and how the result is attached are all
+Nothing about a repair is decided here. Which rows need one, what settings
+reproduce it, how one is run and how the result is attached are all
 :mod:`origenerator.base_backfill`, so this cannot answer a question differently
 from the way the app answers it; what is here is the argument parsing and the
 report.

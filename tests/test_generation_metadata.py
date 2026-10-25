@@ -6,6 +6,7 @@ from origenerator import config
 from origenerator.config import OUTPUT_PLACES
 from origenerator.generation_metadata import basic_section, created_item, file_item
 from origenerator.output_places import OutputPlaces
+from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 
 
 def _row(**overrides):
@@ -123,10 +124,10 @@ def test_created_row_carries_no_reveal_path():
     assert created.reveal is None
 
 
-def _stamped(**block):
-    return json.dumps({"recipe": "wan22_i2v", "recipe_version": "v007",
+def _stamped(workflow="wan22_i2v", version="v007", basis="recorded", **block):
+    return json.dumps({WORKFLOW: workflow, WORKFLOW_VERSION: version,
                        "app_commit": "1a2b3c4d5e6f7a8b", "app_dirty": False,
-                       "recipe_version_basis": "recorded", **block})
+                       BASIS: basis, **block})
 
 
 def test_the_block_ends_with_the_workflow_version_and_the_app_build_that_ran_it():
@@ -136,28 +137,28 @@ def test_the_block_ends_with_the_workflow_version_and_the_app_build_that_ran_it(
 
 
 def test_an_image_with_a_stamp_shows_a_block_of_just_its_workflow_version():
-    row = _image_row(provenance=_stamped(recipe="sdxl_t2i", recipe_version="v004"))
+    row = _image_row(provenance=_stamped(workflow="sdxl_t2i", version="v004"))
 
     assert [(item.label, item.value) for item in basic_section(row).items] == [
         ("Workflow version", "v004 (app build 1a2b3c4)")]
 
 
 def test_a_version_worked_out_from_the_files_date_says_so():
-    row = _row(provenance=_stamped(recipe_version="v004", app_commit=None, app_dirty=None,
-                                   recipe_version_basis="file_date"))
+    row = _row(provenance=_stamped(version="v004", app_commit=None, app_dirty=None,
+                                   basis="file_date"))
 
     assert basic_section(row).items[-1].value == "v004 (going by the file's date)"
 
 
 def test_a_block_that_could_not_work_out_a_version_says_unknown():
-    row = _row(provenance=_stamped(recipe_version=None, app_commit=None, app_dirty=None,
-                                   recipe_version_basis=None))
+    row = _row(provenance=_stamped(version=None, app_commit=None, app_dirty=None,
+                                   basis=None))
 
     assert basic_section(row).items[-1].value == "unknown"
 
 
 def test_a_version_recorded_before_builds_were_noted_shows_just_the_version():
-    row = _row(provenance=_stamped(recipe_version="v002", app_commit=None, app_dirty=None))
+    row = _row(provenance=_stamped(version="v002", app_commit=None, app_dirty=None))
 
     assert basic_section(row).items[-1].value == "v002"
 
@@ -170,7 +171,7 @@ def test_a_build_that_carried_uncommitted_edits_says_so():
 
 
 def test_an_item_from_a_workflow_the_app_no_longer_has_names_no_workflow_version():
-    row = _row(workflow_name="wan21_ati_i2v", provenance=_stamped(recipe="wan21_ati_i2v"))
+    row = _row(workflow_name="wan21_ati_i2v", provenance=_stamped(workflow="wan21_ati_i2v"))
 
     assert [item.label for item in basic_section(row).items] == ["File", "Created"]
 

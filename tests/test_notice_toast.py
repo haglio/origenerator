@@ -14,7 +14,7 @@ _RUN = "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
 
 
 def _notice(generation=_RUN):
-    return Notice("Video ready", "Example Recipe · 4:12", ok=True, generation=generation)
+    return Notice("Video ready", "Example Workflow · 4:12", ok=True, generation=generation)
 
 
 def _filings(monkeypatch):

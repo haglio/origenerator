@@ -17,6 +17,7 @@ from origenerator.gui.generation_job import (
     insert_generation_row,
 )
 from origenerator.output_places import OutputPlaces
+from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -78,9 +79,9 @@ def test_a_launched_row_records_which_version_of_its_workflow_ran(qtbot, tmp_pat
     insert_generation_row(db, job)
 
     block = json.loads(db.get_generation(job.prompt_id)["provenance"])
-    assert (block["app"], block["recipe"], block["recipe_version"],
-            block["recipe_version_basis"]) == ("origenerator", "sdxl_t2i", SDXL.version,
-                                               "recorded")
+    assert (block["app"], block[WORKFLOW], block[WORKFLOW_VERSION],
+            block[BASIS]) == ("origenerator", "sdxl_t2i", SDXL.version,
+                              "recorded")
 
 
 def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
@@ -523,7 +524,7 @@ def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
 
 def test_media_type_comes_from_the_workflow_not_a_file(qtbot, tmp_path):
     # The queue places a job before it has run, so what it will produce has to be
-    # readable from the recipe alone.
+    # readable from the settings alone.
     image = GenerationJob(_client(), SDXL, _params())
     video = GenerationJob(_client(), WORKFLOW_REGISTRY["wan22_i2v"],
                           WORKFLOW_REGISTRY["wan22_i2v"].default_params())

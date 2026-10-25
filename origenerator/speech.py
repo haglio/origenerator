@@ -4,13 +4,13 @@ load, before the video that moves her lips to it is submitted.
 A story's scenes carry ``scene_lines`` beside their prompts (see
 :mod:`origenerator.gui.scenes_editor`). A scene with a line renders on WAN 2.2's
 speech-to-video model, which reads the line as audio, so the audio has to exist
-first: this module says which files a recipe needs and makes the ones missing.
+first: this module says which files a run's settings need and makes the ones missing.
 
 The voice is Qwen3-TTS, run by ``tools/speech_worker.py`` in a Python
 environment of its own -- its pins would break the app's and ComfyUI's -- named
 by ``speech_python`` in the overlay. A line's file is named from everything that
-shapes it (the words, the voice, the seed, the scene's length), so re-running a
-recipe finds its lines already made, and a changed word or voice makes new ones.
+shapes it (the words, the voice, the seed, the scene's length), so re-running the
+same settings finds their lines already made, and a changed word or voice makes new ones.
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ class SceneSpeech:
 
 
 def voice_request(params: dict) -> dict:
-    """Whose voice the lines are spoken in: the recording the recipe names when
+    """Whose voice the lines are spoken in: the recording the settings name when
     its Voice is the custom one (with what the recording says, which makes the
     copy a close one), else the preset speaker the Voice names."""
     voice = str(params.get("voice") or VOICE_PRESETS[0])
@@ -91,8 +91,8 @@ def scene_speech(params: dict) -> list[SceneSpeech | None]:
     """What each scene says, or ``None`` for a scene with no line.
 
     The scenes are ``scene_frames``, one length each; a lone scene is the whole
-    clip and runs for ``frame_count`` -- the same reading of a recipe the graph's
-    scene plan makes, so line and segment agree on the seconds. A recipe with
+    clip and runs for ``frame_count`` -- the same reading of the settings the graph's
+    scene plan makes, so line and segment agree on the seconds. Settings with
     no ``scene_lines`` at all is a workflow that cannot speak: no scenes.
     """
     if "scene_lines" not in params:

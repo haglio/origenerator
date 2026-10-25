@@ -67,13 +67,13 @@ from shared_ui.icons import marked_text
 from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
+    act_settings,
     evolver_export,
     fix_training,
     gallery,
     motion_engine,
     osr2_driver,
     outside_videos,
-    recipe_match,
     search,
 )
 from origenerator.animate_command import AnimateRequest
@@ -295,10 +295,10 @@ class FakeDB:
         return list(self._combine_video_uses)
 
     def custom_combinations(self):
-        return [{"prompt_id": row["prompt_id"], "recipe_video_id": row["recipe_video_id"],
+        return [{"prompt_id": row["prompt_id"], "source_video": row["source_video"],
                  "created_at": row.get("created_at") or ""}
                 for row in self._rows
-                if row.get("recipe_video_id") and not row.get("recipe_category")]
+                if row.get("source_video") and not row.get("act")]
 
     def list_item_numbers(self):
         return dict(self._item_numbers)
@@ -454,7 +454,7 @@ def _image(prompt_id, prompt, steps, seed):
 
 
 def _enhanced_image(prompt_id, prompt, steps, seed):
-    """An image whose recipe ran the enhance tail — one wearing the yellow plus."""
+    """An image whose settings ran the enhance tail — one wearing the yellow plus."""
     return _row(prompt_id, "sdxl_t2i",
                 {"positive_prompt": prompt, "steps": steps, "seed": seed,
                  "enhance": True},
@@ -577,7 +577,7 @@ def _workflow_rows(tree, media=None, side=LANDSCAPE):
 
 
 def _image_workflow(tree, side=LANDSCAPE):
-    """The sole image workflow's row — where a one-recipe gallery starts."""
+    """The sole image workflow's row — where a one-workflow gallery starts."""
     (row,) = _workflow_rows(tree, "image", side).values()
     return row
 
@@ -664,7 +664,7 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     assert not _at(workflow, 0).data(0, RECENT_ROLE)    # and nothing the model left out
 
 
-def test_tree_rows_carry_a_recipe_level_badge(qtbot):
+def test_tree_rows_carry_a_folder_level_badge(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1548,9 +1548,9 @@ def _section_headers(view):
             if w.objectName() == "tileGroupHeading"]
 
 
-def test_the_recipe_sort_bands_the_results_by_model_and_lora(qtbot):
+def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     # The other question a search answers: not "where is it" but "which
-    # recipe was that" — so the hits are cut into a labelled band per
+    # model and LoRA was that" — so the hits are cut into a labelled band per
     # model + LoRA combination instead of interleaved.
     rows = [_i2v_video("v1", "styleA", prompt="a cat indoors"),
             _i2v_video("v2", "styleA", prompt="a cat outdoors"),
@@ -1559,7 +1559,7 @@ def test_the_recipe_sort_bands_the_results_by_model_and_lora(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_RECIPE)
+    view.set_search_sort(search.SORT_MODEL_LORA)
 
     headings = [w.text() for w in _section_headers(view)]
 
@@ -1569,7 +1569,16 @@ def test_the_recipe_sort_bands_the_results_by_model_and_lora(qtbot):
     assert headings[0].endswith("(2)")   # the bigger band leads
 
 
-def test_a_recipe_band_folds_shut_on_its_heading(qtbot):
+def test_the_model_lora_order_remembered_under_its_old_name_comes_back(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+
+    view.set_search_sort("recipe")
+
+    assert view.search_sort() == search.SORT_MODEL_LORA
+
+
+def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
     # With a dozen combinations under a broad query, being able to shut the ones
     # you are not asking about is what makes the sort usable rather than sorted.
     rows = [_i2v_video("v1", "styleA", prompt="a cat"),
@@ -1578,7 +1587,7 @@ def test_a_recipe_band_folds_shut_on_its_heading(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_RECIPE)
+    view.set_search_sort(search.SORT_MODEL_LORA)
     header = _section_headers(view)[0]
     band = view._scroll.widget().layout().itemAt(1).widget()
     assert band.isVisible() or not view.isVisible()  # laid out open to begin with
@@ -1598,7 +1607,7 @@ def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_RECIPE)
+    view.set_search_sort(search.SORT_MODEL_LORA)
     shut = next(h for h in _section_headers(view) if "styleA" in h.text())
     shut.click()
 
@@ -4049,7 +4058,7 @@ def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtb
     assert view.visible_prompt_ids() == ["i2"]
 
 
-def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
+def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
     still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
     clip = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
     view = GalleryView(FakeDB([still, clip]))
@@ -7209,7 +7218,7 @@ def test_the_loop_ending_lets_the_pane_go(qtbot, tmp_path):
 
 
 def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path):
-    # The claim is by folder, so a tab parked on a different recipe stays idle
+    # The claim is by folder, so a tab parked on different settings stays idle
     # rather than showing progress for a run that has nothing to do with it.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
@@ -7217,7 +7226,7 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
     view.refresh()
     _select_first_leaf(view)
     panel = _folder_tab(view, db)
-    panel._param_form.set_values({"positive_prompt": "an entirely different recipe"})
+    panel._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
     _reroll_tile(view).add_requested.emit()
 
@@ -7236,7 +7245,7 @@ def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     parked = _folder_tab(view, db)
-    parked._param_form.set_values({"positive_prompt": "an entirely different recipe"})
+    parked._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
     _reroll_tile(view).add_requested.emit()
 
@@ -7256,7 +7265,7 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
     parked = _folder_tab(view, db)
-    parked._param_form.set_values({"positive_prompt": "an entirely different recipe"})
+    parked._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
     _reroll_tile(view).add_requested.emit()
 
@@ -10539,7 +10548,7 @@ def test_a_job_nobody_asked_for_out_loud_is_not_marked(qtbot):
 
 
 def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
-    # Its row shows that picture: two i2v runs off one recipe are the same
+    # Its row shows that picture: two i2v runs off one folder's settings are the same
     # caption and differ only in the frame.
     db = FakeDB([])
     db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
@@ -10591,58 +10600,58 @@ def test_a_job_started_from_words_alone_names_no_frame(qtbot):
 
 
 def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
-    # No act was picked, so the picture is the only thing naming which recipe
+    # No act was picked, so the picture is the only thing naming which source video
     # this run is of — and its row is where that gets read.
     db = FakeDB([])
-    db.add(_row("recipe", "wan22_i2v", {"positive_prompt": "dance"}, "recipe.mp4",
-                thumbnail_path="thumbs/recipe.jpg"))
+    db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
+                thumbnail_path="thumbs/source.jpg"))
     db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
                 "rr1.mp4", status="running", output_files="[]",
-                recipe_video_id="recipe"))
+                source_video="source"))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
     item = {it.key: it for it in view._inflight_items()}["rr1"]
-    assert item.recipe_category == ""
-    assert item.recipe_thumbnail == "thumbs/recipe.jpg"
+    assert item.act == ""
+    assert item.source_video_thumbnail == "thumbs/source.jpg"
 
 
 @pytest.mark.parametrize(("prompt", "stands_apart"), [("dance", False),
                                                       ("dance in the rain", True)])
-def test_a_combine_whose_words_left_its_recipes_says_so_on_its_row(qtbot, prompt, stands_apart):
+def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, prompt, stands_apart):
     db = FakeDB([])
-    db.add(_row("recipe", "wan22_i2v", {"positive_prompt": "dance"}, "recipe.mp4",
-                thumbnail_path="thumbs/recipe.jpg"))
+    db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
+                thumbnail_path="thumbs/source.jpg"))
     db.add(_row("rr1", "wan22_i2v",
                 {"positive_prompt": prompt, "input_image": "kite_00007_.png [output]"},
-                "rr1.mp4", status="running", output_files="[]", recipe_video_id="recipe"))
+                "rr1.mp4", status="running", output_files="[]", source_video="source"))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
     item = {it.key: it for it in view._inflight_items()}["rr1"]
-    assert item.recipe_prompt_edited is stands_apart
+    assert item.prompt_edited is stands_apart
 
 
-def test_a_picked_act_shows_no_recipe_picture_at_all(qtbot):
+def test_a_picked_act_shows_no_source_video_at_all(qtbot):
     # The act names what the video will do, which is the whole of what was
-    # chosen. The clip its recipe was mined out of answers a question nobody
+    # chosen. The clip its settings were mined out of answers a question nobody
     # asked, and a picture of a video the user never picked reads as a job that
     # is that video.
     db = FakeDB([])
-    db.add(_row("recipe", "wan22_i2v", {"positive_prompt": "dance"}, "recipe.mp4",
-                thumbnail_path="thumbs/recipe.jpg"))
+    db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
+                thumbnail_path="thumbs/source.jpg"))
     db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
                 "rr1.mp4", status="running", output_files="[]",
-                recipe_category="dancing", recipe_video_id="recipe"))
+                act="dancing", source_video="source"))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
     item = {it.key: it for it in view._inflight_items()}["rr1"]
-    assert item.recipe_category == "dancing"
-    assert item.recipe_thumbnail is None
+    assert item.act == "dancing"
+    assert item.source_video_thumbnail is None
 
 
 def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
@@ -10654,8 +10663,8 @@ def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
     view.refresh()
 
     item = view._inflight_items()[0]
-    assert item.recipe_category == ""
-    assert item.recipe_thumbnail is None
+    assert item.act == ""
+    assert item.source_video_thumbnail is None
 
 
 def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
@@ -10678,7 +10687,7 @@ def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
     )
 
 
-def test_the_first_run_of_a_new_recipe_has_no_folder_to_show(qtbot):
+def test_the_first_run_of_new_settings_has_no_folder_to_show(qtbot):
     # Nothing has landed there yet, so there is no folder in the tree at all —
     # and the row draws no block rather than an empty grid.
     db = FakeDB([_image("elsewhere", "a boat", 50, 1)])
@@ -10811,11 +10820,11 @@ def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     assert "rr_running" in gv._browser._inflight_cards
 
 
-# --- combine: a video's recipe applied to a dropped image -------------------
+# --- combine: a video's settings applied to a dropped image -----------------
 
 
 def _combine_db(tmp_path, *, enhanced=True):
-    """A DB with one SDXL image to drop in and one i2v video whose recipe to reuse.
+    """A DB with one SDXL image to drop in and one i2v video whose settings to reuse.
 
     The video's own input image is left at the workflow default (empty), so the
     combined result — keyed to the dropped image — lands in a fresh folder. Rows
@@ -10845,11 +10854,11 @@ def _combine_db(tmp_path, *, enhanced=True):
     )
     db.update_generation("vid", status="completed",
                          output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
-    db.set_recipe_source("vid", category="dancing")
+    db.set_settings_source("vid", category="dancing")
     return db
 
 
-def _loop_recipe(db, prompt_id="loop"):
+def _looping_video(db, prompt_id="loop"):
     """A past looping clip for the Genau lane to mine, sampled the long way --
     21 frames at 16fps, which is a cycle and a half and the whole problem."""
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
@@ -10864,18 +10873,18 @@ def _loop_recipe(db, prompt_id="loop"):
     return wf
 
 
-def test_the_genau_lane_asks_for_a_recipe_one_cycle_long(qtbot, tmp_path):
+def test_the_genau_lane_asks_for_settings_one_cycle_long(qtbot, tmp_path):
     """The lane used to choose only WHICH past clip was mined, and from there a
     Genau flick was made exactly like any other video. It cannot be: what Genau
     needs of a clip is a property of its LENGTH, and the clip being mined was
     made before anyone knew that."""
     db = _combine_db(tmp_path)
-    wf = _loop_recipe(db)
+    wf = _looping_video(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._generate_combination("img", "loop", intent=recipe_match.GENAU)
+    view._combine._generate_combination("img", "loop", intent=act_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
     assert job.params["frame_count"] == gallery.CYCLE_FRAMES   # the length that closes
@@ -10887,7 +10896,7 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
     """A cycle is not one motion, so the wording is per act — and the act has to
     reach the shaping, which is the whole reason it is threaded through."""
     db = _combine_db(tmp_path)
-    _loop_recipe(db)
+    _looping_video(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -10901,19 +10910,19 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
 
     gallery_view_module.gallery.cycle_shaped = spy
     try:
-        view._combine._generate_combination("img", "loop", intent=recipe_match.GENAU,
-                                   category="beta")
+        view._combine._generate_combination("img", "loop", intent=act_settings.GENAU,
+                                            category="beta")
     finally:
         gallery_view_module.gallery.cycle_shaped = real
 
     assert asked == ["beta"]
 
 
-def test_the_video_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
-    # A clip for a Funestra is watched at its own rate and wants the recipe that
+def test_the_video_lane_takes_the_mined_settings_as_they_stand(qtbot, tmp_path):
+    # A clip for a Funestra is watched at its own rate and wants the settings that
     # made the one it was mined from.
     db = _combine_db(tmp_path)
-    wf = _loop_recipe(db)
+    wf = _looping_video(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -10926,7 +10935,7 @@ def test_the_video_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
     assert job.params["positive_prompt"] == "alpha"
 
 
-def test_combine_submits_the_recipe_on_the_dropped_picture_with_a_fresh_seed(qtbot, tmp_path):
+def test_combine_submits_the_settings_on_the_dropped_picture_with_a_fresh_seed(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -11007,12 +11016,12 @@ def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tm
     assert tabs.tabBar()._preview_index == tabs.indexOf(panel)
 
 
-def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_path, monkeypatch):
+def test_open_category_opens_the_resolved_video_without_launching(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
 
     view._combine._open_category("img", "dancing")  # the combine DB's one clip is a "dance"
 
@@ -11020,15 +11029,15 @@ def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_pa
     view._client.submit_job.assert_not_called()
     config = view._info_tabs.current_config_panel().current_config()
     assert config.workflow_name == "wan22_i2v"
-    assert config.params["input_image"] == "sdxl_pick.png [output]"  # recipe on the dropped image
+    assert config.params["input_image"] == "sdxl_pick.png [output]"  # settings on the dropped image
 
 
 def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon recipe exists
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon video exists
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     tabs_before = view._info_tabs.count()
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
@@ -11036,7 +11045,7 @@ def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, 
 
     view._combine._open_category("img", "epsilon")
 
-    assert view._info_tabs.count() == tabs_before  # no recipe to open: no tab forked
+    assert view._info_tabs.count() == tabs_before  # no settings to open: no tab forked
     assert shown                                   # but tell the user why
 
 
@@ -11499,7 +11508,7 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
     assert view._live_jobs == {}
 
 
-def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
+def test_category_uses_the_scene_matched_video(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -11510,19 +11519,19 @@ def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
         seen.update(category=category, image_scene=image_scene,
                     scened=all("start_scene" in c for c in candidates),
                     ids=[c.get("prompt_id") for c in candidates])
-        return "vid"  # the recipe whose starting scene fits this image
+        return "vid"  # the video whose starting scene fits this image
 
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", fake_smart)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", fake_smart)
 
     view._combine.generate_category("img", "alpha")
 
     assert seen["category"] == "alpha"
     assert seen["image_scene"] == "a dog"   # the dropped image's own prompt is the scene to match
-    assert seen["scened"]                    # candidates enriched with each recipe's start scene
+    assert seen["scened"]                    # candidates enriched with each video's start scene
     assert seen["ids"] == ["vid"]            # only the rebuildable i2v video is a candidate (not the image)
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
-    assert job.params["input_image"] == "sdxl_pick.png [output]"  # recipe run on the dropped image
+    assert job.params["input_image"] == "sdxl_pick.png [output]"  # settings run on the dropped image
 
 
 def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tmp_path, monkeypatch):
@@ -11530,31 +11539,31 @@ def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tm
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     called = {}
 
-    def fake_best(category, candidates, intent=recipe_match.VIDEO):
+    def fake_best(category, candidates, intent=act_settings.VIDEO):
         called["category"] = category
         called["intent"] = intent
         return "vid"
 
-    monkeypatch.setattr(combine_controller.recipe_match, "best_recipe", fake_best)
+    monkeypatch.setattr(combine_controller.act_settings, "most_used_video", fake_best)
 
     view._combine.generate_category("img", "alpha")
 
-    assert called["category"] == "alpha"   # model unavailable → the act's most-used recipe
+    assert called["category"] == "alpha"   # model unavailable → the act's most-used video
     job = next(iter(view._live_jobs.values()))
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
 
-def test_category_launches_a_real_recipe_via_the_fallback(qtbot, tmp_path, monkeypatch):
-    # No live model in tests, so force the deterministic fallback: real best_recipe then
+def test_category_launches_a_real_video_via_the_fallback(qtbot, tmp_path, monkeypatch):
+    # No live model in tests, so force the deterministic fallback: real most_used_video then
     # finds the combine DB's one "dance" clip for the "dancing" act and runs it.
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
 
     view._combine.generate_category("img", "dancing")
 
@@ -11574,11 +11583,11 @@ def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
     enabled = {combo.itemText(i) for i in range(1, combo.count())
                if combo.model().item(i).isEnabled()}
     # "dancing" has a video to mine; "gamma" needs none — the example overlay
-    # curates a recipe for it.
+    # pins settings for it.
     assert enabled == {"dancing", "gamma"}
 
 
-def test_category_prefers_the_overlays_curated_recipe_over_mining(qtbot, tmp_path, monkeypatch):
+def test_category_prefers_the_overlays_pinned_settings_over_mining(qtbot, tmp_path, monkeypatch):
     # "gamma" is curated in the example overlay, so the launch takes its pinned
     # workflow+params — mining is never consulted, and the gallery needs no past
     # gamma video at all.
@@ -11586,7 +11595,7 @@ def test_category_prefers_the_overlays_curated_recipe_over_mining(qtbot, tmp_pat
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe",
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
 
     view._combine.generate_category("img", "gamma")
@@ -11633,12 +11642,12 @@ def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_pat
     view.refresh()
     monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
 
-    view._combine._on_generate_category("img", "dancing", recipe_match.VIDEO)
+    view._combine._on_generate_category("img", "dancing", act_settings.VIDEO)
 
     item = view._queue._items[0]
-    assert item.recipe_category == "dancing"
+    assert item.act == "dancing"
     assert item.source_image == "sdxl_pick.png [output]"  # the frame being animated
-    assert item.recipe_thumbnail is None  # an act names itself; no clip to show
+    assert item.source_video_thumbnail is None  # an act names itself; no clip to show
     assert item.cancel is None            # nothing on the server to stop yet
 
 
@@ -11655,20 +11664,20 @@ def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypat
                        intent=view._combine.panel.selected_intent()))
 
     item = view._queue._items[0]
-    assert item.recipe_thumbnail == "thumbs/vid.jpg"
-    assert item.recipe_category == ""
+    assert item.source_video_thumbnail == "thumbs/vid.jpg"
+    assert item.act == ""
 
 
-def test_the_stand_in_row_goes_when_the_act_has_no_recipe(qtbot, tmp_path, monkeypatch):
+def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, monkeypatch):
     # It stands in for a launch, so it must not outlive one that never happened.
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip: no epsilon recipe
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip: no epsilon video
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
 
-    view._combine._on_generate_category("img", "epsilon", recipe_match.VIDEO)
+    view._combine._on_generate_category("img", "epsilon", act_settings.VIDEO)
 
     assert view._queue.rows() == []
     assert view._live_jobs == {}
@@ -11680,12 +11689,12 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._on_generate_category("missing", "dancing", recipe_match.VIDEO)
+    view._combine._on_generate_category("missing", "dancing", act_settings.VIDEO)
 
     assert view._queue.rows() == []
 
 
-# --- what a combine's run records about where its recipe came from ----------
+# --- what a combine's run records about where its settings came from --------
 
 
 def _launched_row(view):
@@ -11694,7 +11703,7 @@ def _launched_row(view):
     return view._db.get_generation(job.prompt_id)
 
 
-def test_a_dropped_recipe_names_the_video_it_came_from(qtbot, tmp_path):
+def test_settings_from_a_dropped_video_name_that_video(qtbot, tmp_path):
     # Nothing in the params says which video the settings were lifted off, and
     # the queue row draws that clip in gray beside the frame being animated.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
@@ -11704,8 +11713,8 @@ def test_a_dropped_recipe_names_the_video_it_came_from(qtbot, tmp_path):
     view._combine._generate_combination("img", "vid")
 
     row = _launched_row(view)
-    assert row["recipe_video_id"] == "vid"
-    assert row["recipe_category"] is None  # a dropped video is no dropdown choice
+    assert row["source_video"] == "vid"
+    assert row["act"] is None  # a dropped video is no dropdown choice
 
 
 def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, tmp_path):
@@ -11713,28 +11722,28 @@ def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, 
     db = _combine_db(tmp_path)
     db.insert_generation(prompt_id="made", workflow_name="wan22_i2v",
                          workflow_version=_WAN_I2V.version, params_json="{}", workflow_json="{}")
-    db.set_recipe_source("made", video_prompt_id="vid")
+    db.set_settings_source("made", video_prompt_id="vid")
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     panel = view._combine.panel
 
     assert _listed_under_recent(panel) == ["vid"]
-    panel.set_intent(recipe_match.GENAU)
+    panel.set_intent(act_settings.GENAU)
     assert _listed_under_recent(panel) == ["vid"]
 
 
-def test_a_picked_act_is_recorded_with_the_recipe_it_resolved_to(qtbot, tmp_path, monkeypatch):
+def test_a_picked_act_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
 
     view._combine.generate_category("img", "dancing")
 
     row = _launched_row(view)
-    assert row["recipe_category"] == "dancing"
-    assert row["recipe_video_id"] == "vid"
+    assert row["act"] == "dancing"
+    assert row["source_video"] == "vid"
 
 
 def test_a_curated_act_records_the_act_with_no_video_behind_it(qtbot, tmp_path):
@@ -11747,18 +11756,18 @@ def test_a_curated_act_records_the_act_with_no_video_behind_it(qtbot, tmp_path):
     view._combine.generate_category("img", "gamma")
 
     row = _launched_row(view)
-    assert row["recipe_category"] == "gamma"
-    assert row["recipe_video_id"] is None
+    assert row["act"] == "gamma"
+    assert row["source_video"] is None
 
 
-def test_open_in_generator_marks_the_tab_with_where_the_recipe_came_from(qtbot, tmp_path):
+def test_open_in_generator_marks_the_tab_with_where_the_settings_came_from(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
     view._combine._open_combination("img", "vid", "dancing")
 
-    assert _front_panel(view).recipe_source() == ("dancing", "vid", recipe_match.VIDEO)
+    assert _front_panel(view).settings_source() == ("dancing", "vid", act_settings.VIDEO)
 
 
 def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_path, monkeypatch):
@@ -11767,7 +11776,7 @@ def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     view._combine._open_category("img", "dancing")
     panel = _front_panel(view)
     panel._param_form.set_values({"positive_prompt": "edited before running"})
@@ -11775,8 +11784,8 @@ def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_
     panel._on_generate()
 
     row = _launched_row(view)
-    assert row["recipe_category"] == "dancing"
-    assert row["recipe_video_id"] == "vid"
+    assert row["act"] == "dancing"
+    assert row["source_video"] == "vid"
 
 
 def test_a_generate_from_an_opened_dropped_video_notes_the_lane_it_was_opened_under(
@@ -11784,16 +11793,16 @@ def test_a_generate_from_an_opened_dropped_video_notes_the_lane_it_was_opened_un
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._combine._open_combination("img", "vid", intent=recipe_match.GENAU)
+    view._combine._open_combination("img", "vid", intent=act_settings.GENAU)
 
     _front_panel(view)._on_generate()
 
     noted = [(use["intent"], use["video_prompt_id"], use["generation_prompt_id"])
              for use in view._db.list_combine_video_uses()]
-    assert noted == [(recipe_match.GENAU, "vid", _launched_row(view)["prompt_id"])]
+    assert noted == [(act_settings.GENAU, "vid", _launched_row(view)["prompt_id"])]
 
 
-def test_a_tab_pointed_at_another_generation_drops_the_recipe_mark(qtbot, tmp_path):
+def test_a_tab_pointed_at_another_generation_drops_the_settings_source(qtbot, tmp_path):
     # The tab is about that row now; a launch from it is not the combination's.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -11803,11 +11812,11 @@ def test_a_tab_pointed_at_another_generation_drops_the_recipe_mark(qtbot, tmp_pa
 
     panel.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
 
-    assert panel.recipe_source() == ("", None, "")
+    assert panel.settings_source() == ("", None, "")
 
 
-def test_a_tab_switched_to_another_workflow_drops_the_recipe_mark(qtbot, tmp_path):
-    # A different workflow is a different recipe, so the mark must not ride onto
+def test_a_tab_switched_to_another_workflow_drops_the_settings_source(qtbot, tmp_path):
+    # A different workflow is different settings, so the mark must not ride onto
     # a launch that has nothing to do with the combination.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -11817,7 +11826,7 @@ def test_a_tab_switched_to_another_workflow_drops_the_recipe_mark(qtbot, tmp_pat
 
     panel.prefill("sdxl_t2i", _SDXL.default_params())
 
-    assert panel.recipe_source() == ("", None, "")
+    assert panel.settings_source() == ("", None, "")
 
 
 def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_path):
@@ -11870,7 +11879,7 @@ def test_an_act_opened_links_to_the_past_video_its_settings_came_from(qtbot, tmp
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
 
     view._combine._open_category("img", "dancing")
 
@@ -11891,7 +11900,7 @@ def test_an_act_whose_settings_came_from_no_video_links_to_the_picture_alone(qtb
     assert related._source_video_tile.isHidden()
 
 
-def _combine_view_with_a_looping_recipe(qtbot, tmp_path):
+def _combine_view_with_a_looping_video(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -11900,25 +11909,25 @@ def _combine_view_with_a_looping_recipe(qtbot, tmp_path):
     return view
 
 
-def _opened_combination(qtbot, tmp_path, intent=recipe_match.VIDEO):
-    view = _combine_view_with_a_looping_recipe(qtbot, tmp_path)
+def _opened_combination(qtbot, tmp_path, intent=act_settings.VIDEO):
+    view = _combine_view_with_a_looping_video(qtbot, tmp_path)
     view._combine._open_combination("img", "vid", intent=intent)
     return view, _front_panel(view)
 
 
-def test_a_combination_opened_for_genau_has_its_recipe_in_parentheses_before_any_edit(
+def test_a_combination_opened_for_genau_has_its_source_video_in_parentheses_before_any_edit(
         qtbot, tmp_path):
-    _view, panel = _opened_combination(qtbot, tmp_path, intent=recipe_match.GENAU)
+    _view, panel = _opened_combination(qtbot, tmp_path, intent=act_settings.GENAU)
 
     assert not panel._preview._combination.open_paren_label.isHidden()
 
 
-@pytest.mark.parametrize(("key", "recipes", "edited"), [
+@pytest.mark.parametrize(("key", "as_made", "edited"), [
     ("positive_prompt", "dance", "dance in the rain"),
     ("negative_prompt", "", "blurry"),
 ])
 def test_the_clip_of_an_opened_combination_stands_in_parentheses_while_its_prompt_differs(
-        qtbot, tmp_path, key, recipes, edited):
+        qtbot, tmp_path, key, as_made, edited):
     _view, panel = _opened_combination(qtbot, tmp_path)
     parens = panel._preview._combination.open_paren_label
     assert parens.isHidden()
@@ -11926,11 +11935,11 @@ def test_the_clip_of_an_opened_combination_stands_in_parentheses_while_its_promp
     panel._param_form.set_values({key: edited})
     assert not parens.isHidden()
 
-    panel._param_form.set_values({key: recipes})
+    panel._param_form.set_values({key: as_made})
     assert parens.isHidden()
 
 
-def test_a_run_from_an_edited_combination_keeps_its_recipe_in_parentheses_while_it_waits(
+def test_a_run_from_an_edited_combination_keeps_its_source_video_in_parentheses_while_it_waits(
         qtbot, tmp_path, monkeypatch):
     drawn = []
     monkeypatch.setattr(generating_tile_module, "combination_pixmap",
@@ -11940,23 +11949,23 @@ def test_a_run_from_an_edited_combination_keeps_its_recipe_in_parentheses_while_
 
     panel._on_generate()
 
-    assert drawn[-1].recipe_prompt_edited
-    assert panel._live_source.recipe_prompt_edited
+    assert drawn[-1].prompt_edited
+    assert panel._live_source.prompt_edited
 
 
-def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_recipe_in_parentheses(
+def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_source_video_in_parentheses(
         qtbot, tmp_path):
-    view = _combine_view_with_a_looping_recipe(qtbot, tmp_path)
+    view = _combine_view_with_a_looping_video(qtbot, tmp_path)
 
-    view._combine._generate_combination("img", "vid", intent=recipe_match.GENAU)
+    view._combine._generate_combination("img", "vid", intent=act_settings.GENAU)
     view._select_reroll(next(iter(view._live_jobs)))  # its card in the collection, clicked
 
-    assert _front_panel(view)._live_source.recipe_prompt_edited
+    assert _front_panel(view)._live_source.prompt_edited
 
 
-@pytest.mark.parametrize(("lane", "stands_apart"), [(recipe_match.VIDEO, False),
-                                                    (recipe_match.GENAU, True)])
-def test_a_pressed_combine_stands_in_line_with_its_recipe_marked_as_its_run_will_be(
+@pytest.mark.parametrize(("lane", "stands_apart"), [(act_settings.VIDEO, False),
+                                                    (act_settings.GENAU, True)])
+def test_a_pressed_combine_stands_in_line_with_its_source_video_marked_as_its_run_will_be(
         qtbot, tmp_path, monkeypatch, lane, stands_apart):
     view = _combine_view(qtbot, tmp_path)
     monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
@@ -11967,7 +11976,7 @@ def test_a_pressed_combine_stands_in_line_with_its_recipe_marked_as_its_run_will
                        intent=view._combine.panel.selected_intent()))
 
     (standing,) = view._combine.launching_rows()
-    assert standing.recipe_prompt_edited is stands_apart
+    assert standing.prompt_edited is stands_apart
 
 
 def test_changing_a_setting_other_than_the_prompt_leaves_the_clip_out_of_parentheses(
@@ -11994,12 +12003,12 @@ def test_clicking_a_combine_slot_goes_to_what_it_holds(qtbot, tmp_path, slot_nam
     assert slot.current_id() == prompt_id
 
 
-def test_open_category_prefers_the_curated_recipe_too(qtbot, tmp_path, monkeypatch):
+def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe",
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
     opened = []
     monkeypatch.setattr(view._info_tabs, "open_config",
@@ -12014,11 +12023,11 @@ def test_open_category_prefers_the_curated_recipe_too(qtbot, tmp_path, monkeypat
 
 
 def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon recipe exists
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon video exists
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))
@@ -12613,7 +12622,7 @@ def test_auto_enhance_leaves_a_new_image_alone_with_the_tick_off(qtbot, tmp_path
 def test_a_reroll_never_inherits_the_enhancement_of_what_it_varies(qtbot, tmp_path):
     # With the tick unticked, a fresh seed must come out at base level — even
     # from a folder whose rows were made with the inline tail on. The stored
-    # enhance flag is the recipe's history, not an instruction for the next run.
+    # enhance flag is the settings' history, not an instruction for the next run.
     db = _enhanceable_db(tmp_path, count=1)
     db.set_params_json("g0", json.dumps(dict(
         _SDXL.default_params(), positive_prompt="a cat", seed=0, enhance=True)))
@@ -12653,7 +12662,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     assert settings.startswith("2x · 20 steps · 0.15 redraw")
 
     # An enhance of a DIFFERENT image lands in the same settings folder (both
-    # images share a recipe), so it is this tab's own run it must keep showing:
+    # images share their settings), so it is this tab's own run it must keep showing:
     # the newer one takes the machine, and this run reads as waiting again --
     # its own wait, not the other run's frame.
     view.enhance_items(["g1"])
@@ -13058,7 +13067,7 @@ def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_p
 
 def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
     db = _combine_db(tmp_path)
-    # A sibling already made from this image with the recipe's settings (other seed)
+    # A sibling already made from this image with the video's settings (other seed)
     # gives the target (image × settings) folder a node before we combine.
     sib = dict(_WAN_I2V.default_params(), seed=7, noise_seed=7, positive_prompt="dance",
                input_image="sdxl_pick.png [output]")
@@ -13083,7 +13092,7 @@ def test_combine_slot_predicates_gate_by_kind(qtbot, tmp_path):
     assert view._combine._accepts_image("img") is True
     assert view._combine._accepts_image("vid") is False   # a video isn't a start frame
     assert view._combine._accepts_video("vid") is True
-    assert view._combine._accepts_video("img") is False   # an image isn't an i2v recipe
+    assert view._combine._accepts_video("img") is False   # an image isn't an i2v video
 
 
 def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
@@ -13116,7 +13125,7 @@ def _pick_act(panel, act):
 
 def _pick_lane(panel, intent):
     """Click the combine panel's lane radio; the group releases the other."""
-    radio = (panel._genau_radio if intent == recipe_match.GENAU
+    radio = (panel._genau_radio if intent == act_settings.GENAU
              else panel._video_radio)
     radio.setChecked(True)
 
@@ -13127,8 +13136,8 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
     view._combine.panel.video_slot.set_item("vid")
 
     assert view.combine_selection() == {
-        "image": "img", "videos": {recipe_match.VIDEO: "vid"},
-        "intent": recipe_match.VIDEO, "category": "",
+        "image": "img", "videos": {act_settings.VIDEO: "vid"},
+        "intent": act_settings.VIDEO, "category": "",
     }
 
 
@@ -13137,12 +13146,12 @@ def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
     # others: an act says nothing about which lane answers it.
     view = _combine_view(qtbot, tmp_path)
     view._combine.panel.image_slot.set_item("img")
-    _pick_lane(view._combine.panel, recipe_match.GENAU)
+    _pick_lane(view._combine.panel, act_settings.GENAU)
     _pick_act(view._combine.panel, "beta")
 
     assert view.combine_selection() == {
         "image": "img", "videos": {},
-        "intent": recipe_match.GENAU, "category": "beta",
+        "intent": act_settings.GENAU, "category": "beta",
     }
 
 
@@ -13157,9 +13166,9 @@ def test_restore_combine_selection_refills_the_slots(qtbot, tmp_path):
 
 def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_path):
     first = _combine_view(qtbot, tmp_path)
-    _loop_recipe(first._db)
+    _looping_video(first._db)
     first._combine.panel.video_slot.set_item("vid")
-    _pick_lane(first._combine.panel, recipe_match.GENAU)
+    _pick_lane(first._combine.panel, act_settings.GENAU)
     first._combine.panel.video_slot.set_item("loop")
     saved = first.combine_selection()
 
@@ -13169,7 +13178,7 @@ def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_
     restored.restore_combine_selection(saved)
 
     assert restored._combine.panel.video_slot.current_id() == "loop"
-    _pick_lane(restored._combine.panel, recipe_match.VIDEO)
+    _pick_lane(restored._combine.panel, act_settings.VIDEO)
     assert restored._combine.panel.video_slot.current_id() == "vid"
 
 
@@ -13177,33 +13186,33 @@ def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(
-        {"image": "img", "intent": recipe_match.GENAU, "category": "beta"})
+        {"image": "img", "intent": act_settings.GENAU, "category": "beta"})
 
-    assert view._combine.panel.selected_intent() == recipe_match.GENAU
+    assert view._combine.panel.selected_intent() == act_settings.GENAU
     assert view._combine.panel.selected_category() == "beta"
-    assert view._combine.panel._generate_btn.isEnabled()  # an image and a recipe: ready
+    assert view._combine.panel._generate_btn.isEnabled()  # an image and settings: ready
 
 
 def test_restore_reads_the_video_lane_under_the_name_older_sessions_saved(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
-    _pick_lane(view._combine.panel, recipe_match.GENAU)
+    _pick_lane(view._combine.panel, act_settings.GENAU)
 
     view.restore_combine_selection({"image": "img", "intent": "players"})
 
-    assert view._combine.panel.selected_intent() == recipe_match.VIDEO
+    assert view._combine.panel.selected_intent() == act_settings.VIDEO
 
 
 def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
     # The lane decides which acts are answerable, and what could be answered when
     # the session closed may not be now — a video binned, or the lane itself
     # changed. A greyed act must not come back selected: the buttons would be
-    # live on a pick that can only report "no recipe yet".
+    # live on a pick that can only report "no past video yet".
     view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(
-        {"image": "img", "intent": recipe_match.GENAU, "category": "dancing"})
+        {"image": "img", "intent": act_settings.GENAU, "category": "dancing"})
 
-    assert view._combine.panel.selected_intent() == recipe_match.GENAU
+    assert view._combine.panel.selected_intent() == act_settings.GENAU
     assert view._combine.panel.selected_category() == ""
 
 
@@ -13224,7 +13233,7 @@ def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_pat
     view.restore_combine_selection({"image": "ghost", "video": "img"})
 
     assert view._combine.panel.image_slot.current_id() is None   # "ghost" no longer exists
-    assert view._combine.panel.video_slot.current_id() is None   # "img" isn't an i2v recipe
+    assert view._combine.panel.video_slot.current_id() is None   # "img" isn't an i2v video
 
 
 def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
@@ -13235,7 +13244,7 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": None, "videos": {},
-        "intent": recipe_match.VIDEO, "category": "",
+        "intent": act_settings.VIDEO, "category": "",
     }
 
 
@@ -13271,8 +13280,8 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path, m
 def test_a_video_dragged_from_a_picture_the_gallery_holds_lights_the_image_slot_too(
         qtbot, tmp_path):
     db = _combine_db(tmp_path)
-    recipe = json.loads(db.get_generation("vid")["params_json"])
-    db.set_params_json("vid", json.dumps(dict(recipe, input_image="sdxl_pick.png [output]")))
+    params = json.loads(db.get_generation("vid")["params_json"])
+    db.set_params_json("vid", json.dumps(dict(params, input_image="sdxl_pick.png [output]")))
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -16445,7 +16454,7 @@ def _genau_db(tmp_path):
     )
     db.update_generation("loop", status="completed",
                          output_files=json.dumps([{"filename": "flf2v_loop_1.mp4", "subfolder": ""}]))
-    db.set_recipe_source("loop", category="alpha")
+    db.set_settings_source("loop", category="alpha")
     # A second image, sorted, so a spoken animation has a state to go by. The
     # fixture's original "img" has not been sorted at all.
     db.insert_generation(
@@ -16466,14 +16475,14 @@ def _genau_view(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_genau_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", lambda *a, **k: None)
     return view
 
 
-def test_the_genau_lane_runs_a_looping_recipe(qtbot, tmp_path, monkeypatch):
+def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    view._combine.generate_category("img", "alpha", recipe_match.GENAU)
+    view._combine.generate_category("img", "alpha", act_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
     # The act has a long-form video too; the Genau lane can only use the loop.
@@ -16485,16 +16494,16 @@ def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, mon
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     asked = []
 
-    def spy(category, candidates, intent=recipe_match.VIDEO):
+    def spy(category, candidates, intent=act_settings.VIDEO):
         asked.append(intent)
         return "vid"
 
-    monkeypatch.setattr(combine_controller.recipe_match, "best_recipe", spy)
+    monkeypatch.setattr(combine_controller.act_settings, "most_used_video", spy)
 
     view._combine.generate_category("img", "dancing")
-    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "dancing", act_settings.GENAU)
 
-    assert asked == [recipe_match.VIDEO, recipe_match.GENAU]
+    assert asked == [act_settings.VIDEO, act_settings.GENAU]
 
 
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
@@ -16507,7 +16516,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))
 
-    view._combine.generate_category("img", "alpha", recipe_match.GENAU)
+    view._combine.generate_category("img", "alpha", act_settings.GENAU)
     job = next(iter(view._live_jobs.values()))
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
 
@@ -16518,7 +16527,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
 
 # --- "animate as go now", spoken over a fullscreen picture -------------------
 
-_SPOKEN_LOOP = AnimateRequest(recipe_match.GENAU, "")
+_SPOKEN_LOOP = AnimateRequest(act_settings.GENAU, "")
 
 
 def test_a_spoken_loop_takes_the_one_act_the_sorted_picture_leaves(qtbot, tmp_path,
@@ -16565,7 +16574,7 @@ def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_pat
     db.update_generation("img_delta", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_delta.png", "subfolder": ""}]))
     db.set_picture_state("img_delta", "state two")
-    db.set_recipe_source("loop", category=None)  # nothing left to mine a loop from
+    db.set_settings_source("loop", category=None)  # nothing left to mine a loop from
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -16573,7 +16582,8 @@ def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_pat
     prompt_id, message, kind = view.animate_it("img_delta", _SPOKEN_LOOP)
 
     assert prompt_id is None
-    assert "recipe to base this on yet" in message
+    assert "to take settings from yet" in message
+    assert message.startswith("no past looping “")
     assert kind == WARNING
     assert not view._live_jobs
 
@@ -16627,9 +16637,9 @@ def test_a_second_spoken_loop_over_the_same_picture_is_refused(qtbot, tmp_path, 
     assert len(_spoken_genau_rows(view)) == 1
 
 
-def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
+def test_one_said_while_the_video_is_still_being_chosen_is_refused_too(
         qtbot, tmp_path, monkeypatch):
-    # The mined tier asks the local model which recipe fits and that thinks for
+    # The mined tier asks the local model which video fits and that thinks for
     # several seconds — the exact silence a second command is said into, and
     # there is no row yet to notice it by.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
@@ -16649,11 +16659,11 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     assert len(_spoken_genau_rows(view)) == 1
 
 
-def test_the_picture_is_let_go_of_when_the_act_has_no_recipe(qtbot, tmp_path, monkeypatch):
+def test_the_picture_is_let_go_of_when_the_act_has_no_past_video(qtbot, tmp_path, monkeypatch):
     # A match that found nothing leaves nothing to wait for, so the picture must
     # not stay held — asking again is the whole point once a loop exists.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
-    monkeypatch.setattr(combine_controller.recipe_match, "best_recipe",
+    monkeypatch.setattr(combine_controller.act_settings, "most_used_video",
                         lambda *a, **k: None)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
@@ -16702,7 +16712,7 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
     # Only a spoken one is stamped, and only a spoken one can be said again into
     # the wait: someone at the keyboard can see the queue they just joined.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
-    view._combine.generate_category("img_act", "alpha", recipe_match.GENAU)
+    view._combine.generate_category("img_act", "alpha", act_settings.GENAU)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
@@ -16886,7 +16896,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
 
 
 @pytest.mark.real_thread_hop
-def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypatch):
+def test_the_settings_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypatch):
     # What must hold is that a match taking real time does not hold the UI thread
     # while it takes it.
 
@@ -16904,9 +16914,9 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
     def slow_match(*a, **k):
         asked_on["thread"] = threading.current_thread().name
 
-    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", slow_match)
+    monkeypatch.setattr(combine_controller.act_settings, "scene_matched_video", slow_match)
 
-    view._combine.generate_category("img", "alpha", recipe_match.GENAU)
+    view._combine.generate_category("img", "alpha", act_settings.GENAU)
 
     qtbot.waitUntil(lambda: bool(view._live_jobs), timeout=5000)
     assert asked_on["thread"] != threading.main_thread().name

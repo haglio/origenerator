@@ -774,7 +774,7 @@ class VoiceRouter(QObject):
         LLM which of the prompt's own terms the speaker meant, and a second of
         network wait on this thread is a second of frozen slideshow — at the one
         moment the app must not stutter. Whatever can be answered without that
-        (nothing on screen, a recipe this app can't rebuild) is answered here,
+        (nothing on screen, a video this app can't rebuild) is answered here,
         so a request that was never going to run doesn't wait on a model.
 
         The side rides the pool's context so the answer comes back to the same

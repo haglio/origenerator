@@ -26,9 +26,9 @@ emptied it instead of leaving the user to guess which one to drop.
 Precision is the hard half, and every guard here was put in by a measurement
 rather than a hunch — the comments name what each one cost on a real library.
 The negative prompt is not searched, decimals stay whole, bare numbers are
-dropped from the recipe, and an item's name or seed matches only whole: a search
-is for what a generation is OF, and everything else in a row is either markup or
-bookkeeping that happens to be spelled like a word.
+dropped from the workflow, model and LoRA names, and an item's name or seed
+matches only whole: a search is for what a generation is OF, and the rest of a
+row is either markup or bookkeeping that happens to be spelled like a word.
 
 The table below is plain, publishable English, and it is deliberately
 incomplete: the words describing the library itself — its own vocabulary for
@@ -56,11 +56,16 @@ from origenerator.generation_state import in_sight
 logger = logging.getLogger(__name__)
 
 # The two orders the results pane offers. Recency is the default because the
-# thing you are looking for is usually something you made recently; the recipe
-# order answers the other question — "which model/LoRA combination was that?" —
+# thing you are looking for is usually something you made recently; the Model /
+# LoRA order answers the other question — "which model/LoRA combination was that?" —
 # by putting the rows under headings instead of interleaving them.
 SORT_RECENT = "recent"
-SORT_RECIPE = "recipe"
+SORT_MODEL_LORA = "model_lora"
+_SORTS_SAVED_BEFORE = {"recipe": SORT_MODEL_LORA}
+
+
+def saved_sort(mode: str | None) -> str | None:
+    return _SORTS_SAVED_BEFORE.get(mode or "", mode)
 
 # A word is a run of letters and digits — but a decimal number is ONE word, not
 # two. Without that, every emphasis weight a prompt carries — ``(term:1.2)`` —
@@ -154,7 +159,7 @@ _RELATED = 0.6
 # explicitly excluded the searched-for thing.
 _POSITIVE_WEIGHT = 1.0
 _FOLDER_WEIGHT = 1.0
-_RECIPE_WEIGHT = 0.7
+_MADE_WITH_WEIGHT = 0.7
 _SHORTEST_NAME_START = 4
 
 
@@ -294,7 +299,7 @@ class _Entry:
 
     row: dict
     positive: frozenset[str]
-    recipe: frozenset[str]
+    made_with: frozenset[str]
     seeds: frozenset[str]
     # The names the user gave the folders this row sits in. Unlike the other
     # fields this one isn't a property of the row, so it is taken fresh on every
@@ -366,11 +371,11 @@ def _term_score(term: QueryTerm, entry: _Entry) -> float:
     return max(
         _field_score(term, entry.positive) * _POSITIVE_WEIGHT,
         _field_score(term, entry.folders) * _FOLDER_WEIGHT,
-        _field_score(term, entry.recipe) * _RECIPE_WEIGHT,
+        _field_score(term, entry.made_with) * _MADE_WITH_WEIGHT,
     )
 
 
-def _recipe_text(row: dict, params: dict) -> str:
+def _made_with_text(row: dict, params: dict) -> str:
     """The words naming what made a row: its workflow, model and LoRA files."""
     workflow = row.get("workflow_name") or ""
     return " ".join((
@@ -388,7 +393,7 @@ def _prompt_text(row: dict, params: dict, key: str) -> str:
     return str(row.get(key) or params.get(key) or "")
 
 
-def _recipe_stems(row: dict, params: dict) -> set[str]:
+def _made_with_stems(row: dict, params: dict) -> set[str]:
     """The searchable words of what made a row, bare numbers thrown away.
 
     A model filename is full of them — version parts, dates, step counts,
@@ -396,7 +401,7 @@ def _recipe_stems(row: dict, params: dict) -> set[str]:
     of them collide with the digits a query's number words fold to. Names
     survive whole ("wan22", "sdxl", a LoRA's title); only the pure numbers go.
     """
-    return {stem for stem in _stems(_recipe_text(row, params))
+    return {stem for stem in _stems(_made_with_text(row, params))
             if not stem.replace(".", "").isdigit()}
 
 
@@ -435,7 +440,7 @@ def _build_entry(row: dict) -> _Entry:
         row=row,
         positive=_stems(prompt),
         tags=_tags(prompt),
-        recipe=frozenset(_recipe_stems(row, params)),
+        made_with=frozenset(_made_with_stems(row, params)),
         seeds=frozenset(seeds),
     )
 
@@ -507,7 +512,7 @@ class GallerySearch:
         word that exists elsewhere in the library but not here is still a word
         that reached nothing, and saying so is the useful answer.
 
-        Scored, but not *sorted* by score: the pane offers recency and recipe,
+        Scored, but not *sorted* by score: the pane offers recency and Model / LoRA,
         and a relevance order the user did not ask for would shuffle the results
         under them each time the LLM tier landed. The score decides what is in,
         not what order.
@@ -535,7 +540,7 @@ class GallerySearch:
         )
 
 
-def recipe_heading(row: dict) -> str:
+def model_lora_heading(row: dict) -> str:
     """The model + LoRA combination a row ran on, as a section heading."""
     params = gallery.parse_params(row.get("params_json"))
     workflow = row.get("workflow_name")
@@ -556,7 +561,7 @@ class SearchTile:
 
     ``row`` is the newest hit either way: the tile's picture when it stands
     alone, and what decides the model + LoRA band it lands in when sorted that
-    way — every row in a settings folder ran the same recipe, so any of them
+    way — every row in a settings folder ran the same settings, so any of them
     answers that.
     """
 
@@ -565,7 +570,7 @@ class SearchTile:
     rows: list = field(default_factory=list)
 
 
-def group_by_recipe(results) -> list[tuple[str, list]]:
+def group_by_model_lora(results) -> list[tuple[str, list]]:
     """``results`` split into one section per model + LoRA combination, biggest
     section first (ties alphabetical) and each section still newest-first.
 
@@ -575,7 +580,7 @@ def group_by_recipe(results) -> list[tuple[str, list]]:
     """
     sections: dict[str, list] = {}
     for result in results:
-        sections.setdefault(recipe_heading(result.row), []).append(result)
+        sections.setdefault(model_lora_heading(result.row), []).append(result)
     return sorted(sections.items(), key=lambda item: (-len(item[1]), item[0]))
 
 
@@ -640,7 +645,7 @@ def expand_query(query: str, *, base_url: str, model: str, system_prompt: str,
     the endpoint down, a reply that will not parse. The caller's results are
     already on screen by then, so an empty answer is a widening that did not
     happen rather than a search that failed. Mirrors the transport the voice
-    rewrite and the recipe matcher use: stdlib ``urllib``, one POST, no deps.
+    rewrite and the act match use: stdlib ``urllib``, one POST, no deps.
     """
     words = query_words(query)
     if not words:

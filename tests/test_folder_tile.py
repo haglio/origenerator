@@ -32,7 +32,7 @@ def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
     assert all("›" not in t for t in texts)
 
 
-def test_folder_tile_shows_its_recipe_level_badge(qtbot):
+def test_folder_tile_shows_its_folder_level_badge(qtbot):
     # A model/LoRA/workflow tile wears the same lettered chip the tree does, so a
     # folder's place in the hierarchy reads even in the mixed Favorites collection.
     tile = FolderTile("k", "wan model", [], 3,

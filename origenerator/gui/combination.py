@@ -17,8 +17,8 @@ _PAREN_HEIGHT_SHARE = 0.8
 
 class Combination(NamedTuple):
     picture: str | None = None
-    recipe: str | None = None
-    recipe_prompt_edited: bool = False
+    source_video: str | None = None
+    prompt_edited: bool = False
 
 
 def pair_side(size: QSize, both: bool, enclosed: bool) -> int:
@@ -46,14 +46,14 @@ def draw_plus(painter: QPainter, x: int, side: int) -> None:
     draw_glyph(painter, "plus", TEXT_MUTED, size=width, x=x, y=(side - width) / 2)
 
 
-def draw_recipe(painter: QPainter, x: int, recipe: QPixmap, prompt_edited: bool) -> None:
-    side = recipe.height()
+def draw_source_video(painter: QPainter, x: int, source_video: QPixmap, prompt_edited: bool) -> None:
+    side = source_video.height()
     if prompt_edited:
         paren = paren_width(side)
         _draw_paren(painter, QRect(x, 0, paren, side), "(")
-        _draw_paren(painter, QRect(x + paren + recipe.width(), 0, paren, side), ")")
+        _draw_paren(painter, QRect(x + paren + source_video.width(), 0, paren, side), ")")
         x += paren
-    painter.drawPixmap(x, 0, recipe)
+    painter.drawPixmap(x, 0, source_video)
 
 
 def _draw_paren(painter: QPainter, band: QRect, glyph: str) -> None:

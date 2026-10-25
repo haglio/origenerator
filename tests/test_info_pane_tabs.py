@@ -47,7 +47,7 @@ def _sdxl_full(**over):
 def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i", workflow_version=None):
     """Insert a generation whose params_json reflects its real settings — stamped
     with the workflow's current version unless an older one is asked for, as a run
-    made by this app before the recipe changed would be."""
+    made by this app before the workflow changed would be."""
     db.insert_generation(
         prompt_id=prompt_id,
         workflow_name=workflow_name,
@@ -435,9 +435,9 @@ def test_load_selection_reuses_the_tab_for_the_same_folder(tabs):
     assert tabs.current_config_panel()._displayed_row is b
 
 
-def test_load_selection_reuses_the_tab_for_a_run_made_before_the_recipe_changed(tabs):
-    # A run made before its workflow's recipe changed is filed under that older
-    # recipe's folder, and the tab showing it belongs to that folder too. Opening
+def test_load_selection_reuses_the_tab_for_a_run_made_before_the_workflow_changed(tabs):
+    # A run made before its workflow changed is filed under that older
+    # workflow's folder, and the tab showing it belongs to that folder too. Opening
     # it again lands back in the tab it already has, however many times: one tab,
     # not a row of identical ones.
     row = _complete_gen(tabs._db, "old", _sdxl_full(positive_prompt="a wizard", seed=1),
@@ -703,7 +703,7 @@ def test_the_pair_is_repainted_only_when_it_changes(tabs):
     assert panel._preview.show_combination.call_count == 1
 
 
-@pytest.mark.parametrize("made_from", [Combination(), Combination(recipe_prompt_edited=True)])
+@pytest.mark.parametrize("made_from", [Combination(), Combination(prompt_edited=True)])
 def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs, made_from):
     # A T2V has no picture to stand, so the words are all there is.
     panel = tabs.currentWidget()
@@ -789,7 +789,7 @@ def test_stop_watching_a_blank_tab_leaves_it_blank(tabs):
 
 
 def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, monkeypatch):
-    # Nothing on display but a recipe on the form: the tab goes back to what a
+    # Nothing on display but settings on the form: the tab goes back to what a
     # tab with those settings idles on, the newest thing they made.
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
     cat, _dog = _two_generations(tabs)

@@ -1,7 +1,7 @@
 """Row identity: parse a generation's stored params and reduce them to the
 canonical keys that place it in the gallery tree.
 
-Everything here answers "what recipe produced this row", independent of Qt and of
+Everything here answers "what settings produced this row", independent of Qt and of
 the folder structure itself: parsing ``params_json``, normalizing it against a
 workflow's declared defaults, and hashing the facets the tree groups by (the full
 settings, the model, the LoRA). The frame-identity helpers live here too because
@@ -20,8 +20,8 @@ from origenerator.workflows.model_files import is_no_lora
 
 READINGS_KEPT = 20_000
 
-# Params that identify a specific instance of a recipe rather than the recipe
-# itself — dropped from a row's settings so reruns that differ only in these land
+# Params that identify one run of a row's settings rather than the settings
+# themselves — dropped from a row's settings so reruns that differ only in these land
 # in one folder. Seeds vary the sampling noise; ``input_image`` names the exact
 # start-frame file an i2v ran on, and a re-roll regenerates that file. Dropping
 # the raw filename keeps a video with its own re-rolls; the *configuration* that
@@ -33,7 +33,7 @@ READINGS_KEPT = 20_000
 # workflow growing a seed can't silently start splitting folders by it.
 INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 
-# Params that configure a row's *enhancement* rather than its recipe — also
+# Params that configure a row's *enhancement* rather than its settings — also
 # dropped from its settings, so an enhanced image and its unenhanced twin share
 # one folder. An enhancement is a finish applied to an image, not a different
 # image: the standalone enhancer already folds its result onto the row it
@@ -88,7 +88,7 @@ def _grouping_version(workflow_name: str | None, workflow_version: str | None) -
     names a concrete one, else the workflow's current version.
 
     Folding this into the settings key is what puts different generations of a
-    workflow in different folders. When a workflow's recipe changes (a v002 SDXL
+    workflow in different folders. When a workflow changes (a v002 SDXL
     render vs a v003 one with the enhance tail), its outputs look different, but
     default-normalization would merge them: an old row lacking the new params is
     filled with their defaults (:func:`canonical_settings`) and so hashes like a
@@ -107,7 +107,7 @@ def _grouping_version(workflow_name: str | None, workflow_version: str | None) -
 def _workflow_instance_keys(workflow_name: str) -> frozenset:
     """A workflow's per-instance keys: every seed param it declares
     (sampler and foley alike — a variation re-rolls them all), every seed a
-    recipe carries without a field for it, and the start frame. Cached because
+    row's settings carry without a field for it, and the start frame. Cached because
     ``seed_keys()`` walks ``param_definitions()``, which scans the model
     directories."""
     return frozenset(workflow_named(workflow_name).seed_keys()) | INSTANCE_KEYS
@@ -123,7 +123,7 @@ def _workflow_enhance_keys(workflow_name: str) -> frozenset:
 
 def workflow_enhance_keys(workflow_name: str | None) -> frozenset:
     """The param keys that configure ``workflow_name``'s enhancement rather than
-    its recipe, falling back to the static :data:`ENHANCE_KEYS` for a workflow
+    its settings, falling back to the static :data:`ENHANCE_KEYS` for a workflow
     with no template."""
     wf = workflow_named(workflow_name)
     return _workflow_enhance_keys(workflow_name) if wf is not None else ENHANCE_KEYS
@@ -180,7 +180,7 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
 
 def enhance_settings(workflow_name: str | None, params: dict) -> dict:
     """A row's enhancement-layer params, normalized against the workflow's
-    defaults exactly as :func:`canonical_settings` normalizes its recipe.
+    defaults exactly as :func:`canonical_settings` normalizes its settings.
 
     Deliberately absent from every current key. The one caller is the reconcile's
     pre-layer legacy formula
@@ -291,7 +291,7 @@ def _input_image_config(input_image: str | None, image_index: dict | None,
 
     Videos grouped by configuration here until 2026-08-18, so that a video stayed
     with its own image-seed re-rolls: a fresh draw of the same settings is the
-    same recipe, so it read as the same folder. But two draws of one prompt are
+    same settings, so it read as the same folder. But two draws of one prompt are
     two different pictures, and collecting them made a source-image folder that
     held several — precisely what that tier promises it never does. A re-drawn
     frame now opens its own folder, which is what a new picture is.
@@ -346,7 +346,7 @@ def settings_signature(
     ``image_index`` may be omitted for rows that aren't image-conditioned.
 
     The workflow generation is folded in too (see :func:`_grouping_version`), so
-    rows made before and after a workflow's recipe changed never share a key. A
+    rows made before and after a workflow changed never share a key. A
     stored row passes its ``workflow_version`` column; ``None`` (a live form's
     prospective settings) means the current version.
     """

@@ -1,7 +1,7 @@
 """Re-deriving the base render for images the inline enhance tail finished.
 
 Those rows kept one file and no "before". The base is recoverable because it is
-reproducible: the same seed and recipe with the tail off reproduces the pixels
+reproducible: the same seed and settings with the tail off reproduce the pixels
 that pass made, and attaching it gives the row the ``Original`` / ``Enhancement 1/1``
 pair it should have had. The work rides the absence the background experimenter
 uses, since it is a full render per row and there are a great many of them.
@@ -81,7 +81,7 @@ def test_it_picks_exactly_the_rows_that_lost_their_base(tmp_path):
 
 
 def test_an_unrebuildable_import_is_left_alone(tmp_path):
-    # No registered template, so there is no recipe to re-run — and guessing one
+    # No registered template, so there are no settings to re-run — and guessing them
     # would produce a "base" that is not this image's base at all.
     db = Database(tmp_path / "t.db")
     _add(db, "import", params={"enhance": True}, files=[_file("mystery.png")],
@@ -102,7 +102,7 @@ def test_a_re_render_in_flight_is_not_itself_something_to_repair(tmp_path):
 # --- what one runs at ------------------------------------------------------
 
 
-def test_the_rerun_is_the_recorded_recipe_with_the_tail_off(tmp_path):
+def test_the_rerun_is_the_recorded_settings_with_the_tail_off(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add(db, "baked",
                params=dict(_SDXL.default_params(), enhance=True, seed=4242,
@@ -469,8 +469,8 @@ def _clock():
     return monotonic, sleep
 
 
-def test_a_repair_run_submits_the_base_recipe_and_names_the_files_it_made(tmp_path,
-                                                                        monkeypatch):
+def test_a_repair_run_submits_the_base_settings_and_names_the_files_it_made(tmp_path,
+                                                                            monkeypatch):
     monkeypatch.setattr(
         base_backfill, "extract_completion",
         lambda *a, **k: ([_file("base.png")], None, 4.0))

@@ -12,6 +12,7 @@ import pytest
 from PIL import Image
 
 from origenerator import outside_videos
+from origenerator.act_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
@@ -19,7 +20,6 @@ from origenerator.gui.info_pane_tabs import parse_tabs_state
 from origenerator.gui.param_sections import OTHER_TITLE, section_title
 from origenerator.media import MediaType
 from origenerator.outside_videos import Made, OutsideVideo, Record, rows_bringing_in
-from origenerator.recipe_match import CATEGORIES
 from origenerator.workflows import WORKFLOW_REGISTRY, workflow_named
 from origenerator.workflows.outside import VideoKind, outside_workflow
 

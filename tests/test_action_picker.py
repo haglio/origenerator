@@ -26,7 +26,7 @@ def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, act=None):
         "workflow_name": "sdxl_t2i",
         "output_files": json.dumps([{"filename": filename}]),
         "picture_state": state,
-        "recipe_category": act,
+        "act": act,
     }
 
 

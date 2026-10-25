@@ -615,10 +615,10 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
-def _recipe_match_runs_inline(request, monkeypatch):
+def _act_settings_runs_inline(request, monkeypatch):
     """Let the gallery's off-thread work run straight through.
 
-    The recipe match is asked on a pool thread in the app, because the model it
+    The act's match is asked on a pool thread in the app, because the model it
     asks thinks for several seconds and the window must stay alive. A test wants
     the opposite: launch and inspect in one call, with no event loop to pump. A
     test that exercises the real hop marks itself ``real_thread_hop`` and this

@@ -197,7 +197,7 @@ def legacy_settings_folder_key(row: dict) -> str:
 
 def _preenhance_settings(workflow_name: str, params: dict) -> dict:
     """A row's settings the way every formula predating the enhancement split
-    computed them: the recipe with the enhance tail's params still folded in.
+    computed them: the settings with the enhance tail's params still folded in.
 
     Each legacy key below is a snapshot of a formula that ran while enhancement
     was part of a row's identity, so all three rebuild from this rather than from
@@ -387,7 +387,7 @@ def _joined_the_library_at(row: dict) -> datetime:
 
 
 # How many folders the table of contents marks as lately worked in. A sitting
-# reaches a handful of recipes; marks past that stop picking anything out, and
+# reaches a handful of folders; marks past that stop picking anything out, and
 # every folder marked is no folder marked.
 RECENTLY_WORKED_COUNT = 20
 
@@ -399,7 +399,7 @@ def recently_worked_folders(
     """The ``(side, folder key)`` pairs of the folders worked in most recently.
 
     A folder no longer moves when a generation lands in it — it is placed by the
-    row that made it, so the table of contents keeps the order the recipes were
+    row that made it, so the table of contents keeps the order the settings were
     tried in (:func:`build_gallery_tree`). That order says nothing about where
     the work has lately been, which is the other thing the tree is read for, so
     the freshest folders are marked where they stand instead of floating up.

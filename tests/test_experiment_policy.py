@@ -106,7 +106,7 @@ def test_proposes_nothing_with_no_eligible_rows():
 
 
 def test_machinery_is_never_an_experiment_base_whatever_it_is_called():
-    # An enhance is a derivative of a generation, not a recipe worth exploring:
+    # An enhance is a derivative of a generation, not settings worth exploring:
     # mutating one just re-enhances an existing image. The rule was written as
     # the one machinery workflow's name, which is the only place in the source
     # tree that spelled it -- so a second machinery workflow would silently have
@@ -183,7 +183,7 @@ def test_down_voted_values_are_sampled_less_than_up_voted_ones():
 
 
 def test_batch_size_is_not_an_experiment_dimension():
-    # Varying batch size re-runs the same recipe in bulk — it explores nothing
+    # Varying batch size re-runs the same settings in bulk — it explores nothing
     # and multiplies the GPU bill, so it is never mutated.
     base = make_row("base-1")
     policy = make_policy(seed=8)
@@ -256,7 +256,7 @@ def test_lora_dims_are_the_favorite_mutation(monkeypatch):
 
 def test_video_experiments_keep_their_start_frame():
     # An i2v experiment re-runs on the base row's stored frame — the frame is an
-    # instance of the recipe, not a dimension to wander. A row with no frame
+    # instance of the settings, not a dimension to wander. A row with no frame
     # recorded can't be re-run at all, so it is never a base.
     rows = [
         make_row("with-frame", workflow_name="fake_i2v",

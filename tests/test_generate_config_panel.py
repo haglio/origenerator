@@ -19,6 +19,7 @@ import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
 from origenerator import evolver_export, gallery, osr2_driver
+from origenerator.act_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
@@ -47,7 +48,6 @@ from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
-from origenerator.recipe_match import CATEGORIES
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
@@ -3542,7 +3542,7 @@ def test_taking_that_answer_back_leaves_the_picture_unsorted_again(saved_panel):
 def test_a_video_on_the_tab_is_offered_the_acts_opened_on_its_own(saved_panel):
     panel, db = saved_panel
     _video_row(db, "vid9")
-    db.set_recipe_source("vid9", category=CATEGORIES[1])
+    db.set_settings_source("vid9", category=CATEGORIES[1])
 
     panel.show_saved_generation(db.get_generation("vid9"), [])
 
@@ -3557,7 +3557,7 @@ def test_saying_what_act_the_shown_video_is_lands_on_its_row(saved_panel):
 
     panel._action.pick(CATEGORIES[1])
 
-    assert db.get_generation("vid9")["recipe_category"] == CATEGORIES[1]
+    assert db.get_generation("vid9")["act"] == CATEGORIES[1]
 
 
 def test_the_picture_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_path, monkeypatch,

@@ -18,7 +18,7 @@ on the words, in the voice the Audio section sets (see
 lines param, and its cards carry no lines field.
 
 A scene is one thing or the other, and the card says which. The speech model
-renders a talking performance and nothing else: measured on his own recipe, a
+renders a talking performance and nothing else: measured on his own settings, a
 speaking scene moves under half as much as the same scene on the experts, with
 the movement at the head, and driving it with the scene rendered properly
 (control_video, skeletons or frames) lifts that a little without carrying the
@@ -131,7 +131,7 @@ class _Scene(QFrame):
             self.captions[key] = label
         if lines:
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
-            # Every path that fills a line -- typing, loading a recipe, a voice
+            # Every path that fills a line -- typing, loading settings, a voice
             # edit -- ends in textChanged, so the card follows all of them.
             self.fields["scene_lines"].textChanged.connect(self.reflect_use)
         self.reflect_use()

@@ -25,7 +25,7 @@ def _rounded(value):
     return round(value, 6) if isinstance(value, float) else value
 
 
-def _recipe_inputs(built: dict) -> dict:
+def _compared_inputs(built: dict) -> dict:
     if built["class_type"] == "VHS_VideoCombine":
         return {name: value for name, value in built["inputs"].items() if name != "crf"}
     return built["inputs"]
@@ -39,7 +39,7 @@ def _fingerprint(payload: dict) -> str:
             built = payload[node_id]
             nodes[node_id] = _digest([
                 built["class_type"],
-                {name: wired(value) for name, value in _recipe_inputs(built).items()},
+                {name: wired(value) for name, value in _compared_inputs(built).items()},
             ])
         return nodes[node_id]
 
@@ -191,7 +191,7 @@ _VARIATIONS = {
 _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 _INSTALLED_OUTLINE_DETECTORS = ("skin_detector.pt", "hair_detector.pt")
 
-# Changing the recipes above, or what _fingerprint reads, moves these without any
+# Changing the settings above, or what _fingerprint reads, moves these without any
 # graph changing: re-record every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "25f811aa4de86d7b",
@@ -273,7 +273,7 @@ def test_a_workflows_graph_changes_only_with_its_version(name):
                  lambda patch: patch.setitem(_PINNED, "pose_estimator", "another_estimator.pt"),
                  id="a pose skeleton"),
 ])
-def test_a_change_to_a_part_the_pinned_recipe_leaves_out_still_moves_the_fingerprint(
+def test_a_change_to_a_part_the_pinned_settings_leave_out_still_moves_the_fingerprint(
         name, change, monkeypatch):
     workflow = WORKFLOW_REGISTRY[name]
     pinned_graph = _variation_fingerprint(workflow, {})
@@ -287,7 +287,7 @@ def test_a_change_to_a_part_the_pinned_recipe_leaves_out_still_moves_the_fingerp
 
 @pytest.mark.parametrize("name", sorted(name for name, workflow in WORKFLOW_REGISTRY.items()
                                         if workflow.output_type == "video"))
-def test_how_finely_a_video_is_compressed_is_no_part_of_its_recipe(name, monkeypatch):
+def test_how_finely_a_video_is_compressed_is_no_part_of_its_settings(name, monkeypatch):
     workflow = WORKFLOW_REGISTRY[name]
     before = _workflow_fingerprint(workflow)
 

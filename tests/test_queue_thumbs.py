@@ -63,55 +63,55 @@ def test_a_missing_file_is_no_picture_rather_than_a_blank_one(qapp, tmp_path):
     assert source_pixmap(Combination(), CELL) is None
 
 
-def test_a_combine_draws_the_frame_then_its_recipe_in_gray(qapp, tmp_path):
-    # The frame leads because it is what gets animated; the recipe follows in
+def test_a_combine_draws_the_frame_then_its_source_video_in_gray(qapp, tmp_path):
+    # The frame leads because it is what gets animated; the source video follows in
     # gray because it is the settings being reused, not a second thing being made.
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
-    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+    video = _picture(tmp_path / "source.png", (0, 0, 255))
 
-    block = source_pixmap(Combination(frame, recipe), CELL)
+    block = source_pixmap(Combination(frame, video), CELL)
 
     lead = _color_at(block, _middle_of_cell(0), CELL // 2)
     assert lead.red() > 200 and lead.blue() < 60         # the frame, still itself
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
-    assert follow.red() == follow.green() == follow.blue()  # the recipe, drained
+    assert follow.red() == follow.green() == follow.blue()  # the source video, drained
 
 
-def _recipe_columns(block, recipe):
-    drained = fitted_cell(recipe, CELL, gray=True).toImage().pixelColor(CELL // 2, CELL // 2)
+def _source_video_columns(block, video):
+    drained = fitted_cell(video, CELL, gray=True).toImage().pixelColor(CELL // 2, CELL // 2)
     image = block.toImage()
     return [x for x in range(image.width()) if image.pixelColor(x, CELL // 2) == drained]
 
 
-def test_a_combine_row_puts_a_plus_between_the_frame_and_its_recipe(qapp, tmp_path):
+def test_a_combine_row_puts_a_plus_between_the_frame_and_its_source_video(qapp, tmp_path):
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
-    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+    video = _picture(tmp_path / "source.png", (0, 0, 255))
 
-    block = source_pixmap(Combination(frame, recipe), CELL)
+    block = source_pixmap(Combination(frame, video), CELL)
 
-    assert _painted(block.toImage(), CELL, _recipe_columns(block, recipe)[0])
+    assert _painted(block.toImage(), CELL, _source_video_columns(block, video)[0])
 
 
-def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path):
+def test_a_source_video_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path):
     # A video queued after the image it animates has no frame on disk yet. The
-    # recipe still says something about this run, and stays in its own cell so
+    # source video still says something about this run, and stays in its own cell so
     # the two read as one column down the line.
-    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+    video = _picture(tmp_path / "source.png", (0, 0, 255))
 
-    block = source_pixmap(Combination(tmp_path / "not-yet.png", recipe), CELL)
+    block = source_pixmap(Combination(tmp_path / "not-yet.png", video), CELL)
 
     assert _color_at(block, _middle_of_cell(0), CELL // 2).alpha() == 0
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
     assert follow.blue() > 0 and follow.red() == follow.blue()
 
 
-def test_a_recipe_whose_prompt_was_edited_stands_in_parentheses_on_its_row(qapp, tmp_path):
+def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses_on_its_row(qapp, tmp_path):
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
-    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
-    as_made = source_pixmap(Combination(frame, recipe), CELL)
-    edited = source_pixmap(Combination(frame, recipe, recipe_prompt_edited=True), CELL)
+    video = _picture(tmp_path / "source.png", (0, 0, 255))
+    as_made = source_pixmap(Combination(frame, video), CELL)
+    edited = source_pixmap(Combination(frame, video, prompt_edited=True), CELL)
 
-    made_at, edited_at = _recipe_columns(as_made, recipe), _recipe_columns(edited, recipe)
+    made_at, edited_at = _source_video_columns(as_made, video), _source_video_columns(edited, video)
 
     assert edited_at[0] > made_at[0]
     assert _painted(edited.toImage(), made_at[0], edited_at[0])

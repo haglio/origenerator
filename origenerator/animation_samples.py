@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections import defaultdict
 
 from origenerator import animation_paths, gallery
+from origenerator.act_settings import GENAU, VIDEO, act_of, loops
 from origenerator.db_generations import SENT_COLUMNS
 from origenerator.file_refs import frame_name
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
-from origenerator.recipe_match import GENAU, VIDEO, act_of, loops
 
 Path = tuple[str, str, str]  # lane, act, state
 

@@ -100,7 +100,7 @@ class ExperimentPolicy:
             if workflow is None:
                 continue
             if not workflow.selectable:
-                # Machinery rather than a recipe anyone picks — the enhance
+                # Machinery rather than a workflow anyone picks — the enhance
                 # workflow. Mutating one of its results just re-enhances an
                 # existing image, so there is nothing to explore.
                 continue
@@ -173,7 +173,7 @@ class ExperimentPolicy:
     def _mutable_dims(workflow):
         """The dimensions an experiment may vary: the prompt pair, any bounded
         numeric, and any multi-option combo — per the workflow's own form.
-        Batch size is exempt: varying it re-runs the same recipe in bulk, which
+        Batch size is exempt: varying it re-runs the same settings in bulk, which
         explores nothing and multiplies the GPU bill."""
         dims = []
         for pd in workflow.param_definitions():
@@ -195,7 +195,7 @@ class ExperimentPolicy:
 
     def _crossover_prompts(self, params, workflow, rows):
         """Replace the prompt pair with another finished generation's — the same
-        recipe pointed at a sibling subject. Donors are weighted by their own
+        settings pointed at a sibling subject. Donors are weighted by their own
         appeal (stars/up-votes) and the verdict record of their prompt."""
         current = params.get("positive_prompt", "")
         donors = []

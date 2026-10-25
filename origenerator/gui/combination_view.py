@@ -1,4 +1,4 @@
-"""The two halves of a combination, shown as the sum they are: image + recipe.
+"""The two halves of a combination, shown as the sum they are: image + source video.
 
 Two renderings of one look. :class:`CombinationView` is the live one, for a pane
 with room to loop the clip; :func:`combination_pixmap` is the same arithmetic as
@@ -15,7 +15,7 @@ holds the settings, but the pane above it had nothing to show and said so, with
 the same "select a generation to preview" a tab that had been pointed at nothing
 says. So it shows the arithmetic instead: the frame that will be animated on the
 left, a plus sign, and on the right the clip whose settings the run will follow,
-looping in gray (:mod:`origenerator.gui.grayscale`) because it is the recipe and
+looping in gray (:mod:`origenerator.gui.grayscale`) because it lends the settings and
 not the result.
 
 Both pictures are square-fit into whatever height the pane has, side by side, so
@@ -35,7 +35,7 @@ from shared_ui.spacing import MARGIN_STANDARD
 from origenerator.gui.combination import (
     Combination,
     draw_plus,
-    draw_recipe,
+    draw_source_video,
     pair_side,
     paren_font,
     paren_width,
@@ -65,16 +65,16 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
     from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a picture the
     strip has already scaled this second is not scaled again for the tile.
     """
-    both = bool(combination.picture and combination.recipe)
-    enclosed = bool(combination.recipe) and combination.recipe_prompt_edited
+    both = bool(combination.picture and combination.source_video)
+    enclosed = bool(combination.source_video) and combination.prompt_edited
     side = pair_side(size, both, enclosed)
     image = fitted_cell(combination.picture, side)
-    recipe = fitted_cell(combination.recipe, side, gray=True)
-    if image is None and recipe is None:
+    source_video = fitted_cell(combination.source_video, side, gray=True)
+    if image is None and source_video is None:
         return None
-    plus = plus_width(side) if image is not None and recipe is not None else 0
-    paren = paren_width(side) if recipe is not None and enclosed else 0
-    halves = sum(side for half in (image, recipe) if half is not None)
+    plus = plus_width(side) if image is not None and source_video is not None else 0
+    paren = paren_width(side) if source_video is not None and enclosed else 0
+    halves = sum(side for half in (image, source_video) if half is not None)
     canvas = QPixmap(halves + plus + 2 * paren, side)
     canvas.fill(Qt.GlobalColor.transparent)
     painter = QPainter(canvas)
@@ -85,8 +85,8 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
     if plus:
         draw_plus(painter, x, side)
         x += plus
-    if recipe is not None:
-        draw_recipe(painter, x, recipe, enclosed)
+    if source_video is not None:
+        draw_source_video(painter, x, source_video, enclosed)
     painter.end()
     return canvas
 
@@ -136,7 +136,7 @@ class CombinationView(QWidget):
         layout.addStretch(1)
 
     def show_pair(self, combination: Combination) -> None:
-        """Show the picture beside its recipe clip, looping in gray.
+        """Show the picture beside its source video, looping in gray.
 
         Either may be missing — a curated act is pinned in the overlay and has no
         past video under it, and a frame can have moved — and the plus shows only
@@ -144,7 +144,7 @@ class CombinationView(QWidget):
         """
         self._stop_movie()
         self._image_path = str(combination.picture) if combination.picture else None
-        self._video_path = str(combination.recipe) if combination.recipe else None
+        self._video_path = str(combination.source_video) if combination.source_video else None
         self._pixmap = _readable(self._image_path)
         if self._pixmap is None:
             self.image_label.clear()
@@ -154,14 +154,14 @@ class CombinationView(QWidget):
             self.video_label.clear()  # no stale last frame under the next pair
         self.video_label.setVisible(self._has_clip)
         self.plus_label.setVisible(self._pixmap is not None and self._has_clip)
-        self._show_parentheses(combination.recipe_prompt_edited)
+        self._show_parentheses(combination.prompt_edited)
         if self._has_clip:
             self._movie = looping_movie(self._video_path, self._side_size(),
                                         self.video_label)
             play_grayscale(self._movie, self.video_label)
         self._rescale()
 
-    def mark_recipe_prompt_edited(self, edited: bool) -> None:
+    def mark_prompt_edited(self, edited: bool) -> None:
         self._show_parentheses(edited)
         self._rescale()
 

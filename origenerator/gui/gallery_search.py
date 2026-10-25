@@ -3,7 +3,7 @@
 One of the gallery's screen concerns, lifted out of the view that used to hold
 all of them. What lives here is the whole of a search's life — the debounce and
 the widening's longer one, the query and its expansions, the outcome, the tiles
-the pane draws and the recipe bands folded shut, the sort and the count line.
+the pane draws and the Model / LoRA bands folded shut, the sort and the count line.
 
 What stays with the host is what a search is *of*: which folder the tree has
 selected, what rows the gallery is holding, and what the pane and the header do
@@ -42,7 +42,7 @@ _DELAY_MS = 300
 # would answer the first keystroke of every query with most of the gallery.
 MIN_CHARS = 3
 # The sort orders the results pane offers, as (label, mode) in menu order.
-_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RECIPE))
+_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_MODEL_LORA))
 
 
 class SearchHost(Protocol):
@@ -91,7 +91,7 @@ class GallerySearchController(QObject):
         self._outcome = search.SearchOutcome((), ())
         self._tiles: list = []      # its hits as the pane draws them
         self._sort = search.SORT_RECENT
-        self._collapsed: set[str] = set()   # recipe bands folded shut
+        self._collapsed: set[str] = set()   # Model / LoRA bands folded shut
         self._expander = expander or SearchExpander(self)
         self._expander.expanded.connect(self._on_expanded)
         self._timer = QTimer(self)
@@ -130,7 +130,7 @@ class GallerySearchController(QObject):
         # How many the query found, and — past what the pane draws at once — that
         # it is showing a slice; beside it, the order the results are laid out in.
         # Recency is one question ("the one I made recently"); model + LoRA is the
-        # other ("which recipe was that"), and picking it cuts the results into a
+        # other ("which model and LoRA was that"), and picking it cuts the results into a
         # labelled band per combination rather than interleaving them.
         self._count = QLabel("")
         self._count.setObjectName("estimateLabel")
@@ -172,7 +172,7 @@ class GallerySearchController(QObject):
     def set_sort(self, mode: str | None) -> None:
         """Restore the remembered results order (ignoring anything unrecognized,
         so a state file from a version that offered a different one still opens)."""
-        index = self._sort_combo.findData(mode)
+        index = self._sort_combo.findData(search.saved_sort(mode))
         if index >= 0:
             self._sort_combo.setCurrentIndex(index)  # its signal sets the mode
 
@@ -376,7 +376,7 @@ class GallerySearchController(QObject):
         return tiles
 
     def _on_section_toggled(self, heading: str, collapsed: bool) -> None:
-        """Remember a recipe band's fold state, so a redraw — a rebuild, a landing
+        """Remember a Model / LoRA band's fold state, so a redraw — a rebuild, a landing
         generation, a widening — doesn't spring open the bands you shut."""
         if collapsed:
             self._collapsed.add(heading)

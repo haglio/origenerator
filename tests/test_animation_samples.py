@@ -10,7 +10,7 @@ import json
 import pytest
 
 from origenerator import animation_samples
-from origenerator.recipe_match import GENAU, VIDEO
+from origenerator.act_settings import GENAU, VIDEO
 
 _PATHS = {
     "animation_paths": {
@@ -33,7 +33,7 @@ def _clip(prompt_id, *, made_from, act="alpha", workflow="wan22_i2v",
           created="2026-01-01 00:00:00", **marks):
     return {
         "prompt_id": prompt_id, "workflow_name": workflow, "status": "completed",
-        "positive_prompt": f"a scene, {act}", "recipe_category": act,
+        "positive_prompt": f"a scene, {act}", "act": act,
         "params_json": json.dumps({"input_image": f"{made_from}.png [output]"}),
         "output_files": json.dumps([{"filename": f"{prompt_id}.mp4"}]),
         "created_at": created, **marks,

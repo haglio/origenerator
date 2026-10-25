@@ -180,7 +180,7 @@ def test_a_video_and_the_picture_it_was_made_from_come_in_with_all_their_record_
     picture = _frame_of(db, shown)
     assert {key: value for key, value in json.loads(shown["params_json"]).items()
             if key != "input_image"} == _VIDEO_PARAMS
-    assert (shown["positive_prompt"], shown["seed"], shown["recipe_category"],
+    assert (shown["positive_prompt"], shown["seed"], shown["act"],
             shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
     assert json.loads(picture["params_json"]) == _PICTURE_PARAMS
     assert (picture["positive_prompt"], picture["negative_prompt"], picture["seed"],
@@ -393,7 +393,7 @@ def test_the_funscript_sweep_writes_nothing_for_a_video_from_another_source(tmp_
     assert written == []
 
 
-def test_a_video_from_another_source_is_never_stamped_with_this_apps_recipes(tmp_path):
+def test_a_video_from_another_source_is_never_stamped_with_this_apps_workflows(tmp_path):
     _brought_in(tmp_path)
     db = Database(tmp_path / "test.db")
 
@@ -496,7 +496,7 @@ def test_picking_another_act_for_a_word_made_video_leaves_it_where_it_is(tmp_pat
 
     pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
 
-    assert db.get_generation(picked["prompt_id"])["recipe_category"] == "Bow"
+    assert db.get_generation(picked["prompt_id"])["act"] == "Bow"
     assert ItemNames.from_library(db).of(picked["prompt_id"]) == named
 
 
@@ -507,7 +507,7 @@ def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(
     scan(db, _places(tmp_path), grab=_still)
 
     assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4"]]
-    assert db.get_generation(picked["prompt_id"])["recipe_category"] == "Bow"
+    assert db.get_generation(picked["prompt_id"])["act"] == "Bow"
 
 
 def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
@@ -518,7 +518,7 @@ def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
 
     scan(db, _places(tmp_path), grab=_still)
 
-    assert db.get_generation(picked["prompt_id"])["recipe_category"] == "Kneel"
+    assert db.get_generation(picked["prompt_id"])["act"] == "Kneel"
 
 
 def test_a_pick_does_not_keep_a_video_from_taking_its_star_from_the_record(tmp_path):
@@ -660,7 +660,7 @@ def test_videos_whose_records_name_no_prompt_share_one_folder_each_keeping_its_a
         "c3_topaz.mp4": {"video": {"action": "Bow"}}})
 
     assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4", "c3_topaz.mp4"]]
-    assert sorted(row["recipe_category"] for row in _videos(db)) == ["Bow", "Wave", "Wave"]
+    assert sorted(row["act"] for row in _videos(db)) == ["Bow", "Wave", "Wave"]
 
 
 def _workflow_folders(db, media_label: str) -> list[str]:
@@ -761,7 +761,7 @@ def test_a_look_brings_a_video_already_brought_in_up_to_its_record(tmp_path):
 
     [shown] = _videos(db)
     picture = _frame_of(db, shown)
-    assert (shown["positive_prompt"], shown["seed"], shown["recipe_category"],
+    assert (shown["positive_prompt"], shown["seed"], shown["act"],
             shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
     assert (picture["source"], picture["positive_prompt"], picture["seed"]) == (
         GenerationSource.OUTSIDE, "a quiet shore", 22)

@@ -65,7 +65,7 @@ def speech_python(content: dict[str, Any] | None = None) -> Path | None:
     Qwen3-TTS pins a torch and a transformers that would break this app's own
     environment and ComfyUI's, so it lives in one of its own, and which one is
     a fact about the machine: the overlay names its interpreter. Absent, a
-    recipe with lines fails at submit saying so, rather than the app guessing
+    run with lines fails at submit saying so, rather than the app guessing
     at an environment that may not exist.
     """
     return _overlay_path("speech_python", content)

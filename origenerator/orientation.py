@@ -18,7 +18,7 @@ The shape is the folder's wherever its settings state a size: every picture of
 that folder sits on that side, a running one is placed before it has a
 picture, and a picture that disagrees with its folder shows up beside it
 rather than hiding on the other side. A folder whose settings state no size --
-a video's, whose recipe derives the size in-graph from its start frame -- goes
+a video's, whose workflow derives the size in-graph from its start frame -- goes
 by the item's own shape, read off its thumbnail (a cheap header read that
 keeps the aspect) or its file, and by its start frame while it has neither. An
 item that answers none of them files under Landscape, the roomier region --

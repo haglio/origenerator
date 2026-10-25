@@ -363,7 +363,7 @@ def test_a_generation_that_leaves_the_gallery_leaves_the_index():
     assert _hits(index, "lamp") == []
 
 
-# --- grouping the results by the recipe that made them ----------------------
+# --- grouping the results by the model and LoRA that made them -------------
 
 
 def _lora_row(prompt_id, lora, prompt="a quiet street"):
@@ -420,7 +420,7 @@ def test_an_unnamed_folders_row_is_reached_by_no_name():
 def test_results_group_under_one_heading_per_model_and_lora():
     rows = [_lora_row("g1", "driftstyle"), _lora_row("g2", "driftstyle"),
             _lora_row("g3", "emberstyle")]
-    sections = search.group_by_recipe(_index(rows).search("street").results)
+    sections = search.group_by_model_lora(_index(rows).search("street").results)
     assert [[r.row["prompt_id"] for r in found] for _, found in sections] == [
         ["g1", "g2"], ["g3"]]
     assert "driftstyle" in sections[0][0]
@@ -428,16 +428,16 @@ def test_results_group_under_one_heading_per_model_and_lora():
 
 
 def test_the_biggest_combination_leads():
-    # The recipe you use most is the one you are most likely reading through,
+    # The combination you use most is the one you are most likely reading through,
     # and it makes a one-off read as the outlier it is.
     rows = [_lora_row("g1", "emberstyle"), _lora_row("g2", "driftstyle"),
             _lora_row("g3", "driftstyle"), _lora_row("g4", "driftstyle")]
-    sections = search.group_by_recipe(_index(rows).search("street").results)
+    sections = search.group_by_model_lora(_index(rows).search("street").results)
     assert [len(found) for _, found in sections] == [3, 1]
 
 
 def test_a_heading_names_both_the_model_and_the_lora():
-    heading = search.recipe_heading(_lora_row("g1", "driftstyle"))
+    heading = search.model_lora_heading(_lora_row("g1", "driftstyle"))
     assert "example_high" in heading and "driftstyle_high" in heading
 
 

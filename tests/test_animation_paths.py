@@ -4,9 +4,9 @@ from __future__ import annotations
 import pytest
 
 from origenerator import animation_paths
+from origenerator.act_settings import GENAU, VIDEO
 from origenerator.content import EXAMPLE_CONTENT, load_content
 from origenerator.picture_states import state_names
-from origenerator.recipe_match import GENAU, VIDEO
 
 # A small stand-in for the overlay's own table: two lanes, three acts, three states.
 _PATHS = {
@@ -72,7 +72,7 @@ def test_the_example_table_names_only_acts_and_states_the_example_declares():
     line naming an act or a state nothing declares is a line that can never fire.
     Held over the committed example, which is what documents the shape."""
     example = load_content(EXAMPLE_CONTENT, EXAMPLE_CONTENT)
-    acts = set(example["recipe_categories"])
+    acts = set(example["acts"])
     states = set(state_names(example))
     table = example["animation_paths"]
 

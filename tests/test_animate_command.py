@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import pytest
 
+from origenerator.act_settings import GENAU, VIDEO
 from origenerator.animate_command import (
     AnimateRequest,
     animate_command_phrases,
     animate_command_spelling,
     match_animate_command,
 )
-from origenerator.recipe_match import GENAU, VIDEO
 
 
 @pytest.mark.parametrize("said", [

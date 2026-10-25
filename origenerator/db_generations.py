@@ -12,7 +12,7 @@ import json
 import threading
 
 from origenerator.db_connection import SqliteFile, Store
-from origenerator.db_schema import GENERATION_COLUMNS
+from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
 from origenerator.generation_state import (
     MADE_ELSEWHERE,
     GenerationSource,
@@ -170,9 +170,9 @@ class GenerationStore(Store):
                 (params_json, workflow_json, prompt_id),
             )
 
-    def set_recipe_source(self, prompt_id: str, *, category: str | None = None,
-                          video_prompt_id: str | None = None):
-        """Record where a combine launch got its recipe: the act picked in the
+    def set_settings_source(self, prompt_id: str, *, category: str | None = None,
+                            video_prompt_id: str | None = None):
+        """Record where a combine launch got its settings: the act picked in the
         dropdown, and the video whose settings the run re-uses. Written after the
         launch, because only the caller that built the combination knows either;
         empty values are stored as NULL, so each records the half it has."""
@@ -186,7 +186,7 @@ class GenerationStore(Store):
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
         """Record which image the standalone enhance ``prompt_id`` is of.
 
-        Written straight after the launch, like :meth:`set_recipe_source`: the
+        Written straight after the launch, like :meth:`set_settings_source`: the
         row goes in as the job is submitted, and only the caller that chose the
         image knows which row it was. The run's params name a *file*, and a
         file name can belong to more than one row; this is the one thing on the
@@ -215,7 +215,7 @@ class GenerationStore(Store):
                 "UPDATE generations SET source = :source, workflow_name = :workflow_name,"
                 " params_json = :params_json,"
                 " positive_prompt = :positive_prompt, negative_prompt = :negative_prompt,"
-                " seed = :seed, recipe_category = :recipe_category, created_at = :created_at,"
+                " seed = :seed, recipe_category = :act, created_at = :created_at,"
                 " completed_at = :completed_at WHERE prompt_id = :prompt_id",
                 rows,
             )
@@ -331,7 +331,7 @@ class GenerationStore(Store):
                    ORDER BY id""",
                 (GenerationStatus.COMPLETED, *_KNOWN_SOURCES, *MADE_ELSEWHERE),
             ).fetchall()
-            return [dict(r) for r in rows]
+            return [as_read(r) for r in rows]
 
     def highest_id_issued(self) -> int:
         """The largest id this table has ever handed out, deleted rows included.
@@ -368,7 +368,7 @@ class GenerationStore(Store):
 
     def insert_rows(self, rows: list[dict]):
         with self._connect() as conn:
-            for row in rows:
+            for row in map(as_stored, rows):
                 cols = [c for c in GENERATION_COLUMNS if c in row]
                 conn.execute(
                     f"INSERT INTO generations ({', '.join(cols)})"
@@ -382,7 +382,7 @@ class GenerationStore(Store):
                 f"SELECT * FROM generations WHERE prompt_id = ? AND {_OF_A_KNOWN_SOURCE}",
                 (prompt_id, *_KNOWN_SOURCES),
             ).fetchone()
-            return dict(row) if row else None
+            return as_read(row) if row else None
 
     def library_version(self) -> int:
         return self._version()
@@ -397,7 +397,7 @@ class GenerationStore(Store):
                         " AND source != ? ORDER BY id DESC",
                         (*_KNOWN_SOURCES, GenerationSource.LEFT_OUT),
                     ).fetchall()
-                self._listed = (version, [dict(r) for r in rows])
+                self._listed = (version, [as_read(r) for r in rows])
             return [dict(r) for r in self._listed[1]]
 
     def library_paths(self) -> set[str]:
@@ -421,4 +421,4 @@ class GenerationStore(Store):
                 " WHERE recipe_video_id IS NOT NULL AND recipe_category IS NULL"
                 " ORDER BY id DESC"
             ).fetchall()
-            return [dict(r) for r in rows]
+            return [as_read(r) for r in rows]

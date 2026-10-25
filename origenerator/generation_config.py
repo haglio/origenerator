@@ -196,12 +196,12 @@ def filled_params(row: dict, workflow) -> dict:
     """A stored row's params with any it didn't carry filled from the workflow's
     defaults (imports keep only sparse metadata) — its seeds left exactly as
     stored. The reproducible half of :func:`prepared_params`, used on its own to
-    re-run a recipe while pinning one of its two seeds (an i2v re-roll that keeps
+    re-run settings while pinning one of their two seeds (an i2v re-roll that keeps
     the video seed, say).
 
     The enhance layer is taken from the workflow's defaults rather than the row,
     so a new run never inherits an enhancement from the one it varies. Every
-    other param is the recipe, and a variation reproduces it; enhancement is not
+    other param is part of the settings, and a variation reproduces them; enhancement is not
     — it is what the gallery's Enhance subpanel applies, deliberately and
     app-wide. Inheriting it silently is what made a re-roll come out enhanced
     with the subpanel's tick unticked.

@@ -8,7 +8,7 @@ color it wears it in, and the chips the badges sit on.
 
 The toolbar-button icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
-recipe-level badges (:func:`level_badge_icon`) are lettered chips marking which
+folder-level badges (:func:`level_badge_icon`) are lettered chips marking which
 of workflow/model/LoRA a folder is; the media-type badges
 (:func:`media_type_badge`) are corner chips marking a Recents tile as an image
 or a video.

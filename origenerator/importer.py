@@ -167,19 +167,19 @@ def merge_video_sidecar_rows(db: Database) -> int:
 
 
 def first_frames_filed_apart_from_their_videos(rows: list[dict]) -> list[dict]:
-    recipes_by_video_stem: dict[str, list[dict]] = {}
+    graphs_by_video_stem: dict[str, list[dict]] = {}
     for row in rows:
         files = row_output_files(row)
         if files and media_type_from_filename(files[0].get("filename", "")) == MediaType.VIDEO:
-            recipe = recipe_of(row)
-            if recipe:
-                recipes_by_video_stem.setdefault(Path(files[0]["filename"]).stem, []).append(recipe)
+            graph = graph_of(row)
+            if graph:
+                graphs_by_video_stem.setdefault(Path(files[0]["filename"]).stem, []).append(graph)
     return [
         row for row in rows
         if source_of(row) == GenerationSource.IMPORTED
         and len(files := row_output_files(row)) == 1
         and media_type_from_filename(files[0].get("filename", "")) == MediaType.IMAGE
-        and recipe_of(row) in recipes_by_video_stem.get(Path(files[0]["filename"]).stem, [])
+        and graph_of(row) in graphs_by_video_stem.get(Path(files[0]["filename"]).stem, [])
     ]
 
 
@@ -222,15 +222,15 @@ def merge_soundless_copy_rows(db: Database, *, send_down) -> int:
 
 def fold_sound_versions_into_their_videos(db: Database) -> int:
     rows = db.list_generations()
-    with_recipe_by_file = {file_key(files[0]): row for row in rows
-                           if (files := row_output_files(row)) and recipe_of(row)}
+    with_graph_by_file = {file_key(files[0]): row for row in rows
+                          if (files := row_output_files(row)) and graph_of(row)}
     folded = 0
     for row in rows:
         files = row_output_files(row)
-        if source_of(row) != GenerationSource.IMPORTED or len(files) != 1 or recipe_of(row):
+        if source_of(row) != GenerationSource.IMPORTED or len(files) != 1 or graph_of(row):
             continue
         silent = soundless_copies_of(files)
-        video = with_recipe_by_file.get(file_key(silent[0])) if silent else None
+        video = with_graph_by_file.get(file_key(silent[0])) if silent else None
         if video is None or len(row_output_files(video)) != 1:
             continue
         db.update_generation(video["prompt_id"], output_files=json.dumps(files + silent))
@@ -317,19 +317,19 @@ def backfill_import_workflows(db: Database) -> int:
             continue
         files = row_output_files(row)
         name = _workflow_that_made(files[0].get("filename", "") if files else "",
-                                   recipe_of(row), kind)
+                                   graph_of(row), kind)
         if name != filed:
             db.set_workflow_name(row["prompt_id"], name)
             updated += 1
     return updated
 
 
-def refile_enhancements_another_recipe_made(db: Database) -> int:
+def refile_enhancements_another_workflow_made(db: Database) -> int:
     refiled = 0
     for row in db.list_generations():
         if row.get("workflow_name") != ENHANCE_WORKFLOW:
             continue
-        graph = recipe_of(row)
+        graph = graph_of(row)
         name = _reconciled(ENHANCE_WORKFLOW, _workflow_from_nodes(graph) if graph else None,
                            media_type_of_row(row))
         if name != ENHANCE_WORKFLOW:
@@ -359,7 +359,7 @@ def backfill_import_params(db: Database, places: OutputPlaces) -> int:
         if source_of(row) != GenerationSource.IMPORTED:
             continue
         params = parse_params(row.get("params_json"))
-        stated = _graph_params(recipe_of(row))
+        stated = _graph_params(graph_of(row))
         if "width" not in params and "width" not in stated:
             stated.update(_size_from_its_own_file(_first_output_path(row, places),
                                     row.get("workflow_name") or ""))
@@ -377,7 +377,7 @@ def backfill_imported_video_seeds(db: Database) -> int:
         params = parse_params(row.get("params_json"))
         if row.get("source") != GenerationSource.IMPORTED or "noise_seed" not in params:
             continue
-        graph = recipe_of(row)
+        graph = graph_of(row)
         seed = _sampler_settings(graph)[0] if graph else None
         if seed is None or params["noise_seed"] == seed:
             continue
@@ -409,7 +409,7 @@ def _record_key(entry: dict) -> str:
     return f"{sub}/{name}" if sub else name
 
 
-def recipe_of(row: dict) -> dict:
+def graph_of(row: dict) -> dict:
     return graph_from_text(row.get("workflow_json") or "")
 
 
@@ -551,7 +551,7 @@ def _sampler_settings(graph: dict) -> tuple[int | None, dict]:
 
 
 def _refine_passes(graph: dict) -> list[dict]:
-    """The KSamplers whose settings describe a refinement rather than the recipe.
+    """The KSamplers whose settings describe a refinement rather than the base settings.
 
     The SDXL workflows end in a second, low-denoise KSampler over a re-encoded
     image (the enhance pass), recognized by sampling a VAEEncode'd latent. Its

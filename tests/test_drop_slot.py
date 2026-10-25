@@ -150,7 +150,7 @@ def test_emptying_a_slot_stops_the_clip_it_was_looping(qtbot, tmp_path):
 
 
 def test_a_grayscale_slot_drains_the_clip_it_holds(qtbot, tmp_path):
-    # The video slot holds a recipe, not a result: in color it reads as a second
+    # The video slot holds a source video, not a result: in color it reads as a second
     # subject beside the image it will animate.
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
     slot = _slot(qtbot, kind="video", preview=lambda pid: (None, webp), grayscale=True)

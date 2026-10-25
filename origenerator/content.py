@@ -1,6 +1,6 @@
 """Content overlay — the values that must not be published, loaded at runtime.
 
-The act vocabulary the recipe matcher scores prompts against describes the
+The act vocabulary describes the
 library this tool serves, so it lives in
 ``content.local.json`` (git-ignored) rather than in source.  A
 committed ``content.example.json`` documents the shape and is what a fresh or
@@ -50,12 +50,23 @@ def overlay_path(
                                  EXAMPLE_CONTENT if example_path is None else example_path)
 
 
+_RENAMED_KEYS = {"recipe_categories": "acts", "combine_recipes": "pinned_kino_settings",
+                 "genau_recipes": "pinned_genau_settings"}
+
+
+def _current(content: dict[str, Any]) -> dict[str, Any]:
+    for old, new in _RENAMED_KEYS.items():
+        if old in content and new not in content:
+            content[new] = content.pop(old)
+    return content
+
+
 def load_content(
     local_path: Path | None = None,
     example_path: Path | None = None,
 ) -> dict[str, Any]:
     """The local overlay's content when present, else the committed example."""
-    return json.loads(_text(overlay_path(local_path, example_path)))
+    return _current(json.loads(_text(overlay_path(local_path, example_path))))
 
 
 load_content.cache_clear = _text.cache_clear
@@ -80,8 +91,10 @@ def missing_overlay_keys(
     Empty when there is no local overlay at all: a fresh or public checkout runs
     on the example, so there is nothing to be short of.
     """
-    return _overlay.missing_keys(LOCAL_CONTENT if local_path is None else local_path,
-                                 EXAMPLE_CONTENT if example_path is None else example_path)
+    missing = _overlay.missing_keys(LOCAL_CONTENT if local_path is None else local_path,
+                                    EXAMPLE_CONTENT if example_path is None else example_path)
+    present = load_content(local_path, example_path)
+    return tuple(key for key in missing if key not in present)
 
 
 def genau_flick_word() -> str:

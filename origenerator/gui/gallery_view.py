@@ -431,7 +431,7 @@ class GalleryView(QWidget):
         before its first refresh.
         """
         self._image_rows: list[dict] = []
-        # Pictures whose spoken animation is still choosing a recipe, so a
+        # Pictures whose spoken animation is still choosing a video, so a
         # second one said into that wait is refused rather than queued twice
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
@@ -533,7 +533,7 @@ class GalleryView(QWidget):
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
             names=self._item_names, radio=self._radio,
             turn_the_radio_on=lambda: self._bank.turn_the_radio_on())
-        # Combine: a video's recipe run again on a dropped picture, and the
+        # Combine: a video's settings run again on a dropped picture, and the
         # spoken "animate as" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
         # which _build_ui places under the tree.
@@ -1357,14 +1357,14 @@ class GalleryView(QWidget):
         if not launched:
             return  # no client, or every submit failed
         if launching is not None:
-            # A tab Combine opened stamps its runs with where the recipe came
+            # A tab Combine opened stamps its runs with where the settings came
             # from, whether they were launched as opened or edited first — that
             # mark is the only thing telling the queue what act a video is of.
-            category, video_id, intent = launching.recipe_source()
+            category, video_id, intent = launching.settings_source()
             for prompt_id in launched:
                 if category or video_id:
-                    self._db.set_recipe_source(prompt_id, category=category,
-                                               video_prompt_id=video_id)
+                    self._db.set_settings_source(prompt_id, category=category,
+                                                 video_prompt_id=video_id)
                 if video_id and not category:
                     self._db.record_combine_video_use(intent, video_id, prompt_id)
                 launching.note_launched(prompt_id)
@@ -1619,7 +1619,7 @@ class GalleryView(QWidget):
         self._tree_view.populate(
             self._build_sides(trees), folder_meta=meta,
             # Where the work has lately been. The tree keeps the order the
-            # recipes were tried in, so nothing else in it says so.
+            # settings were tried in, so nothing else in it says so.
             recently_worked=gallery.recently_worked_folders(trees, rows, bumped=bumped),
         )
         # The rows the old selection group pointed at are gone with the rebuild;
@@ -2344,7 +2344,7 @@ class GalleryView(QWidget):
                               auto_generating=self._auto.is_active(key),
                               typical_seconds=self.typical_run_seconds(job),
                               made_from=self._job_made_from(
-                                  job, lambda recipe: recipe.get("thumbnail_path")))
+                                  job, lambda source_video: source_video.get("thumbnail_path")))
         tile.set_selected(key == self._selected_reroll_key)
         tile.cancel_requested.connect(lambda: self._cancel_reroll(key))
         tile.context_requested.connect(lambda pos: self._generating_tile_menu(key, pos))
@@ -2440,7 +2440,7 @@ class GalleryView(QWidget):
         seed is not part of what places a row (see
         :func:`~origenerator.gallery.signatures.canonical_settings`), so the
         rewrite comes out as this folder's parallel: the same seeds in the same
-        recipe, saying something slightly different.
+        settings, saying something slightly different.
 
         Each new generation is linked to the image it was rewritten from, one
         by one rather than folder to folder — what it says now beside what it
@@ -2509,9 +2509,9 @@ class GalleryView(QWidget):
         frame = resolve_input_image_path(job.params.get("input_image"))
         return str(frame) if frame is not None else None
 
-    def _job_made_from(self, job, recipe_media) -> Combination:
+    def _job_made_from(self, job, source_video_media) -> Combination:
         """What ``job`` was made from, for a surface with no frame of it yet: the
-        picture, and the clip whose settings it follows as ``recipe_media`` shows
+        picture, and the clip whose settings it follows as ``source_video_media`` shows
         that clip — a still on the folder's tile, a loop in a config tab.
 
         The clip only where a *video* was dropped: an act picked off the Combine
@@ -2520,13 +2520,13 @@ class GalleryView(QWidget):
         same reason the queue's rows leave it out (see BrowserPane).
         """
         row = self._db.get_generation(job.prompt_id) if job is not None else None
-        recipe = (None if row is None or row.get("recipe_category")
-                  else self._db.get_generation(row.get("recipe_video_id") or ""))
+        source_video = (None if row is None or row.get("act")
+                        else self._db.get_generation(row.get("source_video") or ""))
         return Combination(
             self._job_source_picture(job),
-            recipe_media(recipe) if recipe is not None else None,
-            recipe is not None
-            and gallery.prompts_differ_from(job.params, recipe, job.workflow))
+            source_video_media(source_video) if source_video is not None else None,
+            source_video is not None
+            and gallery.prompts_differ_from(job.params, source_video, job.workflow))
 
     def typical_run_seconds(self, job) -> float | None:
         """What a whole run of ``job``'s workflow usually takes — the prior the
@@ -2937,7 +2937,7 @@ class GalleryView(QWidget):
         """Launch the revised generation and record the request under it;
         return the line to say about it and its kind.
 
-        The revision is the target's own recipe with its prompt pair edited and
+        The revision is the target's own settings with its prompt pair edited and
         *the same seed* — "the same picture but without X" means the picture, so
         the one thing deliberately not re-rolled is the seed that draws it.
         """
@@ -3071,7 +3071,7 @@ class GalleryView(QWidget):
             self._jobs.reroll_image_seed(key, row, self._image_rows)
         self._select_reroll(key)  # a no-op if the launch above failed to register
 
-    # --- combine: a video's recipe applied to a dropped image -------------
+    # --- combine: a video's settings applied to a dropped image -----------
 
     # --- the line's answer to the press, before there is a job ------------
 
@@ -3081,7 +3081,7 @@ class GalleryView(QWidget):
         A seam as much as a call: the suite replaces this with a straight-through
         version, so a test can poll or launch and inspect in one breath rather
         than pumping an event loop for every one. The poll and the combine's
-        recipe match are both slow for the same reason — something on the other
+        match of an act to a video are both slow for the same reason — something on the other
         end of a socket thinks for seconds — and both answer through here.
         """
         run_off_thread(work, done, owner=self)
@@ -3193,7 +3193,7 @@ class GalleryView(QWidget):
         settings are this very folder, else in the pane's preview tab, seeded
         from the run's own settings
         (:meth:`GenerateConfigPanel.show_running_generation`) so the tab is *for*
-        this run — its form is the run's recipe, its bar fills with the run's
+        this run — its form is the run's settings, its bar fills with the run's
         progress, its button discards it, and its preview follows the run's
         frames to the picture they land as
         (:meth:`GenerateConfigPanel.watch_folder`). That is what a click on the

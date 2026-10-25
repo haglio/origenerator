@@ -169,7 +169,7 @@ def test_gathering_a_folder_and_its_parent_counts_each_item_once():
     assert len(gallery.rows_under(folder)) == 2
 
 
-def test_a_custom_folder_wears_no_recipe_level_but_names_its_tier():
+def test_a_custom_folder_wears_no_folder_level_but_names_its_tier():
     (folder,) = gallery.build_custom_folders(
         _tree([_row("i1", "a cat")]), [{"id": 1, "name": "Mine", "folders": [], "items": []}]
     )

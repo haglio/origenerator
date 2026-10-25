@@ -325,7 +325,7 @@ def test_a_picture_already_made_at_these_settings_says_so_rather_than_no(enhance
 
 def test_a_folder_that_is_not_a_settings_folder_offers_nothing(enhance):
     # The collections and the workflow folders above a settings one have no single
-    # recipe to enhance at.
+    # set of settings to enhance at.
     controller, _host = enhance(FakeHost(group=FakeGroup([_image("i1")])))
 
     assert controller.offer() == (False, "Nothing here to enhance")

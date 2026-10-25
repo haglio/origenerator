@@ -3,7 +3,7 @@
 Every value that describes the library rather than the code comes from here, so
 `load_content` is called from five module scopes across four packages — and
 before it was cached, importing `config` alone read and parsed the JSON, and
-importing config plus search plus recipe_match plus workflows read the same file
+importing config plus search plus act_settings plus workflows read the same file
 six times over.
 
 The count is a test rather than a comment because nothing else would show it:
@@ -108,7 +108,7 @@ def test_the_overlay_is_read_once_however_many_modules_want_it():
     modules import `config` alone. One read."""
     seen = _import_in_a_fresh_interpreter(
         "origenerator.config", "origenerator.search",
-        "origenerator.recipe_match", "origenerator.workflows")
+        "origenerator.act_settings", "origenerator.workflows")
 
     assert seen["overlay_reads"] == ["content.example.json"]
 
@@ -129,7 +129,7 @@ def test_a_workflow_imports_on_an_overlay_that_is_missing_what_it_wants(tmp_path
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("module", ["origenerator.search", "origenerator.recipe_match"])
+@pytest.mark.parametrize("module", ["origenerator.search", "origenerator.act_settings"])
 def test_a_consumer_of_the_overlay_does_not_read_it_at_import(module):
     """It reads `config`'s, which is the one read above; asking again at its own
     import is what made the count six."""
@@ -207,8 +207,8 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
 
     assert documented == {
         "speech_python", "lora_training_python", "lora_training_scripts",
-        "recipe_categories", "combine_recipes", "search_synonyms",
-        "genau_recipes", "detail_fix_parts", "genau_flick_prompts",
+        "acts", "pinned_kino_settings", "search_synonyms",
+        "pinned_genau_settings", "detail_fix_parts", "genau_flick_prompts",
         "model_recommendations", "lora_recommendations",
         "picture_states", "picture_state_grid", "animation_paths",
     }
@@ -227,3 +227,20 @@ def test_the_pyproject_says_the_launch_needs_every_key_of_the_example_in_the_loc
     assert compared.returncode == 0, compared.stderr
     assert [REPO_ROOT / declared["every-key-of"], REPO_ROOT / declared["in"]] == [
         Path(line) for line in compared.stdout.splitlines()]
+
+
+def test_an_overlay_written_before_three_keys_were_renamed_reads_under_the_new_ones(tmp_path):
+    example = tmp_path / "content.example.json"
+    example.write_text(json.dumps({"acts": [], "pinned_kino_settings": {},
+                                   "pinned_genau_settings": {}}), encoding="utf-8")
+    local = tmp_path / "content.local.json"
+    local.write_text(json.dumps({"recipe_categories": ["alpha"],
+                                 "combine_recipes": {"alpha": {"workflow": "wan22_i2v"}},
+                                 "genau_recipes": {}}), encoding="utf-8")
+
+    loaded = content.load_content(local, example)
+
+    assert loaded["acts"] == ["alpha"]
+    assert loaded["pinned_kino_settings"] == {"alpha": {"workflow": "wan22_i2v"}}
+    assert loaded["pinned_genau_settings"] == {}
+    assert content.missing_overlay_keys(local, example) == ()

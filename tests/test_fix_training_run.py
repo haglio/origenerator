@@ -146,7 +146,7 @@ def test_a_finished_training_lets_the_queue_go_and_names_the_lora_it_made(
 
     assert made.args == [fix_training.lora_of({"lora": "hands 2026-10-19 0130.safetensors"})]
     (outcome,) = queue.ended
-    assert (outcome.kind, outcome.recipe, outcome.ok) == ("Training", "Hands fix", True)
+    assert (outcome.kind, outcome.display_name, outcome.ok) == ("Training", "Hands fix", True)
     assert outcome.seconds == pytest.approx(30, abs=10)
     assert not run.running
 

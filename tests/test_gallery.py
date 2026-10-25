@@ -96,7 +96,7 @@ def test_the_tree_files_each_kind_under_a_folder_of_its_own_images_first():
     assert [workflow.key for workflow in child_groups(videos)] == ["video/wan22_i2v"]
 
 
-def test_folder_level_names_the_recipe_levels_and_nothing_else():
+def test_folder_level_names_the_folder_levels_and_nothing_else():
     # The workflow -> model -> LoRA -> source-image folders each report their
     # level, so each carries a badge saying which it is. A settings leaf is
     # where the generations live and reports none.
@@ -301,7 +301,7 @@ def test_the_start_frame_index_reads_each_pictures_file_list_once_across_rebuild
     assert reads.count(picture["output_files"]) == 1
 
 
-def test_a_recipes_signature_is_worked_out_once_however_often_it_is_asked(monkeypatch):
+def test_a_rows_settings_signature_is_worked_out_once_however_often_it_is_asked(monkeypatch):
     worked_out = []
     real = signatures.canonical_settings
     monkeypatch.setattr(signatures, "canonical_settings",
@@ -373,7 +373,7 @@ def test_settings_signature_drops_input_image_for_an_unknown_workflow():
 def test_settings_signature_folds_which_picture_the_start_frame_is_for_i2v():
     # A video groups by the *picture* it animates: two videos with identical video
     # settings split whenever their frames are different pictures — even two draws
-    # of one prompt, which are two pictures however alike the recipe was.
+    # of one prompt, which are two pictures however alike the settings were.
     face1 = _img("face1", "a face", 30, 1)      # sdxl_t2i_face1.png
     face2 = _img("face2", "a face", 30, 2)      # same image config, a second draw
     scene = _img("scene", "a landscape", 30, 1)  # a differently configured frame
@@ -424,7 +424,7 @@ def test_settings_signature_tolerates_missing_or_invalid_params():
 
 def test_settings_signature_splits_workflow_generations():
     # A workflow's version is part of a row's identity: different generations of
-    # a workflow render the same recipe differently (v002 SDXL had no enhance
+    # a workflow render the same settings differently (v002 SDXL had no enhance
     # tail), so their rows must not share a folder. The regression this pins: an
     # old row stores none of the newer params, so default-normalization alone
     # hashes it exactly like a new run.
@@ -441,7 +441,7 @@ def test_settings_signature_splits_workflow_generations():
 
 
 def test_settings_signature_gives_imports_and_live_forms_the_current_generation():
-    # "imported" names no recipe generation (best-effort metadata), and a live
+    # "imported" names no workflow generation (best-effort metadata), and a live
     # form's prospective settings pass no version at all; both take the current
     # version, so a sparse import, its full re-roll (stamped with the real
     # version), and the form that would re-run it all share one folder.
@@ -456,7 +456,7 @@ def test_settings_signature_gives_imports_and_live_forms_the_current_generation(
 
 def test_settings_signature_ignores_the_enhancement():
     # An enhancement is a finish applied to an image, not a different image: the
-    # same recipe with the enhance tail on and off is ONE folder. (The standalone
+    # same settings with the enhance tail on and off are ONE folder. (The standalone
     # enhancer already worked this way — it folds onto the row it upgrades without
     # moving it — and the workflows' inline toggle now agrees.)
 
@@ -473,7 +473,7 @@ def test_settings_signature_ignores_the_enhancement():
                                                enhance_steps=40, enhance_denoise=0.3,
                                                upscale_model="4x_other.pth"),
                               None, workflow_version="v004") == plain
-    # A real recipe difference still splits — the drop is the tail, not the row.
+    # A real difference in settings still splits — the drop is the tail, not the row.
     assert settings_signature("sdxl_t2i", sdxl(enhance=True, steps=12), None,
                               workflow_version="v004") != plain
 
@@ -602,7 +602,7 @@ def test_enhance_params_for_builds_an_image_enhance_config():
 
 def test_gallery_tree_splits_different_workflow_generations_into_folders():
     # The user-facing shape of the version fold: an old-generation SDXL render
-    # and a new one of the same recipe become sibling settings folders rather
+    # and a new one of the same settings become sibling settings folders rather
     # than one mixed folder of unlike outputs.
     old = _row(prompt_id="old", workflow_version="v002",
                params_json=json.dumps({"positive_prompt": "a lighthouse"}),
@@ -709,7 +709,7 @@ def test_a_run_that_recorded_no_model_never_shares_a_folder_key_with_the_default
     assert len({folder.key for folder in folders}) == len(folders) == 2
 
 
-def test_a_recipes_model_and_lora_are_read_once_however_often_they_are_asked(monkeypatch):
+def test_a_rows_model_and_lora_are_read_once_however_often_they_are_asked(monkeypatch):
     reads = []
     real = signatures.parse_params
     monkeypatch.setattr(signatures, "parse_params",
@@ -1015,7 +1015,7 @@ def test_i2v_videos_split_into_a_folder_per_input_image_config():
 def test_every_video_in_a_source_folder_animates_the_one_picture():
     # The tier's whole promise: open any settings folder inside a source-image
     # folder and every video in it ran on that one frame. Two draws of a single
-    # prompt are two pictures, so they get two folders however alike their recipes.
+    # prompt are two pictures, so they get two folders however alike their settings.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)  # a second draw of the same settings
     sources = _i2v_source_folders([
@@ -1132,7 +1132,7 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
         "video/wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)"}
 
 
-def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_by_the_recipes_own_name():
+def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_by_the_workflows_own_name():
     # The two no longer share a parent, Images holding the one and Videos the
     # other, so neither needs telling apart from its twin by what it holds.
     assert _workflow_labels([_LOOP_STILL, _LOOP_CLIP]) == {
@@ -1967,7 +1967,7 @@ def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies()
 
 def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
     # A row from before scenes carries only frame_count; its re-roll writes the
-    # one scene out as scene_frames. Both are the same recipe, and a scene list
+    # one scene out as scene_frames. Both are the same settings, and a scene list
     # of one that disagrees with the clip length is overruled by it in the graph
     # too, so it must not split the folder.
 

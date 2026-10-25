@@ -1,16 +1,16 @@
 """The gallery's image + video combine panel, sitting under the TOC folder tree.
 
-Drop an image into the top slot, then supply a *recipe* either by picking an act
+Drop an image into the top slot, then supply *settings* either by picking an act
 from the Action list, which sends the app looking for a fitting past video, or by
 dropping a specific i2v video (shown in gray: it is here for its settings). The two
 are mutually exclusive. A video dropped into the top slot lends it only the picture
 it was made from, and one let go between the slots lends each what it can. Generate
-re-runs the chosen recipe on the dropped image; “Edit individual…” hands it to a
+re-runs the chosen settings on the dropped image; “Edit individual…” hands them to a
 generate tab first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
 video (the default), or a Genau flick — one complete cycle, looping. That choice
-picks which recipes the act is answered from, so the dropdown's usable acts change
+picks which videos the act is answered from, so the dropdown's usable acts change
 with it: an act only the video lane can answer grays out under Genau, and acts that
 are no kind of cycle at all are not offered there.
 
@@ -40,6 +40,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
 
 from origenerator import animation_paths
+from origenerator.act_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.content import genau_flick_word
 from origenerator.gui.action_picker import ACTION_LABEL
 from origenerator.gui.drop_slot import DROP_A_VIDEO, DROP_AN_IMAGE, DropSlot, DropZone
@@ -52,12 +53,11 @@ from origenerator.gui.generate_button import (
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.media import MediaType
-from origenerator.recipe_match import GENAU, VIDEO
 
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "(custom)"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
-_NEEDS_RECIPE = "Pick an act or drop a video first"
+_NEEDS_ACT_OR_VIDEO = "Pick an act or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
 
 
@@ -80,7 +80,7 @@ def _keep_its_room_when_hidden(widget: QWidget) -> None:
 
 @dataclass(frozen=True)
 class CombineRequest:
-    """One press of Generate or “Edit individual…”: the picture, the recipe —
+    """One press of Generate or “Edit individual…”: the picture, the settings —
     a dropped video or a picked act, never both — the lane it is answered from,
     and whether it is bound for the generator rather than for a run now."""
 
@@ -92,7 +92,7 @@ class CombineRequest:
 
 
 class CombinePanel(QWidget):
-    """Image slot + a recipe (dropped video or picked act) + an intent + Generate."""
+    """Image slot + settings (dropped video or picked act) + an intent + Generate."""
 
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
     animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
@@ -143,7 +143,7 @@ class CombinePanel(QWidget):
         self._list_the_acts(VIDEO)
         open_the_list_in_full(self._category)
         self._category.setToolTip(
-            "Pick an act and Generate — the app reuses a fitting past video's recipe "
+            "Pick an act and Generate — the app reuses a fitting past video's settings "
             "on the dropped image. Or pick (custom) and drop a specific video instead."
         )
         self._category.currentIndexChanged.connect(self._on_category_changed)
@@ -163,7 +163,7 @@ class CombinePanel(QWidget):
         # Or the row's spare height goes to the word, which then floats in it.
         action_column.addStretch(1)
 
-        # The video part: the two ways to supply the recipe, side by side in one
+        # The video part: the two ways to supply the settings, side by side in one
         # container so the dropdown reads as belonging to the video side, not the image.
         self._video_part = QWidget()
         video_row = QHBoxLayout(self._video_part)
@@ -200,8 +200,8 @@ class CombinePanel(QWidget):
         intent_row.addWidget(self._genau_radio)
         intent_row.addStretch(1)
 
-        # Two ways to act on the same chosen recipe: run it now, or open it in the
-        # generator to tweak first. Both gate on the same "image + recipe" readiness.
+        # Two ways to act on the same chosen settings: run them now, or open them in the
+        # generator to tweak first. Both gate on the same "image + settings" readiness.
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._emit)
         self._open_btn = QPushButton("Edit individual…")
@@ -218,7 +218,7 @@ class CombinePanel(QWidget):
         heading = QLabel("Combine")
         heading.setObjectName("combineHeading")
         heading.setToolTip(
-            "Re-run a video's recipe on the dropped image: pick an act, or drop a video."
+            "Re-run a video's settings on the dropped image: pick an act, or drop a video."
         )
         layout.addWidget(heading)
         parted = QVBoxLayout()
@@ -236,7 +236,7 @@ class CombinePanel(QWidget):
     # --- intent (what the result is for) ----------------------------------
 
     def selected_intent(self) -> str:
-        """``VIDEO`` or ``GENAU`` — which lane the chosen recipe is answered from."""
+        """``VIDEO`` or ``GENAU`` — which lane the chosen settings are answered from."""
         return GENAU if self._genau_radio.isChecked() else VIDEO
 
     def set_intent(self, intent: str):
@@ -281,26 +281,24 @@ class CombinePanel(QWidget):
         including an act the current lane cannot answer, which
         :meth:`set_available_categories` has grayed out. A grayed act must not
         arrive selected for the same reason it must not stay selected: the
-        buttons would go live on a pick that can only answer "no recipe yet".
+        buttons would go live on a pick that can only answer "no past video yet".
         """
         index = self._category.findText(category)
         usable = index >= 1 and self._category.model().item(index).isEnabled()
         self._category.setCurrentIndex(index if usable else 0)
 
     def set_available_categories(self, available: Collection[str]):
-        """Gray out every act the current lane has no recipe for — nothing to mine and
-        nothing pinned, so offering it could only ever answer "no recipe yet". A
+        """Gray out every act the current lane has no settings for — nothing to mine and
+        nothing pinned, so offering it could only ever answer "no past video yet". A
         disabled item says why on hover, naming the lane, since an act the video
         lane answers happily can still be unanswerable as a loop. The neutral
         "(custom)" is never grayed."""
-        genau = self.selected_intent() == GENAU
+        lane = self.selected_intent()
         model = self._category.model()
         for index in range(1, self._category.count()):
             act = self._category.itemText(index)
             usable = act in available
-            reason = (f"No past looping “{act}” {genau_flick_word()} to base a Genau recipe "
-                      "on yet" if genau
-                      else f"No past “{act}” video to base a recipe on yet")
+            reason = as_sentence(no_past_video(act, lane))
             model.item(index).setEnabled(usable)
             self._category.setItemData(
                 index, "" if usable else reason, Qt.ItemDataRole.ToolTipRole,
@@ -375,22 +373,22 @@ class CombinePanel(QWidget):
         self._generate_btn.set_caption(
             RANDOM_SEED_CAPTION if can_run and remakes_its_own else DEFAULT_CAPTION)
         self._open_btn.setEnabled(ready)
-        missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_RECIPE
+        missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_ACT_OR_VIDEO
         self._generate_btn.setToolTip(
             missing or (ALREADY_MAKING_ONE_TIP if self._folder_generating else ""))
         self._open_btn.setToolTip(missing or _EDIT_TIP)
 
     def _emit(self):
-        """Generate: run the chosen recipe on the dropped image now."""
+        """Generate: run the chosen settings on the dropped image now."""
         self._dispatch(edit_first=False)
 
     def _emit_open(self):
-        """“Edit individual…”: hand the recipe to a generate tab to change first."""
+        """“Edit individual…”: hand the settings to a generate tab to change first."""
         self._dispatch(edit_first=True)
 
     def _dispatch(self, *, edit_first: bool):
         """Announce what was asked for: a picked act, else the dropped video, and
-        nothing at all while either the picture or the recipe is missing."""
+        nothing at all while either the picture or the settings are missing."""
         image_id = self.image_slot.current_id()
         category = self.selected_category()
         video_id = "" if category else (self.video_slot.current_id() or "")

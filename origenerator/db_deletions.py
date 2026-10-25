@@ -16,6 +16,7 @@ import json
 
 from origenerator.db_connection import Store
 from origenerator.db_generations import library_paths_in
+from origenerator.db_schema import as_read
 from origenerator.generation_state import GenerationSource, source_of
 
 
@@ -81,7 +82,7 @@ def _deletion(record) -> dict:
     """One ``deletions`` row with its JSON columns parsed back into data."""
     return {
         "prompt_id": record["prompt_id"],
-        "row": json.loads(record["row_json"]),
+        "row": as_read(json.loads(record["row_json"])),
         "batch": json.loads(record["batch_json"]),
         "deleted_at": record["deleted_at"],
     }

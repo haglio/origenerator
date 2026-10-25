@@ -621,7 +621,7 @@ class GenerationJob(QObject):
 class _Speaking(QThread):
     """The voice at work, off the GUI thread: ComfyUI asked to give the GPU
     back first (its resident models would leave the voice no room), then
-    every line the recipe still lacks spoken to disk."""
+    every line the settings still lack spoken to disk."""
 
     def __init__(self, client, params, parent=None):
         super().__init__(parent)

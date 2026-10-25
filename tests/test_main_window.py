@@ -18,7 +18,7 @@ from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.preview import Preview
 
-from origenerator import app_link, downtime, gallery, notice_toast, recipe_match, ui_scale
+from origenerator import act_settings, app_link, downtime, gallery, notice_toast, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -1103,7 +1103,7 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
     win.close()
 
     saved = AppState(path).get("gallery_combine")
-    assert saved["image"] == "img" and saved["videos"] == {recipe_match.VIDEO: "vid"}
+    assert saved["image"] == "img" and saved["videos"] == {act_settings.VIDEO: "vid"}
 
 
 def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
@@ -1273,7 +1273,7 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     # The end-to-end round trip: pick a picture, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane
-    # matters as much as the slots — it is which recipes the next Generate is
+    # matters as much as the slots — it is which videos the next Generate is
     # answered from, and which lane's dropped video the slot shows.
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
@@ -1287,7 +1287,7 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
     combine = reopened._gallery_view._combine.panel
     assert combine.image_slot.current_id() == "img"
-    assert combine.selected_intent() == recipe_match.GENAU
+    assert combine.selected_intent() == act_settings.GENAU
     assert combine.video_slot.current_id() is None
     combine._video_radio.setChecked(True)
     assert combine.video_slot.current_id() == "vid"
@@ -1609,7 +1609,7 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
                         lambda app_id, xml, **_filing: said.append(xml))
 
     win._gallery_view._jobs.run_ended.emit(
-        RunOutcome(kind="Video", recipe="WAN 2.2 I2V", seconds=252.0,
+        RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
 
     toast = ElementTree.fromstring(said[0])
@@ -1628,7 +1628,7 @@ def test_a_video_watched_in_the_window_takes_its_notice_back(qtbot, tmp_path, mo
     monkeypatch.setattr(desktop_notices, "app_in_front", lambda: True)
     monkeypatch.setattr(desktop_notices, "seconds_since_input", lambda: 0.0)
     win._gallery_view._jobs.run_ended.emit(
-        RunOutcome(kind="Video", recipe="WAN 2.2 I2V", seconds=252.0,
+        RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
     front_tab = win._gallery_view._info_tabs.current_config_panel()
     monkeypatch.setattr(front_tab, "video_on_screen", lambda: "alpha-1")

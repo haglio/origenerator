@@ -11,6 +11,7 @@ from origenerator import config
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.output_places import OutputPlaces
+from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from tests import gestures
 
 
@@ -192,9 +193,9 @@ def test_an_image_with_a_recorded_workflow_version_shows_that_line(block):
     shown = block.show_row(_row(
         workflow_name="sdxl_t2i",
         output_files=json.dumps([{"filename": "out.png", "subfolder": "image"}]),
-        provenance=json.dumps({"recipe": "sdxl_t2i", "recipe_version": "v004",
+        provenance=json.dumps({WORKFLOW: "sdxl_t2i", WORKFLOW_VERSION: "v004",
                                "app_commit": None, "app_dirty": None,
-                               "recipe_version_basis": "recorded"})))
+                               BASIS: "recorded"})))
 
     assert (shown, "Workflow version" in _texts(block), "v004" in _texts(block)) == (
         True, True, True)

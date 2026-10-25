@@ -1134,7 +1134,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "merge_soundless_copy_rows"),
     ("origenerator.importer", "fold_sound_versions_into_their_videos"),
     ("origenerator.importer", "backfill_import_workflows"),
-    ("origenerator.importer", "refile_enhancements_another_recipe_made"),
+    ("origenerator.importer", "refile_enhancements_another_workflow_made"),
     ("origenerator.importer", "backfill_import_params"),
     ("origenerator.importer", "backfill_imported_video_seeds"),
     ("origenerator.gallery", "fold_completed_enhancements"),
@@ -1287,12 +1287,12 @@ def test_a_videos_first_frame_filed_in_another_folder_goes_to_the_trash_at_start
         (output / subfolder / filename).write_bytes(b"one run")
     monkeypatch.setattr(config, "TRASH_DIR", tmp_path / "trash")
     db = Database(tmp_path / "t.db")
-    recipe = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {}}})
+    graph = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {}}})
     for prompt_id, subfolder, filename in (("video", "video", "scene_one_00001.mp4"),
                                            ("first-frame", "image", "scene_one_00001.png")):
         db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
                              workflow_version="imported", params_json="{}",
-                             workflow_json=recipe, source="imported")
+                             workflow_json=graph, source="imported")
         db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": filename, "subfolder": subfolder, "type": "output"}]))
     library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),

@@ -93,8 +93,8 @@ _BLOCK_W = FOLDER_CELLS * _CELL + (FOLDER_CELLS - 1) * _CELL_GAP
 # The head's picture: a map cell's own height, so the run being made is worth
 # looking at beside the bar measuring it and the two blocks read at one scale.
 _FRAME = MAP_THUMB_H
-_PLUS_W = 10            # the operator between a start frame and its recipe
-_PAREN_W = 5            # the marks around a recipe whose prompt was edited
+_PLUS_W = 10            # the operator between a start frame and its source video
+_PAREN_W = 5            # the marks around a source video whose prompt was edited
 _MARK_H = 8             # the slot the "…" takes when the line runs on past the rows
 _MARK_SIDE = 12         # the frame the family's three dots are drawn in, as on the satellite's map
 _DROP_W = 2             # the mark showing where a dragged row would land
@@ -145,7 +145,7 @@ class JobLine:
     shielded: bool
     movable: bool
     source: tuple[str | None, str | None]
-    recipe_edited: bool
+    prompt_edited: bool
     folder: tuple[str, ...]
 
 
@@ -156,7 +156,7 @@ class Leader:
     key: str
     frame: bytes | None
     source: tuple[str | None, str | None]
-    recipe_edited: bool
+    prompt_edited: bool
     caption: str
     compact: str
     progress: tuple[int, int] | None
@@ -324,7 +324,7 @@ class QueueSection:
             image.alpha_composite(live, (x, y + (_FRAME - live.height) // 2))
             return live.width
         return _paint_source(image, draw, x, y, _FRAME, self.leader.source,
-                             self.leader.recipe_edited) or _slot(draw, x, y, _FRAME)
+                             self.leader.prompt_edited) or _slot(draw, x, y, _FRAME)
 
     def _paint_rows(self, image, draw, x, y, width, pointer, targets) -> None:
         for index, line in enumerate(self.drawn):
@@ -445,31 +445,31 @@ def _frame_image(frame: bytes | None, side: int) -> Image.Image | None:
     return cell
 
 
-def _paint_source(image, draw, x, y, side, source, recipe_edited: bool) -> int:
-    """A job's start frame and, where a combine brought one, the recipe clip it
+def _paint_source(image, draw, x, y, side, source, prompt_edited: bool) -> int:
+    """A job's start frame and, where a combine brought one, the source video it
     follows — gray, and in parentheses where its prompt was edited, as
     :mod:`origenerator.gui.combination_view` draws the same pair.  Nought when
     neither has anything to draw."""
     frame = _cell(source[0], side)
-    recipe = _cell(source[1], side, gray=True)
-    if frame is None and recipe is None:
+    source_video = _cell(source[1], side, gray=True)
+    if frame is None and source_video is None:
         return 0
     cursor = x
     if frame is not None:
         image.alpha_composite(frame, (cursor, y))
         cursor += side
-    if recipe is not None:
+    if source_video is not None:
         if frame is not None:
             draw.text((cursor + _PLUS_W / 2, y + side / 2), "+", font=_tiny(),
                       anchor="mm", fill=(*TEXT_MUTED, 255))
             cursor += _PLUS_W
-        if recipe_edited:
+        if prompt_edited:
             draw.text((cursor + _PAREN_W / 2, y + side / 2), "(", font=_tiny(),
                       anchor="mm", fill=(*TEXT_MUTED, 255))
             cursor += _PAREN_W
-        image.alpha_composite(recipe, (cursor, y))
+        image.alpha_composite(source_video, (cursor, y))
         cursor += side
-        if recipe_edited:
+        if prompt_edited:
             draw.text((cursor + _PAREN_W / 2, y + side / 2), ")", font=_tiny(),
                       anchor="mm", fill=(*TEXT_MUTED, 255))
             cursor += _PAREN_W
@@ -480,7 +480,7 @@ def _paint_pictures(image, draw, x, y, line: JobLine) -> None:
     """A row's picture, as the strip draws the same one
     (:mod:`origenerator.gui.queue_thumbs`): what the job is made from, else what
     its folder holds."""
-    if _paint_source(image, draw, x, y, _CELL, line.source, line.recipe_edited):
+    if _paint_source(image, draw, x, y, _CELL, line.source, line.prompt_edited):
         return
     if not line.folder:
         return
@@ -505,8 +505,8 @@ def _line(item) -> JobLine:
         shieldable=item.shield is not None,
         shielded=item.shielded,
         movable=not item.sent,
-        source=(str(frame) if frame is not None else None, item.recipe_thumbnail),
-        recipe_edited=item.recipe_prompt_edited,
+        source=(str(frame) if frame is not None else None, item.source_video_thumbnail),
+        prompt_edited=item.prompt_edited,
         folder=tuple(str(path) for path in item.folder_thumbnails[:FOLDER_CELLS]),
     )
 
@@ -516,8 +516,8 @@ def _leader(item) -> Leader:
     return Leader(
         key=item.key,
         frame=item.reading.frame,
-        source=(str(frame) if frame is not None else None, item.recipe_thumbnail),
-        recipe_edited=item.recipe_prompt_edited,
+        source=(str(frame) if frame is not None else None, item.source_video_thumbnail),
+        prompt_edited=item.prompt_edited,
         caption=item.reading.caption(),
         compact=item.reading.caption(compact=True),
         progress=item.reading.bars()[0],

@@ -7,6 +7,8 @@ from contextlib import closing
 import pytest
 
 from origenerator.db import Database
+from origenerator.db_schema import STORED_NAMES
+from origenerator.provenance import WORKFLOW, WORKFLOW_VERSION
 
 
 def test_schema_creates_generations_table(tmp_path):
@@ -43,7 +45,7 @@ def test_insert_and_get_generation(tmp_path):
 
 def test_a_generation_goes_in_with_the_provenance_its_launch_stamped(tmp_path):
     db = Database(tmp_path / "test.db")
-    block = json.dumps({"recipe": "sdxl_t2i", "recipe_version": "v002"})
+    block = json.dumps({WORKFLOW: "sdxl_t2i", WORKFLOW_VERSION: "v002"})
 
     db.insert_generation(prompt_id="prov-001", workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json="{}", workflow_json="{}",
@@ -52,21 +54,21 @@ def test_a_generation_goes_in_with_the_provenance_its_launch_stamped(tmp_path):
     assert db.get_generation("prov-001")["provenance"] == block
 
 
-def test_recipe_source_records_where_a_combine_got_its_recipe(tmp_path):
-    # Nothing else on the row says it: the params carry the recipe's values, never
+def test_settings_source_records_where_a_combine_got_its_settings(tmp_path):
+    # Nothing else on the row says it: the params carry the settings' values, never
     # which video they came from or what the user called the act.
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="rec-001", workflow_name="wan22_i2v", workflow_version="v001",
         params_json="{}", workflow_json="{}",
     )
-    assert db.get_generation("rec-001")["recipe_category"] is None
+    assert db.get_generation("rec-001")["act"] is None
 
-    db.set_recipe_source("rec-001", category="dancing", video_prompt_id="vid-9")
+    db.set_settings_source("rec-001", category="dancing", video_prompt_id="vid-9")
 
     row = db.get_generation("rec-001")
-    assert row["recipe_category"] == "dancing"
-    assert row["recipe_video_id"] == "vid-9"
+    assert row["act"] == "dancing"
+    assert row["source_video"] == "vid-9"
 
 
 def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
@@ -86,20 +88,20 @@ def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
     assert db.get_generation("enh-001")["enhance_of"] is None
 
 
-def test_each_half_of_a_recipe_source_can_stand_alone(tmp_path):
-    # A dropped video names no act, and an act the overlay curates a recipe for is
+def test_each_half_of_a_settings_source_can_stand_alone(tmp_path):
+    # A dropped video names no act, and an act the overlay pins settings for is
     # answered from no past video.
     db = Database(tmp_path / "test.db")
     for pid in ("dropped", "curated"):
         db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
                              workflow_version="v001", params_json="{}", workflow_json="{}")
-    db.set_recipe_source("dropped", video_prompt_id="vid-9")
-    db.set_recipe_source("curated", category="dancing")
+    db.set_settings_source("dropped", video_prompt_id="vid-9")
+    db.set_settings_source("curated", category="dancing")
 
-    assert db.get_generation("dropped")["recipe_category"] is None
-    assert db.get_generation("dropped")["recipe_video_id"] == "vid-9"
-    assert db.get_generation("curated")["recipe_category"] == "dancing"
-    assert db.get_generation("curated")["recipe_video_id"] is None
+    assert db.get_generation("dropped")["act"] is None
+    assert db.get_generation("dropped")["source_video"] == "vid-9"
+    assert db.get_generation("curated")["act"] == "dancing"
+    assert db.get_generation("curated")["source_video"] is None
 
 
 def test_a_picture_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_path):
@@ -241,7 +243,7 @@ def _columns(db_path, table):
 @pytest.mark.parametrize("column", [
     "duration_seconds", "evolver_exported_at", "genau_exported_at",
     "genau_requested_at", "progress_json", "starred", "experiment_verdict",
-    "original_files", "enhance_history", "recipe_category", "recipe_video_id",
+    "original_files", "enhance_history", *STORED_NAMES.values(),
     "enhance_of",
 ])
 def test_an_early_database_gains_every_generations_column(tmp_path, column):
@@ -758,6 +760,40 @@ def test_restore_generation_preserves_newest_first_order(tmp_path):
 
     # Restored by its original id, the row lands back in the middle, not on top.
     assert [r["prompt_id"] for r in db.list_generations()] == ["o-2", "o-1", "o-0"]
+
+
+def test_a_combine_deleted_and_restored_keeps_where_its_settings_came_from(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
+                         params_json="{}", workflow_json="{}")
+    db.set_settings_source("c-001", category="dancing", video_prompt_id="vid-9")
+    original = db.get_generation("c-001")
+    db.delete_generation("c-001")
+
+    db.restore_generation(original)
+
+    assert db.get_generation("c-001") == original
+
+
+def _as_read_before_the_rename(row: dict) -> dict:
+    return {STORED_NAMES.get(key, key): value for key, value in row.items()}
+
+
+def test_a_deletion_held_since_before_two_columns_were_renamed_comes_back_under_the_new_names(
+        tmp_path):
+    # A held deletion keeps its row as it was read then, and until the code
+    # called them act and source_video, rows were read under their stored names.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
+                         params_json="{}", workflow_json="{}")
+    db.set_settings_source("c-001", category="dancing", video_prompt_id="vid-9")
+    db.record_deletion("c-001", _as_read_before_the_rename(db.get_generation("c-001")), {})
+    db.delete_generation("c-001")
+
+    held = db.get_deletion("c-001")["row"]
+    assert (held["act"], held["source_video"]) == ("dancing", "vid-9")
+    db.restore_generation(held)
+    assert db.get_generation("c-001")["source_video"] == "vid-9"
 
 
 # --- the recovery bin (held deletions) -------------------------------------

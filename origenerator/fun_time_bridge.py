@@ -27,6 +27,7 @@ slideshows the way it reaches the Funestras:
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from funestra.file_channel import (
@@ -49,6 +50,7 @@ from origenerator.fun_time_mode import (
     RELEASE,
     REQUEST_CLOSED,
     REQUEST_OPEN,
+    SAID_AT,
     SAY,
     SIDES,
     TAKE_BACK,
@@ -58,6 +60,7 @@ from origenerator.radio import deal_to_the_funestras
 from origenerator.slideshow_buttons import (
     ORIGENERATOR_MODE,
     PANEL_PLACES,
+    PRESSES_ABOUT_THE_SLIDE,
     answer,
     origenerator_mode_on,
 )
@@ -96,6 +99,17 @@ def _split_argument(line: str) -> tuple[str, str, str]:
         return line, "", ""
     cut = min(cuts)
     return line[:cut], line[cut], line[cut + 1:]
+
+
+def _without_when_said(said: str) -> tuple[str, float | None]:
+    words, marked, stamp = said.rpartition(SAID_AT)
+    try:
+        said_at_epoch_seconds = float(stamp) if marked else None
+    except ValueError:
+        said_at_epoch_seconds = None
+    if said_at_epoch_seconds is None:
+        return said, None
+    return words, time.monotonic() - (time.time() - said_at_epoch_seconds)
 
 
 class FunTimeBridge(QObject):
@@ -187,6 +201,11 @@ class FunTimeBridge(QObject):
         if not line:
             return
         keyword, marker, argument = _split_argument(line)
+        said_at = None
+        if marker == ":":
+            argument, said_at = _without_when_said(argument)
+        elif not marker:
+            keyword, said_at = _without_when_said(keyword)
         keyword = keyword.upper()  # what it carries keeps its case
         if keyword == HAND_OVER and marker == "|":
             frames, _, taken = argument.partition("|")
@@ -214,13 +233,13 @@ class FunTimeBridge(QObject):
             # command about one of these regions is heard THERE and sent here
             # as the words themselves — matched by this app's own vocabulary,
             # which is the only place that knows its collections and its parts.
-            self._run_what_was_said(side, argument)
+            self._run_what_was_said(side, argument, said_at)
             return
-        self._apply_side(side, action, argument, line)
+        self._apply_side(side, action, argument, line, said_at)
 
-    def _run_what_was_said(self, side: str, words: str) -> None:
+    def _run_what_was_said(self, side: str, words: str, said_at: float | None) -> None:
         was_taking_a_request = self._gallery.taking_a_request()
-        self._gallery.run_spoken_command(f"{side} {words}")
+        self._gallery.run_spoken_command(f"{side} {words}", said_at)
         taking_a_request = self._gallery.taking_a_request()
         if taking_a_request == was_taking_a_request:
             return
@@ -272,7 +291,8 @@ class FunTimeBridge(QObject):
         for slideshow in slideshows:
             slideshow.set_enhanced_mode(enhanced_only)
 
-    def _apply_side(self, side: str, action: str, argument: str, line: str) -> None:
+    def _apply_side(self, side: str, action: str, argument: str, line: str,
+                    said_at: float | None) -> None:
         """A press on *side*'s panel, onto whatever holds that side.
 
         The same answers a slideshow's own panel gets
@@ -283,6 +303,8 @@ class FunTimeBridge(QObject):
         slideshow = self._gallery.region_slideshow(side)
         if slideshow is None:
             return  # an empty region has nothing to drive
+        if action in PRESSES_ABOUT_THE_SLIDE:
+            slideshow.back_to_what_was_said_over(said_at)
         if not answer(slideshow, action, argument):
             logger.warning("Unanswered press for the %s slideshow dropped: %s", side, line)
 

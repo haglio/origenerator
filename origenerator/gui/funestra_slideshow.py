@@ -675,16 +675,17 @@ class FunestraSlideshow(QObject):
     def clear_modes(self) -> bool:
         return self._set.set_filters(SlideshowFilters())
 
-    def voice_target(self, said_at: float | None = None):
-        """The generation a word said at *said_at* is about, else the one on screen."""
-        said_over = self._said_over(said_at)
-        return said_over.prompt_id if said_over else self._set.current_prompt_id()
+    def voice_target(self):
+        """The generation a spoken order is about: the item on screen."""
+        return self._set.current_prompt_id()
 
     def back_to_what_was_said_over(self, said_at: float | None) -> str | None:
         said_over = self._said_over(said_at)
-        if said_over is not None and said_over is not self._set.playlist.current():
+        if said_over is None:
+            return self.voice_target()
+        if said_over is not self._set.playlist.current():
             self._jump_to(said_over)
-        return self.voice_target(said_at)
+        return said_over.prompt_id
 
     def _said_over(self, said_at: float | None):
         showing = (self._item_showing(self._on_screen.path_at(said_at))

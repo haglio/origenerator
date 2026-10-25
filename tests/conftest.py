@@ -253,11 +253,12 @@ class FakeCommandAndRequestListener(QObject):
             return spoken
         return self.speak_command(text)
 
-    def push_dictation(self, text):
+    def push_dictation(self, text, spoken_at=None):
         """The same dictation, fed from somewhere other than the mic — the
         hosting session's channel, which is where the words of a request arrive
         while this app is hosted and its own mic is shut."""
-        return self._dictation.push(text) if self._dictation is not None else None
+        return (self._dictation.push(text, spoken_at=spoken_at)
+                if self._dictation is not None else None)
 
     @property
     def taking_a_request(self):

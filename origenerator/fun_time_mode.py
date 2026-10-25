@@ -508,7 +508,7 @@ def handoff(pid: int, created_at: int) -> dict:
                                                  offer_of(pid, created_at, starting=True)]},
         "showing": {"file": SHOWING_NAME,
                     "writes": [slideshow_mark(pid, created_at, shape)
-                               for shape in ("portrait", "landscape")]},
+                               for shape in ("portrait", "landscape", "both")]},
         "session": {"file": SESSION_NAME, "reads": {"pattern": SESSION_CLAIM.pattern}},
         "takeover": {"file": TAKEOVER_NAME,
                      "reads": {"keys": sorted((TAKEOVER_PID, TAKEOVER_ARGS))}},

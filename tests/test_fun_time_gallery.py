@@ -229,7 +229,8 @@ def _open_slideshow(view, monkeypatch, tmp_path, name, width, height, count=1):
     items = [(str(still), "image", f"id-{name}-{n}", str(still))
              for n in range(count)]
     monkeypatch.setattr(view, "rows_to_play",
-                        lambda: [{"prompt_id": item[2], "workflow_name": item[2]}
+                        lambda: [{"prompt_id": item[2], "workflow_name": "sdxl_t2i",
+                                  "params_json": json.dumps({"width": width, "height": height})}
                                  for item in items])
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: name)
@@ -1575,6 +1576,38 @@ def test_a_slideshow_moved_onto_a_set_of_the_other_shape_goes_on_as_that_set_in_
     assert [slide.prompt_id for slide in carried.whole_set()] == ["id-tall-0", "id-tall-1"]
     assert carried.state().current in {"id-tall-0", "id-tall-1"}
     assert view.region_slideshow("landscape") is None
+
+
+def test_a_slideshow_of_both_shapes_taken_into_a_session_goes_on_on_both_satellites(
+        qtbot, tmp_path, monkeypatch):
+    shapes = {"tall": ({"width": 832, "height": 1216}, (100, 200)),
+              "wide": ({"width": 1216, "height": 832}, (200, 100))}
+    rows, items = [], []
+    for n, name in enumerate(("tall", "wide", "tall")):
+        params, size = shapes[name]
+        still = tmp_path / f"{name}{n}.png"
+        Image.new("RGB", size).save(still)
+        rows.append(_row(f"id-{name}-{n}", "sdxl_t2i", params, f"{name}{n}.png"))
+        items.append((str(still), "image", f"id-{name}-{n}", str(still)))
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "rows_to_play", lambda: rows)
+    monkeypatch.setattr(view._slideshows, "items_of", lambda rows: list(items))
+    monkeypatch.setattr(view, "slideshow_subject", lambda: "a list of both shapes")
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing.shown)
+    assert view.slideshow_showing_on() == "both"
+
+    view.become_hosted(_session())
+    monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
+    open_both_sides(view._slideshows)
+
+    carried = {side: view.region_slideshow(side) for side in ("portrait", "landscape")}
+    for slideshow in carried.values():
+        qtbot.addWidget(slideshow.shown)
+    assert [slide.prompt_id for slide in carried["portrait"].whole_set()] == [
+        "id-tall-0", "id-tall-2"]
+    assert [slide.prompt_id for slide in carried["landscape"].whole_set()] == ["id-wide-1"]
 
 
 def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_session(qtbot):

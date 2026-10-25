@@ -24,6 +24,7 @@ from origenerator.gallery.sides import (
     side_holding,
     side_holds,
     the_one_shape_on,
+    the_side_of,
 )
 
 
@@ -38,6 +39,12 @@ def test_each_shapes_side_holds_that_shape_and_both_holds_each():
 def test_a_shapes_side_holds_that_one_shape_and_both_holds_no_one_shape():
     assert [the_one_shape_on(side) for side in (*SIDES, None)] == [
         PORTRAIT, LANDSCAPE, None, None]
+
+
+def test_a_set_of_shapes_belongs_to_the_side_that_holds_exactly_those_shapes():
+    assert [the_side_of(shapes) for shapes in (
+        [PORTRAIT], [LANDSCAPE, LANDSCAPE], [LANDSCAPE, PORTRAIT], [])] == [
+        PORTRAIT, LANDSCAPE, BOTH, None]
 
 
 def test_the_lists_two_arrangements_each_draw_every_shape_once():

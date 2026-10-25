@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
-from origenerator.workflows.lora_rows import lora_choice, picked_loras
+from origenerator.workflows.lora_rows import lora_rows, picked_loras
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_files import NO_LORA, list_model_files
 
@@ -75,7 +75,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
-            *lora_choice(defaults, "lora", "lora_strength", accepts=(FLUX,)),
+            *lora_rows(defaults, ("lora",), accepts=(FLUX,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=16),

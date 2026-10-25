@@ -16,7 +16,7 @@ picker to slot in between them.
 from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef, ParamType
-from origenerator.workflows.lora_rows import lora_choice
+from origenerator.workflows.lora_rows import lora_rows
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_model_files
 
@@ -46,8 +46,8 @@ def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
     """The high/low LoRA pickers, each directly above its own strength — the
     same expert filter as the models, over the LoRA folder."""
     return [
-        *lora_choice(defaults, "lora_high", "lora_strength_high",
-                     accepts=(WAN,), expert="high", label=" (First Pass)"),
-        *lora_choice(defaults, "lora_low", "lora_strength_low",
-                     accepts=(WAN,), expert="low", label=" (Second Pass)"),
+        *lora_rows(defaults, ("lora_high",), accepts=(WAN,), expert="high",
+                   qualifier=" (First Pass)"),
+        *lora_rows(defaults, ("lora_low",), accepts=(WAN,), expert="low",
+                   qualifier=" (Second Pass)"),
     ]

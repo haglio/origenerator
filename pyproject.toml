@@ -79,6 +79,14 @@ siblings = ["app_support", "funestra", "shared_ui", "voice_core"]
 # Origenerator (app_support.production_update).
 [tool.haglio.production]
 
+# What Origenerator will not open without (origenerator.content.missing_overlay_keys):
+# every key content.example.json documents, in content.local.json. The production
+# updater reads this at the commit it would move production to, and keeps production
+# where it is while content.local.json lacks one of those keys.
+[tool.haglio.opens-only-with]
+every-key-of = "content.example.json"
+in = "content.local.json"
+
 # What a hotfix runs before production takes it (app_support.hotfix), beside the
 # tests its branch changed: every entry point still imports as its launcher starts it.
 [tool.haglio.hotfix]

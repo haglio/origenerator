@@ -20,9 +20,11 @@ from tests.drop_style_seen import worn
 
 def _slot(qtbot, kind="image", lent_by=lambda pid: pid,
           preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False,
-          named=lambda name: None, name_of=lambda held: "", browse=None):
+          named=lambda name: None, name_of=lambda held: "", browse=None,
+          leads_to=lambda held: held):
     slot = DropSlot(kind=kind, lent_by=lent_by, preview=preview, placeholder=placeholder,
-                    grayscale=grayscale, named=named, name_of=name_of, browse=browse)
+                    grayscale=grayscale, named=named, name_of=name_of, browse=browse,
+                    leads_to=leads_to)
     qtbot.addWidget(slot)
     return slot
 
@@ -124,6 +126,32 @@ def test_clicking_a_filled_slot_goes_to_its_item_and_keeps_it(qtbot):
 
     assert went == ["img1"]
     assert slot.current_id() == "img1"
+
+
+def test_a_click_goes_to_the_gallery_item_the_held_file_belongs_to(qtbot):
+    slot = _slot(qtbot, leads_to={"image/scene_00001_.png [output]": "gen-pic"}.get)
+    went = []
+    slot.activated.connect(went.append)
+    slot.set_item("image/scene_00001_.png [output]")
+
+    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+
+    assert went == ["gen-pic"]
+    assert slot.cursor().shape() == Qt.CursorShape.PointingHandCursor
+
+
+@pytest.mark.parametrize(("name", "tip"), [("scene one.png", "scene one.png"), ("", "")])
+def test_a_held_file_from_outside_the_gallery_offers_no_way_there(qtbot, name, tip):
+    slot = _slot(qtbot, leads_to=lambda held: None, name_of=lambda held: name)
+    went = []
+    slot.activated.connect(went.append)
+    slot.set_item("C:/elsewhere/scene one.png")
+
+    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+
+    assert went == []
+    assert slot.cursor().shape() == Qt.CursorShape.ArrowCursor
+    assert slot.toolTip() == tip
 
 
 def test_a_video_preview_animates(qtbot, tmp_path):

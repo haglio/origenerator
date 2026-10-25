@@ -120,7 +120,7 @@ class _Drop(FieldKind):
             self._kind, lambda prompt_id: self._items.lends(prompt_id, self._kind),
             self._items.preview, placeholder_for(self._kind),
             named=self._items.named, name_of=self._items.name_of,
-            browse=lambda: self._browse(pd.key))
+            browse=lambda: self._browse(pd.key), leads_to=self._items.item_of)
         self.write(pd, zone, pd.default)
         return zone
 

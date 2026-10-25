@@ -111,17 +111,20 @@ class CombinePanel(QWidget):
         named: Callable[[str], str | None] = lambda name: None,
         name_of: Callable[[str], str] = lambda held: "",
         browse_picture: Callable[[], None] | None = None,
+        leads_to: Callable[[str], str | None] = lambda held: held,
     ):
         super().__init__(parent)
         self._preview = preview
         self._history = history
         self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, DROP_AN_IMAGE,
-                                   named=named, name_of=name_of, browse=browse_picture)
+                                   named=named, name_of=name_of, browse=browse_picture,
+                                   leads_to=leads_to)
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
         # the image, which is the one thing it is not.
         self.video_slot = DropSlot(MediaType.VIDEO, video_lent_by, preview, DROP_A_VIDEO,
-                                   grayscale=True, named=named, name_of=name_of)
+                                   grayscale=True, named=named, name_of=name_of,
+                                   leads_to=leads_to)
         _keep_its_room_when_hidden(self.video_slot)
         self._between = DropZone((self.image_slot, self.video_slot))
         self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)

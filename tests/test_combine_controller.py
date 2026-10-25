@@ -52,7 +52,7 @@ class FakePanel:
             self.changed.emit()
 
     def __init__(self, image_lent_by, video_lent_by, preview, history, *,
-                 named=None, name_of=None, browse_picture=None):
+                 named=None, name_of=None, browse_picture=None, leads_to=None):
         self.image_lent_by = image_lent_by
         self.video_lent_by = video_lent_by
         self.preview = preview
@@ -60,6 +60,7 @@ class FakePanel:
         self.named = named
         self.name_of = name_of
         self.browse_picture = browse_picture
+        self.leads_to = leads_to
         self.image_slot = self._Slot()
         self.video_slot = self._Slot()
         self.intent = act_settings.VIDEO

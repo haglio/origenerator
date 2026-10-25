@@ -2429,10 +2429,11 @@ def test_clicking_a_held_item_leads_back_to_it(qtbot):
     qtbot.addWidget(form)
     led_to = []
     form.item_activated.connect(led_to.append)
+    zone = form._widgets["input_image"]
 
     form.set_values({"input_image": "C:/elsewhere/photo.png"})
-    form._widgets["input_image"].activated.emit("C:/elsewhere/photo.png")
+    qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
     form.set_values({"input_image": "image/image1.file [output]"})
-    form._widgets["input_image"].activated.emit("image/image1.file [output]")
+    qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
 
     assert led_to == ["image1"]

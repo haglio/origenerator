@@ -800,13 +800,8 @@ class ParamForm(QWidget):
             return self._scenes
         widget = self._kind(pd).make(pd)
         if isinstance(widget, DropSlot):
-            widget.activated.connect(self._lead_to_the_held_item)
+            widget.activated.connect(self.item_activated)
         return widget
-
-    def _lead_to_the_held_item(self, held: str) -> None:
-        prompt_id = self._items.item_of(held)
-        if prompt_id:
-            self.item_activated.emit(prompt_id)
 
     def definitions(self) -> list[ParamDef]:
         return list(self._param_defs)

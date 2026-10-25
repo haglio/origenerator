@@ -12083,6 +12083,20 @@ def test_clicking_a_combine_slot_goes_to_what_it_holds(qtbot, tmp_path, slot_nam
     assert slot.current_id() == prompt_id
 
 
+def test_a_picture_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view.follow_link("img")
+    slot = view._combine.panel.image_slot
+    slot.set_item(str(tmp_path / "scene one.png"))
+
+    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+
+    assert slot.cursor().shape() == Qt.CursorShape.ArrowCursor
+    assert view.selected_prompt_ids() == ["img"]
+
+
 def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())

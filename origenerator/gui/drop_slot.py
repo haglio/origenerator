@@ -109,6 +109,7 @@ class DropSlot(DropZone):
         named: Callable[[str], str | None] = lambda name: None,
         name_of: Callable[[str], str] = lambda held: "",
         browse: Callable[[], None] | None = None,
+        leads_to: Callable[[str], str | None] = lambda held: held,
     ):
         super().__init__(parent=parent)
         self._lent_by = lent_by
@@ -117,6 +118,7 @@ class DropSlot(DropZone):
         self._named = named        # an Origenerator name -> the prompt_id wearing it
         self._name_of = name_of    # what is held -> the name its tooltip says
         self._browse = browse      # picks a file into the slot; None where only items go
+        self._leads_to = leads_to
         self._go_to_tip = f"Click to go to this {kind}"
         # Whether what lands here is held for its settings rather than shown as a
         # result — drawn gray if so, however it previews.
@@ -174,8 +176,7 @@ class DropSlot(DropZone):
             self._label.setPixmap(QPixmap())  # drop any prior preview
             self._label.setText(self._placeholder)
             self._badge.setVisible(False)
-            self.setToolTip("")
-            self.unsetCursor()
+            self._show_where_a_click_goes(None)
             return
         thumb_path, movie_path = self._preview(self._current_id)
         if movie_path and Path(movie_path).exists():
@@ -195,8 +196,16 @@ class DropSlot(DropZone):
                                                TEXT_PRIMARY))
         self._badge.setVisible(True)
         self._badge.raise_()  # keep the kind chip above the preview
-        self.setToolTip(self._name_of(self._current_id) or self._go_to_tip)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._show_where_a_click_goes(self._current_id)
+
+    def _show_where_a_click_goes(self, held: str | None) -> None:
+        leads = held is not None and self._leads_to(held) is not None
+        named = self._name_of(held) if held is not None else ""
+        self.setToolTip(named or (self._go_to_tip if leads else ""))
+        if leads:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.unsetCursor()
 
     # --- drag & drop ------------------------------------------------------
 
@@ -219,8 +228,11 @@ class DropSlot(DropZone):
         light(self._label, AIMED, targeted)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and self._current_id is not None:
-            self.activated.emit(self._current_id)
+        if event.button() != Qt.MouseButton.LeftButton or self._current_id is None:
+            return
+        item = self._leads_to(self._current_id)
+        if item is not None:
+            self.activated.emit(item)
 
     # --- the right-click menu ---------------------------------------------
 

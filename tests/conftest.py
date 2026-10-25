@@ -180,6 +180,17 @@ def titled_models(tmp_path, monkeypatch):
     return write
 
 
+@pytest.fixture
+def worded_loras(tmp_path, monkeypatch):
+    path = tmp_path / "trigger_words.json"
+    monkeypatch.setattr(config, "TRIGGER_WORDS_PATH", path)
+
+    def write(words: dict[str, list[str]]) -> None:
+        path.write_text(json.dumps(words), encoding="utf-8")
+
+    return write
+
+
 class FakeCommandAndRequestListener(QObject):
     """Stands in for CommandAndRequestListener so no test ever opens a real
     microphone.

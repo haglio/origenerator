@@ -118,6 +118,7 @@ TRASH_DIR = _LIBRARY_FILES_DIR / "trash"
 FIX_PHOTOS_DIR = _LIBRARY_FILES_DIR / "fixes"
 FIX_TRAINING_DIR = _LIBRARY_FILES_DIR / "fix training"
 MODEL_TITLES_PATH = _LIBRARY_FILES_DIR / "model_titles.json"
+TRIGGER_WORDS_PATH = _LIBRARY_FILES_DIR / "trigger_words.json"
 LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 
 

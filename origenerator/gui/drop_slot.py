@@ -3,9 +3,9 @@
 The gallery's combine panel pairs two slots — an image slot and a video slot — with
 a zone between them that drops into both. A slot holds whatever its ``lent_by``
 says a dropped generation lends it and turns away one that lends it nothing; it
-previews what it holds — a video loops its clip, an image shows its still — and
-wears a corner badge of its own kind so it's clear which item belongs where. It
-knows only prompt_ids; the view supplies ``lent_by`` and the preview.
+previews what it holds — a video loops its clip, an image shows its still — names
+it underneath, and wears a corner badge of its own kind. What it holds means
+nothing to it; its owner supplies ``lent_by``, the preview and the name.
 
 A slot whose item is held only for its settings is built ``grayscale``, and draws
 whatever lands in it drained of color (:mod:`origenerator.gui.grayscale`) — the
@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
 
+from origenerator.gui import grid_card
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT, light
 from origenerator.gui.generation_drag import dragged_generation
@@ -139,6 +140,11 @@ class DropSlot(DropZone):
         self._label.setWordWrap(True)
         self._label.setMinimumHeight(THUMBNAIL_BOX.height())
         layout.addWidget(self._label)
+        self._caption = QLabel()
+        self._caption.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self._caption.setWordWrap(True)
+        grid_card.style_caption(self._caption)
+        layout.addWidget(self._caption)
         # A corner chip naming this slot's kind, shown only once something's dropped.
         self._badge = MediaBadge(kind, self)
         self._render()
@@ -170,13 +176,19 @@ class DropSlot(DropZone):
             self._movie.deleteLater()
             self._movie = None
 
+    def reread_name(self) -> None:
+        held = self._current_id
+        named = self._name_of(held) if held is not None else ""
+        self._caption.setText(named)
+        self._show_where_a_click_goes(held, named)
+
     def _render(self):
         self._stop_movie()
+        self.reread_name()
         if self._current_id is None:
             self._label.setPixmap(QPixmap())  # drop any prior preview
             self._label.setText(self._placeholder)
             self._badge.setVisible(False)
-            self._show_where_a_click_goes(None)
             return
         thumb_path, movie_path = self._preview(self._current_id)
         if movie_path and Path(movie_path).exists():
@@ -196,11 +208,9 @@ class DropSlot(DropZone):
                                                TEXT_PRIMARY))
         self._badge.setVisible(True)
         self._badge.raise_()  # keep the kind chip above the preview
-        self._show_where_a_click_goes(self._current_id)
 
-    def _show_where_a_click_goes(self, held: str | None) -> None:
+    def _show_where_a_click_goes(self, held: str | None, named: str) -> None:
         leads = held is not None and self._leads_to(held) is not None
-        named = self._name_of(held) if held is not None else ""
         self.setToolTip(named or (self._go_to_tip if leads else ""))
         if leads:
             self.setCursor(Qt.CursorShape.PointingHandCursor)

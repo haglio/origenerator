@@ -2424,6 +2424,15 @@ def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
     assert form._widgets["input_image"].toolTip() == "AB12CD34 001"
 
 
+def test_a_dropped_item_is_named_under_the_zones_picture(qtbot):
+    form = ParamForm([ParamDef("input_image", "Picture", "image", "")], items=_Lends())
+    qtbot.addWidget(form)
+
+    _let_go(form._widgets["input_image"], "image1")
+
+    assert form._widgets["input_image"]._caption.text() == "AB12CD34 001"
+
+
 def test_clicking_a_held_item_leads_back_to_it(qtbot):
     form = ParamForm([ParamDef("input_image", "Picture", "image", "")], items=_Lends())
     qtbot.addWidget(form)

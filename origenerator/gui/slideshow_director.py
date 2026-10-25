@@ -205,7 +205,15 @@ def _place_among(kept, state: SlideshowState) -> SlideshowState:
     return SlideshowState(order=order, current=following, location=state.location)
 
 
-def _shape_of_the_set(side: str, rows, items) -> str:
+def _item_opened_on(items, start: int | None, resume: SlideshowState | None) -> str | None:
+    if start is not None:
+        return items[start][2]
+    return resume.current if resume is not None else None
+
+
+def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
+    if (row := next((row for row in rows if row["prompt_id"] == opened_on), None)) is not None:
+        return row_orientation(row)
     if (shape := the_one_shape_on(side)) is not None:
         return shape
     if rows:
@@ -491,7 +499,8 @@ class SlideshowDirector:
             slideshow = self._hand_to_the_funestra(items, where, channel, actions=actions,
                                             hud=hud, levels=levels, **kwargs)
         else:
-            shape = (_shape_of_the_set(where, rows, items)
+            shape = (_shape_it_opens_on(where, rows, items,
+                                        _item_opened_on(items, kwargs.get("start"), resume))
                      if self._fun_time is None else where)
             slideshow = self._open_a_window(items, where, shape=shape, actions=actions,
                                             hud=hud, levels=levels, **kwargs)

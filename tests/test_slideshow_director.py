@@ -768,6 +768,33 @@ def test_a_slideshow_of_both_shapes_opens_on_the_monitor_most_of_its_items_fit(
     assert made[0].shown.geometry == monitor.getRect()
 
 
+@pytest.mark.parametrize(("shapes", "monitor"), [((TALL, TALL, WIDE), LANDSCAPE_MONITOR),
+                                                  ((WIDE, WIDE, TALL), PORTRAIT_MONITOR)])
+def test_a_slideshow_of_both_shapes_opened_on_an_item_goes_to_that_items_monitor(
+        slideshows, monkeypatch, shapes, monitor):
+    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+    rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes)]
+
+    director.open([(f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
+                   for row in rows], rows=rows, side=BOTH, start=2)
+
+    assert made[0].shown.geometry == monitor.getRect()
+
+
+def test_a_slideshow_of_both_shapes_coming_back_to_an_item_goes_to_that_items_monitor(
+        slideshows, monkeypatch):
+    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+    rows = [_shaped(f"g{n}", params) for n, params in enumerate((TALL, TALL, WIDE))]
+
+    director.open([(f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
+                   for row in rows], rows=rows, side=BOTH,
+                  resume=SlideshowState(order=("g0", "g1", "g2"), current="g2"))
+
+    assert made[0].shown.geometry == LANDSCAPE_MONITOR.getRect()
+
+
 def test_a_slideshow_of_the_other_shape_asked_for_while_one_is_up_moves_to_its_monitor(
         slideshows, monkeypatch):
     monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)

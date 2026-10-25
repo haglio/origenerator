@@ -28,6 +28,8 @@ def library(tmp_path):
     db = Database(tmp_path / "t.db")
     _row(db, "gen-pic", "sdxl_t2i", "image/pic_00001_.png", thumb)
     _row(db, "gen-run", "wan22_i2v", "video/run_00002_.mp4", thumb)
+    _row(db, "gen-made", "wan22_i2v", "video/made_00003_.mp4", thumb,
+         params={"input_image": "image/pic_00001_.png [output]"})
     names = ItemNames.from_library(db)
     items = ZoneItems(
         db, names, LibraryViews(db),
@@ -36,9 +38,9 @@ def library(tmp_path):
     return items, names, output_dir, thumb
 
 
-def _row(db, prompt_id, workflow, file, thumb):
+def _row(db, prompt_id, workflow, file, thumb, params=None):
     db.insert_generation(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
-                         params_json="{}", workflow_json="{}")
+                         params_json=json.dumps(params or {}), workflow_json="{}")
     subfolder, name = file.split("/")
     db.update_generation(prompt_id, status="completed", thumbnail_path=thumb,
                          output_files=json.dumps([{"filename": name, "subfolder": subfolder,
@@ -57,6 +59,12 @@ def test_a_dragged_video_lends_a_video_zone_its_own_path(library):
 
     assert items.lends("gen-run", MediaType.VIDEO) == str(output_dir / "video" / "run_00002_.mp4")
     assert items.lends("gen-run", MediaType.IMAGE) is None
+
+
+def test_a_dragged_video_lends_a_picture_zone_the_picture_it_was_made_from(library):
+    items, _names, _output_dir, _thumb = library
+
+    assert items.lends("gen-made", MediaType.IMAGE) == "image/pic_00001_.png [output]"
 
 
 def test_a_held_item_is_known_by_its_file_and_shows_its_own_pictures(library):

@@ -121,7 +121,13 @@ CREATE TABLE IF NOT EXISTS generations (
     picture_state TEXT,
     -- The shield on a queue row: while set, nothing the queue does for later
     -- work stops this run partway. On the row so a restart keeps it.
-    shielded        INTEGER NOT NULL DEFAULT 0
+    shielded        INTEGER NOT NULL DEFAULT 0,
+    -- The video a backfill run is made to take the place of, by its prompt_id
+    -- (origenerator.enhanced_start_backfill).
+    backfill_of TEXT,
+    -- Set on a backfill run whose old video's copy in Kino was a Fun Time
+    -- favorite, which its own copy is to be once Evolver has filed it.
+    fun_time_favorite_owed INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -267,6 +273,8 @@ ADDED_COLUMNS = {
         "provenance": "TEXT",
         "picture_state": "TEXT",
         "shielded": "INTEGER NOT NULL DEFAULT 0",
+        "backfill_of": "TEXT",
+        "fun_time_favorite_owed": "INTEGER NOT NULL DEFAULT 0",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -296,6 +304,7 @@ GENERATION_COLUMNS = (
     "evolver_unsent_at", "genau_exported_at", "genau_unsent_at",
     "genau_requested_at", "recipe_category", "recipe_video_id",
     "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
+    "backfill_of", "fun_time_favorite_owed",
 )
 
 

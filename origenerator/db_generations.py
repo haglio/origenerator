@@ -15,6 +15,7 @@ from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
 from origenerator.generation_state import (
     MADE_ELSEWHERE,
+    UNLISTED,
     GenerationSource,
     GenerationStatus,
 )
@@ -39,10 +40,15 @@ SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
 _MADE_HERE = f"source NOT IN ({', '.join('?' * len(MADE_ELSEWHERE))})"
+_LISTED = f"source NOT IN ({', '.join('?' * len(UNLISTED))})"
+
+
+def was_sent(row: dict) -> bool:
+    return any(map(row.get, SENT_COLUMNS))
 
 
 def was_kept(row: dict) -> bool:
-    return bool(row.get("starred")) or any(map(row.get, SENT_COLUMNS))
+    return bool(row.get("starred")) or was_sent(row)
 
 
 def library_paths_in(output_files: str | None) -> set[str]:
@@ -252,6 +258,15 @@ class GenerationStore(Store):
     def set_shielded(self, prompt_id: str, shielded: bool):
         self._set(prompt_id, "shielded", 1 if shielded else 0)
 
+    def set_backfill_of(self, prompt_id: str, video_prompt_id: str):
+        self._set(prompt_id, "backfill_of", video_prompt_id)
+
+    def set_source(self, prompt_id: str, source: str):
+        self._set(prompt_id, "source", source)
+
+    def owe_a_fun_time_favorite(self, prompt_id: str):
+        self._set(prompt_id, "fun_time_favorite_owed", 1)
+
     def mark_evolver_exported(self, prompt_id: str):
         """Record that this generation's video was sent to Evolver's inbox.
 
@@ -398,11 +413,17 @@ class GenerationStore(Store):
                 with self._connect() as conn:
                     rows = conn.execute(
                         f"SELECT * FROM generations WHERE {_OF_A_KNOWN_SOURCE}"
-                        " AND source != ? ORDER BY id DESC",
-                        (*_KNOWN_SOURCES, GenerationSource.LEFT_OUT),
+                        f" AND {_LISTED} ORDER BY id DESC",
+                        (*_KNOWN_SOURCES, *UNLISTED),
                     ).fetchall()
                 self._listed = (version, [as_read(r) for r in rows])
             return [dict(r) for r in self._listed[1]]
+
+    def replaced_generations(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM generations WHERE source = ?",
+                                (GenerationSource.REPLACED,)).fetchall()
+        return [dict(row) for row in rows]
 
     def library_paths(self) -> set[str]:
         with self._connect() as conn:

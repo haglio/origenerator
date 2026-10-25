@@ -26,11 +26,15 @@ class GenerationSource(StrEnum):
     OUTSIDE = "outside"
     STARTING_FRAME = "starting_frame"
     LEFT_OUT = "left_out"
+    BACKFILL = "backfill"
+    REPLACED = "replaced"
 
 
 MADE_ELSEWHERE = (GenerationSource.OUTSIDE, GenerationSource.STARTING_FRAME,
                   GenerationSource.LEFT_OUT)
-OUT_OF_SIGHT = (GenerationSource.STARTING_FRAME, GenerationSource.LEFT_OUT)
+OUT_OF_SIGHT = (GenerationSource.STARTING_FRAME, GenerationSource.LEFT_OUT,
+                GenerationSource.BACKFILL, GenerationSource.REPLACED)
+UNLISTED = (GenerationSource.LEFT_OUT, GenerationSource.REPLACED)
 
 
 def source_of(row: dict) -> str:

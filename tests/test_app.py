@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 
-from origenerator import app_link, config, content, gallery
+from origenerator import app_link, config, content, evolver_agreement, gallery
 from origenerator.app import (
     MAINTENANCE,
     Library,
@@ -32,6 +32,7 @@ from origenerator.app import (
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
     _open_the_loading,
+    _put_the_backfill_in_place,
     _taskbar_identity,
     _the_preview_on_the_taskbar,
     _tidy_video_previews,
@@ -1187,6 +1188,9 @@ _MAINTENANCE_PASSES = (
     ("origenerator.inflight", "reconcile_in_flight"),
     ("origenerator.library_filing", "file_what_comfyui_left"),
     ("origenerator.relocate", "relocate_moved_outputs"),
+    ("origenerator.enhanced_start_backfill", "cancel_backfill"),
+    ("origenerator.enhanced_start_backfill", "fold_completed_backfill"),
+    ("origenerator.enhanced_start_backfill", "trash_what_the_backfill_replaced"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "merge_soundless_copy_rows"),
@@ -1312,6 +1316,37 @@ def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(
     landed = inbox / GENAU.source / "flf2v_loop_00001-audio.mp4"
     assert landed.read_bytes() == b"with its sound"
     assert db.get_generation("video")["genau_exported_at"]
+
+
+def test_a_backfilled_video_that_landed_while_the_app_was_closed_replaces_its_old_one(
+        tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    (output / "video").mkdir(parents=True)
+    for name in ("first_00001.mp4", "again_00001.mp4"):
+        (output / "video" / name).write_bytes(b"a video")
+    monkeypatch.setattr(config, "TRASH_DIR", tmp_path / "trash")
+    monkeypatch.setattr(config, "EVOLVER_UPSCALED_DIR", tmp_path / "upscaled")
+    monkeypatch.setattr(evolver_agreement, "records_folder", lambda checkout, root: None)
+    db = Database(tmp_path / "t.db")
+    for prompt_id, filename, source in (("first", "first_00001.mp4", "generated"),
+                                        ("again", "again_00001.mp4", "backfill")):
+        db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_i2v",
+                             workflow_version="v1", params_json="{}", workflow_json="{}",
+                             source=source)
+        db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+            [{"filename": filename, "subfolder": "video", "type": "output"}]))
+    db.set_generation_favorite("first", True)
+    db.set_backfill_of("again", "first")
+    library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
+                      thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs",
+                      inbox=EvolverInbox(tmp_path / "0_inbox"))
+
+    assert _put_the_backfill_in_place(library) == 1
+
+    assert db.get_generation("again")["starred"]
+    assert db.get_generation("first") is None
+    assert db.get_deletion("first") is not None
+    assert not (output / "video" / "first_00001.mp4").exists()
 
 
 def test_an_enhancement_of_a_deleted_picture_goes_to_the_trash_at_startup(tmp_path, monkeypatch):

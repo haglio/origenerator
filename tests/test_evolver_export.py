@@ -65,6 +65,19 @@ def test_export_does_not_clobber_an_already_queued_video(tmp_path):
     assert second.read_bytes() == b"second"
 
 
+def test_a_copy_waiting_under_the_name_a_second_send_gave_it_is_still_held(tmp_path):
+    inbox = evolver_export.EvolverInbox(tmp_path / "inbox")
+    src = tmp_path / "clip.mp4"
+    src.write_bytes(b"pixels")
+    first = inbox.hand_over(src, "lane")
+    inbox.hand_over(src, "lane")
+    first.unlink()
+
+    assert inbox.holds(src, "lane")
+    assert not inbox.holds(tmp_path / "clip two.mp4", "lane")
+    assert not inbox.holds(src, "another lane")
+
+
 class TestTheFunscriptThatGoesWithIt:
     def test_lands_beside_the_copy_under_its_name(self, tmp_path):
         clip, script = tmp_path / "made_00001.mp4", tmp_path / "made_00001.funscript"

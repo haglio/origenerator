@@ -460,7 +460,7 @@ class JobQueue(QObject):
         # experiment frees the machine and starts whatever is at the front, and
         # the front has to be this job by then or the wait it was preempted for
         # is just handed to something else.
-        if newcomer.source != GenerationSource.EXPERIMENT:
+        if _the_users_own(newcomer.source):
             self._preempt_experiments()
         if queue_line.takes_the_front(newcomer):
             self._picture_asked_at = self._clock()

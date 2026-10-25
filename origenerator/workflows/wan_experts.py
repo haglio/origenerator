@@ -16,7 +16,7 @@ picker to slot in between them.
 from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef, ParamType
-from origenerator.workflows.lora_choice import lora_choice
+from origenerator.workflows.lora_rows import lora_choice
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_model_files
 

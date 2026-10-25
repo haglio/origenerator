@@ -14,7 +14,6 @@ from origenerator.workflows.derived_size import measure_derived_size, override_s
 from origenerator.workflows.detail_parts import detail_fix_passes, fix_prompts
 from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
-from origenerator.workflows.model_files import is_no_lora
 
 # ComfyUI's KSampler vocabulary, which the SDXL pair's pickers offer.
 SAMPLER_OPTIONS = [
@@ -116,6 +115,13 @@ class EnhanceTail:
     nodes: dict
     image: list
     upscaled: list
+
+
+@dataclass(frozen=True)
+class LoraChain:
+    nodes: dict
+    model: list
+    clip: list | None
 
 
 def story_of(scenes: list[str]) -> str:
@@ -339,49 +345,20 @@ class WorkflowTemplate(ABC):
         return None
 
     @staticmethod
-    def lora_model_input(node_id: str, model_ref, lora_name, strength):
-        """The optional model-only LoRA node to add to a payload, and the model
-        input the downstream node should read.
-
-        With a real ``lora_name``, returns ``({node_id: <LoraLoaderModelOnly>},
-        [node_id, 0])`` — a one-node dict to merge into the payload, and the ref
-        pointing at it. When ``lora_name`` is the "None" sentinel (or empty),
-        returns ``({}, model_ref)``: no node, and ``model_ref`` passed straight
-        through, so the graph carries no LoRA for that slot and the base model
-        runs unmodified. ComfyUI validates ``lora_name`` against the installed
-        files, so a bypassed slot must be omitted, not passed a placeholder name.
-        """
-        if is_no_lora(lora_name):
-            return {}, model_ref
-        node = {
-            node_id: {
-                "class_type": "LoraLoaderModelOnly",
-                "inputs": {
-                    "model": model_ref,
-                    "lora_name": lora_name,
-                    "strength_model": strength,
-                },
-            }
-        }
-        return node, [node_id, 0]
-
-    @staticmethod
-    def lora_model_and_clip_input(node_id: str, model_ref, clip_ref, lora_name, strength):
-        if is_no_lora(lora_name):
-            return {}, model_ref, clip_ref
-        node = {
-            node_id: {
-                "class_type": "LoraLoader",
-                "inputs": {
-                    "model": model_ref,
-                    "clip": clip_ref,
-                    "lora_name": lora_name,
-                    "strength_model": strength,
-                    "strength_clip": strength,
-                },
-            }
-        }
-        return node, [node_id, 0], [node_id, 1]
+    def lora_chain(node_id: str, model_ref, loras, clip_ref=None) -> LoraChain:
+        nodes: dict = {}
+        for index, (lora_name, strength) in enumerate(loras):
+            loader_id = node_id if index == 0 else f"{node_id}_{index + 1}"
+            if clip_ref is None:
+                nodes[loader_id] = {"class_type": "LoraLoaderModelOnly", "inputs": {
+                    "model": model_ref, "lora_name": lora_name, "strength_model": strength}}
+            else:
+                nodes[loader_id] = {"class_type": "LoraLoader", "inputs": {
+                    "model": model_ref, "clip": clip_ref, "lora_name": lora_name,
+                    "strength_model": strength, "strength_clip": strength}}
+                clip_ref = [loader_id, 1]
+            model_ref = [loader_id, 0]
+        return LoraChain(nodes, model_ref, clip_ref)
 
     @staticmethod
     def scene_prompt_nodes(index: int, scene: int, scenes: list[str], clip_ref, first_ref,
@@ -670,8 +647,7 @@ class WorkflowTemplate(ABC):
         installed), each running over the last one's output rather than on a
         merged rect list: they are different models found by different detectors,
         and an image with a face and two hands must get all three. A part left
-        at zero builds no nodes at all, the same bypass
-        :meth:`lora_model_input` does.
+        at zero builds no nodes at all.
 
         Returns ``(nodes, image_ref)`` — the dict to merge into the payload, and
         the end of the chain. With no part asked for (or no detector installed
@@ -686,16 +662,11 @@ class WorkflowTemplate(ABC):
             nodes.update(found)
             detailer_id = f"fix{index}_detailer"
             own = prompts[fix.part.name]
-            model, clip = model_ref, clip_ref
-            if own["lora"]:
-                lora_id = f"fix{index}_lora"
-                nodes[lora_id] = {
-                    "class_type": "LoraLoader",
-                    "inputs": {"model": model_ref, "clip": clip_ref, "lora_name": own["lora"],
-                               "strength_model": own["strength"],
-                               "strength_clip": own["strength"]},
-                }
-                model, clip = [lora_id, 0], [lora_id, 1]
+            fixed = WorkflowTemplate.lora_chain(
+                f"fix{index}_lora", model_ref,
+                [(own["lora"], own["strength"])] if own["lora"] else [], clip_ref=clip_ref)
+            nodes.update(fixed.nodes)
+            model, clip = fixed.model, fixed.clip
             positive, negative = positive_ref, negative_ref
             if own["prompt"] or own["avoid"] or own["lora"]:
                 positive_id, negative_id = f"fix{index}_positive", f"fix{index}_negative"
@@ -881,8 +852,8 @@ class WorkflowTemplate(ABC):
 
         Returns ``(nodes, frames_ref)`` — the dict to merge into the payload and
         the ref to encode. At the native rate the multiplier is 1 and there is
-        nothing to put between anything: no node, ``frames_ref`` handed straight
-        through, the same bypass :meth:`lora_model_input` does.
+        nothing to put between anything: no node, and ``frames_ref`` handed
+        straight through.
         """
         multiplier = rate_multiplier(params["frame_rate"])
         if multiplier == 1:

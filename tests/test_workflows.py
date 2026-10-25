@@ -9,7 +9,7 @@ from PIL import Image
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.detail_parts as detail_module
 import origenerator.workflows.flux_t2i_upscaled as flux
-import origenerator.workflows.lora_choice as lora_choice_module
+import origenerator.workflows.lora_rows as lora_rows_module
 import origenerator.workflows.sdxl_pose_transfer as pose
 import origenerator.workflows.sdxl_t2i as t2i
 import origenerator.workflows.wan_experts as experts
@@ -112,7 +112,7 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # test_wan_video_workflows_group_all_models_then_all_loras.
 
     options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
-    monkeypatch.setattr(lora_choice_module, "list_lora_files", lambda fallback, **terms: options)
+    monkeypatch.setattr(lora_rows_module, "list_lora_files", lambda fallback, **terms: options)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -486,7 +486,7 @@ def test_flux_runs_its_lora_on_the_model_and_both_prompts_at_one_strength():
 
 def test_flux_offers_a_lora_and_its_strength_just_under_its_model(monkeypatch):
     options = [NO_LORA, "x_flux.safetensors"]
-    monkeypatch.setattr(lora_choice_module, "list_lora_files", lambda fallback, **terms: options)
+    monkeypatch.setattr(lora_rows_module, "list_lora_files", lambda fallback, **terms: options)
     fields = FluxT2iUpscaledWorkflow().param_definitions()
     keys = [pd.key for pd in fields]
     by_key = {pd.key: pd for pd in fields}

@@ -269,7 +269,7 @@ def test_the_form_offers_only_models_this_graph_can_run(monkeypatch):
         return [NO_LORA, *fallback]
 
     monkeypatch.setattr(animate, "list_model_files", models)
-    monkeypatch.setattr("origenerator.workflows.lora_choice.list_lora_files", loras)
+    monkeypatch.setattr("origenerator.workflows.lora_rows.list_lora_files", loras)
     by_key = {pd.key: pd for pd in Wan22AnimateWorkflow().param_definitions()}
 
     assert asked["diffusion_models"] == (WAN_ANIMATE,)

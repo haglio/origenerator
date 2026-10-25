@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef, ParamType
-from origenerator.workflows.model_files import list_lora_files
+from origenerator.workflows.model_files import is_no_lora, list_lora_files
+
+
+def strength_key_of(lora_key: str) -> str:
+    return "lora_strength" + lora_key.removeprefix("lora")
+
+
+def picked_loras(params: dict, keys) -> list[tuple[str, float]]:
+    return [(params[key], params[strength_key_of(key)]) for key in keys
+            if not is_no_lora(params.get(key))]
 
 
 def lora_strength(key: str, default: float, label: str = "") -> ParamDef:

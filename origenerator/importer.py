@@ -35,11 +35,10 @@ from origenerator.gallery import (
     workflow_output_type,
 )
 from origenerator.gallery.output import place_of_its_own
-from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.output_places import OutputPlaces
-from origenerator.record_fold import file_key, fold_record_into
+from origenerator.record_fold import file_key, fold_record_into, lanes_owed
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import soundless_copies_of
@@ -208,7 +207,7 @@ def merge_soundless_copy_rows(db: Database, *, send_down) -> int:
         if video is None:
             continue
         try:
-            for lane in _lanes_its_video_is_owed(row, video):
+            for lane in lanes_owed(row, video):
                 send_down(video, lane)
         except Exception:
             logger.warning("Could not send %s where its soundless copy had gone; "
@@ -238,12 +237,6 @@ def fold_sound_versions_into_their_videos(db: Database) -> int:
         db.delete_generation(row["prompt_id"])
         folded += 1
     return folded
-
-
-def _lanes_its_video_is_owed(copy: dict, video: dict) -> list[str]:
-    return [lane for lane, stamps in LANES.items()
-            if copy.get(stamps["sent"])
-            and not video.get(stamps["sent"]) and not video.get(stamps["unsent"])]
 
 
 def _fold_soundless_copy(db: Database, copy: dict, video: dict, rows: list[dict]) -> None:

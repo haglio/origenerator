@@ -221,22 +221,15 @@ def _tidy_video_previews(library: Library):
 
 
 def _merge_soundless_copies(library: Library):
-    from origenerator.gallery import resolve_preview
-    from origenerator.gui.export_lane import EXPORT_LANES
+    from origenerator.export_lane import EXPORT_LANES_BY_KEY
     from origenerator.importer import (
         fold_sound_versions_into_their_videos,
         merge_soundless_copy_rows,
     )
-    from origenerator.media import MediaType
-
-    lanes = {lane.source_key: lane for lane in EXPORT_LANES}
 
     def send_down(video: dict, lane_key: str) -> None:
-        shown = resolve_preview(video, library.places)
-        if shown is None or shown[1] != MediaType.VIDEO:
-            raise FileNotFoundError(f"{video['prompt_id']} has no video on disk")
-        lanes[lane_key].send(shown[0], video["prompt_id"], db=library.db,
-                             inbox=library.inbox, places=library.places)
+        EXPORT_LANES_BY_KEY[lane_key].send_video_of(
+            video, db=library.db, inbox=library.inbox, places=library.places)
 
     return (merge_soundless_copy_rows(library.db, send_down=send_down)
             + fold_sound_versions_into_their_videos(library.db))

@@ -46,6 +46,7 @@ QT_FREE = (
     "origenerator.inflight",
     "origenerator.bookmark_reconcile",
     "origenerator.base_backfill",
+    "origenerator.export_lane",
     "origenerator.importer",
     "origenerator.db",
     "origenerator.recovery",

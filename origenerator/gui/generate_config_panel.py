@@ -33,6 +33,7 @@ from origenerator.config import (
 )
 from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
+from origenerator.export_lane import UNSEND_CAPTION, lane_for
 from origenerator.gallery import (
     EnhanceSettings,
     config_folder_key,
@@ -62,7 +63,6 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
-from origenerator.gui.export_lane import UNSEND_CAPTION, lane_for
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
 from origenerator.gui.generate_button import (

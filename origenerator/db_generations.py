@@ -41,6 +41,10 @@ _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
 _MADE_HERE = f"source NOT IN ({', '.join('?' * len(MADE_ELSEWHERE))})"
 
 
+def was_kept(row: dict) -> bool:
+    return bool(row.get("starred")) or any(map(row.get, SENT_COLUMNS))
+
+
 def library_paths_in(output_files: str | None) -> set[str]:
     try:
         files = json.loads(output_files or "[]")

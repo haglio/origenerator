@@ -19,6 +19,7 @@ import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
 from origenerator import evolver_export, gallery, osr2_driver
+from origenerator import export_lane as export_lane_module
 from origenerator.act_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
@@ -34,7 +35,6 @@ from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_controls, icons
-from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.animated_strip import _VideoTile

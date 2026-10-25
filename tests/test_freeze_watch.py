@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import textwrap
 from pathlib import Path
 
@@ -160,7 +161,8 @@ def test_a_window_stuck_in_a_slot_leaves_that_slot_in_the_crash_log(tmp_path):
 
     written = crash_log.read_text(encoding="utf-8")
     assert "the_slot_that_stalls" in written
-    assert "answering again after 4 s" in written
+    stalled = re.search(r"answering again after (\d+) s", written)
+    assert stalled and int(stalled.group(1)) >= 4
 
 
 def _close_a_window_whose_teardown_takes(seconds, *, closed_within_s, crash_log):

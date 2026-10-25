@@ -546,6 +546,9 @@ class ParamForm(QWidget):
         scenes = self._scenes.text_fields() if self._scenes is not None else []
         return scenes + [w for w in self._widgets.values() if isinstance(w, QPlainTextEdit)]
 
+    def drop_slots(self) -> tuple[DropSlot, ...]:
+        return tuple(w for w in self._widgets.values() if isinstance(w, DropSlot))
+
     def _has_param(self, key: str) -> bool:
         return key in self._defs
 

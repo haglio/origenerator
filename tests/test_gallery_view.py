@@ -12095,6 +12095,37 @@ def test_combines_drop_zones_name_what_was_dropped_on_them(qtbot, tmp_path):
     assert "" not in named
 
 
+def test_what_a_launch_puts_back_in_combine_is_named_once_the_gallery_draws(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.restore_combine_selection({"image": "img", "videos": {act_settings.VIDEO: "vid"}})
+
+    view.refresh()
+
+    panel = view._combine.panel
+    named = (panel.image_slot._caption.text(), panel.video_slot._caption.text())
+    assert named == (view._item_names.of("img"), view._item_names.of("vid"))
+    assert "" not in named
+
+
+def test_a_start_image_a_launch_puts_back_is_named_once_the_gallery_draws(qtbot, tmp_path,
+                                                                          monkeypatch):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    Image.new("RGB", (8, 8)).save(output_dir / "sdxl_pick.png")
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    panel = view._info_tabs.current_config_panel()
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("wan22_i2v"))
+    start = panel._param_form._widgets["input_image"]
+    panel._param_form.set_values({"input_image": "sdxl_pick.png [output]"})
+
+    view.refresh()
+
+    assert start._caption.text() == view._item_names.of("img") != ""
+
+
 def test_a_picture_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

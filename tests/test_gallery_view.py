@@ -116,7 +116,7 @@ from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
-from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
+from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow, enhance_level_mime
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import FOLDER_KEYS_MIME, RECENT_ROLE, TREE_KEY_ROLE, _action_rects
@@ -159,6 +159,7 @@ from tests.osr2_fakes import FakeBroker
 from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
 from tests.test_combine_panel import _listed_under_recent
+from tests.test_enhance_panel import _dropped_on
 from tests.test_folder_tree import _shown
 from tests.test_osr2_driver import ACTIONS, FakePlayer
 
@@ -4448,6 +4449,36 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
     assert view._bank.enhance.isEnabled()
+
+
+def test_a_version_dragged_onto_the_enhance_panel_grays_the_enhance_that_would_repeat_it(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_finder.pt"])
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.set_enhance_settings(gallery.EnhanceSettings(auto=False, params={
+        "enhance_scale": 3.0,
+        "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}).to_json())
+    _enhanced_in_place(db)
+    # Made before a fix had prompts of its own, so the version records none.
+    ran = gallery.enhance_params_for(db.get_generation("g0"), gallery.EnhanceSettings(
+        params={"enhance_scale": 2.0, "enhance_detail_fixes": {"hands": 0.45}}))
+    ran.pop("enhance_fix_prompts")
+    db.update_generation("g0", enhance_history=json.dumps([
+        {"filename": "image_enhance_00001_.png", "params": ran}]))
+    view.refresh()
+    _select_first_leaf(view)
+    _click_tile(view, "g0")
+    versions = view._info_tabs.current_config_panel()._versions
+    version = next(row for row in versions._host.findChildren(_LevelRow) if row._params)
+    mime = enhance_level_mime(version._params)
+
+    _dropped_on(view._enhance.panel, mime)
+
+    assert not view._bank.enhance.isEnabled()
+    (card,) = versions._host.findChildren(_AddRow)
+    assert "already has a version" in card.toolTip()
 
 
 # --- the controls a tile wears in its own corners -----------------------------

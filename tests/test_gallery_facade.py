@@ -39,6 +39,7 @@ PUBLISHED = {
     "fix_params_for",
     "fold_completed_enhancements", "fold_enhancement",
     "folder_chain", "folder_id", "folder_key_at_level", "folder_key_for", "folder_level", "folder_names_by_row", "folder_signature",
+    "full_settings",
     "generation_of_file",
     "generation_seed", "group_level", "holds",
     "is_enhance_product_row", "is_enhanceable_row",

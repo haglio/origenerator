@@ -29,6 +29,7 @@ from origenerator.gallery.enhance_settings import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    full_settings,
     level_settings,
 )
 from origenerator.output_places import OutputPlaces
@@ -608,6 +609,12 @@ def test_the_prompts_a_fix_ran_with_are_part_of_what_its_level_is():
 
 def test_a_level_made_before_fixes_had_prompts_of_their_own_records_none():
     assert "enhance_fix_prompts" not in level_settings({"enhance_detail_fixes": {"hands": 0.45}})
+
+
+def test_a_level_made_before_fixes_had_prompts_is_the_one_that_gives_each_part_its_own():
+    before = {"enhance_detail_fixes": {"hands": 0.45}}
+
+    assert full_settings(before) == full_settings(dict(before, enhance_fix_prompts={}))
 
 
 def test_a_folders_prompts_for_a_fix_are_kept_with_its_settings():

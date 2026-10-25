@@ -271,7 +271,7 @@ class FakeCommandAndRequestListener(QObject):
 class FakeHearing(QObject):
     """A microphone that says *says* each time ``hear`` is called."""
 
-    said = pyqtSignal(str)
+    said = pyqtSignal(str, float)
     failed = pyqtSignal(str)
 
     def __init__(self, says="no hat"):
@@ -280,8 +280,8 @@ class FakeHearing(QObject):
         self.started = False
         self.stopped = False
 
-    def hear(self):
-        self.said.emit(self.says)
+    def hear(self, spoken_at=0.0):
+        self.said.emit(self.says, spoken_at)
 
     def start(self):
         self.started = True

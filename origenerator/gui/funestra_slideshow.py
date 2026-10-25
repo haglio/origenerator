@@ -14,6 +14,7 @@ session's Funestra and the gallery's caption, or to the window.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from funestra.funestra_verbs import (
     TRASH,
     play_file,
 )
+from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
 from funestra.satellite_hud import hud_text
 from funestra.status import parse_status
@@ -81,8 +83,10 @@ class FunestraSlideshow(QObject):
 
     def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
                  hud=None, pace=None, start=None, shuffle=None,
-                 say=None, shown=None, parent=None):
+                 say=None, shown=None, clock=None, parent=None):
         super().__init__(parent)
+        self._clock = clock or time.monotonic
+        self._on_screen = OnScreenHistory()
         self._side = side
         self.channel = channel
         self.shown = shown if shown is not None else OnASessionsFunestra(self, side, channel, say)
@@ -226,6 +230,7 @@ class FunestraSlideshow(QObject):
     def _follow_the_funestra(self, fields: dict) -> None:
         status = parse_status(fields)
         self._funestra_locked = status.locked
+        self._on_screen.observe(status.video, now=self._clock())
         if status.video and status.video != self._showing:
             self._showing = status.video
             self._follow(status.video)
@@ -337,13 +342,18 @@ class FunestraSlideshow(QObject):
         ends — so this is how the map, the star and every word about "this one"
         find out which item that is.
         """
-        for index, item in enumerate(self._set.playlist.items):
-            if self._file_of(item) == video:
-                if item is not self._set.playlist.current():
-                    self._levels.restart()  # a new item, so its own versions from the top
-                self._set.playlist.jump_to(index)
-                self.media_changed.emit()
-                return
+        showing = self._item_showing(video)
+        if showing is None:
+            return
+        index, item = showing
+        if item is not self._set.playlist.current():
+            self._levels.restart()  # a new item, so its own versions from the top
+        self._set.playlist.jump_to(index)
+        self.media_changed.emit()
+
+    def _item_showing(self, video: str):
+        return next(((index, item) for index, item in enumerate(self._set.playlist.items)
+                     if video and self._file_of(item) == video), None)
 
     def _publish(self) -> None:
         self.shown.panel_changed()
@@ -665,9 +675,21 @@ class FunestraSlideshow(QObject):
     def clear_modes(self) -> bool:
         return self._set.set_filters(SlideshowFilters())
 
-    def voice_target(self):
-        """The generation a spoken order is about: the item on screen."""
-        return self._set.current_prompt_id()
+    def voice_target(self, said_at: float | None = None):
+        """The generation a word said at *said_at* is about, else the one on screen."""
+        said_over = self._said_over(said_at)
+        return said_over.prompt_id if said_over else self._set.current_prompt_id()
+
+    def back_to_what_was_said_over(self, said_at: float | None) -> str | None:
+        said_over = self._said_over(said_at)
+        if said_over is not None and said_over is not self._set.playlist.current():
+            self._jump_to(said_over)
+        return self.voice_target(said_at)
+
+    def _said_over(self, said_at: float | None):
+        showing = (self._item_showing(self._on_screen.path_at(said_at))
+                   if said_at is not None else None)
+        return showing[1] if showing else None
 
     # --- keeping the set current --------------------------------------------
 

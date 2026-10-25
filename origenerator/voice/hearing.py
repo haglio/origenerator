@@ -33,7 +33,7 @@ LOUD_ENOUGH_TO_ANSWER = 1000
 
 
 class Hearing(QObject):
-    said = pyqtSignal(str)
+    said = pyqtSignal(str, float)
     failed = pyqtSignal(str)
 
     def __init__(self, phrases: Collection[str], *, never_repaired: Collection[str] = (),
@@ -64,8 +64,8 @@ class Hearing(QObject):
 
     def _on_heard(self, heard: Heard) -> None:
         if heard.recognition.phrase:
-            self.said.emit(heard.recognition.phrase)
+            self.said.emit(heard.recognition.phrase, heard.spoken_at)
 
     def _on_speech(self, words: str, heard: Heard) -> None:
         if heard.peak >= LOUD_ENOUGH_TO_ANSWER or any(character.isalpha() for character in words):
-            self.said.emit(words)
+            self.said.emit(words, heard.spoken_at)

@@ -132,6 +132,17 @@ def test_a_request_is_re_emitted(qtbot):
     assert [s.text for s in spoken] == ["no hat"]
 
 
+def test_a_request_keeps_the_time_the_mic_heard_its_first_step_said(qtbot):
+    listener, hearing = _request_listener()
+    spoken = []
+    listener.request.connect(spoken.append)
+    listener.start_commands(lambda matched: None)
+
+    hearing.hear(spoken_at=7.5)
+
+    assert [s.opened_at for s in spoken] == [7.5]
+
+
 def test_an_open_request_swallows_what_would_be_a_command(qtbot):
     # The words of a request are a sentence, not instructions: "fix teeth" said
     # inside one belongs to the request.

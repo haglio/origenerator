@@ -877,7 +877,7 @@ def test_closing_while_a_training_waits_its_turn_hands_the_line_over_as_ever(qtb
     assert [call.args[1] for call in client.submit_job.call_args_list] == [waiting.prompt_id]
 
 
-def test_a_submit_refused_as_the_app_closes_is_reported_like_any_other(qtbot, tmp_path):
+def test_a_submit_refused_as_the_app_closes_waits_for_the_next_copy_to_send_it(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -887,10 +887,28 @@ def test_a_submit_refused_as_the_app_closes_is_reported_like_any_other(qtbot, tm
     said = []
     queue.failed.connect(lambda key, message: said.append(key))
 
+    assert queue.flush_to_server() == 0
+
+    assert said == []
+    next_copy = JobQueue(db, _client())
+    next_copy.reconnect_running()
+    assert next_copy.queue_order[-1] == waiting.prompt_id
+
+
+def test_background_work_refused_as_the_app_closes_is_recorded_not_left_for_the_next_launch(
+        qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    _launch_video(queue, "v1", seed=1)
+    queue.start_prepared("e1", WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(),
+                         source=GenerationSource.EXPERIMENT)
+    client.submit_job = MagicMock(side_effect=RuntimeError("bad prompt"))
+
     queue.flush_to_server()
 
-    assert said == ["v2"]
-    assert db.get_generation(waiting.prompt_id)["status"] == "error"
+    assert [row["status"] for row in db.list_generations()
+            if row["source"] == GenerationSource.EXPERIMENT] == ["error"]
 
 
 def test_what_waits_when_comfyui_does_not_answer_as_the_app_closes_stays_for_the_next_launch(

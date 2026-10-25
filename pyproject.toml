@@ -21,10 +21,10 @@ requires-python = ">=3.14"
 # other half had not landed turned all of them red at once. Moving to a newer
 # one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
-    "app-support @ git+https://github.com/haglio/app_support@v0.1.282",
-    "funestra @ git+https://github.com/haglio/funestra@v0.1.583",
-    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.263",
-    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.71",
+    "app-support @ git+https://github.com/haglio/app_support@v0.1.284",
+    "funestra @ git+https://github.com/haglio/funestra@v0.1.584",
+    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.264",
+    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.72",
     "PyQt6>=6,<7",
     # Qt itself, which PyQt6 takes at any 6.11. 6.11.1 handed its wildcard-disconnect
     # warning to the Python message handler holding a signal/slot lock (QTBUG-145216);
@@ -62,8 +62,8 @@ voice = ["faster-whisper>=1,<2"]
 # gc over a run that built thousands of Qt panels. --timeout-method=thread is
 # the half that pays for itself: it dumps the stack of the test that stopped,
 # which turns a stalled required check into a one-line diagnosis.
-# tests/test_timeouts.py holds all three halves of it.
-addopts = "-p app_support.sanitize.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread"
+# app_support.clocks holds all three halves of it.
+addopts = "-p app_support.sanitize.pytest_plugin -p app_support.clocks.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread"
 testpaths = ["tests"]
 qt_api = "pyqt6"
 

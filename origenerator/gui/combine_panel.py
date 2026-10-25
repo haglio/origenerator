@@ -361,6 +361,10 @@ class CombinePanel(QWidget):
     def dropped_videos(self) -> dict[str, str]:
         return dict(self._dropped)
 
+    def reread_names(self) -> None:
+        self.image_slot.reread_name()
+        self.video_slot.reread_name()
+
     def set_dropped_videos(self, videos: dict[str, str]):
         self._dropped = dict(videos)
         if not self.selected_category():

@@ -60,6 +60,7 @@ from origenerator.gui import icons
 from origenerator.gui.action_picker import ActionPicker
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_controls import enhance_state
+from origenerator.gui.drop_slot import DropSlot, DropZone
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
 from origenerator.gui.export_lane import UNSEND_CAPTION, lane_for
@@ -185,7 +186,7 @@ def _pick_installed_ones_first(names: list[str]) -> str:
     return f"{shown} aren't installed anymore — pick installed ones first"
 
 
-class GenerateConfigPanel(QWidget):
+class GenerateConfigPanel(DropZone):
     """One generation configuration: pick a workflow and set its params.
 
     Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
@@ -233,7 +234,7 @@ class GenerateConfigPanel(QWidget):
                  library: LibraryViews | None = None,
                  names: ItemNames | None = None,
                  previews: MovingPreviews | None = None):
-        super().__init__(parent)
+        super().__init__(parent=parent)
         self._heights = heights  # the window's prompt heights, for its forms
         # Where a clip is handed to Evolver. Asked for rather than performed
         # here: the destination is one object's to know, and a test points it at
@@ -1213,9 +1214,11 @@ class GenerateConfigPanel(QWidget):
     def reread_name(self) -> None:
         if self._displayed_row is not None:
             self._metadata_block.setVisible(self._metadata_block.show_name(self._item_name()))
-        if self._param_form is not None:
-            for zone in self._param_form.drop_slots():
-                zone.reread_name()
+        for zone in self.reaches():
+            zone.reread_name()
+
+    def reaches(self) -> tuple[DropSlot, ...]:
+        return () if self._param_form is None else self._param_form.drop_slots()
 
     def tab_icon(self) -> QIcon:
         """The mark beside this tab's name: the displayed item's own thumbnail,

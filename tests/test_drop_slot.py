@@ -116,6 +116,16 @@ def test_clear_on_an_empty_slot_does_not_notify(qtbot):
     assert seen == []  # idempotent: nothing to clear, no spurious change
 
 
+def test_a_filled_slot_names_its_item_under_the_picture(qtbot):
+    slot = _slot(qtbot, name_of=lambda held: f"Example Folder {held}")
+
+    _drop(slot, "img1")
+    named = slot._caption.text()
+    slot.clear()
+
+    assert (named, slot._caption.text()) == ("Example Folder img1", "")
+
+
 def test_clicking_a_filled_slot_goes_to_its_item_and_keeps_it(qtbot):
     slot = _slot(qtbot)
     _drop(slot, "img1")

@@ -151,7 +151,7 @@ from origenerator.voice.commands import match_voice_command as match
 from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts, offered_workflows
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
-from tests import gestures
+from tests import drops, gestures
 from tests.drop_style_seen import worn
 from tests.lit_switches import lit_in
 from tests.marked_words import words
@@ -12060,6 +12060,18 @@ def test_clicking_a_combine_slot_goes_to_what_it_holds(qtbot, tmp_path, slot_nam
 
     assert view.selected_prompt_ids() == [prompt_id]
     assert slot.current_id() == prompt_id
+
+
+def test_combines_drop_zones_name_what_was_dropped_on_them(qtbot, tmp_path):
+    view = _combine_view(qtbot, tmp_path)
+    panel = view._combine.panel
+
+    drops.let_go_over(panel.image_slot, "img")
+    drops.let_go_over(panel.video_slot, "vid")
+
+    named = (panel.image_slot._caption.text(), panel.video_slot._caption.text())
+    assert named == (view._item_names.of("img"), view._item_names.of("vid"))
+    assert "" not in named
 
 
 def test_a_picture_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp_path):

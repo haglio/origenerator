@@ -50,6 +50,7 @@ from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.derived_size import scale_to_total_pixels
+from tests import drops
 from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
 
 
@@ -798,6 +799,49 @@ def test_a_tab_opened_on_a_video_that_names_its_start_picture_can_generate(saved
     panel.show_saved_generation(_video_row(db, input_image="frame.png [output]"), [])
 
     assert panel._generate_btn.isEnabled()
+
+
+def _start_image_tab(qtbot, tmp_path, monkeypatch):
+    output_dir = tmp_path / "output"
+    (output_dir / "image").mkdir(parents=True)
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(output_dir / "image" / "sdxl_img1.png")
+    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    db = Database(tmp_path / "t.db")
+    panel = GenerateConfigPanel(MagicMock(), db)
+    qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    return panel, db, panel._param_form._widgets["input_image"]
+
+
+def test_an_image_let_go_over_the_start_image_shows_there_by_its_name(qtbot, tmp_path,
+                                                                     monkeypatch):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
+    thumbnail = tmp_path / "thumb.png"
+    Image.new("RGB", (8, 8)).save(thumbnail)
+    row = _image_row(db, filename="sdxl_img1.png")
+    db.update_generation("img1", thumbnail_path=str(thumbnail))
+    name = _named(panel, row)
+
+    drops.let_go_over(start_image, "img1")
+
+    assert start_image._caption.text() == name
+    assert not start_image._label.pixmap().isNull()
+
+
+def test_a_start_image_from_outside_the_gallery_is_named_by_its_file_and_goes_nowhere(
+        qtbot, tmp_path, monkeypatch):
+    panel, _db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
+    outside = tmp_path / "picked.png"
+    Image.new("RGB", (8, 8)).save(outside)
+    panel._param_form.set_values({"input_image": str(outside)})
+    went = []
+    panel.source_activated.connect(went.append)
+
+    qtbot.mouseClick(start_image, Qt.MouseButton.LeftButton)
+
+    assert went == []
+    assert start_image._caption.text() == "picked.png"
+    assert start_image.toolTip() == "picked.png"
 
 
 def test_a_fresh_tab_generates_nothing_until_its_start_image_is_picked(qtbot, tmp_path):

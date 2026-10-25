@@ -1213,6 +1213,9 @@ class GenerateConfigPanel(QWidget):
     def reread_name(self) -> None:
         if self._displayed_row is not None:
             self._metadata_block.setVisible(self._metadata_block.show_name(self._item_name()))
+        if self._param_form is not None:
+            for zone in self._param_form.drop_slots():
+                zone.reread_name()
 
     def tab_icon(self) -> QIcon:
         """The mark beside this tab's name: the displayed item's own thumbnail,

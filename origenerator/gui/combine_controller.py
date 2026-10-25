@@ -250,6 +250,9 @@ class CombineController(QObject):
         return video_history(self._db.custom_combinations(), intent,
                              self._db.list_combine_video_uses())
 
+    def reread_names(self) -> None:
+        self.panel.reread_names()
+
     def selection(self) -> dict:
         return {
             "image": self.panel.image_slot.current_id(),

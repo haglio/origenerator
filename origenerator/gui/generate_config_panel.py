@@ -499,6 +499,7 @@ class GenerateConfigPanel(QWidget):
         """
         self._related = RelatedMedia(video_rows=self._video_rows,
                                      row_of=self._db.get_generation,
+                                     held_rows=lambda: self._library.now().held_rows,
                                      name_of=self._names.of, previews=self._previews)
         self._related.source_activated.connect(self.source_activated)
         self._related.animated_activated.connect(self.animated_activated)

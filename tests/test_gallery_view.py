@@ -2469,6 +2469,17 @@ def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
     assert view.visible_prompt_ids() == ["new", "old"]
 
 
+def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.follow_link("d1")
+
+    assert view._browser.showing_trash()
+    assert view.visible_prompt_ids() == ["d1"]
+
+
 def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, tmp_path):
     # End to end through the real GalleryActions: delete a tile, and the item is
     # standing in the Trash collection rather than gone.

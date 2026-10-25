@@ -180,41 +180,30 @@ def titled_models(tmp_path, monkeypatch):
     return write
 
 
-class FakeVoiceSteering(QObject):
-    """Stands in for VoiceSteering so no test ever opens a real microphone.
+class FakeCommandAndRequestListener(QObject):
+    """Stands in for CommandAndRequestListener so no test ever opens a real
+    microphone.
 
     Suite-wide rather than per-module, so a module that builds a gallery for
     some other reason can never inherit a device grab and a speech-model
     download from the one that does.
 
-    ``say`` simulates a heard-and-rewritten utterance steering a loop's prompt,
-    ``speak_command`` one either matcher recognizes, and ``speak`` one fed
-    through the real request dictation.
+    ``speak_command`` simulates an utterance either matcher recognizes, and
+    ``speak`` one fed through the real request dictation.
     """
 
     error = pyqtSignal(str)
     heard = pyqtSignal(str)
-    edited = pyqtSignal(str)
     request = pyqtSignal(object)
 
     def __init__(self, *, command_matcher=None, bare_matcher=None, dictation=None,
                  phrases=(), never_repaired=(), said_in=None):
         super().__init__()
-        self.started = False
-        self.stopped = False
         self.commands_on = False
         self._matcher = command_matcher
         self._bare_matcher = bare_matcher
         self._dictation = dictation
         self._execute = None
-        self._set = None
-
-    def start(self, get_prompt, set_prompt):
-        self.started = True
-        self._set = set_prompt
-
-    def stop(self):
-        self.stopped = True
 
     def start_commands(self, execute):
         self.commands_on = True
@@ -224,13 +213,10 @@ class FakeVoiceSteering(QObject):
         self.commands_on = False
         self._execute = None
 
-    def say(self, new_prompt):
-        self._set(new_prompt)
-
     def speak_command(self, text):
         """One spoken utterance while commands are armed: matched → executed.
 
-        Both vocabularies, bare one first — the order the live steering uses."""
+        Both vocabularies, bare one first — the order the live listener uses."""
         if not self.commands_on:
             return None
         matched = self._bare_matcher(text) if self._bare_matcher else None
@@ -242,7 +228,7 @@ class FakeVoiceSteering(QObject):
 
     def bare_command(self, text):
         """The whole-utterance command *text* is, asked first of a phrase the
-        hosting session heard -- the live steering's own method, mirrored."""
+        hosting session heard -- the live listener's own method, mirrored."""
         collecting = self._dictation is not None and self._dictation.listening
         if collecting or self._bare_matcher is None:
             return None
@@ -282,9 +268,31 @@ class FakeVoiceSteering(QObject):
             self._dictation.reset()
 
 
+class FakeHearing(QObject):
+    """A microphone that says *says* each time ``hear`` is called."""
+
+    said = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, says="no hat"):
+        super().__init__()
+        self.says = says
+        self.started = False
+        self.stopped = False
+
+    def hear(self):
+        self.said.emit(self.says)
+
+    def start(self):
+        self.started = True
+
+    def stop(self):
+        self.stopped = True
+
+
 def keep_the_microphone_shut(setattr) -> None:
-    """Point every voice router's steering at the inert stand-in above."""
-    setattr(voice_router, "VoiceSteering", FakeVoiceSteering)
+    """Point every voice router's listener at the inert stand-in above."""
+    setattr(voice_router, "CommandAndRequestListener", FakeCommandAndRequestListener)
 
 
 @pytest.fixture(autouse=True)
@@ -616,12 +624,11 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
-def _act_settings_runs_inline(request, monkeypatch):
+def _off_thread_work_runs_inline(request, monkeypatch):
     """Let the gallery's off-thread work run straight through.
 
-    The act's match is asked on a pool thread in the app, because the model it
-    asks thinks for several seconds and the window must stay alive. A test wants
-    the opposite: launch and inspect in one call, with no event loop to pump. A
+    The app does slow work on a pool thread so the window stays alive. A test
+    wants the opposite: act and inspect in one call, with no event loop to pump. A
     test that exercises the real hop marks itself ``real_thread_hop`` and this
     stays out of its way -- it used to put the hop back with
     ``monkeypatch.undo()``, which undid every fixture's patches with it and left

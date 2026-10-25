@@ -1,7 +1,6 @@
 """Content overlay — the values that must not be published, loaded at runtime.
 
-The act vocabulary describes the
-library this tool serves, so it lives in
+The act vocabulary describes the library this tool serves, so it lives in
 ``content.local.json`` (git-ignored) rather than in source.  A
 committed ``content.example.json`` documents the shape and is what a fresh or
 public checkout loads; every consumer reads it through here, so the matcher,

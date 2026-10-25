@@ -170,20 +170,9 @@ def test_stop_all_ends_the_loop_that_is_running(qtbot):
     assert auto.active_key() is None
 
 
-def test_rekey_moves_an_active_loop_to_a_new_key(qtbot):
-    launcher = FakeLauncher()
-    auto = AutoGenerateController(launcher)
-    auto.start("old")
-
-    auto.rekey("old", "new")
-
-    assert not auto.is_active("old") and auto.is_active("new")
-
-
 def test_looping_a_new_folder_ends_the_one_that_was_looping(qtbot):
     # One folder at a time: two loops would only take turns on the machine, each
-    # waiting out the other's render, and the voice steering that follows the loop
-    # would have two prompts to answer to.
+    # waiting out the other's render.
     launcher = FakeLauncher()
     auto = AutoGenerateController(launcher)
     stopped = []
@@ -193,7 +182,7 @@ def test_looping_a_new_folder_ends_the_one_that_was_looping(qtbot):
     auto.start("b")
 
     assert auto.is_active("b") and not auto.is_active("a")
-    assert stopped == ["a"]  # reported, so its switch and voice steering clean up
+    assert stopped == ["a"]  # reported, so its switch is cleaned up
 
 
 def test_the_displaced_folder_launches_nothing_more(qtbot):

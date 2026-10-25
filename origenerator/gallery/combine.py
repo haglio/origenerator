@@ -4,8 +4,8 @@ The gallery already holds both halves of an I2V: a video row carries its
 full settings (workflow, params and seed), and any image row's output file can seed
 an i2v. This readies them to re-run on a *different* image — the one input a
 user picks — without touching a Generate tab. The settings are either a past video's
-(:func:`combined_params`) or the overlay's hand-tuned spec for an act
-(:func:`curated_params`), and either one runs with fresh seeds. Qt-free so it
+(:func:`combined_params`) or ones written down as a workflow and its params
+(:func:`written_params`), and either one runs with fresh seeds. Qt-free so it
 stays unit-testable.
 """
 from __future__ import annotations
@@ -77,10 +77,10 @@ def _words(prompt):
     return " ".join(str(prompt or "").split())
 
 
-def curated_params(spec: dict, input_image: str | None, workflow) -> dict | None:
-    """The overlay's hand-tuned act settings readied to run on ``input_image``,
-    with fresh seeds. ``None`` with no picture."""
-    params = {**workflow.default_params(), **(spec.get("params") or {})}
+def written_params(settings: dict, input_image: str | None, workflow) -> dict | None:
+    """Written-down settings over their workflow's defaults, readied to run on
+    ``input_image`` with fresh seeds; ``None`` with no picture."""
+    params = {**workflow.default_params(), **(settings.get("params") or {})}
     return _run_on(input_image, params, workflow)
 
 

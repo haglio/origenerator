@@ -1,5 +1,5 @@
-"""Spoken slideshow control — which utterances claim to be a command, and which fall
-through to prompt steering."""
+"""Spoken slideshow control — which utterances claim to be a command, and which are
+left alone."""
 from __future__ import annotations
 
 import pytest
@@ -49,8 +49,8 @@ def test_naming_the_slideshow_with_no_verb_is_not_a_command():
     assert match_slideshow_command("the slideshow") is None
 
 
-def test_a_sentence_shaped_prompt_falls_through_to_steering():
-    # It mentions a slideshow, but it is plainly a prompt being dictated.
+def test_a_sentence_that_mentions_a_slideshow_is_no_command():
+    # It mentions a slideshow, but it is plainly a sentence.
     said = "a slideshow of her standing by the window in the morning light"
     assert match_slideshow_command(said) is None
 

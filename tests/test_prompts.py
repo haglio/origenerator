@@ -21,17 +21,15 @@ import pytest
 
 PACKAGE = Path(__file__).resolve().parents[1] / "origenerator"
 
-# The four, by name.
+# The two, by name.
 SYSTEM_PROMPTS = (
     "SEARCH_EXPANSION_SYSTEM_PROMPT",
-    "VIDEO_SCENE_MATCH_SYSTEM_PROMPT",
     "VOICE_REQUEST_MATCH_SYSTEM_PROMPT",
-    "VOICE_REWRITE_SYSTEM_PROMPT",
 )
 
-# Longer than any setting has cause to be. The shortest of the four prompts is
-# over a thousand characters; the longest thing config.py legitimately holds is
-# a localhost URL.
+# Longer than any setting has cause to be. The shorter of the two prompts is
+# hundreds of characters; the longest thing config.py legitimately holds is a
+# localhost URL.
 _PROSE = 200
 
 
@@ -39,7 +37,7 @@ def _assigned_strings(module: str) -> dict[str, str]:
     """Module-level ``NAME = "..."`` assignments, by name.
 
     Implicit concatenation inside parentheses is folded by the parser into one
-    constant, which is exactly how all four prompts are written.
+    constant, which is exactly how both prompts are written.
     """
     tree = ast.parse((PACKAGE / module).read_text(encoding="utf-8"))
     return {
@@ -53,8 +51,8 @@ def _assigned_strings(module: str) -> dict[str, str]:
 
 
 def test_config_declares_settings_and_not_prose():
-    """Held at zero. A fifth prompt written into config would fail here rather
-    than land in the file every path, port and device constant shares."""
+    """Held at zero. A prompt written into config would fail here rather than
+    land in the file every path, port and device constant shares."""
     verbose = {name: len(value)
                for name, value in _assigned_strings("config.py").items()
                if len(value) > _PROSE}

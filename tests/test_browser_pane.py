@@ -333,6 +333,20 @@ def test_a_folders_grid_heads_its_batches_with_when_they_were_made(qtbot):
     assert _shown_in_order(scroll) == [first, "g1", second, "g2"]
 
 
+def test_a_video_tile_finds_its_start_frame_in_the_models_picture_index(qtbot):
+    picture = _row("img", 1)
+    video = {**_row("vid", 2), "workflow_name": "wan22_i2v",
+             "params_json": json.dumps({"input_image": "img.png [output]", "noise_seed": 2}),
+             "output_files": json.dumps([{"filename": "vid.mp4", "subfolder": ""}])}
+    pane, _scroll = _pane(qtbot, [picture, video])
+    pane.set_model([], {}, [], [], [], image_index=gallery.build_image_config_index([picture]))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=[video]))
+
+    assert [b.toolTip() for b in pane._thumb_widgets["vid"]._corner_buttons] == [
+        "Randomize video seed", "Randomize image seed"]
+
+
 def test_a_folder_last_made_a_long_while_ago_gives_its_new_tile_a_section_of_its_own(qtbot):
     rows = [_row("g1", 1, _ago(hours=5))]
     pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: LeadTiles(reroll=QLabel("new")))

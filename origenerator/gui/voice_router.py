@@ -89,7 +89,7 @@ from origenerator.voice.commands import (
     spoken_phrases,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation
-from origenerator.voice.steering import VoiceSteering
+from origenerator.voice.listener import CommandAndRequestListener
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import name_parts
 
@@ -159,13 +159,6 @@ _ABOUT_THE_SLIDE = frozenset({
 class VoiceHost(Protocol):
     """What the spoken words need of the gallery around them, and nothing else."""
 
-    def working_prompts(self, key: str) -> dict:
-        """The prompt pair the loop on ``key`` is currently launching — what
-        steering edits."""
-
-    def steer_prompts(self, key: str, new_prompts: dict) -> None:
-        """Put an edited pair back, for the loop's next launch."""
-
     def collection_label(self, key: str) -> str:
         """What to call a collection back — the plain name its row carries, without
         the waiting-work count."""
@@ -209,11 +202,11 @@ class VoiceRouter(QObject):
         self._db = db
         self._slideshows = slideshows
         self._client = client
-        # One listener over three vocabularies: the spoken commands, the prompt
-        # steering, and the dictation that collects "Request … over" across as
-        # many utterances as it takes. The commands said outright are what the
-        # recognizer is asked to hear; everything else is taken down as a sentence.
-        self.listener = VoiceSteering(
+        # One listener over two vocabularies: the spoken commands, and the
+        # dictation that collects "Request … over" across as many utterances as
+        # it takes. The commands said outright are what the recognizer is asked
+        # to hear; everything else is taken down as a sentence.
+        self.listener = CommandAndRequestListener(
             command_matcher=match_voice_command,
             bare_matcher=sided_app_command,
             dictation=RequestDictation(),
@@ -221,10 +214,8 @@ class VoiceRouter(QObject):
             never_repaired=phrases_heard_only_outright(),
             said_in=said_in,
         )
-        self.listener.error.connect(
-            lambda msg: logger.warning("Voice steering: %s", msg))
+        self.listener.error.connect(lambda msg: logger.warning("Voice: %s", msg))
         self.listener.heard.connect(self._on_heard)
-        self.listener.edited.connect(self._on_edited)
         self.listener.error.connect(self._on_error)
         self.listener.request.connect(self.on_spoken_request)
         # A finished request is worked out on the pool: the prompt may not
@@ -238,9 +229,6 @@ class VoiceRouter(QObject):
                           system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
         ), parent=self)
         self._revision.revised.connect(self._on_revised)
-        # The folder whose loop an open mic is steering the prompt of, or None
-        # with no loop to steer.
-        self._steering: str | None = None
         # The generation an open request is about, captured the moment the
         # request opens rather than when it finishes: a slideshow holds still for the
         # sentence, but the words take seconds and the item on screen when they
@@ -331,50 +319,18 @@ class VoiceRouter(QObject):
     def sync(self) -> None:
         """Listen, or don't, exactly as the mic button says.
 
-        Nothing else decides. The mic used to come on with the Auto loop and
+        Nothing else decides. The mic used to come on with Auto-Generate and
         again with a fullscreen slideshow, which made "is it listening?" a question
         with a derivation rather than an answer — and left "start slideshow"
         unhearable in the one state it is for, with no slideshow up.
-
-        What is listened *for* still depends on what is running: the spoken
-        commands always, and the prompt steering only while a loop has a folder
-        to steer. That is not a second switch, just nothing to steer.
         """
         if not self.listening():
-            self.listener.stop()           # both halves, so the listener closes
             self.listener.stop_commands()
             self._flash_timer.stop()
             self._set_caption(None)
             return
         self.listener.start_commands(self.on_command)
-        if self._steering is not None:
-            self.listener.start(
-                lambda: self._host.working_prompts(self._steering),
-                lambda new: self._host.steer_prompts(self._steering, new),
-            )
-        else:
-            self.listener.stop()  # no loop to steer; the commands hold the mic open
         self._show("Listening…", transient=False)
-
-    @property
-    def steering(self) -> str | None:
-        """The folder whose prompt an open mic is steering, or ``None``."""
-        return self._steering
-
-    def steer(self, key: str | None) -> None:
-        """Give voice a loop's prompt to steer, or take the last one away, and
-        open or close the steering half of the mic to match."""
-        self._steering = key
-        self.sync()
-
-    def re_home(self, key: str, target: str) -> None:
-        """The steered loop moved to another settings folder: follow it there.
-
-        Nothing else changes — what the mic is listening for is the same, and
-        the steering reads the folder at each utterance rather than closing over
-        it — so this does not re-open the listener."""
-        if self._steering == key:
-            self._steering = target
 
     # --- the caption --------------------------------------------------------
 
@@ -431,9 +387,6 @@ class VoiceRouter(QObject):
             self._say_both(
                 f"heard: “{gallery.recognized_spelling(text) or text}”")
 
-    def _on_edited(self, _new_prompt: str) -> None:
-        self._say_both("prompt updated")
-
     def _on_error(self, message: str) -> None:
         self._say_both(message, kind=ERROR)
 
@@ -465,7 +418,7 @@ class VoiceRouter(QObject):
         app's own vocabulary: the session cannot know which collections this tree
         has or which detail parts have detectors installed.
 
-        The order is this app's own mic's (``VoiceSteering._meaning``).  A
+        The order is this app's own mic's (``CommandAndRequestListener._meaning``).  A
         whole-utterance word is that command first — "landscape enhanced only"
         turns the slideshow's switch, and left to the looser picture matcher it
         would read as "enhance" with a word after it — so long as no request

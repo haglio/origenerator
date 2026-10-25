@@ -252,8 +252,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     is closed is started by Evolver, so the two batches the closing gallery queued,
     and their two launch adapters, went to origenerator.downtime. 276 -> 274: a run
     ComfyUI refuses as the app closes waits for the next launch to send it, so the
-    pair that kept its message for then went.)"""
+    pair that kept its message for then went. 274 -> 271: what the microphone hears
+    no longer edits the prompt Auto-Generate runs on, so the two methods voice read
+    and wrote that prompt through went, and so did the one that found the folder an
+    edited prompt belonged in.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 274
+               for x in _class_def(VIEW, "GalleryView").body) == 271
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 84

@@ -7,11 +7,11 @@ the toolbar does and the names of the collections that lead the tree — so
 does, and "undo" takes back the last delete without reaching for the mouse.
 
 Every phrase is matched against the WHOLE utterance, and that is the only thing
-making a one-word vocabulary safe on a mic that is also dictating prompts. The
-looser matchers can afford filler words because each carries a word no prompt
-says — a fix leads with "fix", a slideshow command names the slideshow — but a bare
-"lock" carries nothing, so it gets no slack at all: "lock" is the command and "a
-lock of hair over her eye" is a prompt.
+making a one-word vocabulary safe on a mic that hears whole sentences. The
+looser matchers can afford filler words because each carries a word a sentence
+rarely says — a fix leads with "fix", a slideshow command names the slideshow — but
+a bare "lock" carries nothing, so it gets no slack at all: "lock" is the command
+and "a lock of hair over her eye" is no command.
 
 Most of the vocabulary is a fixed set of things to ask for, and one part of it
 is not: the motion's bars take a number said outright — "amp fifty", "max
@@ -29,9 +29,10 @@ OSR2) and the motion's own bars belong to no surface and answer from either.
 One word is deliberately missing. The Requests collection answers to the plural
 "requests" and never to the singular, because "request" is what opens a spoken
 request (:mod:`origenerator.voice.dictation`) and a word cannot both open a
-sentence and navigate away from it. :class:`~origenerator.voice.steering.
-VoiceSteering` gives this vocabulary its say before a request can open, which is
-what lets the plural through; a bare singular still opens the dictation.
+sentence and navigate away from it. :class:`~origenerator.voice.listener.
+CommandAndRequestListener` gives this vocabulary its say before a request can
+open, which is what lets the plural through; a bare singular still opens the
+dictation.
 """
 from __future__ import annotations
 
@@ -321,7 +322,7 @@ def match_app_command(text: str) -> AppCommand | BarSetting | None:
 
     The whole utterance has to be the phrase. Whisper's punctuation and case are
     its own invention and go; nothing else does, so a sentence that happens to
-    contain a command word is left alone to steer the prompt.
+    contain a command word is no command.
 
     Digits survive that reduction, unlike the punctuation around them: whisper
     writes a spoken number either way, so "amp 50" and "amp fifty" are the same

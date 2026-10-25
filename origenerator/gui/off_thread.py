@@ -1,11 +1,5 @@
 """Run one slow call off the UI thread and hand its result back on it.
 
-The gallery's act match asks a local model which past video fits a dropped
-image. That is an HTTP round trip to a model that thinks for several seconds, and
-run inline it froze the whole window for exactly as long — most visibly on a
-spoken animation, where the window is a fullscreen picture and the freeze is all
-there is to look at.
-
 Deliberately tiny: Qt's global pool, or a daemon thread for a call that may wait
 minutes, does the running, and the result crosses back through a queued signal,
 so ``done`` runs on the calling thread, free to touch all the caller owns.

@@ -26,6 +26,7 @@ class _ImageConfig:
 
     prompt_id: str  # which picture it is — what the source-image tier groups on
     signature: str  # the image's settings signature — what names it below
+    rebuildable: bool
 
 
 def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
@@ -56,7 +57,11 @@ def source_image_of(row: dict, image_rows: list[dict]) -> dict | None:
 
 def rebuildable_source_image(row: dict, image_rows: list[dict]) -> dict | None:
     source = source_image_of(row, image_rows)
-    return source if source is not None and _registered(source.get("workflow_name")) else None
+    return source if source is not None and _rebuildable(source) else None
+
+
+def _rebuildable(image: dict) -> bool:
+    return _registered(image.get("workflow_name")) is not None
 
 
 def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
@@ -75,8 +80,17 @@ def source_image_id_in(row: dict, image_index: dict) -> str | None:
     ``image_index`` (see :func:`build_image_config_index`) rather than searched
     for: what a walk of the whole library asks of every video in it. ``None``
     for a row with no input image, or one no indexed generation produced."""
-    entry = image_index.get(_frame_name(parse_params(row.get("params_json")).get("input_image")))
+    entry = _start_frame_entry(row, image_index)
     return (entry.prompt_id or None) if entry is not None else None
+
+
+def rebuildable_source_image_id_in(row: dict, image_index: dict) -> str | None:
+    entry = _start_frame_entry(row, image_index)
+    return (entry.prompt_id or None) if entry is not None and entry.rebuildable else None
+
+
+def _start_frame_entry(row: dict, image_index: dict) -> _ImageConfig | None:
+    return image_index.get(_frame_name(parse_params(row.get("params_json")).get("input_image")))
 
 
 def landing_for(prompt_id: str, rows: list[dict], image_index: dict) -> str:
@@ -105,7 +119,8 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
         workflow_name = image.get("workflow_name") or "unknown"
         signature = settings_signature(workflow_name, image.get("params_json"),
                                        workflow_version=image.get("workflow_version"))
-        config = _ImageConfig(prompt_id=image.get("prompt_id") or "", signature=signature)
+        config = _ImageConfig(prompt_id=image.get("prompt_id") or "", signature=signature,
+                              rebuildable=_rebuildable(image))
         for name in frame_names_of(image.get("output_files")):
             index.setdefault(name, config)
     return index

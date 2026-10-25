@@ -12,7 +12,7 @@ two tiers:
   digits, and widens each term through a synonym table — so ``women`` reaches
   "woman", ``two`` reaches "2" and "pair", and ``woman`` reaches "doll".
 * An **LLM** pass that widens those same terms further once typing stops, over
-  the local endpoint the voice rewrite already uses. It only ever *adds* words
+  the local endpoint a spoken request's match already uses. It only ever *adds* words
   to the first tier's vocabulary, so a model that is down, slow, or talking
   nonsense leaves the results exactly as the deterministic tier ranked them.
 
@@ -644,8 +644,8 @@ def expand_query(query: str, *, base_url: str, model: str, system_prompt: str,
     Returns ``{}`` for anything short of a usable answer — no words to widen,
     the endpoint down, a reply that will not parse. The caller's results are
     already on screen by then, so an empty answer is a widening that did not
-    happen rather than a search that failed. Mirrors the transport the voice
-    rewrite and the act match use: stdlib ``urllib``, one POST, no deps.
+    happen rather than a search that failed. Mirrors the transport a spoken
+    request's match uses: stdlib ``urllib``, one POST, no deps.
     """
     words = query_words(query)
     if not words:

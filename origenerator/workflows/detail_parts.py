@@ -118,7 +118,7 @@ def parts_framed_together() -> frozenset[str]:
     return frozenset(part.name for part in part_table() if part.framed_together)
 
 
-# A command is a few words; anything sentence-shaped is a prompt edit that
+# A command is a few words; anything sentence-shaped is no command, though it
 # happens to start with "fix" ("fix the color of her eyes to blue").
 _MAX_COMMAND_WORDS = 6
 
@@ -134,8 +134,8 @@ def _lead_is_fix(word: str) -> bool:
 
 def match_fix_command(text: str) -> tuple:
     """The parts a spoken utterance asks to fix, in the table's order — ``()``
-    when it isn't asking. Strict about the shape, because everything unmatched
-    here falls through to a prompt rewrite, and "fix the lighting" is one."""
+    when it isn't asking. Strict about the shape: "fix the lighting" starts
+    like one and names no part."""
     heard = words(text)
     if not heard or not _lead_is_fix(heard[0]) or len(heard) > _MAX_COMMAND_WORDS:
         return ()

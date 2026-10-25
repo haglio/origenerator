@@ -38,7 +38,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
 
     name = "wan22_animate"
     version = "v001"
-    display_name = "WAN 2.2 Image-to-Video (Moves from a Library Video)"
+    display_name = "WAN 2.2 I2V (Moves from a Library Video)"
     output_type = MediaType.VIDEO
     derives_size_from_input = True
     derived_size_source = "video"

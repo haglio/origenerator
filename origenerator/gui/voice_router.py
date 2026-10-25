@@ -693,7 +693,7 @@ class VoiceRouter(QObject):
         if self._request_target is None:
             # Taken at the first step of the request, whichever step that is —
             # "Request, no hat, over" is a whole one in a single breath.
-            self._request_target = self._target_of(slideshow)
+            self._request_target = self._target_of(slideshow, spoken.opened_at)
         if spoken.listening:
             self._pause_for_request(slideshow, spoken)
             return
@@ -709,11 +709,11 @@ class VoiceRouter(QObject):
         self.listener.drop_the_request()
         self._request_target = None
 
-    def _target_of(self, slideshow) -> str | None:
-        """What a request just opened is about: the slide filling the screen
-        when a slideshow is up, else the generation picked in the gallery."""
+    def _target_of(self, slideshow, said_at: float | None) -> str | None:
+        """What a request just opened is about: the slide on screen when it was
+        opened, put back on screen, else the generation picked in the gallery."""
         if slideshow is not None:
-            return slideshow.voice_target()
+            return slideshow.back_to_what_was_said_over(said_at)
         return self._host.selected_generation()
 
     def _pause_for_request(self, slideshow, spoken) -> None:

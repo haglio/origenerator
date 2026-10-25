@@ -16,7 +16,7 @@ from origenerator.voice.worker import VoiceWorker
 
 
 class FakeListener(QObject):
-    said = pyqtSignal(str)
+    said = pyqtSignal(str, float)
     failed = pyqtSignal(str)
 
     def __init__(self, says="no hat"):
@@ -25,8 +25,8 @@ class FakeListener(QObject):
         self.started = False
         self.stopped = False
 
-    def hear(self):
-        self.said.emit(self.says)
+    def hear(self, spoken_at=0.0):
+        self.said.emit(self.says, spoken_at)
 
     def start(self):
         self.started = True
@@ -242,6 +242,17 @@ def test_a_request_is_re_emitted_rather_than_steering_the_prompt(qtbot):
 
     assert [s.text for s in spoken] == ["no hat"]
     assert prompts["positive"] == "a woman"  # not also rewritten
+
+
+def test_a_request_keeps_the_time_the_mic_heard_its_first_step_said(qtbot):
+    steering, listener = _request_steering()
+    spoken = []
+    steering.request.connect(spoken.append)
+    steering.start_commands(lambda matched: None)
+
+    listener.hear(spoken_at=7.5)
+
+    assert [s.opened_at for s in spoken] == [7.5]
 
 
 def test_an_open_request_swallows_what_would_be_a_command(qtbot):

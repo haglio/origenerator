@@ -61,6 +61,22 @@ def test_a_request_spoken_across_pauses_is_collected_whole():
     assert done.heard == "Request. no silver earrings and more freckles. Over."
 
 
+def test_a_request_keeps_the_time_its_first_step_was_spoken():
+    dictation = RequestDictation()
+
+    opened = dictation.push("Request.", spoken_at=10.0)
+    middle = dictation.push("no silver earrings", spoken_at=12.0)
+    done = dictation.push("Over.", spoken_at=14.0)
+
+    assert (opened.opened_at, middle.opened_at, done.opened_at) == (10.0, 10.0, 10.0)
+
+
+def test_a_request_said_in_one_breath_keeps_the_time_it_was_spoken():
+    done = RequestDictation().push("Request, no hat, over", spoken_at=7.5)
+
+    assert done.state == COMPLETED and done.opened_at == 7.5
+
+
 def test_every_utterance_of_an_open_request_is_swallowed():
     # Which is what keeps the words of a request out of the prompt steering and
     # away from the "fix …" matcher: nothing in between falls through.

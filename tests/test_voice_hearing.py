@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
 from voice_core.listener import Engines
 from voice_core.speech import HearsSpeech
 from voice_core.whisper_reader import WhisperReader
@@ -80,6 +81,16 @@ def test_a_command_said_outright_arrives_as_its_own_words(qtbot):
     hearing = Hearing({"undo", "star it"}, engines=_engines(["star it"]))
 
     assert _said(qtbot, hearing) == "star it"
+
+
+def test_a_word_arrives_with_the_time_it_began_to_be_said(qtbot):
+    hearing = Hearing({"undo", "star it"}, engines=_engines(["star it"], clock=lambda: 50.0))
+
+    with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS) as said:
+        hearing.start()
+    hearing.stop()
+
+    assert said.args[1] == pytest.approx(50.0, abs=2.0)
 
 
 def test_a_sentence_arrives_as_the_words_it_was_taken_down_as(qtbot):

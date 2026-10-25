@@ -292,6 +292,35 @@ def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp
     assert slideshow.hud_map().corner.prompt_id == "id-2"
 
 
+def test_a_word_is_about_the_slide_that_was_on_screen_when_it_was_said(qtbot, tmp_path):
+    now = [10.0]
+    slideshow = _slideshow(qtbot, tmp_path, clock=lambda: now[0])
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+    now[0] = 12.0
+    _says(slideshow, video="two.png")
+    slideshow.tick()
+
+    assert slideshow.voice_target(said_at=10.5) == "id-1"
+    assert slideshow.voice_target() == "id-2"
+
+
+def test_a_word_said_over_a_slide_since_left_puts_that_slide_back_on_screen(qtbot, tmp_path):
+    now = [10.0]
+    slideshow = _slideshow(qtbot, tmp_path, clock=lambda: now[0])
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+    now[0] = 12.0
+    _says(slideshow, video="two.png")
+    slideshow.tick()
+    _sent(slideshow)
+
+    assert slideshow.back_to_what_was_said_over(10.5) == "id-1"
+    assert _sent(slideshow) == ["PLAY_FILE one.png"]
+    assert slideshow.back_to_what_was_said_over(10.5) == "id-1"
+    assert _sent(slideshow) == []
+
+
 def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)

@@ -154,19 +154,19 @@ class VoiceSteering(QObject):
             with self._lock:
                 self._dictation.reset()
 
-    def _on_said(self, text: str) -> None:
+    def _on_said(self, text: str, spoken_at: float) -> None:
         if self._get_prompts is None and self._execute_command is None:
             return
         prompts = self._get_prompts() if self._get_prompts is not None else None
-        interpret = partial(self._interpret, steering=prompts is not None)
+        interpret = partial(self._interpret, steering=prompts is not None, spoken_at=spoken_at)
         if self._async:
             QThreadPool.globalInstance().start(
                 ProcessTask(self._worker, text, prompts, interpret))
         else:
             self._worker.process(text, prompts, interpret)
 
-    def _interpret(self, text: str, *, steering: bool):
-        meaning = self._meaning(text)
+    def _interpret(self, text: str, *, steering: bool, spoken_at: float):
+        meaning = self._meaning(text, spoken_at)
         length = len(text.split())
         if isinstance(meaning, SpokenRequest):
             logger.info("Voice: request %s", meaning.state.value)
@@ -178,7 +178,7 @@ class VoiceSteering(QObject):
             logger.info("Voice: a %d-word utterance matched no command", length)
         return meaning
 
-    def _meaning(self, text: str):
+    def _meaning(self, text: str, spoken_at: float):
         """What one transcription meant, or ``None`` to let it steer the prompt.
 
         The dictation first, which has first refusal because it is collecting a
@@ -187,7 +187,8 @@ class VoiceSteering(QObject):
         whole-utterance vocabulary and after it the general command matcher.
         """
         with self._lock:
-            spoken = self._dictation.push(text) if self._dictation is not None else None
+            spoken = (self._dictation.push(text, spoken_at=spoken_at)
+                      if self._dictation is not None else None)
         if spoken is not None:
             return spoken
         if not self._listening_for_commands():

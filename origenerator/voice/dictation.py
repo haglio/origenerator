@@ -94,6 +94,7 @@ class SpokenRequest:
     state: RequestState
     text: str
     heard: str
+    opened_at: float | None = None
 
     @property
     def listening(self) -> bool:
@@ -115,6 +116,7 @@ class RequestDictation:
         self._parts: list[str] = []  # the request body, one utterance per entry
         self._heard: list[str] = []  # what was transcribed, markers included
         self._open = False
+        self._opened_at: float | None = None
 
     @property
     def listening(self) -> bool:
@@ -127,18 +129,20 @@ class RequestDictation:
         self._parts = []
         self._heard = []
         self._open = False
+        self._opened_at = None
 
-    def push(self, text: str):
+    def push(self, text: str, *, spoken_at: float | None = None):
         """Feed one transcription; see the class docstring for the answers."""
         if not self._open:
-            return self._maybe_open(text)
+            return self._maybe_open(text, spoken_at)
         return self._continue(text)
 
-    def _maybe_open(self, text: str):
+    def _maybe_open(self, text: str, spoken_at: float | None):
         heard = words(text, keep_apostrophes=True)
         if not heard or not sounds_like(heard[0], LEAD_WORDS):
             return None  # not a request — the caller's other uses may have it
         self._open = True
+        self._opened_at = spoken_at
         self._heard = [text]
         body = _strip_leading_word(text)
         # "Request, no silver earrings, over" is a whole request in one breath, so
@@ -146,7 +150,7 @@ class RequestDictation:
         if self._ends_the_request(heard):
             return self._finish(_strip_trailing_word(body))
         self._parts = [body]
-        return SpokenRequest(OPENED, _join(self._parts), _join(self._heard))
+        return SpokenRequest(OPENED, _join(self._parts), _join(self._heard), self._opened_at)
 
     def _continue(self, text: str):
         self._heard.append(text)
@@ -154,10 +158,10 @@ class RequestDictation:
             return self._finish(_join(self._parts + [_strip_trailing_word(text)]))
         self._parts.append(text)
         if len(self._heard) >= self._max:
-            given_up = _join(self._heard)
+            given_up, opened_at = _join(self._heard), self._opened_at
             self.reset()
-            return SpokenRequest(ABANDONED, "", given_up)
-        return SpokenRequest(COLLECTING, _join(self._parts), _join(self._heard))
+            return SpokenRequest(ABANDONED, "", given_up, opened_at)
+        return SpokenRequest(COLLECTING, _join(self._parts), _join(self._heard), self._opened_at)
 
     @staticmethod
     def _ends_the_request(heard: list[str]) -> bool:
@@ -167,9 +171,9 @@ class RequestDictation:
         return bool(heard) and sounds_like(heard[-1], _END_WORDS)
 
     def _finish(self, body: str):
-        heard = _join(self._heard)
+        heard, opened_at = _join(self._heard), self._opened_at
         self.reset()
-        return SpokenRequest(COMPLETED, body.strip(), heard)
+        return SpokenRequest(COMPLETED, body.strip(), heard, opened_at)
 
 
 def request_words(heard: str) -> str:

@@ -65,6 +65,7 @@ from origenerator.gallery import (
     ENHANCE_WORKFLOW,
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
+    full_settings,
 )
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
@@ -723,9 +724,7 @@ class EnhancePanel(QWidget):
             self._on_change(self.settings())
 
     def _take_settings(self, params: dict) -> None:
-        merged = dict(self.settings().params)
-        merged.update({k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS})
-        self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=merged))
+        self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=full_settings(params)))
         self._emit()
 
 

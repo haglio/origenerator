@@ -45,6 +45,7 @@ from origenerator.gallery import (
     EnhanceLevel,
     EnhanceSettings,
     default_enhance_params,
+    full_settings,
 )
 from origenerator.gui import drag_thumbnail, icons
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -1653,6 +1654,19 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
     # The drop says what to enhance at, not whether to keep enhancing.
     assert settings.auto is True
     assert edits and edits[-1] == settings
+
+
+def test_a_dropped_level_leaves_the_panel_at_exactly_what_that_level_ran_with(qtbot):
+    panel, _edits = _panel(qtbot)
+    panel.show_settings(EnhanceSettings(params={
+        "enhance_scale": 3.0, "enhance_detail_fixes": {"hands": 0.3},
+        "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}))
+    ran = {"enhance_scale": 2.0, "enhance_detail_fixes": {"hands": 0.45}}
+    mime = enhance_level_mime(ran)
+
+    _dropped_on(panel, mime)
+
+    assert full_settings(panel.settings().params) == full_settings(ran)
 
 
 def _in_the_app(qtbot, panel):

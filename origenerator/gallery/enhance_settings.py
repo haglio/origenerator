@@ -73,7 +73,9 @@ def level_settings(params: dict) -> dict:
 
 
 def full_settings(params: dict) -> dict:
-    return {**default_enhance_params(), **level_settings(params)}
+    full = {**default_enhance_params(), **level_settings(params)}
+    full["enhance_fix_prompts"] = fix_prompts(full)
+    return full
 
 
 @dataclass(frozen=True)

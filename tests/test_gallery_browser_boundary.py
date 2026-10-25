@@ -130,9 +130,9 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     time. 270 -> 267: `SlideshowDirector` builds a double-clicked item's slides and
     every slideshow's versions from the rows the browser lists, so the three methods
     that built them here went. 267 -> 266: a folder tile's still of a combine's
-    recipe clip and a config tab's loop of it are one "what this run was made
+    source video and a config tab's loop of it are one "what this run was made
     from", asked for once. 266 -> 265: that answer compares the run's prompts
-    with its recipe's, so the lookup of the recipe row folds into it. 265 -> 267:
+    with its source video's, so the lookup of the source video's row folds into it. 265 -> 267:
     opening a folder lands on its first item, which wants the loading half of a
     thumbnail click without the browsing step a click records -- two methods,
     since a click's own name would be a lie on the folder open driving it. The

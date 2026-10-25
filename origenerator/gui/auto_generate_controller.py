@@ -13,7 +13,7 @@ throws away *this seed*, which is what a loop of random seeds is for, so the loo
 takes it as its cue to try another at once.
 
 One folder at a time. A loop is a standing instruction to spend the whole machine
-on one recipe, and two of them would only take turns at it — each folder waiting
+on one folder's settings, and two of them would only take turns at it — each folder waiting
 out the other's render, both crawling, and the voice steering (which follows the
 loop) with two prompts to answer to. So turning it on somewhere new is also how
 it is turned off where it was.

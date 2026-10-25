@@ -2,7 +2,7 @@
 everything made before it and remake it.
 
 The block is the family's stamp (:mod:`app_support.provenance`) with the
-workflow as its recipe, plus one key of this app's own saying how the recipe
+workflow as what ran, plus one key of this app's own saying how the workflow's
 version came to be known.
 """
 from __future__ import annotations
@@ -23,6 +23,7 @@ from origenerator.generation_state import made_here
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
 
 APP = "origenerator"
+WORKFLOW, WORKFLOW_VERSION = "recipe", "recipe_version"
 BASIS = "recipe_version_basis"
 RECORDED = "recorded"
 FILE_DATE = "file_date"
@@ -56,9 +57,9 @@ def at_launch(workflow) -> dict:
             BASIS: RECORDED}
 
 
-def _worked_out(recipe: str | None, version: str | None, basis: str | None) -> dict:
+def _worked_out(workflow: str | None, version: str | None, basis: str | None) -> dict:
     return {"schema": family.SCHEMA, "app": APP, "app_commit": None, "app_dirty": None,
-            "recipe": recipe, "recipe_version": version,
+            WORKFLOW: workflow, WORKFLOW_VERSION: version,
             "stamped_at": datetime.now(UTC).isoformat(), BASIS: basis}
 
 

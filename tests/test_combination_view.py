@@ -8,7 +8,7 @@ from origenerator.gui.combination_view import combination_pixmap
 
 
 def _picture(path, size=(60, 40), color=(0, 0, 255)):
-    """A file standing in for a start frame or a recipe clip's thumbnail."""
+    """A file standing in for a start frame or a source video's thumbnail."""
     Image.new("RGB", size, color).save(path)
     return str(path)
 
@@ -63,12 +63,12 @@ def _painted(image, left, right):
                for x in range(left, right) for y in range(image.height()))
 
 
-def test_a_recipe_whose_prompt_was_edited_stands_in_parentheses(qtbot, tmp_path):
+def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses(qtbot, tmp_path):
     frame = _picture(tmp_path / "frame.png", size=(80, 80))
     clip = _picture(tmp_path / "clip.png", size=(80, 80), color=(255, 0, 0))
     size = QSize(400, 100)
     as_made = combination_pixmap(Combination(frame, clip), size).toImage()
-    edited = combination_pixmap(Combination(frame, clip, recipe_prompt_edited=True),
+    edited = combination_pixmap(Combination(frame, clip, prompt_edited=True),
                                 size).toImage()
     gray_clip = as_made.pixelColor(as_made.width() - 1, as_made.height() // 2)
 

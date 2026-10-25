@@ -93,7 +93,7 @@ class InFlightItems:
             rows = self._db.list_generations()
         # Every row by id, so a combine's run can show the video its settings
         # came from, and say whether its words still match that video's. Off the
-        # listing already in hand rather than a query per job: the recipe video
+        # listing already in hand rather than a query per job: the source video
         # is an ordinary finished row somewhere in it.
         row_by_id = {r.get("prompt_id"): r for r in rows}
         items = []
@@ -126,8 +126,8 @@ class InFlightItems:
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
-            recipe = (None if row.get("recipe_category")
-                      else row_by_id.get(row.get("recipe_video_id")))
+            source_video = (None if row.get("act")
+                            else row_by_id.get(row.get("source_video")))
             workflow = WORKFLOW_REGISTRY.get(workflow_name)
             if kind == gallery.JobKind.ENHANCE:
                 reveal = partial(self._go_to_the_image_of, row)
@@ -172,18 +172,18 @@ class InFlightItems:
                     requested.get(pid), row_by_id, params, kind),
                 # What the Combine panel was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
-                # run follows — shown gray beside the frame, being the recipe
+                # run follows — shown gray beside the frame, lending the settings
                 # rather than the result. Never both. An act names what the video
                 # will do, which is the whole of what was chosen; the clip its
-                # recipe was mined out of is an answer to a question the user
+                # settings were mined out of is an answer to a question the user
                 # never asked, and a picture of a video they did not pick reads
                 # as a job that is that video. A dropped video *is* the choice,
                 # so there the picture is the only thing saying which.
-                recipe_category=row.get("recipe_category") or "",
-                recipe_thumbnail=(recipe or {}).get("thumbnail_path"),
-                recipe_prompt_edited=bool(
-                    recipe and workflow
-                    and gallery.prompts_differ_from(params, recipe, workflow)),
+                act=row.get("act") or "",
+                source_video_thumbnail=(source_video or {}).get("thumbnail_path"),
+                prompt_edited=bool(
+                    source_video and workflow
+                    and gallery.prompts_differ_from(params, source_video, workflow)),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
                 sent=row.get("status") == GenerationStatus.RUNNING,
             ))
@@ -235,8 +235,8 @@ class InFlightItems:
 
         Read off the folder tree the gallery already built rather than by keying
         every row again — the tree is rebuilt when the rows change, and this runs
-        on every poll. A folder with nothing in it yet (the first run of a new
-        recipe, or an enhancement, whose product folds into the row it enhanced
+        on every poll. A folder with nothing in it yet (the first run of new
+        settings, or an enhancement, whose product folds into the row it enhanced
         rather than landing anywhere) has no node in the tree at all and answers
         with nothing, which the row draws as no block rather than an empty grid.
         ``cache`` memoizes for the length of one pass, since an auto-generate loop

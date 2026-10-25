@@ -4,8 +4,8 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
+from origenerator.act_settings import GENAU, VIDEO
 from origenerator.db import Database
-from origenerator.recipe_match import GENAU, VIDEO
 from origenerator.video_history import video_history
 
 
@@ -19,7 +19,7 @@ def test_a_video_put_in_the_slot_is_listed_under_the_lane_it_went_in_under(tmp_p
 
 
 def _made_from(video, prompt_id="gen-1", created_at="2026-10-01 00:00:00"):
-    return {"prompt_id": prompt_id, "recipe_video_id": video, "created_at": created_at}
+    return {"prompt_id": prompt_id, "source_video": video, "created_at": created_at}
 
 
 def test_a_video_generated_from_before_lanes_were_noted_is_listed_under_both_lanes():
@@ -56,6 +56,6 @@ def test_an_acts_generation_lends_the_slot_no_video(tmp_path):
     for prompt_id, category in (("custom", None), ("act", "alpha")):
         db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_i2v",
                              workflow_version="v001", params_json="{}", workflow_json="{}")
-        db.set_recipe_source(prompt_id, category=category, video_prompt_id=f"vid-{prompt_id}")
+        db.set_settings_source(prompt_id, category=category, video_prompt_id=f"vid-{prompt_id}")
 
     assert video_history(db.custom_combinations(), VIDEO) == ["vid-custom"]

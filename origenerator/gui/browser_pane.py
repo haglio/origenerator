@@ -587,7 +587,7 @@ class BrowserPane(QObject):
         not.
 
         Two orders, because a search answers two different questions. Newest-first
-        is "where is the one I made recently"; by recipe is "which model and LoRA
+        is "where is the one I made recently"; Model / LoRA is "which model and LoRA
         was that", and there the tiles are cut into a labelled band per
         combination rather than interleaved, so the answer is the heading you
         stopped scrolling at. Those bands fold shut on their headers — with a
@@ -614,7 +614,7 @@ class BrowserPane(QObject):
             return
         drawn = list(tiles)[:SEARCH_DRAW_LIMIT]
         container = self._sectioned_results(drawn, collapsed, on_section_toggled) \
-            if sort_mode == search.SORT_RECIPE else self._flat_results(drawn)
+            if sort_mode == search.SORT_MODEL_LORA else self._flat_results(drawn)
         self.show_widget(container)
         self._showing_search = True
 
@@ -637,7 +637,7 @@ class BrowserPane(QObject):
         column = QVBoxLayout(container)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(_SECTION_SPACING)
-        for heading, section in search.group_by_recipe(tiles):
+        for heading, section in search.group_by_model_lora(tiles):
             band = QWidget()
             band_flow = FlowLayout(band, spacing=_TILE_SPACING)
             shut = heading in collapsed
@@ -657,7 +657,7 @@ class BrowserPane(QObject):
     @staticmethod
     def _section_header(heading: str, count: int, band: QWidget, shut: bool,
                         on_toggled) -> FoldHeader:
-        """The band's foldable header: the family's chevron, the recipe, and how
+        """The band's foldable header: the family's chevron, the model and LoRA, and how
         many are in it.
 
         A flat, full-width button rather than a label — the whole strip is the

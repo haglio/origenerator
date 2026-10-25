@@ -79,13 +79,14 @@ CREATE TABLE IF NOT EXISTS generations (
     -- separating such a run from the identical loop workflow started by hand,
     -- which must stay put until Send-to-Genau is pressed.
     genau_requested_at TEXT,
-    -- Where a combine launch got its recipe: the act picked in the Combine
+    -- Where a combine launch got its settings: the act picked in the Combine
     -- panel's dropdown, and the video whose settings the run re-uses. Either can
-    -- stand alone — a dropped video names no act, and an act the overlay curates
-    -- a recipe for is answered from no past video. Nothing else about the run
-    -- records it: the params carry the recipe's values, never which video they
+    -- stand alone — a dropped video names no act, and an act the overlay pins
+    -- settings for is answered from no past video. Nothing else about the run
+    -- records it: the params carry the settings' values, never which video they
     -- came from or what the user called the act. Stamped at launch, because a
-    -- queue row is read while the run is still pending.
+    -- queue row is read while the run is still pending. Read as ``act`` and
+    -- ``source_video`` (STORED_NAMES).
     recipe_category TEXT,
     recipe_video_id TEXT,
     -- The image a standalone enhance run is *of*, by that image's prompt_id.
@@ -296,6 +297,26 @@ GENERATION_COLUMNS = (
     "genau_requested_at", "recipe_category", "recipe_video_id",
     "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
 )
+
+
+# Every copy of the app opens this database, older ones too, so the columns keep their names.
+STORED_NAMES = {"act": "recipe_category", "source_video": "recipe_video_id"}
+
+
+def as_read(row) -> dict:
+    read = dict(row)
+    for name, stored in STORED_NAMES.items():
+        if stored in read:
+            read[name] = read.pop(stored)
+    return read
+
+
+def as_stored(row: dict) -> dict:
+    stored = dict(row)
+    for name, column in STORED_NAMES.items():
+        if name in stored:
+            stored[column] = stored.pop(name)
+    return stored
 
 
 def create(conn) -> None:

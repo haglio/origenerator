@@ -293,7 +293,7 @@ def test_a_queued_run_with_no_picture_shows_what_its_folder_already_holds(build)
     key = "image/sdxl_t2i/aaa"
     items = build([_row("g1")], jobs_by_folder={key: [FakeJob("g1", state="queued")]})
 
-    # A folder with nothing in it yet -- the first run of a new recipe -- has no
+    # A folder with nothing in it yet -- the first run of new settings -- has no
     # node in the tree at all, and draws no block rather than an empty grid.
     assert items[0].folder_thumbnails == ()
 

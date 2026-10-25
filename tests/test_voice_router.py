@@ -17,13 +17,13 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
+from origenerator.act_settings import GENAU, VIDEO
 from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.voice_router import VoiceRouter
-from origenerator.recipe_match import GENAU, VIDEO
 from origenerator.voice.app_commands import (
     AppCommand,
     BarSetting,
@@ -768,7 +768,7 @@ def test_a_request_over_nothing_is_answered_rather_than_queued(router):
     assert words(voice.status) == "nothing on screen to request a change to"
 
 
-def test_a_recipe_this_app_cannot_rebuild_is_answered_here(router):
+def test_a_video_this_app_cannot_rebuild_is_answered_here(router):
     voice, host, _slideshows = router(db=FakeDB([_row("g1", workflow_name="a_stranger")]))
 
     voice._begin_request("g1", Spoken("no hat"))

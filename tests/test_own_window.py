@@ -20,12 +20,12 @@ from PyQt6.QtWidgets import (
 from shared_ui.preview import Preview
 
 from origenerator import (
-    animation_recipes,
+    act_settings,
+    animation_settings,
     branch_session,
     check_animations,
     config,
     own_window,
-    recipe_match,
     sort_pictures,
 )
 from origenerator.gui import stylesheet
@@ -49,8 +49,8 @@ def said(monkeypatch):
 @pytest.fixture
 def a_library_of_its_own(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "gallery.db")
-    monkeypatch.setattr(animation_recipes, "RECIPES_PATH",
-                        tmp_path / "animation_recipes.json")
+    monkeypatch.setattr(animation_settings, "SETTINGS_PATH",
+                        tmp_path / "animation_settings.json")
     return tmp_path
 
 
@@ -83,7 +83,7 @@ def test_an_animation_with_no_sample_starts_from_the_acts_own_settings(
         a_library_of_its_own, monkeypatch):
     """His ask: the per-act settings are the starting position where nothing
     kept was ever made this way."""
-    monkeypatch.setattr(recipe_match, "curated_recipe",
+    monkeypatch.setattr(act_settings, "pinned_settings",
                         lambda act, lane: {"workflow": "wan22_i2v",
                                            "params": {"positive_prompt": "the act's own"}})
 

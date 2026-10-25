@@ -73,7 +73,7 @@ class ActionPicker(QWidget):
             return
         picture = kind == MediaType.IMAGE
         names = self._states if picture else self._acts
-        said = _as_listed(row.get("picture_state" if picture else "recipe_category") or "", names)
+        said = _as_listed(row.get("picture_state" if picture else "act") or "", names)
         self._prompt_id = ""  # nothing is on display while the list is being set
         self._offer(names if picture or not said or said in names else (*names, said))
         self.pick(said)

@@ -48,7 +48,7 @@ def test_filled_params_fills_defaults_but_keeps_every_seed():
     assert params["noise_seed"] == 9
 
 
-def test_filled_params_draws_a_seed_the_recipe_never_recorded_instead_of_zero():
+def test_filled_params_draws_a_seed_the_row_never_recorded_instead_of_zero():
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
     row = {"workflow_name": wf.name,
            "params_json": json.dumps({"positive_prompt": "wave", "noise_seed": 0})}

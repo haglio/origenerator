@@ -294,8 +294,8 @@ class PreviewWidget(QWidget):
         self._combination.show_pair(combination)
         self._stack.setCurrentWidget(self._combination)
 
-    def mark_recipe_prompt_edited(self, edited: bool) -> None:
-        self._combination.mark_recipe_prompt_edited(edited)
+    def mark_prompt_edited(self, edited: bool) -> None:
+        self._combination.mark_prompt_edited(edited)
 
     def show_folder(self, paths) -> None:
         """Show a whole folder at once: every picture in ``paths``, tiled to fill.

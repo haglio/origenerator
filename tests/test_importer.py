@@ -231,7 +231,7 @@ def test_backfill_gives_an_import_whose_graph_states_no_size_the_size_of_its_pic
     assert (params["width"], params["height"]) == (720, 1072)
 
 
-def test_backfill_splits_the_imports_of_no_known_recipe_by_their_shape(tmp_path):
+def test_backfill_splits_the_imports_of_no_known_workflow_by_their_shape(tmp_path):
     output_dir = tmp_path / "output"
     (output_dir / "image").mkdir(parents=True)
     db = Database(tmp_path / "test.db")
@@ -330,7 +330,7 @@ def _add_import(db, prompt_id, workflow_name, filename):
     ))
 
 
-def test_backfill_takes_a_video_out_of_a_recipe_that_only_makes_pictures(tmp_path):
+def test_backfill_takes_a_video_out_of_a_workflow_that_only_makes_pictures(tmp_path):
     db = Database(tmp_path / "test.db")
     _add_import(db, "video", "sdxl_t2i", "renamed_00001.mp4")
     _add_import(db, "picture", "sdxl_t2i", "renamed_00002.png")
@@ -344,7 +344,7 @@ def test_backfill_takes_a_video_out_of_a_recipe_that_only_makes_pictures(tmp_pat
     assert db.get_generation("named-like-a-picture")["workflow_name"] == "unknown"
 
 
-_A_FLUX_PICTURES_RECIPE = {
+_A_FLUX_PICTURES_GRAPH = {
     "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "example_flux.gguf"}},
     "2": {"class_type": "DualCLIPLoader", "inputs": {"type": "flux"}},
     "5": {"class_type": "FluxGuidance", "inputs": {"guidance": 3.5}},
@@ -353,31 +353,31 @@ _A_FLUX_PICTURES_RECIPE = {
 }
 
 
-def _import_filed_as_an_enhancement(db, prompt_id, recipe):
+def _import_filed_as_an_enhancement(db, prompt_id, graph):
     db.insert_generation(prompt_id=prompt_id, workflow_name="image_enhance",
                          workflow_version="imported", params_json="{}",
-                         workflow_json=json.dumps(recipe), source="imported")
+                         workflow_json=json.dumps(graph), source="imported")
 
 
-def test_an_import_filed_as_an_enhancement_that_a_flux_recipe_made_is_filed_under_flux(tmp_path):
+def test_an_import_filed_as_an_enhancement_that_a_flux_workflow_made_is_filed_under_flux(tmp_path):
     db = Database(tmp_path / "test.db")
     enhance = WORKFLOW_REGISTRY["image_enhance"]
-    _import_filed_as_an_enhancement(db, "flux-picture", _A_FLUX_PICTURES_RECIPE)
+    _import_filed_as_an_enhancement(db, "flux-picture", _A_FLUX_PICTURES_GRAPH)
     _import_filed_as_an_enhancement(db, "enhancement", enhance.build_api_payload(
         dict(enhance.default_params(), input_image="image/scene_one.png [output]")))
 
-    assert imp.refile_enhancements_another_recipe_made(db) == 1
+    assert imp.refile_enhancements_another_workflow_made(db) == 1
 
     assert db.get_generation("flux-picture")["workflow_name"] == "flux_t2i_upscaled"
     assert db.get_generation("enhancement")["workflow_name"] == "image_enhance"
 
 
-def test_backfill_files_an_import_whose_name_says_nothing_under_the_recipe_its_graph_names(
+def test_backfill_files_an_import_whose_name_says_nothing_under_the_workflow_its_graph_names(
         tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="flux-picture", workflow_name="unknown",
                          workflow_version="imported", params_json="{}",
-                         workflow_json=json.dumps(_A_FLUX_PICTURES_RECIPE), source="imported")
+                         workflow_json=json.dumps(_A_FLUX_PICTURES_GRAPH), source="imported")
     db.update_generation("flux-picture", output_files=json.dumps(
         [{"filename": "my_flux_00001_.png", "subfolder": "image", "type": "output"}]))
 
@@ -522,7 +522,7 @@ def test_video_prompt_graph_runs_ffprobe_without_a_console_window(tmp_path, monk
     assert captured.get("creationflags") == getattr(sp, "CREATE_NO_WINDOW", 0)
 
 
-def test_an_import_of_no_known_recipe_records_its_shape_so_its_folder_has_one(tmp_path):
+def test_an_import_of_no_known_workflow_records_its_shape_so_its_folder_has_one(tmp_path):
     path = tmp_path / "mystery_00001_.png"
     Image.new("RGB", (480, 832)).save(path)
 
@@ -532,7 +532,7 @@ def test_an_import_of_no_known_recipe_records_its_shape_so_its_folder_has_one(tm
     assert meta["params"] == {"orientation": "portrait"}
 
 
-def test_a_video_import_of_no_recipe_that_makes_videos_takes_its_shape_from_its_frames(
+def test_a_video_import_of_no_workflow_that_makes_videos_takes_its_shape_from_its_frames(
         tmp_path, monkeypatch):
     graph = _graph_of("CheckpointLoaderSimple", "VHS_VideoCombine")
 
@@ -596,7 +596,7 @@ def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
     assert row["workflow_name"] == "wan22_flf2v_loop"
 
 
-def test_a_video_is_never_filed_under_a_recipe_that_only_makes_pictures(tmp_path):
+def test_a_video_is_never_filed_under_a_workflow_that_only_makes_pictures(tmp_path):
     output_dir = tmp_path / "output" / "video"
     output_dir.mkdir(parents=True)
     _make_png_with_metadata(output_dir / "renamed_00001.png",
@@ -740,17 +740,17 @@ def test_a_folded_copys_favorite_goes_to_its_video(tmp_path):
     assert db.get_generation("sounded")["starred"] == 1
 
 
-def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_recipe(tmp_path):
+def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_source(tmp_path):
     db = Database(tmp_path / "test.db")
     _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
     _made_here(db, "combined", "flf2v_loop_00002-audio.mp4")
-    db.set_recipe_source("combined", category="alpha", video_prompt_id="copy")
+    db.set_settings_source("combined", category="alpha", video_prompt_id="copy")
 
     imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
 
     combined = db.get_generation("combined")
-    assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "sounded")
+    assert (combined["act"], combined["source_video"]) == ("alpha", "sounded")
 
 
 def test_a_folded_copy_combines_slot_had_is_listed_as_the_video_that_stays(tmp_path):
@@ -777,10 +777,10 @@ def test_a_starred_folder_keyed_from_a_folded_copy_keeps_its_star(tmp_path):
     assert bookmark["ref_prompt_id"] == "sounded"
 
 
-def test_a_found_sound_version_joins_the_found_video_that_carries_its_recipe(tmp_path):
+def test_a_found_sound_version_joins_the_found_video_that_carries_its_graph(tmp_path):
     db = Database(tmp_path / "test.db")
-    recipe = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {}}})
-    _completed(db, "silent", "scene_one_00001.mp4", "video", workflow_json=recipe)
+    graph = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {}}})
+    _completed(db, "silent", "scene_one_00001.mp4", "video", workflow_json=graph)
     _completed(db, "with-sound", "scene_one_00001-audio.mp4", "video")
     db.set_generation_favorite("with-sound", True)
 
@@ -1064,7 +1064,7 @@ def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(t
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
-        params_json="{}", workflow_json=json.dumps(_A_FLUX_PICTURES_RECIPE), source="imported",
+        params_json="{}", workflow_json=json.dumps(_A_FLUX_PICTURES_GRAPH), source="imported",
     )
 
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
@@ -1073,7 +1073,7 @@ def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(t
 
 def test_backfill_fills_the_lora_a_flux_imports_graph_loaded_at_the_strength_it_ran(tmp_path):
     graph = {
-        **_A_FLUX_PICTURES_RECIPE,
+        **_A_FLUX_PICTURES_GRAPH,
         "11": {"class_type": "LoraLoader",
                "inputs": {"model": ["1", 0], "clip": ["2", 0],
                           "lora_name": "example_style.safetensors",
@@ -1150,7 +1150,7 @@ def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
 
 def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
     # An enhanced SDXL graph carries two KSamplers. A re-imported output must
-    # record the recipe's base pass, not the low-denoise refinement the enhance
+    # record the graph's base pass, not the low-denoise refinement the enhance
     # tail runs over its VAEEncode'd latent — otherwise the import would claim
     # the run took 20 steps at denoise 0.3.
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -1268,7 +1268,7 @@ def test_the_graph_overrules_what_the_filename_claimed(tmp_path):
     """The filename is a first guess only — a file renamed, or written under a
     prefix that was later reused, would otherwise be filed under the wrong
     workflow forever. Workflow names are persisted into every row and named from
-    the overlay's recipes, so this is a data defect, not a display one."""
+    the overlay's pinned settings, so this is a data defect, not a display one."""
     path = tmp_path / "sdxl_t2i_00001_.png"
     _make_png_with_metadata(path, _graph_of("WanImageToVideo"))
 

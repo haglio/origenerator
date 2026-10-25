@@ -914,7 +914,7 @@ def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, t
     # nothing, which is exactly what this is not.
     w = make_preview()
     frame = _make_png(tmp_path / "frame.png")
-    clip = _animated_webp(tmp_path / "recipe.webp")
+    clip = _animated_webp(tmp_path / "source.webp")
 
     w.show_combination(Combination(frame, clip))
 
@@ -923,18 +923,18 @@ def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, t
     assert not w._combination.plus_label.isHidden()
 
 
-def test_the_recipe_half_of_a_combination_loops_in_gray(make_preview, tmp_path):
+def test_the_source_video_half_of_a_combination_loops_in_gray(make_preview, tmp_path):
     w = make_preview()
     w.show(); w.resize(400, 200)
 
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
-                                   _animated_webp(tmp_path / "recipe.webp")))
+                                   _animated_webp(tmp_path / "source.webp")))
 
     color = w._combination.video_label.pixmap().toImage().pixelColor(1, 1)
-    assert color.red() == color.green() == color.blue()  # the recipe, not a result
+    assert color.red() == color.green() == color.blue()  # the source video, not a result
 
 
-def test_a_combination_with_no_recipe_video_shows_the_frame_alone(make_preview, tmp_path):
+def test_a_combination_with_no_source_video_shows_the_frame_alone(make_preview, tmp_path):
     # A curated act is pinned in the content overlay: there is no past video
     # under it, so there is no sum to draw a plus in the middle of.
     w = make_preview()
@@ -952,7 +952,7 @@ def test_the_clip_stands_in_parentheses_once_its_prompt_was_edited(make_preview,
     w = make_preview()
 
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
-                                   _animated_webp(tmp_path / "recipe.webp"), edited))
+                                   _animated_webp(tmp_path / "source.webp"), edited))
 
     parens = (w._combination.open_paren_label, w._combination.close_paren_label)
     assert [label.isHidden() for label in parens] == [not edited, not edited]
@@ -968,7 +968,7 @@ def test_the_pair_asks_for_no_more_width_than_its_pane_has(qtbot, tmp_path, edit
     host.show()
 
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
-                                   _animated_webp(tmp_path / "recipe.webp"), edited))
+                                   _animated_webp(tmp_path / "source.webp"), edited))
     view = w._combination
     view.layout().activate()
 
@@ -988,10 +988,10 @@ def test_an_edit_marked_on_the_pair_on_screen_encloses_its_clip_without_restarti
         make_preview, tmp_path):
     w = make_preview()
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
-                                   _animated_webp(tmp_path / "recipe.webp")))
+                                   _animated_webp(tmp_path / "source.webp")))
     looping = w._combination._movie
 
-    w.mark_recipe_prompt_edited(True)
+    w.mark_prompt_edited(True)
 
     assert not w._combination.open_paren_label.isHidden()
     assert not w._combination.close_paren_label.isHidden()
@@ -1002,7 +1002,7 @@ def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path)
     # Its clip would otherwise keep looping under whatever replaced it.
     w = make_preview()
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
-                                   _animated_webp(tmp_path / "recipe.webp")))
+                                   _animated_webp(tmp_path / "source.webp")))
 
     w.show_image(_make_png(tmp_path / "later.png"))
 

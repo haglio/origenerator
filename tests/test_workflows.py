@@ -508,7 +508,7 @@ def test_flux_with_no_lora_builds_the_graph_it_always_has():
 
 # ---- Image Enhance (the standalone form of the tail) ----
 
-def test_krea2_builds_the_turbo_graph_on_the_official_recipe():
+def test_krea2_builds_the_turbo_graph_on_the_official_settings():
     # Krea 2 Turbo is step-distilled: eight euler steps on the simple schedule at
     # cfg 1, the prompt read by its Qwen3-VL reader through a CLIPLoader of type
     # krea2, the negative the positive zeroed out, and Qwen-Image's VAE decoding.
@@ -964,7 +964,7 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
 
         # Two samplers: the base pass and the enhance pass over the re-encoded
         # image. The enhance pass runs its own steps/denoise but reuses the
-        # base pass's model, conditioning, cfg and seed — same recipe, refined.
+        # base pass's model, conditioning, cfg and seed — same settings, refined.
         samplers = {nid: n["inputs"] for nid, n in payload.items()
                     if n["class_type"] == "KSampler"}
         assert len(samplers) == 2, name
@@ -1115,7 +1115,7 @@ def test_enhance_keys_cover_every_param_only_the_tail_reads():
         assert set(wf.enhance_keys()) == {
             "enhance", "upscale_model", "enhance_scale", "enhance_steps", "enhance_denoise",
         }, name
-    # Flux keeps upscale_model in its recipe: with the toggle OFF that same
+    # Flux keeps upscale_model in its settings: with the toggle OFF that same
     # param drives the plain 4x upscale this workflow is named for, so it is a
     # real difference between two of its renders.
     assert set(WORKFLOW_REGISTRY["flux_t2i_upscaled"].enhance_keys()) == {
@@ -1183,8 +1183,8 @@ def test_a_shared_fragment_never_builds_under_an_id_a_hand_numbered_graph_could_
     assert not any(node_id.isdigit() for node_id in detail_ids)
 
 
-def test_a_form_starts_on_the_value_a_stored_recipe_is_normalized_against():
-    # Two readings of one default: `default_params()` is what a stored recipe is
+def test_a_form_starts_on_the_value_stored_settings_are_normalized_against():
+    # Two readings of one default: `default_params()` is what stored settings are
     # normalized against (gallery.signatures.canonical_settings) while
     # `ParamDef.default` is what the Generate form starts on. Let them disagree
     # and a freshly generated row lands in a different folder from an identical
@@ -1493,7 +1493,7 @@ def test_wan22_i2v_zero_split_still_hands_off_at_half_the_steps():
     assert low["inputs"]["start_at_step"] == 10
 
 
-def test_a_recipe_stored_with_one_shared_strength_still_renders_at_that_strength():
+def test_settings_stored_with_one_shared_strength_still_render_at_that_strength():
     # Generations made before the stages had their own strength carry cfg 1.0
     # with a zero for each stage, which meant "use the shared one". Read as no
     # guidance at all, every one of them would re-run as a different video.
@@ -1653,7 +1653,7 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     assert apply["inputs"]["end_percent"] == 0.9
 
     # Both prompts route through the ControlNet apply into the sampler, which
-    # otherwise runs the plain sdxl_t2i recipe on the checkpoint's model.
+    # otherwise runs the plain sdxl_t2i workflow on the checkpoint's model.
     encodes = {
         n["inputs"]["text"]: nid for nid, n in payload.items()
         if n["class_type"] == "CLIPTextEncode"
@@ -2358,7 +2358,7 @@ def test_a_scene_longer_than_one_window_is_two_segments_of_the_same_scene():
 
 def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
     # One scene is the whole clip, and the clip length is what every other
-    # reader of a recipe goes by (a recipe from the overlay carries only that),
+    # reader of the settings goes by (settings from the overlay carry only that),
     # so a single entry never overrules it.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=121, scene_frames=[81]))
@@ -2366,7 +2366,7 @@ def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
 
 
 def test_the_audio_is_scored_for_the_scenes_as_they_add_up():
-    # The stored clip length is derived from the scenes by the form; a recipe
+    # The stored clip length is derived from the scenes by the form; settings
     # whose scenes and length disagree scores its audio for the frames it will
     # really render.
     wf = Wan22I2vWorkflow()
@@ -2445,7 +2445,7 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
-    # A rate typed by hand — or carried in by a recipe saved before the rates
+    # A rate typed by hand — or carried in by settings saved before the rates
     # were multiples — doesn't get to skew the tempo: the graph interpolates to
     # the nearest reachable rate and writes at THAT, so the clip lands a little
     # off the rate asked for and exactly on time.
@@ -2458,7 +2458,7 @@ def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
-    # A stored recipe carrying a rate from before this ceiling, or a number
+    # Stored settings carrying a rate from before this ceiling, or a number
     # typed past the field's own range, is written at the ceiling.
     wf = WORKFLOW_REGISTRY[name]
     for asked in (128.0, 240.0, 10_000.0):

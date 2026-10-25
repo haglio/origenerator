@@ -8,8 +8,8 @@ import json
 
 import pytest
 
+from origenerator.act_settings import GENAU, VIDEO
 from origenerator.animation_check_session import AnimationCheckSession
-from origenerator.recipe_match import GENAU, VIDEO
 
 _ORDER = [
     (VIDEO, "alpha", "state one"),
@@ -176,7 +176,7 @@ def test_assigning_from_the_acts_own_settings_keeps_their_workflow(session):
     assert params == {"positive_prompt": "mine", "negative_prompt": "none", "steps": 6}
 
 
-def test_an_animation_with_neither_a_sample_nor_an_act_recipe_starts_from_nothing(
+def test_an_animation_with_neither_a_sample_nor_pinned_act_settings_starts_from_nothing(
         session):
     made = session({})
 

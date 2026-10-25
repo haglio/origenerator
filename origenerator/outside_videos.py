@@ -422,7 +422,7 @@ def _recorded_fields(source: str, workflow_name: str, params: dict, made: dateti
         "positive_prompt": params.get("positive_prompt"),
         "negative_prompt": params.get("negative_prompt"),
         "seed": _seed_number(params.get("seed")),
-        "recipe_category": act,
+        "act": act,
         "created_at": made.strftime("%Y-%m-%d %H:%M:%S"),
         "completed_at": filed.isoformat(),
     }

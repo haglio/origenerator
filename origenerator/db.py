@@ -82,9 +82,9 @@ class Database:
         return self.generations.set_params_and_workflow(
             prompt_id, params_json=params_json, workflow_json=workflow_json)
 
-    def set_recipe_source(self, prompt_id: str, *, category: str | None = None,
-                          video_prompt_id: str | None = None):
-        return self.generations.set_recipe_source(
+    def set_settings_source(self, prompt_id: str, *, category: str | None = None,
+                            video_prompt_id: str | None = None):
+        return self.generations.set_settings_source(
             prompt_id, category=category, video_prompt_id=video_prompt_id)
 
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):

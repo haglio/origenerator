@@ -25,9 +25,9 @@ def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> N
     for row in rows:
         if row.get("enhance_of") == gone:
             db.set_enhance_target(row["prompt_id"], stays)
-        if row.get("recipe_video_id") == gone:
-            db.set_recipe_source(row["prompt_id"], category=row.get("recipe_category"),
-                                 video_prompt_id=stays)
+        if row.get("source_video") == gone:
+            db.set_settings_source(row["prompt_id"], category=row.get("act"),
+                                   video_prompt_id=stays)
     db.repoint_combine_video_uses(gone, stays)
     for bookmark in db.folder_meta_full():
         if bookmark.get("ref_prompt_id") == gone:

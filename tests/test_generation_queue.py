@@ -48,7 +48,7 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
           progress=None, reveal=None, cancel=None, foreign_ahead=None, starts_at=None,
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
-          recipe_category="", recipe_thumbnail=None, recipe_prompt_edited=False,
+          act="", source_video_thumbnail=None, prompt_edited=False,
           starting=False, sent=None, shield=None, shielded=False):
     return InFlightItem(key=key, caption=caption,
                         sent=status == "running" if sent is None else sent,
@@ -60,8 +60,8 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                         auto_generating=auto_generating,
                         job_kind=job_kind, requested=requested,
                         source_image=source_image, folder_thumbnails=folder_thumbnails,
-                        recipe_category=recipe_category, recipe_thumbnail=recipe_thumbnail,
-                        recipe_prompt_edited=recipe_prompt_edited, starting=starting,
+                        act=act, source_video_thumbnail=source_video_thumbnail,
+                        prompt_edited=prompt_edited, starting=starting,
                         shield=shield, shielded=shielded)
 
 
@@ -276,14 +276,14 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
     assert corner.width() == corner.height()   # one picture, one square
 
 
-def test_the_corner_stands_the_recipe_beside_the_frame_where_there_is_one(queue, tmp_path):
+def test_the_corner_stands_the_source_video_beside_the_frame_where_there_is_one(queue, tmp_path):
     # A combine's job is a picture and a past clip's settings, and that is what
     # the config tab shows above the form. The corner says the same thing, the
     # clip drawn gray beside the frame — so it needs the room for two.
 
     frame = _picture(tmp_path / "frame.png")
-    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
-    queue.set_items([_item(job_kind="Video", source_image=frame, recipe_thumbnail=recipe)])
+    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
+    queue.set_items([_item(job_kind="Video", source_image=frame, source_video_thumbnail=video)])
     QApplication.processEvents()
     corner = queue._running._frame
 
@@ -446,14 +446,14 @@ def test_our_first_job_beside_another_apps_backlog_brings_its_rule(dressed, qtbo
 
 
 def test_the_rule_keeps_to_the_gap_when_the_live_half_widens(dressed, qtbot, tmp_path):
-    # A combine's job stands its frame and its recipe side by side in the
+    # A combine's job stands its frame and its source video side by side in the
     # corner, twice the width of one picture, which pushes the line over.
     dressed.set_items([_item(job_kind="Video")])
     _settled(dressed)
     was = dressed.head_rule()[0]
 
     dressed.set_items([_item(job_kind="Video", source_image=_picture(tmp_path / "frame.png"),
-                             recipe_thumbnail=_picture(tmp_path / "recipe.png"))])
+                             source_video_thumbnail=_picture(tmp_path / "source.png"))])
 
     qtbot.waitUntil(lambda: dressed.head_rule()[0].x() > was.x() and _rule_on_screen(dressed))
     assert _on_screen(dressed).pixelColor(was).name() != BORDER_SUBTLE.name()
@@ -1059,7 +1059,7 @@ def test_a_drop_carrying_something_else_is_ignored(queue):
 
 def test_a_row_leads_with_what_the_job_costs_and_what_it_is(queue):
     # A line of waiting work is read to find out how long the wait is, so the
-    # price comes before the recipe — which is the same for every row of a folder
+    # price comes before the settings — which are the same for every row of a folder
     # being re-rolled and so tells you nothing about the wait.
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video")])
     assert queue.rows()[0]._lead.text() == "~2 min · Video"
@@ -1083,12 +1083,12 @@ def test_a_row_names_the_act_it_was_asked_for(queue):
     # the whole of what the user chose in Combine, and the one thing separating
     # two runs on the same picture.
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
-                           recipe_category="dancing")])
+                           act="dancing")])
     assert queue.rows()[0]._lead.text() == "~2 min · Video · dancing"
 
 
 def test_a_run_nobody_picked_an_act_for_names_none(queue):
-    # A dropped video is the recipe itself: there was no dropdown choice to show,
+    # A dropped video is the settings' own source: there was no dropdown choice to show,
     # and inventing one from its prompt would be a guess the row states as fact.
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video")])
     assert queue.rows()[0]._lead.text() == "~2 min · Video"
@@ -1096,7 +1096,7 @@ def test_a_run_nobody_picked_an_act_for_names_none(queue):
 
 def test_the_hover_spells_out_where_the_act_came_from(queue):
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
-                           recipe_category="dancing")])
+                           act="dancing")])
     assert "“dancing” act" in queue.rows()[0]._lead.toolTip()
 
 
@@ -1113,7 +1113,7 @@ def test_an_unregistered_workflow_leads_with_the_price_alone(queue):
 
 
 def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
-    # The recipe is worth an answer, just not the row: every row of a folder
+    # The settings are worth an answer, just not the row: every row of a folder
     # being re-rolled carries the same one. A bare "~?" is shorthand a row has the
     # width for and a first reader has no way to expand, so it is spelled out in
     # the same place, beside what the video is made from.
@@ -1129,7 +1129,7 @@ def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
 # --- the picture a queued job can be recognized by ----------------------------
 
 def test_an_image_to_video_row_shows_the_frame_it_animates(queue, tmp_path):
-    # Two i2v rows off one recipe carry the same caption; the frame is the whole
+    # Two i2v rows off one folder's settings carry the same caption; the frame is the whole
     # of what tells them apart.
     frame = _picture(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame,
@@ -1154,41 +1154,41 @@ def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_p
     assert queue.rows()[0]._thumbs._showing == ("folder", mates)
 
 
-def test_a_combine_row_shows_the_frame_and_the_recipe_it_follows(queue, tmp_path):
-    # Not the recipe video alone: that reads as a job that IS that clip. The
+def test_a_combine_row_shows_the_frame_and_the_source_video_it_follows(queue, tmp_path):
+    # Not the source video alone: that reads as a job that IS that clip. The
     # frame being animated leads, and the video whose settings are being reused
     # sits beside it (drawn gray, see queue_thumbs).
     frame = _picture(tmp_path / "frame.png")
-    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
-    queue.set_items([_item(job_kind="Video", source_image=frame, recipe_thumbnail=recipe,
+    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
+    queue.set_items([_item(job_kind="Video", source_image=frame, source_video_thumbnail=video,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
-    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, recipe))
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, video))
 
 
-def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue, tmp_path):
+def test_a_combine_row_keeps_its_source_video_while_the_frame_is_still_rendering(queue, tmp_path):
     # A chained run draws its frame first, so the video after it names one that
-    # isn't on disk yet. The recipe is about this run either way — better it than
+    # isn't on disk yet. The source video is about this run either way — better it than
     # the folder, which says only where the result will land.
-    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
+    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
     queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
-                           recipe_thumbnail=recipe,
+                           source_video_thumbnail=video,
                            folder_thumbnails=(_picture(tmp_path / "mate.png"),))])
-    assert queue.rows()[0]._thumbs._showing == ("source", Combination(None, recipe))
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(None, video))
 
 
-def test_a_combine_row_whose_prompt_was_edited_draws_its_recipe_in_parentheses(queue,
-                                                                                tmp_path):
+def test_a_combine_row_whose_prompt_was_edited_draws_its_source_video_in_parentheses(queue,
+                                                                                     tmp_path):
     frame = _picture(tmp_path / "frame.png")
-    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
-    queue.set_items([_item(job_kind="I2V", source_image=frame, recipe_thumbnail=recipe,
-                           recipe_prompt_edited=True)])
-    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, recipe, True))
+    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
+    queue.set_items([_item(job_kind="I2V", source_image=frame, source_video_thumbnail=video,
+                           prompt_edited=True)])
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, video, True))
 
 
 def test_a_row_that_is_not_a_job_yet_says_so(queue):
     # The press of Generate has an answer on screen before the work that turns it
     # into a job is done — otherwise the button reads as one that did nothing.
-    queue.set_items([_item(status="queued", job_kind="Video", recipe_category="dancing",
+    queue.set_items([_item(status="queued", job_kind="Video", act="dancing",
                            cancel=None, starting=True)])
     row = queue.rows()[0]
 
@@ -1233,7 +1233,7 @@ def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
 
 
 def test_a_job_with_nothing_to_show_carries_no_block(queue):
-    # The first run of a brand-new recipe: no frame, and an empty folder. An empty
+    # The first run of brand-new settings: no frame, and an empty folder. An empty
     # grid would read as a picture that failed to load.
     queue.set_items([_item(job_kind="Image")])
     assert queue.rows()[0]._thumbs.isHidden()

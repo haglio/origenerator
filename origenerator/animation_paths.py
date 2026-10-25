@@ -2,8 +2,8 @@
 lane, an act and a starting state, from the content overlay."""
 from __future__ import annotations
 
+from origenerator.act_settings import GENAU, VIDEO
 from origenerator.content import load_content
-from origenerator.recipe_match import GENAU, VIDEO
 
 LANES = (VIDEO, GENAU)
 

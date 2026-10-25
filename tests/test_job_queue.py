@@ -141,7 +141,7 @@ def test_start_prepared_records_the_callers_source(qtbot, tmp_path):
 
 
 def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
-    # Two pictures of one recipe, both wanted: the second queues with the first
+    # Two pictures of one folder's settings, both wanted: the second queues with the first
     # rather than being refused, which is what stopped them being made together.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
@@ -818,7 +818,7 @@ def test_a_training_that_ends_says_what_it_came_to_the_way_a_run_does(qtbot, tmp
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     training = _Training()
     queue.hold_for_training(training)
-    outcome = RunOutcome(kind="Training", recipe="Hands fix", seconds=2952.0, ok=True,
+    outcome = RunOutcome(kind="Training", display_name="Hands fix", seconds=2952.0, ok=True,
                          source="", generation="")
 
     with qtbot.waitSignal(queue.run_ended) as said:
@@ -1145,7 +1145,7 @@ def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
 
     queue.job_for("k").finished.emit([{"filename": "out.mp4"}], None, 252.0)
 
-    assert ended == [RunOutcome(kind="Video", recipe=_I2V.display_name, seconds=252.0,
+    assert ended == [RunOutcome(kind="Video", display_name=_I2V.display_name, seconds=252.0,
                                 ok=True, source=GenerationSource.GENERATED,
                                 generation=made)]
 

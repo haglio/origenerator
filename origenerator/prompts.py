@@ -83,16 +83,16 @@ VOICE_REQUEST_MATCH_SYSTEM_PROMPT = (
     "chosen term, or -1 if no term means what the speaker said."
 )
 
-# --- Combine category → situation-fitting recipe --------------------------
+# --- Combine category → situation-fitting video ---------------------------
 # When a combine act is picked, the app compares the dropped image's scene to the
-# starting scene each candidate recipe is made for, and reuses the one whose
+# starting scene each candidate video is made for, and reuses the one whose
 # situation matches (e.g. a anchor already in frame vs not, whose hand is on it).
 # The same local LLM as the rewrite above; uncensored, so it judges explicit scenes
 # plainly rather than refusing.
 VIDEO_SCENE_MATCH_SYSTEM_PROMPT = (
-    "You match an input image to the video recipe whose usual starting scene fits it "
+    "You match an input image to the past video whose usual starting scene fits it "
     "best, for a desired act. You get the desired act, a description of the input "
-    "image's scene, and a numbered list of candidate recipes — each shown by the "
+    "image's scene, and a numbered list of candidate videos — each shown by the "
     "starting scene it is normally used with.\n"
     "Pick the ONE candidate whose starting scene is the same situation as the input "
     "image: whether a anchor is already in frame (and where), and whose hand(s) are on "

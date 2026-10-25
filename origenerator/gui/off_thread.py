@@ -1,6 +1,6 @@
 """Run one slow call off the UI thread and hand its result back on it.
 
-The gallery's recipe match asks a local model which past recipe fits a dropped
+The gallery's act match asks a local model which past video fits a dropped
 image. That is an HTTP round trip to a model that thinks for several seconds, and
 run inline it froze the whole window for exactly as long — most visibly on a
 spoken animation, where the window is a fullscreen picture and the freeze is all

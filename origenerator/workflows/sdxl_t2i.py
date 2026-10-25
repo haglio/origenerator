@@ -14,7 +14,7 @@ from origenerator.workflows.model_files import ANY, list_model_files
 class SdxlT2iWorkflow(WorkflowTemplate):
     """SDXL T2I, optionally finished by an upscale/enhance pass.
 
-    The base render is the plain SDXL recipe. With the ``enhance`` toggle on,
+    The base render is the plain SDXL workflow. With the ``enhance`` toggle on,
     its decode then runs the shared enhance tail
     (:meth:`WorkflowTemplate.enhance_image_nodes`): a model upscale for
     sharpness, and a low-denoise second sampling pass in which the checkpoint

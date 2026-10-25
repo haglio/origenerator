@@ -52,13 +52,17 @@ for one thing cost four. So:
   returning the key -- is `workflow_and_signature()`.
 - **Settings** and **config** are two things and keep two words: the
   settings are what the form holds, and a `ConfigSnapshot` is one reading of
-  them. **Recipe** is no word of the user's, though the code still says it
-  (`recipe_category`, `recipe_match`, `animation_recipes`, the overlay's
-  `combine_recipes`) and Combine still shows it: never say it to him or put it
-  in anything new. Say what the thing is -- the workflow a generation ran on,
-  the settings a video was made with, the act it was launched as. Taking it
-  out of those names and off those screens is a change of its own, and the
-  words that replace it on screen are his to choose.
+  them. **Recipe** is no word of the user's, and nothing here says it: a
+  video's settings are its settings, the video a combine takes them from is
+  its source video (`source_video`, as "From source video" under the form
+  says), and the act a video was launched as is its `act`. Only names already
+  stored keep the old word, each read under it in one place: the two
+  `generations` columns, which only the database code names
+  (`db_schema.STORED_NAMES`), the overlay's old keys
+  (`content._RENAMED_KEYS`), the saved Model / LoRA sort (`search.saved_sort`),
+  the accepted animation settings' file (`animation_settings.SETTINGS_PATH`)
+  and the family stamp's keys (`provenance.WORKFLOW`, `WORKFLOW_VERSION`,
+  `BASIS`). Never say it to him or put it in anything new.
 - **The code's word is the one the app shows.** What the gallery shows as a
   video is a video in the code, an image is an image, and either one is an
   item. "Clip", said consistently all through the source, is a word the
@@ -158,18 +162,18 @@ filenames (2026-10-24), and a model added without one is the filename again.
 
 Two columns answer it and nothing else does: a picture's `picture_state`, set in
 the sorting window or the Action list on a Generate tab, and a video's
-`recipe_category`, the act picked when it was launched. `recipe_match.act_of`
+`act`, the act picked when it was launched. `act_settings.act_of`
 reads those two and returns "" for a row nobody has said one for, which a
 slideshow's map draws as a row with no act name, in its gutter and on its filter
 button (`nav_map.act_of`).
 
 It used to be worked out from the prompt, by matching each act's keywords in
-`recipe_categories` against the stored text. That answer named every map row and
+`acts` against the stored text. That answer named every map row and
 narrowed the show's act filter, and it was wrong often enough to be worse than
 nothing: it named rows for an act none of them shows, which the user found off the map
 (2026-09-21). He called the mechanism garbage and had it removed, with the spoken
 "genau it" that animated a picture as whatever its prompt read as (2026-09-22).
-`recipe_categories` is now a plain list of the act names.
+`acts` is now a plain list of the act names.
 
 So nothing in this repo may go back to guessing from a prompt, however tempting a
 blank row looks: a blank says the picture has not been sorted, which is a thing to
@@ -298,7 +302,7 @@ would be lost. `tests/test_launcher_contract.py` holds both to that.
   of the overlay's `animation_paths` entries runs, one at a time, against a video
   the user already kept. `animation_samples` finds and orders them,
   `animation_check_session` is the walk, `gui/animation_check_window.py` is the
-  window, and what is accepted goes to `animation_recipes` -- one set of
+  window, and what is accepted goes to `animation_settings` -- one set of
   settings per (lane, act, picture state) in a file of its own beside the library, which
   `CombineController._curated_combination` asks before the overlay's per-act pin.
 
@@ -452,7 +456,7 @@ OrigeneratorWindow` in a fresh interpreter, no `PYTHONPATH`): `tests/
 test_launch_smoke.py` deliberately stands the committed sample in for the
 local overlay, because a public checkout has only the sample, so it cannot
 see a local overlay the code can no longer read. A copy taken two hours
-earlier met exactly that on 2026-09-26 -- `recipe_categories` went from a
+earlier met exactly that on 2026-09-26 -- the overlay's act list went from a
 list to a table of keywords on the machine 23 minutes after the copy, and the
 preview died at import with a loading screen that never lifted.
 

@@ -19,8 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from origenerator import gallery
+from origenerator.act_settings import act_of
 from origenerator.media import MediaType
-from origenerator.recipe_match import act_of
 from origenerator.search import content_stems
 
 # How many near configurations "more seeds" adds to the exact family.  Six

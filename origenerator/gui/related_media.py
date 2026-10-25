@@ -142,7 +142,7 @@ class RelatedMedia(QWidget):
         )
 
     def _show_source_video_tile(self, row: dict) -> None:
-        video_id = row.get("recipe_video_id")
+        video_id = row.get("source_video")
         video = self._row_of(video_id) if video_id else None
         if video is None:
             self._source_video_tile.clear()

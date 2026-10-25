@@ -73,7 +73,7 @@ def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypat
     assert looked_up == []
 
 
-def test_the_shape_a_recipe_asks_for_is_read_once_however_often_it_is_asked(monkeypatch):
+def test_the_shape_a_row_asks_for_is_read_once_however_often_it_is_asked(monkeypatch):
     reads = []
     real = orientation.canonical_settings
     monkeypatch.setattr(orientation, "canonical_settings",

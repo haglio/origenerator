@@ -28,8 +28,8 @@ def test_a_scene_with_no_line_says_nothing():
 
 
 def test_a_workflow_without_lines_has_no_scenes_to_speak():
-    # A still's recipe carries no scene_lines (nor a frame count to read them
-    # against), and it is simply a recipe nothing in it speaks.
+    # A still's settings carry no scene_lines (nor a frame count to read them
+    # against), so nothing in them speaks.
     assert scene_speech({"positive_prompt": "a still", "seed": 1}) == []
     assert speech.missing_speech({"positive_prompt": "a still"}, Path("nowhere")) == []
 

@@ -53,7 +53,7 @@ def _video(prompt_id, prompt, *, noise_seed, frame, lora="lora_a", act=None):
         "prompt_id": prompt_id,
         "workflow_name": "wan22_i2v",
         "positive_prompt": prompt,
-        "recipe_category": act,
+        "act": act,
         "seed": None,
         "params_json": json.dumps({
             "positive_prompt": prompt, "noise_seed": noise_seed, "input_image": frame,

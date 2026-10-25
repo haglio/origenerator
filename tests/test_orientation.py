@@ -127,7 +127,7 @@ def test_a_video_being_made_from_a_picture_goes_by_that_pictures_shape(tmp_path)
 
 def test_a_video_goes_by_its_folders_start_frame_whatever_size_its_row_stored(tmp_path):
     # A video folder is keyed by its start frame and not by a size its row
-    # carries -- which on the early video recipe was stored and then never
+    # carries -- which on the early video workflow was stored and then never
     # used, the graph deriving the size from the frame all the same.
     frame = tmp_path / "frame.png"
     Image.new("RGB", (90, 160)).save(frame)

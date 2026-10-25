@@ -225,7 +225,7 @@ class WorkflowTemplate(ABC):
     # aspect ratio on a fixed pixel budget) rather than set by hand. The i2v
     # workflows set this; the Generate form then shows the derived width/height in
     # a locked Dimensions field the user can unlock to override. Width/height stay
-    # out of ``default_params`` (the size isn't a stored recipe setting), so an
+    # out of ``default_params`` (the size isn't a stored setting), so an
     # override never splits a gallery folder from an otherwise identical run.
     derives_size_from_input: bool = False
     # Which input a size-deriving workflow takes its shape from.
@@ -249,7 +249,7 @@ class WorkflowTemplate(ABC):
     # gallery's grouping. The SDXL and WAN t2i workflows list ``upscale_model``
     # here: it loads the tail's upscaler and does nothing with the toggle off.
     # Flux does not — there the same param also drives the plain 4x upscale that
-    # is that workflow's namesake output, so it stays part of the recipe.
+    # is that workflow's namesake output, so it stays part of the settings.
     extra_enhance_keys: tuple[str, ...] = ()
     output_node_id: str
     # The node that saves the pre-enhance render, present in the payload only
@@ -314,7 +314,7 @@ class WorkflowTemplate(ABC):
         return self.output_type != MediaType.VIDEO
 
     def enhance_keys(self) -> tuple[str, ...]:
-        """Param keys that configure the enhancement rather than the recipe.
+        """Param keys that configure the enhancement rather than the base settings.
 
         An enhancement is a finish applied to an image, not a different image:
         the gallery deliberately doesn't group by these, so an enhanced render
@@ -405,7 +405,7 @@ class WorkflowTemplate(ABC):
 
         A story is ``scene_frames``, one length per scene; a lone scene is the
         whole clip and runs for ``frame_count`` -- the length every other reader
-        of a recipe goes by, and all a recipe from the overlay carries -- so a
+        of the settings goes by, and all that settings from the overlay carry -- so a
         single entry never overrules it. Each scene splits into segments of at
         most :data:`SINGLE_WINDOW_FRAMES` (:meth:`segment_lengths`), and every
         segment after the first, its scene's first included, starts on the
@@ -579,7 +579,7 @@ class WorkflowTemplate(ABC):
         re-imagines fine texture — skin, hair, fabric — that no upscaler can
         invent, which is what reads as naturalistic. The pass reuses the base
         sampler's model, conditioning, cfg and seed, so an enhanced render is
-        still exactly the recipe its params record; at ``enhance_denoise`` 0 it
+        still exactly the settings its params record; at ``enhance_denoise`` 0 it
         degrades to a plain sharpening upscale.
 
         ``rescale_to`` replaces the relative rescale with an exact WxH, for the

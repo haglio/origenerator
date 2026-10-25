@@ -109,8 +109,8 @@ QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 def _made_from(item) -> Combination:
     frame = resolve_input_image_path(item.source_image)
-    return Combination(str(frame) if frame is not None else None, item.recipe_thumbnail,
-                       item.recipe_prompt_edited)
+    return Combination(str(frame) if frame is not None else None, item.source_video_thumbnail,
+                       item.prompt_edited)
 
 
 class OpensAFolder:
@@ -336,7 +336,7 @@ class RunningPreview(OpensAFolder, QWidget):
         loading two 14B models before its first preview, and this corner stood
         empty through all of it. So the wait shows the same sum the config tab
         and the folder's own tile show for that job — the frame, a plus, and the
-        recipe clip in gray where a combine brought one
+        source video in gray where a combine brought one
         (:func:`~origenerator.gui.combination_view.combination_pixmap`) — and
         nothing at all for a run made from nothing, which is a T2V with
         no picture to its name yet.
@@ -382,13 +382,13 @@ class QueueRow(OpensAFolder, QWidget):
     ``"~2 min · Video · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
     line is the whole of what the row says about the job. The workflow-and-prompt
     name a Generate tab is titled with used to be here and is not: it answers
-    "which recipe", and every row of a folder being re-rolled carries the same
+    "which settings", and every row of a folder being re-rolled carries the same
     one, so a strip of eight said one thing eight times and none of them said
     which was the ten-minute one. It is still a hover away.
 
     The picture is second because that is where it lines up into a column and
     where the eye lands: the frame an I2V animates (with the gray
-    recipe video beside it, where one was dropped), or four out of the folder the
+    source video beside it, where one was dropped), or four out of the folder the
     run will land in (:mod:`origenerator.gui.queue_thumbs`).
 
     Only a wait worth explaining puts more text on the row, and only one this job
@@ -476,7 +476,7 @@ class QueueRow(OpensAFolder, QWidget):
         self._item = item
         self._lead.setText(queue_lead_text(item))
         # The name the row no longer spends its width on, plus what the shorthand
-        # in front of it means. The recipe is worth an answer, just not the row.
+        # in front of it means. The settings are worth an answer, just not the row.
         self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
         # One wait is worth explaining in a row's own width, being this job's
         # alone: the stretch before a pressed Generate is a job at all. The
@@ -514,7 +514,7 @@ class QueueRow(OpensAFolder, QWidget):
 
         The start frame wins whenever there is one, being about *this* run rather
         than about where it will land — and being the only thing separating two
-        i2v rows off one recipe. A combine handed a dropped video draws that video
+        i2v rows off one folder's settings. A combine handed a dropped video draws that video
         beside it, in gray. A run with neither, or one whose pictures aren't on
         disk yet, falls back to the folder view; a folder with nothing in it yet
         leaves the block off the row rather than draw an empty grid.

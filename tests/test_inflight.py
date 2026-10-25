@@ -29,7 +29,7 @@ from origenerator.gui.inflight import (
 
 
 def _item(**over) -> InFlightItem:
-    fields = dict(key="p1", caption="Alpha Recipe › a cat",
+    fields = dict(key="p1", caption="Alpha Workflow › a cat",
                   reading=RunReading(status=JobState.QUEUED, typical_seconds=120.0),
                   reveal=lambda: None)
     fields.update(over)
@@ -48,7 +48,7 @@ def test_a_row_says_what_kind_of_work_it_is_when_the_workflow_is_one_we_know():
 
 
 def test_the_act_follows_the_kind_so_two_runs_on_one_picture_read_apart():
-    assert queue_lead_text(_item(job_kind="Video", recipe_category="alpha")) == (
+    assert queue_lead_text(_item(job_kind="Video", act="alpha")) == (
         "~2 min · Video · alpha")
 
 
@@ -94,7 +94,7 @@ def test_a_workflow_this_build_has_no_template_for_contributes_no_line():
 
 def test_the_hover_names_who_asked_when_it_was_not_a_press_of_generate():
     lines = queue_lead_tooltip(_item(auto_generating=True, requested=True,
-                                     recipe_category="beta")).splitlines()
+                                     act="beta")).splitlines()
     assert lines[1:] == [
         "The “beta” act, picked in Combine",
         "Queued by its folder's auto-generate loop",

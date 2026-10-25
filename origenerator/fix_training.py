@@ -201,7 +201,7 @@ def running_trainings() -> list[dict]:
 
 
 def outcome_of(job: dict, *, ok: bool, seconds: float | None) -> RunOutcome:
-    return RunOutcome(kind=JobKind.TRAINING, recipe=f"{job['part'].capitalize()} fix",
+    return RunOutcome(kind=JobKind.TRAINING, display_name=f"{job['part'].capitalize()} fix",
                       seconds=seconds, ok=ok, source="", generation="")
 
 

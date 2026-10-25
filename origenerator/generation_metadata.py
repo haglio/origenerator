@@ -29,7 +29,7 @@ from pathlib import Path
 
 from origenerator import config, gallery
 from origenerator.output_places import OutputPlaces
-from origenerator.provenance import BASIS, FILE_DATE
+from origenerator.provenance import BASIS, FILE_DATE, WORKFLOW_VERSION
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -140,7 +140,7 @@ def _version_line(block: dict) -> MetaItem:
 
 
 def _version_text(block: dict) -> str:
-    version = block.get("recipe_version")
+    version = block.get(WORKFLOW_VERSION)
     if not version:
         return "unknown"
     if block.get(BASIS) == FILE_DATE:

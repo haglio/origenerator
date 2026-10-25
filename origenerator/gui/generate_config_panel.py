@@ -22,7 +22,7 @@ from shared_ui.icons import glyph_icon, marked_text
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
-from origenerator import evolver_export, outside_videos, recipe_match
+from origenerator import act_settings, evolver_export, outside_videos
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
@@ -278,12 +278,12 @@ class GenerateConfigPanel(QWidget):
         # what says whether anything has actually been rewritten yet.
         self._folder_request: FolderRequest | None = None
         # Where this tab's settings came from, when the Combine panel opened them
-        # here: the act picked in its dropdown, the video whose recipe they are and
+        # here: the act picked in its dropdown, the video whose settings they are and
         # the lane, as (category, video_prompt_id, intent). Carried so a run launched
         # from this tab — as opened, or edited first — says in the queue what it was
         # asked for. Nothing else on the form remembers any of them.
-        self._recipe_source: tuple[str, str | None, str] = ("", None, "")
-        self._recipe_row: dict | None = None
+        self._settings_source: tuple[str, str | None, str] = ("", None, "")
+        self._source_video_row: dict | None = None
         # Re-reads (shortly) whether Generate would reproduce a past run — see
         # refresh_generate_caption for why the answer isn't taken on the spot.
         self._caption_timer = QTimer(self)
@@ -425,7 +425,7 @@ class GenerateConfigPanel(QWidget):
         self._metadata_block = MetadataBlock(go_to_folder=self._go_to_folder)
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
-        self._action = ActionPicker(state_names(), recipe_match.CATEGORIES)
+        self._action = ActionPicker(state_names(), act_settings.CATEGORIES)
         self._action.chosen.connect(self._on_action_chosen)
         body.addWidget(self._action)
 
@@ -672,12 +672,12 @@ class GenerateConfigPanel(QWidget):
         return wf.missing_inputs(self._param_form.get_values())
 
     def _on_workflow_changed(self):
-        # A different workflow is a different recipe: whatever Combine opened
+        # A different workflow is different settings: whatever Combine opened
         # here no longer describes what this tab would run, so its mark goes
         # rather than riding onto an unrelated launch. Set again after a prefill,
         # which is what re-picks the workflow in the first place.
-        self._forget_recipe_source()
-        # And a folder's rewrite is a rewrite of that folder's own recipe. Swap
+        self._forget_settings_source()
+        # And a folder's rewrite is a rewrite of that folder's own settings. Swap
         # the workflow and the form is rebuilt from scratch — the tracked prompt
         # fields with it — so what is left is an ordinary config, not a rewrite
         # of anything.
@@ -813,7 +813,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self._follow_the_model)
         self._param_form.changed.connect(self._show_advice)
         self._param_form.changed.connect(self.refresh_modified_notice)
-        self._param_form.changed.connect(self._mark_recipe_prompt_edits)
+        self._param_form.changed.connect(self._mark_prompt_edits)
         # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
         self._param_form.changed.connect(self._sync_generate)
@@ -911,44 +911,44 @@ class GenerateConfigPanel(QWidget):
             batch.append(self._param_form.get_values())
         return batch
 
-    def set_recipe_source(self, category: str, video_prompt_id: str | None,
-                          intent: str) -> None:
+    def set_settings_source(self, category: str, video_prompt_id: str | None,
+                            intent: str) -> None:
         """Remember that these settings came out of Combine — the act off its
-        dropdown, and the video whose recipe they are — and link to that video
+        dropdown, and the video whose settings they are — and link to that video
         and the picture under the form, as the generation they make will.
 
         Set after the settings are in (:meth:`prefill` re-picks the workflow,
         which clears this), so what the tab launches carries the mark whether it
         is run as opened or edited first.
         """
-        self._recipe_source = (category or "", video_prompt_id or None, intent)
-        self._recipe_row = self._db.get_generation(video_prompt_id) if video_prompt_id else None
+        self._settings_source = (category or "", video_prompt_id or None, intent)
+        self._source_video_row = self._db.get_generation(video_prompt_id) if video_prompt_id else None
         self._related.show_row(self._the_row_generate_would_make(), self._image_rows())
 
     def _the_row_generate_would_make(self) -> dict:
         return {"workflow_name": self._workflow_combo.currentData(),
                 "params_json": json.dumps(self._param_form.get_values()),
-                "recipe_video_id": self._recipe_source[1]}
+                "source_video": self._settings_source[1]}
 
-    def recipe_source(self) -> tuple[str, str | None, str]:
+    def settings_source(self) -> tuple[str, str | None, str]:
         """``(category, video_prompt_id, intent)`` for a tab Combine opened, else
         ``("", None, "")`` — what a launch from here stamps on its row."""
-        return self._recipe_source
+        return self._settings_source
 
-    def _recipe_prompts_differ(self) -> bool:
+    def _prompts_differ_from_source(self) -> bool:
         workflow = workflow_named(self._workflow_combo.currentData())
-        return (self._recipe_row is not None and workflow is not None
+        return (self._source_video_row is not None and workflow is not None
                 and self._param_form is not None
                 and prompts_differ_from(self._param_form.get_values(),
-                                        self._recipe_row, workflow))
+                                        self._source_video_row, workflow))
 
-    def _forget_recipe_source(self) -> None:
-        self._recipe_source = ("", None, "")
-        self._recipe_row = None
+    def _forget_settings_source(self) -> None:
+        self._settings_source = ("", None, "")
+        self._source_video_row = None
 
-    def _mark_recipe_prompt_edits(self) -> None:
+    def _mark_prompt_edits(self) -> None:
         if self._live_source is None:
-            self._preview.mark_recipe_prompt_edited(self._recipe_prompts_differ())
+            self._preview.mark_prompt_edited(self._prompts_differ_from_source())
 
     def show_combination(self, combination: Combination) -> None:
         """Put the combination this tab was opened with in the preview: the frame,
@@ -956,7 +956,7 @@ class GenerateConfigPanel(QWidget):
         made from the pair yet, so there is no result for the pane to show."""
         if self._live_source is None:
             combination = combination._replace(
-                recipe_prompt_edited=self._recipe_prompts_differ())
+                prompt_edited=self._prompts_differ_from_source())
         self._preview.show_combination(combination)
         self._reflow_for_the_media()
 
@@ -1234,7 +1234,7 @@ class GenerateConfigPanel(QWidget):
 
     def prefill(self, workflow_name: str, params: dict):
         # Seeding the form with one configuration is the end of any folder-wide
-        # rewrite this tab was holding: the prompts it lands are a recipe to run,
+        # rewrite this tab was holding: the prompts it lands are settings to run,
         # not a change to a folder's. (:meth:`open_folder_request` prefills first and
         # arms the rewrite afterwards, so it is not undoing itself.) It is the end
         # of following a run, too: the next frame would land over the picture
@@ -1401,7 +1401,7 @@ class GenerateConfigPanel(QWidget):
         """
         self.forget_launched()
         self._forget_watch()
-        self._forget_recipe_source()
+        self._forget_settings_source()
         self._end_folder_request()  # a workflow this tab cannot lay out never reaches prefill
         workflow_name = row.get("workflow_name", "")
         self._autoshow_held = True
@@ -1486,7 +1486,7 @@ class GenerateConfigPanel(QWidget):
         self._live_note = None
         if frame:
             self.show_live_frame(frame)
-        elif made_from is not None and (made_from.picture or made_from.recipe):
+        elif made_from is not None and (made_from.picture or made_from.source_video):
             self.show_live_source(made_from)
         else:
             self.show_live_wait(note)

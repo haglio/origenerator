@@ -48,7 +48,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     writer every video workflow saves with. The stages hand off at ``split_step``
     (0 = half the steps), and each runs at its own ``cfg_high``/``cfg_low`` —
     LoRA authors tune these per stage (motion lives in the high pass, texture in
-    the low), so a recipe can follow their numbers exactly. The output resolution is
+    the low), so a run can follow their numbers exactly. The output resolution is
     derived in-graph from the input image (see :meth:`build_api_payload`): it
     keeps the image's aspect ratio at a fixed pixel budget rather than a
     hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
@@ -151,8 +151,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     @staticmethod
     def _stage_strengths(params: dict) -> tuple[float, float]:
-        """Each sampler's prompt strength. A recipe stored before the stages had
-        their own carries one ``cfg`` and a zero for each stage; that zero meant
+        """Each sampler's prompt strength. Settings stored before the stages had
+        their own carry one ``cfg`` and a zero for each stage; that zero meant
         "use the shared one", so it still does — reading it as no guidance at all
         would re-run every such generation as a different video."""
         shared = params.get("cfg")

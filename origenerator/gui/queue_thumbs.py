@@ -5,7 +5,7 @@ only be recognized by a picture of something *else*. Two somethings, and which
 one a row gets is decided by what the job is:
 
 * **What it is made from** — an I2V's start frame, an enhancement's
-  original. Two queued videos off the same recipe are the same job in every
+  original. Two queued videos off the same settings are the same job in every
   respect but the frame they animate, so this is the whole of what tells them
   apart. A combine given a dropped video adds a second cell beside it: that
   video, in gray (:mod:`origenerator.gui.grayscale`). Gray because it is not
@@ -50,7 +50,7 @@ from PyQt6.QtWidgets import QLabel
 from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import HAIRLINE
 
-from origenerator.gui.combination import Combination, draw_plus, draw_recipe, plus_width
+from origenerator.gui.combination import Combination, draw_plus, draw_source_video, plus_width
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.thumbnail_box import centered_in_square, fitted_in
 
@@ -142,7 +142,7 @@ def _canvas(cell: int) -> QPixmap:
 
 def source_pixmap(made_from: Combination, cell: int) -> QPixmap | None:
     """A block holding what a job is being made from: its picture, and — for a
-    combine's run — the recipe video whose settings it follows, in gray.
+    combine's run — the source video whose settings it follows, in gray.
 
     ``None`` only when neither file loads, so the caller can fall back rather than
     show an empty block; either alone still draws, each in its own cell, so the
@@ -150,22 +150,22 @@ def source_pixmap(made_from: Combination, cell: int) -> QPixmap | None:
     them stay empty rather than becoming slots: this is not a folder and there is
     no third picture missing from it.
 
-    The recipe is drained of color because it is not what is being made. Beside
+    The source video is drained of color because it is not what is being made. Beside
     the frame in full color it reads as a second subject, and the row of a job
     whose frame hasn't rendered yet would read as a job that *is* that clip.
     """
     frame = fitted_cell(made_from.picture, cell)
-    recipe = fitted_cell(made_from.recipe, cell, gray=True)
-    if frame is None and recipe is None:
+    source_video = fitted_cell(made_from.source_video, cell, gray=True)
+    if frame is None and source_video is None:
         return None
     canvas = _canvas(cell)
     painter = QPainter(canvas)
     if frame is not None:
         painter.drawPixmap(0, 0, frame)
-    if recipe is not None:
+    if source_video is not None:
         if frame is not None:
             draw_plus(painter, cell, cell)
-        draw_recipe(painter, cell + plus_width(cell), recipe, made_from.recipe_prompt_edited)
+        draw_source_video(painter, cell + plus_width(cell), source_video, made_from.prompt_edited)
     painter.end()
     return canvas
 
@@ -214,14 +214,14 @@ class QueueThumbs(QLabel):
 
     def show_source(self, made_from: Combination) -> bool:
         """Draw what a job is made from: its start frame, and beside it the
-        recipe video's thumbnail, in gray.
+        source video's thumbnail, in gray.
 
         ``False`` only when neither has anything to draw: no picture and no
-        recipe, or files that have moved or haven't been rendered yet (a video
+        source video, or files that have moved or haven't been rendered yet (a video
         queued after the image it animates is exactly that). The caller falls
         back to the folder view rather than leave a blank block standing where a
         picture was promised — but a frame that hasn't landed no longer costs the
-        row its recipe cell, which is about this run either way.
+        row its source video's cell, which is about this run either way.
         """
         showing = ("source", made_from)
         if self._showing == showing:

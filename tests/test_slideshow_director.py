@@ -1707,13 +1707,13 @@ def _animation(prompt_id, *, frame, act, tmp_path, width=100, height=200):
     """A finished video animated from the picture that wrote *frame*, showing
     *act* — picked for it in Combine, which is where an act is written down.
 
-    A video recipe asks for no size, so what puts this one on a side is the
+    A video's settings ask for no size, so what puts this one on a side is the
     shape of the film itself, which is what its thumbnail carries."""
     params = {"positive_prompt": "it moves", "noise_seed": 5, "input_image": frame}
     row = _row(prompt_id, workflow_name="wan22_i2v", params=params,
                files=(f"{prompt_id}.mp4",))
     row["params_json"] = json.dumps(params)
-    row["recipe_category"] = act
+    row["act"] = act
     thumb = tmp_path / f"{prompt_id}_thumb.png"
     Image.new("RGB", (width, height)).save(thumb)
     row["thumbnail_path"] = str(thumb)

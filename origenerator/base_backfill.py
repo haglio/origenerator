@@ -7,7 +7,7 @@ those rows carry one file and no "before" to compare it against.
 They are recoverable, because they are reproducible. Diffusion is deterministic
 given the same seed, model, sampler, scheduler, steps and cfg, and the enhance
 tail hangs off the base pass without altering it — so re-running the recorded
-recipe with the tail switched off produces exactly the pixels that pass produced
+settings with the tail switched off produces exactly the pixels that pass produced
 the first time.
 
 It is GPU nobody asked for, though — one full render per row, and the library
@@ -69,12 +69,12 @@ TARGET_KEY = "_base_render_of"
 
 
 def rows_missing_their_base(rows: list[dict]) -> list[dict]:
-    """Enhanced images that kept no original and whose recipe can be rebuilt.
+    """Enhanced images that kept no original and whose settings can be rebuilt.
 
     The badge says an enhancement happened; the absence of an original says the
     tail baked it in. Those two together are exactly the rows this can help. A
-    row whose workflow isn't registered (an import) is passed over: there is no
-    recipe to re-run, and guessing one would produce a "base" that is not this
+    row whose workflow isn't registered (an import) is passed over: there are no
+    settings to re-run, and guessing them would produce a "base" that is not this
     image's base at all.
     """
     out = []
@@ -95,7 +95,7 @@ def rows_missing_their_base(rows: list[dict]) -> list[dict]:
 
 
 def base_params_for(row: dict, workflow) -> dict:
-    """The row's own recipe with the enhance tail switched off.
+    """The row's own settings with the enhance tail switched off.
 
     Every other param — the seed above all — is reproduced exactly, because that
     is the whole basis for expecting the same pixels back. The target's id rides
@@ -197,7 +197,7 @@ def render_base_now(client, workflow, params: dict, *,
 
     It lives here rather than in the tool because everything either path decides
     about a repair is decided in this module: which rows need one
-    (:func:`rows_missing_their_base`), what recipe reproduces it
+    (:func:`rows_missing_their_base`), what settings reproduce it
     (:func:`base_params_for`), and how the result is attached
     (:func:`attach_base`). A submit loop kept alone in ``tools/`` is the one
     piece nothing here would notice going out of step.

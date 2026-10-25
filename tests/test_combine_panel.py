@@ -9,7 +9,7 @@ from shared_ui.colors import BG_SECONDARY, BLUE, hovered
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 
-from origenerator import animation_paths, recipe_match
+from origenerator import act_settings, animation_paths
 from origenerator.gui.action_picker import ACTION_LABEL
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
 from origenerator.gui.drags import under_way
@@ -82,7 +82,7 @@ def _pick_act(panel, act):
 
 def _pick_lane(panel, intent):
     """Click the lane's radio; the group's exclusivity releases the other."""
-    radio = (panel._genau_radio if intent == recipe_match.GENAU
+    radio = (panel._genau_radio if intent == act_settings.GENAU
              else panel._video_radio)
     radio.setChecked(True)
 
@@ -122,7 +122,7 @@ def test_the_action_list_carries_the_acts_that_lane_has_a_row_for(qtbot):
 
     assert _acts(panel) == ["alpha", "beta", "gamma", "delta", "epsilon", "dancing"]
 
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
 
     assert _acts(panel) == ["alpha", "beta", "gamma"]
 
@@ -131,7 +131,7 @@ def test_an_act_the_new_lane_has_no_row_for_is_not_left_picked(qtbot):
     panel = _panel(qtbot)
     _pick_act(panel, "delta")
 
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
 
     assert panel.selected_category() == ""
 
@@ -140,7 +140,7 @@ def test_an_act_both_lanes_carry_stays_picked_across_the_switch(qtbot):
     panel = _panel(qtbot)
     _pick_act(panel, "alpha")
 
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
 
     assert panel.selected_category() == "alpha"
 
@@ -172,8 +172,8 @@ def test_grayed_generate_and_edit_say_what_they_still_need(qtbot):
 
     panel.image_slot.set_item("img1")
 
-    needs_recipe = "Pick an act or drop a video first"
-    assert (panel._generate_btn.toolTip(), panel._open_btn.toolTip()) == (needs_recipe, needs_recipe)
+    needs_act_or_video = "Pick an act or drop a video first"
+    assert (panel._generate_btn.toolTip(), panel._open_btn.toolTip()) == (needs_act_or_video, needs_act_or_video)
 
 
 def test_once_ready_generate_drops_its_reason_and_edit_says_what_it_does(qtbot):
@@ -197,17 +197,17 @@ def test_clicking_generate_asks_for_the_dropped_pair(qtbot):
     panel._generate_btn.click()
 
     assert got == [CombineRequest(image_id="img1", video_id="vid1",
-                                  intent=recipe_match.VIDEO)]
+                                  intent=act_settings.VIDEO)]
 
 
 def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
     # "Edit individual…" needs the same ingredients as Generate — a source image
-    # and a recipe — so it lights and dims in lockstep with the Generate button.
+    # and settings — so it lights and dims in lockstep with the Generate button.
     panel = _panel(qtbot)
     assert not panel._open_btn.isEnabled()
 
     panel.image_slot.set_item("img1")
-    assert not panel._open_btn.isEnabled()  # image alone, no recipe yet
+    assert not panel._open_btn.isEnabled()  # image alone, no settings yet
 
     panel.video_slot.set_item("vid1")
     assert panel._open_btn.isEnabled()       # both filled: ready to open
@@ -297,7 +297,7 @@ def test_a_ready_button_sits_one_step_lighter_under_the_pointer(qtbot, pointer, 
     assert ground(button) == hovered(QColor(at_rest)).name()
 
 
-def test_clicking_open_emits_the_dropped_recipe_for_the_generator(qtbot):
+def test_clicking_open_emits_the_dropped_video_for_the_generator(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
     panel.video_slot.set_item("vid1")
@@ -308,7 +308,7 @@ def test_clicking_open_emits_the_dropped_recipe_for_the_generator(qtbot):
 
     # The same pair Generate would ask for, marked as bound for the generator.
     assert opened == [CombineRequest(image_id="img1", video_id="vid1",
-                                     intent=recipe_match.VIDEO, edit_first=True)]
+                                     intent=act_settings.VIDEO, edit_first=True)]
 
 
 def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
@@ -321,7 +321,7 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
     panel._open_btn.click()
 
     assert opened == [CombineRequest(image_id="img1", category="delta",
-                                     intent=recipe_match.VIDEO, edit_first=True)]
+                                     intent=act_settings.VIDEO, edit_first=True)]
 
 
 def test_a_drag_under_way_lights_only_the_slot_it_fits(qtbot):
@@ -440,7 +440,7 @@ def test_the_neutral_option_is_custom_leading_the_acts(qtbot):
     assert panel.selected_category() == ""  # neutral by default
     items = [panel._category.itemText(i) for i in range(panel._category.count())]
     assert items[0] == "(custom)"
-    assert items[1:] == list(animation_paths.acts(recipe_match.VIDEO))
+    assert items[1:] == list(animation_paths.acts(act_settings.VIDEO))
 
 
 def _enabled(panel, text) -> bool:
@@ -453,7 +453,7 @@ def test_acts_with_no_video_to_mine_are_grayed_out(qtbot):
     panel.set_available_categories({"beta", "epsilon"})
 
     assert _enabled(panel, "beta") and _enabled(panel, "epsilon")
-    assert not _enabled(panel, "gamma")  # nothing in the gallery to build a recipe from
+    assert not _enabled(panel, "gamma")  # nothing in the gallery to take settings from
     assert not _enabled(panel, "dancing")
     assert _enabled(panel, "(custom)")     # the neutral option always stays pickable
 
@@ -478,7 +478,7 @@ def test_a_grayed_act_explains_itself(qtbot):
 
 def test_dropdown_sits_beside_the_video_slot_in_one_part(qtbot):
     panel = _panel(qtbot)
-    # The dropdown configures the *video* recipe, so it shares one container with the
+    # The dropdown configures the *video* settings, so it shares one container with the
     # video slot — laid out side by side, not stacked, and not a peer of the image.
     assert panel._action_part.parent() is panel.video_slot.parent()
     assert panel.image_slot.parent() is not panel.video_slot.parent()
@@ -501,10 +501,10 @@ def test_the_word_action_sits_under_the_dropdown_it_names(qtbot):
 def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    assert not panel._generate_btn.isEnabled()  # image alone, no recipe chosen yet
+    assert not panel._generate_btn.isEnabled()  # image alone, no settings chosen yet
 
     _pick_act(panel, "alpha")
-    assert panel._generate_btn.isEnabled()      # a category is a recipe — no video needed
+    assert panel._generate_btn.isEnabled()      # a category is settings enough — no video needed
 
     _pick_act(panel, "")                       # back to neutral
     assert not panel._generate_btn.isEnabled()
@@ -552,8 +552,8 @@ def test_a_binned_video_leaves_the_slot_empty_rather_than_bringing_back_an_older
     fitting.discard("vid2")  # binned while the act was picked
 
     _pick_act(panel, "")
-    _pick_lane(panel, recipe_match.GENAU)
-    _pick_lane(panel, recipe_match.VIDEO)
+    _pick_lane(panel, act_settings.GENAU)
+    _pick_lane(panel, act_settings.VIDEO)
 
     assert panel.video_slot.current_id() is None
     assert _listed_under_recent(panel) == ["vid1"]
@@ -562,14 +562,14 @@ def test_a_binned_video_leaves_the_slot_empty_rather_than_bringing_back_an_older
 def test_each_lane_keeps_its_own_dropped_video(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
     assert panel.video_slot.current_id() is None
     panel.video_slot.set_item("vid2")
 
-    _pick_lane(panel, recipe_match.VIDEO)
+    _pick_lane(panel, act_settings.VIDEO)
     assert panel.video_slot.current_id() == "vid1"
 
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
     assert panel.video_slot.current_id() == "vid2"
 
 
@@ -599,11 +599,11 @@ def test_recent_lists_the_newest_first_and_each_video_once(qtbot):
 def test_each_lane_lists_the_videos_it_had(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
     panel.video_slot.set_item("vid2")
 
     assert _listed_under_recent(panel) == ["vid2"]
-    _pick_lane(panel, recipe_match.VIDEO)
+    _pick_lane(panel, act_settings.VIDEO)
     assert _listed_under_recent(panel) == ["vid1"]
 
 
@@ -673,14 +673,14 @@ def test_picking_an_act_keeps_the_room_recent_takes(qtbot):
 
 def test_recent_lists_what_the_lane_was_given_before_this_session(qtbot):
     uses = _Uses()
-    uses.record(recipe_match.VIDEO, "vid1")
-    uses.record(recipe_match.VIDEO, "vid2")
-    uses.record(recipe_match.GENAU, "vid3")
+    uses.record(act_settings.VIDEO, "vid1")
+    uses.record(act_settings.VIDEO, "vid2")
+    uses.record(act_settings.GENAU, "vid3")
 
     panel = _panel(qtbot, uses=uses)
 
     assert _listed_under_recent(panel) == ["vid2", "vid1"]
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
     assert _listed_under_recent(panel) == ["vid3"]
 
 
@@ -688,7 +688,7 @@ def test_recent_lists_the_video_in_the_slot_first_whatever_came_since(qtbot):
     uses = _Uses()
     panel = _panel(qtbot, uses=uses)
     panel.video_slot.set_item("vid1")
-    uses.record(recipe_match.VIDEO, "vid2")  # given the slot in another copy of the app
+    uses.record(act_settings.VIDEO, "vid2")  # given the slot in another copy of the app
 
     assert _listed_under_recent(panel) == ["vid1", "vid2"]
 
@@ -696,24 +696,24 @@ def test_recent_lists_the_video_in_the_slot_first_whatever_came_since(qtbot):
 def test_a_video_put_in_the_slot_is_said_with_the_lane_it_went_in_under(qtbot):
     uses = _Uses()
     panel = _panel(qtbot, uses=uses)
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
 
     panel.video_slot.set_item("vid1")
 
-    assert uses.said == [(recipe_match.GENAU, "vid1")]
+    assert uses.said == [(act_settings.GENAU, "vid1")]
 
 
 def test_a_lanes_video_shown_again_is_not_said_again(qtbot):
     uses = _Uses()
     panel = _panel(qtbot, uses=uses)
     panel.video_slot.set_item("vid1")
-    _pick_lane(panel, recipe_match.GENAU)
-    _pick_lane(panel, recipe_match.VIDEO)
+    _pick_lane(panel, act_settings.GENAU)
+    _pick_lane(panel, act_settings.VIDEO)
     _pick_act(panel, "alpha")
     _pick_act(panel, "")
-    panel.set_dropped_videos({recipe_match.VIDEO: "vid1"})
+    panel.set_dropped_videos({act_settings.VIDEO: "vid1"})
 
-    assert uses.said == [(recipe_match.VIDEO, "vid1")]
+    assert uses.said == [(act_settings.VIDEO, "vid1")]
 
 
 def test_recent_reads_its_videos_only_when_it_opens(qtbot):
@@ -722,7 +722,7 @@ def test_recent_reads_its_videos_only_when_it_opens(qtbot):
 
     for n in range(5):
         panel.video_slot.set_item(f"vid{n}")
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
 
     assert asked == [f"vid{n}" for n in range(5)]
 
@@ -731,7 +731,7 @@ def test_a_lane_that_has_had_no_video_lists_none_under_recent(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
 
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
 
     assert _listed_under_recent(panel) == []
     assert panel._recent_videos.isEnabled()
@@ -768,7 +768,7 @@ def test_generate_emits_the_picked_act(qtbot):
     panel._generate_btn.click()
 
     assert cats == [CombineRequest(image_id="img1", category="delta",
-                                   intent=recipe_match.VIDEO)]
+                                   intent=act_settings.VIDEO)]
 
 
 # --- the Kino/Genau radio: what the result is for -----------------------------
@@ -778,7 +778,7 @@ def test_the_lane_defaults_to_kino(qtbot):
     # The long-standing behavior of this panel, and by far the more common ask, so
     # the Genau flick is the deliberate detour rather than the default.
     panel = _panel(qtbot)
-    assert panel.selected_intent() == recipe_match.VIDEO
+    assert panel.selected_intent() == act_settings.VIDEO
     assert panel._video_radio.text() == "Kino"
     assert panel._video_radio.isChecked()
     assert not panel._genau_radio.isChecked()
@@ -803,14 +803,14 @@ def test_generate_carries_the_chosen_lane(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
     _pick_act(panel, "alpha")  # one both lanes have a row for, so the pick stands
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
     cats = []
     panel.combine_requested.connect(cats.append)
 
     panel._generate_btn.click()
 
     assert cats == [CombineRequest(image_id="img1", category="alpha",
-                                   intent=recipe_match.GENAU)]
+                                   intent=act_settings.GENAU)]
 
 
 def test_switching_the_lane_announces_it_once(qtbot):
@@ -820,22 +820,22 @@ def test_switching_the_lane_announces_it_once(qtbot):
     heard = []
     panel.intent_changed.connect(heard.append)
 
-    _pick_lane(panel, recipe_match.GENAU)
-    assert heard == [recipe_match.GENAU]
+    _pick_lane(panel, act_settings.GENAU)
+    assert heard == [act_settings.GENAU]
 
-    _pick_lane(panel, recipe_match.VIDEO)
-    assert heard == [recipe_match.GENAU, recipe_match.VIDEO]
+    _pick_lane(panel, act_settings.VIDEO)
+    assert heard == [act_settings.GENAU, act_settings.VIDEO]
 
 
 def test_a_grayed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     panel = _panel(qtbot)
-    _pick_lane(panel, recipe_match.GENAU)
+    _pick_lane(panel, act_settings.GENAU)
     panel.set_available_categories({"beta"})
 
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
     # An act the video lane answers happily can still have no loop under it, so
     # the grayed-out reason has to name which lane it is talking about.
-    assert reason == "No past looping “gamma” flick to base a Genau recipe on yet"
+    assert reason == "No past looping “gamma” flick to take settings from yet"
 
 
 def test_the_genau_lane_names_what_it_makes_in_the_overlays_word(qtbot):
@@ -846,8 +846,8 @@ def test_the_genau_lane_names_what_it_makes_in_the_overlays_word(qtbot):
 
 
 def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
-    # Otherwise Generate stays lit on a pick the lane has no recipe for, and the
-    # click can only end in "no recipe yet".
+    # Otherwise Generate stays lit on a pick the lane has no settings for, and the
+    # click can only end in "no past video yet".
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
     _pick_act(panel, "gamma")

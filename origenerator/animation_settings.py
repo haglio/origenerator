@@ -1,4 +1,4 @@
-"""The settings each animation runs, once accepted: one recipe per lane, act and
+"""The settings each animation runs, once accepted: one set per lane, act and
 starting state, in a file beside the library that reads as empty if it will not
 parse."""
 from __future__ import annotations
@@ -11,23 +11,23 @@ from origenerator.config import LIBRARY_STATE_DIR
 
 logger = logging.getLogger(__name__)
 
-RECIPES_PATH = LIBRARY_STATE_DIR / "animation_recipes.json"
+SETTINGS_PATH = LIBRARY_STATE_DIR / "animation_recipes.json"
 
 
 def _read(path: Path | None = None) -> dict:
-    path = path or RECIPES_PATH
+    path = path or SETTINGS_PATH
     if not path.is_file():
         return {}
     try:
         held = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
-        logger.warning("animation recipes unreadable (%s): starting empty", e)
+        logger.warning("animation settings unreadable (%s): starting empty", e)
         return {}
     return held if isinstance(held, dict) else {}
 
 
 def _write(held: dict, path: Path | None = None) -> None:
-    path = path or RECIPES_PATH
+    path = path or SETTINGS_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     beside = path.with_suffix(".partial.json")
     beside.write_text(json.dumps(held, indent=2, ensure_ascii=False) + "\n",
@@ -35,9 +35,9 @@ def _write(held: dict, path: Path | None = None) -> None:
     beside.replace(path)
 
 
-def recipe_for(lane: str, act: str, state: str, *, path: Path | None = None
+def settings_for(lane: str, act: str, state: str, *, path: Path | None = None
                ) -> dict | None:
-    """One animation's accepted settings, shaped like an overlay-curated recipe."""
+    """One animation's accepted settings, shaped like the overlay's pinned settings."""
     held = _read(path).get(lane, {}).get(act, {}).get(state)
     if not isinstance(held, dict) or not (held.get("workflow") or held.get("params")):
         return None
@@ -68,7 +68,7 @@ def accepted(*, path: Path | None = None) -> set[tuple[str, str, str]]:
             for state in states}
 
 
-class AcceptedRecipes:
+class AcceptedSettings:
     """The store the window writes through, handed in so a test can stand in."""
 
     def remember(self, lane: str, act: str, state: str, *, workflow: str,
@@ -79,5 +79,5 @@ class AcceptedRecipes:
         return accepted()
 
     def assigned(self, lane: str, act: str, state: str) -> dict | None:
-        return recipe_for(lane, act, state)
+        return settings_for(lane, act, state)
 

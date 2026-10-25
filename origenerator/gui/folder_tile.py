@@ -38,7 +38,7 @@ class FolderTile(QFrame):
     clicked = pyqtSignal(str)
     context_requested = pyqtSignal(str, QPoint)
 
-    _BADGE = BUTTON_ICON  # on-tile size of the recipe-level chip
+    _BADGE = BUTTON_ICON  # on-tile size of the folder-level chip
 
     def __init__(self, key, text, preview_paths, count, favorite=False,
                  context="", badge=None, parent=None):

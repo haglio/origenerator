@@ -1,4 +1,4 @@
-"""Pure logic for combining a gallery image + a video's recipe into new params."""
+"""Pure logic for combining a gallery image + a video's settings into new params."""
 from __future__ import annotations
 
 import json
@@ -28,7 +28,7 @@ def _picture(files):
     return gallery.output_file_reference(files or [])
 
 
-def test_a_combination_runs_the_recipe_on_the_dropped_picture_with_fresh_seeds():
+def test_a_combination_runs_the_settings_on_the_dropped_picture_with_fresh_seeds():
     video = _video_row(noise_seed=0, audio_seed=0, positive_prompt="a cat", steps=20)
     image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
@@ -41,7 +41,7 @@ def test_a_combination_runs_the_recipe_on_the_dropped_picture_with_fresh_seeds()
 
 
 def test_combined_params_fills_missing_params_from_workflow_defaults():
-    # A sparse video row (e.g. an import) still builds a full, submittable recipe.
+    # A sparse video row (e.g. an import) still builds full, submittable settings.
     video = _video_row(seed=3, noise_seed=9)
     image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
@@ -66,8 +66,8 @@ def test_combined_params_references_the_images_subfolder_output():
     assert params["input_image"] == "images/sdxl_new.png [output]"
 
 
-def test_combined_params_drops_the_recipes_stored_size():
-    # A recipe video carrying a size — an import's scraped one, or an unlocked
+def test_combined_params_drops_the_videos_stored_size():
+    # A source video carrying a size — an import's scraped one, or an unlocked
     # override — sized the frame IT ran on. Carried onto a differently shaped
     # image it would stretch it, so the swap drops it.
     video = _video_row(seed=3, noise_seed=9, width=720, height=928)
@@ -81,7 +81,7 @@ def test_combined_params_drops_the_recipes_stored_size():
 def test_combined_params_payload_derives_the_size_from_the_dropped_image():
     # The end of the same story: with no size carried over, the built graph
     # scales to the pixel budget and reads the size back off the result, rather
-    # than forcing the recipe's WxH onto an image of another shape.
+    # than forcing the video's WxH onto an image of another shape.
     video = _video_row(seed=3, noise_seed=9, width=720, height=928)
     image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
@@ -98,7 +98,7 @@ def test_combined_params_payload_derives_the_size_from_the_dropped_image():
 
 def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
     # The drop is gated on the workflow deriving its size, not on the key names:
-    # a workflow that sizes by hand has width/height as real recipe settings.
+    # a workflow that sizes by hand has width/height as real settings.
     class _ManualSize:
         derives_size_from_input = False
 
@@ -118,59 +118,59 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
 
     assert (params["width"], params["height"]) == (720, 928)
 
-# --- whether a run still says what its recipe video said --------------------
+# --- whether a run still says what its source video said --------------------
 
 
-def _recipe_run(**recipe_params):
-    recipe = _video_row(**recipe_params)
-    return recipe, gallery.combined_params(
-        recipe, _picture([{"filename": "sdxl_new.png", "subfolder": ""}]), _I2V)
+def _source_video_run(**video_params):
+    video = _video_row(**video_params)
+    return video, gallery.combined_params(
+        video, _picture([{"filename": "sdxl_new.png", "subfolder": ""}]), _I2V)
 
 
-def test_a_run_whose_negative_prompt_moved_off_its_recipes_differs_from_it():
-    recipe, params = _recipe_run(positive_prompt="alpha form", negative_prompt="beta")
+def test_a_run_whose_negative_prompt_moved_off_its_source_videos_differs_from_it():
+    video, params = _source_video_run(positive_prompt="alpha form", negative_prompt="beta")
 
-    assert not gallery.prompts_differ_from(params, recipe, _I2V)
-    assert gallery.prompts_differ_from({**params, "negative_prompt": "gamma"}, recipe, _I2V)
+    assert not gallery.prompts_differ_from(params, video, _I2V)
+    assert gallery.prompts_differ_from({**params, "negative_prompt": "gamma"}, video, _I2V)
 
 
 @pytest.mark.parametrize(("key", "words"), [("audio_prompt", "a low hum"),
                                              ("audio_negative_prompt", "static"),
                                              ("scene_lines", ["hello there"])])
-def test_the_audio_prompts_and_the_spoken_lines_are_words_of_the_recipe_too(key, words):
-    recipe, params = _recipe_run(positive_prompt="alpha form")
+def test_the_audio_prompts_and_the_spoken_lines_are_words_of_the_settings_too(key, words):
+    video, params = _source_video_run(positive_prompt="alpha form")
 
-    assert gallery.prompts_differ_from({**params, key: words}, recipe, _I2V)
+    assert gallery.prompts_differ_from({**params, key: words}, video, _I2V)
 
 
-def test_the_same_words_spaced_or_wrapped_differently_are_still_the_recipes():
-    recipe, params = _recipe_run(positive_prompt="alpha form,\r\ncalm", negative_prompt="beta")
+def test_the_same_words_spaced_or_wrapped_differently_are_still_the_source_videos():
+    video, params = _source_video_run(positive_prompt="alpha form,\r\ncalm", negative_prompt="beta")
 
     respaced = {**params, "positive_prompt": "alpha form, calm  ", "negative_prompt": " beta"}
 
-    assert not gallery.prompts_differ_from(respaced, recipe, _I2V)
+    assert not gallery.prompts_differ_from(respaced, video, _I2V)
 
 
-def test_a_run_carrying_no_lines_says_what_a_recipe_with_empty_lines_says():
-    recipe, params = _recipe_run(positive_prompt="alpha form")
+def test_a_run_carrying_no_lines_says_what_settings_with_empty_lines_say():
+    video, params = _source_video_run(positive_prompt="alpha form")
     params.pop("scene_lines")
 
-    assert not gallery.prompts_differ_from(params, recipe, _I2V)
+    assert not gallery.prompts_differ_from(params, video, _I2V)
 
 
 def test_a_run_missing_a_prompt_reads_it_as_the_workflows_default():
-    recipe, params = _recipe_run(positive_prompt="alpha form")
+    video, params = _source_video_run(positive_prompt="alpha form")
     params.pop("audio_negative_prompt")
 
-    assert not gallery.prompts_differ_from(params, recipe, _I2V)
+    assert not gallery.prompts_differ_from(params, video, _I2V)
 
 
-def test_the_words_the_genau_lane_adds_are_words_the_recipe_never_said():
-    recipe, params = _recipe_run(positive_prompt="alpha form", negative_prompt="beta")
+def test_the_words_the_genau_lane_adds_are_words_the_source_video_never_said():
+    video, params = _source_video_run(positive_prompt="alpha form", negative_prompt="beta")
 
-    assert gallery.prompts_differ_from(gallery.cycle_shaped(params, _I2V), recipe, _I2V)
+    assert gallery.prompts_differ_from(gallery.cycle_shaped(params, _I2V), video, _I2V)
 
-# --- curated_params: the overlay's hand-tuned act recipe on a dropped image ---
+# --- curated_params: the overlay's hand-tuned act settings on a dropped image ---
 
 
 _SPEC = {
@@ -193,7 +193,7 @@ def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
 
 
 def test_curated_params_rerolls_every_seed():
-    # A curated recipe has no exemplar run to reproduce; a pinned seed would
+    # Curated settings have no exemplar run to reproduce; a pinned seed would
     # render the identical video for the same image every time.
     image = _picture([{"filename": "sdxl_new.png", "subfolder": ""}])
 
@@ -208,10 +208,10 @@ def test_a_picture_with_no_file_on_disk_cannot_be_curated():
     assert gallery.curated_params(_SPEC, _picture(None), _I2V) is None
 
 
-def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
-    # A curated recipe stored before the stages had their own strength names one
+def test_settings_written_against_the_shared_strength_still_render_at_it():
+    # Curated settings stored before the stages had their own strength name one
     # shared number and a zero per stage; the workflow reads those the way it
-    # always did, so the recipe keeps producing what it was tuned to produce.
+    # always did, so the settings keep producing what it was tuned to produce.
     spec = {"workflow": "wan22_i2v",
             "params": {"cfg": 1.0, "cfg_high": 0.0, "cfg_low": 0.0, "steps": 8}}
 
@@ -221,7 +221,7 @@ def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
 
     assert [n["inputs"]["cfg"] for n in samplers] == [1.0, 1.0]
 
-# --- shaping a recipe into one cycle, for the lane that scrubs it ------------
+# --- shaping settings into one cycle, for the lane that scrubs them ---------
 
 _LOOP = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
 
@@ -230,7 +230,7 @@ def _shaped(category="", **over):
     return gallery.cycle_shaped(dict(_LOOP.default_params(), **over), _LOOP, category)
 
 
-def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
+def test_genau_settings_are_generated_at_the_shortest_length_that_closes():
     """Genau steers whatever it is given as ONE cycle, so the ideal clip is the
     shortest that holds exactly one — 13 frames by the cadence arithmetic. It is
     29 because the model cannot CLOSE a loop that short: measured at a fixed
@@ -239,17 +239,17 @@ def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
     assert _shaped()["frame_count"] == combine.CYCLE_FRAMES == 29
 
 
-def test_a_genau_recipe_plays_at_the_top_rate_the_writer_allows():
+def test_genau_settings_play_at_the_top_rate_the_writer_allows():
     """29 frames of one cycle is far too coarse to scrub slowly, which is most
     of what Genau is for. The frames in between are interpolated after decode, so
     asking for the top rate costs a pass rather than sampler time."""
     assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS
 
 
-def test_the_words_that_ask_for_one_cycle_are_added_to_the_recipes_own():
+def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
     """At 29 frames the model fits about two cycles left to itself, so the lane
-    asks for one outright. Added to the recipe's prompt rather than replacing it:
-    the recipe says what the clip is OF, and this says how it moves."""
+    asks for one outright. Added to the video's prompt rather than replacing it:
+    the prompt says what the clip is OF, and this says how it moves."""
     shaped = _shaped(positive_prompt="alpha form", negative_prompt="beta")
 
     assert shaped["positive_prompt"].startswith("alpha form ")
@@ -281,8 +281,8 @@ def test_an_overlay_carrying_no_words_leaves_the_prompt_exactly_as_it_was(monkey
     assert shaped["frame_count"] == combine.CYCLE_FRAMES
 
 
-def test_a_recipe_with_nothing_to_shape_is_handed_back_as_it_is():
-    # This shapes a recipe; it does not invent one. A workflow with no length and
+def test_settings_with_nothing_to_shape_are_handed_back_as_they_are():
+    # This shapes settings; it does not invent them. A workflow with no length and
     # no rate to set has neither.
     params = {"positive_prompt": "alpha", "seed": 3}
 

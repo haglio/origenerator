@@ -1,10 +1,10 @@
-"""Combine: a video's recipe run again on a dropped picture.
+"""Combine: a video's settings run again on a dropped picture.
 
 The fifth of the gallery's screen concerns to come out of the view that used to
 hold all of them. What lives here is the whole act -- the panel with its two drop
 slots, what a dropped item lends each and how it shows there, the lane and
-the act picked beside them, and every way a recipe is found and launched: the
-dropped video's own, the one pinned in the overlay for an act, or the one a local
+the act picked beside them, and every way settings are found and launched: the
+dropped video's own, those pinned in the overlay for an act, or those a local
 model mines out of past clips that fit the picture's situation.
 
 Two things ride with it because nothing else has them. The stand-in row a press
@@ -29,11 +29,11 @@ from typing import Protocol
 from PyQt6.QtCore import QObject
 
 from origenerator import (
+    act_settings,
     animation_paths,
-    animation_recipes,
+    animation_settings,
     evolver_export,
     gallery,
-    recipe_match,
 )
 from origenerator.animate_command import what_to_animate
 from origenerator.check_animations import the_animation_window
@@ -43,7 +43,6 @@ from origenerator.config import (
     LOCAL_LLM_MODEL,
     OUTPUT_PLACES,
 )
-from origenerator.content import genau_flick_word
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
@@ -71,6 +70,8 @@ ALREADY_MAKING_ONE = "already making it — handing that one over"
 # is minutes of the one machine spent on a clip that was never going to work.
 NOT_A_PICTURE = "only a picture can be animated"
 
+NO_PAST_VIDEO = "No past video yet"
+
 
 class CombineHost(Protocol):
     """What a combine needs of the gallery around it, and nothing else."""
@@ -94,7 +95,7 @@ class CombineHost(Protocol):
 
     def off_thread(self, work, done) -> None:
         """Run one slow call away from the UI and hand its result back here —
-        asking the model which recipe fits is seconds of network wait."""
+        asking the model which video fits is seconds of network wait."""
 
     def queue_changed(self) -> None:
         """Redraw the line: a stand-in row went on it or came off it."""
@@ -112,7 +113,7 @@ class CombineHost(Protocol):
 
 
 class CombineController(QObject):
-    """The combine panel, and every way a recipe reaches a dropped picture."""
+    """The combine panel, and every way settings reach a dropped picture."""
 
     def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
                  info_tabs_of, slideshows, inbox: evolver_export.EvolverInbox | None = None,
@@ -139,14 +140,14 @@ class CombineController(QObject):
         # anything that can't be mistaken for a prompt id.
         self._launching: dict[str, InFlightItem] = {}
         self._launch_seq = 0
-        # Pictures a spoken animation is still finding a recipe for: the mined
+        # Pictures a spoken animation is still finding settings for: the mined
         # tier asks a local model, which thinks for several seconds, and that is
         # exactly the silence a second command is said into.
         self._genau_resolving: set[str] = set()
         # Combine: drop an image + an i2v video, Generate re-runs that video's
-        # recipe on the image. Needs a client to generate, so it hides without one.
+        # settings on the image. Needs a client to generate, so it hides without one.
         self.panel = CombinePanel(
-            self._picture_lent_by, self._recipe_lent_by, self._slot_preview,
+            self._picture_lent_by, self._video_lent_by, self._slot_preview,
             self._video_history, named=self._names.prompt_id_of, name_of=self._name_of,
             browse_picture=self._browse_picture)
         self.panel.video_used.connect(self._db.record_combine_video_use)
@@ -223,7 +224,7 @@ class CombineController(QObject):
         return prompt_id if prompt_id and self._accepts_image(prompt_id) else None
 
     def _rebuildable_video_row(self, row) -> bool:
-        """Whether ``row`` is a video whose i2v recipe the app can rebuild — so its
+        """Whether ``row`` is a video whose i2v settings the app can rebuild — so its
         settings can be re-run on a new image. (``is_image_conditioned`` already
         implies the workflow is registered.) The shared gate under both the video
         drop slot and the category dropdown's candidate pool."""
@@ -235,7 +236,7 @@ class CombineController(QObject):
     def _accepts_video(self, prompt_id: str) -> bool:
         return self._rebuildable_video_row(self._db.get_generation(prompt_id))
 
-    def _recipe_lent_by(self, prompt_id: str) -> str | None:
+    def _video_lent_by(self, prompt_id: str) -> str | None:
         return prompt_id if self._accepts_video(prompt_id) else None
 
     def _slot_preview(self, prompt_id: str) -> tuple[str | None, str | None]:
@@ -276,7 +277,7 @@ class CombineController(QObject):
         image_id = saved.get("image")
         if image_id and self._accepts_image(image_id):
             self.panel.image_slot.set_item(image_id)
-        self.panel.set_intent(saved.get("intent") or recipe_match.VIDEO)
+        self.panel.set_intent(saved.get("intent") or act_settings.VIDEO)
         videos = saved.get("videos")
         if not isinstance(videos, dict):
             videos = {self.panel.selected_intent(): saved.get("video")}
@@ -286,19 +287,18 @@ class CombineController(QObject):
 
     def rebuildable_videos(self, rows: list[dict]) -> list[dict]:
         """The completed, rebuildable i2v videos among ``rows`` — the pool an act's
-        recipe is mined from (each carries the prompt it was made from, which names
-        its act)."""
+        settings are mined from, each carrying the act it was launched as."""
         return [row for row in rows
                 if row.get("status") == GenerationStatus.COMPLETED
                 and self._rebuildable_video_row(row)]
 
     def offer_the_acts(self, rows: list[dict]) -> None:
         """Gray out the acts this press could not answer: those with no video to
-        mine a recipe from, and -- once a picture is in the slot -- those
+        mine settings from, and -- once a picture is in the slot -- those
         :mod:`origenerator.animation_paths` says it cannot start from. A picture
         nobody has sorted yet narrows nothing."""
         lane = self.panel.selected_intent()
-        offered = recipe_match.available_categories(
+        offered = act_settings.available_categories(
             self.rebuildable_videos(rows), lane)
         state = self._state_of(self.panel.image_slot.current_id())
         if state:
@@ -332,7 +332,7 @@ class CombineController(QObject):
     # --- the line's answer to the press, before there is a job ---------------
 
     def _on_request(self, request) -> None:
-        """Answer one press of the panel: run the chosen recipe now, or hand it to
+        """Answer one press of the panel: run the chosen settings now, or hand them to
         a generate tab to change first (:class:`CombineRequest`)."""
         if request.edit_first:
             if request.category:
@@ -386,7 +386,7 @@ class CombineController(QObject):
 
     def _show_launching(self, image_id: str, *, category: str = "",
                         video_id: str | None = None,
-                        intent: str = recipe_match.VIDEO) -> str:
+                        intent: str = act_settings.VIDEO) -> str:
         """Put a stand-in row at the back of the line for a Generate just pressed,
         and return its key. It carries everything already known about the run, so
         the row that replaces it is the same row with its price filled in, and it
@@ -398,8 +398,8 @@ class CombineController(QObject):
                  if video_id and not category else None)
         edited = False
         if built is not None:
-            workflow, params, recipe_row, _image_row = built
-            edited = gallery.prompts_differ_from(params, recipe_row, workflow)
+            workflow, params, _video_row, _image_row = built
+            edited = gallery.prompts_differ_from(params, video_row, workflow)
         self._launching[key] = InFlightItem(
             key=key,
             caption="A video from Combine, still being started",
@@ -407,11 +407,11 @@ class CombineController(QObject):
             reveal=lambda: None,  # no folder to open yet: it has no settings
             media_type=MediaType.VIDEO,
             job_kind=gallery.JobKind.VIDEO,
-            recipe_category=category,
+            act=category,
             # The same rule the finished row follows: a picked act names itself in
             # the text, and only a dropped video is shown.
-            recipe_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
-            recipe_prompt_edited=edited,
+            source_video_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
+            prompt_edited=edited,
             source_image=self._picture_reference(image_id),
             starting=True,
         )
@@ -432,21 +432,21 @@ class CombineController(QObject):
     # --- building and launching a combination --------------------------------
 
     def _combined_params(self, image_id: str, video_id: str,
-                         intent: str = recipe_match.VIDEO, category: str = ""):
+                         intent: str = act_settings.VIDEO, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
-        ``video_id``'s recipe on ``image_id`` — the video's workflow and settings,
+        ``video_id``'s settings on ``image_id`` — the video's workflow and params,
         fresh seeds, and the dropped picture as the input image; ``image_row``
         is ``None`` for a picture browsed from outside the gallery.
 
-        Under ``GENAU`` the recipe is then re-cut to hold one cycle and smoothed
+        Under ``GENAU`` the settings are then re-cut to hold one cycle and smoothed
         back out (:func:`~origenerator.gallery.combine.cycle_shaped`). The lane
-        used to choose only WHICH recipe was mined, and from there a Genau flick
+        used to choose only WHICH settings were mined, and from there a Genau flick
         was made exactly like any other video; it can't be, because what Genau
         needs of a clip is a property of the clip's own length, and the past clip
         being mined was made before anyone knew that.
 
         ``None`` when the pair can't be combined: the video row is gone or isn't
-        a rebuildable image-conditioned recipe, or there is no picture file to
+        a rebuildable image-conditioned video, or there is no picture file to
         seed from. Shared by the Generate and Open-in-generator paths.
         """
         image_row = self._db.get_generation(image_id)
@@ -456,17 +456,17 @@ class CombineController(QObject):
         workflow_name = video_row.get("workflow_name") or ""
         workflow = WORKFLOW_REGISTRY.get(workflow_name)
         if workflow is None or not gallery.is_image_conditioned(workflow_name):
-            return None  # the video must be a rebuildable, image-conditioned recipe
+            return None  # the video must be rebuildable and image-conditioned
         params = gallery.combined_params(video_row, self._picture_reference(image_id), workflow)
         if params is None:
             return None  # no picture file to seed from
-        if intent == recipe_match.GENAU:
+        if intent == act_settings.GENAU:
             params = gallery.cycle_shaped(params, workflow, category)
         return workflow, params, video_row, image_row
 
     def _open_combination(self, image_id: str, video_id: str, category: str = "",
-                          intent: str = recipe_match.VIDEO) -> None:
-        """Open a dropped image + video's recipe as an editable generate tab instead
+                          intent: str = act_settings.VIDEO) -> None:
+        """Open a dropped image + video's settings as an editable generate tab instead
         of running it — the combine panel's "Edit individual…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
         and shows the pair it was opened with rather than an empty pane."""
@@ -491,7 +491,7 @@ class CombineController(QObject):
         panel = self._info_tabs_of().open_config(workflow.name, params)
         if panel is None:
             return
-        panel.set_recipe_source(category, video_id, intent)
+        panel.set_settings_source(category, video_id, intent)
         panel.show_combination(Combination(
             still, self._host.animated_preview(video_row) if video_row is not None else None))
 
@@ -506,8 +506,8 @@ class CombineController(QObject):
 
     def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
                               category: str = "",
-                              intent: str = recipe_match.VIDEO) -> None:
-        """Generate a new video from a dropped image + a dropped video's recipe,
+                              intent: str = act_settings.VIDEO) -> None:
+        """Generate a new video from a dropped image + a dropped video's settings,
         landing it in the folder for that (image × settings) combination.
 
         ``send`` hands the clip to Genau the moment it exists, as a spoken
@@ -524,8 +524,8 @@ class CombineController(QObject):
             return
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
-            self._db.set_recipe_source(prompt_id, category=category,
-                                       video_prompt_id=video_id)
+            self._db.set_settings_source(prompt_id, category=category,
+                                         video_prompt_id=video_id)
             if not category:
                 self._db.record_combine_video_use(intent, video_id, prompt_id)
             self._mark_for_sending(prompt_id, send)
@@ -545,10 +545,10 @@ class CombineController(QObject):
         self._host.reveal_launch(key)
         return True
 
-    # --- finding the recipe an act names --------------------------------------
+    # --- finding the settings an act names ------------------------------------
 
     def _category_candidates(self) -> list:
-        """The recipe pool, read fresh at generate time rather than from the last
+        """The pool of past videos, read fresh at generate time rather than from the last
         rebuild — the gallery may have gained a video since."""
         return self.rebuildable_videos(self._db.list_generations())
 
@@ -563,12 +563,12 @@ class CombineController(QObject):
         return video_row.get("positive_prompt") or ""
 
     def _resolve_category(self, image_id: str, category: str, intent: str, then) -> None:
-        """Find the recipe that fits ``category`` for the dropped image, then call
+        """Find the video that fits ``category`` for the dropped image, then call
         ``then(video_id)`` with a rebuildable video's ``prompt_id`` — or ``None``,
         with a hint on screen so a click never silently does nothing.
 
-        :func:`recipe_match.smart_recipe` first, then
-        :func:`recipe_match.best_recipe`; under ``GENAU`` both see only the looping
+        :func:`act_settings.scene_matched_video` first, then
+        :func:`act_settings.most_used_video`; under ``GENAU`` both see only the looping
         clips, so the hint names that narrower pool. The match runs off the UI
         thread and answers through ``then``, because the model thinks for 4 to 9
         seconds, measured here; everything it needs is gathered first, so the pool
@@ -585,44 +585,39 @@ class CombineController(QObject):
         scene = (image_row or {}).get("positive_prompt") or ""
 
         def match():
-            fitting = image_row is not None and recipe_match.smart_recipe(  # no scene outside
+            fitting = image_row is not None and act_settings.scene_matched_video(  # no scene outside
                 category, scene, candidates,
                 base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
                 system_prompt=VIDEO_SCENE_MATCH_SYSTEM_PROMPT, intent=intent,
             )
-            return fitting or recipe_match.best_recipe(category, candidates, intent)
+            return fitting or act_settings.most_used_video(category, candidates, intent)
 
         def resolved(video_id):
-            logger.info("combine: category=%s intent=%s image=%s -> recipe from %s",
+            logger.info("combine: category=%s intent=%s image=%s -> settings from %s",
                         category, intent, image_id, video_id)
             if video_id is None:
-                self._say_no_recipe(category, intent)
+                self._say_no_past_video(category, intent)
             then(video_id)
 
         self._host.off_thread(match, resolved)
 
-    def _say_no_recipe(self, category: str, intent: str) -> None:
-        """Say the act has nothing to build a recipe from — in the corner of the
+    def _say_no_past_video(self, category: str, intent: str) -> None:
+        """Say the act has no past video to take settings from — at the top of the
         fullscreen surface being spoken to when one is up, and in a dialog
         otherwise. A dialog thrown over a picture someone is looking at is the one
         place this must never appear."""
-        what = (f"looping “{category}” {genau_flick_word()}" if intent == recipe_match.GENAU
-                else f"“{category}” video")
+        said = act_settings.no_past_video(category, intent)
         if self._slideshows.showing is not None:
-            self._slideshows.note_voice_run(
-                None, f"no past {what} to base a recipe on yet", kind=WARNING)
+            self._slideshows.note_voice_run(None, said, kind=WARNING)
             return
-        self._host.tell(
-            "No recipe yet",
-            f"No past {what} to base a recipe on yet — make one first, "
-            "or drop a specific video instead.",
-        )
+        self._host.tell(NO_PAST_VIDEO, f"{act_settings.as_sentence(said)} — make one first, "
+                                       "or drop a specific video instead.")
 
     def _curated_combination(self, image_id: str, category: str,
-                             intent: str = recipe_match.VIDEO):
+                             intent: str = act_settings.VIDEO):
         """The ``(workflow, params)`` for ``category``'s overlay-curated ``intent``
-        recipe on the dropped image — the pinned setup that outranks mining (see
-        :func:`recipe_match.curated_recipe`), its seeds freshly rolled.
+        settings on the dropped image — the pinned setup that outranks mining (see
+        :func:`act_settings.pinned_settings`), its seeds freshly rolled.
 
         ``None`` sends the caller on to mining: the act has no accepted settings
         and no curated entry, the entry names an unknown or
@@ -637,8 +632,8 @@ class CombineController(QObject):
         # different runs, and the overlay's per-act pin can only ever be right
         # for one of them. It stays as the answer for a picture nobody has
         # sorted, and for an animation nobody has accepted settings for yet.
-        spec = (animation_recipes.recipe_for(intent, category, self._state_of(image_id))
-                or recipe_match.curated_recipe(category, intent))
+        spec = (animation_settings.settings_for(intent, category, self._state_of(image_id))
+                or act_settings.pinned_settings(category, intent))
         if spec is None:
             return None
         workflow = WORKFLOW_REGISTRY.get(spec.get("workflow") or "")
@@ -649,29 +644,29 @@ class CombineController(QObject):
         params = gallery.curated_params(spec, reference, workflow)
         if params is None:
             return None
-        if intent == recipe_match.GENAU:
+        if intent == act_settings.GENAU:
             params = gallery.cycle_shaped(params, workflow, category)
         return workflow, params
 
     def _generate_curated(self, image_id: str, category: str, intent: str,
                           send: bool) -> bool:
-        """Launch ``category``'s curated ``intent`` recipe on the dropped image;
+        """Launch ``category``'s curated ``intent`` settings on the dropped image;
         ``False`` when the act has no usable curated entry, so the caller falls back
         to mining."""
         built = self._curated_combination(image_id, category, intent)
         if built is None:
             return False
         workflow, params = built
-        logger.info("combine: category=%s intent=%s image=%s -> curated recipe",
+        logger.info("combine: category=%s intent=%s image=%s -> pinned settings",
                     category, intent, image_id)
         key = self._host.folder_key_for(workflow.name, params, workflow.version)
         if self._already_making_one(key, send):
             return True
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
-            # The act, with no video under it: a curated recipe is pinned in the
+            # The act, with no video under it: curated settings are pinned in the
             # overlay, so there is no past run for the queue row to show in gray.
-            self._db.set_recipe_source(prompt_id, category=category)
+            self._db.set_settings_source(prompt_id, category=category)
             self._mark_for_sending(prompt_id, send)
             self._host.reveal_launch(key)
         return True
@@ -687,10 +682,10 @@ class CombineController(QObject):
             self._db.mark_genau_requested(prompt_id)
 
     def generate_category(self, image_id: str, category: str,
-                          intent: str = recipe_match.VIDEO, send: bool = False,
+                          intent: str = act_settings.VIDEO, send: bool = False,
                           launching: str | None = None) -> None:
-        """Run the recipe that fits ``category`` on the dropped image: the
-        overlay's curated recipe when one is pinned for the act, else the mined
+        """Run the settings that fit ``category`` on the dropped image: the
+        overlay's curated settings when some are pinned for the act, else the mined
         exemplar. ``intent`` chooses which lane both tiers answer from; ``send``
         hands the finished clip to Genau without a second ask, and holds the
         picture until the launch is a row (see :meth:`_already_genaud`).
@@ -712,7 +707,7 @@ class CombineController(QObject):
     def _combine_resolved(self, image_id: str, send: bool, category: str,
                           intent: str, launching: str | None,
                           video_id: str | None) -> None:
-        """The recipe match came back: run what it found on the image, if it
+        """The match came back: run what it found on the image, if it
         found anything. ``category`` is the act it was asked for, which the
         launched row records — the mined video answers it, but only the act says
         what the user actually chose.
@@ -730,12 +725,12 @@ class CombineController(QObject):
             self._drop_launching(launching)
 
     def _open_category(self, image_id: str, category: str,
-                       intent: str = recipe_match.VIDEO) -> None:
-        """Open the recipe that fits ``category`` as an editable generate tab — the
+                       intent: str = act_settings.VIDEO) -> None:
+        """Open the settings that fit ``category`` as an editable generate tab — the
         Open-in-generator counterpart to :meth:`generate_category`, honoring the
         same curated-over-mined order and the same lane.
 
-        A run started from that tab is an ordinary Generate, so a Genau recipe opened
+        A run started from that tab is an ordinary Generate, so Genau settings opened
         this way is not auto-sent; the tab's own Send-to-Genau does it once the clip
         is there.
         """
@@ -785,7 +780,7 @@ class CombineController(QObject):
         matched to this picture by its start frame, counted whether it is still
         coming or has landed, and read from the database so one reconnected after
         a restart still counts. A row that errored counts as nothing. The stretch
-        with no row at all -- the model thinking about which recipe fits -- is held
+        with no row at all -- the model thinking about which video fits -- is held
         in :attr:`_genau_resolving` instead.
         """
         if row.get("prompt_id") in self._genau_resolving:
@@ -811,17 +806,17 @@ class CombineController(QObject):
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != MediaType.IMAGE:
             return None, NOT_A_PICTURE, WARNING
-        loop = asked.lane == recipe_match.GENAU
+        loop = asked.lane == act_settings.GENAU
         if loop and self._already_genaud(row):
             return None, ALREADY_GENAUD, WARNING
         answer = what_to_animate(asked, row.get("picture_state") or "")
         if answer.act is None:
             return None, answer.said, ERROR if answer.unsupported else WARNING
         act = answer.act
-        available = recipe_match.available_categories(
+        available = act_settings.available_categories(
             self.rebuildable_videos(self._db.list_generations()), asked.lane)
         if act not in available:
-            return None, f"no “{act}” recipe to base this on yet", WARNING
+            return None, act_settings.no_past_video(act, asked.lane), WARNING
         logger.info("animate as: image=%s lane=%s -> act=%s", image_id, asked.lane, act)
         self.generate_category(image_id, act, asked.lane, send=loop)
         return image_id, f"animating as “{act}”", NOTICE

@@ -1,7 +1,7 @@
 """Drain the color out of a picture shown only for what it configures.
 
 A video dropped into the combine panel is not what is being made — it is the
-recipe the run will follow. In full color beside the frame it will animate it
+video whose settings the run will follow. In full color beside the frame it will animate it
 reads as a second subject, and a queue row showing it alone reads as a job that
 is that video. Gray says outright that it is a setting rather than a result, so
 every surface a config-only video reaches draws it through here.

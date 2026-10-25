@@ -17,7 +17,7 @@ A row carrying ``RECENT_ROLE`` is one of the folders lately worked in, and wears
 a dot at the pane's own left edge — the same place on every row, whatever its
 depth, so the marks read down the edge as one column. The tree no longer lifts a
 folder when something lands in it — it stays where the row that made it put it,
-so the order the recipes were tried in survives — and the dot is what is left to
+so the order the settings were tried in survives — and the dot is what is left to
 say where the work has been.
 
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered

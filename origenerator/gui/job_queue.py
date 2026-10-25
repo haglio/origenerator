@@ -1,7 +1,7 @@
 """Every generation this app makes, from the press to the saved row.
 
 Two shapes arrive — a fresh variation of a settings folder (a re-roll) and a
-video built from an arbitrary image on another video's recipe (a combine) — and
+video built from an arbitrary image on another video's settings (a combine) — and
 both are keyed by their settings folder, so a combine reconnects and lands in
 its folder exactly as a re-roll does.
 
@@ -74,7 +74,7 @@ def _outcome_of(db, job, *, ok: bool, seconds: float | None = None) -> RunOutcom
     """
     return RunOutcome(
         kind=gallery.job_kind_label(job.workflow.name),
-        recipe=job.workflow.display_name,
+        display_name=job.workflow.display_name,
         seconds=elapsed_since(job.started_at) if seconds is None else seconds,
         ok=ok,
         source=job.source,
@@ -357,7 +357,7 @@ class JobQueue(QObject):
         self._reroll_variation(key, row, image_rows, new_image=True, new_video=False)
 
     def _reroll_variation(self, key, row, image_rows, *, new_image, new_video):
-        """Launch ``row``'s recipe with each seed independently re-rolled or kept.
+        """Launch ``row``'s settings with each seed independently re-rolled or kept.
 
         The video seed is re-rolled (``new_video``) or reused as stored; the start
         frame is freshly regenerated (``new_image``, when it's a re-buildable

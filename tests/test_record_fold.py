@@ -98,9 +98,9 @@ def test_a_folder_of_your_own_holding_both_records_holds_the_one_that_stays_once
 def test_a_combine_made_from_the_folded_record_names_the_one_that_stays(tmp_path):
     db = _two_records(tmp_path)
     _row(db, "combined", status="running")
-    db.set_recipe_source("combined", category="alpha", video_prompt_id="repeat")
+    db.set_settings_source("combined", category="alpha", video_prompt_id="repeat")
 
     _fold_repeat_into_first(db)
 
     combined = db.get_generation("combined")
-    assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "first")
+    assert (combined["act"], combined["source_video"]) == ("alpha", "first")

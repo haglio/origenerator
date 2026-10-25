@@ -11,6 +11,7 @@ import pytest
 
 from origenerator import provenance
 from origenerator.db import Database
+from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 # When each version of a workflow landed, as its file's history would say.
@@ -55,7 +56,7 @@ def _ran(db, prompt_id, version, *, launched, finished, trimmed_from=None, graph
         "workflow_json": json.dumps(graph or {}), "created_at": launched,
         "completed_at": finished,
         "trimmed_from": trimmed_from,
-        "provenance": json.dumps({"recipe": "sdxl_t2i", "recipe_version": version})})
+        "provenance": json.dumps({WORKFLOW: "sdxl_t2i", WORKFLOW_VERSION: version})})
 
 
 def _block(db, prompt_id):
@@ -63,7 +64,7 @@ def _block(db, prompt_id):
 
 
 def _known(block):
-    return block["recipe"], block["recipe_version"], block["recipe_version_basis"]
+    return block[WORKFLOW], block[WORKFLOW_VERSION], block[BASIS]
 
 
 def test_a_row_launched_before_stamping_is_stamped_with_the_version_it_recorded(tmp_path):
@@ -73,13 +74,13 @@ def test_a_row_launched_before_stamping_is_stamped_with_the_version_it_recorded(
     provenance.stamp_unstamped(db)
 
     block = _block(db, "gen-alpha")
-    assert (block["recipe"], block["recipe_version"], block["recipe_version_basis"],
+    assert (block[WORKFLOW], block[WORKFLOW_VERSION], block[BASIS],
             block["app_commit"]) == ("sdxl_t2i", "v003", "recorded", None)
 
 
 def test_a_row_its_launch_stamped_keeps_that_stamp(tmp_path):
     db = Database(tmp_path / "origenerator.db")
-    stamped = json.dumps({"recipe": "sdxl_t2i", "recipe_version": "v004",
+    stamped = json.dumps({WORKFLOW: "sdxl_t2i", WORKFLOW_VERSION: "v004",
                           "app_commit": "c0ffee"})
     _launched(db, "gen-beta", version="v004", provenance=stamped)
 
@@ -371,3 +372,9 @@ def test_every_workflow_declares_its_version_in_a_form_its_history_can_find(name
 
     assert [version for _landed, version in provenance.version_history(copy)] == [
         workflow.version]
+
+
+def test_the_stamp_keeps_what_ran_under_the_keys_it_was_first_written_with():
+    # Every row's block, and every library video's sidecar, holds them already.
+    assert (WORKFLOW, WORKFLOW_VERSION, BASIS) == (
+        "recipe", "recipe_version", "recipe_version_basis")

@@ -18,7 +18,7 @@ class RunOutcome:
     """
 
     kind: str
-    recipe: str
+    display_name: str
     seconds: float | None
     ok: bool
     source: str
@@ -46,7 +46,7 @@ def notice_for(outcome: RunOutcome) -> Notice | None:
     if title is None or outcome.seconds is None or outcome.seconds < LONG_RUN_SECONDS:
         return None
     took = clock_duration(outcome.seconds)
-    body = f"{outcome.recipe} · {took}" if outcome.ok else f"{outcome.recipe} · stopped after {took}"
+    body = f"{outcome.display_name} · {took}" if outcome.ok else f"{outcome.display_name} · stopped after {took}"
     return Notice(title, body, ok=outcome.ok, generation=outcome.generation)
 
 
@@ -56,7 +56,7 @@ def outcome_of_row(row: dict, *, ok: bool, seconds: float | None) -> RunOutcome:
     workflow = WORKFLOW_REGISTRY.get(workflow_name)
     return RunOutcome(
         kind=job_kind_label(workflow_name),
-        recipe=workflow.display_name if workflow is not None else workflow_name,
+        display_name=workflow.display_name if workflow is not None else workflow_name,
         seconds=seconds,
         ok=ok,
         source=source_of(row),

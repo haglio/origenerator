@@ -1,9 +1,9 @@
-"""Combine a gallery image with a video recipe into new i2v params.
+"""Combine a gallery image with a video's settings into new i2v params.
 
-The gallery already holds both halves of an I2V: a video row carries a
-full recipe (workflow + settings + seed), and any image row's output file can seed
-an i2v. This readies a recipe to re-run on a *different* image — the one input a
-user picks — without touching a Generate tab. The recipe is either a past video's
+The gallery already holds both halves of an I2V: a video row carries its
+full settings (workflow, params and seed), and any image row's output file can seed
+an i2v. This readies them to re-run on a *different* image — the one input a
+user picks — without touching a Generate tab. The settings are either a past video's
 (:func:`combined_params`) or the overlay's hand-tuned spec for an act
 (:func:`curated_params`), and either one runs with fresh seeds. Qt-free so it
 stays unit-testable.
@@ -24,7 +24,7 @@ _CONTENT = load_content()
 #
 # It is 29 because the model cannot close a loop that short. First-last-frame
 # conditions both ends on the same picture, but the model needs room to come
-# BACK to it, and measured over one recipe at a fixed seed the last frame lands
+# BACK to it, and measured over one video's settings at a fixed seed the last frame lands
 # this far from the first: 13 frames -2.02%, 17 +1.34%, 21 +0.99%, 29 +0.23%,
 # 41 -0.19%, 81 +0.05%. Under 29 the lighting visibly pops on every repeat; at
 # 29 it stops. So the length is set by the loop closing, and the ONE cycle is
@@ -46,15 +46,15 @@ CYCLE_FRAMES = 29
 # In the overlay rather than here for the reason every other phrase the library
 # speaks in is: this file is public, and the sanitize guard bans that vocabulary
 # from the tracked tree. An overlay with none of this leaves every prompt exactly
-# as its recipe wrote it.
+# as its settings wrote it.
 _CYCLE_WORDS: dict = _CONTENT.get("genau_flick_prompts") or {}
 
 
 def combined_params(video_row: dict, input_image: str | None, workflow) -> dict | None:
-    """The video's recipe readied to run on ``input_image`` -- what the graph
+    """The video's settings readied to run on ``input_image`` -- what the graph
     loads the new picture by -- with fresh seeds. ``None`` with no picture.
 
-    A size-deriving recipe's stored ``width``/``height`` sized its OWN frame,
+    A size-deriving workflow's stored ``width``/``height`` sized its OWN frame,
     so they are dropped: left in, they would stretch the new picture to them.
     """
     params = _run_on(input_image, filled_params(video_row, workflow), workflow)
@@ -65,10 +65,10 @@ _PROMPT_KEYS = ("positive_prompt", "negative_prompt", "scene_lines",
                 "audio_prompt", "audio_negative_prompt")
 
 
-def prompts_differ_from(params: dict, recipe_row: dict, workflow) -> bool:
+def prompts_differ_from(params: dict, video_row: dict, workflow) -> bool:
     run = {**workflow.default_params(), **params}
-    recipe = filled_params(recipe_row, workflow)
-    return any(_words(run.get(key)) != _words(recipe.get(key)) for key in _PROMPT_KEYS)
+    followed = filled_params(video_row, workflow)
+    return any(_words(run.get(key)) != _words(followed.get(key)) for key in _PROMPT_KEYS)
 
 
 def _words(prompt):
@@ -78,7 +78,7 @@ def _words(prompt):
 
 
 def curated_params(spec: dict, input_image: str | None, workflow) -> dict | None:
-    """The overlay's hand-tuned act recipe readied to run on ``input_image``,
+    """The overlay's hand-tuned act settings readied to run on ``input_image``,
     with fresh seeds. ``None`` with no picture."""
     params = {**workflow.default_params(), **(spec.get("params") or {})}
     return _run_on(input_image, params, workflow)
@@ -95,7 +95,7 @@ def cycle_words(category: str = "") -> tuple[str, str]:
     default pair when that act has none of its own -- see :data:`_CYCLE_WORDS`.
 
     Empty strings when the overlay carries nothing at all, which is what leaves
-    a recipe's prompt untouched rather than appending a stray space.
+    a run's prompt untouched rather than appending a stray space.
     """
     words = _CYCLE_WORDS.get(category) or _CYCLE_WORDS.get("") or {}
     return ((words.get("positive") or "").strip(),
@@ -125,7 +125,7 @@ def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
       (:mod:`origenerator.workflows.frame_rate`).
 
     A workflow with no length or no rate to set is handed back unchanged: this
-    shapes a recipe, it does not invent one.
+    shapes settings, it does not invent them.
     """
     defaults = workflow.default_params()
     if "frame_count" not in defaults or "frame_rate" not in defaults:

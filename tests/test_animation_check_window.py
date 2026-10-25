@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionButton,
 )
 
+from origenerator.act_settings import VIDEO
 from origenerator.animation_check_session import AnimationCheckSession
 from origenerator.gui.animation_check_window import (
     ACCEPT,
@@ -38,7 +39,6 @@ from origenerator.gui.animation_check_window import (
     AnimationCheckWindow,
 )
 from origenerator.gui.stylesheet import COMMITS, build_stylesheet
-from origenerator.recipe_match import VIDEO
 
 _ORDER = [(VIDEO, "alpha", "state one"), (VIDEO, "beta", "state two")]
 

@@ -490,7 +490,7 @@ def _fox_library(tmp_path):
             _row("v1", "wan22_i2v",
                  {"positive_prompt": "the fox runs", "noise_seed": 5,
                   "input_image": "sdxl_t2i_g1.png"},
-                 "wan22_i2v_v1.mp4", recipe_category="alpha")]
+                 "wan22_i2v_v1.mp4", act="alpha")]
     for row in rows:
         row["thumbnail_path"] = str(tall)
         if row["workflow_name"] == "sdxl_t2i":
@@ -904,7 +904,7 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
 
     slideshow.slideshow_toggle_lock()
 
-    # The item held, not a sibling of it: every seed of one recipe shares a
+    # The item held, not a sibling of it: every seed of one set of settings shares a
     # settings folder, so a tab picked by folder came up on the wrong picture.
     assert opened == ["id-tall-0"]
     assert navigated == ["id-tall-0"]  # and the browser went there too

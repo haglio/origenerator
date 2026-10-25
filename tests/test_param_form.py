@@ -101,7 +101,7 @@ def test_browse_button_fits_its_caption(qtbot):
 
 def test_bool_param_renders_a_tick_control_and_round_trips(qtbot):
     # The enhance toggle is a "bool" ParamDef: a TickControl field that reads and
-    # writes True/False like any other value — so a stored recipe's flag comes
+    # writes True/False like any other value — so stored settings' flag comes
     # back checked/unchecked, and the emitted params carry a real bool.
     form = ParamForm([ParamDef("enhance", "Enhance", "bool", True)])
     qtbot.addWidget(form)
@@ -1028,7 +1028,7 @@ def test_param_form_set_values_updates_widgets(qtbot, sample_defs):
 
 def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     # A LoRA strength of 0.85 rounded to 0.8 by the field's own precision is a
-    # different render, and it is what goes back into the database as the recipe.
+    # different render, and it is what goes back into the database as the settings.
     form = ParamForm(sample_defs)
     qtbot.addWidget(form)
 
@@ -1056,7 +1056,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     (ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=161, step=4,
               options=[1, 5, 10], unit="s", rate=16.0), 21, 21),
 ])
-def test_every_kind_of_setting_reads_back_as_the_recipe_stores_it(qtbot, pd, written, read_back):
+def test_every_kind_of_setting_reads_back_as_the_row_stores_it(qtbot, pd, written, read_back):
     # What a field reads back is what a generation's params_json holds, and
     # Evolver reads that key by key: the value and its type both.
     form = ParamForm([pd])
@@ -1575,7 +1575,7 @@ def test_the_frames_a_duration_asks_for_dont_move_when_the_frame_rate_does(qtbot
 
 
 def test_a_loaded_frame_count_is_shown_as_the_seconds_it_really_runs(qtbot):
-    # A recipe saved before the rates were multiples carries 24 fps; it loads as
+    # Settings saved before the rates were multiples carry 24 fps; it loads as
     # the reachable rate beside it, and its frames still read as their own
     # seconds rather than being restated at whatever rate came with them.
     form = ParamForm(_video_defs())
@@ -1691,7 +1691,7 @@ def test_a_stored_story_fills_one_field_per_scene(qtbot):
     assert form.get_values() == stored
 
 
-def test_a_recipe_from_before_scenes_loads_as_one_scene_of_the_clips_length(qtbot):
+def test_settings_from_before_scenes_load_as_one_scene_of_the_clips_length(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     form.set_values({"positive_prompt": "one shot", "negative_prompt": "blurry", "frame_count": 121})
@@ -1817,8 +1817,8 @@ def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
     assert scene.fields["positive_prompt"].toPlainText() == "she pours a glass"
 
 
-def test_a_stored_spoken_recipe_opens_with_its_prompts_already_shut_down(qtbot):
-    # Loading a recipe fills the lines through the same textChanged path typing
+def test_stored_spoken_settings_open_with_their_prompts_already_shut_down(qtbot):
+    # Loading settings fills the lines through the same textChanged path typing
     # does, so a story opened from the gallery shows the trade without an edit.
 
     form = ParamForm(_scene_defs())
@@ -1881,8 +1881,8 @@ def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     assert "scene_lines" not in form.get_values()
 
 
-def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbot):
-    # A recipe from the overlay carries the clip length over the workflow's
+def test_settings_whose_lone_scene_disagrees_with_the_clip_follow_the_clip(qtbot):
+    # Settings from the overlay carry the clip length over the workflow's
     # default scene list; the clip length is what the graph runs a lone scene
     # for, so it is what the form shows and emits.
     form = ParamForm(_scene_defs())
@@ -2065,7 +2065,7 @@ def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot):
 def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
     # A preset needs no recording, and two fields under it read as a second
     # thing to fill in; they appear when the Voice is the custom one, and go
-    # with a recipe that stored it.
+    # with settings that stored it.
 
     form = ParamForm(_scene_defs() + _voice_defs())
     qtbot.addWidget(form)

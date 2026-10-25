@@ -947,7 +947,7 @@ class ParamForm(QWidget):
         if (self._scenes is not None and "frame_count" in params
                 and len(params.get("scene_frames") or []) < 2):
             # A lone scene is the whole clip and runs for the clip length, which
-            # is all a recipe from before scenes (or from the overlay) carries.
+            # is all that settings from before scenes (or from the overlay) carry.
             params = {**params, "scene_frames": [params["frame_count"]]}
         # The story first: it sets how many scenes there are, and every other
         # per-scene value is laid over the scenes it made.

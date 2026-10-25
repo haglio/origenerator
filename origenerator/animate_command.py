@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from origenerator import animation_paths
-from origenerator.recipe_match import CATEGORIES, GENAU, VIDEO
+from origenerator.act_settings import CATEGORIES, GENAU, VIDEO
 from origenerator.voice.text import sounds_like, words
 
 # The verb as whisper renders it, and every rendering of the loop lane's sound.

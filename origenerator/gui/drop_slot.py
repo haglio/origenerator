@@ -9,7 +9,7 @@ knows only prompt_ids; the view supplies ``lent_by`` and the preview.
 
 A slot whose item is held only for its settings is built ``grayscale``, and draws
 whatever lands in it drained of color (:mod:`origenerator.gui.grayscale`) — the
-video slot's whole purpose being the recipe rather than the clip.
+video slot's whole purpose being the clip's settings rather than the clip.
 """
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ import json
 
 def _launcher(db, client, enhance_settings):
     """Queue one video of a sample's own picture with the prompts as edited: the
-    same recipe, its seeds re-rolled so it cannot reproduce the sample."""
+    same settings, their seeds re-rolled so it cannot reproduce the sample."""
     from origenerator import gallery
     from origenerator.generation_config import randomize_seeds
     from origenerator.gui.enhance_controller import launch_enhancements
@@ -56,9 +56,9 @@ def _launcher(db, client, enhance_settings):
 
 
 def the_animation_window():
-    from origenerator import animation_samples, gallery, recipe_match
+    from origenerator import act_settings, animation_samples, gallery
     from origenerator.animation_check_session import AnimationCheckSession
-    from origenerator.animation_recipes import AcceptedRecipes
+    from origenerator.animation_settings import AcceptedSettings
     from origenerator.app_state import AppState
     from origenerator.comfyui_client import ComfyUIClient
     from origenerator.config import (
@@ -91,8 +91,8 @@ def the_animation_window():
         AnimationCheckSession(
             list(animation_samples.paths_in_order(rows)),
             animation_samples.samples_by_path(rows),
-            AcceptedRecipes(),
-            pinned=recipe_match.curated_recipe),
+            AcceptedSettings(),
+            pinned=act_settings.pinned_settings),
         look,
         _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS),
                   gallery.EnhanceSettings.parse(AppState(UI_STATE_PATH).get("enhance_settings"))),

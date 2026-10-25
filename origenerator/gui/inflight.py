@@ -54,7 +54,7 @@ class InFlightItem:
     # What kind of work this is in one word — "Image", "Video", "Enhance"
     # (:func:`gallery.job_kind_label`), or "" for a workflow this build has no
     # template for. The workflow's display name is in :attr:`caption` and answers
-    # a different question: which recipe, not what it costs to ask for.
+    # a different question: which settings, not what it costs to ask for.
     job_kind: str = ""
     # A spoken "Request … over" queued this one, rather than a press of Generate
     # or an auto-generate loop. Worth its own mark: it is the one kind of job the
@@ -63,7 +63,7 @@ class InFlightItem:
     requested: bool = False
     # The start frame this run is built from, as its ``LoadImage`` reference —
     # what an i2v (and an enhance) is *of*. Its picture is the fastest way to
-    # tell two queued videos apart, their captions being their shared recipe.
+    # tell two queued videos apart, their captions being their shared workflow.
     source_image: str | None = None
     # A file on disk showing what this run came from — the start frame above,
     # or the image a request was made of. A queued run has no picture of its
@@ -75,21 +75,21 @@ class InFlightItem:
     # there — "" for every other run, and for a combine that was given a dropped
     # video instead of a picked act. It is the one word saying what this video
     # will *do*, and nothing else on the row carries it.
-    recipe_category: str = ""
+    act: str = ""
     # The thumbnail of the video whose settings this run re-uses, for a combine
-    # given a dropped video — the only thing naming which recipe that was. Drawn
-    # gray beside the start frame: it is the recipe, not the result, and a row
+    # given a dropped video — the only thing naming which video that was. Drawn
+    # gray beside the start frame: it lends the settings, not the result, and a row
     # showing it alone reads as a job that is that video. Empty where an act was
-    # picked instead: :attr:`recipe_category` already says what was chosen, and
-    # the clip its recipe was mined out of was never the user's pick.
-    recipe_thumbnail: str | None = None
-    recipe_prompt_edited: bool = False
+    # picked instead: :attr:`act` already says what was chosen, and
+    # the clip its settings were mined out of was never the user's pick.
+    source_video_thumbnail: str | None = None
+    prompt_edited: bool = False
     # Up to four thumbnail files from the folder this job will land in — what a
     # run with no picture of its own can be recognized by, its own output being
     # the thing that doesn't exist yet.
     folder_thumbnails: tuple = ()
     # This one is not a job yet: it stands in for a press of Generate whose work
-    # to become one — resolving a recipe, building the params, the submit itself
+    # to become one — choosing the settings, building the params, the submit itself
     # — has not finished. It has no row, no id on the server, and nothing to
     # cancel; it exists so the press has a visible answer.
     starting: bool = False
@@ -121,8 +121,8 @@ def queue_lead_text(item: InFlightItem) -> str:
     parts = [queue_estimate_label(item.reading.typical_seconds)]
     if item.job_kind:
         parts.append(item.job_kind)
-    if item.recipe_category:
-        parts.append(item.recipe_category)
+    if item.act:
+        parts.append(item.act)
     if item.auto_generating:
         parts.append("Auto")
     if item.requested:
@@ -145,8 +145,8 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
         lines = [f"About {queue_estimate_label(item.reading.typical_seconds).lstrip('~')}"
                  " on this workflow's recent runs"]
     lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
-    if item.recipe_category:
-        lines.append(f"The “{item.recipe_category}” act, picked in Combine")
+    if item.act:
+        lines.append(f"The “{item.act}” act, picked in Combine")
     if item.auto_generating:
         lines.append("Queued by its folder's auto-generate loop")
     if item.requested:
@@ -296,7 +296,7 @@ def starting_row_text(starting: bool) -> str | None:
     """What a row that is not a job yet says in place of a wait.
 
     Pressing Generate in the Combine panel is not the same as queueing something:
-    an act has to be answered by a recipe first — a question put to a local model,
+    an act has to be answered by settings first — a question put to a local model,
     several seconds of it — and then the params built and the prompt submitted.
     With nothing on screen for that stretch, the press reads as a press that did
     nothing, which is indistinguishable from a wedged app. This row is the answer,

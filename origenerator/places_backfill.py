@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from itertools import islice
 from pathlib import Path
 
 from origenerator import gallery, points_of_interest
@@ -28,25 +29,27 @@ def queue_finding_for_the_absence(db, client) -> int:
 def queue_finding(rows: list[dict], client, record: Path, limit: int = RUNS_PER_ABSENCE) -> int:
     waiting = _read(record)
     asked = {(one["row"], one["file"]) for one in waiting.values()}
+    unasked = ((row, level) for row, level in pictures_to_look_over(rows)
+               if (row["prompt_id"], level.file["filename"]) not in asked)
+    batch = {str(uuid.uuid4()): picture for picture in islice(unasked, limit)}
+    _write(record, waiting | {prompt_id: _noted(*picture) for prompt_id, picture in batch.items()})
     queued = 0
-    for row, level in pictures_to_look_over(rows):
-        if queued >= limit:
-            break
-        picture = (row["prompt_id"], level.file["filename"])
-        if picture in asked:
-            continue
-        prompt_id = str(uuid.uuid4())
+    for prompt_id, (row, level) in batch.items():
         try:
             client.submit_job(finding_graph(level), prompt_id)
         except Exception as e:
             logger.warning("ComfyUI took no more pictures to look over: %s", e)
             break
-        waiting[prompt_id] = {"row": picture[0], "file": picture[1]}
+        waiting[prompt_id] = _noted(row, level)
         queued += 1
     _write(record, waiting)
     if queued:
         logger.info("Queued %d picture(s) to look over for their places while the app is closed", queued)
     return queued
+
+
+def _noted(row: dict, level: gallery.EnhanceLevel) -> dict:
+    return {"row": row["prompt_id"], "file": level.file["filename"]}
 
 
 def fold_found_places(db, client, record: Path) -> int:

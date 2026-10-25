@@ -5,7 +5,6 @@ from origenerator.workflows.frame_rate import NATIVE_FPS
 
 
 def start_frame(start_seconds: float) -> int:
-    """The video's frames, at the models' rate, that the run skips."""
     return max(0, round(start_seconds * NATIVE_FPS))
 
 SHORTEST_CLIP_FRAMES = 5
@@ -22,8 +21,7 @@ def frames_within(frame_count: int, *, video_seconds: float | None, start: int) 
 
 
 def driven_actions(actions: list[dict], *, start_ms: int, length_ms: int) -> list[dict]:
-    """The script over the stretch performed, counted from its start, with the
-    device's position at either end."""
+    """The script over the stretch performed, from its start, with a position at either end."""
     if not actions:
         return []
     end_ms = start_ms + length_ms

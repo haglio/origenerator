@@ -32,12 +32,9 @@ _SEAM_FRAMES = 1
 class Wan22AnimateWorkflow(WorkflowTemplate):
     """WAN 2.2 Animate: the picture's person performs a library video's movements.
 
-    ComfyUI's own ``video_wan2_2_14B_animate`` template in its animation mode:
-    the video's pose and face, read off every frame, drive the motion, the
-    picture says who performs it, and the run is shaped like the video, with
-    the picture fitted into that shape rather than cropped. The video's sound
-    and its script (:meth:`authored_actions`) come along with its movements.
-    """
+    ComfyUI's own ``video_wan2_2_14B_animate`` template in its animation mode, the
+    run shaped like the video and the picture fitted into it, never cropped; the
+    video's sound and script (:meth:`authored_actions`) come along."""
 
     name = "wan22_animate"
     version = "v001"
@@ -106,7 +103,6 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
         return scale_to_total_pixels(*size) if size else None
 
     def authored_actions(self, params: dict) -> list[dict] | None:
-        """The library video's script cut to the stretch performed, or ``None``."""
         script = library_funscript_of(params.get("video") or "", videos_dir=config.LIBRARY_VIDEOS_DIR,
                                       scripts_dir=config.LIBRARY_SCRIPTS_DIR)
         actions = read_actions(script)
@@ -118,7 +114,6 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
 
     @staticmethod
     def _within_the_video(params: dict) -> dict:
-        """``params`` asking for no more of the video than lies past its start."""
         seconds = video_duration_seconds(params["video"]) if params.get("video") else None
         frames = frames_within(int(params["frame_count"]), video_seconds=seconds,
                                start=start_frame(params["video_start"]))

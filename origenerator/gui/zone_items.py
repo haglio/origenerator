@@ -1,5 +1,4 @@
-"""What a drop zone holds, read for it: what a dragged item lends it, the
-pictures and name of what it holds, and the item a pasted name means."""
+"""What a drop zone holds: what a drag lends it, its pictures and name, a pasted name's item."""
 from __future__ import annotations
 
 import hashlib
@@ -46,8 +45,7 @@ class FilesOnly:
 
 
 class ZoneItems(FilesOnly):
-    """The gallery's reading: a generation's own pictures and name where the
-    held value names one of its files, a still made for a video from outside."""
+    """The gallery's reading: a generation's pictures and name, or a still for an outside video."""
 
     def __init__(self, db, names, rows_of: Callable[[MediaType], list[dict]], *,
                  places: OutputPlaces, input_dir: Path, thumb_dir: Path,

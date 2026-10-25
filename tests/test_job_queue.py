@@ -35,6 +35,7 @@ def _client():
     # again; answered here, never by a server on the machine.
     client.fetch_history = MagicMock(return_value={})
     client.forget_history = MagicMock()
+    client.executing_prompts = MagicMock(return_value=set())
     return client
 
 
@@ -378,6 +379,7 @@ def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
     # refused to dequeue survives that sweep and is adopted as a live job. It
     # reconnects with its row's source, so the first user launch still clears it.
     client = _client()
+    client.executing_prompts.return_value = {"exp-rr"}
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -436,6 +438,7 @@ def test_progress_persistence_is_throttled(qtbot, tmp_path, monkeypatch):
 def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
     # On restart the reconnected job comes back already showing its last position.
     client = _client()
+    client.executing_prompts.return_value = {"rr"}
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -1500,6 +1503,7 @@ def test_every_video_the_server_holds_is_pulled_back_for_the_image(qtbot, tmp_pa
     # rest queued after it there, where the image would wait on all of them.
     # They come back in the order they were in, ahead of any video waiting here.
     client = _client()
+    client.executing_prompts.return_value = {"v-old"}
     db = Database(tmp_path / "test.db")
     for pid in ("v-old", "v-new"):
         db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
@@ -1516,10 +1520,30 @@ def test_every_video_the_server_holds_is_pulled_back_for_the_image(qtbot, tmp_pa
     assert queue.queue_order == [image.prompt_id, "v-old", "v-new"]
 
 
+def test_a_restart_takes_back_every_job_comfyui_holds_but_is_not_making(qtbot, tmp_path):
+    client = _client()
+    client.executing_prompts = MagicMock(return_value={"v-old"})
+    db = Database(tmp_path / "test.db")
+    for pid in ("v-old", "v-new"):
+        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
+                             workflow_version=_I2V.version, positive_prompt="x", seed=1,
+                             params_json=json.dumps(_params(seed=1)), workflow_json="{}")
+        db.update_generation(pid, status="running")
+    queue = JobQueue(db, client)
+
+    queue.reconnect_running()
+
+    assert queue.queue_order == ["v-old", "v-new"]
+    assert [c.args[0] for c in client.cancel_prompt.call_args_list] == ["v-new"]
+    assert db.get_generation("v-new")["status"] == "pending"
+    assert db.get_generation("v-old")["status"] == "running"
+
+
 def test_the_run_comfyui_is_making_is_the_front_of_the_line(qtbot, tmp_path):
     # Taken back after a restart, the runs the server holds come back oldest
     # first, which need not be the order it makes them in.
     client = _client()
+    client.executing_prompts.return_value = {"v-new"}
     db = Database(tmp_path / "test.db")
     for pid in ("v-old", "v-new"):
         db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",

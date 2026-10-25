@@ -25,6 +25,15 @@ def strength_key_of(lora_key: str) -> str:
     return "lora_strength" + lora_key.removeprefix("lora")
 
 
+def lora_key_of(key: str) -> str | None:
+    return "lora" + key.removeprefix("lora_strength") if key.startswith("lora_strength") else None
+
+
+def strength_without_its_lora(key: str, values: dict) -> bool:
+    lora = lora_key_of(key)
+    return lora in values and is_no_lora(values[lora])
+
+
 def keys_with_strengths(keys) -> tuple[str, ...]:
     return tuple(name for key in keys for name in (key, strength_key_of(key)))
 

@@ -42,6 +42,7 @@ from origenerator.setting_advice import Advice, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
+from origenerator.workflows.lora_rows import strength_key_of
 from origenerator.workflows.model_files import NO_LORA
 from tests.thumbnail_rows import painted_row, square
 
@@ -64,8 +65,11 @@ def test_field_labels_fit_the_heading_font(qtbot):
     form._sections["Models & LoRAs"].set_collapsed(False)  # its section starts folded
     with qtbot.waitExposed(form):
         form.show()
+    form.resize(form.sizeHint())
+    form.layout().activate()
 
     label = next(w for w in form.findChildren(QLabel) if w.text() == label_text)
+    assert label.isVisible()
     assert label.width() >= label.fontMetrics().horizontalAdvance(label_text)
 
 
@@ -2044,22 +2048,22 @@ def test_a_speaking_scene_keeps_the_speaking_help_at_prompt_strength_one(qtbot):
     assert _scene_text_state(scene, "negative_prompt") == _SHUT_DOWN_AVOID
 
 
-def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot):
+@pytest.mark.parametrize("key", ["lora_high", "lora_low", "lora", "lora_2", "lora_3"])
+def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot, key):
+    strength = strength_key_of(key)
     form = ParamForm([
-        ParamDef("lora_high", "LoRA (First Pass)", "combo", "None",
-                 options=["None", "example_style_high.safetensors"]),
-        ParamDef("lora_strength_high", "LoRA Strength (First Pass)", "float", 1.0,
-                 min_val=0.0, max_val=2.0, step=0.05),
+        ParamDef(key, "LoRA", "combo", "None", options=["None", "example_style.safetensors"]),
+        ParamDef(strength, "LoRA Strength", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
     ])
     qtbot.addWidget(form)
-    assert not _row_visible(form, "lora_strength_high")
+    assert not _row_visible(form, strength)
 
-    lora = form._widgets["lora_high"]
-    lora.setCurrentIndex(lora.findData("example_style_high.safetensors"))
-    assert _row_visible(form, "lora_strength_high")
+    lora = form._widgets[key]
+    lora.setCurrentIndex(lora.findData("example_style.safetensors"))
+    assert _row_visible(form, strength)
 
-    form.set_values({"lora_high": "None"})
-    assert not _row_visible(form, "lora_strength_high")
+    form.set_values({key: "None"})
+    assert not _row_visible(form, strength)
 
 
 def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):

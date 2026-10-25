@@ -629,7 +629,7 @@ def test_a_press_while_comfyui_is_down_waits_as_queued_until_comfyui_answers(qtb
     assert said == []
 
 
-def test_everything_waiting_on_comfyui_fails_together_when_it_cannot_be_brought_up(
+def test_everything_waiting_on_comfyui_fails_together_saying_origenerator_couldnt_start_it(
         qtbot, tmp_path):
     client = _client()
     client.submit_job = MagicMock(side_effect=_comfyui_down())
@@ -644,8 +644,11 @@ def test_everything_waiting_on_comfyui_fails_together_when_it_cannot_be_brought_
     coming_up.finish.set()
     qtbot.waitUntil(lambda: len(said) == 2, timeout=5000)
 
-    assert said == [("k1", COMFYUI_DID_NOT_START), ("k2", COMFYUI_DID_NOT_START)]
-    assert {db.get_generation(job.prompt_id)["status"] for job in (first, second)} == {"error"}
+    assert said == [("k1", "Origenerator couldn't start ComfyUI."),
+                    ("k2", "Origenerator couldn't start ComfyUI.")]
+    rows = [db.get_generation(job.prompt_id) for job in (first, second)]
+    assert [(row["status"], row["error_message"]) for row in rows] == [
+        ("error", "Origenerator couldn't start ComfyUI.")] * 2
     assert queue.all_jobs == []
     assert (coming_up.times, client.submit_job.call_count) == (1, 1)
 

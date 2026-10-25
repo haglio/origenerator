@@ -318,6 +318,30 @@ def test_the_tile_down_every_row_is_as_tall_as_all_of_them_and_their_gaps(window
     assert _tile(made, "state three").height() == one.height() * 2 + GAP_MEDIUM
 
 
+def _drawing_rows(made, state):
+    shot = _tile(made, state).grab().toImage()
+    return [y for y in range(shot.height())
+            if any(shot.pixelColor(x, y).red() > 150
+                   and shot.pixelColor(x, y).green() < 100
+                   for x in range(shot.width()))]
+
+
+def test_a_tile_down_several_rows_draws_in_the_middle_of_them(window, tmp_path):
+    """His words: on the tile down seven rows the "image should be aligned in a
+    horizontal row w/ the images for" the single-row tiles beside its middle."""
+    marks = {state: _drawn(tmp_path / f"{state}.png", color="red")
+             for state in ("state one", "state two", "state three", "state four")}
+    made, _ = window("gen-one", marks=marks,
+                     tiles=(Tile("state one", 0, 0), Tile("state two", 1, 0),
+                            Tile("state three", 2, 0), Tile("state four", 0, 1, rows=3)))
+
+    def below_the_middle(state):
+        rows = _drawing_rows(made, state)
+        return (rows[0] + rows[-1]) // 2 - _tile(made, state).height() // 2
+
+    assert abs(below_the_middle("state four") - below_the_middle("state two")) <= 2
+
+
 def test_nine_rows_of_buttons_stand_in_the_room_the_window_has(window):
     """His words: "shrink the buttons", so that all nine rows of his sheet are
     there to press without the strip of them scrolling: the drawing gives up the

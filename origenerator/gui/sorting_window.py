@@ -117,6 +117,7 @@ class SortingWindow(QWidget):
         self._session = session
         self._marks = dict(marks)
         self._tiles: dict[str, QToolButton] = {}
+        self._faces: dict[str, QToolButton] = {}
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
         # The picture at its own size, kept so a resize re-scales from the
@@ -166,7 +167,7 @@ class SortingWindow(QWidget):
         for tile in tiles:
             grid.addWidget(
                 self._state_tile(tile.state, drawings.get(tile.state), scale,
-                                 named[tile.state]),
+                                 named[tile.state], tile.rows),
                 tile.row, tile.column, tile.rows, tile.columns,
                 Qt.AlignmentFlag.AlignCenter)
         self._make_every_tile_one_size(tiles, drawings, scale)
@@ -206,21 +207,23 @@ class SortingWindow(QWidget):
         return panel
 
     def _make_every_tile_one_size(self, tiles, drawings, scale) -> None:
-        buttons = list(self._tiles.values())
-        if not buttons:
+        faces = [self._face(state) for state in self._tiles]
+        if not faces:
             return
         rows = max((tile.row + tile.rows for tile in tiles), default=1)
         allowed = (ROOM_FOR_THE_GRID - GAP_MEDIUM * (rows - 1)) // rows
-        tall = max(button.sizeHint().height() for button in buttons)
+        tall = max(face.sizeHint().height() for face in faces)
         self._mark = MARK if tall <= allowed else MARK - (tall - allowed)
         self._draw_at(self._mark, drawings, scale)
-        widest = max(button.sizeHint().width() for button in buttons)
-        tallest = max(button.sizeHint().height() for button in buttons)
+        widest = max(face.sizeHint().width() for face in faces)
+        tallest = max(face.sizeHint().height() for face in faces)
         self._center_the_block(tiles, tallest, drawings, scale)
         for tile in tiles:
+            wide = widest * tile.columns + GAP_MEDIUM * (tile.columns - 1)
             self._tiles[tile.state].setFixedSize(
-                widest * tile.columns + GAP_MEDIUM * (tile.columns - 1),
-                tallest * tile.rows + GAP_MEDIUM * (tile.rows - 1))
+                wide, tallest * tile.rows + GAP_MEDIUM * (tile.rows - 1))
+            if tile.state in self._faces:
+                self._faces[tile.state].setFixedSize(wide, tallest)
 
     def _room_for_a_name(self, tiles) -> int:
         metrics = QFontMetrics(self._name_font)
@@ -233,25 +236,41 @@ class SortingWindow(QWidget):
             room += 1
         return room
 
-    def _state_tile(self, state: str, drawing: QPixmap | None,
-                    scale: float, name: str) -> QToolButton:
+    def _state_tile(self, state: str, drawing: QPixmap | None, scale: float,
+                    name: str, rows: int = 1) -> QToolButton:
         tile = QToolButton(objectName=state_button(state))
-        tile.setText(name)
-        tile.setFont(self._name_font)
-        tile.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-        tile.setIconSize(QSize(MARK, MARK))
         # Never the keyboard's: Space would otherwise re-fire whichever tile was
         # pressed last, and Escape has to go on closing the window.
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tile.clicked.connect(lambda _checked=False, state=state: self._on_state(state))
         self._tiles[state] = tile
+        face = tile if rows == 1 else self._face_in_the_middle_row(state, tile)
+        face.setText(name)
+        face.setFont(self._name_font)
+        face.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        face.setIconSize(QSize(MARK, MARK))
         if drawing is not None and not drawing.isNull():
-            tile.setIcon(QIcon(on_a_white_square(drawing, MARK, scale)))
+            face.setIcon(QIcon(on_a_white_square(drawing, MARK, scale)))
         return tile
 
+    def _face_in_the_middle_row(self, state: str, tile) -> QToolButton:
+        face = QToolButton(tile)
+        face.setAutoRaise(True)
+        face.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        held = QVBoxLayout(tile)
+        held.setContentsMargins(0, 0, 0, 0)
+        held.addStretch(1)
+        held.addWidget(face, 0, Qt.AlignmentFlag.AlignHCenter)
+        held.addStretch(1)
+        self._faces[state] = face
+        return face
+
+    def _face(self, state: str) -> QToolButton:
+        return self._faces.get(state, self._tiles[state])
+
     def _draw_at(self, mark: int, drawings, scale: float, above: int = 0) -> None:
-        for state, tile in self._tiles.items():
-            self._draw_one(tile, drawings.get(state), mark, scale, above)
+        for state in self._tiles:
+            self._draw_one(self._face(state), drawings.get(state), mark, scale, above)
 
     def _draw_one(self, tile, drawing, mark: int, scale: float, above: int) -> None:
         tile.setIconSize(QSize(mark, mark + above))
@@ -262,10 +281,10 @@ class SortingWindow(QWidget):
     def _center_the_block(self, tiles, tallest: int, drawings, scale: float) -> None:
         line = QFontMetrics(self._name_font).height()
         for tile in tiles:
-            button = self._tiles[tile.state]
-            spare = tallest - self._mark - line * (button.text().count("\n") + 1)
+            face = self._face(tile.state)
+            spare = tallest - self._mark - line * (face.text().count("\n") + 1)
             if spare > 1:
-                self._draw_one(button, drawings.get(tile.state), self._mark, scale,
+                self._draw_one(face, drawings.get(tile.state), self._mark, scale,
                                spare // 2)
 
 

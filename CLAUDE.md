@@ -104,8 +104,9 @@ so a branch never installs into it: to run a sibling version the venv does not
 hold — an unlanded change, or a pin the branch moves — put a checkout of it
 first on `PYTHONPATH` for the suite, and give the preview a launcher of its own
 in the worktree's git-ignored `state/` that sets the same `PYTHONPATH`. A
-funestra checkout used that way needs `vendor/libmpv-2.dll` copied in from
-the production funestra checkout's `vendor/`, and is one you made: another session's
+funestra checkout used that way needs nothing copied in, since funestra finds
+`libmpv-2.dll` in `%USERPROFILE%\.haglio\libmpv\` from any checkout, and is one
+you made: another session's
 goes when that session is done with it, and a suite that lost one partway on
 2026-09-27 failed on `No module named 'player_core.mpv_player'`. Moving a pin is this repo's own commit,
 with its own suite to answer for it, and a new shared_ui release reaches this
@@ -474,8 +475,7 @@ launch already does, and never reinstall the shared venv for a preview, since
 other sessions' suites run out of it. Every sibling such a launcher puts on
 `PYTHONPATH` comes from a checkout held at the version the branch needs -- the
 sibling branch's own worktree for the unlanded change, a worktree at the
-pinned tag for any other, with `vendor/libmpv-2.dll` copied into a funestra
-one -- never from a primary checkout, which every landing pulls forward under
+pinned tag for any other -- never from a primary checkout, which every landing pulls forward under
 the launcher until the link dies on import before a window appears. And before
 that link goes out, replay the launch's imports under the launcher's own
 environment: `tests/test_launch_smoke.py` strips `PYTHONPATH` on purpose, so a

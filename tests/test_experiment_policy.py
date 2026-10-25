@@ -296,3 +296,37 @@ def test_an_experiment_leaves_a_videos_size_to_the_image_it_animates():
     proposal = policy.propose([base])
 
     assert "width" not in proposal.params and "height" not in proposal.params
+
+
+class FakeTwoLoraWorkflow(FakeWorkflow):
+    name = "fake_two_lora_t2i"
+    lora_keys = ("lora", "lora_2")
+
+    def default_params(self) -> dict:
+        return {**super().default_params(), "lora": "style_a.safetensors", "lora_strength": 1.0,
+                "lora_2": "None", "lora_strength_2": 1.0}
+
+    def param_definitions(self) -> list:
+        loras = ["None", "style_a.safetensors", "style_b.safetensors"]
+        return super().param_definitions() + [
+            ParamDef("lora", "LoRA 1", "combo", "style_a.safetensors", options=loras),
+            ParamDef("lora_strength", "LoRA Strength 1", "float", 1.0,
+                     min_val=0.0, max_val=2.0, step=0.05),
+            ParamDef("lora_2", "LoRA 2", "combo", "None", options=loras),
+            ParamDef("lora_strength_2", "LoRA Strength 2", "float", 1.0,
+                     min_val=0.0, max_val=2.0, step=0.05),
+        ]
+
+
+def test_an_experiment_never_turns_the_strength_of_a_lora_left_on_none():
+    workflow = FakeTwoLoraWorkflow()
+    base = make_row("two-loras", workflow_name=workflow.name,
+                    params={"lora": "style_a.safetensors", "lora_strength": 1.0,
+                            "lora_2": "None", "lora_strength_2": 1.0})
+    policy = ExperimentPolicy(registry={workflow.name: workflow}, rng=random.Random(4))
+
+    proposals = [policy.propose([base]) for _ in range(300)]
+
+    assert any("lora_strength" in p.mutated_keys for p in proposals)
+    assert all(p.params["lora_2"] != "None" for p in proposals
+               if "lora_strength_2" in p.mutated_keys)

@@ -23,6 +23,7 @@ from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamType
 from origenerator.workflows.derived_size import without_an_explicit_size
+from origenerator.workflows.lora_rows import strength_without_its_lora
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
@@ -189,6 +190,8 @@ class ExperimentPolicy:
         change was made (a dimension with nothing to change to is a no-op)."""
         if pd.key == "positive_prompt":
             return self._crossover_prompts(params, workflow, rows)
+        if strength_without_its_lora(pd.key, params):
+            return False
         if pd.type == ParamType.COMBO:
             return self._swap_combo(params, pd, workflow, rows)
         return self._jitter_numeric(params, pd, workflow, rows)

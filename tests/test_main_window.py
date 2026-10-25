@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
 import winsound
 from contextlib import contextmanager
 from dataclasses import replace
@@ -531,6 +532,7 @@ class _QueueSpyClient(ComfyUIClient):
         super().__init__()
         self.canceled = []
         self.submitted = []
+        self.submitted_on = []
         self.interrupted = []
 
     def cancel_prompt(self, prompt_id):
@@ -541,6 +543,7 @@ class _QueueSpyClient(ComfyUIClient):
 
     def submit_job(self, payload, prompt_id):
         self.submitted.append(prompt_id)
+        self.submitted_on.append(threading.current_thread())
         return prompt_id
 
 
@@ -592,6 +595,7 @@ def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtb
     qtbot.addWidget(win)
     win._gallery_view.set_experiments_enabled(True)
     win.close()
+    win.hand_comfyui_what_runs_while_closed()
     assert client.submitted == []  # nothing while the app is open, or as it closes
 
     downtime.hand_comfyui_the_work_left(db, client, AppState(tmp_path / "ui.json"))
@@ -602,6 +606,41 @@ def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtb
     assert all(r.get("status") == "running" for r in queued)
 
 
+def _waiting_image(db, prompt_id):
+    """A picture the queue was holding when the app last closed, which the next
+    window takes back into its line."""
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i",
+        workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version, positive_prompt="a cat", seed=1,
+        params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                                    positive_prompt="a cat", seed=1)),
+        workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="pending")
+
+
+def test_once_the_window_has_gone_comfyui_is_asked_with_nothing_of_the_windows_running(
+        qtbot, tmp_path):
+    """While the window is up, a hand-over waits on a thread of its own and the
+    window's events run meanwhile, so it keeps answering. Once it has gone those
+    are a closed window's events -- a click on a notification would put it back
+    on screen -- so each hand-over waits for ComfyUI where it is."""
+    db = Database(tmp_path / "t.db")
+    for prompt_id in ("first", "second"):
+        _waiting_image(db, prompt_id)
+    client = _QueueSpyClient()
+    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(win)
+    asked_while_open = len(client.submitted_on)
+
+    win.close()
+    win.hand_comfyui_what_runs_while_closed()
+
+    asked_once_closed = client.submitted_on[asked_while_open:]
+    assert asked_once_closed
+    assert set(asked_once_closed) == {threading.main_thread()}
+
+
 def test_with_the_switch_off_the_closed_apps_turn_runs_no_experiments(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     _completed_image(db)
@@ -609,6 +648,7 @@ def test_with_the_switch_off_the_closed_apps_turn_runs_no_experiments(qtbot, tmp
     win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
     win.close()
+    win.hand_comfyui_what_runs_while_closed()
 
     downtime.hand_comfyui_the_work_left(db, client, AppState(tmp_path / "ui.json"))
 
@@ -630,6 +670,7 @@ def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(win)
 
     win.close()
+    win.hand_comfyui_what_runs_while_closed()
 
     assert client.submitted == []
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
@@ -890,7 +931,7 @@ def test_default_window_is_not_maximized(qtbot, tmp_path):
     assert not win.isMaximized()
 
 
-def test_close_event_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
+def test_closing_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
     # The queue holds work back for the sake of somebody watching, and closing the
     # app ends every one of those reasons: ComfyUI outlives it and works through
     # the rest alone.
@@ -898,6 +939,7 @@ def test_close_event_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     with patch.object(type(win._gallery_view._jobs), "flush_to_server") as flush:
         win.close()
+        win.hand_comfyui_what_runs_while_closed()
 
     flush.assert_called_once_with()
 

@@ -206,6 +206,10 @@ class JobQueue(QObject):
         self._first: frozenset[str] = frozenset()
         self._training = None
         self._enhance = None
+        self._closed = False
+
+    def close(self) -> None:
+        self._closed = True
 
     def hold_for_training(self, training) -> None:
         self._training = training
@@ -521,7 +525,7 @@ class JobQueue(QObject):
                  else self._clock() - self._picture_asked_at)
         return queue_line.wait_before_starting(self._waiting[0], since)
 
-    def _hand_over(self, job: GenerationJob, *, closing: bool = False) -> bool:
+    def _hand_over(self, job: GenerationJob) -> bool:
         """Submit one job to ComfyUI, reporting whether the server took it.
 
         The submit waits off the GUI thread with the window kept alive
@@ -529,22 +533,23 @@ class JobQueue(QObject):
         the job is gone from the line by the time the server answers, and a
         server that took it is told to let it go. A refused run of the user's
         says so through :attr:`failed`, or waits for the next launch to send
-        it when the app is closing, which makes the plain blocking call.
+        it once the queue is closed. A closed queue has no window left to keep
+        alive, so it makes the plain blocking call.
         """
         key = self._key_of(job)
         self._in_flight = job
         try:
-            job.start(None if closing else _off_the_gui_thread)
+            job.start(None if self._closed else _off_the_gui_thread)
         except Exception as e:
             if self._key_of(job) is None:
                 return False  # canceled while out, and never taken: nothing to undo
-            if comfyui_api.unreachable(e) and closing:
+            if comfyui_api.unreachable(e) and self._closed:
                 self._waiting.insert(0, job)
                 return False
             if comfyui_api.unreachable(e) and self._bring_up_comfyui is not None:
                 self._hold_for_comfyui(job)
                 return False
-            if closing and _the_users_own(job.source):
+            if self._closed and _the_users_own(job.source):
                 logger.warning("Left %s for the next launch to send: ComfyUI refused it as "
                                "the app closed: %s", key, e)
                 self._drop(key, job)
@@ -608,11 +613,11 @@ class JobQueue(QObject):
         """Hand ComfyUI everything still waiting, and say how much went.
 
         What the closing app calls. ComfyUI outlives Origenerator and works
-        through its queue alone, so a line kept for the user's sake — including
-        the batch of experiments the close just queued — belongs to the server
-        the moment there is no longer a user to keep it for. Every rule this
-        queue has is about not interrupting somebody who is watching.
+        through its queue alone, so a line kept for the user's sake belongs to
+        the server the moment there is no longer a user to keep it for. Every
+        rule this queue has is about not interrupting somebody who is watching.
         """
+        self.close()
         if self.training_holds_the_machine():
             logger.info("Left %d queued job(s) for the next launch: a fix's training holds "
                         "the graphics card", len(self._waiting))
@@ -622,7 +627,7 @@ class JobQueue(QObject):
             if queue_line.waits_for_any(job, self.all_jobs):
                 continue
             self._waiting.remove(job)
-            if self._hand_over(job, closing=True):
+            if self._hand_over(job):
                 handed += 1
             elif self._waiting and self._waiting[0] is job:
                 logger.info("Left %d queued job(s) for the next launch: ComfyUI did not answer",

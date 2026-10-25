@@ -4,6 +4,9 @@ Run as ``python -m tests.real_close <file>`` by test_app's test of the close,
 with the state folder it is to use in ``ORIGENERATOR_STATE_DIR``. It writes to
 *file*, as JSON, how many of each kind of QObject Python still owned as the
 QApplication's own wrapper was freed: the moment PyQt deletes each of them itself.
+
+:func:`open_and_close` is the launch and the close alone, for a child that
+watches something else of the close (tests.real_close_handing_over).
 """
 from __future__ import annotations
 
@@ -23,9 +26,15 @@ from PyQt6 import sip
 from PyQt6.QtCore import QCoreApplication, QObject, QThread, QTimer
 from PyQt6.QtWidgets import QApplication
 
-from origenerator import app, config
+from origenerator import app, config, landed_while_away
 
 _the_application = None
+
+
+def _leave_no_watcher_behind(setattr) -> None:
+    """A close with runs in flight starts a process to wait them out, and one
+    started from here would ask the ComfyUI on this machine about them for hours."""
+    setattr(landed_while_away, "_start_a_watcher", lambda _identity: None)
 
 
 def _a_port_nothing_answers_on() -> int:
@@ -51,14 +60,9 @@ def _say_what_python_owns(_freed) -> None:
     Path(sys.argv[1]).write_text(json.dumps(_owned_by_python()), encoding="utf-8")
 
 
-def _built_then_closed(build):
-    def build_then_close(*args, **kwargs):
-        global _the_application
-        window = build(*args, **kwargs)
-        _the_application = weakref.ref(QApplication.instance(), _say_what_python_owns)
-        _close_once_its_loop_runs(window)
-        return window
-    return build_then_close
+def _watch_the_application_go(_window) -> None:
+    global _the_application
+    _the_application = weakref.ref(QApplication.instance(), _say_what_python_owns)
 
 
 def _close_once_its_loop_runs(window) -> None:
@@ -68,16 +72,28 @@ def _close_once_its_loop_runs(window) -> None:
         QTimer.singleShot(0, lambda: _close_once_its_loop_runs(window))
 
 
-def main() -> int:
+def open_and_close(built) -> int:
+    """Run the app with everything a run must not reach kept off, close its
+    window as soon as its loop runs, and return what ``main`` returned.
+    *built* is handed the window as soon as it is built."""
     say_where_it_hangs()
     for keep_off in (suite.keep_the_microphone_shut, suite.refuse_the_comfyui_on_this_machine,
                      suite.start_no_comfyui_on_this_machine,
                      suite.keep_off_the_device, suite.keep_out_of_windows, suite.keep_silent,
-                     suite.refuse_the_dialogs_nobody_can_answer):
+                     suite.refuse_the_dialogs_nobody_can_answer, _leave_no_watcher_behind):
         keep_off(setattr)
     config.COMFYUI_PORT = _a_port_nothing_answers_on()
-    app._build_window = _built_then_closed(app._build_window)
+    build = app._build_window
+
+    def build_then_close(*args, **kwargs):
+        window = build(*args, **kwargs)
+        built(window)
+        _close_once_its_loop_runs(window)
+        return window
+
+    app._build_window = build_then_close
     return app.main([])
 
 
-raise SystemExit(main())
+if __name__ == "__main__":
+    raise SystemExit(open_and_close(_watch_the_application_go))

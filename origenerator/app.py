@@ -517,10 +517,21 @@ def _build_window(client, db, app_state, fun_time, preview, taskbar):
 
 def _put_away_unseen(window, app, crash_log) -> None:
     window.close()
+    freeze_watch = None
     if crash_log is not None:
         from origenerator.freeze_watch import watch_the_window
-        watch_the_window(app, crash_log).end_the_process_if_the_close_sticks()
+        freeze_watch = watch_the_window(app, crash_log)
+        freeze_watch.end_the_process_if_the_close_sticks()
     _run_the_loop_only_to_quit(app)
+    _hand_comfyui_what_runs_while_closed(window, freeze_watch)
+
+
+def _hand_comfyui_what_runs_while_closed(window, freeze_watch) -> None:
+    if freeze_watch is not None:
+        freeze_watch.end_the_process_if_the_hand_over_sticks()
+    window.hand_comfyui_what_runs_while_closed()
+    if freeze_watch is not None:
+        freeze_watch.end_the_process_if_the_close_sticks()
 
 
 def _run_the_loop_only_to_quit(app) -> None:
@@ -830,11 +841,11 @@ def _boot_and_run(app, app_args, preview) -> int:
     _look_for_other_sources_videos(db, app)
 
     from origenerator.freeze_watch import watch_the_window
-    if crash_log is not None:
-        watch_the_window(app, crash_log)
+    freeze_watch = None if crash_log is None else watch_the_window(app, crash_log)
     exit_code = app.exec()
     if watch is not None:
         watch.withdraw()
+    _hand_comfyui_what_runs_while_closed(window, freeze_watch)
     _disconnect(client)
     if claim is not None:
         claim.let_go()

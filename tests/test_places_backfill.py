@@ -195,6 +195,7 @@ def test_once_closed_the_apps_turn_hands_comfyui_the_pictures_to_look_over(qtbot
     window = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(window)
     window.close()
+    window.hand_comfyui_what_runs_while_closed()
     assert submitted == []
 
     downtime.hand_comfyui_the_work_left(db, ComfyUIClient(), AppState(tmp_path / "ui.json"))

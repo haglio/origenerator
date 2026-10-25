@@ -96,6 +96,13 @@ _KEYS_THE_SESSION_OWNS = frozenset(
 SESSION_PERSIST_INTERVAL_MS = 5_000
 
 
+def _run_on_its_own(chore) -> None:
+    try:
+        chore()
+    except Exception as e:
+        logger.warning("Close-time %s failed: %s", chore.__name__, e)
+
+
 class OrigeneratorWindow(QMainWindow):
     handed_back = pyqtSignal()
 
@@ -386,15 +393,13 @@ class OrigeneratorWindow(QMainWindow):
         if event.spontaneous() and not self._sure_to_close():
             event.ignore()
             return
-        for chore in (self._leave_work_for_while_closed,
-                      self._gallery_view.flush_queue_to_server):
-            try:
-                chore()
-            except Exception as e:
-                logger.warning("Close-time %s failed: %s", chore.__name__, e)
+        _run_on_its_own(self._leave_work_for_while_closed)
         self._persist_session()
         self._gallery_view.close()
         super().closeEvent(event)
+
+    def hand_comfyui_what_runs_while_closed(self) -> None:
+        _run_on_its_own(self._gallery_view.flush_queue_to_server)
 
     def _leave_work_for_while_closed(self) -> None:
         if not is_branch_session():

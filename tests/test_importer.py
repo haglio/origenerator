@@ -1331,7 +1331,7 @@ def test_an_imported_performance_gains_the_video_it_performed(tmp_path):
         workflow_json=json.dumps(graph), source="imported",
     )
 
-    assert backfill_import_params(db, tmp_path) == 1
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
 
     params = json.loads(db.get_generation("performed")["params_json"])
     assert params["video"] == "C:/library/videos/videos/scene one.mp4"

@@ -310,12 +310,15 @@ class VoiceRouter(QObject):
         unhearable in the one state it is for, with no slideshow up.
         """
         if not self.listening():
-            self.listener.stop_commands()
-            self._flash_timer.stop()
-            self._set_caption(None)
+            self.shut_the_mic()
             return
         self.listener.start_commands(self.on_command)
         self._show("Listening…", transient=False)
+
+    def shut_the_mic(self) -> None:
+        self.listener.stop_commands()
+        self._flash_timer.stop()
+        self._set_caption(None)
 
     # --- the caption --------------------------------------------------------
 

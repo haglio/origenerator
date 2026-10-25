@@ -16199,6 +16199,19 @@ def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
     assert view._voice.listener.commands_on  # still on, because the button still is
 
 
+def test_a_closed_gallery_leaves_the_mic_shut_and_its_button_as_it_was(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._bank.mic.setChecked(True)
+
+    view.close()
+
+    assert not view._voice.listener.commands_on
+    assert view._bank.mic.isChecked()
+
+
 def test_a_slideshow_with_the_mic_off_hears_nothing(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())

@@ -3131,6 +3131,23 @@ def _two_pictures_on_screen(qtbot):
     return view, view._browser._thumb_widgets["i2"]
 
 
+def test_dragging_a_picture_lights_the_tabs_start_image_until_it_is_let_go(qtbot, monkeypatch):
+    view, tile = _two_pictures_on_screen(qtbot)
+    panel = view._info_tabs.current_config_panel()
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("wan22_i2v"))
+    well = panel._param_form._widgets["input_image"]._label
+    lit_while_dragged = []
+    monkeypatch.setattr(QDrag, "exec", lambda drag, *args: lit_while_dragged.append(
+        well.property(LIT)) or Qt.DropAction.IgnoreAction)
+    at = tile.rect().center()
+
+    gestures.press(tile, at)
+    gestures.move(tile, at + QPoint(40, 0))
+
+    assert lit_while_dragged == [True]
+    assert well.property(LIT) is False
+
+
 def test_pressing_a_picture_lights_it_up_and_leaves_the_tab_as_it_was(qtbot):
     view, tile = _two_pictures_on_screen(qtbot)
 

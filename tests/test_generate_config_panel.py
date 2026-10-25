@@ -949,6 +949,38 @@ def test_the_start_image_lights_while_a_picture_it_would_take_is_dragged(qtbot, 
     assert start_image._label.property(LIT) is False
 
 
+def test_a_picture_let_go_anywhere_on_the_tab_becomes_its_start_image(qtbot, tmp_path,
+                                                                     monkeypatch):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
+    _image_row(db, filename="sdxl_img1.png")
+
+    taken = drops.let_go_over(panel._workflow_combo, "img1")
+
+    assert taken.isAccepted()
+    assert start_image.current_id() == "image/sdxl_img1.png [output]"
+
+
+def test_a_picture_let_go_on_settings_with_no_picture_box_is_turned_away(panel):
+    _image_row(panel._db)
+
+    assert not drops.let_go_over(panel._workflow_combo, "img1").isAccepted()
+
+
+def test_a_video_let_go_anywhere_on_the_tab_fills_every_box_it_lends_something(
+        qtbot, tmp_path, monkeypatch):
+    panel, db, _start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_animate"))
+    _image_row(db, filename="sdxl_img1.png")
+    _video_row(db, input_image="image/sdxl_img1.png [output]")
+
+    taken = drops.let_go_over(panel._workflow_combo, "vid1")
+
+    values = panel._param_form.get_values()
+    assert taken.isAccepted()
+    assert values["input_image"] == "image/sdxl_img1.png [output]"
+    assert values["video"] == str(gcp_module.OUTPUT_PLACES.file("video/vid1.mp4"))
+
+
 def test_a_start_image_from_outside_the_gallery_is_named_by_its_file_and_goes_nowhere(
         qtbot, tmp_path, monkeypatch):
     panel, _db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)

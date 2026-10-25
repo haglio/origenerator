@@ -528,8 +528,8 @@ class JobQueue(QObject):
         (:func:`_off_the_gui_thread`), so a Cancel can arrive while it is out:
         the job is gone from the line by the time the server answers, and a
         server that took it is told to let it go. A refused run of the user's
-        says so through :attr:`failed`. The ``closing`` app has no window
-        left to keep alive, so it makes the plain blocking call.
+        says so through :attr:`failed`, or waits for the next launch to send
+        it when the app is closing, which makes the plain blocking call.
         """
         key = self._key_of(job)
         self._in_flight = job
@@ -543,6 +543,11 @@ class JobQueue(QObject):
                 return False
             if comfyui_api.unreachable(e) and self._bring_up_comfyui is not None:
                 self._hold_for_comfyui(job)
+                return False
+            if closing and _the_users_own(job.source):
+                logger.warning("Left %s for the next launch to send: ComfyUI refused it as "
+                               "the app closed: %s", key, e)
+                self._drop(key, job)
                 return False
             logger.warning("Re-roll submission failed for %s: %s", key, e)
             self._refuse(key, job, str(e))

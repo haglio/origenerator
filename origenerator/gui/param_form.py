@@ -45,7 +45,7 @@ from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
-from origenerator.workflows.model_files import is_no_lora
+from origenerator.workflows.lora_rows import lora_key_of, strength_without_its_lora
 
 _SEED_MAX = (1 << 63) - 1
 # The params one scenes editor speaks for: the story (stored as the positive
@@ -85,8 +85,6 @@ _SHOWN_WHILE = {
     "voice_sample": lambda values: _speaks(values) and values.get("voice") == CUSTOM_VOICE,
     "voice_sample_text": lambda values: _speaks(values) and values.get("voice") == CUSTOM_VOICE,
     "unet_s2v": _speaks,
-    "lora_strength_high": lambda values: not is_no_lora(values.get("lora_high")),
-    "lora_strength_low": lambda values: not is_no_lora(values.get("lora_low")),
 }
 
 _SOUND_IN_USE = (lambda values: not _all_speak(values), lambda values: EVERY_SCENE_SPEAKS_HELP)
@@ -250,6 +248,9 @@ class ParamForm(QWidget):
         for row, shows in _SHOWN_WHILE.items():
             if row in self._widgets:
                 self._set_row_visible(row, shows(values))
+        for row in self._widgets:
+            if lora_key_of(row) in values:
+                self._set_row_visible(row, not strength_without_its_lora(row, values))
         for row, (in_use, shut_down_help) in _IN_USE_WHILE.items():
             if row not in self._widgets:
                 continue

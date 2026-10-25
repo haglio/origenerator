@@ -816,6 +816,38 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
     assert shown == [0]   # only the plain click moved the preview
 
 
+@pytest.mark.parametrize(("clicked", "shift_clicked", "run"),
+                         [(0, 2, [0, 1, 2]), (3, 1, [1, 2, 3])], ids=["down", "up"])
+def test_shift_click_picks_the_run_from_the_level_last_clicked(qtbot, clicked,
+                                                               shift_clicked, run):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(3)))
+    shown = []
+    versions.level_selected.connect(shown.append)
+
+    _click(qtbot, _rows(versions)[clicked])
+    _click(qtbot, _rows(versions)[shift_clicked], Qt.KeyboardModifier.ShiftModifier)
+
+    assert versions.selected_positions() == run
+    assert shown == [clicked]   # picked for the Delete, like a ctrl-click
+
+
+def test_an_arrow_after_a_shift_click_steps_on_from_the_level_shift_clicked(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(3)))
+    shown = []
+    versions.level_selected.connect(shown.append)
+
+    _click(qtbot, _rows(versions)[0])
+    _click(qtbot, _rows(versions)[2], Qt.KeyboardModifier.ShiftModifier)
+    qtbot.keyClick(_rows(versions)[2], Qt.Key.Key_Down)
+
+    assert versions.selected_positions() == [3]
+    assert shown == [0, 3]
+
+
 def _clicked_into(qtbot, position, count=2):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -825,6 +857,15 @@ def _clicked_into(qtbot, position, count=2):
     row = _rows(versions)[position]
     _click(qtbot, row)
     return versions, row, shown
+
+
+def test_a_shift_click_picks_the_run_from_the_level_the_arrows_reached(qtbot):
+    versions, row, _shown = _clicked_into(qtbot, 0, count=3)
+
+    qtbot.keyClick(row, Qt.Key.Key_Down)
+    _click(qtbot, _rows(versions)[3], Qt.KeyboardModifier.ShiftModifier)
+
+    assert versions.selected_positions() == [1, 2, 3]
 
 
 def test_down_and_right_pick_and_show_the_level_under_the_one_clicked(qtbot):
@@ -875,6 +916,16 @@ def test_up_from_the_top_level_takes_the_highlight_onto_the_enhance_row(qtbot):
 
     assert enhance_row._selected
     assert versions.selected_positions() == []
+
+
+def test_a_shift_click_with_the_arrows_on_the_enhance_row_picks_just_the_level_clicked(qtbot):
+    # The Enhance row is no version, so a run has nowhere to start from there.
+    versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
+
+    qtbot.keyClick(row, Qt.Key.Key_Up)
+    _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ShiftModifier)
+
+    assert (enhance_row._selected, versions.selected_positions()) == (False, [1])
 
 
 @pytest.mark.parametrize("enter", [Qt.Key.Key_Return, Qt.Key.Key_Enter],

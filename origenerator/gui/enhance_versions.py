@@ -584,14 +584,15 @@ class EnhanceVersions(QWidget):
     def _on_row_clicked(self, position: int, modifiers):
         """Pick a level as a click picks a thumbnail, and put it in the preview.
 
-        Ctrl leaves the preview where it was — the gesture is "these ones",
-        aimed at the Delete that follows, and swapping the picture under each
-        ctrl-click would fight it."""
+        Ctrl and Shift leave the preview where it was — the gesture is "these
+        ones", aimed at the Delete that follows, and swapping the picture under
+        each click would fight it."""
         ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
         self._arrows_from = position
-        self._picking.apply(position, ctrl=ctrl)
+        self._picking.apply(position, ctrl=ctrl, shift=shift)
         self._show_picks()
-        if not ctrl:
+        if not (ctrl or shift):
             self.level_selected.emit(position)
 
     def _show_picks(self) -> None:

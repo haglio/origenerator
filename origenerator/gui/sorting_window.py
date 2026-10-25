@@ -52,6 +52,12 @@ def one_term_to_a_line(state: str) -> str:
     return re.sub(r"\s+\(", "\n(", lines).strip()
 
 
+def a_name_for(state: str, room: int, width_of) -> str:
+    if width_of(state) <= room:
+        return state
+    return wrapped_to_fit(one_term_to_a_line(state), room, width_of)
+
+
 def wrapped_to_fit(text: str, room: int, width_of) -> str:
     lines = []
     for line in text.split("\n"):
@@ -65,10 +71,6 @@ def wrapped_to_fit(text: str, room: int, width_of) -> str:
                 standing = tried
         lines.append(standing)
     return "\n".join(lines)
-
-
-def on_the_bottom_line(text: str, lines: int) -> str:
-    return "\n" * max(0, lines - text.count("\n") - 1) + text
 
 
 def _fitted(source: QPixmap, width: int, height: int) -> QPixmap:
@@ -86,17 +88,21 @@ def one_scale_for_all(drawings, side: int) -> float:
     return side / largest if largest else 1.0
 
 
-def on_a_white_square(source: QPixmap, side: int, scale: float) -> QPixmap:
-    canvas = QPixmap(side, side)
-    canvas.fill(WHITE)
-    if source.isNull():
-        return canvas
-    drawn = source.scaled(max(1, round(source.width() * scale)),
-                          max(1, round(source.height() * scale)),
-                          Qt.AspectRatioMode.KeepAspectRatio,
-                          Qt.TransformationMode.SmoothTransformation)
+def on_a_white_square(source: QPixmap, side: int, scale: float,
+                      above: int = 0) -> QPixmap:
+    """The drawing on a white square of *side*, under *above* pixels of clear
+    space: the strip carries the square and its name down, and shows nothing."""
+    canvas = QPixmap(side, side + above)
+    canvas.fill(Qt.GlobalColor.transparent)
     painter = QPainter(canvas)
-    painter.drawPixmap((side - drawn.width()) // 2, (side - drawn.height()) // 2, drawn)
+    painter.fillRect(0, above, side, side, WHITE)
+    if not source.isNull():
+        drawn = source.scaled(max(1, round(source.width() * scale)),
+                              max(1, round(source.height() * scale)),
+                              Qt.AspectRatioMode.KeepAspectRatio,
+                              Qt.TransformationMode.SmoothTransformation)
+        painter.drawPixmap((side - drawn.width()) // 2,
+                           above + (side - drawn.height()) // 2, drawn)
     painter.end()
     return canvas
 
@@ -112,6 +118,7 @@ class SortingWindow(QWidget):
         self._marks = dict(marks)
         self._tiles: dict[str, QToolButton] = {}
         self._name_font = make_font(size=SIZE_SMALL)
+        self._mark = MARK
         # The picture at its own size, kept so a resize re-scales from the
         # original rather than from an already-shrunk copy.
         self._shown = QPixmap()
@@ -152,14 +159,14 @@ class SortingWindow(QWidget):
                     for tile in tiles if self._marks.get(tile.state)}
         scale = one_scale_for_all(drawings.values(), MARK)
         room = self._room_for_a_name(tiles)
-        named = {tile.state: wrapped_to_fit(one_term_to_a_line(tile.state), room,
-                                            QFontMetrics(self._name_font).horizontalAdvance)
-                 for tile in tiles}
-        lines = max(name.count("\n") + 1 for name in named.values())
+        wide = QFontMetrics(self._name_font).horizontalAdvance
+        named = {tile.state: a_name_for(
+            tile.state, room * tile.columns + GAP_MEDIUM * (tile.columns - 1), wide)
+            for tile in tiles}
         for tile in tiles:
             grid.addWidget(
                 self._state_tile(tile.state, drawings.get(tile.state), scale,
-                                 on_the_bottom_line(named[tile.state], lines)),
+                                 named[tile.state]),
                 tile.row, tile.column, tile.rows, tile.columns,
                 Qt.AlignmentFlag.AlignCenter)
         self._make_every_tile_one_size(tiles, drawings, scale)
@@ -205,17 +212,17 @@ class SortingWindow(QWidget):
         rows = max((tile.row + tile.rows for tile in tiles), default=1)
         allowed = (ROOM_FOR_THE_GRID - GAP_MEDIUM * (rows - 1)) // rows
         tall = max(button.sizeHint().height() for button in buttons)
-        if tall > allowed:
-            self._draw_at(MARK - (tall - allowed), drawings, scale)
+        self._mark = MARK if tall <= allowed else MARK - (tall - allowed)
+        self._draw_at(self._mark, drawings, scale)
         widest = max(button.sizeHint().width() for button in buttons)
         tallest = max(button.sizeHint().height() for button in buttons)
+        self._center_the_block(tiles, tallest, drawings, scale)
         for tile in tiles:
             self._tiles[tile.state].setFixedSize(
                 widest * tile.columns + GAP_MEDIUM * (tile.columns - 1),
                 tallest * tile.rows + GAP_MEDIUM * (tile.rows - 1))
 
     def _room_for_a_name(self, tiles) -> int:
-        """The narrowest width that keeps every name to :data:`NAME_LINES` lines."""
         metrics = QFontMetrics(self._name_font)
         named = [one_term_to_a_line(tile.state) for tile in tiles]
         widest = max(metrics.horizontalAdvance(word)
@@ -242,12 +249,24 @@ class SortingWindow(QWidget):
             tile.setIcon(QIcon(on_a_white_square(drawing, MARK, scale)))
         return tile
 
-    def _draw_at(self, mark: int, drawings, scale: float) -> None:
+    def _draw_at(self, mark: int, drawings, scale: float, above: int = 0) -> None:
         for state, tile in self._tiles.items():
-            tile.setIconSize(QSize(mark, mark))
-            drawing = drawings.get(state)
-            if drawing is not None and not drawing.isNull():
-                tile.setIcon(QIcon(on_a_white_square(drawing, mark, scale * mark / MARK)))
+            self._draw_one(tile, drawings.get(state), mark, scale, above)
+
+    def _draw_one(self, tile, drawing, mark: int, scale: float, above: int) -> None:
+        tile.setIconSize(QSize(mark, mark + above))
+        if drawing is not None and not drawing.isNull():
+            tile.setIcon(QIcon(on_a_white_square(drawing, mark, scale * mark / MARK,
+                                                 above)))
+
+    def _center_the_block(self, tiles, tallest: int, drawings, scale: float) -> None:
+        line = QFontMetrics(self._name_font).height()
+        for tile in tiles:
+            button = self._tiles[tile.state]
+            spare = tallest - self._mark - line * (button.text().count("\n") + 1)
+            if spare > 1:
+                self._draw_one(button, drawings.get(tile.state), self._mark, scale,
+                               spare // 2)
 
 
     def _on_state(self, state: str) -> None:

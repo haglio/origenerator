@@ -1024,13 +1024,9 @@ class GenerateConfigPanel(QWidget):
         return self._previews.of(row) if row else None
 
     def _zone_items(self) -> ZoneItems:
-        return ZoneItems(self._db, self._names, self._rows_of_kind, places=OUTPUT_PLACES,
+        return ZoneItems(self._db, self._names, self._library, places=OUTPUT_PLACES,
                          input_dir=COMFYUI_INPUT_DIR, thumb_dir=THUMB_DIR,
                          moving_preview=self._previews.of)
-
-    def _rows_of_kind(self, kind: MediaType) -> list[dict]:
-        library = self._library.now()
-        return library.image_rows if kind == MediaType.IMAGE else library.video_rows
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)

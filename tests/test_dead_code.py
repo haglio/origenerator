@@ -137,7 +137,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 #
 # 19261 when a discarded seed's relaunch moved ahead of the folder's redraw: the
 # helper that wrapped the drop and the redraw went, and what its line said is
-# test_a_tab_watching_the_loop_follows_it_onto_the_next_seed.
+# test_a_tab_watching_auto_generate_follows_it_onto_the_next_seed.
 #
 # 19254 when the button bank's marks grew to fill their buttons: the bank
 # button's note that its icon was drawn near the button's full height, which it

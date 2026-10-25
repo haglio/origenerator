@@ -128,7 +128,7 @@ def redo_icon() -> QIcon:
     return glyph_icon("redo_arrow", size=_SIZE)
 
 
-def autoloop_icon() -> QIcon:
+def auto_generate_icon() -> QIcon:
     return glyph_icon("bolt", size=_SIZE)
 
 

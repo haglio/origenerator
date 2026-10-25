@@ -6869,9 +6869,9 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
     assert now == was
 
 
-# --- auto-generate: the folder re-roll on a loop until stopped --------------
+# --- Auto-Generate: the folder re-roll, again and again until stopped -------
 
-def test_toggling_auto_starts_a_reroll_loop(qtbot, tmp_path):
+def test_toggling_auto_starts_auto_generate(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -6929,9 +6929,9 @@ def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     assert key in view._live_jobs            # a fresh variation is running
 
 
-def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_path):
-    # One folder at a time: two loops would take turns on the machine, each
-    # waiting out the other's render.
+def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path):
+    # One folder at a time: Auto-Generate in two would take turns on the
+    # machine, each waiting out the other's render.
     client = _reroll_client()
     db = _seeded_db(tmp_path)
     db.insert_generation(
@@ -6960,7 +6960,7 @@ def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_
     assert view._bank.auto.isChecked()  # the switch follows the folder in front
 
 
-def test_toggling_auto_off_stops_the_loop(qtbot, tmp_path):
+def test_toggling_auto_off_stops_auto_generate(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -6991,7 +6991,7 @@ def test_auto_stops_when_a_variation_fails(qtbot, tmp_path):
     assert client.submit_job.call_count == 1       # did not spin on the failure
 
 
-def test_cancelling_a_reroll_keeps_the_auto_loop_and_tries_another_seed(qtbot, tmp_path):
+def test_cancelling_a_reroll_keeps_auto_generate_on_and_tries_another_seed(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -7002,13 +7002,13 @@ def test_cancelling_a_reroll_keeps_the_auto_loop_and_tries_another_seed(qtbot, t
 
     view._cancel_reroll(key)  # the live tile's Cancel: "not this seed", not "stop"
 
-    assert view._auto.is_active(key)          # the loop is still on
+    assert view._auto.is_active(key)          # Auto-Generate is still on
     assert view._bank.auto.isChecked()         # and the toggle still says so
     assert client.submit_job.call_count == 2  # a fresh seed went out at once
     assert view._live_jobs[key].prompt_id != canceled
 
 
-def test_cancelling_an_auto_folders_job_by_name_keeps_the_loop_going(qtbot, tmp_path):
+def test_cancelling_an_auto_folders_job_by_name_keeps_auto_generate_going(qtbot, tmp_path):
     # The queue row's Cancel and a config tab's, which name the run to stop.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
@@ -7025,7 +7025,7 @@ def test_cancelling_an_auto_folders_job_by_name_keeps_the_loop_going(qtbot, tmp_
     assert view._live_jobs[key].prompt_id != canceled
 
 
-def test_a_tab_watching_the_loop_follows_it_onto_the_next_seed(qtbot, tmp_path):
+def test_a_tab_watching_auto_generate_follows_it_onto_the_next_seed(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -7042,7 +7042,7 @@ def test_a_tab_watching_the_loop_follows_it_onto_the_next_seed(qtbot, tmp_path):
     assert _frame_shown(panel._preview, _png_bytes())
 
 
-def test_only_the_auto_toggle_ends_the_loop_not_a_string_of_cancels(qtbot, tmp_path):
+def test_only_the_auto_toggle_ends_auto_generate_not_a_string_of_cancels(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -7050,7 +7050,7 @@ def test_only_the_auto_toggle_ends_the_loop_not_a_string_of_cancels(qtbot, tmp_p
     key = _select_first_leaf(view)
     view._toggle_auto(True)
 
-    for _ in range(3):  # discard seed after seed — the loop keeps offering more
+    for _ in range(3):  # discard seed after seed — Auto-Generate keeps offering more
         view._cancel_reroll(key)
     assert view._auto.is_active(key)
     assert client.submit_job.call_count == 4
@@ -7070,8 +7070,9 @@ def _folder_tab(view, db):
 
 def test_auto_relabels_the_discard_button_in_all_three_panes(qtbot, tmp_path):
     # Center (the folder's live tile), foot (the queue row) and right (the config
-    # tab) each draw a button for the run in flight. While the folder loops, the
-    # press throws away a seed and the loop starts another, so all three say so.
+    # tab) each draw a button for the run in flight. While the folder
+    # auto-generates, the press throws away a seed and Auto-Generate starts
+    # another, so all three say so.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -7140,7 +7141,7 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
     first = view._live_jobs[key]
     assert view._info_tabs.current_config_panel().launched_runs() == [first.origin]
 
-    client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # the loop moves on
+    client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # Auto-Generate moves on
 
     panel = view._info_tabs.current_config_panel()
     assert panel._cancel_btn.isHidden() is False
@@ -7148,7 +7149,7 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
 
 
 def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
-    # The reported bug: a loop left running while the user browsed grew a row of
+    # The reported bug: Auto-Generate left running while the user browsed grew a row of
     # tabs, one per image it made. Each finished variation was loaded into whatever
     # tab was in front — the pane's resting tab, which nothing in it had asked for
     # the picture, and which then stopped being blank, so the next clicked
@@ -7166,7 +7167,7 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
 
     assert view._info_tabs.count() == 1
     panel = view._info_tabs.current_config_panel()
-    # Still holding the item the folder opened on, not a variation the loop made.
+    # Still holding the item the folder opened on, not a variation Auto-Generate made.
     assert panel.displayed_row()["prompt_id"] == "orig"
 
     landed = next(r for r in db.list_generations() if r["status"] == "completed")
@@ -7176,10 +7177,11 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
 
 
 def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
-    # The reported bug: the loop's live frames filled the preview of whichever tab
-    # was open, over the picture the user had put there, and its results landed
-    # there too. A loop runs while the user works on something else; the folder's
-    # own live tile is where it can be watched. Even a tab on the looping folder —
+    # The reported bug: Auto-Generate's live frames filled the preview of whichever
+    # tab was open, over the picture the user had put there, and its results landed
+    # there too. Auto-Generate runs while the user works on something else; the
+    # folder's own live tile is where it can be watched. Even a tab on the folder
+    # it runs in —
     # which does light up with its progress and Next-seed button — keeps showing
     # what the user opened it on.
     db = _seeded_db(tmp_path)
@@ -7204,10 +7206,10 @@ def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     assert view._selected_reroll_key is None  # the pane was never taken over
 
 
-def test_watching_a_loop_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp_path):
-    # Clicking the folder's live tile is how the loop is watched full size, and it
-    # is the one thing that gives the pane to a loop. Watching one variation is
-    # watching what the loop does next, so the tile picked once keeps mirroring
+def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp_path):
+    # Clicking the folder's live tile is how Auto-Generate is watched full size, and
+    # it is the one thing that gives the pane to Auto-Generate. Watching one variation
+    # is watching what Auto-Generate does next, so the tile picked once keeps mirroring
     # across the hand-off rather than going dark after one.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
@@ -7216,7 +7218,7 @@ def test_watching_a_loop_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    _generating_tile(view).selected.emit()  # the user points the pane at the loop
+    _generating_tile(view).selected.emit()  # the user points the pane at Auto-Generate
     panel = view._info_tabs.current_config_panel()
     panel._preview.show_frame = MagicMock()
 
@@ -7227,8 +7229,8 @@ def test_watching_a_loop_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp
     panel._preview.show_frame.assert_called_with(b"the next one")
 
 
-def test_the_loop_ending_lets_the_pane_go(qtbot, tmp_path):
-    # The key stands for the loop while one runs, so the switch going off is what
+def test_auto_generate_ending_lets_the_pane_go(qtbot, tmp_path):
+    # The key stands for Auto-Generate while it runs, so the switch going off is what
     # ends the pane's watch — nothing else is coming to take it.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
@@ -7302,7 +7304,7 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
 
 
 def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):
-    # Never hidden: a loop runs until it is stopped, and a switch that went away
+    # Never hidden: Auto-Generate runs until it is stopped, and a switch that went away
     # with its folder would leave one running with nothing on screen to say so.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -7317,8 +7319,8 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     assert "open a settings folder" in view._bank.auto.toolTip()
 
 
-def test_the_switchs_tip_takes_you_to_whichever_folder_is_looping(qtbot, tmp_path):
-    # The tip is only offered while the loop is somewhere other than the folder on
+def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtbot, tmp_path):
+    # The tip is only offered while Auto-Generate is somewhere other than the folder on
     # screen, and being taken there is the whole of what it is for — naming the
     # folder would be no help, since the names are long and alike.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
@@ -7329,7 +7331,7 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_is_looping(qtbot, tmp_pat
     view._tree.setCurrentItem(_image_workflow(view._tree))  # look somewhere else
     assert _selected_folder(view) != key
 
-    view._bank.auto_tip.link_activated.emit("looping")
+    view._bank.auto_tip.link_activated.emit("auto")
 
     assert _selected_folder(view) == key
 
@@ -7459,7 +7461,7 @@ def test_auto_generate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
-    # It used to come on with the Auto loop and again with a fullscreen slideshow,
+    # It used to come on with Auto-Generate and again with a fullscreen slideshow,
     # which made "is it listening?" a thing to work out rather than to look at.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -8665,7 +8667,7 @@ def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
     qtbot.addWidget(view)
     slideshow = _slideshow_of_first_leaf(qtbot, view)
 
-    db.add(_image("i2", "a cat", 50, 2))              # the loop landed the next one
+    db.add(_image("i2", "a cat", 50, 2))              # Auto-Generate landed the next one
     view._on_reroll_finished("some-key", "i2")
 
     assert {item[2] for item in slideshow._set.playlist._items} == {"i1", "i2"}
@@ -10060,10 +10062,10 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
     assert view._jobs.all_jobs == []      # the run really stopped
 
 
-def test_an_auto_looping_folders_card_offers_the_next_seed_and_a_real_stop(
+def test_an_auto_generating_folders_card_offers_the_next_seed_and_a_real_stop(
         qtbot, tmp_path, monkeypatch):
-    # A discard ends nothing while the loop is on — it throws this seed away and
-    # the loop launches another — so the menu says what that press actually gets
+    # A discard ends nothing while Auto-Generate is on — it throws this seed away
+    # and Auto-Generate launches another — so the menu says what that press actually gets
     # you, in the same words the tile's button and the strip's row use. Unlike
     # those, it has room to offer the stop as well, which is the thing you cannot
     # otherwise ask for without going to the header for the Auto switch.
@@ -10071,7 +10073,7 @@ def test_an_auto_looping_folders_card_offers_the_next_seed_and_a_real_stop(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._toggle_auto(True)          # the loop launches the first variation
+    view._toggle_auto(True)          # Auto-Generate launches the first variation
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_recents(view)
@@ -10082,10 +10084,11 @@ def test_an_auto_looping_folders_card_offers_the_next_seed_and_a_real_stop(
     assert labels == [["Next seed", "Cancel and stop auto-generating"]]
 
 
-def test_canceling_from_a_looping_folders_card_ends_the_loop_too(
+def test_canceling_from_an_auto_generating_folders_card_ends_auto_generate_too(
         qtbot, tmp_path, monkeypatch):
-    # The whole point of the second entry: the loop goes off and the run in it is
-    # thrown away. The order matters — a discard under a live loop is its cue to
+    # The whole point of the second entry: Auto-Generate goes off and the run in it
+    # is thrown away. The order matters — a discard while Auto-Generate is on is its
+    # cue to
     # launch the next seed, so canceling first would leave a fresh run running.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -10099,7 +10102,7 @@ def test_canceling_from_a_looping_folders_card_ends_the_loop_too(
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert not view._auto.is_active(key)     # the loop is off...
+    assert not view._auto.is_active(key)     # Auto-Generate is off...
     assert view._jobs.all_jobs == []       # ...and nothing was launched in its place
 
 
@@ -10137,9 +10140,9 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
     assert view._jobs.all_jobs == []
 
 
-def test_a_looping_folders_live_tile_offers_the_stop_its_button_cannot(
+def test_an_auto_generating_folders_live_tile_offers_the_stop_its_button_cannot(
         qtbot, tmp_path, monkeypatch):
-    # The tile's button reads "Next seed" while the loop is on and there is no
+    # The tile's button reads "Next seed" while Auto-Generate is on and there is no
     # room on it for a second act. The menu has the room, so it carries the stop.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -13661,7 +13664,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     slideshow.close()
 
 
-def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
+def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_picture(
         qtbot, tmp_path, monkeypatch):
     by_id = lambda row, places: (f"{row['prompt_id']}.png", "image")
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
@@ -13672,7 +13675,7 @@ def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
     view.refresh()
     key = _select_first_leaf(view)
     view._bank.auto.click()
-    _generating_tile(view).selected.emit()  # watching the loop in the tab
+    _generating_tile(view).selected.emit()  # watching Auto-Generate in the tab
     landed = view._live_jobs[key].prompt_id
     client.job_completed.emit(landed, _REROLL_HISTORY)  # the tab shows it; the next runs
 
@@ -13831,8 +13834,8 @@ class _SignalMotion(QObject):
         return "OSR2 stub"
 
 
-def _looping_view(qtbot, monkeypatch, rows):
-    """A gallery on a settings leaf whose loop reports active, built on a stubbed
+def _auto_generating_view(qtbot, monkeypatch, rows):
+    """A gallery on a settings leaf whose Auto-Generate reports active, built on a stubbed
     motion so no device backend spins up."""
     view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(),
                        osr2_motion=_SignalMotion())
@@ -13845,13 +13848,13 @@ def _looping_view(qtbot, monkeypatch, rows):
 
 
 def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeypatch):
-    # A folder that is looping used to answer this gesture with the auto-generate
+    # A folder Auto-Generate runs in used to answer this gesture with the auto-generate
     # montage — a second slideshow, for a double-click that means "this one,
     # bigger". Watching the frames come in is what fullscreen is for.
     _resolve_by_id(monkeypatch)
-    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     panel = view._info_tabs.current_config_panel()
-    panel._preview.show_frame(_png_bytes())  # the loop's generation, streaming
+    panel._preview.show_frame(_png_bytes())  # Auto-Generate's generation, streaming
 
     win = panel._preview.open_fullscreen()
 
@@ -13865,7 +13868,7 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
     # The one switch picks the source, and a script beats the motion: turning it
     # on over an image moves it, and browsing to a scripted video hands the device
     # to the funscript rather than leaving both streaming at it.
-    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     driver = _FakeDriver()
     view._osr2_driver = driver
     panel = view._info_tabs.current_config_panel()
@@ -13997,7 +14000,7 @@ def test_leaving_a_paused_slideshow_leaves_the_room_paused(qtbot, monkeypatch, l
 def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     # The motion is app-global: dismissing a view must not park the device.
     _resolve_by_id(monkeypatch)
-    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
     # And its Space reaches the one switch, like every other surface's.
@@ -14008,7 +14011,7 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
 
 
 def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
-    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Esc is the gallery's here — no dialog and no fullscreen view up. Said
     # outright, because which window Qt calls active is ambient in a test process
     # (a fullscreen view another test opened and closed can still hold it).
@@ -14022,7 +14025,7 @@ def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
 def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):
     # "Always available": the same keys the fullscreen views answer are routed
     # app-wide by the gallery's event filter, under its own-keys guards.
-    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     _on_screen(qtbot, view, 1400, 900)
 
     gestures.press_key(view, Qt.Key.Key_L)
@@ -14032,7 +14035,7 @@ def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):
 
 def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_does(
         qtbot, monkeypatch):
-    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     _on_screen(qtbot, view, 1400, 900)
 
     gestures.press_key(view, Qt.Key.Key_9, Qt.KeyboardModifier.KeypadModifier)
@@ -14314,7 +14317,7 @@ def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_aga
 
 
 def _startable_view(qtbot, tmp_path, monkeypatch):
-    """A gallery on a loopable folder with nothing running — the app as it opens."""
+    """A gallery on a folder Auto-Generate can run in, idle — the app as it opens."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: ("g0.png", "image"))
     radio = _FakeRadio()
@@ -16043,7 +16046,7 @@ def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
     assert "picture on screen" in words(view._voice.status)
 
 
-def test_start_slideshow_is_heard_with_no_slideshow_and_no_loop(qtbot, tmp_path,
+def test_start_slideshow_is_heard_with_no_slideshow_and_no_auto_generate(qtbot, tmp_path,
                                                           monkeypatch):
     # The state the command is for: nothing playing, nothing generating, mic on.
     view = _voiceable(qtbot, tmp_path, monkeypatch)

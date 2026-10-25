@@ -57,8 +57,8 @@ from origenerator.gui.inflight import (
     InFlightItem,
     discard_run_text,
     discard_run_tooltip,
-    stop_loop_text,
-    stop_loop_tooltip,
+    stop_auto_generate_text,
+    stop_auto_generate_tooltip,
 )
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.inflight_items import InFlightItems
@@ -918,14 +918,14 @@ class BrowserPane(QObject):
         and a card answered with nothing, so stopping a run meant finding it again
         among the lower strip's rows. The wording is the strip's
         (:func:`inflight.discard_run_text`) — "Next seed" while the folder is
-        auto-looping, where the press starts another rather than stopping
+        auto-generating, where the press starts another rather than stopping
         anything.
 
-        Which is exactly why a looping folder's card gets a second entry
-        (:func:`inflight.stop_loop_text`): a menu, unlike the one button those
+        Which is exactly why an auto-generating folder's card gets a second entry
+        (:func:`inflight.stop_auto_generate_text`): a menu, unlike the one button those
         surfaces have room for, can carry both the discard and a real stop, so a
-        run under a live loop can be ended without going to the header for the
-        Auto switch. The loop goes off first — a discard while it is still on is
+        run made while Auto-Generate is on can be ended without going to the header
+        for the Auto switch. Auto-Generate goes off first — a discard while it is still on is
         the cue for the next seed, so canceling first would start one.
 
         No menu at all for a running row this session holds no job for — one a
@@ -941,8 +941,8 @@ class BrowserPane(QObject):
         discard.setToolTip(discard_run_tooltip(item.auto_generating))
         stop = None
         if item.auto_generating and item.stop_auto is not None:
-            stop = menu.addAction(stop_loop_text())
-            stop.setToolTip(stop_loop_tooltip())
+            stop = menu.addAction(stop_auto_generate_text())
+            stop.setToolTip(stop_auto_generate_tooltip())
         chosen = menu.exec(global_pos)
         if chosen is discard:
             item.cancel()

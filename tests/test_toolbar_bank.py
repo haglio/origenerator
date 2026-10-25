@@ -125,7 +125,7 @@ def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_on
 
 
 def test_the_bank_opens_with_its_optional_buttons_away(bank):
-    # A loop runs until it is stopped, so Auto is never hidden; the slideshow and
+    # Auto-Generate runs until it is stopped, so Auto is never hidden; the slideshow and
     # the grouping are offered only where they mean something.
     made = bank()
 
@@ -150,8 +150,8 @@ def test_one_state_writes_every_button(bank):
 
 
 def test_a_switch_put_where_the_app_already_is_does_not_re_run_the_press(bank):
-    # Blocked around the write, not around the press: a bank re-aimed while a
-    # loop is running must not toggle the loop off.
+    # Blocked around the write, not around the press: a bank re-aimed while
+    # Auto-Generate is running must not toggle it off.
     pressed = []
     made = bank(_acts(toggle_auto=pressed.append))
 
@@ -170,7 +170,7 @@ def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(b
     assert made.auto.isChecked() is True
 
 
-def test_the_loop_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(bank):
+def test_auto_generate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(bank):
     # Only one of the two ever appears: naming the folder is no use when a name
     # is a short code, so the tip offers to go there instead.
     made = bank()
@@ -181,9 +181,9 @@ def test_the_loop_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(bank)
     assert "Go to it" in made.auto_tip._html
 
 
-def test_the_tip_s_link_leads_wherever_the_loop_is_now(bank):
+def test_the_tip_s_link_leads_wherever_auto_generate_is_now(bank):
     followed = []
-    made = bank(_acts(go_to_looping_folder=followed.append))
+    made = bank(_acts(go_to_auto_generating_folder=followed.append))
 
     made.auto_tip.link_activated.emit("auto")
 

@@ -867,7 +867,7 @@ def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
 
 
 def test_a_run_no_tab_launched_belongs_to_no_tab(tabs):
-    # The gallery's own launches — the folder tile's "+", the auto-generate loop —
+    # The gallery's own launches — the folder tile's "+", Auto-Generate —
     # are nobody's Generate. Their results must not land in whatever tab happens to
     # be in front: filling the pane's blank resting tab with a picture stopped it
     # being the tab a click loads into, so the next click opened one beside it.

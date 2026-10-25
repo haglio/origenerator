@@ -1173,7 +1173,7 @@ class SlideshowDirector:
 
         Which is the whole point of watching a folder that is auto-generating —
         the playlist is otherwise the fixed set the slideshow opened with, so the
-        items the loop makes while it runs are exactly the ones it never reaches.
+        items Auto-Generate makes while it runs are exactly the ones it never reaches.
         Asked of each slideshow's OWN location, remembered when it opened, rather
         than of the view on screen: inside Fun Time the slideshows play on the
         satellite regions while the main window goes on being used, so by the

@@ -95,6 +95,8 @@ from origenerator.workflows.detail_parts import parts_framed_together
 
 logger = logging.getLogger(__name__)
 
+_ABOUT_THE_SLIDE_SAID_OVER = frozenset({AppCommand.CULL, AppCommand.FAVORITE, AppCommand.LOCK})
+
 _REGION_CAPTIONS = {"portrait": "Origenerator Portrait", "landscape": "Origenerator Landscape"}
 _SWITCH_HELD_BY = {_FAVORITES_KEY: "favorites", _ENHANCED_KEY: "enhanced"}
 
@@ -1556,16 +1558,18 @@ class SlideshowDirector:
         else:
             slideshow.note_voice_command("nothing here is enhanced", kind=WARNING)
 
-    def run_on_slide(self, command: AppCommand) -> None:
+    def run_on_slide(self, command: AppCommand, said_at: float | None = None) -> None:
         """A word about the slide filling the screen: step off it either way,
         take it away, lock it, or bookmark it.
 
         The words are Fun Time's, and so is what they do — "weird" condemns what
-        is on screen, a lock holds it — because the two rooms are one room to
-        whoever is speaking, and a word that means one thing there and another
-        here is a word nobody can use.
+        was on screen when it was said, a lock holds it — because the two rooms are
+        one room to whoever is speaking, and a word that means one thing there and
+        another here is a word nobody can use.
         """
         slideshow = self._slideshow
+        if command in _ABOUT_THE_SLIDE_SAID_OVER:
+            slideshow.back_to_what_was_said_over(said_at)
         kind = NOTICE
         if command is AppCommand.BACK:
             slideshow.slideshow_step(-1)

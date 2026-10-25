@@ -45,7 +45,7 @@ class CommandAndRequestListener(QObject):
 
     def start_commands(self, execute) -> None:
         """Open the mic: an utterance the matcher recognizes calls ``execute``
-        with what it matched."""
+        with what it matched and when it was said."""
         self._execute_command = execute
         self._hearing.start()  # an already-open mic stays as it is
 
@@ -100,7 +100,7 @@ class CommandAndRequestListener(QObject):
             self.request.emit(meaning)
         elif meaning is not None:
             logger.info("Voice: a %d-word utterance matched %r", length, meaning)
-            self._execute_command(meaning)
+            self._execute_command(meaning, spoken_at)
         else:
             logger.info("Voice: a %d-word utterance matched no command", length)
 

@@ -63,6 +63,7 @@ class FakeListener:
         self.commands_on = False
         self.bare = None
         self.dictated = None
+        self.dictated_at = []
         self.on_command = None
 
     def start_commands(self, handler):
@@ -75,7 +76,8 @@ class FakeListener:
     def bare_command(self, text):
         return self.bare
 
-    def push_dictation(self, text):
+    def push_dictation(self, text, spoken_at=None):
+        self.dictated_at.append(spoken_at)
         return self.dictated
 
 
@@ -113,9 +115,6 @@ class FakeSlideshow:
         self.runs = []
         self.pauses = []
         self.requests = []
-
-    def voice_target(self):
-        return self.target
 
     def back_to_what_was_said_over(self, said_at):
         self.went_back_for.append(said_at)
@@ -169,8 +168,8 @@ class FakeSlideshows:
     def filter_enhanced(self, enhanced_only, side):
         self.filters.append((enhanced_only, side))
 
-    def run_on_slide(self, command):
-        self.slide_words.append(command)
+    def run_on_slide(self, command, said_at=None):
+        self.slide_words.append((command, said_at))
 
 
 class FakeMotion:
@@ -565,7 +564,15 @@ def test_a_transport_word_goes_to_the_slide_while_a_slideshow_is_up(router):
 
     voice.on_command(AppCommand.FORWARD)
 
-    assert slideshows.slide_words == [AppCommand.FORWARD]
+    assert slideshows.slide_words == [(AppCommand.FORWARD, None)]
+
+
+def test_a_word_about_the_slide_goes_with_when_it_was_said(router):
+    voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=FakeSlideshow()))
+
+    voice.on_command(AppCommand.LOCK, said_at=7.5)
+
+    assert slideshows.slide_words == [(AppCommand.LOCK, 7.5)]
 
 
 def test_undo_stays_the_gallerys_even_under_a_slideshow(router):
@@ -620,6 +627,16 @@ def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):
 
     assert host.enhanced == ["g7"]
     assert slideshow.runs == [("g7", "enhancing…", NOTICE)]
+
+
+def test_an_order_said_over_an_image_since_left_is_about_that_image_put_back(router):
+    slideshow = FakeSlideshow(target="g7", said_over={7.5: "g6"})
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
+
+    voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND, None), said_at=7.5)
+
+    assert host.enhanced == ["g6"]
+    assert slideshow.went_back_for == [7.5]
 
 
 def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(router):
@@ -844,6 +861,15 @@ def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
 
     assert voice.run_spoken_command("portrait request no hat") is True
     assert words(voice.status) == "Request: no hat… — say “over” to submit"
+
+
+def test_the_sessions_words_reach_the_dictation_with_when_they_were_said(router):
+    voice, _host, _slideshows = router()
+    voice.listener.dictated = Spoken("no hat", listening=True)
+
+    voice.run_spoken_command("portrait request no hat", said_at=7.5)
+
+    assert voice.listener.dictated_at == [7.5]
 
 
 def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(

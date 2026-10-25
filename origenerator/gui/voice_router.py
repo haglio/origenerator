@@ -397,7 +397,7 @@ class VoiceRouter(QObject):
 
     # --- one utterance ------------------------------------------------------
 
-    def run_spoken_command(self, text: str) -> bool:
+    def run_spoken_command(self, text: str, said_at: float | None = None) -> bool:
         """Run a command the HOSTING session heard, and say whether it was one.
 
         Fun Time owns the microphone while this app is hosted — one mic, one
@@ -419,26 +419,26 @@ class VoiceRouter(QObject):
         instead of the region the request is about.
         """
         side, rest = split_side(text)
-        spoken = self.listener.push_dictation(rest)
+        spoken = self.listener.push_dictation(rest, spoken_at=said_at)
         if spoken is not None:
             self.on_spoken_request(spoken, side=side)
             return True
         bare = self.listener.bare_command(text)
         if bare is not None:
-            self.on_command(bare)
+            self.on_command(bare, said_at)
             return True
         matched = match_voice_command(text)
         if matched is None:
             logger.info("Voice (from the session): a %d-word utterance matched no command",
                         len(text.split()))
             return False
-        self.on_command(matched)
+        self.on_command(matched, said_at)
         return True
 
-    def on_command(self, matched) -> None:
+    def on_command(self, matched, said_at: float | None = None) -> None:
         """One recognized utterance: a collection to play, a slideshow command, a bare
         word about the app or the slide in front of the speaker, or an order
-        about the image — each with the side it named, if it named one.
+        about the image — each with the side it named and when it was said.
 
         An order about the image always arrives wrapped in a
         :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
@@ -450,11 +450,11 @@ class VoiceRouter(QObject):
             self._slideshows.run_slideshow_command(matched.command, matched.side)
         elif isinstance(matched, SurfaceCommand):
             if isinstance(matched.command, AppCommand):
-                self._run_app_command(matched.command, matched.side)
+                self._run_app_command(matched.command, matched.side, said_at)
             else:
-                self._on_image_command(matched)
+                self._on_image_command(matched, said_at)
         elif isinstance(matched, AppCommand):
-            self._run_app_command(matched)
+            self._run_app_command(matched, said_at=said_at)
         elif isinstance(matched, BarSetting):
             self._set_motion_bar(matched)
         else:
@@ -465,7 +465,8 @@ class VoiceRouter(QObject):
 
     # --- the bare vocabulary: a collection, a switch, the motion, or the slide ---
 
-    def _run_app_command(self, command: AppCommand, side: str | None = None) -> None:
+    def _run_app_command(self, command: AppCommand, side: str | None = None,
+                         said_at: float | None = None) -> None:
         """One bare spoken word.
 
         Four kinds, and which it is decides where it lands: a collection name stands
@@ -483,7 +484,7 @@ class VoiceRouter(QObject):
         elif command in _MOTION:
             self._move_the_motion(command)
         elif self._slideshows.showing is not None and command in _ABOUT_THE_SLIDE:
-            self._slideshows.run_on_slide(command)
+            self._slideshows.run_on_slide(command, said_at)
         else:
             self._run_in_gallery(command)
 
@@ -589,8 +590,8 @@ class VoiceRouter(QObject):
         act()
         self._slideshows.answer(said)
 
-    def _on_image_command(self, command) -> None:
-        """A spoken command about the image on screen: a targeted "fix <part>"
+    def _on_image_command(self, command, said_at: float | None = None) -> None:
+        """A spoken command about the image on screen as it was said: a "fix <part>"
         (or several parts, or "fix all"), "enhance" for the better version of
         it, or "genau it" to animate it as a Genau flick.
 
@@ -617,7 +618,7 @@ class VoiceRouter(QObject):
                      else f"a {name_parts(command.command)} fix")
             self._show(f"{wants} needs an image on screen", transient=True)
             return
-        target = slideshow.voice_target()
+        target = slideshow.back_to_what_was_said_over(said_at)
         if isinstance(command.command, AnimateRequest):
             prompt_id, message, kind = self._host.animate_it(target, command.command)
         elif command.command == gallery.ENHANCE_COMMAND:

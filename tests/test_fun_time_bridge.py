@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -184,13 +185,68 @@ def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch
     app's own vocabulary, because only this app knows what its collections are."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     spoken = []
-    monkeypatch.setattr(view, "run_spoken_command", spoken.append)
+    monkeypatch.setattr(view, "run_spoken_command",
+                        lambda text, said_at: spoken.append((text, said_at)))
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "LANDSCAPE_SAY:favorites\nPORTRAIT_SAY:fix teeth\n", encoding="utf-8")
     bridge._tick()
 
-    assert spoken == ["landscape favorites", "portrait fix teeth"]
+    assert spoken == [("landscape favorites", None), ("portrait fix teeth", None)]
+
+
+def test_a_spoken_phrase_goes_with_when_the_session_heard_it_said(qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    commanded = []
+    monkeypatch.setattr(view._voice, "on_command",
+                        lambda matched, said_at=None: commanded.append(said_at))
+    five_seconds_ago = time.time() - 5.0
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        f"PORTRAIT_SAY:fix teeth @{five_seconds_ago:.3f}\n", encoding="utf-8")
+    bridge._tick()
+
+    assert commanded == [pytest.approx(time.monotonic() - 5.0, abs=1.0)]
+
+
+class _SaidOverShow:
+    def __init__(self):
+        self.done = []
+
+    def back_to_what_was_said_over(self, said_at):
+        self.done.append(("back to", said_at))
+
+    def slideshow_cull(self):
+        self.done.append(("weird",))
+
+    def set_locked(self, locked):
+        self.done.append(("locked", locked))
+
+
+def test_a_spoken_weird_goes_back_to_the_slide_it_was_said_over_first(qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _SaidOverShow()
+    monkeypatch.setattr(view, "region_slideshow", lambda side: show)
+    five_seconds_ago = time.time() - 5.0
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        f"portrait_trash @{five_seconds_ago:.3f}\n", encoding="utf-8")
+    bridge._tick()
+
+    assert show.done == [("back to", pytest.approx(time.monotonic() - 5.0, abs=1.0)), ("weird",)]
+
+
+def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, tmp_path,
+                                                                        monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _SaidOverShow()
+    monkeypatch.setattr(view, "region_slideshow", lambda side: show)
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        f"portrait_lock_on @{time.time() - 5.0:.3f}\n", encoding="utf-8")
+    bridge._tick()
+
+    assert show.done == [("locked", True)]
 
 
 def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path, monkeypatch):
@@ -828,7 +884,7 @@ def test_the_maps_own_verbs_all_reach_the_slideshow(qtbot, tmp_path, monkeypatch
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     dropped = []
-    monkeypatch.setattr(bridge, "_apply_side", lambda side, action, argument, line:
+    monkeypatch.setattr(bridge, "_apply_side", lambda side, action, argument, line, said_at:
                         dropped.append(line) if not answer(view.region_slideshow(side), action, argument)
                         else None)
 
@@ -900,6 +956,30 @@ def test_a_host_matches_each_line_the_document_names_by_its_published_pattern(tm
                  for line, pattern in zip(lines, document["command_patterns"], strict=True)
                  for spelled in (line.lower(), line.upper())
                  if not re.fullmatch(pattern, spelled)]
+
+    assert unmatched == []
+
+
+def _said_aloud(template: str, tmp_path) -> str:
+    said_at = contract.declaration()["said_at_suffix"].format(
+        said_at_epoch_seconds="1761390000.250")
+    return _a_line_like(template, tmp_path) + ("" if "|" in template else said_at)
+
+
+def test_every_line_said_aloud_is_answered_with_when_it_was_said_on_its_end(
+        qtbot, tmp_path, caplog):
+    for template in contract.declaration()["command_lines"]:
+        _told_on_a_fresh_bridge(tmp_path, _said_aloud(template, tmp_path))
+
+    assert "dropped" not in caplog.text
+
+
+def test_a_host_matches_each_line_said_aloud_with_its_time_by_its_published_pattern(tmp_path):
+    document = contract.declaration()
+    lines = [_said_aloud(template, tmp_path) for template in document["command_lines"]]
+
+    unmatched = [line for line, pattern in zip(lines, document["command_patterns"], strict=True)
+                 if not re.fullmatch(pattern, line)]
 
     assert unmatched == []
 

@@ -108,6 +108,7 @@ CLOSE_SLIDESHOW = "close_slideshow"
 SIDE_VERBS = (OPEN_SLIDESHOW, CLOSE_SLIDESHOW)
 GO_TO = "GO_TO"
 SAY = "say"
+SAID_AT = " @"
 REQUEST_OPEN = "request_open"
 REQUEST_CLOSED = "request_closed"
 
@@ -197,11 +198,13 @@ def _lines_said_to(side: str) -> tuple[str, ...]:
 
 
 _CARRIED = re.compile(r"(\{\w+\})")
+_MAYBE_SAID_AT = rf"(?:{re.escape(SAID_AT)}[0-9]+(?:\.[0-9]+)?)?"
 
 
 def command_patterns() -> tuple[str, ...]:
     return tuple("(?i)" + "".join(".+" if _CARRIED.fullmatch(piece) else re.escape(piece)
                                   for piece in _CARRIED.split(line))
+                 + ("" if "|" in line else _MAYBE_SAID_AT)
                  for line in command_lines())
 
 
@@ -220,6 +223,7 @@ def declaration() -> dict:
         "command_case_blind": True,
         "command_lines": list(command_lines()),
         "command_patterns": list(command_patterns()),
+        "said_at_suffix": f"{SAID_AT}{{said_at_epoch_seconds}}",
         "request_lines": [spelled_for(side, line) for side in SIDES
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
         "fix_phrases": list(published_fix_phrases()),

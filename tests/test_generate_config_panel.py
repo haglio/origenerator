@@ -3578,7 +3578,7 @@ def test_the_picture_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_p
     mime = generation_mime("img1")
     zone.dropEvent(QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
                               Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
-    zone.activated.emit(zone.current_id())
+    qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
 
     assert panel._param_form.get_values()["input_image"] == "image/sdxl_img1.png [output]"
     assert zone.toolTip() == panel._names.of("img1")

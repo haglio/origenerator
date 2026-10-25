@@ -149,7 +149,7 @@ class CombineController(QObject):
         self.panel = CombinePanel(
             self._picture_lent_by, self._video_lent_by, self._slot_preview,
             self._video_history, named=self._names.prompt_id_of, name_of=self._name_of,
-            browse_picture=self._browse_picture)
+            browse_picture=self._browse_picture, leads_to=self._item_held)
         self.panel.video_used.connect(self._db.record_combine_video_use)
         # Both Generate paths go through a wrapper that puts a stand-in row in the
         # line first: the work between the press and a real job is seconds long,
@@ -157,7 +157,7 @@ class CombineController(QObject):
         self.panel.combine_requested.connect(self._on_request)
         self._animation_settings = None
         self.panel.animation_settings_requested.connect(self._on_animation_settings)
-        self.panel.item_activated.connect(self._go_to)
+        self.panel.item_activated.connect(self._host.follow_link)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
         self.panel.intent_changed.connect(self._on_intent_changed)
@@ -203,8 +203,11 @@ class CombineController(QObject):
         row = self._db.get_generation(image_id)
         return self._still_path(row) if row is not None else self._picture_reference(image_id)
 
+    def _item_held(self, held: str) -> str | None:
+        return held if self._db.get_generation(held) is not None else None
+
     def _name_of(self, held: str) -> str:
-        if self._db.get_generation(held) is not None:
+        if self._item_held(held) is not None:
             return self._names.of(held)
         return self._files.name_of(held)
 
@@ -212,10 +215,6 @@ class CombineController(QObject):
         path = pick_a_file(self.panel, "Image", FILE_FILTERS[MediaType.IMAGE])
         if path:
             self.panel.image_slot.set_item(path)
-
-    def _go_to(self, held: str) -> None:
-        if self._db.get_generation(held) is not None:
-            self._host.follow_link(held)
 
     def _picture_lent_by(self, prompt_id: str) -> str | None:
         row = self._db.get_generation(prompt_id)

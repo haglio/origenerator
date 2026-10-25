@@ -409,7 +409,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # a section of its own, taken down to what the tree measured.
 # 16326 when a request's rewrite came to be asked for its answer with no dots to
 # copy back.
-MAX_PROSE_LINES = 16326
+# 16323 when a picture a request is still making came to show its words, its marks
+# and what it was requested from, and the Request section's aim lost the docstring
+# its tests now say.
+MAX_PROSE_LINES = 16323
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

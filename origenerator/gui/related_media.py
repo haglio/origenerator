@@ -160,7 +160,7 @@ class RelatedMedia(QWidget):
         self._show_source_video_tile(row)
         self._source_section.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
-        self._show_requests_and_modifications(row.get("prompt_id"))
+        self.show_requests_and_modifications(row.get("prompt_id"))
         # Hides itself when empty, which for anything but an animated image it is.
         self._shown = row
         items = self._animated_items(row)
@@ -187,7 +187,7 @@ class RelatedMedia(QWidget):
         self._source_tile.clear()
         self._source_video_tile.clear()
         self._source_section.hide()
-        self._show_requests_and_modifications(None)
+        self.show_requests_and_modifications(None)
         self._animated_strip.hide()
         self._animations_section.hide()
 
@@ -206,7 +206,7 @@ class RelatedMedia(QWidget):
             heading=heading, media_type=media_type,
         )
 
-    def _show_requests_and_modifications(self, prompt_id: str | None) -> None:
+    def show_requests_and_modifications(self, prompt_id: str | None) -> None:
         request = self._request_of(prompt_id) if prompt_id else None
         made_from = self._row_of(request["source_prompt_id"]) if request else None
         made_into = [(record, made)

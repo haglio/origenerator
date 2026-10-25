@@ -38,6 +38,8 @@ from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.animated_strip import _VideoTile
+from origenerator.gui.drags import under_way
+from origenerator.gui.drop_style import LIT
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generation_drag import generation_mime
@@ -826,6 +828,46 @@ def test_an_image_let_go_over_the_start_image_shows_there_by_its_name(qtbot, tmp
 
     assert start_image._caption.text() == name
     assert not start_image._label.pixmap().isNull()
+
+
+def test_a_video_let_go_over_the_start_image_gives_it_the_picture_it_was_made_from(
+        qtbot, tmp_path, monkeypatch):
+    _panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
+    _image_row(db, filename="sdxl_img1.png")
+    _video_row(db, input_image="image/sdxl_img1.png [output]")
+
+    drops.let_go_over(start_image, "vid1")
+
+    assert start_image.current_id() == "image/sdxl_img1.png [output]"
+
+
+def test_a_video_made_from_a_picture_the_gallery_lacks_is_turned_away(qtbot, tmp_path,
+                                                                      monkeypatch):
+    _panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
+    _video_row(db, input_image="elsewhere.png")
+
+    taken = drops.let_go_over(start_image, "vid1")
+
+    assert not taken.isAccepted()
+    assert start_image.current_id() is None
+
+
+def test_the_start_image_lights_while_a_picture_it_would_take_is_dragged(qtbot, tmp_path,
+                                                                         monkeypatch):
+    _panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
+    _image_row(db)
+    _video_row(db, "vid1", input_image="image/sdxl_img1.png [output]")
+    _video_row(db, "vid2", input_image="elsewhere.png")
+    lit = []
+
+    for dragged in ("img1", "vid1", "vid2"):
+        mime = generation_mime(dragged)
+        under_way.started.emit(mime, None)
+        lit.append(start_image._label.property(LIT))
+        under_way.ended.emit()
+
+    assert lit == [True, True, False]
+    assert start_image._label.property(LIT) is False
 
 
 def test_a_start_image_from_outside_the_gallery_is_named_by_its_file_and_goes_nowhere(

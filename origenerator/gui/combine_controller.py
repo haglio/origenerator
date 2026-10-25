@@ -191,9 +191,7 @@ class CombineController(QObject):
         """What a graph loads the held picture by, ``None`` for what is no picture."""
         row = self._db.get_generation(image_id)
         if row is not None:
-            if gallery.media_type_of_row(row) != MediaType.IMAGE:
-                return None
-            return gallery.output_file_reference(gallery.row_output_files(row))
+            return gallery.input_image_reference(row)
         path = self._files.path_of(image_id)
         if path is None or media_type_from_filename(path.name) != MediaType.IMAGE:
             return None
@@ -217,10 +215,9 @@ class CombineController(QObject):
             self.panel.image_slot.set_item(path)
 
     def _picture_lent_by(self, prompt_id: str) -> str | None:
-        row = self._db.get_generation(prompt_id)
-        if row is not None and gallery.media_type_of_row(row) == MediaType.VIDEO:
-            prompt_id = gallery.source_image_id_in(row, self._host.image_config_index())
-        return prompt_id if prompt_id and self._accepts_image(prompt_id) else None
+        picture = gallery.picture_lent_by(prompt_id, self._db.get_generation,
+                                          self._host.image_config_index())
+        return picture["prompt_id"] if picture is not None else None
 
     def _rebuildable_video_row(self, row) -> bool:
         """Whether ``row`` is a video whose i2v settings the app can rebuild — so its

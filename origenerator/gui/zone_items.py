@@ -59,14 +59,14 @@ class ZoneItems(FilesOnly):
         self._moving_preview = moving_preview
 
     def lends(self, prompt_id: str, kind: MediaType) -> str | None:
+        if kind == MediaType.IMAGE:
+            return gallery.input_image_reference(gallery.picture_lent_by(
+                prompt_id, self._db.get_generation, self._library.now().image_config_index))
         row = self._db.get_generation(prompt_id)
         if row is None or gallery.media_type_of_row(row) != kind:
             return None
-        files = gallery.row_output_files(row)
-        if kind == MediaType.IMAGE:
-            return gallery.output_file_reference(files)
         return next((str(gallery.output_file_path(file, self._places))
-                     for file in files if file.get("filename")), None)
+                     for file in gallery.row_output_files(row) if file.get("filename")), None)
 
     def item_of(self, held: str) -> str | None:
         row = self._row_of(held)

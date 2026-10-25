@@ -263,3 +263,9 @@ def output_file_reference(files: list[dict]) -> str | None:
         path = f"{subfolder}/{filename}" if subfolder else filename
         return f"{path} [{f.get('type') or 'output'}]"
     return None
+
+
+def input_image_reference(row: dict | None) -> str | None:
+    if not row or media_type_of_row(row) != MediaType.IMAGE:
+        return None
+    return output_file_reference(row_output_files(row))

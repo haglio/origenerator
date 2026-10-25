@@ -8,9 +8,15 @@ animated into. The bridge between a video's folders and its start frame's.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from origenerator.gallery.output import frame_names_of, row_output_files
+from origenerator.gallery.output import (
+    frame_names_of,
+    input_image_reference,
+    media_type_of_row,
+    row_output_files,
+)
 from origenerator.gallery.signatures import (
     _frame_name,
     _registered,
@@ -18,6 +24,7 @@ from origenerator.gallery.signatures import (
     settings_signature,
 )
 from origenerator.generation_state import GenerationSource, in_sight, made_here, source_of
+from origenerator.media import MediaType
 
 
 @dataclass
@@ -77,6 +84,15 @@ def source_image_id_in(row: dict, image_index: dict) -> str | None:
     for a row with no input image, or one no indexed generation produced."""
     entry = image_index.get(_frame_name(parse_params(row.get("params_json")).get("input_image")))
     return (entry.prompt_id or None) if entry is not None else None
+
+
+def picture_lent_by(prompt_id: str, row_of: Callable[[str], dict | None],
+                    image_index: dict) -> dict | None:
+    row = row_of(prompt_id)
+    if row is not None and media_type_of_row(row) == MediaType.VIDEO:
+        source = source_image_id_in(row, image_index)
+        row = row_of(source) if source else None
+    return row if input_image_reference(row) is not None else None
 
 
 def landing_for(prompt_id: str, rows: list[dict], image_index: dict) -> str:

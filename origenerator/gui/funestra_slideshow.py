@@ -150,8 +150,11 @@ class FunestraSlideshow(QObject):
         self._send(RELOAD_PLAYLIST)
 
     def _tell_the_pace(self) -> None:
-        self._send(f"{SET_PACE} {self._pace.seconds}")
+        self._send(f"{SET_PACE} {self._funestra_pace()}")
         self._hold_what_is_being_made_for_half()
+
+    def _funestra_pace(self) -> int:
+        return self._levels.pace(self._pace.seconds)
 
     def _tell_the_keep(self) -> None:
         keeps = self._keeps()
@@ -160,8 +163,7 @@ class FunestraSlideshow(QObject):
             self._send(LOCK_ON if keeps else LOCK_OFF)
 
     def _keeps(self) -> bool:
-        return (self._locked or self._request_holds_it or self._on_the_run()
-                or self._levels.stepping)
+        return self._locked or self._request_holds_it or self._on_the_run()
 
     def _on_the_run(self) -> bool:
         current = self._set.playlist.current()
@@ -237,7 +239,7 @@ class FunestraSlideshow(QObject):
         half the pace, its move still made at the whole: the Funestra moves on
         from it early, and its scrubber counts that half down.  Any other, and
         one under the lock, holds for the pace."""
-        current, pace = self._set.playlist.current(), self._pace.seconds
+        current, pace = self._set.playlist.current(), self._funestra_pace()
         held_for = self._set.pace_for(current, pace) if current is not None else pace
         if held_for < pace and not self._keeps():
             self._send(f"{HOLD_PICTURE} {held_for:g}")
@@ -301,10 +303,12 @@ class FunestraSlideshow(QObject):
         within the versions is held here, ahead of the status the Funestra is
         still publishing.
         """
+        comparing = self._levels.stepping
         version = self._levels.step(delta, base=self._current_base())
         if version is None:
             return
-        self._tell_the_keep()
+        if not comparing:
+            self._tell_the_pace()
         self._send(play_file(playlist_item(version.path, version.media_type,
                                            version.points_of_interest)))
         self.media_changed.emit()
@@ -316,7 +320,6 @@ class FunestraSlideshow(QObject):
             # The version stepped to was spliced into the Funestra's list after its
             # item; the set's own list stands it back on the item before it moves.
             self._hand_over()
-        self._tell_the_keep()
 
     def _current_base(self) -> str:
         """The file the set lists the item on screen under — what its versions
@@ -867,6 +870,8 @@ class FunestraSlideshow(QObject):
         if not self._open:
             return
         self._open = False
+        if self._levels.stepping:
+            self._send(f"{SET_PACE} {self._pace.seconds}")
         if self._keep_told and not self._locked:
             self._send(LOCK_OFF)
         slide = self._set.playlist.current()

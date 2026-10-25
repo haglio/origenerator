@@ -98,6 +98,9 @@ class LevelStepper:
     def stepping(self) -> bool:
         return self._stepping
 
+    def pace(self, dwell_s: int) -> int:
+        return 0 if self._stepping else dwell_s
+
     @property
     def index(self) -> int:
         """Which of those versions is showing, from the top. Nought is both the

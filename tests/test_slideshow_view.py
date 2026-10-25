@@ -1700,7 +1700,7 @@ def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
     assert named == ["Enhancement 1/2", "Original", "Enhancement 1/2", "Enhancement 2/2"]
 
 
-def test_a_version_shift_stepped_to_comes_up_moving_and_holds_the_slideshow(qtbot, tmp_path):
+def test_a_version_shift_stepped_to_comes_up_still_and_holds_the_slideshow(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a"), ("b.png", "image", "id-b")])
     view.slideshow.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
@@ -1709,7 +1709,7 @@ def test_a_version_shift_stepped_to_comes_up_moving_and_holds_the_slideshow(qtbo
     _shift(view, Qt.Key.Key_Right)
     _runs_out(view)
 
-    assert (_engine(view).opened_at_pace[-1], _engine(view).loop_file) == (4, True)
+    assert _engine(view).opened_at_pace[-1] == 0
     assert _media_on_screen(view) == original
 
 
@@ -1740,10 +1740,10 @@ def test_a_pace_set_while_versions_are_compared_waits_for_the_arrow_that_moves_o
 
     view.slideshow.set_dwell_s(9)
     _settle(view)
-    held = (_engine(view).loop_file, list(_engine(view).opened))
+    held = (_engine(view).pace_s, list(_engine(view).opened))
     _press(view, Qt.Key.Key_Right)
 
-    assert held == (True, opened)
+    assert held == (0, opened)
     assert _engine(view).opened_at_pace[-1] == 9
 
 
@@ -1759,7 +1759,7 @@ def test_a_version_landing_while_versions_are_compared_keeps_the_slideshow_held(
     _settle(view)
     _runs_out(view)
 
-    assert (_engine(view).loop_file, _media_on_screen(view)) == (True, better)
+    assert (_engine(view).pace_s, _media_on_screen(view)) == (0, better)
 
 
 def test_comparing_a_videos_versions_holds_the_slideshow_on_them_too(qtbot):

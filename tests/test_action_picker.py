@@ -160,7 +160,7 @@ def test_a_button_beside_the_list_opens_the_window_that_answers_for_them_all(
     monkeypatch.setattr(QMessageBox, "information",
                         lambda parent, title, text: said.append(text))
     monkeypatch.setattr(action_picker, "the_sorting_window",
-                        lambda: "Every picture already says what it shows.")
+                        lambda first="": "Every picture already says what it shows.")
 
     picker.findChild(QPushButton, SORT_BUTTON).click()
 
@@ -171,7 +171,7 @@ def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second
         picker, monkeypatch, qtbot):
     made = []
 
-    def one_window():
+    def one_window(first=""):
         window = QWidget()
         qtbot.addWidget(window)
         made.append(window)
@@ -184,3 +184,27 @@ def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second
     button.click()
 
     assert len(made) == 1
+
+
+def test_the_button_beside_the_list_says_what_pressing_it_sets(picker):
+    """His words for what that button does: "set image actions"."""
+    button = picker.findChild(QPushButton, SORT_BUTTON)
+
+    assert (button.text(), button.toolTip()) == (
+        "Set image actions…",
+        "Set this picture's action, then every picture nobody has answered for, "
+        "one press apiece")
+
+
+def test_pressing_it_starts_on_the_picture_in_front_of_him(picker, monkeypatch):
+    """His words: it "should start with the current image, then go on to the usual
+    queue", so the window is told which picture is on display."""
+    opened = []
+    monkeypatch.setattr(QMessageBox, "information", lambda parent, title, text: None)
+    monkeypatch.setattr(action_picker, "the_sorting_window",
+                        lambda first="": opened.append(first) or "nothing waiting")
+
+    picker.show_row(_row("img-seven", state="state two"))
+    picker.findChild(QPushButton, SORT_BUTTON).click()
+
+    assert opened == ["img-seven"]

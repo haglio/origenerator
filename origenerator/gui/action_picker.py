@@ -48,9 +48,9 @@ class ActionPicker(QWidget):
         self._combo.currentIndexChanged.connect(self._on_picked)
         row.addWidget(self._combo, 1)
         self._sorting = None
-        self._sort = QPushButton("Sort pictures…", objectName=SORT_BUTTON)
-        self._sort.setToolTip("Say what every picture nobody has answered for shows, "
-                              "one press apiece")
+        self._sort = QPushButton("Set image actions…", objectName=SORT_BUTTON)
+        self._sort.setToolTip("Set this picture's action, then every picture nobody "
+                              "has answered for, one press apiece")
         self._sort.clicked.connect(self._on_sort)
         row.addWidget(self._sort)
         self.hide()
@@ -98,7 +98,7 @@ class ActionPicker(QWidget):
             self._sorting.raise_()
             self._sorting.activateWindow()
             return
-        built = the_sorting_window()
+        built = the_sorting_window(self._prompt_id)
         if not show_or_say("Sorting pictures", built, parent=self):
             self._sorting = built
 

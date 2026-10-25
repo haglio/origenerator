@@ -69,6 +69,8 @@ SORT_RECIPE = "recipe"
 # term. Measured against a real library that was 52% of it, which is what made
 # the first cut of this search unusable rather than merely imprecise.
 _WORD_RE = re.compile(r"[a-z0-9]+(?:\.[0-9]+)+|[a-z0-9]+")
+_QUOTED = re.compile(r'["\u201c\u201d]([^"\u201c\u201d]*)(?:["\u201c\u201d]|$)')
+_TAG_BREAK = re.compile(r"[,;:!?|()\[\]{}<>\n]|\.(?!\d)")
 
 # Written numbers fold onto their digits, in both directions: prompts write
 # "two women" as often as "2 women", and the query may say either.
@@ -185,8 +187,23 @@ def _stem(word: str) -> str:
 
 
 @lru_cache(maxsize=READINGS_KEPT)
+def _tags(text: str) -> tuple[tuple[str, ...], ...]:
+    return tuple(words for words in (tuple(_words(part)) for part in _TAG_BREAK.split(text))
+                 if words)
+
+
+@lru_cache(maxsize=READINGS_KEPT)
 def _stems(text: str) -> frozenset[str]:
-    return frozenset(_stem(word) for word in _words(text))
+    return frozenset(_stem(word) for tag in _tags(text) for word in tag)
+
+
+def _unquoted(query: str) -> str:
+    return _QUOTED.sub(" ", query)
+
+
+def _quoted(query: str) -> tuple[tuple[str, ...], ...]:
+    return tuple(dict.fromkeys(words for words in (tuple(_words(part))
+                                                   for part in _QUOTED.findall(query)) if words))
 
 
 def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
@@ -237,7 +254,7 @@ _SYNONYMS = _synonym_index(_overlay_groups())
 
 @dataclass(frozen=True)
 class QueryTerm:
-    """One word of a query, with everything that satisfies it.
+    """One word of a query, or words quoted together, with what satisfies it.
 
     ``synonyms`` come from the table, ``related`` from the LLM; they are kept
     apart rather than merged so a table hit can outrank a volunteered one.
@@ -247,6 +264,7 @@ class QueryTerm:
     stem: str
     synonyms: frozenset[str] = frozenset()
     related: frozenset[str] = frozenset()
+    side_by_side: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -284,13 +302,15 @@ class _Entry:
     # moment ago has to be findable by its name now.
     folders: frozenset[str] = frozenset()
     name: str = ""
+    tags: tuple[tuple[str, ...], ...] = ()
+    folder_tags: tuple[tuple[str, ...], ...] = ()
 
 
 def query_words(query: str) -> tuple[str, ...]:
     """The words a query actually searches on: its non-stop words, in order,
     each counted once. A query of nothing but stop words keeps them — better to
     search for "the" than to answer a typed query with everything."""
-    words = _words(without_name_starts(query))
+    words = _words(without_name_starts(_unquoted(query)))
     kept = [word for word in words if word not in _STOP_WORDS] or words
     seen: set[str] = set()
     ordered = []
@@ -310,7 +330,9 @@ def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm
     """
     synonyms = _SYNONYMS if synonyms is None else synonyms
     terms = [QueryTerm(text=start, stem=start.lower())
-             for start in dict.fromkeys(name_starts_in(query))]
+             for start in dict.fromkeys(name_starts_in(_unquoted(query)))]
+    terms += [QueryTerm(text=" ".join(words), stem="", side_by_side=words)
+              for words in _quoted(query)]
     for word in query_words(query):
         stem = _stem(word)
         table = set(synonyms.get(stem, ())) - {stem}
@@ -337,6 +359,8 @@ def _field_score(term: QueryTerm, stems: frozenset[str]) -> float:
 
 def _term_score(term: QueryTerm, entry: _Entry) -> float:
     """The best any part of ``entry`` satisfies ``term``, field weighting applied."""
+    if term.side_by_side:
+        return _EXACT if _says(entry, term.side_by_side) else 0.0
     if term.stem in entry.seeds or _starts_the_name(term.stem, entry.name):
         return _EXACT
     return max(
@@ -381,19 +405,23 @@ def _folder_stems(names) -> frozenset[str]:
     return frozenset().union(*(_stems(name) for name in names))
 
 
+def _says(entry: _Entry, words: tuple[str, ...]) -> bool:
+    count = len(words)
+    return any(tag[at:at + count] == words
+               for tag in (*entry.tags, *entry.folder_tags)
+               for at in range(len(tag) - count + 1))
+
+
 def _starts_the_name(typed: str, name: str) -> bool:
     return len(typed) >= _SHORTEST_NAME_START and name.startswith(typed)
-
-
-def _positive_stems(row: dict, params: dict) -> frozenset[str]:
-    return _stems(_prompt_text(row, params, "positive_prompt"))
 
 
 def content_stems(row: dict) -> frozenset[str]:
     """The words *row*'s prompt is about, stemmed and with the filler out — what
     two generations' prompts are compared on to say how alike they read
     (:mod:`origenerator.nav_map`)."""
-    return _positive_stems(row, gallery.parse_params(row.get("params_json"))) - _STOP_WORDS
+    params = gallery.parse_params(row.get("params_json"))
+    return _stems(_prompt_text(row, params, "positive_prompt")) - _STOP_WORDS
 
 
 def _build_entry(row: dict) -> _Entry:
@@ -402,9 +430,11 @@ def _build_entry(row: dict) -> _Entry:
              if params.get(key) is not None}
     if row.get("seed") is not None:
         seeds.add(str(row["seed"]))
+    prompt = _prompt_text(row, params, "positive_prompt")
     return _Entry(
         row=row,
-        positive=_positive_stems(row, params),
+        positive=_stems(prompt),
+        tags=_tags(prompt),
         recipe=frozenset(_recipe_stems(row, params)),
         seeds=frozenset(seeds),
     )
@@ -448,12 +478,14 @@ class GallerySearch:
             if not prompt_id or prompt_id in entries \
                     or not gallery.produced_output(row) or not in_sight(row):
                 continue
-            folders = _folder_stems(folder_names.get(prompt_id, ()))
+            named = folder_names.get(prompt_id, ())
+            folders = _folder_stems(named)
             name = (item_name(prompt_id) if item_name else "").lower()
             known = self._entries.get(prompt_id)
             entries[prompt_id] = replace(
                 known if known is not None else _build_entry(row),
                 row=row, folders=folders, name=name,
+                folder_tags=tuple(tag for folder in named for tag in _tags(folder)),
             )
             order.append(prompt_id)
         self._entries = entries

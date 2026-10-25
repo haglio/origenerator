@@ -8,6 +8,7 @@ from pathlib import Path
 
 from origenerator import gallery
 from origenerator.file_refs import reference_basename, reference_path, unannotated
+from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
@@ -47,13 +48,13 @@ class FilesOnly:
 class ZoneItems(FilesOnly):
     """The gallery's reading: a generation's pictures and name, or a still for an outside video."""
 
-    def __init__(self, db, names, rows_of: Callable[[MediaType], list[dict]], *,
+    def __init__(self, db, names, library: LibraryViews, *,
                  places: OutputPlaces, input_dir: Path, thumb_dir: Path,
                  moving_preview: Callable[[dict], str | None]):
         super().__init__(places=places, input_dir=input_dir)
         self._db = db
         self._names = names
-        self._rows_of = rows_of
+        self._library = library
         self._thumb_dir = thumb_dir
         self._moving_preview = moving_preview
 
@@ -92,7 +93,7 @@ class ZoneItems(FilesOnly):
         kind = media_type_from_filename(path.name) if path is not None else None
         if kind is None:
             return None
-        prompt_id = gallery.generation_of_file(path, self._rows_of(kind))
+        prompt_id = gallery.generation_of_file(path, self._library.now().rows_of(kind))
         return self._db.get_generation(prompt_id) if prompt_id else None
 
     def _still_of(self, path: Path) -> str | None:

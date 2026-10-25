@@ -1,4 +1,4 @@
-"""The window for settling what each animation runs: the picture a sample started
+"""The window for settling what each animation runs: the image a sample started
 from, the sample, and the prompts, which are editable. The walk is
 :class:`~origenerator.animation_check_session.AnimationCheckSession`."""
 from __future__ import annotations
@@ -31,7 +31,7 @@ REJECT = "animation.reject"
 BACK = "animation.back"
 FORWARD = "animation.forward"
 
-PICTURE = "animation.picture"
+IMAGE = "animation.image"
 SAMPLE = "animation.sample"
 BLANK = "animation.blank"
 
@@ -47,8 +47,8 @@ class AnimationCheckWindow(QWidget):
     """One animation at a time, with the video that stands as its sample."""
 
     def __init__(self, session, look, submit, parent=None):
-        """``look`` answers ``(picture path, looping sample path)`` for a sample;
-        ``submit`` queues a run of the edited prompts on that sample's picture."""
+        """``look`` answers ``(image path, looping sample path)`` for a sample;
+        ``submit`` queues a run of the edited prompts on that sample's image."""
         super().__init__(parent)
         self._session = session
         self._look = look
@@ -61,12 +61,12 @@ class AnimationCheckWindow(QWidget):
         self._counted = QLabel(objectName=COUNTED)
         self._counted.setToolTip(
             "Every animation that can be asked for — each act, in each lane, from each "
-            "kind of picture — and how many already have settings assigned.")
+            "kind of image — and how many already have settings assigned.")
         self._said = QLabel(objectName=SAID)
         self._said.setWordWrap(True)
-        self._picture = QLabel(objectName=PICTURE)
-        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._picture.setMinimumSize(280, 280)
+        self._image = QLabel(objectName=IMAGE)
+        self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._image.setMinimumSize(280, 280)
         self._clip = QLabel(objectName=SAMPLE)
         self._clip.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._clip.setMinimumSize(280, 280)
@@ -75,9 +75,9 @@ class AnimationCheckWindow(QWidget):
         shown = QHBoxLayout(pair)
         shown.setContentsMargins(0, 0, 0, 0)
         shown.setSpacing(GAP_MEDIUM)
-        shown.addWidget(self._picture, 1)
+        shown.addWidget(self._image, 1)
         shown.addWidget(self._clip, 1)
-        # Sharing the row it reads as a caption on the picture's half.
+        # Sharing the row it reads as a caption on the image's half.
         self._blank = QLabel(NO_SAMPLE, objectName=BLANK)
         self._blank.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._blank.setWordWrap(True)
@@ -132,10 +132,10 @@ class AnimationCheckWindow(QWidget):
             (REJECT, "View next preexisting sample from library",
              "Drop this one and show the next video made this way", self._on_reject),
             (SUBMIT, "Generate new sample with current settings",
-             "Queue a video of this picture with the prompts as they now read, "
+             "Queue a video of this image with the prompts as they now read, "
              "and come back to this animation once it is done", self._on_submit),
             (ACCEPT, "Assign these settings",
-             "Every animation of this act from this kind of picture runs these "
+             "Every animation of this act from this kind of image runs these "
              "settings, with the prompts as they now read", self._on_accept),
         ):
             button = QPushButton(caption, objectName=name)
@@ -183,7 +183,7 @@ class AnimationCheckWindow(QWidget):
             return
         lane, act, state = path
         self._heading.setText(
-            f"{lane_said_as(lane)} · {act} · from a “{state}” picture")
+            f"{lane_said_as(lane)} · {act} · from a “{state}” image")
         at, of = self._session.position
         self._counted.setText(f"{at} of {of} · {self._session.answered} done")
         sample = self._session.sample
@@ -219,7 +219,7 @@ class AnimationCheckWindow(QWidget):
 
     def _clear_the_pair(self, *, keep_the_prompts: bool = False) -> None:
         self._still = QPixmap()
-        self._picture.clear()
+        self._image.clear()
         stop_what_plays_in(self._clip)
         self._clip.clear()
         if not keep_the_prompts:
@@ -228,10 +228,10 @@ class AnimationCheckWindow(QWidget):
 
     def _draw_the_still(self) -> None:
         if self._still.isNull():
-            self._picture.setText("(this picture's file is missing)")
+            self._image.setText("(this image's file is missing)")
             return
-        self._picture.setPixmap(self._still.scaled(
-            self._picture.width(), self._picture.height(),
+        self._image.setPixmap(self._still.scaled(
+            self._image.width(), self._image.height(),
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation))
 

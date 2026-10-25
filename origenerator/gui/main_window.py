@@ -282,7 +282,7 @@ class OrigeneratorWindow(QMainWindow):
             self.showMinimized()
 
     def _hand_the_window_over(self, session: FunTimeSession) -> None:
-        """Publish this window's picture for a room in the headset, which has no
+        """Publish this window's frame for a room in the headset, which has no
         monitor to put it on.  Shown, because Qt draws nothing for a window
         Windows has unmapped, and out of sight, because he is not in front of
         it."""
@@ -295,7 +295,7 @@ class OrigeneratorWindow(QMainWindow):
         bridge.take_back_asked.connect(self._taken_back_to_the_monitors)
 
     def _handed_to_a_headset(self, frames_file, input_file) -> None:
-        logger.info("A headset session has this window now; its picture goes to %s "
+        logger.info("A headset session has this window now; its frame goes to %s "
                     "and its presses come from %s", frames_file, input_file)
         self._take_the_window_back()
         self._fun_time = replace(
@@ -308,7 +308,7 @@ class OrigeneratorWindow(QMainWindow):
 
     def _taken_back_to_the_monitors(self) -> None:
         logger.info("A session on the monitors has this window now; it stops "
-                    "publishing its picture and parks")
+                    "publishing its frame and parks")
         self._take_the_window_back()
         self._fun_time = replace(self._fun_time, frames_file=None, input_file=None)
         ui_scale.draw_at(ui_scale.room_scale(in_a_headset=False))
@@ -357,7 +357,7 @@ class OrigeneratorWindow(QMainWindow):
         # decides who within the band is in front.
         self._dress_for_the_room(session)
         if session.in_a_headset:
-            self._fill_the_pictures_cap()
+            self._fill_the_frame_cap()
         else:
             self._sit_at_the_sessions_rect(session.main_rect)
 
@@ -375,9 +375,9 @@ class OrigeneratorWindow(QMainWindow):
             self._restore_geometry()
         else:
             self.restoreGeometry(self._found[0])
-        self._fill_the_pictures_cap()
+        self._fill_the_frame_cap()
 
-    def _fill_the_pictures_cap(self) -> None:
+    def _fill_the_frame_cap(self) -> None:
         width, height = self.width(), self.height()
         if width <= 0 or height <= 0:
             return

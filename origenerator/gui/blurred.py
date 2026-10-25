@@ -21,11 +21,11 @@ def blurred_backdrop(path, size: QSize) -> QPixmap | None:
     return _CACHE[key]
 
 
-def blurred_and_dimmed(picture: QPixmap, size: QSize) -> QPixmap:
-    small = picture.scaled(max(1, size.width() // _BLUR_DIVISOR),
-                           max(1, size.height() // _BLUR_DIVISOR),
-                           Qt.AspectRatioMode.IgnoreAspectRatio,
-                           Qt.TransformationMode.SmoothTransformation)
+def blurred_and_dimmed(pixmap: QPixmap, size: QSize) -> QPixmap:
+    small = pixmap.scaled(max(1, size.width() // _BLUR_DIVISOR),
+                          max(1, size.height() // _BLUR_DIVISOR),
+                          Qt.AspectRatioMode.IgnoreAspectRatio,
+                          Qt.TransformationMode.SmoothTransformation)
     blurred = small.scaled(size, Qt.AspectRatioMode.IgnoreAspectRatio,
                            Qt.TransformationMode.SmoothTransformation)
     painter = QPainter(blurred)
@@ -37,11 +37,11 @@ def blurred_and_dimmed(picture: QPixmap, size: QSize) -> QPixmap:
 def _render(path, size: QSize) -> QPixmap | None:
     if not Path(path).is_file() or size.width() <= 0 or size.height() <= 0:
         return None
-    picture = QPixmap(str(path))
-    if picture.isNull():
+    pixmap = QPixmap(str(path))
+    if pixmap.isNull():
         return None
-    covering = picture.scaled(size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                              Qt.TransformationMode.SmoothTransformation)
+    covering = pixmap.scaled(size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                             Qt.TransformationMode.SmoothTransformation)
     plate = covering.copy((covering.width() - size.width()) // 2,
                           (covering.height() - size.height()) // 2,
                           size.width(), size.height())

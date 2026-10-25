@@ -39,7 +39,7 @@ def test_an_act_of_several_words_is_heard_whole():
     assert match_animate_command("animate as dancing") == AnimateRequest(VIDEO, "dancing")
 
 
-def test_the_act_may_be_left_out_where_the_picture_leaves_no_choice():
+def test_the_act_may_be_left_out_where_the_image_leaves_no_choice():
     assert match_animate_command("animate as") == AnimateRequest(VIDEO, "")
     assert match_animate_command("animate as genau") == AnimateRequest(GENAU, "")
     assert match_animate_command("animate") == AnimateRequest(VIDEO, "")

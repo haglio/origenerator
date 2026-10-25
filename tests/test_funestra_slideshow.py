@@ -272,7 +272,7 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
     assert slideshow.video_on_screen() is None
 
 
-def test_the_funestra_is_told_how_long_a_picture_holds_that_nothing_holds_it_and_to_read_the_list(
+def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_to_read_the_list(
         qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, pace=SlideshowPace(seconds=6))
 
@@ -280,7 +280,7 @@ def test_the_funestra_is_told_how_long_a_picture_holds_that_nothing_holds_it_and
 
 
 def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
-    """The Funestra walks the list by itself — a picture's pace runs out, a clip
+    """The Funestra walks the list by itself — an image's pace runs out, a clip
     ends — so which item the map lights, the star answers about and a spoken
     "this one" means is the Funestra's answer, read back."""
     slideshow = _slideshow(qtbot, tmp_path)
@@ -577,7 +577,7 @@ def test_a_double_click_on_the_map_moves_a_lock_held_on_another_item_onto_that_o
 
 
 def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
-    """The pace is the Funestra's to keep — it holds a picture that long and then
+    """The pace is the Funestra's to keep — it holds an image that long and then
     ends the file, which is how a slide moves on at all."""
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
@@ -610,7 +610,7 @@ def test_a_slideshow_that_is_over_takes_its_panel_down_though_the_funestra_is_re
 
 def test_a_slideshow_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, tmp_path):
     # The same promise as the full-screen slideshow: whichever way a slideshow ends,
-    # the picture it was on is the one to find in the gallery afterwards.
+    # the image it was on is the one to find in the gallery afterwards.
     slideshow = _slideshow(qtbot, tmp_path)
     handed = []
     slideshow.open_requested.connect(handed.append)
@@ -800,7 +800,7 @@ def test_a_reorder_lets_go_and_hands_the_funestra_the_new_list_from_its_top(qtbo
     assert slideshow.hud_order_label == LATEST_LABEL
 
 
-def test_a_reorder_keeping_the_slide_leaves_the_funestra_on_the_picture_it_has(qtbot, tmp_path):
+def test_a_reorder_keeping_the_slide_leaves_the_funestra_on_the_image_it_has(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
@@ -1031,8 +1031,8 @@ def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
     assert reopened.hud_map() == closed.hud_map()
 
 
-def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):
-    """A row worn down to one picture plays that picture over and over, which
+def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
+    """A row worn down to one image plays that image over and over, which
     is the lock — so the cull that wore it down ends the loop and tells the
     Funestra to lock what is left.  Only the lock: none of what a pressed lock
     also does, since nobody pressed one."""
@@ -1044,7 +1044,7 @@ def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):
     slideshow.slideshow_loop("seed")                       # the row: one.png and one-b.png
     _sent(slideshow)
 
-    slideshow.slideshow_cull()                             # weird the picture on screen
+    slideshow.slideshow_cull()                             # weird the image on screen
     sent = _sent(slideshow)
     _says(slideshow, video="one-b.png", locked=True)
     slideshow.tick()
@@ -1054,13 +1054,13 @@ def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):
     assert (asked, starred, opened) == ([], [], [])
 
 
-def test_a_forward_step_in_a_row_down_to_one_picture_hands_the_set_back(qtbot, tmp_path):
-    """A cull can leave the row holding only the picture on screen, and a
-    Funestra stepping round a list of one plays that picture again — so the step
+def test_a_forward_step_in_a_row_down_to_one_image_hands_the_set_back(qtbot, tmp_path):
+    """A cull can leave the row holding only the image on screen, and a
+    Funestra stepping round a list of one plays that image again — so the step
     ends the loop first, and what it steps into is the set coming back."""
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
     slideshow.slideshow_loop("seed")                      # the row: one.png and one-b.png
-    slideshow.slideshow_cull()                            # down to the one picture left
+    slideshow.slideshow_cull()                            # down to the one image left
     _sent(slideshow)
 
     slideshow.slideshow_step(1)
@@ -1203,8 +1203,8 @@ def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
     assert said == ["Looping seeds: 2", "Loop off"]
 
 
-def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot, tmp_path):
-    """A row holding only the picture on screen cannot be looped, and the press
+def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
+    """A row holding only the image on screen cannot be looped, and the press
     still means "this one" — so the Funestra is told to lock it, the way its own
     loop button locks a clip whose group holds only that clip."""
     said = []
@@ -1460,7 +1460,7 @@ def test_an_item_nothing_is_being_made_of_holds_for_the_whole_pace(qtbot, tmp_pa
     assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
 
 
-def test_a_request_spoken_over_a_picture_keeps_it_on_the_funestra_still_moving(qtbot, tmp_path):
+def test_a_request_spoken_over_an_image_keeps_it_on_the_funestra_still_moving(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     slideshow.pause_for_request(True)
@@ -1580,7 +1580,7 @@ def test_an_item_whose_enhancement_starts_while_it_is_up_keeps_its_whole_time(qt
     assert not any(verb.startswith("HOLD_PICTURE") for verb in _sent(slideshow))
 
 
-def test_a_picture_enhanced_during_the_slideshow_steps_its_versions_on_the_funestra(qtbot, tmp_path):
+def test_an_image_enhanced_during_the_slideshow_steps_its_versions_on_the_funestra(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.note_enhanced("id-1", "one_enhanced.png")
     _says(slideshow, video="one_enhanced.png")
@@ -1699,7 +1699,7 @@ def test_a_slideshow_that_closes_takes_its_frames_with_it(qtbot, tmp_path):
     assert list((tmp_path / "frames").iterdir()) == []
 
 
-def test_a_picture_being_enhanced_on_the_funestra_shows_the_enhancement_coming_in(
+def test_an_image_being_enhanced_on_the_funestra_shows_the_enhancement_coming_in(
         qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
@@ -1708,7 +1708,7 @@ def test_a_picture_being_enhanced_on_the_funestra_shows_the_enhancement_coming_i
     assert _frame_shown(_sent(slideshow)) == FRAME
 
 
-def test_a_better_version_landing_on_the_funestras_picture_goes_up_on_its_move(qtbot,
+def test_a_better_version_landing_on_the_funestras_image_goes_up_on_its_move(qtbot,
                                                                           tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
@@ -1790,7 +1790,7 @@ FACE = ((0.4, 0.1, 0.6, 0.3),)
 _PLACED = {"one.png": [("one.png", "image", "Enhance 1", FACE), ("one-base.png", "image", "Original")]}
 
 
-def test_a_picture_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tmp_path):
+def test_an_image_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
 
     slideshow.set_levels(_PLACED)

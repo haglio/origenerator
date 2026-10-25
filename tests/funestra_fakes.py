@@ -1,8 +1,8 @@
 """A stand-in for the Funestras' engine, for a Funestra in this app's window to run on.
 
 What :class:`funestra.mpv_engine.MpvEngine` offers a Funestra, answered
-from memory: the file it was handed, the one staged after it, the pace and a
-picture's hold, the freeze, the sound, a still's move, and the overlays the panel and a picture
+from memory: the file it was handed, the one staged after it, the pace and an
+image's hold, the freeze, the sound, a still's move, and the overlays the panel and an image
 are composited with.
 """
 from __future__ import annotations
@@ -131,7 +131,7 @@ class FakeEngine:
         self.overlays.pop(ident, None)
 
     def run_out(self) -> None:
-        """The item on screen ended: a clip played through, or a picture's
+        """The item on screen ended: a clip played through, or an image's
         pace ran out.  The engine rolls onto what was staged after it, where
         something was."""
         if len(self.playlist) > self.playlist_pos + 1:

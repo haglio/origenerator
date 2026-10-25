@@ -1,5 +1,5 @@
 """The seeds a Generate tab's Seed dropdown offers: every seed used for the kind of
-item the tab makes, newest first, each beside a picture of the item it made.
+item the tab makes, newest first, each beside a thumbnail of the item it made.
 
 Fixture rows are fabricated (see CLAUDE.md).
 """
@@ -100,7 +100,7 @@ def test_a_run_that_ended_having_made_nothing_offers_no_seed_of_its_own():
     ]
 
 
-def test_a_run_in_flight_is_listed_with_no_picture_yet_at_the_size_it_will_be():
+def test_a_run_in_flight_is_listed_with_no_thumbnail_yet_at_the_size_it_will_be():
     running = {**_row("g2", seed=20, width=832, height=1216),
                "output_files": None, "status": "running"}
 
@@ -139,7 +139,7 @@ def test_the_library_hands_over_every_generation_newest_first(tmp_path):
     ]
 
 
-def test_a_seed_drawn_and_never_generated_is_listed_with_no_picture_at_its_size(tmp_path):
+def test_a_seed_drawn_and_never_generated_is_listed_with_no_thumbnail_at_its_size(tmp_path):
     db = Database(tmp_path / "test.db")
 
     db.record_seed_use(kind="drawn", seed_key="seed", seed=77, width=832, height=1216,

@@ -105,17 +105,17 @@ def test_each_half_of_a_settings_source_can_stand_alone(tmp_path):
     assert db.get_generation("curated")["source_video"] is None
 
 
-def test_a_picture_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_path):
+def test_an_image_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="pic-001", workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json="{}", workflow_json="{}")
-    assert db.get_generation("pic-001")["picture_state"] is None
+    assert db.get_generation("pic-001")["image_state"] is None
 
-    db.set_picture_state("pic-001", "state two")
-    assert db.get_generation("pic-001")["picture_state"] == "state two"
+    db.set_image_state("pic-001", "state two")
+    assert db.get_generation("pic-001")["image_state"] == "state two"
 
-    db.set_picture_state("pic-001", None)
-    assert db.get_generation("pic-001")["picture_state"] is None
+    db.set_image_state("pic-001", None)
+    assert db.get_generation("pic-001")["image_state"] is None
 
 
 def test_update_generation(tmp_path):
@@ -795,6 +795,21 @@ def test_a_deletion_held_since_before_two_columns_were_renamed_comes_back_under_
     assert (held["act"], held["source_video"]) == ("dancing", "vid-9")
     db.restore_generation(held)
     assert db.get_generation("c-001")["source_video"] == "vid-9"
+
+
+def test_a_deletion_held_since_before_the_image_state_was_renamed_comes_back_with_its_state(
+        tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="pic-001", workflow_name="sdxl_t2i", workflow_version="v001",
+                         params_json="{}", workflow_json="{}")
+    db.set_image_state("pic-001", "state two")
+    db.record_deletion("pic-001", _as_read_before_the_rename(db.get_generation("pic-001")), {})
+    db.delete_generation("pic-001")
+
+    held = db.get_deletion("pic-001")["row"]
+    assert held["image_state"] == "state two"
+    db.restore_generation(held)
+    assert db.get_generation("pic-001")["image_state"] == "state two"
 
 
 # --- the recovery bin (held deletions) -------------------------------------

@@ -23,7 +23,7 @@ _CONTENT = load_content()
 # lands (a cycle at the app's own cadence is 0.83 s, and 13/16 is 0.81).
 #
 # It is 29 because the model cannot close a loop that short. First-last-frame
-# conditions both ends on the same picture, but the model needs room to come
+# conditions both ends on the same image, but the model needs room to come
 # BACK to it, and measured over one video's settings at a fixed seed the last frame lands
 # this far from the first: 13 frames -2.02%, 17 +1.34%, 21 +0.99%, 29 +0.23%,
 # 41 -0.19%, 81 +0.05%. Under 29 the lighting visibly pops on every repeat; at
@@ -52,10 +52,10 @@ _CYCLE_WORDS: dict = _CONTENT.get("genau_flick_prompts") or {}
 
 def combined_params(video_row: dict, input_image: str | None, workflow) -> dict | None:
     """The video's settings readied to run on ``input_image`` -- what the graph
-    loads the new picture by -- with fresh seeds. ``None`` with no picture.
+    loads the new image by -- with fresh seeds. ``None`` with no image.
 
     A size-deriving workflow's stored ``width``/``height`` sized its OWN frame,
-    so they are dropped: left in, they would stretch the new picture to them.
+    so they are dropped: left in, they would stretch the new image to them.
     """
     params = _run_on(input_image, filled_params(video_row, workflow), workflow)
     return None if params is None else without_an_explicit_size(params, workflow)
@@ -79,7 +79,7 @@ def _words(prompt):
 
 def written_params(settings: dict, input_image: str | None, workflow) -> dict | None:
     """Written-down settings over their workflow's defaults, readied to run on
-    ``input_image`` with fresh seeds; ``None`` with no picture."""
+    ``input_image`` with fresh seeds; ``None`` with no image."""
     params = {**workflow.default_params(), **(settings.get("params") or {})}
     return _run_on(input_image, params, workflow)
 

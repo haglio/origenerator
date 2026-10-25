@@ -13,10 +13,10 @@ _REPORT_ID = re.compile(r"fix(\d+)_points")
 _SIZE, _MASK, _WHOLE = "places_size", "places_mask", "places_whole"
 
 
-def report_nodes(fix_index: int, segs_ref, picture_ref) -> dict:
+def report_nodes(fix_index: int, segs_ref, original_ref) -> dict:
     joined, each, one, points = (f"fix{fix_index}_{role}" for role in ("places", "each", "one", "points"))
     return {
-        _SIZE: {"class_type": "GetImageSize", "inputs": {"image": picture_ref}},
+        _SIZE: {"class_type": "GetImageSize", "inputs": {"image": original_ref}},
         _MASK: {"class_type": "SolidMask",
                 "inputs": {"value": 1.0, "width": [_SIZE, 0], "height": [_SIZE, 1]}},
         _WHOLE: {"class_type": "MaskToSEGS",

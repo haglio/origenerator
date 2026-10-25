@@ -1,4 +1,4 @@
-"""What a picture can be sorted as showing, and how its buttons are arranged,
+"""What an image can be sorted as showing, and how its buttons are arranged,
 from the content overlay (``content.example.json`` documents both)."""
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ class Tile(NamedTuple):
 def state_names(content: dict | None = None) -> tuple[str, ...]:
     if content is None:
         content = load_content()
-    listed = content.get("picture_states")
+    listed = content.get("image_states")
     if not isinstance(listed, list):
         return ()
     names = (entry.strip() for entry in listed if isinstance(entry, str))
@@ -38,7 +38,7 @@ def state_grid(content: dict | None = None) -> tuple[Tile, ...]:
     if content is None:
         content = load_content()
     names = state_names(content)
-    arranged = content.get("picture_state_grid")
+    arranged = content.get("image_state_grid")
     tiles: list[Tile] = []
     placed: set[str] = set()
     down = 0

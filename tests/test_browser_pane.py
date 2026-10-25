@@ -44,7 +44,7 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.orientation import oriented_key
-from tests.pictured_rows import looping_clip
+from tests.thumbnail_rows import looping_clip
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
@@ -389,7 +389,7 @@ def test_revealing_a_folder_past_the_first_page_draws_its_square(qtbot):
     assert [tile.key for tile in _drawn(scroll, FolderTile) if tile._selected] == ["k59"]
 
 
-def test_revealing_a_picture_past_the_first_page_draws_and_picks_its_tile(qtbot):
+def test_revealing_an_item_past_the_first_page_draws_and_picks_its_tile(qtbot):
     rows = _sixty()
     pane, scroll = _pane(qtbot, rows)
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
@@ -456,7 +456,7 @@ def test_latest_redraws_its_cards_when_the_line_changes_order(qtbot):
     assert list(pane._inflight_cards) == ["j1", "j2"]
 
 
-def test_latest_puts_work_started_long_after_the_newest_picture_in_a_now_section(qtbot):
+def test_latest_puts_work_started_long_after_the_newest_item_in_a_now_section(qtbot):
     finished = [_row("g1", 1, _ago(hours=5))]
     pane, scroll = _pane(qtbot, [_running("j1", 2), *finished])
     _open_recents(pane, finished)
@@ -491,13 +491,13 @@ def test_a_folders_grid_heads_its_batches_with_when_they_were_made(qtbot):
     assert _shown_in_order(scroll) == [first, "g1", second, "g2"]
 
 
-def test_a_video_tile_finds_its_start_frame_in_the_models_picture_index(qtbot):
-    picture = _row("img", 1)
+def test_a_video_tile_finds_its_start_frame_in_the_models_image_index(qtbot):
+    image = _row("img", 1)
     video = {**_row("vid", 2), "workflow_name": "wan22_i2v",
              "params_json": json.dumps({"input_image": "img.png [output]", "noise_seed": 2}),
              "output_files": json.dumps([{"filename": "vid.mp4", "subfolder": ""}])}
-    pane, _scroll = _pane(qtbot, [picture, video])
-    pane.set_model([], {}, [], [], [], image_index=gallery.build_image_config_index([picture]))
+    pane, _scroll = _pane(qtbot, [image, video])
+    pane.set_model([], {}, [], [], [], image_index=gallery.build_image_config_index([image]))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=[video]))
 
@@ -558,7 +558,7 @@ def test_the_request_tile_stays_with_a_folders_only_section(qtbot):
     assert _shown_in_order(scroll) == [heading, "new", "request", "g1"]
 
 
-def test_the_run_in_front_stands_after_the_request_tile_where_its_picture_will_land(qtbot):
+def test_the_run_in_front_stands_after_the_request_tile_where_its_tile_will_land(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5))]
     tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"),
                       generating=QLabel("generating"))
@@ -584,8 +584,8 @@ def test_the_run_in_front_stays_beside_the_plus_when_the_request_tile_stands_abo
 
 
 def test_a_folder_draws_its_runs_back_of_the_line_first_and_the_one_in_front_last(qtbot):
-    # The run in front lands next, beside the newest picture, so the runs
-    # waiting after it stand before it rather than between it and that picture.
+    # The run in front lands next, beside the newest item, so the runs
+    # waiting after it stand before it rather than between it and that item.
     finished = _row("g1", 1, _ago(minutes=5))
     rows = [_running("r1", 2), _waiting("r2", 3), _waiting("r3", 4), finished]
     tiles = LeadTiles(reroll=QLabel("new"), generating=QLabel("generating"))
@@ -719,7 +719,7 @@ def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot):
     assert list(pane._inflight_cards) == ["a2"]
 
 
-def test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_below_it(qtbot):
+def test_a_folders_favorites_are_its_starred_items_and_the_favorite_folders_below_it(qtbot):
     rows = [_made_with("a1", "alpha.safetensors", starred=1),
             _made_with("a2", "alpha.safetensors", prompt="scene two"),
             _made_with("b1", "beta.safetensors", starred=1)]
@@ -828,7 +828,7 @@ def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeyp
 
 def test_a_redraw_of_the_latest_collection_keeps_the_tiles_it_already_drew(qtbot):
     # Every landing redraws the collection from a fresh model, and every tile the
-    # user had scrolled into view was built again from its picture.
+    # user had scrolled into view was built again from its thumbnail.
     rows = [_row("a", 1), _row("b", 2)]
     pane, _scroll = _pane(qtbot, rows)
     _open_recents(pane, rows)
@@ -852,7 +852,7 @@ def test_a_kept_tile_takes_the_star_its_row_now_wears(qtbot):
     assert tile._favorite is True
 
 
-def test_a_tile_whose_picture_changed_is_drawn_afresh(qtbot):
+def test_a_tile_whose_thumbnail_changed_is_drawn_afresh(qtbot):
     rows = [_row("a", 1)]
     pane, _scroll = _pane(qtbot, rows)
     _open_recents(pane, rows)

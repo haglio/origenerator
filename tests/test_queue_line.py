@@ -39,14 +39,14 @@ def test_a_video_joins_the_back():
 def test_a_videos_start_frame_joins_the_back_though_it_draws_a_still():
     # Asking for a video is asking for minutes of GPU whichever prompt goes
     # first. Placed by what its own prompt makes, the frame would take the very
-    # front and land the whole run ahead of every picture already waiting.
+    # front and land the whole run ahead of every image already waiting.
     line = [_image(), _image()]
     assert queue_line.is_video(_video_frame()) is True
     assert queue_line.insertion_index(line, _video_frame()) == 2
 
 
 def test_images_stack_newest_first():
-    # Each new picture takes the front, so the last one asked for is next: it was
+    # Each new image takes the front, so the last one asked for is next: it was
     # asked for while looking at the one before it.
     line = []
     for job in (older := _image("older"), newer := _image("newer")):
@@ -93,7 +93,7 @@ def test_the_users_image_work_takes_the_machine_from_whatever_is_rendering():
 
 def test_a_video_asked_for_takes_the_machine_from_nothing():
     # Asking for a video is asking for "later" -- and the start frame of one is
-    # the opening of a video, not a picture to wait for.
+    # the opening of a video, not an image to wait for.
     assert queue_line.takes_the_front(_video()) is False
     assert queue_line.takes_the_front(_video_frame()) is False
 
@@ -105,15 +105,15 @@ def test_work_nobody_asked_for_takes_the_machine_from_nothing():
 
 # --- rejoining the line after being set aside -----------------------------------
 
-def test_a_video_set_aside_rejoins_after_the_last_picture():
+def test_a_video_set_aside_rejoins_after_the_last_image():
     # Ahead of the videos still waiting, which it was in front of, and after
-    # every picture and enhancement, which are what it was set aside for.
+    # every image and enhancement, which are what it was set aside for.
     newcomer = _image("new")
     line = [newcomer, _image("older"), _video(), _video()]
     assert queue_line.rejoin_index(line, _video(), newcomer) == 2
 
 
-def test_a_video_set_aside_rejoins_after_a_picture_a_video_was_dragged_above():
+def test_a_video_set_aside_rejoins_after_an_image_a_video_was_dragged_above():
     # "Not above any other image or enhancement" outranks "top of the videos".
     newcomer = _image("new")
     line = [newcomer, _video(), _image("older")]
@@ -125,15 +125,15 @@ def test_a_videos_start_frame_set_aside_rejoins_with_the_videos():
     assert queue_line.rejoin_index([newcomer, _video()], _video_frame(), newcomer) == 1
 
 
-def test_a_picture_set_aside_rejoins_right_after_the_picture_that_took_its_place():
+def test_an_image_set_aside_rejoins_right_after_the_image_that_took_its_place():
     # It was the front until the newcomer took it, so it stays ahead of the
-    # pictures asked for before it, as newest-first already had it.
+    # images asked for before it, as newest-first already had it.
     newcomer = _image("new")
     line = [newcomer, _image("older"), _video()]
     assert queue_line.rejoin_index(line, _image(), newcomer) == 1
 
 
-def test_a_picture_set_aside_for_a_newcomer_no_longer_in_line_takes_the_front():
+def test_an_image_set_aside_for_a_newcomer_no_longer_in_line_takes_the_front():
     assert queue_line.rejoin_index([_image("older")], _image(), _image("gone")) == 0
 
 
@@ -148,27 +148,27 @@ def test_work_nobody_asked_for_set_aside_rejoins_at_the_back():
 
 # --- when a video may start ------------------------------------------------------
 
-def test_a_video_waits_until_a_minute_after_the_last_picture_asked_for():
-    # A picture asked for stops the video being made, so one started in the gap
-    # before the user's next picture is only stopped again: its render thrown
-    # away, and that picture slowed by the switch (the user's call, 2026-10-21).
-    assert queue_line.wait_before_starting(_video(), seconds_since_a_picture=10) == 50
+def test_a_video_waits_until_a_minute_after_the_last_image_asked_for():
+    # An image asked for stops the video being made, so one started in the gap
+    # before the user's next image is only stopped again: its render thrown
+    # away, and that image slowed by the switch (the user's call, 2026-10-21).
+    assert queue_line.wait_before_starting(_video(), seconds_since_an_image=10) == 50
 
 
-def test_a_picture_never_waits():
-    assert queue_line.wait_before_starting(_image(), seconds_since_a_picture=10) == 0
+def test_an_image_never_waits():
+    assert queue_line.wait_before_starting(_image(), seconds_since_an_image=10) == 0
 
 
 def test_a_video_waits_no_longer_once_the_minute_is_up():
-    assert queue_line.wait_before_starting(_video(), seconds_since_a_picture=75) == 0
+    assert queue_line.wait_before_starting(_video(), seconds_since_an_image=75) == 0
 
 
-def test_a_video_waits_for_nothing_before_any_picture_is_asked_for():
-    assert queue_line.wait_before_starting(_video(), seconds_since_a_picture=None) == 0
+def test_a_video_waits_for_nothing_before_any_image_is_asked_for():
+    assert queue_line.wait_before_starting(_video(), seconds_since_an_image=None) == 0
 
 
 def test_a_videos_start_frame_waits_with_the_videos():
-    assert queue_line.wait_before_starting(_video_frame(), seconds_since_a_picture=10) == 50
+    assert queue_line.wait_before_starting(_video_frame(), seconds_since_an_image=10) == 50
 
 
 # --- a video waits for the enhancement of its start image -----------------------

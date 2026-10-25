@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtCore import pyqtSignal
 
-from origenerator.gui.pictured_dropdown import PICTURES_ROLE, PicturedDropdown
+from origenerator.gui.thumbnail_dropdown import THUMBNAILS_ROLE, ThumbnailDropdown
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,7 @@ class RecentVideo:
     size = None
 
 
-class RecentVideos(PicturedDropdown):
+class RecentVideos(ThumbnailDropdown):
     picked = pyqtSignal(str)
 
     def __init__(self, recent: Callable[[], list[RecentVideo]],
@@ -29,7 +29,7 @@ class RecentVideos(PicturedDropdown):
         self._list_rows(("", (video,)) for video in self._recent())
 
     def _on_activated(self, row: int) -> None:
-        video = self.itemData(row, PICTURES_ROLE)[0]
+        video = self.itemData(row, THUMBNAILS_ROLE)[0]
         self.setCurrentIndex(-1)
         self.picked.emit(video.item)
 

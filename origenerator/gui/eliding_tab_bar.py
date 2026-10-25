@@ -16,7 +16,7 @@ _CLOSE_PADDING = GAP_MEDIUM
 # the same at both ends, so a tab's two ends are one spacing rather than two.
 EDGE = MARGIN_STANDARD
 
-# The square a tab's mark is drawn in, whatever shape the picture is, and the
+# The square a tab's mark is drawn in, whatever shape the thumbnail is, and the
 # canvas it rides on. The canvas is wider than the square by the gap the label
 # needs, because Qt's own tab layout puts the text a fixed _QT_LABEL_GAP after
 # whatever the icon measures and offers no way to say otherwise — so the mark
@@ -30,10 +30,10 @@ def tab_mark(icon: QIcon) -> QIcon:
     """``icon`` as a tab wears it: square, and trailing the gap its label needs.
 
     Squared by filling rather than fitting, so every tab's mark is the same
-    width and the row's spacing doesn't shift with a picture's shape — at this
+    width and the row's spacing doesn't shift with a thumbnail's shape — at this
     size a thumbnail is a swatch, and what the crop takes off its sides is not
     anything the eye was reading. A null icon stays null: a tab that has nothing
-    to show wears nothing, rather than an empty square where a picture goes.
+    to show wears nothing, rather than an empty square where a thumbnail goes.
     """
     if icon.isNull():
         return icon

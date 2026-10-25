@@ -18,7 +18,7 @@ worked in, drawn here because it is a color saying one thing, not a mark anyone
 reads.
 
 The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
-:func:`corner_enhance_icon`) are the marks a generation's picture wears in its
+:func:`corner_enhance_icon`) are the marks an item wears in its
 own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
 with the cursor on it -- because each is a badge and a button at once: the mark
 says which state the item is in, and pressing it is what changes that state.
@@ -145,7 +145,7 @@ def slideshow_icon() -> QIcon:
 def enhance_icon() -> QIcon:
     """A bold plus — enhance (upscale + re-sample) images.
 
-    Yellow, the very plus a picture wears in its enhance corner once it holds one
+    Yellow, the very plus an item wears in its enhance corner once it holds one
     (:func:`corner_enhance_icon`), so the button and the mark it leaves are
     one symbol in one color — and so it can't be read as a star, which is what
     green means across this family (:data:`_STAR_GLYPH`)."""
@@ -308,7 +308,7 @@ def media_type_icon(media_type: str) -> QIcon:
     """The same play/photo mark as :func:`media_type_badge`, bare.
 
     The badge sits over a thumbnail, so it needs its dark chip to read against
-    any picture; this one sits in a row of text — a config tab's label, where it
+    any thumbnail; this one sits in a row of text — a config tab's label, where it
     stands in for the thumbnail a tab has no result to show yet, or the row of a
     folder of images or videos — so the chip would be a black square among words.
     """
@@ -331,10 +331,10 @@ def separate_mark(size: int) -> QPixmap:
     return glyph_pixmap("portrait_beside_landscape", size, TEXT_PRIMARY)
 
 
-# --- the controls a picture wears in its corners --------------------------
+# --- the controls an item wears in its corners --------------------------
 
-# What the plus in a picture's lower-right corner is saying. The three are the
-# whole of what the enhancer can be up to about one image; a picture it cannot
+# What the plus in an item's lower-right corner is saying. The three are the
+# whole of what the enhancer can be up to about one image; an item it cannot
 # take at all (a video, or a run with no file) shows no plus.
 ENHANCE_OPEN = "open"   # nothing made of it yet: the offer of a first one
 ENHANCE_HELD = "held"   # it already holds the very version these settings make
@@ -357,13 +357,13 @@ _ENHANCE_SHADOW = 5.0
 
 @cache
 def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
-    """The star in a picture's top-left corner: bookmark it, or take the
+    """The star in an item's top-left corner: bookmark it, or take the
     bookmark away.
 
     Filled and green once it is bookmarked — the green Fun Time paints its
     favorite ★ with, so one color means one thing across both apps — and a
     hollow outline while it is not. The mark is therefore the state and the
-    button at once, which is why a favorited picture keeps it up with nothing
+    button at once, which is why a favorited item keeps it up with nothing
     hovering: there is no separate badge left to disagree with it.
     """
     return _corner_icon("star" if favorite else "star_outline",
@@ -372,7 +372,7 @@ def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
 
 @cache
 def corner_trash_icon(*, armed: bool) -> QIcon:
-    """The trash can in a picture's lower-left corner: delete this item.
+    """The trash can in an item's lower-left corner: delete this item.
 
     Red under the cursor rather than the other two's light gray — it is the one
     corner whose act takes something away, and it wears the very can, in the very
@@ -382,7 +382,7 @@ def corner_trash_icon(*, armed: bool) -> QIcon:
 
 @cache
 def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
-    """The plus in a picture's lower-right corner, reading ``state``.
+    """The plus in an item's lower-right corner, reading ``state``.
 
     :data:`ENHANCE_OPEN` is a hollow plus — nothing has been made of this image
     and pressing would make the first. :data:`ENHANCE_HELD` is the solid yellow

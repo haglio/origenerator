@@ -5,7 +5,7 @@ It drives its Funestra through a channel that answers three calls -- the list it
 plays, the verbs it takes, the status it reads back -- which a session's Funestra
 answers on its files (:class:`~origenerator.fun_time_mode.FunestraChannel`) and
 the window's in this process (:class:`~origenerator.gui.funestra_pane.PaneChannel`).
-The Funestra owns what is on screen from there: it holds a picture for the pace,
+The Funestra owns what is on screen from there: it holds an image for the pace,
 plays a clip to its end and rolls onto the next, repeats the one it is locked
 onto, and freezes with the room.  What differs is only where the slideshow is
 seen -- *shown*: the panel, the lines it says and the room's pause go to the
@@ -97,7 +97,7 @@ class FunestraSlideshow(QObject):
         self._pace.changed.connect(self._on_pace_changed)
         self._take_set(items, start=start, shuffle=shuffle, hud=hud)
         self._open = True
-        # What the Funestra last said it was showing: a picture that has moved on
+        # What the Funestra last said it was showing: a slide that has moved on
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._funestra_locked = False
@@ -190,7 +190,7 @@ class FunestraSlideshow(QObject):
 
     @property
     def dwell_s(self) -> int:
-        """The seconds an unlocked picture holds the Funestra's screen."""
+        """The seconds an unlocked image holds the Funestra's screen."""
         return self._pace.seconds
 
     def set_dwell_s(self, seconds: int) -> None:
@@ -333,7 +333,7 @@ class FunestraSlideshow(QObject):
     def _follow(self, video: str) -> None:
         """Stand the pass on the item the Funestra just moved to.
 
-        The Funestra walks the list by itself — a picture's pace runs out, a clip
+        The Funestra walks the list by itself — an image's pace runs out, a clip
         ends — so this is how the map, the star and every word about "this one"
         find out which item that is.
         """
@@ -361,7 +361,7 @@ class FunestraSlideshow(QObject):
     def slideshow_step(self, delta: int) -> None:
         """Step the Funestra either way.  Moving off a locked slide releases the
         lock, the way the Funestras' own prev/next cancel a lock — and a loop
-        down to the picture on screen is ended first, so what the Funestra is
+        down to the slide on screen is ended first, so what the Funestra is
         handed to step into is the set rather than a list of one."""
         self._unlock()
         if delta > 0:
@@ -442,7 +442,7 @@ class FunestraSlideshow(QObject):
             self._condemn(item.prompt_id)
 
     def _lock_what_the_cull_left(self) -> None:
-        """A row worn down to one picture plays that picture over and over,
+        """A row worn down to one item plays that item over and over,
         which is the lock — so the cull that wore it down ends the loop and
         tells the Funestra to lock what is left.  The lock is the state and
         nothing else: none of what a pressed lock also does — the star, the
@@ -559,7 +559,7 @@ class FunestraSlideshow(QObject):
     def _lock_instead_of_looping(self) -> None:
         """Tell the Funestra to lock what it is showing: the answer a loop asked
         of a row of one gets on a Funestra of its own, where the loop button of a
-        group holding one clip locks that clip.  A row that size is the picture
+        group holding one clip locks that clip.  A row that size is the item
         itself, so the press means "this one" rather than nothing; and a lock is
         not a loop, so a loop that was running is dropped."""
         self._set.end_loop()

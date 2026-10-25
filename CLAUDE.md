@@ -75,13 +75,28 @@ for one thing cost four. So:
   screen they take the word the settings all of Haglio share give them,
   genau_flick_words.
 - **An item is an image or a video, and neither is a picture or a record.**
-  This code says "picture" all through it where it means an image, and
-  "record" where it means an item or the row behind one. Neither is the
+  This code said "picture" all through it where it meant an image, and still
+  says "record" where it means an item or the row behind one. Neither is the
   user's word, and an agent who reads them here says them to him: a
   loading-screen line read "Leaving one record per picture...", and he could
   not tell what it meant. So an agent says image, video and item, to him and
-  on the screen. The code's "picture" is being renamed to "image", and a
-  "picture" that is not an image gets the name he gives it.
+  on the screen. The code's "picture" became "image" (2026-10-25), and a
+  picture that was no image took a name of its own: the small one on a tile,
+  a row or a card is a **thumbnail**, one frame of a video or of this window
+  sent to the headset is a **frame**, his drawings on the sorting window's
+  buttons and the OSR2 console's drawing are **drawings**, and what a run is
+  making, in the help for its settings, is the **result**. Saved names keep
+  the old word and are read under the new one in one place each, as the
+  recipe ones are: the `picture_state` column is `image_state`
+  (`db_schema.STORED_NAMES`), an overlay's `picture_states` and
+  `picture_state_grid` load as `image_states` and `image_state_grid`, a tab
+  saved with a `picture_border` restores it as its `media_border`, and the
+  folders of his drawings, `pictures_being_looked_over.json` and the
+  `outside picture:` workflow names keep theirs. What another repo owns
+  changes there first: Funestra's `HOLD_PICTURE` and the engine, radio and
+  slideshow calls Origenerator answers for it, shared_ui's
+  `PressablePicture`, which the OSR2 console is drawn as, app_support's
+  `origenerator_pictures_dir` and its loading screen's `pictures.json`.
 - **Where the screen names nothing, the code takes the user's word.** The
   list of folders down the left of the gallery is the **TOC** (table of
   contents), and the marks that open and shut its folders are its
@@ -166,7 +181,7 @@ filenames (2026-10-24), and a model added without one is the filename again.
 
 ## What a generation shows is said by hand, never read off its prompt
 
-Two columns answer it and nothing else does: a picture's `picture_state`, set in
+Two columns answer it and nothing else does: an image's `image_state`, set in
 the sorting window or the Action list on a Generate tab, and a video's
 `act`, the act picked when it was launched. `act_settings.act_of`
 reads those two and returns "" for a row nobody has said one for, which a
@@ -178,11 +193,11 @@ It used to be worked out from the prompt, by matching each act's keywords in
 narrowed the show's act filter, and it was wrong often enough to be worse than
 nothing: it named rows for an act none of them shows, which the user found off the map
 (2026-09-21). He called the mechanism garbage and had it removed, with the spoken
-"genau it" that animated a picture as whatever its prompt read as (2026-09-22).
+"genau it" that animated an image as whatever its prompt read as (2026-09-22).
 `acts` is now a plain list of the act names.
 
 So nothing in this repo may go back to guessing from a prompt, however tempting a
-blank row looks: a blank says the picture has not been sorted, which is a thing to
+blank row looks: a blank says the image has not been sorted, which is a thing to
 fix in the sorting window, not in code. The near miss that still counts: a
 "fallback" that reads the prompt only when the hand-set answer is missing — that
 is exactly the shape that was removed, and it leaves one question with two
@@ -194,13 +209,13 @@ ComfyUI saves into a folder of its own (`comfyui_output_dir` in the settings
 all of Haglio shares), outside the library, and refuses to save into or read
 from anything a link inside that folder points at (its realpath check, since
 2026-07-02). So each run saves into `origenerator/<prompt id>/` there
-(`library_filing.saving_into_its_run_folder`; a past output or picked picture
+(`library_filing.saving_into_its_run_folder`; a past output or picked image
 the run reads reaches ComfyUI the way every file kept outside its folders
 does, as a copy in its temp folder, `comfyui_inputs`), and completion files
 each finished file into the library folder its kind is kept in (`file_into_library`; the kinds are `OutputPlaces`, read from
 the settings), numbered after the highest number already there or held in
-Trash. That last part is his rule (2026-10-24): a name another picture had is
-never given out while that picture can come back, and a skipped number is
+Trash. That last part is his rule (2026-10-24): a name another item had is
+never given out while that item can come back, and a skipped number is
 fine. A file put back from Trash whose name a newer file has anyway comes back
 under the next free number, and its item lists that name, so no two items ever
 list one file. A record keeps naming its file by kind (`image`, `video`, ...), so
@@ -222,7 +237,7 @@ That folder still holds four links from the old scheme (`image`, `video`,
 app's uses them, and they stay for a checkout older than this change: such a
 copy resolves its records through them, and with them gone, the first real
 folder of those names that a save created would read to its startup repair as
-every picture having vanished from a folder that still holds files. Removing
+every image having vanished from a folder that still holds files. Removing
 them is safe only once no checkout that old can be started.
 
 ## A video's filename is not the video
@@ -305,32 +320,33 @@ and write the LIVE install's library from whichever checkout starts them
 database is one nobody will ever animate from, so a run of either spent on it
 would be lost. `tests/test_launcher_contract.py` holds both to that.
 
-- `sort_pictures.vbs` -> `origenerator.sort_pictures` -- says what each picture
-  shows, a press apiece. The vocabulary is the overlay's `picture_states` and
-  the answer lands in `generations.picture_state`; which pictures are still
-  waiting and in what order is `picture_sorting`, what each press does is
+- `sort_images.vbs` -> `origenerator.sort_images` -- says what each image
+  shows, a press apiece. The vocabulary is the overlay's `image_states` and
+  the answer lands in the row's `image_state`; which images are still
+  waiting and in what order is `image_sorting`, what each press does is
   `sorting_session`, and the window is `gui/sorting_window.py`. Each state's
-  button wears the user's own drawing of it, found by `picture_marks` under the
-  live install's `state/picture_states/`: his, and library subject matter, so
+  button wears the user's own drawing of it, found by `action_drawings` in the
+  running copy's own `state/picture_states/` and then the live install's: his,
+  and library subject matter, so
   they are as uncommittable as the state names and live beside the library.
 - `check_animations.vbs` -> `origenerator.check_animations` -- settles what each
   of the overlay's `animation_paths` entries runs, one at a time, against a video
   the user already kept. `animation_samples` finds and orders them,
   `animation_check_session` is the walk, `gui/animation_check_window.py` is the
   window, and what is accepted goes to `animation_settings` -- one set of
-  settings per (lane, act, picture state) in a file of its own beside the library, which
+  settings per (lane, act, image state) in a file of its own beside the library, which
   `CombineController._curated_combination` asks before the overlay's per-act pin.
 
   That per-act pin is on its way out, by the user's decision: it answered for a
-  whole act whatever the picture showed, and it did not animate well enough to
+  whole act whatever the image showed, and it did not animate well enough to
   keep. So nothing new may be built on it or around it -- no editor for it, no
   second place that writes it -- and the end state is settings per (lane, act,
-  picture state) and nothing else. Until every one of those is settled it stays
+  image state) and nothing else. Until every one of those is settled it stays
   as one thing only: the starting position the window offers for an animation
   nobody ever kept a video of, which is the last place `starting_point` looks.
 
 Neither can answer anything the other has not: an animation's samples are clips
-made from pictures already sorted, so the sorting window comes first and a fresh
+made from images already sorted, so the sorting window comes first and a fresh
 library shows every animation blank.
 
 ## The commands in `tools/`, and why each one is not a menu item
@@ -436,7 +452,7 @@ counts every control a person can set and every press and bar on the
 console, and fails on one that neither a key of the table nor its short list
 of things that are no setting accounts for. So a new control is finished
 when it has its key, or its line there saying why it is no setting -- what is
-being searched for, what one picture shows, a nudge, and Auto-generate, which
+being searched for, what one image shows, a nudge, and Auto-generate, which
 a restart leaves off, since an Auto-Generate that came back on by itself
 could run unnoticed.
 
@@ -517,7 +533,7 @@ change to a size, to a key or a command, or to hosted-only code owes a Fun Time
 launcher beside the standalone one: bigger toolbar marks handed over in a
 standalone preview alone were sent back for exactly that. A change that looks
 and works the same at any size and in either host, such as taking the dim off a
-picture under the not-yet-generated line, goes out with the standalone preview
+image under the not-yet-generated line, goes out with the standalone preview
 alone; a second launcher would only ask him to accept it twice. When the hosted
 half is owed, make a
 fun_time worktree on fun_time's current `main`, put your Origenerator worktree's
@@ -587,8 +603,8 @@ serial happened; `broker_heartbeat.txt` is broker liveness); grep each state
 dir's `origenerator.log` for "OSR2 motion engaged" / "streaming" to see whether
 the app ever actually drove; lay a widget out offscreen and read its geometry
 — `geometry()`, `sizeHint()`, where a child lands (`mapTo(window, QPoint())`)
-once `layout().activate()` has run — never a picture of it, because a grab of
-anything showing a generation is one of his pictures, which no agent looks at
+once `layout().activate()` has run — never a grab of it, because a grab of
+anything showing a generation shows his images and videos, which no agent looks at
 (Private Content, in the global engineering law), and the private-content
 hook refuses to open a PNG this checkout does not track; and check which
 instance the user is running from the launch lines at the top of each state

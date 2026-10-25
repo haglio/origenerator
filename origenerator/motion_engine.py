@@ -174,12 +174,12 @@ def position_ahead(motion: Motion, lead_s: float) -> float:
 
 def trace_window(motion: Motion, samples: int, span_s: float) -> tuple[list[float], float]:
     """The motion sampled forward from now as 0-1 heights — the drive readout's
-    picture of the motion the device is being sent, ``span_s`` seconds of it —
+    drawing of the motion the device is being sent, ``span_s`` seconds of it —
     as ``samples`` + 1 values, the last one the knot past the readout's edge,
     and how far the drawn line is shifted left, as a fraction of one sample.
 
     Both sources are read on knots a fixed stretch of their own clock apart --
-    the wave on its phase, the learned motion on its script -- so the picture
+    the wave on its phase, the learned motion on its script -- so the drawing
     holds still between knots and slides by the fraction rather than being
     redrawn at fixed columns.
     """

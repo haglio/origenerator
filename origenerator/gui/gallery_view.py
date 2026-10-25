@@ -430,7 +430,7 @@ class GalleryView(QWidget):
         before its first refresh.
         """
         self._image_rows: list[dict] = []
-        # Pictures whose spoken animation is still choosing a video, so a
+        # Images whose spoken animation is still choosing a video, so a
         # second one said into that wait is refused rather than queued twice
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
@@ -532,7 +532,7 @@ class GalleryView(QWidget):
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
             names=self._item_names, radio=self._radio,
             turn_the_radio_on=lambda: self._bank.turn_the_radio_on())
-        # Combine: a video's settings run again on a dropped picture, and the
+        # Combine: a video's settings run again on a dropped image, and the
         # spoken "animate as" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
         # which _build_ui places under the tree.
@@ -542,14 +542,14 @@ class GalleryView(QWidget):
             names=self._item_names)
         # The standalone enhance: its settings panel, what the Enhance button
         # would run on, and the live run's appearance on every surface showing
-        # the picture it improves
+        # the image it improves
         # (:mod:`origenerator.gui.enhance_controller`). It builds its own panel,
         # which _build_ui seats in the footer.
         self._enhance = EnhanceController(
             self, db=db, jobs=self._jobs, browser=self._browser,
             slideshows=self._slideshows, info_tabs_of=lambda: self._info_tabs)
-        self._jobs.enhance_pictures_with(
-            lambda picture: self._enhance.enhance_items([picture["prompt_id"]]))
+        self._jobs.enhance_images_with(
+            lambda image: self._enhance.enhance_items([image["prompt_id"]]))
         # Everything spoken: the microphone, the caption that says what it heard,
         # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
         # caption is placed by _build_ui, and the bank it presses is bound to it
@@ -890,7 +890,7 @@ class GalleryView(QWidget):
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
         self._info_tabs.changes_requested.connect(self._on_changes_requested)
         # ...and its right-click's "Go to folder" goes the other way: from a
-        # tab's settings across to the pictures they have made.
+        # tab's settings across to the items they have made.
         self._info_tabs.folder_requested.connect(self._go_to_folder)
         info_pane = QWidget()
         info_column = QVBoxLayout(info_pane)
@@ -1373,7 +1373,7 @@ class GalleryView(QWidget):
         combine's launch, the Auto-Generate tip's link, a click on an in-flight card —
         and in all of them the open is a step on the way to that run's tile rather
         than somewhere browsed to. So it lands on no saved item of its own
-        (:meth:`_land_on_the_first_item`): one loaded here would paint a picture
+        (:meth:`_land_on_the_first_item`): one loaded here would paint an item
         nobody asked for over the very tab the run belongs to, and re-seed that
         tab's form from a saved row mid-run. The folder is a stop and a visit all
         the same, both recorded once the tile is picked.
@@ -1745,7 +1745,7 @@ class GalleryView(QWidget):
         generation it shows changes under it or goes (see
         :meth:`InfoPaneTabs.refresh_displayed` and
         :meth:`InfoPaneTabs.reconcile_previews`). Painting the selection
-        into whichever tab was in front is how a tab came to show a picture that
+        into whichever tab was in front is how a tab came to show an item that
         was not its own."""
         if not prompt_id or prompt_id not in self._browser.listed_prompt_ids():
             return
@@ -1841,7 +1841,7 @@ class GalleryView(QWidget):
         return True
 
     def reveal(self, prompt_id: str) -> bool:
-        """Pick and scroll to the picture where the pane stands, and put the item
+        """Pick and scroll to the tile where the pane stands, and put the item
         back in the info pane; a pane of folders marks the square holding it.
         Whether anything the pane shows held it."""
         if self._browser.reveal_tile(prompt_id):
@@ -2008,8 +2008,8 @@ class GalleryView(QWidget):
 
         The one move under every gesture that names a folder to open — a folder
         tile's click, a config tab's "Go to folder", a step of the path — as
-        :meth:`_go_to_generation` is the one under every gesture that names a
-        picture. Each is a decision to go there, so a running search is put away
+        :meth:`_go_to_generation` is the one under every gesture that names an
+        item. Each is a decision to go there, so a running search is put away
         first: a search's results are folder tiles too, and this is how they
         open; without it the field would still be full while the pane shows the
         folder it drilled into.
@@ -2424,10 +2424,10 @@ class GalleryView(QWidget):
             return
         # One entry per run the press will make, thumbnail or not, so the count
         # in the hover is the number of images and not of readable files.
-        pictures = [row.get("thumbnail_path") for row in rows]
+        thumbnails = [row.get("thumbnail_path") for row in rows]
         self._clear_reroll_selection()  # the tab is about the folder, not a live run
         self._info_tabs.open_folder_request(group.key, group.label, workflow.name,
-                                      filled_params(rows[0], workflow), pictures)
+                                      filled_params(rows[0], workflow), thumbnails)
 
     def _on_changes_requested(self, folder_key: str, workflow_name: str, params: dict):
         """A request tab's Generate: run every image of ``folder_key`` again with
@@ -2485,13 +2485,13 @@ class GalleryView(QWidget):
         if launched:
             self._stand_on_the_run_in(key, rebuild=True)
 
-    def _job_source_picture(self, job) -> str | None:
+    def _job_source_image(self, job) -> str | None:
         """A file showing what ``job`` came from, for the tile to stand blurred
         under the wait until the run streams a frame of its own.
 
         The image it was requested of first — a folder-wide request queues a run
         per image and none of them animates anything, so what it was asked about
-        is the only picture it has — then the start frame an i2v or an enhance is
+        is the only image it has — then the start frame an i2v or an enhance is
         built on. ``None`` for a run that came from nothing, which keeps the
         plain plate: a queued image looks like every other queued image because
         it genuinely is.
@@ -2508,11 +2508,11 @@ class GalleryView(QWidget):
 
     def _job_made_from(self, job, source_video_media) -> Combination:
         """What ``job`` was made from, for a surface with no frame of it yet: the
-        picture, and the clip whose settings it follows as ``source_video_media`` shows
+        image, and the clip whose settings it follows as ``source_video_media`` shows
         that clip — a still on the folder's tile, a loop in a config tab.
 
         The clip only where a *video* was dropped: an act picked off the Combine
-        dropdown names what the run will do rather than a clip, and a picture of
+        dropdown names what the run will do rather than a clip, and a thumbnail of
         some video the user never chose reads as a job that is that video — the
         same reason the queue's rows leave it out (see BrowserPane).
         """
@@ -2520,7 +2520,7 @@ class GalleryView(QWidget):
         source_video = (None if row is None or row.get("act")
                         else self._db.get_generation(row.get("source_video") or ""))
         return Combination(
-            self._job_source_picture(job),
+            self._job_source_image(job),
             source_video_media(source_video) if source_video is not None else None,
             source_video is not None
             and gallery.prompts_differ_from(job.params, source_video, job.workflow))
@@ -2539,7 +2539,7 @@ class GalleryView(QWidget):
 
         Auto-Generate is left running while the user works, so what it is making is not
         what they are looking at. Its frames used to fill the info pane — that is,
-        the preview of whichever tab was open, over the picture the user had put
+        the preview of whichever tab was open, over the item the user had put
         there — and its results landed in a tab too. Both belong to the folder's
         own live tile in the middle column, which streams the run whether or not
         the pane is pointed at it.
@@ -2714,7 +2714,7 @@ class GalleryView(QWidget):
         """The generations the slideshow would play from the view on screen: the
         collection's own rows in a collection, else everything under the selected
         folder.  All of it: narrowing a slideshow to its favorites or its enhanced
-        pictures is the slideshow's own doing, from the two switches on its HUD.
+        images is the slideshow's own doing, from the two switches on its HUD.
         """
         rows = self._browser.collection_rows()
         if rows is None:
@@ -2751,7 +2751,7 @@ class GalleryView(QWidget):
 
     def bank_state(self, enhance: Offer) -> BankState:
         """How the bank stands right now, gathered from the seams the buttons
-        belong to: the trail, the undo stack, the tree's selection, the pictures
+        belong to: the trail, the undo stack, the tree's selection, the items
         picked, the enhance settings, the slideshows, and Auto-Generate.
 
         Assembled here because here is where those meet. Everything it reads is
@@ -2897,7 +2897,7 @@ class GalleryView(QWidget):
         return the line to say about it and its kind.
 
         The revision is the target's own settings with its prompt pair edited and
-        *the same seed* — "the same picture but without X" means the picture, so
+        *the same seed* — "the same image but without X" means the image, so
         the one thing deliberately not re-rolled is the seed that draws it.
         """
         params = {**params, "positive_prompt": revision.positive,
@@ -2924,7 +2924,7 @@ class GalleryView(QWidget):
         Undoable like every other delete here, and only ever a delete of files:
         the generation keeps its row, its folder, its star and its other
         versions. The rebuild after is what redraws the tile — a binned top
-        version means a new picture and, once the last enhancement goes, no more
+        version means a new thumbnail and, once the last enhancement goes, no more
         green badge."""
         row = self._db.get_generation(prompt_id)
         if row is None or not self._actions.delete_enhance_levels(row, filenames):
@@ -3065,11 +3065,11 @@ class GalleryView(QWidget):
         return self._enhance.enhance_from_slideshow(prompt_id)
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
-        """The spoken "enhance" over a picture."""
+        """The spoken "enhance" over an image."""
         return self._enhance.enhance_it(prompt_id)
 
     def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
-        """The spoken "fix <part>" over a picture."""
+        """The spoken "fix <part>" over an image."""
         return self._enhance.fix_parts(prompt_id, parts)
 
     def image_rows(self) -> list[dict]:
@@ -3094,7 +3094,7 @@ class GalleryView(QWidget):
 
     def animate_it(self, image_id: str | None,
                    asked) -> tuple[str | None, str, str]:
-        """Animate a picture as a named act — what an "animate as" runs."""
+        """Animate an image as a named act — what an "animate as" runs."""
         return self._combine.animate_it(image_id, asked)
 
     def reveal_launch(self, key: str):
@@ -3112,7 +3112,7 @@ class GalleryView(QWidget):
     def _launched_side(self, key: str) -> str:
         """Which side a job just launched in folder ``key`` will land on.
 
-        Read off the size it asked for, since it has no picture to measure yet —
+        Read off the size it asked for, since it has no result to measure yet —
         the same thing that puts its in-flight card in one Recents collection rather
         than the other. With no job to ask, the side being browsed.
         """
@@ -3152,13 +3152,13 @@ class GalleryView(QWidget):
         (:meth:`GenerateConfigPanel.show_running_generation`) so the tab is *for*
         this run — its form is the run's settings, its bar fills with the run's
         progress, its button discards it, and its preview follows the run's
-        frames to the picture they land as
+        frames to the item they land as
         (:meth:`GenerateConfigPanel.watch_folder`). That is what a click on the
         tile or on the collection's card asks for, and the tab comes to the front as a
         clicked thumbnail's does.
 
         The folder tile's "+" lands its run the same way: that press is a press
-        for a picture, and its tile is a thumbnail's worth of one. The tab it
+        for an item, and its tile is a thumbnail's worth of one. The tab it
         lands in is the pane's resting or preview tab, else a new one, so no tab
         anybody is working in is taken.
         """
@@ -3230,7 +3230,7 @@ class GalleryView(QWidget):
     def _on_reroll_preview(self, key: str, prompt_id: str, data: bytes):
         """A run streamed a frame: put it in every tab following its folder — and
         nowhere else. A tab that isn't following the folder is showing something
-        of its own, and a frame painted over that is the picture nobody asked for.
+        of its own, and a frame painted over that is the one nobody asked for.
         """
         for panel in self._info_tabs.watchers_of(key):
             panel.show_live_frame(data)
@@ -3291,7 +3291,7 @@ class GalleryView(QWidget):
     def _abandon_reroll_preview(self, key: str):
         """A run in folder ``key`` ended with nothing to show (cancelled or
         failed): its tile stops being the selected item; and once the folder has
-        no run left, the tabs following it put their own pictures back. While it
+        no run left, the tabs following it put their own items back. While it
         still has one — the next of a batch, Auto-Generate's next seed — they keep
         following, since that run's frames are what comes next."""
         if key == self._selected_reroll_key:
@@ -3385,7 +3385,7 @@ class GalleryView(QWidget):
             launcher.show_completed_result(finished_row, self._image_rows)
 
     def _show_landed_to_watchers(self, key: str, finished_row: dict | None, launcher):
-        """The run a tab was following has landed: put its picture where its live
+        """The run a tab was following has landed: put its item where its live
         frames were, in every tab following folder ``key``.
 
         Without this a tab watching Auto-Generate — or a fullscreen slideshow opened over
@@ -3562,7 +3562,7 @@ class GalleryView(QWidget):
     # --- deletion & undo ---------------------------------------------------
 
     def generation_menu(self, prompt_ids: list[str], global_pos):
-        """The right-click menu a generation's picture offers, wherever it is shown.
+        """The right-click menu a generation offers, wherever it is shown.
 
         One menu rather than one per surface: a thumbnail in the browser pane and
         the preview in a config tab are looking at the same generation, so a
@@ -3640,7 +3640,7 @@ class GalleryView(QWidget):
             self._delete_rows(rows)
 
     def _can_open_containing_folder(self, row: dict) -> bool:
-        """Whether there is a folder to send this generation's picture to.
+        """Whether there is a folder to send this generation's file to.
 
         A deleted one has none — it left its folder when its row did — and neither
         has one whose folder is already the pane you are standing in, where going
@@ -3654,7 +3654,7 @@ class GalleryView(QWidget):
     def run_item_action(self, prompt_id: str, action: str):
         """Run one corner control's act on one generation.
 
-        The corner controls are drawn on a particular picture, so unlike the menu
+        The corner controls are drawn on a particular item, so unlike the menu
         they never act on a selection: pressing the star on a tile bookmarks THAT
         tile, whichever tiles happen to be picked.
         """
@@ -4150,7 +4150,7 @@ class GalleryView(QWidget):
         """Go to a generation: open the folder holding it, draw that folder, pick
         the item's own tile in it, and show the item in the info pane.
 
-        The single move under every "take me to this picture" — a link, a
+        The single move under every "take me to this item" — a link, a
         right-click "Go to folder", Back and Forward, a hosted slideshow's lock, an
         undo landing on what it brought back. There is no lighter version of it
         and no separate path for any of them: a move that did some of those and

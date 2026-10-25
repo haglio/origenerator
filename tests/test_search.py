@@ -191,15 +191,15 @@ def test_the_code_leading_a_name_finds_every_item_of_its_folder():
 
 
 def test_a_whole_name_lands_on_its_item_alone():
-    rows = [_row("picture", "a quiet street"), _row("made from it", "a quiet street"),
+    rows = [_row("image", "a quiet street"), _row("made from it", "a quiet street"),
             _row("numbered alike", "a quiet street")]
-    names = {"picture": "3FA9C0D2 004", "made from it": "77B1E0AA 000",
+    names = {"image": "3FA9C0D2 004", "made from it": "77B1E0AA 000",
              "numbered alike": "77B1E0AA 004"}
     folders = {"made from it": ["3FA9C0D2 004"], "numbered alike": ["3FA9C0D2 001"]}
     index = search.GallerySearch()
     index.update(rows, folders, item_name=names.get)
 
-    assert _hits(index, "3FA9C0D2 004") == ["picture"]
+    assert _hits(index, "3FA9C0D2 004") == ["image"]
 
 
 def test_the_start_of_a_name_finds_the_items_whose_names_start_that_way():

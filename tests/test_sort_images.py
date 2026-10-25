@@ -1,4 +1,4 @@
-"""The pictures the sorting window walks, as it is handed them.
+"""The images the sorting window walks, as it is handed them.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
@@ -9,10 +9,10 @@ import json
 from origenerator import gallery
 from origenerator.db import Database
 from origenerator.output_places import OutputPlaces
-from origenerator.sort_pictures import waiting_pictures
+from origenerator.sort_images import waiting_images
 
 
-def test_each_waiting_picture_carries_the_name_its_tile_wears(tmp_path):
+def test_each_waiting_image_carries_the_name_its_tile_wears(tmp_path):
     db = Database(tmp_path / "origenerator.db")
     db.insert_generation(prompt_id="gen-one", workflow_name="sdxl_t2i", workflow_version="v1",
                          seed=1, workflow_json="{}",
@@ -21,13 +21,13 @@ def test_each_waiting_picture_carries_the_name_its_tile_wears(tmp_path):
                          output_files=json.dumps([{"filename": "gen-one.png", "subfolder": ""}]))
     row = db.get_generation("gen-one")
 
-    waiting = waiting_pictures(db, OutputPlaces.in_one_folder(tmp_path))
+    waiting = waiting_images(db, OutputPlaces.in_one_folder(tmp_path))
 
-    assert [picture["name"] for picture in waiting] == [
+    assert [image["name"] for image in waiting] == [
         f"{gallery.folder_id(gallery.settings_folder_key(row))} 000"]
 
 
-def _a_finished_picture(db, prompt_id: str, seed: int) -> None:
+def _a_finished_image(db, prompt_id: str, seed: int) -> None:
     db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="v1", seed=seed, workflow_json="{}",
                          params_json=json.dumps({"positive_prompt": "a red kite",
@@ -37,25 +37,25 @@ def _a_finished_picture(db, prompt_id: str, seed: int) -> None:
                                                    "subfolder": ""}]))
 
 
-def test_the_line_starts_with_the_picture_it_was_opened_on(tmp_path):
+def test_the_line_starts_with_the_image_it_was_opened_on(tmp_path):
     """His words: it "should start with the current image, then go on to the usual
     queue" -- so the one in front of him comes first even with an action already."""
     db = Database(tmp_path / "origenerator.db")
-    _a_finished_picture(db, "gen-one", 1)
-    _a_finished_picture(db, "gen-two", 2)
-    db.set_picture_state("gen-two", "state two")
+    _a_finished_image(db, "gen-one", 1)
+    _a_finished_image(db, "gen-two", 2)
+    db.set_image_state("gen-two", "state two")
 
-    waiting = waiting_pictures(db, OutputPlaces.in_one_folder(tmp_path), "gen-two")
+    waiting = waiting_images(db, OutputPlaces.in_one_folder(tmp_path), "gen-two")
 
-    assert [picture["prompt_id"] for picture in waiting] == ["gen-two", "gen-one"]
+    assert [image["prompt_id"] for image in waiting] == ["gen-two", "gen-one"]
 
 
-def test_the_picture_it_was_opened_on_stands_in_the_line_once(tmp_path):
+def test_the_image_it_was_opened_on_stands_in_the_line_once(tmp_path):
     db = Database(tmp_path / "origenerator.db")
-    _a_finished_picture(db, "gen-one", 1)
-    _a_finished_picture(db, "gen-two", 2)
+    _a_finished_image(db, "gen-one", 1)
+    _a_finished_image(db, "gen-two", 2)
 
-    waiting = waiting_pictures(db, OutputPlaces.in_one_folder(tmp_path), "gen-two")
+    waiting = waiting_images(db, OutputPlaces.in_one_folder(tmp_path), "gen-two")
 
-    asked = [picture["prompt_id"] for picture in waiting]
+    asked = [image["prompt_id"] for image in waiting]
     assert (asked[0], asked.count("gen-two"), len(asked)) == ("gen-two", 1, 2)

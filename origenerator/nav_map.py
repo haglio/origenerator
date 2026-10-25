@@ -3,13 +3,13 @@
 A Fun Time satellite maps the clip on screen against its library: the same
 act under other seeds runs right as the seed row, and the same subject's
 other acts run down as the column.  A slideshow of this app's generations reads
-the same way, in the gallery's own terms.  The subject is a picture, and what
+the same way, in the gallery's own terms.  The subject is an image, and what
 was made of it is the videos animated from it: they run down its column, each
-named for the act it shows, and the picture heads theirs as their source.  A
-seed is the picture's — a video's own sampler seed says nothing about which
-picture it is of — so a picture's row is its settings folder (the workflow,
+named for the act it shows, and the image heads theirs as their source.  A
+seed is the image's — a video's own sampler seed says nothing about which
+image it is of — so an image's row is its settings folder (the workflow,
 its version, the model, the LoRA and every setting but the seed), and a
-video's is its act animated from the pictures in its own picture's folder.
+video's is its act animated from the images in its own image's folder.
 
 Pure and Qt-free: rows in, rows out.  The slideshow keeps the item on screen and
 the gallery supplies the library it is mapped against.
@@ -25,10 +25,10 @@ from origenerator.search import content_stems
 
 # How many near configurations "more seeds" adds to the exact family.  Six
 # fills the HUD's seed row; the point of the cap is that widening must never
-# dump a whole model's worth of pictures into a row meant to show close kin.
+# dump a whole model's worth of images into a row meant to show close kin.
 WIDEN_ADDITIONS = 6
 
-# What a picture is called among the acts of the videos animated from it.
+# What an image is called among the acts of the videos animated from it.
 SOURCE_IMAGE = "Source image"
 
 
@@ -53,7 +53,7 @@ def seed_family(current: dict, rows, *, image_index) -> list[dict]:
 def config_family(current: dict, rows, *, image_index) -> list[dict]:
     """*current* and every row with its seed under another configuration.
 
-    The same workflow and model, because a seed only means the same picture
+    The same workflow and model, because a seed only means the same image
     where the same sampler draws from the same latent: a seed that collides
     across models is a coincidence, and one across workflows is not even that.
     """
@@ -81,8 +81,8 @@ def _likeness(one: frozenset[str], other: frozenset[str]) -> float:
 class Surroundings:
     """What the library holds around one generation: the act its own row is
     named for, the same act under other seeds along the row, down the column
-    one generation for each other act of the same picture with the act it
-    shows, and the rest of that picture's whole group — what a loop down the
+    one generation for each other act of the same image with the act it
+    shows, and the rest of that image's whole group — what a loop down the
     column plays, twins of an act included."""
 
     label: str = ""
@@ -92,8 +92,8 @@ class Surroundings:
     group: tuple[dict, ...] = ()
 
 
-def _source_picture_id(row: dict, image_index) -> str | None:
-    """Which picture *row* was animated from, or ``None`` for a row that is not
+def _source_image_id(row: dict, image_index) -> str | None:
+    """Which image *row* was animated from, or ``None`` for a row that is not
     a video or whose start frame no generation in the library produced."""
     if gallery.media_type_of_row(row) != MediaType.VIDEO:
         return None
@@ -101,37 +101,37 @@ def _source_picture_id(row: dict, image_index) -> str | None:
 
 
 class _Animations:
-    """Which picture each of the library's videos was animated from, and back
+    """Which image each of the library's videos was animated from, and back
     — read once, because every question the map asks would walk it again."""
 
     def __init__(self, rows, image_index) -> None:
-        pictures = {row["prompt_id"]: row for row in rows
-                    if gallery.media_type_of_row(row) != MediaType.VIDEO}
-        self._picture_of: dict[str, dict] = {}
+        images = {row["prompt_id"]: row for row in rows
+                  if gallery.media_type_of_row(row) != MediaType.VIDEO}
+        self._image_of: dict[str, dict] = {}
         self._videos_of: dict[str, list[dict]] = {}
         for row in rows:
-            picture = pictures.get(_source_picture_id(row, image_index))
-            if picture is not None:
-                self._picture_of[row["prompt_id"]] = picture
-                self._videos_of.setdefault(picture["prompt_id"], []).append(row)
+            image = images.get(_source_image_id(row, image_index))
+            if image is not None:
+                self._image_of[row["prompt_id"]] = image
+                self._videos_of.setdefault(image["prompt_id"], []).append(row)
 
-    def picture_of(self, row: dict) -> dict | None:
-        return self._picture_of.get(row["prompt_id"])
+    def image_of(self, row: dict) -> dict | None:
+        return self._image_of.get(row["prompt_id"])
 
-    def videos_of(self, picture: dict) -> list[dict]:
-        return self._videos_of.get(picture["prompt_id"], [])
+    def videos_of(self, image: dict) -> list[dict]:
+        return self._videos_of.get(image["prompt_id"], [])
 
     def label_of(self, row: dict) -> str:
-        """The act(s) *row*'s map row is named for: what it shows, and — for a
-        picture something was animated from — that it is their source."""
+        """The act(s) *row*'s map row is named for: what it shows, and — for an
+        image something was animated from — that it is their source."""
         source = SOURCE_IMAGE if self.videos_of(row) else ""
         return ", ".join(act for act in (source, act_of(row)) if act)
 
     def group_of(self, row: dict) -> list[dict]:
-        """The picture *row* is or was animated from, then every video animated
-        from it.  A video made from no picture the library holds stands alone."""
-        picture = self.picture_of(row) or row
-        return [picture, *self.videos_of(picture)]
+        """The image *row* is or was animated from, then every video animated
+        from it.  A video made from no image the library holds stands alone."""
+        image = self.image_of(row) or row
+        return [image, *self.videos_of(image)]
 
 
 def _one_per_act(labeled) -> tuple[tuple[dict, str], ...]:
@@ -153,14 +153,14 @@ def act_labels(rows, *, image_index) -> dict[str, str]:
 def surroundings(current: dict, rows, *, image_index) -> Surroundings:
     animations = _Animations(rows, image_index)
     own = animations.label_of(current)
-    picture = animations.picture_of(current)
-    if picture is None:
+    image = animations.image_of(current)
+    if image is None:
         seeds = seed_family(current, rows, image_index=image_index)[1:]
     else:
-        # A video's seed is its picture's: the same act, animated from the
-        # same configuration of picture under other seeds.
+        # A video's seed is its image's: the same act, animated from the
+        # same configuration of image under other seeds.
         seeds = [video
-                 for sibling in seed_family(picture, rows, image_index=image_index)
+                 for sibling in seed_family(image, rows, image_index=image_index)
                  for video in animations.videos_of(sibling)
                  if video["prompt_id"] != current["prompt_id"]
                  and animations.label_of(video) == own]
@@ -169,10 +169,10 @@ def surroundings(current: dict, rows, *, image_index) -> Surroundings:
     return Surroundings(
         label=own,
         seeds=tuple(seeds),
-        # Configurations belong to pictures: a video's seed is the picture's
+        # Configurations belong to images: a video's seed is the image's
         # it was animated from, so another configuration of it is a video of
-        # that picture, which the acts below already are.
-        configs=() if picture is not None else tuple(
+        # that image, which the acts below already are.
+        configs=() if image is not None else tuple(
             config_family(current, rows, image_index=image_index)[1:]),
         actions=_one_per_act(
             (row, label) for row, label in ((row, animations.label_of(row)) for row in group)
@@ -187,10 +187,10 @@ def beyond_the_row(current: dict, rows, *, image_index,
     *additions* of them — nothing when nothing lies beyond it, which is a dead
     end worth saying rather than a row of strangers.
 
-    Beyond a video animated from a picture lie other videos of its act — the
+    Beyond a video animated from an image lie other videos of its act — the
     act is a bound, not a preference: another act is what the column is for —
     nearest by the model and LoRA that animated them, then by how alike the
-    pictures they were animated from read.  Beyond anything else lie the other
+    images they were animated from read.  Beyond anything else lie the other
     configurations of its own model: the same LoRA first, then the prompt that
     reads most like this one.
     """
@@ -199,20 +199,20 @@ def beyond_the_row(current: dict, rows, *, image_index,
     kept = {current["prompt_id"], *(row["prompt_id"] for row in around.seeds)}
     model = gallery.folder_key_at_level(current, "model", image_index)
     lora = gallery.folder_key_at_level(current, "lora", image_index)
-    picture = animations.picture_of(current)
-    if picture is None:
+    image = animations.image_of(current)
+    if image is None:
         candidates = [row for row in _others(current, rows)
                       if gallery.folder_key_at_level(row, "model", image_index) == model]
     else:
         candidates = [row for row in rows
                       if gallery.media_type_of_row(row) == MediaType.VIDEO
                       and animations.label_of(row) == around.label]
-    subject = content_stems(picture or current)
+    subject = content_stems(image or current)
     ranked = sorted(
         (
             (gallery.folder_key_at_level(row, "model", image_index) != model,
              gallery.folder_key_at_level(row, "lora", image_index) != lora,
-             -_likeness(subject, content_stems(animations.picture_of(row) or row)),
+             -_likeness(subject, content_stems(animations.image_of(row) or row)),
              row["prompt_id"],
              row)
             for row in candidates if row["prompt_id"] not in kept
@@ -230,9 +230,9 @@ def one_per_stretch(rows, *, image_index) -> list[dict]:
     listing of everything newest-first is mostly runs; a slideshow of it plays one
     of each, and the map's seed row reaches the rest.  What counts as one
     stretch is read off when the generations were MADE, not off where they sit
-    in the listing handed over: Latest moves a picture to where its
-    enhancement falls, which breaks a sitting's run into pieces wherever a
-    picture of it was enhanced later.  The listing's own order is what comes
+    in the listing handed over: Latest moves an image to where its
+    enhancement falls, which breaks a sitting's run into pieces wherever an
+    image of it was enhanced later.  The listing's own order is what comes
     back, minus what the stretches swallowed.
     """
     made = sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)

@@ -1,10 +1,10 @@
-"""Which version of the picture on screen is showing, and how to step it.
+"""Which version of the image on screen is showing, and how to step it.
 
 An enhanced image is several files: the original, and each level made from it.
 Shift+Left/Right in a slideshow moves within that one image rather than along the
-set, because a version is not a neighbor — you compare two versions of a picture
+set, because a version is not a neighbor — you compare two versions of an image
 by texture, which is exactly what cannot be told apart from memory, from a
-thumbnail or over a picture that is moving.
+thumbnail or over an image that is moving.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ class LevelStepper:
 
     def __init__(self) -> None:
         self._by_path: dict[str, list[Version]] = {}
-        # The picture being stepped, once stepping has started. Kept separately
+        # The image being stepped, once stepping has started. Kept separately
         # from what the caller offers, because the file on screen stops being
         # the one the set lists the image under the moment a level is showing.
         self._base: str | None = None
@@ -64,17 +64,17 @@ class LevelStepper:
                 if versions and versions[0].points_of_interest}
 
     def restart(self) -> None:
-        """Back to the top version, for a new picture."""
+        """Back to the top version, for a new image."""
         self.back_to_the_top()
         self._stepping = False
 
     def back_to_the_top(self) -> None:
-        """For a picture whose versions have just gone a level deeper."""
+        """For an image whose versions have just gone a level deeper."""
         self._base = None
         self._index = 0
 
     def step(self, delta: int, *, base: str):
-        """Move ``delta`` versions within the picture on screen and answer the
+        """Move ``delta`` versions within the image on screen and answer the
         one to show, or ``None`` when there is nothing to step.
 
         Nothing to step is an item with one version: the caller leaves the set
@@ -91,7 +91,7 @@ class LevelStepper:
         return versions[self._index]
 
     def levels(self, *, base: str) -> list[Version]:
-        """The versions of the picture on screen — what the HUD names one of."""
+        """The versions of the image on screen — what the HUD names one of."""
         return self._by_path.get(self._base or base) or []
 
     @property

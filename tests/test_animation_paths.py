@@ -6,7 +6,7 @@ import pytest
 from origenerator import animation_paths
 from origenerator.act_settings import GENAU, VIDEO
 from origenerator.content import EXAMPLE_CONTENT, load_content
-from origenerator.picture_states import state_names
+from origenerator.image_states import state_names
 
 # A small stand-in for the overlay's own table: two lanes, three acts, three states.
 _PATHS = {

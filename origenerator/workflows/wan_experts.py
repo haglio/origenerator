@@ -37,7 +37,7 @@ def wan_expert_model_params(defaults: dict) -> list[ParamDef]:
 
 def wan_expert_shift_param(defaults: dict) -> ParamDef:
     """One Composition Focus for both passes: two values would hand the
-    picture over at mismatched noise."""
+    result over at mismatched noise."""
     return ParamDef("shift_high", "Composition Focus", ParamType.FLOAT, defaults["shift_high"],
                     min_val=0.0, max_val=20.0, step=0.5, also_sets=("shift_low",), good=(5, 12))
 

@@ -1,4 +1,4 @@
-"""Every picture drawn beside the gallery is the size the Drop a video box draws it.
+"""Every thumbnail drawn beside the gallery is the size the Drop a video box draws it.
 
 His rule (2026-10-21): "all thumbnails aside from the ones in the Gallery view
 (which are bigger) should be the same size", the size the Combine drop box shows.
@@ -18,11 +18,11 @@ from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
 
 
-def _wide_picture(tmp_path) -> str:
+def _wide_thumbnail(tmp_path) -> str:
     path = tmp_path / "wide.png"
-    picture = QImage(300, 150, QImage.Format.Format_RGB32)
-    picture.fill(QColor("red"))
-    picture.save(str(path))
+    thumbnail = QImage(300, 150, QImage.Format.Format_RGB32)
+    thumbnail.fill(QColor("red"))
+    thumbnail.save(str(path))
     return str(path)
 
 
@@ -33,8 +33,8 @@ def _as_the_drop_box_draws_it(qtbot, path) -> QSize:
     return box._label.pixmap().size()
 
 
-def test_a_source_tile_draws_a_picture_the_size_the_drop_box_does(qtbot, tmp_path):
-    path = _wide_picture(tmp_path)
+def test_a_source_tile_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):
+    path = _wide_thumbnail(tmp_path)
     tile = SourceTile()
     qtbot.addWidget(tile)
 
@@ -43,8 +43,8 @@ def test_a_source_tile_draws_a_picture_the_size_the_drop_box_does(qtbot, tmp_pat
     assert tile._thumb.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)
 
 
-def test_the_animated_in_strip_draws_a_picture_the_size_the_drop_box_does(qtbot, tmp_path):
-    path = _wide_picture(tmp_path)
+def test_the_animated_in_strip_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):
+    path = _wide_thumbnail(tmp_path)
     strip = AnimatedVideoStrip()
     qtbot.addWidget(strip)
 
@@ -54,9 +54,9 @@ def test_the_animated_in_strip_draws_a_picture_the_size_the_drop_box_does(qtbot,
     assert tile.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)
 
 
-def test_an_enhancement_level_draws_a_picture_the_size_the_drop_box_does(qtbot, tmp_path):
-    path = _wide_picture(tmp_path)
+def test_an_enhancement_level_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):
+    path = _wide_thumbnail(tmp_path)
     row = _LevelRow(EnhanceLevel(1, "Enhance 1", {"filename": "wide.png"}, {}), 1, path)
     qtbot.addWidget(row)
 
-    assert row._picture.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)
+    assert row._thumbnail.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)

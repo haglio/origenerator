@@ -12,7 +12,7 @@ _DETECTOR_DROP_SIZE = 10      # rects smaller than this are noise, not anatomy
 _DETECTOR_NODE = re.compile(r"fix(\d+)_detector")
 
 
-def finding_nodes(index: int, fix: DetailFixPass, image_ref, picture_ref) -> tuple[dict, list]:
+def finding_nodes(index: int, fix: DetailFixPass, image_ref, original_ref) -> tuple[dict, list]:
     provider_id, segs_id = f"fix{index}_detector", f"fix{index}_segs"
     finder = finder_of(fix.part)
     nodes = {
@@ -35,7 +35,7 @@ def finding_nodes(index: int, fix: DetailFixPass, image_ref, picture_ref) -> tup
             },
         },
     }
-    nodes.update(points_of_interest.report_nodes(index, [segs_id, 0], picture_ref))
+    nodes.update(points_of_interest.report_nodes(index, [segs_id, 0], original_ref))
     return nodes, [segs_id, 0]
 
 

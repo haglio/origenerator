@@ -61,7 +61,7 @@ def _drawn_arrow_rules() -> str:
     """The arrows of the step buttons and of Generate's dropdown, as ``image:``
     rules over generated triangles.
 
-    Qt takes an arrow only as a picture — the CSS zero-size-element-with-borders triangle
+    Qt takes an arrow only as an image — the CSS zero-size-element-with-borders triangle
     draws a filled rectangle here, which is what appeared over the buttons — so
     :mod:`origenerator.spin_arrows` renders one. If it can't, this contributes
     nothing and Qt draws its own arrow: uncertain color, but an arrow.
@@ -183,7 +183,7 @@ def build_stylesheet() -> str:
        chosen Video/Genau lane simply vanished. So both states are stated here:
        the same hairline ring the fields wear, and inside it a light disc a
        couple of pixels short of that ring. The disc is a radial gradient because
-       Qt draws no shapes for a subcontrol and takes a picture only as a file
+       Qt draws no shapes for a subcontrol and takes an image only as a file
        (see _drawn_arrow_rules above); a gradient also stays crisp at any screen
        scale, and its two stops sit a hair apart rather than hard against each
        other so the disc's edge reads smooth instead of stepped. */

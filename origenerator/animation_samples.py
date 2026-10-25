@@ -1,5 +1,5 @@
 """Each animation's sample, and the order they are worked through: a video the
-user kept of that act from a picture sorted that way, most-kept first."""
+user kept of that act from an image sorted that way, most-kept first."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -18,9 +18,9 @@ def _made(row: dict) -> str:
     return row.get("created_at") or ""
 
 
-def _states_by_picture(rows: list[dict]) -> dict[str, str]:
+def _states_by_image(rows: list[dict]) -> dict[str, str]:
     return {
-        frame_name(file.get("filename")): row.get("picture_state") or ""
+        frame_name(file.get("filename")): row.get("image_state") or ""
         for row in rows
         if gallery.media_type_of_row(row) == MediaType.IMAGE
         for file in gallery.row_output_files(row)
@@ -40,7 +40,7 @@ def samples_by_path(rows: list[dict], *, content: dict | None = None
                      ) -> dict[Path, list[dict]]:
     """Every kept video that stands as a sample, by the animation it is one of,
     newest first; one serves the loop lane only if a looping workflow made it."""
-    states = _states_by_picture(rows)
+    states = _states_by_image(rows)
     found: dict[Path, list[dict]] = defaultdict(list)
     for clip in sorted(_kept_clips(rows), key=_made, reverse=True):
         act = act_of(clip)

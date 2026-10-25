@@ -184,7 +184,7 @@ class FunestraPane(QWidget):
                 time.sleep(_TICK_MS / 1000)
                 self._engine.push_still()
         except Exception:
-            logger.exception("A slideshow's picture stopped moving")
+            logger.exception("A slideshow's image stopped moving")
 
     def set_audio_muted(self, muted: bool) -> None:
         self._muted = muted

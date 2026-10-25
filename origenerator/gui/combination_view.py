@@ -2,14 +2,14 @@
 
 Two renderings of one look. :class:`CombinationView` is the live one, for a pane
 with room to loop the clip; :func:`combination_pixmap` is the same arithmetic as
-a still, for the surfaces that hold a picture rather than a widget — the queue
+a still, for the surfaces that hold a pixmap rather than a widget — the queue
 strip's corner and a folder's generating tile. They are together here because what
 they have to agree on is the look: a run in flight shows the same pair in all
 three places until ComfyUI streams a frame of the run itself, and three
 surfaces each drawing their own idea of it is what left one blurred, one blank
 and one missing its plus.
 
-What "Edit individual…" hands a tab is not a generation — it is a picture and a
+What "Edit individual…" hands a tab is not a generation — it is an image and a
 past video's settings, and nothing has been made from them yet. The form below
 holds the settings, but the pane above it had nothing to show and said so, with
 the same "select a generation to preview" a tab that had been pointed at nothing
@@ -18,7 +18,7 @@ left, a plus sign, and on the right the clip whose settings the run will follow,
 looping in gray (:mod:`origenerator.gui.grayscale`) because it lends the settings and
 not the result.
 
-Both pictures are square-fit into whatever height the pane has, side by side, so
+Both halves are square-fit into whatever height the pane has, side by side, so
 the pair reads as one line of arithmetic at any size the pane is dragged to.
 """
 from __future__ import annotations
@@ -45,30 +45,30 @@ from origenerator.gui.grayscale import play_grayscale
 from origenerator.gui.looping_preview import fit_size, looping_movie
 from origenerator.gui.queue_thumbs import fitted_cell
 
-# How much of the pane's height a picture takes, leaving room for the plus sign
+# How much of the pane's height a half takes, leaving room for the plus sign
 # to breathe between them and the pane's own margins around them.
 _HEIGHT_SHARE = 0.8
 _MARGIN = MARGIN_STANDARD
 
 
 def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
-    """The pair as one still picture, fitted into ``size`` — or ``None`` for a
+    """The pair as one still, fitted into ``size`` — or ``None`` for a
     run made from nothing, which is a plate the caller leaves alone.
 
     The same arithmetic :class:`CombinationView` lays out live: the frame, the
     plus, and the clip whose settings go with it, drained of color because it is
     not what is being made. Either half alone still draws, and the plus shows
-    only with both, since a lone picture is not a sum.
+    only with both, since a lone image is not a sum.
 
     A still rather than the widget because the surfaces that want it are a
     thumbnail-sized label apiece, redrawn on every poll — and the halves come
-    from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a picture the
+    from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a cell the
     strip has already scaled this second is not scaled again for the tile.
     """
-    both = bool(combination.picture and combination.source_video)
+    both = bool(combination.image and combination.source_video)
     enclosed = bool(combination.source_video) and combination.prompt_edited
     side = pair_side(size, both, enclosed)
-    image = fitted_cell(combination.picture, side)
+    image = fitted_cell(combination.image, side)
     source_video = fitted_cell(combination.source_video, side, gray=True)
     if image is None and source_video is None:
         return None
@@ -92,12 +92,12 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
 
 
 def _readable(path) -> QPixmap | None:
-    """The picture at ``path``, or ``None`` when there is none to load — a frame
+    """The pixmap at ``path``, or ``None`` when there is none to load — a frame
     the library has since moved is an ordinary case, not an error."""
     if not path or not Path(path).is_file():
         return None
-    picture = QPixmap(str(path))
-    return None if picture.isNull() else picture
+    pixmap = QPixmap(str(path))
+    return None if pixmap.isNull() else pixmap
 
 
 class CombinationView(QWidget):
@@ -136,14 +136,14 @@ class CombinationView(QWidget):
         layout.addStretch(1)
 
     def show_pair(self, combination: Combination) -> None:
-        """Show the picture beside its source video, looping in gray.
+        """Show the image beside its source video, looping in gray.
 
         Either may be missing — a curated act is pinned in the overlay and has no
         past video under it, and a frame can have moved — and the plus shows only
-        when both halves are there, since a lone picture is not a sum.
+        when both halves are there, since a lone image is not a sum.
         """
         self._stop_movie()
-        self._image_path = str(combination.picture) if combination.picture else None
+        self._image_path = str(combination.image) if combination.image else None
         self._video_path = str(combination.source_video) if combination.source_video else None
         self._pixmap = _readable(self._image_path)
         if self._pixmap is None:
@@ -182,7 +182,7 @@ class CombinationView(QWidget):
     # --- fitting ----------------------------------------------------------
 
     def _side(self) -> int:
-        """The square each picture is fitted into: a share of the pane's height,
+        """The square each half is fitted into: a share of the pane's height,
         and no wider than lets the pair, its plus and any parentheses fit across
         between the margins — the arithmetic :func:`combination_pixmap` draws by."""
         room = QSize(self.width() - 2 * _MARGIN, int(self.height() * _HEIGHT_SHARE))
@@ -205,8 +205,8 @@ class CombinationView(QWidget):
                 # Re-fit in place rather than rebuilding: a new movie would restart
                 # the loop from frame one on every pixel of a resize drag.
                 self._movie.setScaledSize(target)
-        for picture in (self.image_label, self.video_label):
-            picture.setFixedWidth(side)
+        for label in (self.image_label, self.video_label):
+            label.setFixedWidth(side)
         self.plus_label.setPixmap(glyph_pixmap("plus", plus_width(side), TEXT_MUTED))
         self.plus_label.setFixedWidth(plus_width(side))
         for paren in self._parens:

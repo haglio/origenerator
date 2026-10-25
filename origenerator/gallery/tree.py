@@ -21,7 +21,7 @@ Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
 (always), LoRA (always — collapsed to a single "(no LoRA)" folder when the
 workflow declares no LoRA keys, so every branch nests the same depth), and — for
-videos — the source image a video animates, i.e. which picture its start frame is
+videos — the source image a video animates, i.e. which image its start frame is
 (:func:`_input_image_config`). The settings group is the full key, so it nests
 beneath every projection. This module owns the grouping logic with no Qt
 dependency so it can be unit-tested directly.
@@ -74,7 +74,7 @@ from origenerator.gallery.signatures import (
     folder_signature,
     is_image_conditioned,
     lora_signature,
-    made_from_a_picture,
+    made_from_an_image,
     model_signature,
     parse_params,
     settings_only,
@@ -157,7 +157,7 @@ def folder_chain(row: dict, image_index: dict | None = None) -> tuple[str, ...]:
 
 
 def _grows_source_images(media_type: str, workflow_name: str) -> bool:
-    return media_type == MediaType.VIDEO and made_from_a_picture(workflow_name)
+    return media_type == MediaType.VIDEO and made_from_an_image(workflow_name)
 
 
 def _lora_place(workflow_name: str, params_json: str | None) -> str:
@@ -167,9 +167,9 @@ def _lora_place(workflow_name: str, params_json: str | None) -> str:
 
 def _source_image_place(workflow_name: str, params_json: str | None,
                         image_index: dict | None) -> str:
-    picture = _input_image_config(parse_params(params_json).get("input_image"), image_index,
-                                  identify=True)
-    return json.dumps([_lora_place(workflow_name, params_json), picture])
+    image = _input_image_config(parse_params(params_json).get("input_image"), image_index,
+                                identify=True)
+    return json.dumps([_lora_place(workflow_name, params_json), image])
 
 
 def legacy_parentless_folder_key(row: dict, level: str, image_index: dict | None = None) -> str:
@@ -349,7 +349,7 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
     (:func:`~origenerator.gallery.enhance.enhancement_recency`). An enhancement
     has no card of its own here — it is a version of an image, not an item beside
     one — so if it did not move the image, the work would be listed nowhere and
-    the picture being worked on could sit a thousand tiles down, unfindable. What
+    the image being worked on could sit a thousand tiles down, unfindable. What
     an image is having done to it is the newest thing about it.
 
     Nothing is capped here: the collection keeps going as far back as the user has ever
@@ -455,7 +455,7 @@ def enhanced_generations(rows: list[dict]) -> list[dict]:
 
 def requested_generations(records: list[dict], rows: list[dict]) -> list[dict]:
     """Each request paired with what it made, newest first — the Requests collection's
-    list. Spoken, or typed as one picture of a folder-wide rewrite: both leave
+    list. Spoken, or typed as one image of a folder-wide rewrite: both leave
     the same record, and both belong in the collection of things you asked for.
 
     ``records`` are the rows :meth:`Database.list_requests` returns; each gains
@@ -464,7 +464,7 @@ def requested_generations(records: list[dict], rows: list[dict]) -> list[dict]:
     generation is kept, unlike the other collections' listings — a request you have
     just spoken should appear at once, and the whole of what this collection shows
     about it (what was heard, what changed in the prompt) is readable before
-    there is a picture to look at.
+    there is an image to look at.
 
     A record whose generation is gone is skipped rather than dropped from the
     table: a delete here is undoable, so the request has to be waiting if the
@@ -498,7 +498,7 @@ class _Tier:
 
     The media type and the workflow name are the two halves of every key below;
     ``folder_meta`` is the names and stars the folders carry; ``image_index``
-    resolves a start frame to the picture it is. All four used to travel as four
+    resolves a start frame to the image it is. All four used to travel as four
     parameters through five builders that each handed them on untouched, and
     every builder's `children_for` lambda had to list them again.
     """
@@ -594,7 +594,7 @@ def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
 
 def _build_source_image_groups(tier: _Tier, rows: list[dict]) -> list[SourceImageGroup]:
     """The source-image folders under one model/LoRA folder: videos split by the
-    picture they animate, each holding its settings leaves."""
+    image they animate, each holding its settings leaves."""
     return _grouped_folders(
         tier, rows, cls=SourceImageGroup,
         signature=lambda r: _source_image_place(tier.workflow_name, r.get("params_json"),
@@ -648,7 +648,7 @@ def start_frame_index(rows: list[dict]) -> dict:
 
     Hand this to :func:`build_gallery_tree` wherever the tree is built from a
     *slice* of the library — one shape's rows, say. The key of a video's folder
-    names the picture it animates, and that picture can perfectly well be on the
+    names the image it animates, and that image can perfectly well be on the
     other side of the split (a portrait frame with the size unlocked to a
     landscape clip, or a run placed by the size it asked for while its frame is
     measured). An index built from the slice alone misses it, and keys the folder

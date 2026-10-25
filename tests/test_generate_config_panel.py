@@ -63,7 +63,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
-from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
+from tests.thumbnail_rows import looping_clip, painted_row, where_the_thumbnail_is
 
 
 @pytest.fixture
@@ -126,7 +126,7 @@ def test_the_panel_is_one_column_with_no_side_pane(panel):
 
 
 def test_the_column_reads_preview_then_generate_then_settings(panel):
-    """Generate heads the settings under the line below the picture, rather
+    """Generate heads the settings under the line below the preview, rather
     than trailing them in the lower right corner, where Windows pops up its
     notices over whatever is there."""
     panel.show()
@@ -147,7 +147,7 @@ def test_the_column_reads_preview_then_generate_then_settings(panel):
 
 
 def test_a_thick_border_held_still_parts_generate_from_the_settings(panel):
-    """As thick as the border under the picture and as wide as the tab, but
+    """As thick as the border under the preview and as wide as the tab, but
     no handle: dragging it could only move Generate the way the border above
     it already does."""
     panel.show()
@@ -182,10 +182,10 @@ def test_the_border_under_generate_wears_the_gray_of_the_one_above_it(app_chrome
     assert gray(panel._settings_border) == gray(panel._media_split.handle(1))
 
 
-def test_the_picture_and_the_settings_share_the_column_by_what_each_asks_for(panel):
+def test_the_preview_and_the_settings_share_the_column_by_what_each_asks_for(panel):
     """Generate rides on top of the settings, so weighing them at four parts to
-    the picture's three, as when the button sat under them, took a tenth of
-    the picture's height away."""
+    the preview's three, as when the button sat under them, took a tenth of
+    the preview's height away."""
     panel.show()
     panel.resize(700, 1000)
     QApplication.processEvents()
@@ -197,7 +197,7 @@ def test_the_picture_and_the_settings_share_the_column_by_what_each_asks_for(pan
 
 
 def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(panel):
-    """So a tall picture can be given the room it wants without the form being
+    """So a tall item can be given the room it wants without the form being
     pinned to a ratio someone else chose — like every other pane boundary."""
     split = panel._media_split
 
@@ -663,7 +663,7 @@ def test_a_video_tabs_seed_dropdown_plays_the_videos_it_lists(blank_panel, qtbot
     field = panel._param_form._widgets["noise_seed"]
     field.showPopup()
     first = painted_row(field, 0)
-    middle = where_the_picture_is(first).center()
+    middle = where_the_thumbnail_is(first).center()
 
     qtbot.waitUntil(lambda: painted_row(field, 0).pixel(middle) != first.pixel(middle),
                     timeout=3000)
@@ -852,7 +852,7 @@ def test_generate_sends_the_random_seed_on_show_and_then_shows_the_next_one(pane
     assert panel._param_form.seed_is_random() is True
 
 
-def test_a_tab_with_no_picture_to_start_from_grays_generate_and_says_why(qtbot, tmp_path):
+def test_a_tab_with_no_image_to_start_from_grays_generate_and_says_why(qtbot, tmp_path):
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
 
@@ -863,7 +863,7 @@ def test_a_tab_with_no_picture_to_start_from_grays_generate_and_says_why(qtbot, 
     assert panel._generate_btn.toolTip() == "Nothing to start from — pick an Image first"
 
 
-def test_picking_the_picture_to_start_from_lights_generate(qtbot, tmp_path):
+def test_picking_the_image_to_start_from_lights_generate(qtbot, tmp_path):
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
     panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
@@ -875,7 +875,7 @@ def test_picking_the_picture_to_start_from_lights_generate(qtbot, tmp_path):
     assert panel._generate_btn.toolTip() == ""
 
 
-def test_a_tab_opened_on_a_video_that_names_its_start_picture_can_generate(saved_panel):
+def test_a_tab_opened_on_a_video_that_names_its_start_image_can_generate(saved_panel):
     panel, db = saved_panel
 
     panel.show_saved_generation(_video_row(db, input_image="frame.png [output]"), [])
@@ -1150,7 +1150,7 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
     assert panel._preview._generation == "g1"  # its preview can be dragged onto combine
 
 
-def test_a_picture_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
+def test_an_image_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
         qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     db.insert_generation(
@@ -1225,7 +1225,7 @@ def test_unticking_random_on_a_clip_on_display_puts_its_own_seed_back(saved_pane
     assert panel._param_form.get_values()["noise_seed"] == 22
 
 
-def test_a_tab_showing_a_still_wears_its_picture_in_the_seed_field(saved_panel, tmp_path):
+def test_a_tab_showing_a_still_wears_its_thumbnail_in_the_seed_field(saved_panel, tmp_path):
     panel, db = saved_panel
     thumbnail = tmp_path / "made.png"
     red = QPixmap(40, 40)
@@ -1236,8 +1236,8 @@ def test_a_tab_showing_a_still_wears_its_picture_in_the_seed_field(saved_panel, 
 
     panel.show_saved_generation(db.get_generation("img1"), [])
 
-    picture = panel._param_form._widgets["seed"]._picture.pixmap().toImage()
-    assert picture.pixelColor(picture.width() // 2, picture.height() // 2) == QColor("red")
+    image = panel._param_form._widgets["seed"]._thumbnail.pixmap().toImage()
+    assert image.pixelColor(image.width() // 2, image.height() // 2) == QColor("red")
 
 
 def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
@@ -1396,7 +1396,7 @@ def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):
 
     panel.show_saved_generation(row, [row])
 
-    # The item's own picture, at its own size — not one of the drawn glyphs.
+    # The item's own image, at its own size — not one of the drawn glyphs.
     assert panel.tab_icon().availableSizes() == [QSize(4, 4)]
 
 
@@ -1721,8 +1721,8 @@ def test_each_level_carries_its_own_file_row(saved_panel):
 
 
 def test_the_way_to_the_folder_is_one_button_at_the_top(saved_panel):
-    # Every version of a picture is in the same folder, so going there is the
-    # picture's act rather than any one file's: one button, in the block above
+    # Every version of an image is in the same folder, so going there is the
+    # image's act rather than any one file's: one button, in the block above
     # the settings, and none among the file rows where Show in Explorer — which
     # names a different file each time — belongs.
     panel, db = saved_panel
@@ -1761,7 +1761,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
                                                         monkeypatch):
     # The pane at the top of the tab is where this app shows what is being made,
     # and an enhancement of the image on display is being made — it used to be
-    # the one surface that sat on the old picture while the little row streamed.
+    # the one surface that sat on the old image while the little row streamed.
 
     panel, db = saved_panel
     output_dir = tmp_path / "out"
@@ -1861,7 +1861,7 @@ def test_up_onto_the_enhance_row_and_enter_asks_for_an_enhance_of_the_image(save
 
 
 def test_the_preview_carries_the_shown_generations_corner_controls(saved_panel):
-    # The acts on a generation belong on its picture, not in a bank under the
+    # The acts on a generation belong on its image, not in a bank under the
     # settings — the same three corners a gallery thumbnail of it wears.
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
@@ -1964,7 +1964,7 @@ def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
 
 def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
         saved_panel, monkeypatch):
-    # Settings that have generated nothing put up no picture, and the footer of
+    # Settings that have generated nothing put up no image, and the footer of
     # whatever was on display before it must not be left stranded there — it
     # names a file that is no longer on screen.
     panel, db = saved_panel
@@ -1982,7 +1982,7 @@ def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
 
 
 def _wizard_panel(qtbot, tmp_path, monkeypatch):
-    """A tab over one finished picture, filed in the folder ``_wiz_params`` names
+    """A tab over one finished image, filed in the folder ``_wiz_params`` names
     — its workflow version and all — with its file on disk, so the tab can put
     it up."""
     output = tmp_path / "out"
@@ -2001,7 +2001,7 @@ def _wizard_panel(qtbot, tmp_path, monkeypatch):
     return panel, db
 
 
-def test_a_picture_the_tab_puts_up_itself_carries_its_own_file_row(
+def test_an_image_the_tab_puts_up_itself_carries_its_own_file_row(
         qtbot, tmp_path, monkeypatch):
     # The newest result of these settings is a real generation, not a peek: you
     # reach its file from it exactly as from one you clicked — which is what
@@ -2291,9 +2291,9 @@ def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_pa
                                                          "vid1")
 
 
-def test_a_click_puts_up_only_the_picture_it_was_on(qtbot, tmp_path, monkeypatch):
+def test_a_click_puts_up_only_the_image_it_was_on(qtbot, tmp_path, monkeypatch):
     # Seeding the form from the clicked item used to put up the newest result of
-    # its settings on the way — its picture, and its versions' pictures under the
+    # its settings on the way — its image, and its versions' images under the
     # settings — for the click to replace all of it at once. Nobody saw that one;
     # every click waited for it.
     panel, db = _wizard_panel(qtbot, tmp_path, monkeypatch)
@@ -2329,7 +2329,7 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
 # --- the modified notice: the preview no longer answers the form -------------
 
 def _notice(panel):
-    """What the preview is saying over its picture, or "" when it says nothing."""
+    """What the preview is saying over its image, or "" when it says nothing."""
     return "" if panel._preview._notice.isHidden() else panel._preview._notice.text()
 
 
@@ -2338,7 +2338,7 @@ def _set_prompt(panel, text):
 
 
 def test_a_browsed_generation_arrives_unmarked(saved_panel):
-    # The form was just seeded from this row, so the picture is exactly what
+    # The form was just seeded from this row, so the image is exactly what
     # these settings make: nothing to warn about.
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
@@ -2346,7 +2346,7 @@ def test_a_browsed_generation_arrives_unmarked(saved_panel):
     assert _notice(panel) == ""
 
 
-def test_editing_a_setting_marks_the_picture_as_not_generated_yet(saved_panel):
+def test_editing_a_setting_marks_the_image_as_not_generated_yet(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
@@ -2481,7 +2481,7 @@ def test_selecting_a_workflow_after_such_a_video_clears_the_note_and_brings_gene
     assert panel._generate_pair.isEnabled()
 
 
-def _picture_made_with(db, checkpoint, prompt_id="img9"):
+def _image_made_with(db, checkpoint, prompt_id="img9"):
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt="scene one", seed=1, checkpoint=checkpoint)
     db.insert_generation(
@@ -2493,12 +2493,12 @@ def _picture_made_with(db, checkpoint, prompt_id="img9"):
     return db.get_generation(prompt_id)
 
 
-def test_a_picture_made_with_a_model_that_is_not_installed_says_so_under_the_workflow_dropdown(
+def test_an_image_made_with_a_model_that_is_not_installed_says_so_under_the_workflow_dropdown(
         installed_models, saved_panel):
     panel, db = saved_panel
-    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
+    image = _image_made_with(db, "retired_checkpoint.safetensors")
 
-    panel.show_saved_generation(picture, [picture])
+    panel.show_saved_generation(image, [image])
 
     assert _note(panel) == ("This was made with retired_checkpoint, which isn't installed "
                             "anymore, so no new ones can be made with it until an installed one "
@@ -2509,8 +2509,8 @@ def test_a_picture_made_with_a_model_that_is_not_installed_says_so_under_the_wor
 def test_the_note_sits_between_the_workflow_dropdown_and_the_settings_under_it(
         installed_models, saved_panel):
     panel, db = saved_panel
-    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
-    panel.show_saved_generation(picture, [picture])
+    image = _image_made_with(db, "retired_checkpoint.safetensors")
+    panel.show_saved_generation(image, [image])
     panel.show()
     panel.resize(700, 1600)
     QApplication.processEvents()
@@ -2528,8 +2528,8 @@ def test_the_note_sits_between_the_workflow_dropdown_and_the_settings_under_it(
 
 def test_the_note_wears_the_amber_of_a_warning(app_chrome, installed_models, saved_panel):
     panel, db = saved_panel
-    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
-    panel.show_saved_generation(picture, [picture])
+    image = _image_made_with(db, "retired_checkpoint.safetensors")
+    panel.show_saved_generation(image, [image])
     note = panel._cannot_remake_note
 
     note.ensurePolished()
@@ -2540,9 +2540,9 @@ def test_the_note_wears_the_amber_of_a_warning(app_chrome, installed_models, sav
 def test_a_long_model_name_in_the_note_wraps_rather_than_scrolling_sideways(
         installed_models, saved_panel):
     panel, db = saved_panel
-    picture = _picture_made_with(
+    image = _image_made_with(
         db, "an_invented_checkpoint_whose_name_runs_on_and_on_and_on_v1.safetensors")
-    panel.show_saved_generation(picture, [picture])
+    panel.show_saved_generation(image, [image])
     panel.show()
 
     panel.resize(300, 800)
@@ -2555,8 +2555,8 @@ def test_a_long_model_name_in_the_note_wraps_rather_than_scrolling_sideways(
 def test_the_missing_models_field_wears_a_warning_that_puts_an_installed_one_in_its_place(
         installed_models, saved_panel):
     panel, db = saved_panel
-    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
-    panel.show_saved_generation(picture, [picture])
+    image = _image_made_with(db, "retired_checkpoint.safetensors")
+    panel.show_saved_generation(image, [image])
     mark = panel._param_form._warning_marks["checkpoint"]
     assert not mark.isHidden()
     assert mark.toolTip() == ("Not installed anymore, so nothing can be made with it. "
@@ -2572,8 +2572,8 @@ def test_the_missing_models_field_wears_a_warning_that_puts_an_installed_one_in_
 def test_generate_is_grayed_out_while_the_form_names_a_model_that_is_not_installed(
         installed_models, saved_panel):
     panel, db = saved_panel
-    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
-    panel.show_saved_generation(picture, [picture])
+    image = _image_made_with(db, "retired_checkpoint.safetensors")
+    panel.show_saved_generation(image, [image])
 
     _set_prompt(panel, "scene two")
 
@@ -2584,8 +2584,8 @@ def test_generate_is_grayed_out_while_the_form_names_a_model_that_is_not_install
 
 def test_picking_an_installed_model_brings_generate_back(installed_models, saved_panel):
     panel, db = saved_panel
-    picture = _picture_made_with(db, "retired_checkpoint.safetensors")
-    panel.show_saved_generation(picture, [picture])
+    image = _image_made_with(db, "retired_checkpoint.safetensors")
+    panel.show_saved_generation(image, [image])
     checkpoint = panel._param_form._widgets["checkpoint"]
 
     checkpoint.setCurrentIndex(
@@ -2629,7 +2629,7 @@ def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
 
 
 def test_re_rolling_the_seed_marks_it_too(saved_panel):
-    # Same prompt, but the run would draw a different seed — so the picture on
+    # Same prompt, but the run would draw a different seed — so the image on
     # screen is not what Generate would make either.
     panel, db = saved_panel
     image = _image_row(db, "img1")
@@ -2641,7 +2641,7 @@ def test_re_rolling_the_seed_marks_it_too(saved_panel):
 
 
 def test_a_tab_with_nothing_on_display_is_never_marked(panel):
-    # No picture, nothing to be modified away from — a fresh tab's form is
+    # No image, nothing to be modified away from — a fresh tab's form is
     # edited constantly and must not carry a warning about an empty pane.
     _set_prompt(panel, "a dog")
     assert panel._displayed_row is None
@@ -2659,7 +2659,7 @@ def _resting_on(panel, image, monkeypatch, tmp_path):
 def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
     saved_panel, monkeypatch, tmp_path
 ):
-    # The pane's resting picture is this config's newest result, so it stops
+    # The pane's resting image is this config's newest result, so it stops
     # matching the moment the settings do.
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
@@ -2698,7 +2698,7 @@ def test_switching_workflow_leaves_no_stale_mark(saved_panel):
 
 def _frame_bytes(tmp_path, size: int = 8) -> bytes:
     """One encoded preview frame, as ComfyUI streams them over the websocket.
-    ``size`` only varies the picture, so two calls make two distinct frames."""
+    ``size`` only varies the image, so two calls make two distinct frames."""
     path = tmp_path / f"frame{size}.png"
     pixmap = QPixmap(size, 6)
     pixmap.fill()
@@ -2708,7 +2708,7 @@ def _frame_bytes(tmp_path, size: int = 8) -> bytes:
 
 def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_path):
     # An enhancement is not a run of these settings — it is the coming state of
-    # the very picture they are being edited away from — so the mark holds over
+    # the very image they are being edited away from — so the mark holds over
     # its frames. Clearing it per frame left the two trading places several
     # times a second while the form was typed in.
     panel, db = saved_panel
@@ -2732,7 +2732,7 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
     # The enhancement folds into the row the tab is showing — the image gains a
     # version, and nothing about the settings moves. So the edits made while it
     # cooked are still edits, and the mark saying so stays up rather than being
-    # wiped by the picture arriving. Re-taking the mark here read those very
+    # wiped by the image arriving. Re-taking the mark here read those very
     # edits as the new baseline.
     panel, db = saved_panel
     output_dir = tmp_path / "out"
@@ -2755,7 +2755,7 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
 
 def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
     # Pressing Generate on modified settings streams the run into this pane; the
-    # frames are the answer, so the warning about the old picture goes with them.
+    # frames are the answer, so the warning about the old image goes with them.
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
@@ -2824,7 +2824,7 @@ def test_a_video_just_clicked_says_generate_will_draw_a_random_seed(saved_panel,
     qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
 
 
-def test_a_tab_on_an_imported_pictures_own_settings_says_generate_will_draw_a_random_seed(
+def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_random_seed(
         saved_panel, qtbot):
     # Wherever the item on display came from, the notice gone means these are
     # the settings it was made with, and the button says so the same way.
@@ -3004,11 +3004,11 @@ def test_the_tab_is_named_after_the_folder_it_asks_about(requesting):
     assert requesting.title() == f"Request {_FOLDER_LABEL}"
 
 
-def test_a_request_tab_offers_no_corners_over_its_wall_of_pictures(
+def test_a_request_tab_offers_no_corners_over_its_wall_of_thumbnails(
         saved_panel, tmp_path, monkeypatch):
     # Audit §3 bug 15, signed off and fixed 2026-08-31: the wall used to keep
     # the corners of whichever generation the tab had been showing, so trash
-    # there binned a picture the user was not looking at.
+    # there binned an image the user was not looking at.
     panel, db = saved_panel
     image = _image_row(db, "img1")
     monkeypatch.setattr(gcp_module, "resolve_preview",
@@ -3027,7 +3027,7 @@ def test_a_request_tab_offers_no_corners_over_its_wall_of_pictures(
 
 
 def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(requesting):
-    # The corners are re-armed after every change to the picture, and the
+    # The corners are re-armed after every change to the image, and the
     # gallery pushes enhance settings on a poll — so the fix has to hold past
     # the next one rather than only at the moment the wall goes up.
     requesting.set_enhance_settings(gallery.EnhanceSettings(auto=True))
@@ -3535,7 +3535,7 @@ def test_every_lane_stamps_a_column_the_database_actually_writes(saved_panel):
 def test_generate_is_off_while_its_folder_is_already_making_one(panel, qtbot):
     # His rule: one item at a time per folder. The app has been slow enough that
     # he double-clicks Generate to be sure the press took, and the second press
-    # used to make a second picture nobody asked for.
+    # used to make a second image nobody asked for.
     panel.set_making_one_check(
         lambda config: config.params["positive_prompt"] == "a folder making one")
     prompt = panel._param_form._widgets["positive_prompt"]
@@ -3582,13 +3582,13 @@ def _drawing_settings(panel):
     return values["sampler_name"], values["scheduler"], values["steps"], values["cfg"]
 
 
-def test_a_fresh_picture_starts_on_its_models_recommended_settings(blank_panel, recommended):
+def test_a_fresh_image_starts_on_its_models_recommended_settings(blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 
     assert _drawing_settings(blank_panel) == ("euler_ancestral", "normal", 30, 4.0)
 
 
-def test_picking_another_model_for_a_fresh_picture_takes_that_models_settings(
+def test_picking_another_model_for_a_fresh_image_takes_that_models_settings(
         blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 
@@ -3597,7 +3597,7 @@ def test_picking_another_model_for_a_fresh_picture_takes_that_models_settings(
     assert _drawing_settings(blank_panel) == ("dpmpp_2m", "karras", 35, 5.0)
 
 
-def test_picking_another_model_for_a_shown_picture_keeps_its_settings(recommended, saved_panel):
+def test_picking_another_model_for_a_shown_image_keeps_its_settings(recommended, saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
@@ -3728,7 +3728,7 @@ def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtb
     assert {left(section.warning) for section in shown} == {left(panel._workflow_warning)}
 
 
-def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
+def test_a_fresh_images_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 
     form = blank_panel._param_form
@@ -3736,9 +3736,9 @@ def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_p
                     if form._widgets[key].itemIcon(i).cacheKey() == icons.thumbs_up_icon().cacheKey()}
               for key in ("sampler_name", "scheduler")}
     assert marked == {"sampler_name": {"euler_ancestral"}, "scheduler": {"normal"}}
-def test_saying_what_the_shown_picture_shows_lands_on_its_row(saved_panel):
+def test_saying_what_the_shown_image_shows_lands_on_its_row(saved_panel):
     """The same column the sorting window writes, reachable from the tab the
-    picture is being looked at on."""
+    image is being looked at on."""
     panel, db = saved_panel
     image = _image_row(db, "img9")
     states = panel._action.offered()
@@ -3746,10 +3746,10 @@ def test_saying_what_the_shown_picture_shows_lands_on_its_row(saved_panel):
     panel.show_saved_generation(image, [image])
     panel._action.pick(states[1])
 
-    assert db.get_generation("img9")["picture_state"] == states[1]
+    assert db.get_generation("img9")["image_state"] == states[1]
 
 
-def test_taking_that_answer_back_leaves_the_picture_unsorted_again(saved_panel):
+def test_taking_that_answer_back_leaves_the_image_unsorted_again(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img9")
     states = panel._action.offered()
@@ -3758,7 +3758,7 @@ def test_taking_that_answer_back_leaves_the_picture_unsorted_again(saved_panel):
 
     panel._action.pick("")
 
-    assert db.get_generation("img9")["picture_state"] is None
+    assert db.get_generation("img9")["image_state"] is None
 
 
 def test_a_video_on_the_tab_is_offered_the_acts_opened_on_its_own(saved_panel):
@@ -3782,8 +3782,8 @@ def test_saying_what_act_the_shown_video_is_lands_on_its_row(saved_panel):
     assert db.get_generation("vid9")["act"] == CATEGORIES[1]
 
 
-def test_the_picture_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_path, monkeypatch,
-                                                                    installed_models):
+def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_path, monkeypatch,
+                                                                  installed_models):
     output_dir = tmp_path / "output"
     (output_dir / "image").mkdir(parents=True)
     Image.new("RGB", (8, 8), (10, 20, 30)).save(output_dir / "image" / "sdxl_img1.png")

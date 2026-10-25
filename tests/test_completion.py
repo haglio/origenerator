@@ -185,7 +185,7 @@ def test_a_script_that_cannot_be_written_never_strands_a_finished_video(tmp_path
 
 def test_a_finished_run_is_filed_in_the_library_before_its_thumbnail_is_drawn(tmp_path):
     library = tmp_path / "library"
-    places = OutputPlaces(comfyui=tmp_path / "comfyui saves", pictures=library / "pictures",
+    places = OutputPlaces(comfyui=tmp_path / "comfyui saves", images=library / "images",
                           videos=library / "videos", scripts=library / "scripts",
                           audio=library / "sounds")
     waiting = places.run("n1") / "image"
@@ -197,5 +197,5 @@ def test_a_finished_run_is_filed_in_the_library_before_its_thumbnail_is_drawn(tm
     files, thumb, _duration = extract_completion(SDXL, history, places, tmp_path / "thumbs", "n1")
 
     assert files == [{"filename": "sdxl_t2i_00001_.png", "subfolder": "image", "type": "output"}]
-    assert (places.pictures / "sdxl_t2i_00001_.png").is_file()
+    assert (places.images / "sdxl_t2i_00001_.png").is_file()
     assert thumb is not None and Path(thumb).is_file()

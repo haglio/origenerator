@@ -121,7 +121,7 @@ def test_config_tab_title_handles_unknown_workflow():
     assert config_tab_title("nope", {}) == "nope"
 
 
-def test_job_kind_separates_a_video_from_a_picture():
+def test_job_kind_separates_a_video_from_an_image():
     # What the queue's rows lead with, because it is what a job costs: seconds
     # against minutes.
     assert job_kind_label("sdxl_t2i") == "Image"
@@ -289,17 +289,17 @@ def test_whether_a_row_produced_a_file_is_read_once_however_often_it_is_asked(mo
     assert reads == [files]
 
 
-def test_the_start_frame_index_reads_each_pictures_file_list_once_across_rebuilds(monkeypatch):
+def test_the_start_frame_index_reads_each_images_file_list_once_across_rebuilds(monkeypatch):
     reads = []
     real = gallery_output.parse_file_list
     monkeypatch.setattr(gallery_output, "parse_file_list",
                         lambda raw: reads.append(raw) or real(raw))
-    picture = _img("indexed_once", "a picture indexed once", 30, 1)
+    image = _img("indexed_once", "an image indexed once", 30, 1)
 
     for _ in range(3):
-        assert "sdxl_t2i_indexed_once.png" in build_image_config_index([dict(picture)])
+        assert "sdxl_t2i_indexed_once.png" in build_image_config_index([dict(image)])
 
-    assert reads.count(picture["output_files"]) == 1
+    assert reads.count(image["output_files"]) == 1
 
 
 def test_a_rows_settings_signature_is_worked_out_once_however_often_it_is_asked(monkeypatch):
@@ -371,10 +371,10 @@ def test_settings_signature_drops_input_image_for_an_unknown_workflow():
     assert settings_signature(None, a) != settings_signature(None, c)  # a real setting differs
 
 
-def test_settings_signature_folds_which_picture_the_start_frame_is_for_i2v():
-    # A video groups by the *picture* it animates: two videos with identical video
-    # settings split whenever their frames are different pictures — even two draws
-    # of one prompt, which are two pictures however alike the settings were.
+def test_settings_signature_folds_which_image_the_start_frame_is_for_i2v():
+    # A video groups by the *image* it animates: two videos with identical video
+    # settings split whenever their frames are different images — even two draws
+    # of one prompt, which are two images however alike the settings were.
     face1 = _img("face1", "a face", 30, 1)      # sdxl_t2i_face1.png
     face2 = _img("face2", "a face", 30, 2)      # same image config, a second draw
     scene = _img("scene", "a landscape", 30, 1)  # a differently configured frame
@@ -386,14 +386,14 @@ def test_settings_signature_folds_which_picture_the_start_frame_is_for_i2v():
     sig_face1 = settings_signature("wan22_i2v", vid("sdxl_t2i_face1.png"), index)
     sig_face2 = settings_signature("wan22_i2v", vid("sdxl_t2i_face2.png"), index)
     sig_scene = settings_signature("wan22_i2v", vid("sdxl_t2i_scene.png"), index)
-    assert sig_face1 != sig_face2  # a second draw is a second picture -> its own folder
+    assert sig_face1 != sig_face2  # a second draw is a second image -> its own folder
     assert sig_face1 != sig_scene  # and so is an unrelated frame
 
 
 def test_settings_signature_folds_the_frames_config_for_an_image_result():
     # An enhance is image-conditioned too, but its results live in the Images tree,
     # which has no source-image tier — so a batch of enhances stays one folder of
-    # work rather than fragmenting into one folder per picture.
+    # work rather than fragmenting into one folder per image.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)
     index = build_image_config_index([face1, face2])
@@ -656,8 +656,8 @@ def test_a_video_reroll_on_the_same_frame_stays_in_its_folder():
 
 
 def test_a_video_reroll_on_a_fresh_frame_opens_that_frames_own_folder():
-    # Re-drawing the start frame makes a different picture, and a source-image
-    # folder holds one picture — so the new video files under the new frame rather
+    # Re-drawing the start frame makes a different image, and a source-image
+    # folder holds one image — so the new video files under the new frame rather
     # than joining the old one's folder.
 
     frame_a = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
@@ -1022,10 +1022,10 @@ def test_i2v_videos_split_into_a_folder_per_input_image_config():
     }
 
 
-def test_every_video_in_a_source_folder_animates_the_one_picture():
+def test_every_video_in_a_source_folder_animates_the_one_image():
     # The tier's whole promise: open any settings folder inside a source-image
     # folder and every video in it ran on that one frame. Two draws of a single
-    # prompt are two pictures, so they get two folders however alike their settings.
+    # prompt are two images, so they get two folders however alike their settings.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)  # a second draw of the same settings
     sources = _i2v_source_folders([
@@ -1039,8 +1039,8 @@ def test_every_video_in_a_source_folder_animates_the_one_picture():
 
 
 def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
-    # Their prompts are identical, so their pictures share a folder, and the
-    # number each picture has there is what tells the two apart.
+    # Their prompts are identical, so their images share a folder, and the
+    # number each image has there is what tells the two apart.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)
     first, second = _i2v_source_folders([
@@ -1052,8 +1052,8 @@ def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
 
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():
-    # The name that picture's own tile and tab wear, so the two read as one
-    # picture from either side.
+    # The name that image's own tile and tab wear, so the two read as one
+    # image from either side.
     face = _img("face", "a smiling face", 30, 1)
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
     (source,) = _i2v_source_folders(rows, name_of={"face": "3FA9C0D2 004"}.get)
@@ -1727,7 +1727,7 @@ def _enhance_run(prompt_id, source_file, row_id, *, done=None):
 def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
     # An enhancement gets no card of its own in the collection — it is a version of an
     # image, not an item beside one — so the image itself has to move, or the run
-    # is listed nowhere and the picture being worked on stays buried under
+    # is listed nowhere and the image being worked on stays buried under
     # everything made since.
     running = _enhance_run("e1", "sdxl_t2i_i1.png", 4)
     rows = [running] + _collection(("i3", 3), ("i2", 2), ("i1", 1))
@@ -1870,7 +1870,7 @@ def test_a_custom_name_replaces_the_code():
     assert named.label == "Cats"
 
 
-def test_a_picture_previews_from_its_own_full_file(tmp_path):
+def test_an_image_previews_from_its_own_full_file(tmp_path):
     out = tmp_path / "output"
     (out / "image").mkdir(parents=True)
     full = out / "image" / "sdxl_t2i_1_.png"
@@ -1954,18 +1954,18 @@ def test_output_disk_files_includes_a_video_metadata_sidecar(tmp_path):
     assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [mp4, sidecar]
 
 
-def test_deleting_a_video_takes_its_soundless_copy_and_that_copys_picture_along(tmp_path):
+def test_deleting_a_video_takes_its_soundless_copy_and_that_copys_still_along(tmp_path):
     out = tmp_path / "output"
     (out / "video").mkdir(parents=True)
     sounded = out / "video" / "flf2v_loop_1-audio.mp4"
     soundless = out / "video" / "flf2v_loop_1.mp4"
-    picture = out / "video" / "flf2v_loop_1.png"
-    for file in (sounded, soundless, picture):
+    still = out / "video" / "flf2v_loop_1.png"
+    for file in (sounded, soundless, still):
         file.write_bytes(b"v")
     row = _row(output_files=json.dumps([
         {"filename": "flf2v_loop_1-audio.mp4", "subfolder": "video"},
         {"filename": "flf2v_loop_1.mp4", "subfolder": "video", "role": "silent"}]))
-    assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [sounded, soundless, picture]
+    assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [sounded, soundless, still]
 
 
 def test_output_disk_files_omits_files_not_on_disk(tmp_path):

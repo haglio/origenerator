@@ -1,7 +1,7 @@
 """Re-deriving the base render an inline enhance threw away, while the app is shut.
 
 Before enhancement became a layer, a workflow with ``enhance`` on saved only the
-finished picture: the base render was made on the way through and discarded, so
+finished image: the base render was made on the way through and discarded, so
 those rows carry one file and no "before" to compare it against.
 
 They are recoverable, because they are reproducible. Diffusion is deterministic

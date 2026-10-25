@@ -14,8 +14,8 @@ from origenerator.gui.action_picker import ACTION_LABEL
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.pictured_dropdown import PICTURES_ROLE
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui.thumbnail_dropdown import THUMBNAILS_ROLE
 
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
@@ -34,14 +34,14 @@ class _Uses:
         return list(dict.fromkeys(newest_first))
 
 
-def _panel(qtbot, start_pictures=None, *, fitting=None, preview=None, uses=None):
-    """Pictures are ``img*`` and videos ``vid*``; a video lends the image slot the
-    picture ``start_pictures`` names for it, and nothing when it names none.
+def _panel(qtbot, start_images=None, *, fitting=None, preview=None, uses=None):
+    """Images are ``img*`` and videos ``vid*``; a video lends the image slot the
+    image ``start_images`` names for it, and nothing when it names none.
     ``fitting`` narrows the videos the video slot takes to the ones it holds."""
-    start_pictures = start_pictures or {}
+    start_images = start_images or {}
     uses = uses if uses is not None else _Uses()
     panel = CombinePanel(
-        image_lent_by=lambda pid: pid if pid.startswith("img") else start_pictures.get(pid),
+        image_lent_by=lambda pid: pid if pid.startswith("img") else start_images.get(pid),
         video_lent_by=lambda pid: pid if pid.startswith("vid") and (
             fitting is None or pid in fitting) else None,
         preview=preview or (lambda pid: (None, None)),
@@ -98,7 +98,7 @@ def test_the_two_edit_buttons_say_which_settings_each_one_edits(qtbot):
 
 
 def test_the_animation_settings_are_editable_with_nothing_in_the_slots(qtbot):
-    """What it opens is about the 93 animations, not about a dropped picture, so
+    """What it opens is about the 93 animations, not about a dropped image, so
     it is not gated on one the way Generate and "Edit individual…" are."""
     panel = _panel(qtbot)
     asked = []
@@ -213,10 +213,10 @@ def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
     assert panel._open_btn.isEnabled()       # both filled: ready to open
 
 
-def test_generate_says_it_draws_a_random_seed_for_a_video_on_its_own_start_picture(qtbot):
+def test_generate_says_it_draws_a_random_seed_for_a_video_on_its_own_start_image(qtbot):
     # The press gives the video's settings fresh seeds, so it makes a new
     # variation rather than the same video again, and the button says so.
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
     panel.image_slot.set_item("img1")
 
     panel.video_slot.set_item("vid1")
@@ -224,8 +224,8 @@ def test_generate_says_it_draws_a_random_seed_for_a_video_on_its_own_start_pictu
     assert panel._generate_btn.text() == "Generate with Random seed"
 
 
-def test_generate_stays_plain_for_a_video_on_another_picture(qtbot):
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+def test_generate_stays_plain_for_a_video_on_another_image(qtbot):
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
     panel.image_slot.set_item("img2")
 
     panel.video_slot.set_item("vid1")
@@ -233,8 +233,8 @@ def test_generate_stays_plain_for_a_video_on_another_picture(qtbot):
     assert panel._generate_btn.text() == "Generate"
 
 
-def test_generate_goes_back_to_plain_once_the_picture_changes(qtbot):
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+def test_generate_goes_back_to_plain_once_the_image_changes(qtbot):
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
     panel.image_slot.set_item("img1")
     panel.video_slot.set_item("vid1")
 
@@ -326,9 +326,9 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
 
 def test_a_drag_under_way_lights_only_the_slot_it_fits(qtbot):
     panel = _panel(qtbot)  # image slot accepts img*, video slot accepts vid*
-    picture, video = generation_mime("img7"), generation_mime("vid7")
+    image, video = generation_mime("img7"), generation_mime("vid7")
 
-    under_way.started.emit(picture, None)
+    under_way.started.emit(image, None)
     assert panel.image_slot._label.property("dragActive") is True
     assert panel.video_slot._label.property("dragActive") is False
     under_way.ended.emit()
@@ -343,16 +343,16 @@ def test_a_drag_under_way_lights_only_the_slot_it_fits(qtbot):
 
 
 def test_a_video_let_go_between_the_slots_lands_in_both(qtbot):
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
 
     _let_go_over(panel._between, "vid1")
 
-    assert panel.image_slot.current_id() == "img1"  # the picture the video was made from
+    assert panel.image_slot.current_id() == "img1"  # the image the video was made from
     assert panel.video_slot.current_id() == "vid1"
 
 
 def test_a_video_over_the_room_between_the_slots_lights_both(qtbot):
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
 
     assert _drag_over(panel._between, "vid1").isAccepted()
     assert _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
@@ -362,7 +362,7 @@ def test_a_video_over_the_room_between_the_slots_lights_both(qtbot):
 
 
 def test_both_slots_stay_lit_while_the_drag_moves_about_between_them(qtbot):
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
     _drag_over(panel._between, "vid1")
     mime = generation_mime("vid1")
     event = QDragMoveEvent(QPoint(5, 3), Qt.DropAction.CopyAction, mime,
@@ -375,7 +375,7 @@ def test_both_slots_stay_lit_while_the_drag_moves_about_between_them(qtbot):
 
 
 def test_letting_go_between_the_slots_puts_both_out(qtbot):
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
     _drag_over(panel._between, "vid1")
 
     _let_go_over(panel._between, "vid1")
@@ -384,7 +384,7 @@ def test_letting_go_between_the_slots_puts_both_out(qtbot):
 
 
 def test_between_the_slots_a_video_lands_only_where_it_lends_something(qtbot):
-    panel = _panel(qtbot)  # the gallery holds no picture vid7 was made from
+    panel = _panel(qtbot)  # the gallery holds no image vid7 was made from
 
     _drag_over(panel._between, "vid7")
     assert not _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
@@ -394,7 +394,7 @@ def test_between_the_slots_a_video_lands_only_where_it_lends_something(qtbot):
     assert panel.video_slot.current_id() == "vid7"
 
 
-def test_a_picture_let_go_between_the_slots_lands_in_the_image_slot(qtbot):
+def test_an_image_let_go_between_the_slots_lands_in_the_image_slot(qtbot):
     panel = _panel(qtbot)
 
     _let_go_over(panel._between, "img1")
@@ -412,7 +412,7 @@ def test_what_lends_neither_slot_anything_cannot_be_let_go_between_them(qtbot):
 
 def test_with_an_act_picked_the_room_between_reaches_only_the_image_slot(qtbot):
     # The video slot is hidden under an act, so nothing shows it as a target.
-    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    panel = _panel(qtbot, start_images={"vid1": "img1"})
     _pick_act(panel, "alpha")
 
     _let_go_over(panel._between, "vid1")
@@ -575,7 +575,7 @@ def test_each_lane_keeps_its_own_dropped_video(qtbot):
 
 def _listed_under_recent(panel):
     panel._recent_videos.refresh()
-    return [panel._recent_videos.itemData(row, PICTURES_ROLE)[0].item
+    return [panel._recent_videos.itemData(row, THUMBNAILS_ROLE)[0].item
             for row in range(panel._recent_videos.count())]
 
 
@@ -859,8 +859,8 @@ def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
     assert not panel._generate_btn.isEnabled()
 
 
-def test_the_act_list_is_labelled_the_way_a_pictures_own_action_is(qtbot):
-    """One word for the two halves of the same vocabulary: what a picture shows,
+def test_the_act_list_is_labelled_the_way_an_images_own_action_is(qtbot):
+    """One word for the two halves of the same vocabulary: what an image shows,
     and what it can be made to do."""
     panel = _panel(qtbot)
 
@@ -923,7 +923,7 @@ def test_both_zones_paste_a_name_and_only_the_image_zone_browses(qtbot):
         image_lent_by=lambda pid: pid, video_lent_by=lambda pid: pid,
         preview=lambda pid: (None, None), history=lambda intent: [],
         named={"AB12CD34 001": "img1"}.get, name_of={"img1": "AB12CD34 001"}.get,
-        browse_picture=lambda: browsed.append("asked"))
+        browse_image=lambda: browsed.append("asked"))
     qtbot.addWidget(panel)
     image_actions = {action.text(): action for action in panel.image_slot.menu().actions()}
     assert list(image_actions) == ["Paste Origenerator name", "Browse..."]

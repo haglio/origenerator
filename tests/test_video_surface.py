@@ -8,9 +8,9 @@ from origenerator.gui.video_surface import VideoSurface
 
 
 def _frame(color: str) -> QVideoFrame:
-    picture = QImage(64, 36, QImage.Format.Format_RGB32)
-    picture.fill(QColor(color))
-    return QVideoFrame(picture)
+    pixels = QImage(64, 36, QImage.Format.Format_RGB32)
+    pixels.fill(QColor(color))
+    return QVideoFrame(pixels)
 
 
 def _count_conversions(monkeypatch) -> list:
@@ -38,4 +38,4 @@ def test_a_burst_of_frames_costs_one_conversion_and_shows_the_newest(qtbot, monk
     QApplication.processEvents()
 
     assert len(converted) == 1
-    assert surface.picture().pixelColor(32, 18) == QColor("white")
+    assert surface.current_frame().pixelColor(32, 18) == QColor("white")

@@ -1,8 +1,8 @@
-"""Where the browser pane stands, and the scroll that brings a picture into view.
+"""Where the browser pane stands, and the scroll that brings a tile into view.
 
 No gallery here: a scroll area with a tall column of plain widgets is all these
 answers need, and it is the only place the arithmetic can be read on its own.
-The gallery's own tests say what a person sees -- the picture picked, in view,
+The gallery's own tests say what a person sees -- the tile picked, in view,
 clear of the pane's edge -- and cannot pin the margin to the pixel, because the
 pane's furniture takes a few of them when a page lands and a scroll bar appears.
 """
@@ -51,7 +51,7 @@ def _room_under(scroll, tile) -> int:
             - _room_over(scroll, tile) - tile.size().height())
 
 
-def test_a_picture_under_the_view_comes_up_with_the_margin_under_it(pane, qtbot):
+def test_a_tile_under_the_view_comes_up_with_the_margin_under_it(pane, qtbot):
     scroll, tiles = pane
     assert scroll.verticalScrollBar().value() == 0
 
@@ -60,7 +60,7 @@ def test_a_picture_under_the_view_comes_up_with_the_margin_under_it(pane, qtbot)
     assert _room_under(scroll, tiles[15]) == REVEAL_MARGIN
 
 
-def test_a_picture_over_the_view_comes_down_with_the_margin_over_it(pane, qtbot):
+def test_a_tile_over_the_view_comes_down_with_the_margin_over_it(pane, qtbot):
     scroll, tiles = pane
     scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
 
@@ -69,7 +69,7 @@ def test_a_picture_over_the_view_comes_down_with_the_margin_over_it(pane, qtbot)
     assert _room_over(scroll, tiles[2]) == REVEAL_MARGIN
 
 
-def test_a_picture_already_clear_of_both_edges_is_left_where_it_is(pane, qtbot):
+def test_a_tile_already_clear_of_both_edges_is_left_where_it_is(pane, qtbot):
     scroll, tiles = pane
     scroll.verticalScrollBar().setValue(200)
 

@@ -70,7 +70,7 @@ def _outcome_of(db, job, *, ok: bool, seconds: float | None = None) -> RunOutcom
 
     Read before the finish is announced, because the announcement is what folds
     an enhance away (:func:`origenerator.gallery.fold_enhancement`): the row is
-    still there to name the picture the run improved.
+    still there to name the image the run improved.
     """
     return RunOutcome(
         kind=gallery.job_kind_label(job.workflow.name),
@@ -85,8 +85,8 @@ def _outcome_of(db, job, *, ok: bool, seconds: float | None = None) -> RunOutcom
 def _the_item_it_is_about(db, job) -> str:
     """The generation a run is a run of, as the gallery will hold it afterwards.
 
-    Its own, except for an enhance: that is an upgrade of a picture already in
-    the gallery, and its own row is folded into that picture and deleted as it
+    Its own, except for an enhance: that is an upgrade of an image already in
+    the gallery, and its own row is folded into that image and deleted as it
     lands, so its id names nothing by the time anyone can answer a notice of it.
     """
     row = db.get_generation(job.prompt_id) or {}
@@ -157,9 +157,9 @@ class JobQueue(QObject):
     User work owns the GPU: launching any user job first cancels every in-flight
     background experiment, the one generator of jobs the user didn't ask for, so a
     Generate starts at once instead of queuing after a long experiment run. And the
-    user's image work owns it outright: whatever is being rendered when a picture is
+    user's image work owns it outright: whatever is being rendered when an image is
     asked for is set aside -- stopped, and put back in the line to start over once
-    the pictures are done (:meth:`_set_aside_for`) -- unless a slideshow is locked
+    the images are done (:meth:`_set_aside_for`) -- unless a slideshow is locked
     on it (:meth:`put_first`) or it is shielded (:meth:`shield`)."""
 
     changed = pyqtSignal()            # the set of live jobs changed (add/reconnect)
@@ -188,7 +188,7 @@ class JobQueue(QObject):
         self._clock = clock
         self._bring_up_comfyui = bring_up_comfyui or BRING_UP_COMFYUI
         self._awaiting_comfyui = False
-        self._picture_asked_at: float | None = None
+        self._image_asked_at: float | None = None
         self._videos_wait = QTimer(self)
         self._videos_wait.setSingleShot(True)
         self._videos_wait.timeout.connect(self._pump)
@@ -200,7 +200,7 @@ class JobQueue(QObject):
         self._on_server: list[GenerationJob] = []
         self._waiting: list[GenerationJob] = []
         self._in_flight: GenerationJob | None = None  # out to the server, unanswered
-        # The user's picture asked for while a hand-over was out, which takes
+        # The user's image asked for while a hand-over was out, which takes
         # the machine from what lands (see _set_aside_for and _pump).
         self._takes_over_on_landing: GenerationJob | None = None
         self._first: frozenset[str] = frozenset()
@@ -241,7 +241,7 @@ class JobQueue(QObject):
         A folder can have several queued at once, but the things keyed by folder —
         its one generating tile, the selection that follows it — show the one in
         front: being made, or next to be. That is not always the one asked for
-        first, since a picture asked for second takes the machine from the first
+        first, since an image asked for second takes the machine from the first
         (:meth:`_set_aside_for`). Use :attr:`all_jobs` for everything in flight.
         """
         return {key: self._leading(jobs) for key, jobs in self._jobs.items() if jobs}
@@ -300,7 +300,7 @@ class JobQueue(QObject):
 
         A background experiment takes only an idle folder and never stacks; user
         work preempts one in :meth:`_admit`. The user's own batches — Enhance All,
-        a folder's settings rewrite — queue one run per picture into a folder that
+        a folder's settings rewrite — queue one run per image into a folder that
         is already busy, so a folder holding several jobs is normal here; it is a
         second *press* that the gallery turns down.
         """
@@ -401,7 +401,7 @@ class JobQueue(QObject):
         i2v's image→video hand-off so both stages read as one run. ``run_media_type``
         is what that whole run makes, for a stage that doesn't make it itself: the
         chain's first prompt draws a still, and the line must place it as the video
-        it was asked for, or asking for a video would jump every picture already
+        it was asked for, or asking for a video would jump every image already
         waiting.
         """
         job = self._new_job(key, workflow, params, on_finished,
@@ -433,7 +433,7 @@ class JobQueue(QObject):
         insert_generation_row(self._db, job)
         return job
 
-    def enhance_pictures_with(self, enhance) -> None:
+    def enhance_images_with(self, enhance) -> None:
         self._enhance = enhance
 
     def _enhanced_start_image_of(self, job: GenerationJob) -> str | None:
@@ -442,14 +442,14 @@ class JobQueue(QObject):
         start_image = job.params.get("input_image")
         images = [row for row in self._db.list_generations()
                   if gallery.media_type_of_row(row) == MediaType.IMAGE]
-        picture_id = gallery.source_image_id_for(start_image, images)
-        picture = next((row for row in images if row["prompt_id"] == picture_id), None)
-        if picture is None:
+        image_id = gallery.source_image_id_for(start_image, images)
+        image = next((row for row in images if row["prompt_id"] == image_id), None)
+        if image is None:
             return None
-        if gallery.is_enhanced_row(picture):
-            return gallery.enhanced_version_of(start_image, picture)
+        if gallery.is_enhanced_row(image):
+            return gallery.enhanced_version_of(start_image, image)
         if not queue_line.waits_for_any(job, self.all_jobs):
-            self._enhance(picture)
+            self._enhance(image)
         return None
 
     def _admit(self, newcomer: GenerationJob):
@@ -463,7 +463,7 @@ class JobQueue(QObject):
         if _the_users_own(newcomer.source):
             self._preempt_experiments()
         if queue_line.takes_the_front(newcomer):
-            self._picture_asked_at = self._clock()
+            self._image_asked_at = self._clock()
             self._set_aside_for(newcomer)
         # Announced before the hand-over, not after: the server can take a
         # minute to answer, and the launch is in the line the moment its row is
@@ -497,14 +497,14 @@ class JobQueue(QObject):
             job = self._waiting.pop(0)
             if not self._hand_over(job):
                 continue
-            # A picture asked for while that hand-over was out takes the machine
+            # An image asked for while that hand-over was out takes the machine
             # from what just landed on it, as one asked for a moment later would.
             newcomer, self._takes_over_on_landing = self._takes_over_on_landing, None
             if newcomer is not None and self._key_of(newcomer) is not None:
                 self._set_aside_for(newcomer)
 
     def start_now(self) -> None:
-        self._picture_asked_at = None
+        self._image_asked_at = None
         self._videos_wait.stop()
         self._pump()
 
@@ -521,8 +521,8 @@ class JobQueue(QObject):
                     or self._awaiting_comfyui)
 
     def _wait_at_the_front(self) -> float:
-        since = (None if self._picture_asked_at is None
-                 else self._clock() - self._picture_asked_at)
+        since = (None if self._image_asked_at is None
+                 else self._clock() - self._image_asked_at)
         return queue_line.wait_before_starting(self._waiting[0], since)
 
     def _hand_over(self, job: GenerationJob) -> bool:

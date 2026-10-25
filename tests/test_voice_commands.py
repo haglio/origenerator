@@ -1,4 +1,4 @@
-"""What a spoken utterance over a fullscreen picture is taken to mean.
+"""What a spoken utterance over a fullscreen image is taken to mean.
 
 Three commands share one mic, so the matcher has to keep them apart and keep all
 of them away from the sentences the same mic hears, which is why a loose match
@@ -40,7 +40,7 @@ def test_a_fix_that_names_no_part_falls_through_like_any_other_miss():
     assert voice_commands.match_command("fix the lighting") is None
 
 
-def test_the_recognizer_is_asked_to_hear_every_command_about_the_picture():
+def test_the_recognizer_is_asked_to_hear_every_command_about_the_image():
     heard = voice_commands.command_phrases()
     for phrase in ("enhance", "enhance it", "fix teeth", "fix all",
                    "animate as alpha", "animate as go now alpha"):

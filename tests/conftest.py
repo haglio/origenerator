@@ -304,7 +304,7 @@ def refuse_the_comfyui_on_this_machine(setattr) -> None:
     """Refuse every call to the real ComfyUI address, as a machine without one would.
 
     Whatever reaches the ComfyUI running here is rendered into the folder the
-    app imports new pictures from at launch -- into the user's own gallery.
+    app imports new images from at launch -- into the user's own gallery.
     """
     real_urlopen = urllib.request.urlopen
     comfyui = (config.COMFYUI_HOST, config.COMFYUI_PORT)

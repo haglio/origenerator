@@ -139,7 +139,7 @@ def _without(indices: list, removed: int) -> list:
 def in_order(order: list) -> None:
     """A shuffle that doesn't: play the set in the order it was handed over.
 
-    What a double-clicked picture opens in — its folder as the browser lists it,
+    What a double-clicked item opens in — its folder as the browser lists it,
     starting where the double-click landed — against the random pass a folder
     played from the toolbar gets.
     """
@@ -152,7 +152,7 @@ class SlideshowPlaylist:
         self._order = list(range(len(self._items)))
         self._shuffle(self._order)  # play in a random order
         # The pass begins at its own front unless a particular item was asked for:
-        # a double-clicked picture opens on *that* picture, which sits wherever
+        # a double-clicked item opens on *that* item, which sits wherever
         # this pass's order happens to have put it.
         self._pos = (self._order.index(start)
                      if start is not None and 0 <= start < len(self._items) else 0)
@@ -176,7 +176,7 @@ class SlideshowPlaylist:
     def order(self) -> list:
         """The pass's item indices — how a slide's place in the set is named.
 
-        Read for the position readout ("picture 3 of 40") and for the hosting
+        Read for the position readout ("3 of 40") and for the hosting
         session's HUD map, both of which have to say where in the *set* the
         slide on screen is, not where in the shuffled pass.
         """
@@ -334,7 +334,7 @@ class SlideshowPlaylist:
 
         Only a live one. A frame arriving after the run landed — a message from
         the tail of it, or a poll a beat late — must not take the finished
-        picture back off the screen and put a half-rendered one there.
+        image back off the screen and put a half-rendered one there.
         """
         live = [index for index in self._made_by(prompt_id)
                 if self._items[index].is_live]

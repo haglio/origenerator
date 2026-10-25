@@ -85,7 +85,7 @@ def test_a_place_written_in_a_shape_no_fix_writes_is_passed_over():
     assert points_of_interest.boxes_of(entry, framed_together=()) == ((0.1, 0.1, 0.3, 0.5),)
 
 
-def test_a_report_that_never_says_how_big_the_picture_is_gives_no_places():
+def test_a_report_that_never_says_how_big_the_image_is_gives_no_places():
     outputs = {"fix0_points": {"text": [json.dumps([0, 0, 0, 0])]}}
 
     assert points_of_interest.reported(outputs) == []
@@ -97,7 +97,7 @@ def test_a_run_whose_only_text_is_no_report_of_a_fix_reported_nothing():
     assert points_of_interest.reported(outputs) is None
 
 
-def test_every_pass_shares_one_measure_of_the_picture_it_ran_on():
+def test_every_pass_shares_one_measure_of_the_image_it_ran_on():
     first = points_of_interest.report_nodes(0, ["fix0_segs", 0], ["enh_decode", 0])
     second = points_of_interest.report_nodes(1, ["fix1_segs", 0], ["enh_decode", 0])
 

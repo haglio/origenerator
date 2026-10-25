@@ -8,7 +8,7 @@ prompt_id, so the gallery navigates to it.
 A video's start frame is what it shows most often. The other relations borrow
 it — the item a spoken request revised, the clip a cycle was cut out of, the
 video whose settings Combine ran — which is why its heading, its badge and
-whether its picture is drained of color are set with each showing.
+whether its thumbnail is drained of color are set with each showing.
 """
 from __future__ import annotations
 

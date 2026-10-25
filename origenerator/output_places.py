@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-PICTURES = "image"
+IMAGES = "image"
 SCRIPTS = "funscript"
 AUDIO = "audio"
 WORKING_FOLDER = "origenerator"
@@ -14,7 +14,7 @@ WORKING_FOLDER = "origenerator"
 @dataclass(frozen=True)
 class OutputPlaces:
     comfyui: Path
-    pictures: Path
+    images: Path
     videos: Path
     scripts: Path
     audio: Path
@@ -23,19 +23,19 @@ class OutputPlaces:
     @classmethod
     def in_one_folder(cls, folder: Path, *, trash: Path | None = None) -> OutputPlaces:
         folder = Path(folder)
-        return cls(comfyui=folder, pictures=folder / PICTURES, videos=folder,
+        return cls(comfyui=folder, images=folder / IMAGES, videos=folder,
                    scripts=folder / SCRIPTS, audio=folder / AUDIO, trash=trash)
 
     @classmethod
     def from_settings(cls, settings: dict, *, comfyui_dir: Path,
                       trash: Path | None = None) -> OutputPlaces:
         comfyui = Path(settings.get("comfyui_output_dir") or Path(comfyui_dir) / "output")
-        pictures, videos = (settings.get("origenerator_pictures_dir"),
+        images, videos = (settings.get("origenerator_pictures_dir"),
                             settings.get("origenerator_videos_dir"))
-        if not (pictures and videos):
+        if not (images and videos):
             return cls.in_one_folder(comfyui, trash=trash)
         videos = Path(videos)
-        return cls(comfyui=comfyui, pictures=Path(pictures), videos=videos,
+        return cls(comfyui=comfyui, images=Path(images), videos=videos,
                    scripts=Path(settings.get("origenerator_scripts_dir") or videos / SCRIPTS),
                    audio=Path(settings.get("origenerator_audio_dir") or videos / AUDIO),
                    trash=trash)
@@ -87,7 +87,7 @@ class OutputPlaces:
                    for home in (self.videos, *self._named().values()))
 
     def _named(self) -> dict[str, Path]:
-        return {PICTURES: self.pictures, SCRIPTS: self.scripts, AUDIO: self.audio}
+        return {IMAGES: self.images, SCRIPTS: self.scripts, AUDIO: self.audio}
 
 
 def _parts_within(folder: Path, home: Path) -> tuple[str, ...] | None:

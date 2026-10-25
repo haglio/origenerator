@@ -714,18 +714,18 @@ def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
     assert _shown(source) == f"(1) {source.text(0)}"
 
 
-def test_a_videos_source_folder_in_the_toc_wears_its_pictures_name(qtbot):
-    picture = _image("i1", "a cat", 50, 1)
+def test_a_videos_source_folder_in_the_toc_wears_its_images_name(qtbot):
+    image = _image("i1", "a cat", 50, 1)
     video = _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5,
                                      "input_image": "sdxl_t2i_i1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, picture]))
+    view = GalleryView(FakeDB([video, image]))
     qtbot.addWidget(view)
     view.refresh()
 
     source = _at(_video_workflow(view._tree), 0, 0, 0)
 
-    assert source.text(0) == f"{gallery.folder_id(gallery.settings_folder_key(picture))} 000"
+    assert source.text(0) == f"{gallery.folder_id(gallery.settings_folder_key(image))} 000"
 
 def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # The tree is six levels deep by the time it reaches a settings folder and it
@@ -1051,11 +1051,11 @@ def test_the_all_row_holds_images_and_videos_and_is_where_the_gallery_lands(qtbo
 
 
 def test_each_side_grows_a_folder_for_a_kind_only_where_it_holds_that_kind(qtbot):
-    tall_picture = _row("i1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1,
-                                           "width": 100, "height": 200}, "sdxl_t2i_i1.png")
+    tall_image = _row("i1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1,
+                                         "width": 100, "height": 200}, "sdxl_t2i_i1.png")
     wide_video = _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
                       "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([tall_picture, wide_video]))
+    view = GalleryView(FakeDB([tall_image, wide_video]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1117,16 +1117,16 @@ def test_all_shows_its_collections_then_images_and_videos_as_squares(qtbot):
 
 
 def _both_kinds_in_every_collection():
-    """A picture and a video in each collection both kinds have: both favorited and
+    """An image and a video in each collection both kinds have: both favorited and
     asked for, an experiment of each kind, and one of each deleted."""
-    picture, video = _image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")
-    picture["starred"] = video["starred"] = 1
-    db = _bin_db(rows=[picture, video,
+    image, video = _image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")
+    image["starred"] = video["starred"] = 1
+    db = _bin_db(rows=[image, video,
                        {**_image("ie", "a dog", 50, 2), "source": "experiment"},
                        {**_i2v_video("ve", "styleB"), "source": "experiment"}],
                  held=[("di", _image("di", "a bird", 50, 3)),
                        ("dv", _i2v_video("dv", "styleC"))])
-    for row in (picture, video):
+    for row in (image, video):
         db.record_request(prompt_id=row["prompt_id"], source_prompt_id=None, heard="scene one")
     return db
 
@@ -1281,7 +1281,7 @@ def test_an_enhanced_image_counts_on_the_enhanced_of_every_folder_above_it(qtbot
         assert _shown(_collection_row(folder, "Enhanced")) == "(1) Enhanced"
 
 
-def test_starring_a_picture_counts_it_on_the_favorites_of_every_folder_above_it(qtbot):
+def test_starring_an_image_counts_it_on_the_favorites_of_every_folder_above_it(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1729,7 +1729,7 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
 
 def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
     # Rows in a settings folder share a prompt and differ only by seed, so a
-    # prompt match hits all of them — and eight near-copies of one picture bury
+    # prompt match hits all of them — and eight near-copies of one image bury
     # every other place the query reached.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3), _image("i4", "a dog", 50, 4)]
@@ -1746,7 +1746,7 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
 
 def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
     # Collapsing is for the near-copies; a folder that answered once has nothing
-    # to collapse, and a folder tile there would hide the picture under a name.
+    # to collapse, and a folder tile there would hide the image under a name.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2139,7 +2139,7 @@ def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
 
 
 def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
-    # However the lock came about: a picture locked from the map, a slideshow put
+    # However the lock came about: an image locked from the map, a slideshow put
     # back the way it was left, a Funestra locking itself.
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []
@@ -3312,7 +3312,7 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
     assert labels == ["Copy name", "", "Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
 
 
-def test_enhance_is_grayed_for_a_picture_that_already_has_that_enhancement(qtbot, monkeypatch):
+def test_enhance_is_grayed_for_an_image_that_already_has_that_enhancement(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -3511,7 +3511,7 @@ def test_a_deleted_item_offers_no_way_to_a_folder(qtbot):
 
 
 def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
-    # A video's block above the settings carries its file, where a picture's
+    # A video's block above the settings carries its file, where an image's
     # carries none; the way to the folder sits over both the same.
     view = GalleryView(FakeDB([_i2v_video("v1", "smooth")]), actions=FakeActions())
     qtbot.addWidget(view)
@@ -3527,7 +3527,7 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
 
 def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
     # Standing in the videos' Latest leaves the folder list whole, so a tab
-    # showing a picture still has somewhere to go.
+    # showing an image still has somewhere to go.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -3699,7 +3699,7 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
     assert _drawn(view) == ["fresh", *scrolled_into]
 
 
-def test_a_double_click_on_a_picture_in_latest_plays_everything_latest_lists(qtbot, monkeypatch):
+def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB(_many_recents(120)))
     qtbot.addWidget(view)
@@ -4003,7 +4003,7 @@ def test_a_rebuild_reads_the_library_and_the_requests_once(qtbot, monkeypatch):
     assert sorted(reads) == ["list_generations", "list_requests"]
 
 
-def test_a_rebuild_works_out_when_each_picture_was_last_enhanced_once(qtbot, monkeypatch):
+def test_a_rebuild_works_out_when_each_image_was_last_enhanced_once(qtbot, monkeypatch):
     worked_out = []
     _counted(monkeypatch, gallery, "enhancement_recency", worked_out)
     _counted(monkeypatch, gallery_tree_module, "enhancement_recency", worked_out)
@@ -4017,7 +4017,7 @@ def test_a_rebuild_works_out_when_each_picture_was_last_enhanced_once(qtbot, mon
 
 def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
         qtbot, monkeypatch):
-    # The tree keyed its folders against one index of the pictures, and the
+    # The tree keyed its folders against one index of the images, and the
     # folder keys asked of the view were derived against a second, built from
     # scratch on the first ask after every rebuild.
     built = []
@@ -4539,7 +4539,7 @@ def test_the_enhance_panel_grays_out_on_a_video_too(qtbot):
 
 
 def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
-    # Pressing it would spend a generation arriving at the picture already
+    # Pressing it would spend a generation arriving at the image already
     # sitting in the version list. Turning any setting makes it a different
     # enhancement, and the button comes back — which is what tells the two
     # reasons apart: "you have this one" rather than "not this image".
@@ -4700,7 +4700,7 @@ def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
 
 
 def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
-    # The control is drawn on a particular picture, in that picture's own corner,
+    # The control is drawn on a particular image, in that image's own corner,
     # so it has already said which item it is about. The menu is where a whole
     # selection is acted on.
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
@@ -4930,7 +4930,7 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
 def _linked_view(qtbot, source="i7", count=12):
     """A view on a video whose start frame is one of ``count`` sibling images, laid
     out in a window too short to hold them all — the setup for following a source
-    link into a folder big enough that landing on the right picture matters."""
+    link into a folder big enough that landing on the right image matters."""
     images = [_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)]
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -4977,10 +4977,10 @@ def test_following_a_link_to_a_word_made_videos_hidden_frame_lands_on_that_video
     assert view._selected["prompt_id"] == "o1"
 
 
-def test_a_followed_link_puts_the_picture_on_screen_in_the_same_turn(qtbot):
-    # The folder's pictures are created but not yet positioned when the link lands,
+def test_a_followed_link_puts_the_image_on_screen_in_the_same_turn(qtbot):
+    # The folder's images are created but not yet positioned when the link lands,
     # so a scroll that aimed at them straight away would aim at nothing. The pane
-    # lays itself out first, which is what puts the picture on screen without
+    # lays itself out first, which is what puts the image on screen without
     # waiting for the turn to end.
     view = _linked_view(qtbot)
 
@@ -5692,7 +5692,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
     generation that was selected. The restore re-selects it with history
     suppressed, which refreshes the front tab's preview; the resting tab has
     nothing to refresh, so it must stay empty rather than come up as a blank
-    generate form under someone else's picture.
+    generate form under someone else's image.
     """
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: (Path("C:/out/sdxl_t2i_i2.png"), "image"))
@@ -6658,7 +6658,7 @@ def test_main_view_reflows_to_fill_extra_width(qtbot):
     assert layout.heightForWidth(2000) < layout.heightForWidth(300)
 
 
-def test_add_tile_leads_the_folders_pictures(qtbot):
+def test_add_tile_leads_the_folders_images(qtbot):
     # Thumbnails are newest-first, so the "new variation" tile leads them rather
     # than trailing the oldest.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
@@ -6688,7 +6688,7 @@ def test_no_add_tile_for_unknown_workflow(qtbot):
     assert _reroll_tile(view) is None
 
 
-def test_no_add_tile_for_an_import_that_never_named_its_starting_picture(qtbot):
+def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
     rows = [_row("imp", "image_enhance", {"seed": 1}, "imp.png", source="imported")]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
     qtbot.addWidget(view)
@@ -6756,7 +6756,7 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
     # with the run's Cancel where the + had been -- so on a slow app, a second
     # press on a Cancel already taken landed on the + it had turned back into,
     # and started another. The + stays put now, grayed out, and the run gets a
-    # tile of its own where its picture will land.
+    # tile of its own where its image will land.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -6819,7 +6819,7 @@ def _request_card(view):
 
 
 def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
-    """A DB holding one settings folder with a completed picture per seed — the
+    """A DB holding one settings folder with a completed image per seed — the
     folder a rewrite re-runs."""
     db = Database(tmp_path / "folder.db")
     for seed in seeds:
@@ -6858,7 +6858,7 @@ def test_a_folder_offers_a_request_card_beside_its_reroll_tile(qtbot, tmp_path):
 
 def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
     # The rewrite reproduces the folder seed for seed, so a folder whose only row
-    # is still in flight has no picture to say differently yet.
+    # is still in flight has no image to say differently yet.
     rows = [_row("run1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1}, "x.png",
                  status="running", output_files=json.dumps([]))]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
@@ -6897,7 +6897,7 @@ def test_a_request_runs_every_image_again_with_its_own_seed(qtbot, tmp_path):
     assert {job.params["positive_prompt"] for job in jobs} == {"a dog on a couch"}
 
 
-def test_a_rewrite_never_stops_one_of_its_own_pictures_for_the_next(qtbot, tmp_path):
+def test_a_rewrite_never_stops_one_of_its_own_images_for_the_next(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=client)
     qtbot.addWidget(view)
@@ -6923,8 +6923,8 @@ def test_the_rewrite_lands_in_one_folder_beside_the_one_it_came_from(qtbot, tmp_
     assert landing != {key}                  # ...and it isn't the folder it came from
 
 
-def test_each_rewritten_picture_is_linked_to_the_one_it_came_from(qtbot, tmp_path):
-    # Individually, not folder to folder: the link is what says which picture
+def test_each_rewritten_image_is_linked_to_the_one_it_came_from(qtbot, tmp_path):
+    # Individually, not folder to folder: the link is what says which image
     # this one is the rewrite of, and it shows on the item itself.
     db = _folder_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
@@ -6984,7 +6984,7 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
     _rewritten(view, key)
 
     queued = [job.prompt_id for job in view._jobs.all_jobs]
-    # The one in front -- the last asked for, since each picture takes the
+    # The one in front -- the last asked for, since each image takes the
     # machine from the one before -- is the folder's generating tile; the rest
     # each get their own card.
     assert _generating_tile(view) is not None
@@ -7298,7 +7298,7 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
     # The reported bug: Auto-Generate left running while the user browsed grew a row of
     # tabs, one per image it made. Each finished variation was loaded into whatever
     # tab was in front — the pane's resting tab, which nothing in it had asked for
-    # the picture, and which then stopped being blank, so the next clicked
+    # the image, and which then stopped being blank, so the next clicked
     # generation opened a tab beside it rather than loading into it.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
@@ -7324,7 +7324,7 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
 
 def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     # The reported bug: Auto-Generate's live frames filled the preview of whichever
-    # tab was open, over the picture the user had put there, and its results landed
+    # tab was open, over the image the user had put there, and its results landed
     # there too. Auto-Generate runs while the user works on something else; the
     # folder's own live tile is where it can be watched. Even a tab on the folder
     # it runs in —
@@ -7413,7 +7413,7 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
 
 
 def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
-    # And it still ends up on screen: the press was a press for a picture, so a
+    # And it still ends up on screen: the press was a press for an image, so a
     # tab opens on the run rather than the pane going on showing work the press
     # had nothing to do with. The tab that was up keeps what it was holding.
     db = _seeded_db(tmp_path)
@@ -7536,7 +7536,7 @@ def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
 # --- a tab's right-click: across to the folder its settings generate into -----
 
 def test_a_tabs_go_to_folder_opens_the_folder_its_settings_have_made(qtbot, tmp_path):
-    # The way across from an open generate tab to the pictures it has made.
+    # The way across from an open generate tab to the images it has made.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -7683,7 +7683,7 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
     # Whisper renders a command several ways and the matcher answers to all of
     # them, so printing the transcription showed a misspelling of a command that
     # was understood perfectly well — "enhanced it" over a caption that then went
-    # and enhanced the picture.
+    # and enhanced the image.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -7826,7 +7826,7 @@ def test_the_item_picked_comes_first_though_another_in_the_folder_is_being_enhan
 
 
 def _standalone_slideshow(qtbot, monkeypatch):
-    """A fullscreen slideshow of two pictures, opened with no session under it."""
+    """A fullscreen slideshow of two images, opened with no session under it."""
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
@@ -7922,7 +7922,7 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
                        sorted(playlist.items[index][2] for index in playlist.order)))
 
     # Latest plays one of a sitting's run of one configuration, and these two
-    # pictures are such a run; Shuffle plays the shape's whole library.
+    # images are such a run; Shuffle plays the shape's whole library.
     assert played == [("Latest", ["i1"]), ("Shuffle", ["i1", "i2"])]
     slideshow.close()
 
@@ -7942,7 +7942,7 @@ def test_a_video_asked_for_while_the_slideshow_plays_is_made(qtbot, monkeypatch,
     assert [call.args[1] for call in client.submit_job.call_args_list] == [video]
 
 
-def test_locking_a_picture_makes_its_waiting_enhancement_the_next_one_made(
+def test_locking_an_image_makes_its_waiting_enhancement_the_next_one_made(
         qtbot, tmp_path, monkeypatch):
     _resolve_by_id(monkeypatch)
     client = _reroll_client()
@@ -7968,7 +7968,7 @@ def test_locking_a_picture_makes_its_waiting_enhancement_the_next_one_made(
 
 def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     # A folder gets its node the moment a generation starts, so this one has a
-    # row and no picture. A button offering a slideshow that opens nothing is worse
+    # row and no image. A button offering a slideshow that opens nothing is worse
     # than no button: it reappears once the first item lands.
     view = GalleryView(FakeDB([_running_row("in_flight", prompt="a cat")]))
     qtbot.addWidget(view)
@@ -8120,9 +8120,9 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
     slideshow.close()
 
 
-def test_the_enhanced_switch_narrows_a_slideshow_to_the_pictures_made_better(qtbot, monkeypatch):
+def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot, monkeypatch):
     # A folder enhanced through carries both versions of everything, and a pass
-    # of that is every picture twice — the second time being the point.  The
+    # of that is every image twice — the second time being the point.  The
     # switch is the slideshow's own, beside F-mode on the HUD it wears.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -8363,7 +8363,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
 
     assert view._slideshows.showing is None               # out of the slideshow...
     assert view._tree.currentItem() is _collection(view, RECENTS_KEY)  # ...still in the collection
-    assert view._browser.selected_ids == {shown}     # with that picture picked
+    assert view._browser.selected_ids == {shown}     # with that image picked
     # And the item open in a tab: leaving a slideshow for an item is a decision to
     # work on it, which a folder under a stale form isn't.
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
@@ -8395,7 +8395,7 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
 def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
         qtbot, monkeypatch):
     # However you leave -- Escape, a double-click, the spoken "close" -- the
-    # picture you were looking at is the one you want to find, picked in the collection
+    # image you were looking at is the one you want to find, picked in the collection
     # the slideshow was playing rather than left for you to hunt for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
@@ -8423,7 +8423,7 @@ def _laid_out_folder(qtbot, count=60):
 
 
 def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeypatch):
-    # Latest draws fifty pictures at a time, so a slideshow stepped well past them hands
+    # Latest draws fifty images at a time, so a slideshow stepped well past them hands
     # back one the collection has not drawn yet: it is drawn, picked and scrolled to,
     # rather than the collection coming back with nothing marked on it.
     _resolve_by_id(monkeypatch)
@@ -8453,8 +8453,8 @@ def _folder_squares(view):
 
 
 def _folder_square_holding(view, prompt_id: str) -> str:
-    """The key of the drawn square whose folder holds this picture -- what the eye
-    looks for when the pane lists folders rather than the pictures in them."""
+    """The key of the drawn square whose folder holds this image -- what the eye
+    looks for when the pane lists folders rather than the images in them."""
     folder = gallery.settings_folder_key(view._db.get_generation(prompt_id),
                                          view.image_config_index())
     for tile in _folder_squares(view):
@@ -8465,7 +8465,7 @@ def _folder_square_holding(view, prompt_id: str) -> str:
 
 def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(qtbot,
                                                                           monkeypatch):
-    # All shows folders, not the pictures inside them, so there is no picture to
+    # All shows folders, not the images inside them, so there is no image to
     # pick -- the square the slide came out of is what the eye is looking for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
@@ -8488,8 +8488,8 @@ def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(
 
 def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_came_from(
         qtbot, monkeypatch):
-    # A star on a folder puts the folder in the Favorites collection, not the pictures
-    # inside it, so a slide that came out of one has no picture of its own there.
+    # A star on a folder puts the folder in the Favorites collection, not the images
+    # inside it, so a slide that came out of one has no image of its own there.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     _on_screen(qtbot, view, 1800, 1300)
@@ -8517,7 +8517,7 @@ def _in_view(view, prompt_id) -> bool:
     return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
 
 
-def test_the_picture_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_library_moves(
+def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_library_moves(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view, db = _laid_out_folder(qtbot)
@@ -8540,7 +8540,7 @@ def test_the_picture_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_
     assert _in_view(view, far)
 
 
-def test_a_picked_picture_holds_its_place_as_new_ones_land_above_it(qtbot):
+def test_a_picked_image_holds_its_place_as_new_ones_land_above_it(qtbot):
     view, db = _laid_out_folder(qtbot)
     far = view.listed_prompt_ids()[-3]
     view._browser.reveal_tile(far)
@@ -8616,7 +8616,7 @@ def test_reopening_a_slideshow_comes_back_to_the_slide_it_was_closed_on(qtbot, m
 def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeypatch):
     # A hold is the user saying this is the one: the slideshow reopened on the folder
     # it was playing is still stopped on that slide. A slideshow of Latest opens on the
-    # newest picture instead, which is what Latest is opened for.
+    # newest image instead, which is what Latest is opened for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
@@ -8638,41 +8638,41 @@ def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeyp
 
 
 def _resolve_each_to_its_own_kind(monkeypatch):
-    """Resolve a picture's preview to an image and a video's to a video, the way
-    a slideshow of a picture and the videos animated from it plays them."""
+    """Resolve an image's preview to an image and a video's to a video, the way
+    a slideshow of an image and the videos animated from it plays them."""
     monkeypatch.setattr(gallery, "resolve_preview", lambda row, places: (
         (f"{row['prompt_id']}.mp4", "video") if row["workflow_name"] == "wan22_i2v"
         else (f"{row['prompt_id']}.png", "image")))
 
 
-def _animated_from(prompt_id, picture, seed):
-    """A video animated from *picture*: a row down that picture's column on the
+def _animated_from(prompt_id, image, seed):
+    """A video animated from *image*: a row down that image's column on the
     Nav Map."""
     return _row(prompt_id, "wan22_i2v",
-                {"positive_prompt": "dance", "input_image": f"sdxl_t2i_{picture}.png",
+                {"positive_prompt": "dance", "input_image": f"sdxl_t2i_{image}.png",
                  "seed": seed},
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
-def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, picture):
-    """The Slideshow button pressed on the landscape folder holding *picture*,
-    the slideshow then stood on that picture by its cell on the Nav Map."""
+def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, image):
+    """The Slideshow button pressed on the landscape folder holding *image*,
+    the slideshow then stood on that image by its cell on the Nav Map."""
     _resolve_each_to_its_own_kind(monkeypatch)
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     _keys_are_the_gallerys(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id[picture])
+    view._tree.setCurrentItem(view._leaf_by_id[image])
     view._bank.slideshow.click()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_play_video|{picture}.png")
+    slideshow.shown.press(f"{slideshow.shown.hud_side}_play_video|{image}.png")
     return view, slideshow
 
 
 def _looping_actions_on_a_video(qtbot, monkeypatch, *, elsewhere=()):
-    """A folder of two pictures, the first animated twice, looping that picture's
+    """A folder of two images, the first animated twice, looping that image's
     actions from the panel's loop button and standing on the first video."""
     view, slideshow = _slideshow_of_the_folder_of(
         qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
@@ -8685,8 +8685,8 @@ def _looping_actions_on_a_video(qtbot, monkeypatch, *, elsewhere=()):
 
 
 def _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch):
-    """A folder of two seeds of one picture, its row widened by "more seeds" to a
-    picture of the next folder over, and standing on that one."""
+    """A folder of two seeds of one image, its row widened by "more seeds" to an
+    image of the next folder over, and standing on that one."""
     view, slideshow = _slideshow_of_the_folder_of(
         qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
                              _image("p3", "a cat sitting", 50, 3)],
@@ -8716,9 +8716,9 @@ _LEFT_AND_COME_BACK_TO = pytest.mark.parametrize(
 @_LEFT_AND_COME_BACK_TO
 def test_a_slideshow_left_looping_actions_comes_back_looping_them_where_it_stood(
         qtbot, monkeypatch, come_back):
-    # The Nav Map is part of where a slideshow was left: closed looping a picture's
+    # The Nav Map is part of where a slideshow was left: closed looping an image's
     # actions, the next one loops them again, standing where the last stood --
-    # which in an action loop is one of the picture's videos as often as not.
+    # which in an action loop is one of the image's videos as often as not.
     view, slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
     looping, standing_on = slideshow.hud_map(), slideshow._set.playlist.current()
     assert (looping.loop, standing_on.prompt_id) == ("action", "v1")
@@ -8768,8 +8768,8 @@ def test_the_slideshow_button_on_another_folder_plays_that_folder_not_the_loop_l
 def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on_it(
         qtbot, monkeypatch):
     # The Slideshow button plays the folder on screen, so leaving on one of the
-    # picture's videos has to put that video's own folder on screen, picked --
-    # not the folder of the picture the slideshow was started from.
+    # image's videos has to put that video's own folder on screen, picked --
+    # not the folder of the image the slideshow was started from.
     view, slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
     folder_of_the_video = oriented_key(gallery.settings_folder_key(
         view._db.get_generation("v1"), view.image_config_index()), LANDSCAPE)
@@ -8932,8 +8932,8 @@ def test_a_run_being_made_joins_a_recents_slideshow_too(qtbot, monkeypatch):
 
 
 def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
-    # It is a better version of a picture the slideshow may already be playing, and it
-    # says so in that picture's own corner — not as a second, worse slide of it.
+    # It is a better version of an image the slideshow may already be playing, and it
+    # says so in that image's own corner — not as a second, worse slide of it.
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1),
                  _row("e1", gallery.ENHANCE_WORKFLOW, {"seed": 1}, "",
@@ -9384,8 +9384,8 @@ def test_the_tab_claiming_the_tiles_run_is_kept(qtbot, tmp_path):
 
 def test_opening_a_runs_folder_from_its_card_loads_no_saved_item(qtbot, tmp_path):
     # Clicking an in-flight card goes to the run, so the folder it opens on the
-    # way lands on no saved item of its own — one loaded there would paint a
-    # picture nobody asked for over the very tab the run belongs to.
+    # way lands on no saved item of its own — one loaded there would paint an
+    # image nobody asked for over the very tab the run belongs to.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -9537,7 +9537,7 @@ def test_a_cancelled_generation_leaves_a_slideshow_of_a_saved_file_alone(qtbot, 
 
 def test_clicking_add_opens_a_tab_on_the_run_it_started(qtbot, tmp_path):
     # One click on "+" starts the run and puts it up in a tab, which is where it
-    # can be watched full size — the tile's own picture is a thumbnail. The tile
+    # can be watched full size — the tile's own image is a thumbnail. The tile
     # is lit as well, the gallery's selection being that run now.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -9616,7 +9616,7 @@ def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_
     assert _preview_of(view).show_message.call_args.args[0] == "Waiting for preview…"
 
 
-def test_a_run_waiting_out_the_minute_after_a_picture_says_when_it_starts(
+def test_a_run_waiting_out_the_minute_after_an_image_says_when_it_starts(
         qtbot, tmp_path, monkeypatch):
     view, _client = _waiting_view(qtbot, tmp_path, backlog=0)
     waiting, = view._live_jobs.values()
@@ -9635,10 +9635,10 @@ def test_start_now_on_the_job_queue_starts_the_video_waiting_out_the_minute(qtbo
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _key, picture = _running_reroll(view)  # a picture asked for: videos wait a minute
+    _key, image = _running_reroll(view)  # an image asked for: videos wait a minute
     view._jobs.start_prepared("video/k", _WAN_I2V, dict(_WAN_I2V.default_params(), seed=3))
     video = view._jobs.newest_job_for("video/k")
-    view._jobs.cancel_job(picture.prompt_id)
+    view._jobs.cancel_job(image.prompt_id)
     view._update_queue()
     assert view._queue._running.status_text().startswith("Starts in")
 
@@ -9774,7 +9774,7 @@ def test_i2v_reroll_regenerates_its_input_image_enhances_it_then_makes_the_video
     enhance_job.finished.emit(
         [{"filename": "image_enhance_new.png", "subfolder": "image", "type": "output"}],
         None, 1.0)
-    view._jobs.start_now()  # the minute videos wait after a picture, here the enhancement
+    view._jobs.start_now()  # the minute videos wait after an image, here the enhancement
 
     # Stage 3: the video now runs on the enhancement, its own seeds fresh.
     vid_job = view._live_jobs[key]
@@ -9859,7 +9859,7 @@ def test_i2v_item_made_from_a_hidden_starting_frame_offers_only_the_video_seed(q
     assert _tooltips(view, "vid") == ["Randomize video seed"]
 
 
-def test_an_i2v_item_that_never_named_its_starting_picture_offers_no_seed_rerolls(qtbot, tmp_path):
+def test_an_i2v_item_that_never_named_its_starting_image_offers_no_seed_rerolls(qtbot, tmp_path):
     view = GalleryView(_single_i2v_db(tmp_path, ""), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -10027,7 +10027,7 @@ def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_pat
     gestures.click(thumb, thumb.rect().center())
     form = view._info_tabs.current_config_panel()._param_form
     header = next(iter(form._sections.values()))._header
-    # The row saying what the picture shows sits above the form, so in a window
+    # The row saying what the image shows sits above the form, so in a window
     # this short the first section header hangs below the fold, where a click
     # would land on nothing and leave the focus where it was.
     _scroll_into_view(header)
@@ -10720,7 +10720,7 @@ def test_a_job_nobody_asked_for_out_loud_is_not_marked(qtbot):
 
 
 def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
-    # Its row shows that picture: two i2v runs off one folder's settings are the same
+    # Its row shows that image: two i2v runs off one folder's settings are the same
     # caption and differ only in the frame.
     db = FakeDB([])
     db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
@@ -10732,7 +10732,7 @@ def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
     assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
 
 
-def test_an_enhancement_carries_the_picture_it_is_a_second_pass_over(qtbot):
+def test_an_enhancement_carries_the_image_it_is_a_second_pass_over(qtbot):
     # Same relation as a video's start frame: the image it is *of* is the whole
     # of what one enhancement in the line has to distinguish it from another.
     db = FakeDB([])
@@ -10772,7 +10772,7 @@ def test_a_job_started_from_words_alone_names_no_frame(qtbot):
 
 
 def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
-    # No act was picked, so the picture is the only thing naming which source video
+    # No act was picked, so the image is the only thing naming which source video
     # this run is of — and its row is where that gets read.
     db = FakeDB([])
     db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
@@ -10809,7 +10809,7 @@ def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, 
 def test_a_picked_act_shows_no_source_video_at_all(qtbot):
     # The act names what the video will do, which is the whole of what was
     # chosen. The clip its settings were mined out of answers a question nobody
-    # asked, and a picture of a video the user never picked reads as a job that
+    # asked, and an image of a video the user never picked reads as a job that
     # is that video.
     db = FakeDB([])
     db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
@@ -10840,7 +10840,7 @@ def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
 
 
 def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
-    # Its own output is the one picture it cannot show, so its row is placed by
+    # Its own output is the one image it cannot show, so its row is placed by
     # what the same settings made last time — newest first, four at most.
     settings = {"positive_prompt": "a kite", "steps": 50}
     db = FakeDB([])
@@ -11107,7 +11107,7 @@ def test_the_video_lane_takes_the_mined_settings_as_they_stand(qtbot, tmp_path):
     assert job.params["positive_prompt"] == "alpha"
 
 
-def test_combine_submits_the_settings_on_the_dropped_picture_with_a_fresh_seed(qtbot, tmp_path):
+def test_combine_submits_the_settings_on_the_dropped_image_with_a_fresh_seed(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -11122,7 +11122,7 @@ def test_combine_submits_the_settings_on_the_dropped_picture_with_a_fresh_seed(q
     view._client.submit_job.assert_called_once()
 
 
-def test_a_combine_on_a_picture_never_enhanced_enhances_it_and_makes_the_video_from_that(
+def test_a_combine_on_an_image_never_enhanced_enhances_it_and_makes_the_video_from_that(
         qtbot, tmp_path):
     db = _combine_db(tmp_path, enhanced=False)
     view = GalleryView(db, client=_reroll_client())
@@ -11133,7 +11133,7 @@ def test_a_combine_on_a_picture_never_enhanced_enhances_it_and_makes_the_video_f
     (enhance,) = [job for job in view._jobs.all_jobs if job.enhances]
     enhance.finished.emit([{"filename": "image_enhance_00001_.png", "subfolder": "image"}],
                           None, 1.0)
-    view._jobs.start_now()  # the minute videos wait after a picture, here the enhancement
+    view._jobs.start_now()  # the minute videos wait after an image, here the enhancement
 
     first, then = [call.args for call in view._client.submit_job.call_args_list]
     assert first[1] == enhance.prompt_id
@@ -11385,9 +11385,9 @@ def _click_thumbnail(view, row, image_rows):
     return _front_panel(view)
 
 
-def test_another_picture_of_the_folder_being_generated_cannot_be_generated_too(qtbot, tmp_path):
-    # One item at a time per folder, whichever of its pictures is open: a folder
-    # already making one takes no second Generate, and the tab on the other picture
+def test_another_image_of_the_folder_being_generated_cannot_be_generated_too(qtbot, tmp_path):
+    # One item at a time per folder, whichever of its images is open: a folder
+    # already making one takes no second Generate, and the tab on the other image
     # still does not claim the run it did not start.
     db = _two_image_db(tmp_path, prompts=("a shared prompt", "a shared prompt"))
     view = GalleryView(db, client=_reroll_client())
@@ -11506,7 +11506,7 @@ def test_a_tabs_cancel_stops_its_run_and_hands_the_folder_back(qtbot, tmp_path):
 
 
 def test_cancel_works_on_a_run_launched_from_a_clicked_image(qtbot, tmp_path):
-    # The path the user actually takes: click a picture in the browser, Generate,
+    # The path the user actually takes: click an image in the browser, Generate,
     # then Cancel. The tab is the one the click loaded, not one prefilled by hand.
     db = _two_image_db(tmp_path, prompts=("a shared prompt", "a shared prompt"))
     view = GalleryView(db, client=_reroll_client())
@@ -11800,7 +11800,7 @@ def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, m
 
 
 def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, monkeypatch):
-    # A picture that is gone has no settings looked up for it; the row must go too.
+    # An image that is gone has no settings looked up for it; the row must go too.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -11956,7 +11956,7 @@ def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_p
     assert preview._stack.currentWidget() is preview._combination
 
 
-def test_open_in_generator_links_to_the_picture_and_the_video_before_generating(qtbot, tmp_path):
+def test_open_in_generator_links_to_the_image_and_the_video_before_generating(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -11988,7 +11988,7 @@ def test_the_video_an_opened_combination_makes_keeps_both_links(qtbot, tmp_path)
     assert not panel._related._source_video_tile.isHidden()
 
 
-def test_an_act_whose_settings_came_from_no_video_links_to_the_picture_alone(qtbot, tmp_path):
+def test_an_act_whose_settings_came_from_no_video_links_to_the_image_alone(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -12354,7 +12354,7 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     assert view._bank.enhance.toolTip() == "Nothing here to enhance"
 
 
-def test_enhance_all_never_stops_one_of_its_own_pictures_for_the_next(qtbot, tmp_path):
+def test_enhance_all_never_stops_one_of_its_own_images_for_the_next(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -12444,7 +12444,7 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1
 
 
-def test_a_queue_rows_shield_keeps_its_run_going_for_the_picture_asked_for_after_it(
+def test_a_queue_rows_shield_keeps_its_run_going_for_the_image_asked_for_after_it(
         qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path), client=client)
@@ -12468,7 +12468,7 @@ def _cancel_from_the_queue(view, job):
     queued._cancel.click()
 
 
-def _cancel_from_the_pictures_menu(view, job):
+def _cancel_from_the_images_menu(view, job):
     view._enhance.cancel_for([view._db.get_generation("g0")])
 
 
@@ -12477,13 +12477,13 @@ def _fail_on_comfyui(view, job):
 
 
 @pytest.mark.parametrize("end_unfinished", [
-    _cancel_from_the_queue, _cancel_from_the_pictures_menu, _fail_on_comfyui])
+    _cancel_from_the_queue, _cancel_from_the_images_menu, _fail_on_comfyui])
 def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
         qtbot, tmp_path, monkeypatch, end_unfinished):
     output_dir = tmp_path / "output"
     (output_dir / "image").mkdir(parents=True)
-    picture = output_dir / "image" / "sdxl_t2i_g0.png"
-    picture.write_bytes(_png_bytes())
+    image = output_dir / "image" / "sdxl_t2i_g0.png"
+    image.write_bytes(_png_bytes())
     monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
@@ -12501,7 +12501,7 @@ def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
     assert not panel._versions._host.findChildren(_PendingRow)
     assert panel._versions._host.findChildren(_AddRow)
     assert not panel._preview._live
-    assert panel._preview.is_showing_any([picture])
+    assert panel._preview.is_showing_any([image])
 
 
 def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbot, tmp_path):
@@ -12882,7 +12882,7 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     assert tile._image_label.pixmap() is not None
     assert not tile._image_label.pixmap().isNull()
 
-    # The run ending puts the tile's own picture back: those frames were a
+    # The run ending puts the tile's own thumbnail back: those frames were a
     # partial render of a file that never landed.
     view._jobs._jobs.clear()
     view._enhance.reconcile()
@@ -12990,7 +12990,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path
 def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     # A batch shares one folder and so one frame slot: the frame there belongs
     # to whichever of them ComfyUI is running, and lending it to the tiles queued
-    # after it would show each of those a picture of a different image.
+    # after it would show each of those a thumbnail of a different image.
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -13434,7 +13434,7 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path, m
     assert panel.video_slot._label.property("dragActive") is False  # put out at the end
 
 
-def test_a_video_dragged_from_a_picture_the_gallery_holds_lights_the_image_slot_too(
+def test_a_video_dragged_from_an_image_the_gallery_holds_lights_the_image_slot_too(
         qtbot, tmp_path):
     db = _combine_db(tmp_path)
     params = json.loads(db.get_generation("vid")["params_json"])
@@ -13488,7 +13488,7 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
     in_flight = {}
 
     def drag_loop_through_a_grid_redraw(drag, _action):
-        # A redraw keeps a tile whose row still looks the same; this one's picture
+        # A redraw keeps a tile whose row still looks the same; this one's thumbnail
         # moves, so the redraw is the kind that takes the tile away under the drag.
         view._db.update_generation("vid", thumbnail_path="moved.jpg")
         view.refresh()
@@ -13894,7 +13894,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     slideshow.close()
 
 
-def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_picture(
+def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_image(
         qtbot, tmp_path, monkeypatch):
     by_id = lambda row, places: (f"{row['prompt_id']}.png", "image")
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
@@ -13921,7 +13921,7 @@ def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_p
     slideshow.close()
 
 
-def test_a_double_click_on_a_picture_from_another_folder_opens_that_folder(
+def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     rows = [_image("a1", "a cat", 50, 1), _image("b1", "a dog", 50, 1),
@@ -14128,7 +14128,7 @@ def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     return view, slideshow
 
 
-def test_a_slideshow_standing_on_its_own_plays_the_radio_while_its_picture_is_up(
+def test_a_slideshow_standing_on_its_own_plays_the_radio_while_its_image_is_up(
         qtbot, monkeypatch):
     radio = _FakeRadio()
     _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio)
@@ -14178,8 +14178,8 @@ def test_a_standing_slideshows_volume_comes_back_after_a_restart(qtbot, monkeypa
     assert (engine.volume, engine.muted) == (40, True)
 
 
-def _click_the_picture(slideshow):
-    """A click on the slideshow's picture, clear of its panel and of the corners that
+def _click_the_slide(slideshow):
+    """A click on the slideshow's slide, clear of its panel and of the corners that
     open it, through the window the Funestra draws into."""
     engine_of(slideshow.shown)
     slideshow.shown.showFullScreen()
@@ -14188,23 +14188,23 @@ def _click_the_picture(slideshow):
     gestures.click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
 
 
-def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_pictures_with_it(
+def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_slides_with_it(
         qtbot, monkeypatch):
     radio, motion = _FakeRadio(), _SignalMotion()
     _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio,
                                                         osr2_motion=motion)
 
-    _click_the_picture(slideshow)
+    _click_the_slide(slideshow)
     assert (slideshow.shown._paused, motion.frozen, radio.frozen, omnipause.frozen()) == (
         True, True, True, True)
 
-    _click_the_picture(slideshow)
+    _click_the_slide(slideshow)
     assert (slideshow.shown._paused, motion.frozen, radio.frozen, omnipause.frozen()) == (
         False, False, False, False)
     slideshow.close()
 
 
-def _double_click_the_picture(slideshow):
+def _double_click_the_slide(slideshow):
     window = slideshow.shown._pane._window
     gestures.double_click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
 
@@ -14213,13 +14213,13 @@ def _press_enter(slideshow):
     gestures.press_key(slideshow.shown, Qt.Key.Key_Return)
 
 
-@pytest.mark.parametrize("leave", [_double_click_the_picture, _press_enter],
-                         ids=["a double-click on the picture", "Enter"])
+@pytest.mark.parametrize("leave", [_double_click_the_slide, _press_enter],
+                         ids=["a double-click on the slide", "Enter"])
 def test_leaving_a_paused_slideshow_leaves_the_room_paused(qtbot, monkeypatch, leave):
     radio, motion = _FakeRadio(), _SignalMotion()
     _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio,
                                                         osr2_motion=motion)
-    _click_the_picture(slideshow)
+    _click_the_slide(slideshow)
 
     leave(slideshow)
     qtbot.waitUntil(lambda: not slideshow.shown.isVisible())
@@ -14335,8 +14335,8 @@ def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot)
 
 
 def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
-    # The surface in front answers for the device alone: a slideshow opening on a
-    # picture hands the OSR2 to the motion, the way a Funestra hands back to it
+    # The surface in front answers for the device alone: a slideshow opening on an
+    # image hands the OSR2 to the motion, the way a Funestra hands back to it
     # between scripted clips.  Falling through to the front tab left that tab's
     # funscript driving under a slideshow it has nothing to do with, until the slideshow
     # happened to reach a scripted video of its own.
@@ -14345,7 +14345,7 @@ def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscri
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")]
 
-    slideshow = _double_click_slideshow(view, qtbot)  # a picture: nothing scripted on screen
+    slideshow = _double_click_slideshow(view, qtbot)  # an image: nothing scripted on screen
 
     assert driver.stopped >= 1
     assert view._osr2_motion.active
@@ -16026,7 +16026,7 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
 
 def test_a_generation_still_in_flight_stays_out_of_a_slideshow(qtbot):
     # It used to be seeded with no file, and drew "Generating…" as its slide —
-    # a blank between pictures. It joins the slideshow when it has something to show.
+    # a blank between slides. It joins the slideshow when it has something to show.
     db = FakeDB([_running_row("in_flight", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -16133,7 +16133,7 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
 
 def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
         qtbot, tmp_path, monkeypatch):
-    # Two bad parts in one picture is one command, and one run that fixes both.
+    # Two bad parts in one image is one command, and one run that fixes both.
     view = _fix_slideshow(qtbot, tmp_path, monkeypatch,
                           "teeth_yolov8n.pt", "hand_yolov8s.pt")
 
@@ -16208,7 +16208,7 @@ def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
     view._slideshows.showing.close()
 
 
-def test_a_double_clicked_pictures_slideshow_opens_at_the_clip_seconds_set(
+def test_a_double_clicked_images_slideshow_opens_at_the_clip_seconds_set(
         qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._pace.set_seconds(7)
@@ -16274,7 +16274,7 @@ def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
     view._voice.listener.speak_command("fix teeth")
 
     assert view._live_jobs == {}
-    assert "picture on screen" in words(view._voice.status)
+    assert "image on screen" in words(view._voice.status)
 
 
 def test_start_slideshow_is_heard_with_no_slideshow_and_no_auto_generate(qtbot, tmp_path,
@@ -16368,7 +16368,7 @@ def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeyp
 
 def test_a_finished_request_queues_the_revision_with_the_same_seed(
         qtbot, tmp_path, monkeypatch):
-    # "the same picture but without X" means the picture, so the one thing not
+    # "the same image but without X" means the image, so the one thing not
     # re-rolled is the seed that draws it.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
@@ -16404,7 +16404,7 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
     assert record["new_positive"] == "a woman, soft light"
 
 
-def test_a_queued_request_is_logged_by_the_pictures_it_joins_never_by_its_words(
+def test_a_queued_request_is_logged_by_the_images_it_joins_never_by_its_words(
         qtbot, tmp_path, monkeypatch, caplog):
     view = _requesting_view(qtbot, tmp_path, monkeypatch,
                             prompt="gamma form, an example lantern, soft light")
@@ -16575,9 +16575,9 @@ def _genau_db(tmp_path):
 
     The long-form video the fixture already carries was launched as the same act,
     so this also pins that the Genau lane picks the loop over it. "state two" is
-    the one picture state the example overlay lets the Genau lane animate at all,
+    the one image state the example overlay lets the Genau lane animate at all,
     and "alpha" the one act it allows from it — so an "animate as go now" over
-    this picture needs no act said. Both pictures are enhanced already, as
+    this image needs no act said. Both images are enhanced already, as
     the combine DB's is.
     """
     db = _combine_db(tmp_path)
@@ -16596,15 +16596,15 @@ def _genau_db(tmp_path):
     # fixture's original "img" has not been sorted at all.
     db.insert_generation(
         prompt_id="img_act", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
-        positive_prompt="a picture by the window", seed=2,
+        positive_prompt="an image by the window", seed=2,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=2,
-                                    positive_prompt="a picture by the window")),
+                                    positive_prompt="an image by the window")),
         workflow_json="{}",
     )
     db.update_generation("img_act", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_act.png", "subfolder": ""},
          {"filename": "sdxl_act_base.png", "subfolder": "", "role": "original"}]))
-    db.set_picture_state("img_act", "state two")
+    db.set_image_state("img_act", "state two")
     return db
 
 
@@ -16661,13 +16661,13 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
-# --- "animate as go now", spoken over a fullscreen picture -------------------
+# --- "animate as go now", spoken over a fullscreen image -------------------
 
 _SPOKEN_LOOP = AnimateRequest(act_settings.GENAU, "")
 
 
-def test_a_spoken_loop_takes_the_one_act_the_sorted_picture_leaves(qtbot, tmp_path,
-                                                                   monkeypatch):
+def test_a_spoken_loop_takes_the_one_act_the_sorted_image_leaves(qtbot, tmp_path,
+                                                                 monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
     # "img_act" is sorted, and its state leaves the Genau lane one act, so the
@@ -16684,8 +16684,8 @@ def test_a_spoken_loop_takes_the_one_act_the_sorted_picture_leaves(qtbot, tmp_pa
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"]
 
 
-def test_a_spoken_loop_over_an_unsorted_picture_asks_for_its_action(qtbot, tmp_path,
-                                                                    monkeypatch):
+def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_path,
+                                                                  monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
     prompt_id, message, kind = view.animate_it("img", _SPOKEN_LOOP)  # never sorted
@@ -16699,17 +16699,17 @@ def test_a_spoken_loop_over_an_unsorted_picture_asks_for_its_action(qtbot, tmp_p
 def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path,
                                                                   monkeypatch):
     db = _genau_db(tmp_path)
-    # A sorted picture of a state whose act the gallery holds no looping clip of.
+    # A sorted image of a state whose act the gallery holds no looping clip of.
     db.insert_generation(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
-        positive_prompt="another picture", seed=3,
+        positive_prompt="another image", seed=3,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=3,
-                                    positive_prompt="another picture")),
+                                    positive_prompt="another image")),
         workflow_json="{}",
     )
     db.update_generation("img_delta", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_delta.png", "subfolder": ""}]))
-    db.set_picture_state("img_delta", "state two")
+    db.set_image_state("img_delta", "state two")
     db.set_settings_source("loop", category=None)  # nothing left to mine a loop from
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -16730,7 +16730,7 @@ def test_a_spoken_loop_declines_a_video(qtbot, tmp_path, monkeypatch):
     prompt_id, message, kind = view.animate_it("loop", _SPOKEN_LOOP)
 
     assert prompt_id is None
-    assert "picture" in message
+    assert "image" in message
     assert kind == WARNING
 
 
@@ -16744,7 +16744,7 @@ def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     # Answered in the surface's own corner, not in a dialog over it — the speaker
-    # is looking at the picture, not at this pane.
+    # is looking at the image, not at this pane.
     assert surface.noted[0] == "img_act"
     assert "alpha" in surface.noted[1]
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
@@ -16755,10 +16755,10 @@ def _spoken_genau_rows(view):
     return [r for r in view._db.list_generations() if r.get("genau_requested_at")]
 
 
-def test_a_second_spoken_loop_over_the_same_picture_is_refused(qtbot, tmp_path, monkeypatch):
+def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, monkeypatch):
     # Saying it twice is what you do when the first time appeared to do nothing,
     # and it does appear to: the clip queues after whatever the machine is on
-    # and the picture on screen doesn't change. Two identical runs would spend
+    # and the image on screen doesn't change. Two identical runs would spend
     # minutes of the one GPU making a clip that is already coming.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
@@ -16773,9 +16773,9 @@ def test_a_second_spoken_loop_over_the_same_picture_is_refused(qtbot, tmp_path, 
     assert len(_spoken_genau_rows(view)) == 1
 
 
-def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
+def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
-    # A clip that has arrived is still a clip of this picture — asking again
+    # A clip that has arrived is still a clip of this image — asking again
     # would only re-make it, so it is answered rather than run.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
@@ -16795,7 +16795,7 @@ def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
         qtbot, tmp_path, monkeypatch):
     # Asking again is the only way to get a clip after a failure, so a row that
-    # produced nothing must not read as this picture having been Genau'd.
+    # produced nothing must not read as this image having been Genau'd.
     view = _genau_view(qtbot, tmp_path)
     view._slideshows._slideshow = _VoiceSurface("img_act")
 
@@ -16822,7 +16822,7 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
 
 
 def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_path):
-    # The spoken form of the Enhance button, aimed at the picture being watched.
+    # The spoken form of the Enhance button, aimed at the image being watched.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -16836,14 +16836,14 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
-    # Answered in the slideshow's own corner: the speaker is looking at the picture.
+    # Answered in the slideshow's own corner: the speaker is looking at the image.
     assert surface.noted == ("g0", "enhancing…", NOTICE)
 
 
-def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_path):
+def test_a_spoken_enhance_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
     # Said over a slideshow, this is a gesture made with no view of the Enhance panel
     # — the same reason a hold's Down leaves one alone — so it says so rather
-    # than re-deriving the picture at whatever the settings happen to read now.
+    # than re-deriving the image at whatever the settings happen to read now.
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps([
         {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
@@ -16897,8 +16897,8 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
 
 
 def test_a_spoken_enhance_with_no_slideshow_up_presses_the_bank_button(qtbot, tmp_path):
-    # The word names a bank button as well as the picture on screen, and with no
-    # picture filling the screen it is the button — aimed the way a click aims
+    # The word names a bank button as well as the image on screen, and with no
+    # image filling the screen it is the button — aimed the way a click aims
     # it, at the folder's images that have never been enhanced.
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
@@ -16932,7 +16932,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     # a verb added to the vocabulary lands there without this module listing the
     # parts a second time and drifting from it.  It wraps what it matches with
     # the side the utterance named, which is how a room with two slideshows in it
-    # says which picture is meant.
+    # says which image is meant.
 
     assert match("enhance").command == gallery.ENHANCE_COMMAND
     assert match("animate as alpha").command.act == "alpha"
@@ -17455,7 +17455,7 @@ def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot)
 
 
 def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_path,
-                                                                    monkeypatch):
+                                                                     monkeypatch):
     """The two folders a preview is resolved out of used to be read off the config
     module in the middle of the method, so the only way to point a view at a
     library of its own was to patch module state -- which four tests did while
@@ -17508,7 +17508,7 @@ def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp
 def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tmp_path):
     # The double-click he describes: the app has been slow enough that he presses
     # Generate twice to be sure it took, and the second press used to draw its own
-    # seed and make a picture he never asked for.
+    # seed and make an image he never asked for.
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)

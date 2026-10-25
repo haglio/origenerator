@@ -1,4 +1,4 @@
-"""The shape every card in a folder's grid shares — pictures and offers alike.
+"""The shape every card in a folder's grid shares — items and offers alike.
 
 A settings folder's grid holds finished thumbnails, live in-flight cards, and the
 two cards that aren't generations at all: the re-roll "+" and the request card
@@ -19,11 +19,11 @@ from PyQt6.QtWidgets import QLabel
 from shared_ui.fonts import FONT_UI, SIZE_TINY, make_font
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
-# The picture a card gives to its content, and the frame around it. The picture
+# The thumbnail a card gives to its content, and the frame around it. The thumbnail
 # is what the grid is for, so the card's height is what gives when the caption
 # needs more room, never this.
 CARD_WIDTH = 180
-PICTURE_SIZE = (172, 160)
+THUMBNAIL_SIZE = (172, 160)
 CARD_MARGIN = GAP_SMALL
 CARD_SPACING = GAP_SMALL
 
@@ -44,14 +44,14 @@ def caption_height() -> int:
 
 
 def card_size() -> tuple:
-    """Every card's outside — the picture, the caption band under it, and the
+    """Every card's outside — the thumbnail, the caption band under it, and the
     frame around both."""
-    height = (2 * CARD_MARGIN + PICTURE_SIZE[1] + CARD_SPACING + caption_height())
+    height = (2 * CARD_MARGIN + THUMBNAIL_SIZE[1] + CARD_SPACING + caption_height())
     return CARD_WIDTH, height
 
 
-def picture_size() -> QSize:
-    return QSize(*PICTURE_SIZE)
+def thumbnail_size() -> QSize:
+    return QSize(*THUMBNAIL_SIZE)
 
 
 def folder_card_size(breadcrumb: bool = False) -> tuple:
@@ -109,13 +109,13 @@ def selected_css(name: str) -> str:
 
 class MarkPlate(QLabel):
     """One of the family's marks, large and muted, on the plate a thumbnail's
-    picture would occupy."""
+    thumbnail would occupy."""
 
     def __init__(self, mark: str, *, side: int):
         super().__init__()
         self.mark = mark
         self._side = side
-        self.setFixedSize(*PICTURE_SIZE)
+        self.setFixedSize(*THUMBNAIL_SIZE)
         self.setStyleSheet(_PLATE_CSS)
 
     def paintEvent(self, event):

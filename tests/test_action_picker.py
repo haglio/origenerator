@@ -25,7 +25,7 @@ def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, act=None):
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "output_files": json.dumps([{"filename": filename}]),
-        "picture_state": state,
+        "image_state": state,
         "act": act,
     }
 
@@ -37,7 +37,7 @@ def picker(qtbot):
     return made
 
 
-def test_a_picture_offers_every_state_and_opens_on_the_one_it_was_sorted_as(picker):
+def test_an_image_offers_every_state_and_opens_on_the_one_it_was_sorted_as(picker):
     picker.show_row(_row(state="state two"))
 
     assert not picker.isHidden()
@@ -45,20 +45,20 @@ def test_a_picture_offers_every_state_and_opens_on_the_one_it_was_sorted_as(pick
     assert picker.offered() == ["", *_STATES]
 
 
-def test_a_picture_nobody_has_sorted_yet_opens_on_nothing(picker):
+def test_an_image_nobody_has_sorted_yet_opens_on_nothing(picker):
     picker.show_row(_row())
 
     assert picker.picked() == ""
 
 
-def test_a_picture_sorted_as_a_state_the_list_no_longer_offers_opens_on_nothing(picker):
+def test_an_image_sorted_as_a_state_the_list_no_longer_offers_opens_on_nothing(picker):
     picker.show_row(_row(state="a state taken off the list"))
 
     assert not picker.isHidden()
     assert picker.picked() == ""
 
 
-def test_picking_a_state_says_which_picture_it_is_for(picker, qtbot):
+def test_picking_a_state_says_which_image_it_is_for(picker, qtbot):
     picker.show_row(_row("img-7"))
 
     with qtbot.waitSignal(picker.chosen) as caught:
@@ -67,7 +67,7 @@ def test_picking_a_state_says_which_picture_it_is_for(picker, qtbot):
     assert caught.args == ["img-7", "state three"]
 
 
-def test_putting_a_picture_up_does_not_read_as_someone_picking_for_it(picker):
+def test_putting_an_image_up_does_not_read_as_someone_picking_for_it(picker):
     said = []
     picker.chosen.connect(lambda *args: said.append(args))
 
@@ -107,7 +107,7 @@ def test_an_act_spelled_like_one_on_the_list_but_for_case_and_spacing_is_that_ac
     assert picker.offered() == ["", *_ACTS]
 
 
-def test_only_a_picture_offers_the_button_that_sorts_pictures(picker):
+def test_only_an_image_offers_the_button_that_sorts_images(picker):
     sort = picker.findChild(QPushButton, SORT_BUTTON)
 
     picker.show_row(_row(filename="scene_00001_.mp4"))
@@ -117,7 +117,7 @@ def test_only_a_picture_offers_the_button_that_sorts_pictures(picker):
     assert (on_a_video, sort.isHidden()) == (True, False)
 
 
-def test_the_list_says_whether_it_is_a_pictures_or_a_videos(picker):
+def test_the_list_says_whether_it_is_an_images_or_a_videos(picker):
     combo = picker.findChild(QComboBox)
 
     picker.show_row(_row(filename="scene_00001_.mp4"))
@@ -126,7 +126,7 @@ def test_the_list_says_whether_it_is_a_pictures_or_a_videos(picker):
 
     assert (on_a_video, combo.toolTip()) == (
         "What this video shows — the act it was made as",
-        "What this picture already shows — which decides what it can be animated as")
+        "What this image already shows — which decides what it can be animated as")
 
 
 def test_a_tab_showing_nothing_shows_no_row(picker):
@@ -155,16 +155,16 @@ def test_the_list_opens_wide_enough_for_the_longest_action(picker):
 def test_a_button_beside_the_list_opens_the_window_that_answers_for_them_all(
         picker, monkeypatch):
     """The same window its own launcher opens, built in one place, so the two
-    cannot come to show different pictures."""
+    cannot come to show different images."""
     said = []
     monkeypatch.setattr(QMessageBox, "information",
                         lambda parent, title, text: said.append(text))
     monkeypatch.setattr(action_picker, "the_sorting_window",
-                        lambda first="": "Every picture already says what it shows.")
+                        lambda first="": "Every image already says what it shows.")
 
     picker.findChild(QPushButton, SORT_BUTTON).click()
 
-    assert said == ["Every picture already says what it shows."]
+    assert said == ["Every image already says what it shows."]
 
 
 def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second(
@@ -192,13 +192,13 @@ def test_the_button_beside_the_list_says_what_pressing_it_sets(picker):
 
     assert (button.text(), button.toolTip()) == (
         "Set image actions…",
-        "Set this picture's action, then every picture nobody has answered for, "
+        "Set this image's action, then every image nobody has answered for, "
         "one press apiece")
 
 
-def test_pressing_it_starts_on_the_picture_in_front_of_him(picker, monkeypatch):
+def test_pressing_it_starts_on_the_image_in_front_of_him(picker, monkeypatch):
     """His words: it "should start with the current image, then go on to the usual
-    queue", so the window is told which picture is on display."""
+    queue", so the window is told which image is on display."""
     opened = []
     monkeypatch.setattr(QMessageBox, "information", lambda parent, title, text: None)
     monkeypatch.setattr(action_picker, "the_sorting_window",

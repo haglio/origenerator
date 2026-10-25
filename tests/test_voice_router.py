@@ -602,10 +602,10 @@ def test_a_matched_kind_nobody_wired_through_is_logged_not_dropped(router, caplo
     assert "no arm for a matched" in caplog.text
 
 
-# --- orders about the picture on screen -------------------------------------
+# --- orders about the image on screen -------------------------------------
 
 
-def test_an_order_about_the_picture_goes_to_the_slide_filling_the_screen(router):
+def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):
     slideshow = FakeSlideshow(target="g7")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
@@ -630,7 +630,7 @@ def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(rout
     assert slideshows.answers == ["Enhance 2 images"]
 
 
-def test_an_animation_goes_to_the_picture_on_screen_with_the_lane_and_act_said(router):
+def test_an_animation_goes_to_the_image_on_screen_with_the_lane_and_act_said(router):
     slideshow = FakeSlideshow(target="g7")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
     asked = AnimateRequest(GENAU, "alpha")
@@ -641,13 +641,13 @@ def test_an_animation_goes_to_the_picture_on_screen_with_the_lane_and_act_said(r
     assert slideshow.runs == [("g7", "animating as “alpha”…", NOTICE)]
 
 
-def test_an_animation_asked_for_with_no_picture_on_screen_says_so(router):
+def test_an_animation_asked_for_with_no_image_on_screen_says_so(router):
     voice, host, _slideshows = router()
 
     voice.on_command(SurfaceCommand(AnimateRequest(VIDEO, "alpha"), None))
 
     assert host.animated == []
-    assert words(voice.status) == "an animation needs a picture on screen"
+    assert words(voice.status) == "an animation needs an image on screen"
 
 
 # --- a request said over several breaths ------------------------------------
@@ -670,7 +670,7 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
                                        db=FakeDB([_row("g1")]))
     begun = []
     # The working-out itself goes to a pool thread, whose answer would land
-    # whenever it landed; what this is about is which picture it is begun on.
+    # whenever it landed; what this is about is which image it is begun on.
     voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("no hat", listening=True))
     slideshow.target = "g2"

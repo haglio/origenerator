@@ -53,9 +53,9 @@ class Made:
 @dataclass(frozen=True)
 class Record:
     video: Made = field(default_factory=Made)
-    picture: Made | None = None
+    image: Made | None = None
     act: str | None = None
-    picture_key: tuple[str, str] | None = None
+    image_key: tuple[str, str] | None = None
     favorite: bool = False
 
 
@@ -64,12 +64,12 @@ def record_of(video: Path, records_folder: Path, *, act: str | None = None) -> R
     shown, made_from = _block(recorded, "video"), recorded.get("source_image")
     if act is not None:
         shown = {**shown, "action": act}
-    picture = made_from if isinstance(made_from, dict) else None
-    read = {"video": shown, "source_image": picture}
+    image = made_from if isinstance(made_from, dict) else None
+    read = {"video": shown, "source_image": image}
     return Record(video=_made(shown, PLACES[MediaType.VIDEO]),
-                  picture=_made(picture, PLACES[MediaType.IMAGE]) if picture is not None else None,
+                  image=_made(image, PLACES[MediaType.IMAGE]) if image is not None else None,
                   act=shown.get("action") or None,
-                  picture_key=seed_group_key(read) if picture else None,
+                  image_key=seed_group_key(read) if image else None,
                   favorite=recorded.get("favorite") is True)
 
 
@@ -166,10 +166,10 @@ def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VID
                                        rows=rows,
                                        held=db.library_paths() | db.binned_library_paths())]
     kinds = _kinds_by_site(rows, new)
-    pictures = _bring_up_to_records(db, places, rows, keep_going, kinds)
+    images = _bring_up_to_records(db, places, rows, keep_going, kinds)
     wanted = itertools.takewhile(lambda _new: keep_going(), new)
     brought = (made for video, record in wanted
-               if (made := _brought_in(video, record, places, pictures, grab, kinds)))
+               if (made := _brought_in(video, record, places, images, grab, kinds)))
     brought_in = 0
     for batch in itertools.batched(brought, videos_per_write):
         db.insert_rows([row for made in batch for row in made])
@@ -177,23 +177,23 @@ def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VID
     return brought_in
 
 
-def _brought_in(video: OutsideVideo, record: Record, places: Places, pictures: dict, grab,
+def _brought_in(video: OutsideVideo, record: Record, places: Places, images: dict, grab,
                 kinds: dict[str, set[VideoKind]]) -> list[dict]:
-    picture = _picture_of(video.source, record)
+    image = _image_of(video.source, record)
     made = rows_bringing_in(video, record, frames_dir=places.frames_dir,
-                            thumb_dir=places.thumb_dir, grab=grab, picture=pictures.get(picture),
+                            thumb_dir=places.thumb_dir, grab=grab, image=images.get(image),
                             kind=_named_kind(record, kinds[video.source]))
-    if picture is not None and picture not in pictures and len(made) == 2:
-        pictures[picture] = made[0]
+    if image is not None and image not in images and len(made) == 2:
+        images[image] = made[0]
     return made
 
 
-def _picture_of(site: str, record: Record) -> tuple | None:
-    return (site, *record.picture_key) if record.picture_key else None
+def _image_of(site: str, record: Record) -> tuple | None:
+    return (site, *record.image_key) if record.image_key else None
 
 
 def _kind(record: Record) -> VideoKind:
-    return VideoKind.IMAGE_TO_VIDEO if record.picture is not None else VideoKind.TEXT_TO_VIDEO
+    return VideoKind.IMAGE_TO_VIDEO if record.image is not None else VideoKind.TEXT_TO_VIDEO
 
 
 def _named_kind(record: Record, kinds_at_its_site: set[VideoKind]) -> VideoKind | None:
@@ -227,7 +227,7 @@ def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
     told_here, acted_here = _starred_here(said), _acted_here(said)
     frames = _frames_by_file(rows)
     made_here_from_frames = [row for row in rows if made_here(row) and _input_image(row)]
-    pictures: dict[tuple, dict] = {}
+    images: dict[tuple, dict] = {}
     rewritten: dict[str, dict] = {}
     for video_row in _outside_videos_oldest_first(rows):
         if not keep_going():
@@ -241,14 +241,14 @@ def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
                            act=_picked_since(acted_here.get(place), written))
         frame_row = frames.get(_input_image(video_row))
         site = outside_source(video_row["workflow_name"])
-        picture = _picture_of(site, record)
-        kept = pictures.get(picture)
+        image = _image_of(site, record)
+        kept = images.get(image)
         if kept is not None and (frame_row is None or frame_row["prompt_id"] != kept["prompt_id"]):
             if frame_row is not None:
                 _fold(db, frame_row, kept, made_here_from_frames)
             frame_row = kept
-        elif picture is not None and frame_row is not None:
-            pictures[picture] = frame_row
+        elif image is not None and frame_row is not None:
+            images[image] = frame_row
         frame_file = _kept_file(frame_row) if frame_row is not None else _input_image(video_row)
         updates = [(video_row, _video_fields(record, filed, frame_file, site,
                                              _named_kind(record, kinds.get(site, set()))))]
@@ -260,7 +260,7 @@ def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
         _take_the_star(db, video_row, record, told_here.get(place, 0), written)
     db.set_recorded_fields(list(rewritten.values()))
     db.forget_item_numbers(_numbered_in_another_folder(db))
-    return pictures
+    return images
 
 
 def _numbered_in_another_folder(db) -> list[str]:
@@ -298,9 +298,9 @@ def _fold(db, copy: dict, kept: dict, made_here_from_frames: list[dict]) -> None
     if copy.get("starred") and not kept.get("starred"):
         db.set_generation_favorite(kept["prompt_id"], True)
         kept["starred"] = 1
-    if copy.get("picture_state") and not kept.get("picture_state"):
-        db.set_picture_state(kept["prompt_id"], copy["picture_state"])
-        kept["picture_state"] = copy["picture_state"]
+    if copy.get("image_state") and not kept.get("image_state"):
+        db.set_image_state(kept["prompt_id"], copy["image_state"])
+        kept["image_state"] = copy["image_state"]
     _forget_frame(db, copy)
 
 
@@ -362,14 +362,14 @@ def _acted_here(said: list[dict]) -> dict[str, tuple[float, str]]:
 
 
 def rows_bringing_in(video: OutsideVideo, record: Record, *, frames_dir: Path, thumb_dir: Path,
-                     grab=first_frame_of, picture: dict | None = None,
+                     grab=first_frame_of, image: dict | None = None,
                      kind: VideoKind | None = None) -> list[dict]:
     frame = grab(video.path)
     if frame is None:
         return []
     filed = datetime.fromtimestamp(video.path.stat().st_mtime, tz=UTC)
     video_id = str(uuid.uuid4())
-    if picture is None:
+    if image is None:
         frame_id = str(uuid.uuid4())
         frame_path = _saved_frame(frame, frames_dir / f"{frame_id}.jpg")
         frames = [{**_frame_fields(record, filed, video.source), **_as_brought_in(),
@@ -379,7 +379,7 @@ def rows_bringing_in(video: OutsideVideo, record: Record, *, frames_dir: Path, t
                    "thumbnail_path": str(generate_thumbnail(frame_path, MediaType.IMAGE,
                                                             thumb_dir, name=frame_id))}]
     else:
-        frame_path, frames = Path(_kept_file(picture)), []
+        frame_path, frames = Path(_kept_file(image)), []
     return [*frames, {
         **_video_fields(record, filed, str(frame_path), video.source, kind), **_as_brought_in(),
         "prompt_id": video_id,
@@ -397,12 +397,12 @@ def _as_brought_in() -> dict:
 
 
 def _frame_fields(record: Record, filed: datetime, site: str) -> dict:
-    picture = record.picture
+    image = record.image
     return _recorded_fields(
-        GenerationSource.OUTSIDE if picture else GenerationSource.STARTING_FRAME,
+        GenerationSource.OUTSIDE if image else GenerationSource.STARTING_FRAME,
         outside_workflow(site, MediaType.IMAGE),
-        (picture or record.video).params,
-        _made_at(picture or record.video, filed), filed, act=None)
+        (image or record.video).params,
+        _made_at(image or record.video, filed), filed, act=None)
 
 
 def _video_fields(record: Record, filed: datetime, frame_file: str | None, site: str,

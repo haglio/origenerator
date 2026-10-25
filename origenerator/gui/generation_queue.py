@@ -5,7 +5,7 @@ live frame of the job ComfyUI is rendering, filling the strip's height out of it
 lower-left corner, and beside it a column no wider than a bar needs to be — the
 job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
 bar it measures. That frame opens the folder its run will land in, the way the
-row of the same job on the right does: it is a picture of a job, and a picture of
+row of the same job on the right does: it is a thumbnail of a job, and a thumbnail of
 a job goes where the job goes. A job ComfyUI hasn't started has no reading to
 write and that bar only sweeps, so where another app's work is what is holding
 it up, the line under the bar says so: a bar sweeping with nothing said about it
@@ -20,9 +20,9 @@ to a new place in the line. A row says what the job will cost and what kind of
 thing it is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a
 line of waiting work is read to find out how long the wait is, and the
 workflow-and-prompt name that used to be here is the same on every row of a
-folder being re-rolled. Beside that, a picture — the frame an I2V
+folder being re-rolled. Beside that, a thumbnail — the frame an I2V
 animates, the gray clip a dropped-video combine takes its settings from, or a
-four-up of the folder the run will land in — because the one picture a queued
+four-up of the folder the run will land in — because the one thumbnail a queued
 job cannot show is its own.
 Only what ComfyUI already holds is fixed: nothing can be moved in front of it.
 With nothing queued at all, the strip says so in dim letters across the middle of
@@ -172,7 +172,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
     The frame goes where the row of the same job goes — a click or a double-click
     on it opens the folder the run will land in (:class:`OpensAFolder`). Only the
-    frame: the bar beside it is a reading of this job rather than a picture of it,
+    frame: the bar beside it is a reading of this job rather than a thumbnail of it,
     and the note under that bar is about the shared server, so neither is
     something to click through to a folder.
     """
@@ -339,10 +339,10 @@ class RunningPreview(OpensAFolder, QWidget):
         source video in gray where a combine brought one
         (:func:`~origenerator.gui.combination_view.combination_pixmap`) — and
         nothing at all for a run made from nothing, which is a T2V with
-        no picture to its name yet.
+        no thumbnail to its name yet.
 
         The label is sized to what it draws, since the pair is twice as wide as
-        the square a single picture (or a live frame) fills.
+        the square a single thumbnail (or a live frame) fills.
         """
         side = min(self.height(), _STRIP_HEIGHT)
         pixmap = QPixmap()
@@ -378,7 +378,7 @@ class QueueRow(OpensAFolder, QWidget):
     """One job in the line: what it costs, what it is, what it is made from, and
     the buttons that shield it and throw it away.
 
-    Read left to right: the buttons, then the job's picture, then what it is —
+    Read left to right: the buttons, then the job's thumbnail, then what it is —
     ``"~2 min · Video · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
     line is the whole of what the row says about the job. The workflow-and-prompt
     name a Generate tab is titled with used to be here and is not: it answers
@@ -386,7 +386,7 @@ class QueueRow(OpensAFolder, QWidget):
     one, so a strip of eight said one thing eight times and none of them said
     which was the ten-minute one. It is still a hover away.
 
-    The picture is second because that is where it lines up into a column and
+    The thumbnail is second because that is where it lines up into a column and
     where the eye lands: the frame an I2V animates (with the gray
     source video beside it, where one was dropped), or four out of the folder the
     run will land in (:mod:`origenerator.gui.queue_thumbs`).
@@ -397,7 +397,7 @@ class QueueRow(OpensAFolder, QWidget):
     that is the whole line's, and is said once, under the bar in the left half —
     the bar it is holding up, and the thing it is there to explain.
 
-    The picture block is one width whether it holds one picture or four, so the
+    The thumbnail block is one width whether it holds one thumbnail or four, so the
     line of text beside it starts at the same place on every row.
 
     The second button reads "Cancel", or "Next seed" for a job whose folder is
@@ -411,8 +411,8 @@ class QueueRow(OpensAFolder, QWidget):
     """
 
     HEIGHT = 34  # about two of these fit beside the progress bar
-    # The side of one cell of the picture block: the row's height less its
-    # margins, so the pictures are as big as a row that still reads as a row can
+    # The side of one cell of the thumbnail block: the row's height less its
+    # margins, so the thumbnails are as big as a row that still reads as a row can
     # make them. The block itself is four of these across.
     THUMB = HEIGHT - 6
     INSET = GAP_SMALL
@@ -510,12 +510,12 @@ class QueueRow(OpensAFolder, QWidget):
         self._render_note()
 
     def _render_thumbs(self, item):
-        """The row's picture: what the job is made from, else what its folder holds.
+        """The row's thumbnail: what the job is made from, else what its folder holds.
 
         The start frame wins whenever there is one, being about *this* run rather
         than about where it will land — and being the only thing separating two
         i2v rows off one folder's settings. A combine handed a dropped video draws that video
-        beside it, in gray. A run with neither, or one whose pictures aren't on
+        beside it, in gray. A run with neither, or one whose thumbnails aren't on
         disk yet, falls back to the folder view; a folder with nothing in it yet
         leaves the block off the row rather than draw an empty grid.
         """
@@ -585,7 +585,7 @@ class GenerationQueue(QWidget):
 
     reorder_requested = pyqtSignal(list)  # prompt ids, in the order they were dropped into
     clear_queue_requested = pyqtSignal()  # wipe another app's work off ComfyUI
-    start_now_requested = pyqtSignal()  # end the minute a video waits after a picture
+    start_now_requested = pyqtSignal()  # end the minute a video waits after an image
 
     def __init__(self, parent=None):
         super().__init__(parent)

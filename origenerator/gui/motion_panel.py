@@ -67,7 +67,7 @@ class MotionPanel(PressablePicture):
         self.setFixedSize(*panel_room(motion))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
-        # second is the same picture at Pillow's price, and with the panel now
+        # second is the same drawing at Pillow's price, and with the panel now
         # always up that price would be paid for the whole session.
         self._repaint = QTimer(self)
         self._repaint.setInterval(REPAINT_MS)
@@ -144,7 +144,7 @@ class MotionPanel(PressablePicture):
                 else self._control.state())
 
     def picture(self) -> tuple[bytes, tuple[int, int]]:
-        """The console drawn — the picture, before it is a widget. Returned
+        """The console drawn — the drawing, before it is a widget. Returned
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         self._drawn_device = self._device()

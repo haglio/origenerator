@@ -266,7 +266,7 @@ def _backfill_import_params(library: Library):
     never recorded — the model and LoRA it nests under, the size it was made at,
     what it was told to avoid, the image an i2v was animated from, the sound it
     was scored with — so the app
-    offers a re-roll of the picture in front of the user rather than of the
+    offers a re-roll of the image in front of the user rather than of the
     workflow's defaults, and files it on the side its folder's size names."""
     from origenerator.importer import backfill_import_params
 
@@ -286,12 +286,12 @@ def _fold_enhancements(library: Library):
     here as a bare file, and the standalone image the scan just reconstructed
     from it is exactly what there is to fold away."""
     from origenerator import config
-    from origenerator.gallery import enhancements_of_pictures_gone, fold_completed_enhancements
+    from origenerator.gallery import enhancements_of_images_gone, fold_completed_enhancements
 
     fold_completed_enhancements(library.db)
-    return _scrap(library, enhancements_of_pictures_gone(library.db.list_generations(),
-                                                         places=library.places,
-                                                         input_dir=config.COMFYUI_INPUT_DIR))
+    return _scrap(library, enhancements_of_images_gone(library.db.list_generations(),
+                                                       places=library.places,
+                                                       input_dir=config.COMFYUI_INPUT_DIR))
 
 
 def _scrap(library: Library, rows: list[dict]) -> int:
@@ -388,7 +388,7 @@ MAINTENANCE = (
              counted="Put back the seed of %d video imports",
              failure="Video-import seed repair failed: %s"),
     BootPass("Folding enhancements into their images...", _fold_enhancements,
-             counted="Moved %d enhancement(s) of deleted pictures to the Trash",
+             counted="Moved %d enhancement(s) of deleted images to the Trash",
              failure="Enhancement fold failed: %s"),
     BootPass(None, _disown_foreign_runs,
              counted="Disowned a preview's run id on %d enhanced image(s)",

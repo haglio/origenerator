@@ -34,8 +34,8 @@ def _faded_backgrounds(window):
     return [faded for faded in window.findChildren(FadedBackground) if faded.isVisible()]
 
 
-def _lightness_across_the_middle(picture):
-    image = picture.toImage()
+def _lightness_across_the_middle(grab):
+    image = grab.toImage()
     return [image.pixelColor(x, image.height() // 2).lightness()
             for x in range(0, image.width(), 4)]
 

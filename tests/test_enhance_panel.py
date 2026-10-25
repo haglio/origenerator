@@ -752,7 +752,7 @@ def _click(qtbot, row, modifier=Qt.KeyboardModifier.NoModifier):
 
 
 def test_clicking_anywhere_on_a_row_picks_it(qtbot):
-    # A row is one thing to click. Its picture and its lines of text cover
+    # A row is one thing to click. Its thumbnail and its lines of text cover
     # nearly all of it, and a child widget takes the press by default — which
     # left only the margins around them live.
 
@@ -761,7 +761,7 @@ def test_clicking_anywhere_on_a_row_picks_it(qtbot):
     versions.show_levels(_items(_levels(1)), created_fallback="2026-08-01")
     row = _rows(versions)[0]
 
-    targets = [row._picture, row._title]
+    targets = [row._thumbnail, row._title]
     targets += [lbl for lbl in row.findChildren(QLabel) if lbl.text() == "File"]
     for target in targets:
         assert row.childAt(target.mapTo(row, QPoint(3, 3))) is None, target.text()
@@ -1398,11 +1398,11 @@ def test_the_add_cards_tile_is_the_yellow_press_and_the_row_beside_it_is_not(qtb
     QApplication.processEvents()
     (card,) = versions._host.findChildren(_AddRow)
     image = card.grab().toImage()
-    tile = card._picture.geometry()
+    tile = card._thumbnail.geometry()
     beside = image.copy(tile.right() + 1, 0, image.width() - tile.right() - 1,
                         image.height())
 
-    assert card._picture.size() == versions._rows[0]._picture.size()
+    assert card._thumbnail.size() == versions._rows[0]._thumbnail.size()
     assert _share_painted(image.copy(tile), AMBER) > 0.5
     assert _share_painted(beside, AMBER) == 0
 
@@ -1412,11 +1412,11 @@ def test_the_add_cards_plus_is_drawn_big_in_its_tile(qtbot):
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
     (card,) = versions._host.findChildren(_AddRow)
-    plus = card._picture.pixmap().toImage()  # drawn, like the bank's plus, not typed
+    plus = card._thumbnail.pixmap().toImage()  # drawn, like the bank's plus, not typed
 
     inked = sum(1 for y in range(plus.height()) for x in range(plus.width())
                 if plus.pixelColor(x, y).alpha() > 128)
-    assert inked >= card._picture.width() * card._picture.height() // 12
+    assert inked >= card._thumbnail.width() * card._thumbnail.height() // 12
 
 
 def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):
@@ -1445,7 +1445,7 @@ def test_hovering_the_dimmed_card_outlines_the_level_it_would_duplicate_in_white
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x", 1))
     (card,) = versions._host.findChildren(_AddRow)
-    duplicate = versions._rows[1]._picture
+    duplicate = versions._rows[1]._thumbnail
     point = QPointF(card.rect().center())
     resting = duplicate.styleSheet()
 
@@ -1504,7 +1504,7 @@ def _an_image(path, size=(16, 16)):
 
 
 def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, level_drags):
-    # The same gesture as dragging a gallery thumbnail onto Combine: the picture
+    # The same gesture as dragging a gallery thumbnail onto Combine: the thumbnail
     # comes along under the cursor, so what is being dragged is never in doubt.
     tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "e1.png"))
@@ -1532,9 +1532,9 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, level_
     assert level_drags == []
 
 
-def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, level_drags):
+def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, level_drags):
     # An enhancement is an upscale, so the file under a version can be huge; the
-    # picture under the cursor is the same thumbnail every other drag trails.
+    # thumbnail under the cursor is the same thumbnail every other drag trails.
 
     tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "big.png", (1024, 768)))
@@ -1547,7 +1547,7 @@ def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, level_
     assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_MAX
 
 
-def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):
+def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
     # A level whose file is gone still carries its settings; there is simply no
     # image to trail, and that must not stop the drag.
     class _RecordingDrag:
@@ -1593,7 +1593,7 @@ def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
 
 def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
     # "Enhancing" alone says nothing you didn't already know; the numbers are
-    # the only thing worth reading off a tile that has no picture yet.
+    # the only thing worth reading off a tile that has no thumbnail yet.
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -1750,10 +1750,10 @@ def test_folding_survives_a_rebuild_for_another_image(qtbot):
     assert versions.is_collapsed()
 
 
-def test_a_narrow_row_puts_its_facts_under_the_picture(qtbot):
+def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
     """The widest thing in the tab wraps rather than set the pane's floor.
 
-    A picture beside a file's facts and buttons wants some 450px side by side,
+    A thumbnail beside a file's facts and buttons wants some 450px side by side,
     which is wider than a tiling-narrow info pane can be — so the pane would have
     had to choose between refusing to fit a monitor third and scrolling its
     settings sideways. Stacked, the row asks for the wider of the two rather than
@@ -1768,17 +1768,17 @@ def test_a_narrow_row_puts_its_facts_under_the_picture(qtbot):
     qtbot.addWidget(host)
     host.show()
 
-    side_by_side = row._picture.sizeHint().width() + row._facts.minimumSize().width()
+    side_by_side = row._thumbnail.sizeHint().width() + row._facts.minimumSize().width()
     assert row.minimumSizeHint().width() < side_by_side
 
     host.resize(side_by_side + 60, 400)          # room for both
     QApplication.processEvents()
-    assert row._title.x() > row._picture.x() + row._picture.width()
-    assert row._title.y() < row._picture.y() + row._picture.height()
+    assert row._title.x() > row._thumbnail.x() + row._thumbnail.width()
+    assert row._title.y() < row._thumbnail.y() + row._thumbnail.height()
 
     host.resize(row.minimumSizeHint().width(), 400)   # room for one
     QApplication.processEvents()
-    assert row._title.y() >= row._picture.y() + row._picture.height()
+    assert row._title.y() >= row._thumbnail.y() + row._thumbnail.height()
 
 
 def test_the_panels_captions_use_plain_words(qtbot):

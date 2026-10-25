@@ -554,12 +554,12 @@ class SearchTile:
 
     Several hits in one settings folder are one answer, not eight — they share a
     prompt and settings and differ only by seed, so drawing each of them fills
-    the pane with near-copies of the same picture and buries the other places
+    the pane with near-copies of the same item and buries the other places
     the query reached. So the view collapses them onto their folder (``group``
     set, ``rows`` the hits it stands for), and leaves a folder's lone hit as
     itself (``group`` ``None``).
 
-    ``row`` is the newest hit either way: the tile's picture when it stands
+    ``row`` is the newest hit either way: the tile's thumbnail when it stands
     alone, and what decides the model + LoRA band it lands in when sorted that
     way — every row in a settings folder ran the same settings, so any of them
     answers that.

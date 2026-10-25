@@ -257,7 +257,7 @@ def test_show_image_animates_animated_file(make_preview, tmp_path):
 def test_an_animated_preview_is_fitted_into_the_pane_without_being_stretched(
         make_preview, tmp_path):
     # The hazard this scaling exists for, and the one it was never asked about: a
-    # 4:3 loop stretched to fill a square pane is a different picture from the one
+    # 4:3 loop stretched to fill a square pane is a different item from the one
     # that was made, and the shape is what a viewer notices first.
     w = make_preview()
     w._image_label.resize(200, 200)
@@ -320,7 +320,7 @@ def test_the_video_on_screen_is_named_by_the_run_it_came_from(make_preview, tmp_
     assert w.video_on_screen() == "alpha-1"
 
 
-def test_a_picture_or_the_frames_of_a_run_still_going_are_no_video_on_screen(
+def test_an_image_or_the_frames_of_a_run_still_going_are_no_video_on_screen(
         make_preview, tmp_path):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"), "alpha-1")
@@ -462,7 +462,7 @@ def _slideshow_on_a_sessions_funestra(tmp_path):
     return slideshow
 
 
-def test_a_pane_whose_picture_went_to_a_sessions_funestra_goes_on_taking_runs_and_files(
+def test_a_pane_whose_item_went_to_a_sessions_funestra_goes_on_taking_runs_and_files(
         make_preview, tmp_path):
     slideshow = _slideshow_on_a_sessions_funestra(tmp_path)
     preview = make_preview()
@@ -517,8 +517,8 @@ def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monk
 
 def test_the_corners_keep_off_the_timeline_while_a_videos_size_is_unknown(qtbot, tmp_path):
     # A clip's resolution arrives late, or never (a backend need not report it),
-    # and until it does the picture is taken to be the whole media area. That
-    # is not the whole pane: the timeline along the foot is no picture, and a
+    # and until it does the item is taken to be the whole media area. That
+    # is not the whole pane: the timeline along the foot is no part of the item, and a
     # chip laid over it read as a dark tab hanging off the video's lower edge.
     w = _timeline_preview(qtbot)
     w.resize(320, 480)
@@ -551,7 +551,7 @@ def test_the_timeline_takes_the_videos_length_from_the_player(qtbot, tmp_path):
     assert w._timeline._duration == 4000
 
 
-def test_the_corners_follow_the_picture_when_the_timeline_takes_its_room(qtbot, tmp_path):
+def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp_path):
     # The timeline appears with the video, a layout pass later, and takes its rows
     # from the media area. A clip whose resolution is known is placed against
     # the video surface, so the corners have to be re-placed when that surface
@@ -678,7 +678,7 @@ def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_pat
 
 def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
         qtbot, make_preview, tmp_path, drags):
-    # The pane fits its picture to its own size, which is far bigger than a drop
+    # The pane fits its item to its own size, which is far bigger than a drop
     # slot; under the cursor it travels as a thumbnail like every other drag.
     w = make_preview()
     w.show()
@@ -708,7 +708,7 @@ def test_a_dragged_animation_trails_the_frame_it_is_on(make_preview, tmp_path, d
 
 
 def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, drags):
-    # A video's picture is on the player's surface, in no label at all — the last
+    # A video's item is on the player's surface, in no label at all — the last
     # frame handed to the sink is the only hold on it, and without it a dragged
     # video was the one drag in the app that showed nothing.
     w = make_preview()
@@ -759,12 +759,12 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, drags):
     assert drags == []
 
 
-# --- the notice: this picture isn't what the settings beside it would make ---
+# --- the notice: this item isn't what the settings beside it would make ---
 
 def _video_frame(color: str) -> QVideoFrame:
-    picture = QImage(64, 36, QImage.Format.Format_RGB32)
-    picture.fill(QColor(color))
-    return QVideoFrame(picture)
+    pixels = QImage(64, 36, QImage.Format.Format_RGB32)
+    pixels.fill(QColor(color))
+    return QVideoFrame(pixels)
 
 
 def _middle_of_the_media(w) -> QColor:
@@ -794,7 +794,7 @@ def test_a_playing_video_is_drawn_in_the_preview_itself(make_preview, tmp_path):
 
 @pytest.mark.parametrize("show_red", [_show_a_red_video, _show_a_red_still],
                          ids=["video", "still"])
-def test_a_notice_leaves_the_picture_under_it_as_it_was(make_preview, tmp_path, show_red):
+def test_a_notice_leaves_the_item_under_it_as_it_was(make_preview, tmp_path, show_red):
     w = make_preview()
     w.resize(320, 240)
     show_red(w, tmp_path)
@@ -850,7 +850,7 @@ def test_clearing_the_notice_takes_it_away(make_preview, tmp_path):
     lambda w, tmp: w.show_combination(Combination(_make_png(tmp / "c.png"))),
 ])
 def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, show):
-    # A notice is about the picture it was set over, so it can never outlive it —
+    # A notice is about the item it was set over, so it can never outlive it —
     # least of all over the live frames of the run that answers it.
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
@@ -861,9 +861,9 @@ def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, 
     assert w._notice.isHidden()
 
 
-def test_frames_of_the_picture_itself_leave_the_notice_up(make_preview, tmp_path):
+def test_frames_of_the_item_itself_leave_the_notice_up(make_preview, tmp_path):
     # An enhancement streams the coming state of what is already on display —
-    # not a run of the settings beside it — so a notice about that picture is
+    # not a run of the settings beside it — so a notice about that item is
     # just as true of the version arriving, and the two belong on screen
     # together. Cleared by each frame and re-asserted by each keystroke, it
     # blinked at the rate the run streamed while the form was typed in.
@@ -878,7 +878,7 @@ def test_frames_of_the_picture_itself_leave_the_notice_up(make_preview, tmp_path
 
 
 def test_a_kept_notice_rides_over_the_frame_that_lands_under_it(make_preview, tmp_path):
-    # Switching the stacked layout to the picture raises that widget above every
+    # Switching the stacked layout to the item raises that widget above every
     # sibling it has, the notice included — so a kept one is lifted back.
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4")  # the stack is on the video surface
@@ -909,7 +909,7 @@ def test_narrowing_the_pane_wraps_the_plate_to_fit_inside_it(make_preview, tmp_p
 # --- a combination, before anything has been made from it --------------------
 
 def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, tmp_path):
-    # "Edit individual…" hands a tab a picture and a past video's settings. The
+    # "Edit individual…" hands a tab an item and a past video's settings. The
     # idle line ("select a generation to preview") describes a tab pointed at
     # nothing, which is exactly what this is not.
     w = make_preview()
@@ -1008,7 +1008,7 @@ def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path)
 
     assert w._stack.currentWidget() is w._image_label
     assert w._combination._movie is None
-# --- the corner controls over the picture ------------------------------------
+# --- the corner controls over the item ------------------------------------
 
 def _corners(w):
     """The preview's star, trash can and plus, in that order."""
@@ -1025,7 +1025,7 @@ def test_an_armed_preview_wears_the_same_corners_a_thumbnail_does(make_preview,
     assert all(not b.isHidden() for b in _corners(w))
 
 
-def test_a_new_picture_takes_the_last_one_s_corners_away(make_preview, tmp_path):
+def test_a_new_item_takes_the_last_one_s_corners_away(make_preview, tmp_path):
     # The corners are about the generation on screen, so they can no more outlive
     # it than the "no longer these settings" notice can.
     w = make_preview()
@@ -1062,7 +1062,7 @@ def test_a_corner_of_the_preview_names_the_generation_it_is_about(make_preview,
     assert fired == [("p1", corner_controls.STAR)]
 
 
-def test_right_clicking_the_picture_asks_for_its_menu(make_preview, tmp_path):
+def test_right_clicking_the_item_asks_for_its_menu(make_preview, tmp_path):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_actions("p1", favorite=False, enhance=None)
@@ -1085,18 +1085,18 @@ def test_right_clicking_an_unarmed_preview_asks_for_nothing(make_preview):
     assert asked == []
 
 
-def test_the_corners_follow_the_picture_rather_than_the_pane(make_preview, tmp_path):
+def test_the_corners_follow_the_item_rather_than_the_pane(make_preview, tmp_path):
     # A portrait image in a wide pane is letterboxed, so corners pinned to the
-    # pane would float in the black surround instead of on the picture.
+    # pane would float in the black surround instead of on the item.
     w = make_preview()
     w.resize(400, 300)
     w._image_label.resize(400, 300)
     w.show_image(_make_tall_png(tmp_path / "tall.png"))
     w.set_actions("p1", favorite=True, enhance=None)
 
-    picture = w.media_rect()
-    assert picture.width() < w.width()          # it really is letterboxed
-    assert picture.contains(_corners(w)[0].geometry())
+    area = w.media_rect()
+    assert area.width() < w.width()          # it really is letterboxed
+    assert area.contains(_corners(w)[0].geometry())
 
 
 # --- putting the pane down before laying new content in it -------------------
@@ -1105,12 +1105,12 @@ def test_the_corners_follow_the_picture_rather_than_the_pane(make_preview, tmp_p
 # notice, the corner controls, the media, the live follow and the generation.
 # The set is the same six things each time, so these pin it as one list —
 # including the deliberate exception (a kept notice rides over the frames of the
-# picture it is about) and the one that is a defect, held below.
+# item it is about) and the one that is a defect, held below.
 
 
 def _pane_holding_everything(w, tmp_path):
     """A pane holding a saved generation with every resettable thing set: an
-    animated picture, a notice over it, armed corners and an armed drag."""
+    animated item, a notice over it, armed corners and an armed drag."""
     w.show_image(_animated_webp(tmp_path / "held.webp"), "held")
     w.set_notice("no longer what these settings would make")
     w.set_actions("held", favorite=True, enhance=None)
@@ -1125,7 +1125,7 @@ def test_showing_an_image_puts_down_all_the_pane_was_holding(make_preview, tmp_p
     w.show_image(path)
 
     assert w._player.stop.called            # whatever was playing
-    assert w._notice.isHidden()             # the notice about the last picture
+    assert w._notice.isHidden()             # the notice about the last item
     assert w._actions_id is None            # and its corners
     assert w._media == (path, "image")
     assert w._live is False
@@ -1205,10 +1205,10 @@ def test_a_message_marked_live_leaves_the_pane_following_the_run(make_preview,
     assert w._live is True
 
 
-def test_frames_of_the_picture_itself_keep_the_notice_they_are_about(make_preview,
-                                                                     tmp_path):
-    # An enhancement of the picture on screen: whatever the notice says about that
-    # picture is just as true of the version being made, so it stays up.
+def test_frames_of_the_item_itself_keep_the_notice_they_are_about(make_preview,
+                                                                  tmp_path):
+    # An enhancement of the item on screen: whatever the notice says about that
+    # item is just as true of the version being made, so it stays up.
     w = _pane_holding_everything(make_preview(), tmp_path)
 
     w.show_frame(_png_bytes(), enhancing=True)
@@ -1216,7 +1216,7 @@ def test_frames_of_the_picture_itself_keep_the_notice_they_are_about(make_previe
     assert not w._notice.isHidden()
 
 
-def test_frames_of_the_picture_itself_keep_its_corners(make_preview, tmp_path):
+def test_frames_of_the_item_itself_keep_its_corners(make_preview, tmp_path):
     w = _pane_holding_everything(make_preview(), tmp_path)
     star, trash, _plus = _corners(w)
 
@@ -1234,7 +1234,7 @@ def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,
 
     assert w._player.stop.called
     assert w._notice.isHidden()
-    assert w._actions_id is None            # a wall of pictures is not a row
+    assert w._actions_id is None            # a wall of items is not a row
     assert w._media is None
     assert w._live is False
     assert w._movie is None
@@ -1245,7 +1245,7 @@ def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,
                                                                  tmp_path):
     # The defect this closes (audit §3 bug 15, signed off 2026-08-31): the wall
     # kept the corners of whatever generation was there before it, so pressing
-    # trash binned a picture the user was no longer looking at.
+    # trash binned an item the user was no longer looking at.
     w = _pane_holding_everything(make_preview(), tmp_path)
     fired = []
     w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))

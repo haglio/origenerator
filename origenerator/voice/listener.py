@@ -68,7 +68,7 @@ class CommandAndRequestListener(QObject):
         """The whole-utterance command *text* is, or ``None`` -- asked first, and
         only while no request is being said, of what this app's own mic heard
         and of what the HOSTING session heard alike. Without it the session's
-        "enhanced only" reached the looser picture matcher, which reads it as
+        "enhanced only" reached the looser image matcher, which reads it as
         "enhance" with a word after it and spends a generation on it.
         """
         if self._bare_matcher is None or self.taking_a_request:

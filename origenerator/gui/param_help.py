@@ -21,12 +21,12 @@ from origenerator.workflows.base import ParamDef
 # Keyed by param name: what the setting does.
 _COMPOSITION_FOCUS = (
     "How the steps split between composition (the layout, the poses and, in a video, "
-    "the motion) and fine detail. Higher keeps the picture noisy for longer, so more "
+    "the motion) and fine detail. Higher keeps the result noisy for longer, so more "
     "of the steps decide composition; lower gives more of them to texture and detail."
 )
 
 PARAM_HELP: dict[str, str] = {
-    # --- prompts and the picture a run starts from ---
+    # --- prompts and the image a run starts from ---
     "positive_prompt": (
         "What you want to see. Comma-separated phrases work best; the earlier a "
         "phrase appears, the more weight it tends to carry. A video can tell a "
@@ -68,15 +68,15 @@ PARAM_HELP: dict[str, str] = {
         "its own, and a new scene starts with the one before it."
     ),
     "input_image": (
-        "The picture this run is built from: the start frame for a video, or the "
-        "structure to re-skin. Drop a picture from the gallery on it, or right-click "
+        "The image this run is built from: the start frame for a video, or the "
+        "structure to re-skin. Drop an image from the gallery on it, or right-click "
         "it to paste an Origenerator name or browse to any file."
     ),
     "video": (
-        "The video of the library whose moves the picture's person performs: "
+        "The video of the library whose moves the person in the image performs: "
         "the person's pose is read off every frame and performed, the video's "
         "sound rides along, and its script becomes the result's. The run is "
-        "shaped like this video, with the picture fitted into that shape. Drop a "
+        "shaped like this video, with the image fitted into that shape. Drop a "
         "video from the gallery on it, or right-click it to paste an Origenerator "
         "name or browse to one of the library's."
     ),
@@ -95,7 +95,7 @@ PARAM_HELP: dict[str, str] = {
         "composition. Random draws a fresh one on every Generate."
     ),
     "audio_seed": (
-        "The starting noise for the generated sound, separate from the picture's "
+        "The starting noise for the generated sound, separate from the video's "
         "seed — re-roll it to get a different take of the same scene's sound."
     ),
 
@@ -125,7 +125,7 @@ PARAM_HELP: dict[str, str] = {
     ),
     "lora_strength": (
         "How hard the LoRA pulls. 1.0 is its intended strength; much weaker and "
-        "it barely shows, much stronger and it tends to take over the picture."
+        "it barely shows, much stronger and it tends to take over the result."
     ),
     "lora_high": (
         "A LoRA trained for a specific look or subject, applied to the first "
@@ -138,19 +138,19 @@ PARAM_HELP: dict[str, str] = {
     "lora_strength_high": (
         "How hard the first pass's LoRA (high noise) pulls. 1.0 is its intended "
         "strength; much weaker and it barely shows, much stronger and it tends to "
-        "take over the picture."
+        "take over the result."
     ),
     "lora_strength_low": (
         "How hard the second pass's LoRA (low noise) pulls. 1.0 is its intended "
         "strength; much weaker and it barely shows, much stronger and it tends to "
-        "take over the picture."
+        "take over the result."
     ),
 
     # --- calibration ---
     "steps": (
-        "How many times the model goes over the picture, refining it. More steps "
+        "How many times the model goes over the result, refining it. More steps "
         "means more settled detail and a longer wait, with little gain once the "
-        "picture has stopped changing."
+        "result has stopped changing."
     ),
     "cfg": (
         "How strictly the model obeys the prompt (the CFG scale underneath). Too low "
@@ -179,7 +179,7 @@ PARAM_HELP: dict[str, str] = {
     ),
     "guidance": "How strictly the model obeys the prompt (Flux's guidance value).",
     "sampler_name": (
-        "How the picture moves from noise toward the model's guess at each step; "
+        "How the result moves from noise toward the model's guess at each step; "
         "hover each choice for how it works and how long it takes."
     ),
     "scheduler": (
@@ -198,25 +198,25 @@ PARAM_HELP: dict[str, str] = {
         "bigger it gets, the more the pass has to invent."
     ),
     "enhance_steps": (
-        "How many times the enhancement goes over the enlarged picture. Around 20 is "
+        "How many times the enhancement goes over the enlarged image. Around 20 is "
         "enough to build texture without redrawing anything."
     ),
     "enhance_denoise": (
-        "How far the enhance may stray from the picture it is refining (its denoise). "
+        "How far the enhance may stray from the image it is refining (its denoise). "
         "0.15 adds skin and fabric texture; by 0.3 it starts re-imagining anatomy, "
         "which is where creases turn into wounds."
     ),
     "enhance_detail_fixes": (
         "Which parts the enhance goes back over and redraws on their own, and how "
         "hard it redraws each. This is what mends a mouth melted into its teeth or a "
-        "finger too many, and it can afford to be bold where the whole-picture pass "
+        "finger too many, and it can afford to be bold where the whole-image pass "
         "cannot, since nothing outside the regions found is touched: around 0.45 "
         "actually re-forms a bad hand, while below 0.3 it only tidies the one it was "
         "given."
     ),
     "enhance_fix_prompts": (
         "The prompts a fix redraws its part toward and away from, put ahead of the "
-        "picture's own, and the LoRA it redraws through. A fix run with different "
+        "image's own, and the LoRA it redraws through. A fix run with different "
         "ones makes a different enhancement level."
     ),
 
@@ -225,7 +225,7 @@ PARAM_HELP: dict[str, str] = {
         "Which structure is lifted out of the structure image and held onto: its "
         "depth, or the skeleton of the people in it."
     ),
-    "controlnet": "The model that holds the picture to the structure image (a ControlNet).",
+    "controlnet": "The model that holds the result to the structure image (a ControlNet).",
     "controlnet_strength": (
         "How firmly the output is held to the structure image. Lower lets the prompt "
         "reshape things; higher traces the source closely."
@@ -258,7 +258,7 @@ PARAM_HELP: dict[str, str] = {
     # --- sound ---
     "audio_prompt": (
         "What the generated soundtrack should be — the sounds themselves, not the "
-        "picture. It watches the finished motion while it scores."
+        "video. It watches the finished motion while it scores."
     ),
     "audio_negative_prompt": "Sounds to keep out of the generated soundtrack.",
 }
@@ -311,7 +311,7 @@ RECOMMENDED: dict[str, str] = {
 OPTION_HELP: dict[str, dict[str, str]] = {
     "sampler_name": {
         "euler": (
-            "Each step moves straight toward the model's guess of the finished picture, "
+            "Each step moves straight toward the model's guess of the finished result, "
             "so it settles smoothly and early. One model run per step, the quickest kind."
         ),
         "euler_ancestral": (
@@ -345,7 +345,7 @@ OPTION_HELP: dict[str, dict[str, str]] = {
             "Spacing. About one model run per step, as fast as euler."
         ),
         "dpm_adaptive": (
-            "Keeps going until the picture stops changing, choosing its own number of "
+            "Keeps going until the result stops changing, choosing its own number of "
             "steps and ignoring Steps and Step Spacing. One model run per step or more, "
             "and the whole run often takes several times as long as euler's."
         ),
@@ -355,7 +355,7 @@ OPTION_HELP: dict[str, dict[str, str]] = {
         ),
         "dpmpp_sde": (
             "A DPM++ solver with a second guess at each step and a measured amount of "
-            "fresh noise, for detailed, lively pictures; with karras it is the DPM++ SDE "
+            "fresh noise, for detailed, lively results; with karras it is the DPM++ SDE "
             "Karras of model pages. Two model runs per step, about twice as slow as "
             "euler."
         ),
@@ -390,7 +390,7 @@ OPTION_HELP: dict[str, dict[str, str]] = {
         ),
         "lcm": (
             "Only for LCM models, which finish in 4 to 8 steps; on any other model it "
-            "ruins the picture. One model run per step, as fast as euler."
+            "ruins the result. One model run per step, as fast as euler."
         ),
         "ddim": (
             "An early sampler that moves straight toward the guess, much like euler. One "

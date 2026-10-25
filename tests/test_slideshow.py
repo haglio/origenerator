@@ -99,7 +99,7 @@ def test_index_tracks_the_current_position():
 
 
 def test_a_pass_can_start_on_a_named_item():
-    # A double-clicked picture opens on *that* picture, not on whatever the set
+    # A double-clicked item opens on *that* item, not on whatever the set
     # happens to lead with.
     playlist = _playlist(start=2)
     assert playlist.current() == Slide("c.png", "image")
@@ -321,7 +321,7 @@ def test_a_live_slide_takes_the_newest_frame_of_itself():
 
 def test_a_frame_for_a_slide_that_already_landed_is_ignored():
     # A message from the tail of a run, or a poll a beat late: it must not take
-    # the finished picture back off the screen and put a half-rendered one there.
+    # the finished image back off the screen and put a half-rendered one there.
     playlist = _four()
 
     assert playlist.update_live("id-a", b"frame-late") is False

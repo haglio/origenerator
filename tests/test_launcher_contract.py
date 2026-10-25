@@ -58,12 +58,12 @@ def test_the_sorting_launcher_sorts_the_live_library_whichever_checkout_runs_it(
     and a run of sorting spent on it is lost. So it borrows what the preview
     launcher does: the primary's venv, and the flag that points the library at
     the live install (config.LIBRARY_STATE_DIR). In the primary both are itself."""
-    report = dry_run(REPO_ROOT / "sort_pictures.vbs")
+    report = dry_run(REPO_ROOT / "sort_images.vbs")
 
     assert Path(report.value("directory")) == REPO_ROOT
-    assert report.value("arguments") == "-m origenerator.sort_pictures"
+    assert report.value("arguments") == "-m origenerator.sort_images"
     assert report.value("environment") == "ORIGENERATOR_BRANCH_SESSION=1"
-    assert Path(report.value("log")) == REPO_ROOT / "state" / "sort_pictures_launcher.log"
+    assert Path(report.value("log")) == REPO_ROOT / "state" / "sort_images_launcher.log"
 
 
 @on_windows
@@ -76,7 +76,7 @@ def test_both_of_those_windows_run_on_the_primary_checkouts_venv():
     is where three folders up IS the primary: the shared launcher spells that
     climb the same way wherever the file sits, so from a plain checkout it
     answers with a folder holding no virtual environment at all."""
-    for name in ("sort_pictures.vbs", "check_animations.vbs"):
+    for name in ("sort_images.vbs", "check_animations.vbs"):
         report = dry_run(REPO_ROOT / name)
 
         assert Path(report.value("interpreter")) == (

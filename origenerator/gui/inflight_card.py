@@ -11,7 +11,7 @@ on a dimming scrim (:class:`origenerator.gui.stage_scrim.StageScrim`), the same
 one a finished thumbnail wears while its enhancement cooks; and along the frame's
 foot a bar carries how far along the run is and how long that has taken
 (:func:`origenerator.timing.progress_status_label`), in the same words the lower
-strip's queue uses for the same job. A stage message that *replaced* the picture
+strip's queue uses for the same job. A stage message that *replaced* the thumbnail
 hid the one thing worth looking at, and a percentage that lived only in the queue
 left the card and the strip each telling half of one story.
 
@@ -34,7 +34,7 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
-_IMAGE_SIZE = grid_card.PICTURE_SIZE  # the family shape, so cards flow with tiles
+_IMAGE_SIZE = grid_card.THUMBNAIL_SIZE  # the family shape, so cards flow with tiles
 _BORDER_PX = 2
 # A blue "in progress" edge, distinct from a resting tile's.
 _BORDER = f"{_BORDER_PX}px solid {palette.IN_FLIGHT_BORDER}"
@@ -85,7 +85,7 @@ class InFlightCard(QWidget):
         layout.addWidget(self._caption)
 
         # Both ride over the frame rather than taking a row of their own, so the
-        # picture keeps the height a finished tile's has.
+        # thumbnail keeps the height a finished tile's has.
         self._scrim = StageScrim(self)
         self._bar = ProgressCaption(self)
         self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -138,10 +138,10 @@ class InFlightCard(QWidget):
         from rather than as the result (:mod:`origenerator.gui.blurred`).
 
         A run that came from nothing keeps the plain plate: there is no honest
-        picture to put there, and a queued image looks like every other queued
+        thumbnail to put there, and a queued image looks like every other queued
         image because it genuinely is.
         """
-        backdrop = blurred_backdrop(item.source_picture, QSize(*_IMAGE_SIZE))
+        backdrop = blurred_backdrop(item.source_file, QSize(*_IMAGE_SIZE))
         if backdrop is not None:
             self._image.setPixmap(backdrop)
 
@@ -176,7 +176,7 @@ class InFlightCard(QWidget):
 
         The frame is only positioned once the card's layout has run, so that is
         forced here rather than waited for: an overlay placed before it sits in
-        the card's top-left corner instead of over the picture.
+        the card's top-left corner instead of over the thumbnail.
         """
         self.layout().activate()
         frame = self._image.geometry()

@@ -1,4 +1,4 @@
-"""Dragging something out of a widget: the gesture, and the picture it trails.
+"""Dragging something out of a widget: the gesture, and the thumbnail it trails.
 
 The gesture is the same wherever it starts — note where the left button went
 down, and only once the pointer has travelled the platform's own drag distance
@@ -14,11 +14,11 @@ panel — so what is in flight is never in doubt. What each source is showing
 lives somewhere different, though: a still sits in a label's pixmap, a looping
 WebP in a ``QMovie``, a playing video on the player's own surface with no pixmap
 anywhere. Reaching only for ``label.pixmap()`` is how a dragged video came to
-trail nothing at all, while a dragged still trailed a picture the size of the
+trail nothing at all, while a dragged still trailed a thumbnail the size of the
 whole preview pane.
 
 So the sources ask here instead, and a drag looks the same wherever it started:
-one size, and nothing shown for the one case with genuinely no picture to show.
+one size, and nothing shown for the one case with genuinely no thumbnail to show.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.drags import carry
 
-# Every drag's picture fits inside this. Roughly a drop slot's own preview, so what
+# Every drag's thumbnail fits inside this. Roughly a drop slot's own preview, so what
 # is under the cursor reads as the thing that is about to land in the slot —
 # and a full-size still from the preview pane no longer swallows the pane it is
 # being dragged across.
@@ -52,9 +52,9 @@ def fit_thumbnail(pixmap: QPixmap | None) -> QPixmap:
 
 
 def label_thumbnail(label) -> QPixmap:
-    """The drag picture for whatever a ``QLabel`` is showing.
+    """The drag thumbnail for whatever a ``QLabel`` is showing.
 
-    A label playing a movie has a null ``pixmap()`` — its picture is the frame
+    A label playing a movie has a null ``pixmap()`` — its thumbnail is the frame
     the movie is on — so a video tile asked the wrong way looks empty.
     """
     movie = label.movie()

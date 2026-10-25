@@ -14,9 +14,9 @@ A row's tree key is its folder's own key with its side appended
 folder the user composed hang off the plain key, being the folder's rather than
 the side's.
 
-The shape is the folder's wherever its settings state a size: every picture of
+The shape is the folder's wherever its settings state a size: every item of
 that folder sits on that side, a running one is placed before it has a
-picture, and a picture that disagrees with its folder shows up beside it
+file, and an item that disagrees with its folder shows up beside it
 rather than hiding on the other side. A folder whose settings state no size --
 a video's, whose workflow derives the size in-graph from its start frame -- goes
 by the item's own shape, read off its thumbnail (a cheap header read that

@@ -1,4 +1,4 @@
-"""ComfyUI opens a picture, video or sound only from its own input, output or temp
+"""ComfyUI opens an image, video or sound only from its own input, output or temp
 folder, resolved past any link into them, so a run names each file kept anywhere
 else by a copy in ComfyUI's temp folder, which ComfyUI empties as it starts."""
 from __future__ import annotations

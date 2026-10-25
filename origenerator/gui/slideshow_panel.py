@@ -19,7 +19,7 @@ from origenerator.slideshow_buttons import slideshow_rows
 
 # The presses a slideshow answers for itself wherever it is drawn: the two filters,
 # reset, the order pair, the loops, the expand mark, the map's own clicks and
-# its keys, and the versions of the picture on screen.  The transport is the
+# its keys, and the versions of the image on screen.  The transport is the
 # other half, which a hosted window hands to its session instead.
 THE_SLIDESHOWS_OWN = frozenset({
     "fmode", "enhanced", "reset", "shuffle", "latest", "no_loop", "seed_loop",

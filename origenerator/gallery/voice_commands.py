@@ -1,4 +1,4 @@
-"""What a spoken utterance over a fullscreen picture can ask for.
+"""What a spoken utterance over a fullscreen image can ask for.
 
 Three commands share one mic: "fix <part>"
 (:mod:`~origenerator.workflows.detail_parts`), "animate as <act>"
@@ -25,7 +25,7 @@ from origenerator.workflows.detail_parts import (
 
 # The enhance command, as a value the dispatcher can test for. A bare marker
 # rather than a richer object because the command carries no argument: what to
-# enhance is whatever picture is on the screen being spoken over.
+# enhance is whatever image is on the screen being spoken over.
 ENHANCE_COMMAND = "enhance"
 
 # The word itself, and the past tense whisper offers about as readily off a
@@ -94,6 +94,6 @@ def said_in(phrase: str) -> str | None:
 
 
 def command_phrases() -> frozenset[str]:
-    """Every command about the picture that a recognizer listening for words should hear."""
+    """Every command about the image that a recognizer listening for words should hear."""
     return (fix_command_phrases() | animate_command_phrases()
             | {ENHANCE_COMMAND, f"{ENHANCE_COMMAND} it"})

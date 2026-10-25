@@ -51,7 +51,6 @@ from origenerator.outside_videos import (
 )
 from origenerator.picture_sorting import pictures_to_sort
 from origenerator.provenance import stamp_unstamped
-from origenerator.record_repair import repair_records
 from origenerator.relocate import relocate_moved_outputs
 from origenerator.workflows.outside import outside_workflow
 
@@ -354,21 +353,8 @@ def test_deleting_a_video_from_another_source_takes_none_of_the_librarys_files(t
 
 def _comfyui_output(tmp_path) -> Path:
     output = tmp_path / "comfyui output"
-    (output / "image").mkdir(parents=True)
-    (output / "image" / "sdxl_t2i_00001_.png").write_bytes(b"a picture")
+    output.mkdir(parents=True)
     return output
-
-
-def test_the_launch_repair_keeps_every_video_from_another_source_and_its_frame(tmp_path):
-    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
-    _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
-    _filed(places.upscaled_dir, "portrait", "b-site", "c1_topaz.mp4")
-    scan(db, places, grab=_still)
-    before = db.list_generations()
-
-    repair_records(db, OutputPlaces.in_one_folder(_comfyui_output(tmp_path)))
-
-    assert db.list_generations() == before
 
 
 def test_a_video_from_another_source_is_never_followed_into_comfyuis_output(tmp_path):

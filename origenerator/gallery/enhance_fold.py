@@ -50,6 +50,7 @@ from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
+from origenerator.record_fold import file_key
 
 logger = logging.getLogger(__name__)
 
@@ -110,10 +111,13 @@ def fold_enhancement(db, enhance_row: dict,
     if source_id is None:
         return None
     source = db.get_generation(source_id)
+    source_files = row_output_files(source)
+    listed = {file_key(entry) for entry in source_files}
+    new_files = [entry for entry in enhanced_files if file_key(entry) not in listed]
     updates = {
-        "output_files": json.dumps(enhanced_files + row_output_files(source)),
+        "output_files": json.dumps(new_files + source_files),
         "enhance_history": json.dumps(
-            _history_entries(enhanced_files, enhance_level_params(enhance_row), enhance_row)
+            _history_entries(new_files, enhance_level_params(enhance_row), enhance_row)
             + parse_file_list(source.get("enhance_history"))
         ),
     }

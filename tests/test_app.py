@@ -1201,7 +1201,6 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
     ("origenerator.provenance", "stamp_unstamped"),
-    ("origenerator.record_repair", "repair_records"),
     ("origenerator.bookmark_reconcile", "reconcile_bookmarks"),
 )
 
@@ -1424,12 +1423,11 @@ _SPLASH_LINES = (
     "Repairing thumbnails...",
     "Recovering generation times...",
     "Recording workflow versions...",
-    "Leaving one record per picture...",
     "Restoring folder bookmarks...",
 )
 
 
-def test_the_boot_says_the_thirteen_things_it_says():
+def test_the_boot_says_the_twelve_things_it_says():
     assert tuple(p.status for p in MAINTENANCE if p.status is not None) == _SPLASH_LINES
 
 

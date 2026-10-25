@@ -53,6 +53,7 @@ from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
+from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_names import ItemNames
@@ -1506,8 +1507,8 @@ def test_a_panel_still_on_the_picker_has_no_folder(blank_panel):
 
 # --- displaying a saved generation: the footer folded in from the inspect pane ---
 
-def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
-    """A completed SDXL image whose output file an i2v can name as its source."""
+def _image_being_made(db, prompt_id="img1", prompt="a cat"):
+    """An SDXL image ComfyUI is still making, with no file yet."""
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt=prompt, seed=1)
     db.insert_generation(
@@ -1515,6 +1516,13 @@ def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
         positive_prompt=prompt, seed=1,
         params_json=json.dumps(params), workflow_json="{}",
     )
+    db.update_generation(prompt_id, status="running")
+    return db.get_generation(prompt_id)
+
+
+def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
+    """A completed SDXL image whose output file an i2v can name as its source."""
+    _image_being_made(db, prompt_id, prompt)
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": filename, "subfolder": "image"}]))
     return db.get_generation(prompt_id)
@@ -2880,6 +2888,62 @@ def test_an_image_a_request_made_shows_its_words_in_the_request_section(saved_pa
     field = panel._param_form.request_field()
     assert field._words.text() == "no hat"
     assert field._words.isEnabled()
+
+
+def test_an_image_a_request_is_still_making_shows_its_words_in_the_request_section(
+        saved_panel):
+    panel, db = saved_panel
+    running = _image_being_made(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+
+    panel.show_running_generation(running)
+
+    assert panel._param_form.request_field()._words.text() == "no hat"
+
+
+def test_an_image_still_being_made_is_asked_no_change_of_until_it_lands(saved_panel):
+    panel, db = saved_panel
+    running = _image_being_made(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+    panel.show_running_generation(running)
+    field = panel._param_form.request_field()
+    assert not field._words.isEnabled()
+
+    db.update_generation("img1", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_img1.png", "subfolder": "image"}]))
+    landed = db.get_generation("img1")
+    panel.show_completed_result(landed, [landed])
+
+    assert field._words.isEnabled()
+    assert field._words.text() == "no hat"
+
+
+def test_an_image_a_request_is_still_making_is_marked_against_the_one_it_was_asked_of(
+        saved_panel, qtbot):
+    panel, db = saved_panel
+    running = _image_being_made(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+
+    panel.show_running_generation(running)
+
+    positive = panel._param_form._widgets["positive_prompt"]
+    qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
+    assert _positive(panel) == "a cat"
+    assert _notice(panel) == ""
+
+
+def test_an_image_a_request_is_still_making_links_to_the_one_it_was_asked_of(saved_panel):
+    panel, db = saved_panel
+    _image_row(db, "src", prompt="a cat, a hat")
+    running = _image_being_made(db, "img1", prompt="a cat")
+    _request_made(db, "img1", source="src")
+
+    panel.show_running_generation(running)
+
+    section = panel._related._requests_section
+    assert not section.isHidden()
+    assert [(tile._heading.text(), tile._prompt_id)
+            for tile in section.findChildren(SourceTile)] == [("Requested from", "src")]
 
 
 def test_an_image_a_request_made_is_marked_against_the_one_it_was_asked_of(

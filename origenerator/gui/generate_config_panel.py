@@ -1396,9 +1396,10 @@ class GenerateConfigPanel(DropZone):
         """
         self._point_elsewhere(row)
         self._hide_footer()
+        self._related.show_requests_and_modifications(row["prompt_id"])
         self._preview.clear()          # whatever was up is not this run's
         self._set_displayed_row(None)  # a running generation isn't a saved one
-        self._note_displayed_config()  # ...so no settings for a notice to deviate from
+        self._note_displayed_config(being_made=row)  # ...so nothing for a notice to deviate from
         self._emit_title()
 
     def _point_elsewhere(self, row: dict):
@@ -1617,7 +1618,8 @@ class GenerateConfigPanel(DropZone):
         if armed is not None:
             self._arm_preview_actions(armed)
 
-    def _note_displayed_config(self, made_with: dict | None = None):
+    def _note_displayed_config(self, made_with: dict | None = None, *,
+                               being_made: dict | None = None):
         """Take the settings a generation arriving in this tab was made with
         as the mark to measure edits against, and clear any notice left from the
         last one: the form's, or ``made_with`` for a result of this tab's own
@@ -1629,39 +1631,42 @@ class GenerateConfigPanel(DropZone):
             self._item_config(made_with) if self._displayed_row is not None else None
         )
         if self._param_form is not None:
-            self._aim_the_request()
+            self._aim_the_request(self._displayed_row or being_made)
+            marked_against = self._marked_against()
             with self._loading():  # marking the fields is no edit of them
-                if self._displayed_config is None:
+                if marked_against is None:
                     self._param_form.clear_prompt_rewrites()
                 else:
-                    self._param_form.track_prompt_rewrites(self._marked_against())
+                    self._param_form.track_prompt_rewrites(marked_against)
         self.refresh_modified_notice()
 
-    def _marked_against(self) -> dict:
-        params = self._displayed_config.params
+    def _marked_against(self) -> dict | None:
         aim = self._request_aim
-        if aim is None or not aim.words:
+        requested = aim is not None and bool(aim.words)
+        if self._displayed_config is None and not requested:
+            return None
+        params = self._settings_shown().params
+        if not requested:
             return params
         return {**params, "positive_prompt": aim.asked_of[0],
                 "negative_prompt": aim.asked_of[1]}
 
+    def _settings_shown(self) -> ConfigSnapshot:
+        return self._displayed_config or self._item_config()
+
     # --- the Request section: words the image on display is asked to change by
 
-    def _aim_the_request(self) -> None:
-        """Point the Request section at the image on display: the words a
-        request made it with, ready to be edited, or nothing for one nobody asked
-        for -- and nothing to ask of at all with no image up."""
+    def _aim_the_request(self, row: dict | None) -> None:
         field = self._param_form.request_field()
         if field is None:
             self._request_aim = None
             return
-        row, config = self._displayed_row, self._displayed_config
-        if row is None or config is None:
+        if row is None:
             self._request_aim = None
             field.set_available(False)
             return
-        shown = (config.params.get("positive_prompt") or "",
-                 config.params.get("negative_prompt") or "")
+        params = self._settings_shown().params
+        shown = (params.get("positive_prompt") or "", params.get("negative_prompt") or "")
         record = self._db.get_request(row["prompt_id"])
         words = words_of(record)
         self._request_aim = _RequestAim(
@@ -1670,7 +1675,7 @@ class GenerateConfigPanel(DropZone):
                       if words else shown),
             shown=shown,
             source_prompt_id=record["source_prompt_id"] if words else row["prompt_id"])
-        field.set_available(True)
+        field.set_available(self._displayed_config is not None)
         field.show_words(words)
 
     def asked(self) -> dict | None:

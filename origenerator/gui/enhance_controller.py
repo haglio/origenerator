@@ -27,6 +27,7 @@ from typing import NamedTuple, Protocol
 from PyQt6.QtWidgets import QMessageBox
 
 from origenerator import config, enhance_presets, fix_training, gallery
+from origenerator.file_refs import frame_name
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.enhance_panel import EnhancePanel
@@ -63,6 +64,10 @@ def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.
     workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
     by_folder: dict[str, list[tuple[dict, dict]]] = {}
     for row, params in asks:
+        if _made_or_on_its_way(jobs, row, params):
+            logger.info("Not enhancing %s again: it has, or has on its way, an enhancement "
+                        "at these settings", row.get("prompt_id"))
+            continue
         by_folder.setdefault(_folder_of(workflow, params, image_index), []).append((row, params))
     launched = []
     for key, entries in by_folder.items():
@@ -76,6 +81,16 @@ def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.
                 db.set_enhance_target(prompt_id, row.get("prompt_id"))
             launched.append((row, params, key, prompt_id))
     return launched
+
+
+def _made_or_on_its_way(jobs, row: dict, params: dict) -> bool:
+    if gallery.level_matching_params(row, params) is not None:
+        return True
+    image = frame_name(params.get("input_image"))
+    return any(job.workflow.name == gallery.ENHANCE_WORKFLOW
+               and frame_name(job.params.get("input_image")) == image
+               and gallery.same_enhancement(job.params, params)
+               for job in jobs.all_jobs)
 
 
 class Offer(NamedTuple):
@@ -395,9 +410,9 @@ class EnhanceController:
             self._note_launch(*launched)
 
     def _launch(self, row: dict, params: dict) -> bool:
-        (launched,) = launch_enhancements(self._jobs, self._db, [(row, params)],
-                                          self._host.image_config_index())
-        return self._note_launch(*launched)
+        launched = launch_enhancements(self._jobs, self._db, [(row, params)],
+                                       self._host.image_config_index())
+        return bool(launched) and self._note_launch(*launched[0])
 
     def _note_launch(self, row: dict, params: dict, key: str, prompt_id: str | None) -> bool:
         """Unlaunchable (no client, or the submit was refused) is logged rather

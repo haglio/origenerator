@@ -57,7 +57,7 @@ PUBLISHED = {
     "recent_generations", "recently_worked_folders", "recognized_spelling",
     "remove_enhance_levels", "requested_generations", "rerollable", "resolve_preview",
     "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
-    "rows_under", "section_headings", "selection_group",
+    "rows_under", "same_enhancement", "section_headings", "selection_group",
     "settings_folder_key", "settings_signature", "source_image_id_for",
     "source_image_id_in", "source_image_of",
     "favorite_folders", "favorite_generations", "start_frame_index",

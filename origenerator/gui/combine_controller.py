@@ -43,11 +43,11 @@ from origenerator.config import (
     LOCAL_LLM_MODEL,
     OUTPUT_PLACES,
 )
+from origenerator.export_lane import GENAU as GENAU_LANE
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
-from origenerator.gui.export_lane import GENAU as GENAU_LANE
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import InFlightItem, RunReading

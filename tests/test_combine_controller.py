@@ -18,13 +18,13 @@ from PyQt6.QtWidgets import QWidget
 from origenerator import act_settings, evolver_export, gallery
 from origenerator.animate_command import AnimateRequest
 from origenerator.db import Database
+from origenerator.export_lane import GENAU
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import combine_controller as module
 from origenerator.gui import file_pick
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
-from origenerator.gui.export_lane import GENAU
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces

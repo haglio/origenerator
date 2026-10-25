@@ -6,16 +6,12 @@ from collections import defaultdict
 
 from origenerator import animation_paths, gallery
 from origenerator.act_settings import GENAU, VIDEO, act_of, loops
-from origenerator.db_generations import SENT_COLUMNS
+from origenerator.db_generations import was_kept
 from origenerator.file_refs import frame_name
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 
 Path = tuple[str, str, str]  # lane, act, state
-
-
-def _was_kept(row: dict) -> bool:
-    return bool(row.get("starred")) or any(map(row.get, SENT_COLUMNS))
 
 
 def _made(row: dict) -> str:
@@ -37,7 +33,7 @@ def _kept_clips(rows: list[dict]) -> list[dict]:
             and gallery.produced_output(row)
             and gallery.media_type_of_row(row) == MediaType.VIDEO
             and gallery.is_image_conditioned(row.get("workflow_name") or "")
-            and _was_kept(row)]
+            and was_kept(row)]
 
 
 def samples_by_path(rows: list[dict], *, content: dict | None = None

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from origenerator import db_schema
 from origenerator import gallery_contract as contract
-from origenerator.gui.export_lane import EXPORT_LANES
+from origenerator.export_lane import EXPORT_LANES
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.frame_rate import NATIVE_FPS
 from tests.children import run_python

@@ -45,8 +45,8 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
 from origenerator.db import Database
 from origenerator.evolver_export import EvolverInbox
+from origenerator.export_lane import GENAU
 from origenerator.fun_time_mode import OFFER_NAME
-from origenerator.gui.export_lane import GENAU
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.output_places import OutputPlaces

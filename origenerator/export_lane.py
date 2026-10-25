@@ -14,7 +14,9 @@ from origenerator.act_settings import loops
 from origenerator.config import EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.funscript import funscript_of
+from origenerator.gallery import resolve_preview
 from origenerator.gallery_contract import LANES
+from origenerator.media import MediaType
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,12 @@ class ExportLane:
         self.mark(db, prompt_id)
         return landed
 
+    def send_video_of(self, row: dict, *, db, inbox, places) -> Path:
+        shown = resolve_preview(row, places)
+        if shown is None or shown[1] != MediaType.VIDEO:
+            raise FileNotFoundError(f"{row['prompt_id']} has no video on disk")
+        return self.send(shown[0], row["prompt_id"], db=db, inbox=inbox, places=places)
+
 KINO = ExportLane(
     name="Kino", source_key="evolver", source=EVOLVER_SOURCE,
     mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
@@ -118,6 +126,7 @@ GENAU = ExportLane(
 )
 
 EXPORT_LANES = (KINO, GENAU)
+EXPORT_LANES_BY_KEY = {lane.source_key: lane for lane in EXPORT_LANES}
 
 UNSEND_CAPTION = "Unsend"
 

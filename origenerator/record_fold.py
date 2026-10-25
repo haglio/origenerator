@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from origenerator.gallery_contract import LANES
+
 
 def file_key(entry: dict) -> tuple[str, str]:
     return entry.get("subfolder") or "", entry.get("filename") or ""
@@ -8,6 +10,12 @@ def file_key(entry: dict) -> tuple[str, str]:
 def fold_record_into(db, rows, folded: dict, keeper: dict) -> None:
     _carry_over_what_the_user_put_on_it(db, folded, keeper)
     _repoint_at_the_record_that_stays(db, rows, folded, keeper)
+
+
+def lanes_owed(folded: dict, keeper: dict) -> list[str]:
+    return [lane for lane, stamps in LANES.items()
+            if folded.get(stamps["sent"])
+            and not keeper.get(stamps["sent"]) and not keeper.get(stamps["unsent"])]
 
 
 def _carry_over_what_the_user_put_on_it(db, folded: dict, keeper: dict) -> None:

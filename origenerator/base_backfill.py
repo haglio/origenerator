@@ -147,28 +147,38 @@ def queue_base_renders(rows: list[dict], launch, limit: int | None = None,
     top of that, for a caller that wants a fixed number.
     """
     pending = already_queued(rows)
+
+    def launch_one(row: dict) -> bool:
+        workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
+        return launch(workflow, base_params_for(row, workflow)) is not None
+
+    queued, spent = queue_within_budget(
+        rows, [row for row in rows_missing_their_base(rows) if row["prompt_id"] not in pending],
+        launch_one, budget_minutes=budget_minutes, limit=limit)
+    if queued:
+        logger.info("Queued %d base re-render(s) (~%d min) to run while the app "
+                    "is closed", queued, round(spent / 60))
+    return queued
+
+
+def queue_within_budget(rows: list[dict], candidates: list[dict], launch_one, *,
+                        budget_minutes: float, limit: int | None = None) -> tuple[int, float]:
     cost: dict[str, float] = {}
     budget = budget_minutes * 60
     spent = 0.0
     queued = 0
-    for row in rows_missing_their_base(rows):
+    for row in candidates:
         if limit is not None and queued >= limit:
             break
-        if row["prompt_id"] in pending:
-            continue
         name = row["workflow_name"]
         if name not in cost:
             cost[name] = typical_seconds(rows, name)
         if queued and spent + cost[name] > budget:
             break  # always at least one, however slow: the backlog has to move
-        workflow = WORKFLOW_REGISTRY[name]
-        if launch(workflow, base_params_for(row, workflow)) is not None:
+        if launch_one(row):
             queued += 1
             spent += cost[name]
-    if queued:
-        logger.info("Queued %d base re-render(s) (~%d min) to run while the app "
-                    "is closed", queued, round(spent / 60))
-    return queued
+    return queued, spent
 
 
 # How often the run-it-now path asks ComfyUI whether a repair has landed, and how

@@ -292,7 +292,7 @@ def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp
     assert slideshow.hud_map().corner.prompt_id == "id-2"
 
 
-def test_a_word_is_about_the_slide_that_was_on_screen_when_it_was_said(qtbot, tmp_path):
+def test_a_word_said_at_no_known_time_is_about_the_slide_on_screen(qtbot, tmp_path):
     now = [10.0]
     slideshow = _slideshow(qtbot, tmp_path, clock=lambda: now[0])
     _says(slideshow, video="one.png")
@@ -300,9 +300,10 @@ def test_a_word_is_about_the_slide_that_was_on_screen_when_it_was_said(qtbot, tm
     now[0] = 12.0
     _says(slideshow, video="two.png")
     slideshow.tick()
+    _sent(slideshow)
 
-    assert slideshow.voice_target(said_at=10.5) == "id-1"
-    assert slideshow.voice_target() == "id-2"
+    assert slideshow.back_to_what_was_said_over(None) == "id-2"
+    assert _sent(slideshow) == []
 
 
 def test_a_word_said_over_a_slide_since_left_puts_that_slide_back_on_screen(qtbot, tmp_path):

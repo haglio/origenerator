@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 import threading
 from functools import partial
+from typing import NamedTuple
 
 from PyQt6.QtCore import QObject, QThreadPool, pyqtSignal
 
@@ -38,6 +39,11 @@ from origenerator.voice.rewrite import rewrite_prompt
 from origenerator.voice.worker import ProcessTask, VoiceWorker
 
 logger = logging.getLogger(__name__)
+
+
+class _SaidCommand(NamedTuple):
+    command: object
+    said_at: float
 
 
 class VoiceSteering(QObject):
@@ -94,7 +100,7 @@ class VoiceSteering(QObject):
 
     def start_commands(self, execute) -> None:
         """Begin listening for spoken commands: an utterance the matcher
-        recognizes calls ``execute`` with what it matched. Independent of
+        recognizes calls ``execute`` with what it matched and when it was said. Independent of
         steering — this alone keeps the mic open, and alongside a steered loop
         a matched command is consumed rather than rewriting the prompt."""
         self._execute_command = execute
@@ -130,7 +136,7 @@ class VoiceSteering(QObject):
         """
         return self._bare_matcher(text) if self._bare_matcher is not None else None
 
-    def push_dictation(self, text: str):
+    def push_dictation(self, text: str, spoken_at: float | None = None):
         """Feed the open request one transcription heard somewhere else, and
         answer what it meant (``None`` when it is not part of a request).
 
@@ -142,7 +148,8 @@ class VoiceSteering(QObject):
         half a request must never be held in one of them and half in the other.
         """
         with self._lock:
-            return self._dictation.push(text) if self._dictation is not None else None
+            return (self._dictation.push(text, spoken_at=spoken_at)
+                    if self._dictation is not None else None)
 
     @property
     def taking_a_request(self) -> bool:
@@ -176,7 +183,9 @@ class VoiceSteering(QObject):
             logger.info("Voice: rewriting the prompt with a %d-word instruction", length)
         else:
             logger.info("Voice: a %d-word utterance matched no command", length)
-        return meaning
+        if meaning is None or isinstance(meaning, SpokenRequest):
+            return meaning
+        return _SaidCommand(meaning, spoken_at)
 
     def _meaning(self, text: str, spoken_at: float):
         """What one transcription meant, or ``None`` to let it steer the prompt.
@@ -208,7 +217,7 @@ class VoiceSteering(QObject):
             self.request.emit(matched)
             return
         if self._execute_command is not None:
-            self._execute_command(matched)
+            self._execute_command(matched.command, matched.said_at)
 
     def _on_rewritten(self, new_prompts) -> None:
         logger.info("Voice: rewrote the prompt pair")

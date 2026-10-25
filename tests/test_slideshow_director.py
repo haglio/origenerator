@@ -108,6 +108,7 @@ class FakeSlideshow:
         self.hud_order_label = ""
         self.locked_on = None
         self.shown_locked = []
+        self.done = []
 
     # what a slideshow is, and what it holds
     def holds(self, prompt_id):
@@ -220,13 +221,19 @@ class FakeSlideshow:
 
     def cull(self):
         self.culled += 1
+        self.done.append(("cull",))
 
     def favorite(self):
         self.favorites += 1
+        self.done.append(("favorite",))
         return self.favoritable
 
     def set_locked(self, locked):
+        self.done.append(("lock", locked))
         return locked
+
+    def back_to_what_was_said_over(self, said_at):
+        self.done.append(("back to", said_at))
 
     def show_locked(self, path):
         self.shown_locked.append(path)
@@ -1488,12 +1495,41 @@ def test_the_transport_words_step_the_slide_and_say_which_way(slideshows):
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.run_on_slide(AppCommand.FORWARD)
-    director.run_on_slide(AppCommand.BACK)
+    director.run_on_slide(AppCommand.FORWARD, said_at=7.5)
+    director.run_on_slide(AppCommand.BACK, said_at=7.5)
 
     assert made[0].steps == [1, -1]
+    assert made[0].done == []  # a step is from the slide on screen
     assert made[0].said == ["next", "back"]
     assert made[0].said_kinds == [NOTICE, NOTICE]
+
+
+def test_a_lock_said_over_a_slide_since_left_puts_that_slide_back_and_locks_it(slideshows):
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+
+    director.run_on_slide(AppCommand.LOCK, said_at=7.5)
+
+    assert made[0].done == [("back to", 7.5), ("lock", True)]
+
+
+def test_weird_said_over_a_slide_since_left_puts_that_slide_back_and_takes_it_away(slideshows):
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+
+    director.run_on_slide(AppCommand.CULL, said_at=7.5)
+
+    assert made[0].done == [("back to", 7.5), ("cull",)]
+
+
+def test_a_favorite_said_over_a_slide_since_left_puts_that_slide_back_and_favorites_it(
+        slideshows):
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+
+    director.run_on_slide(AppCommand.FAVORITE, said_at=7.5)
+
+    assert made[0].done == [("back to", 7.5), ("favorite",)]
 
 
 def test_a_favorite_over_a_slide_with_nothing_to_favorite_says_so(slideshows):

@@ -109,6 +109,14 @@ def test_what_steers_the_prompt_leaves_its_words_and_both_prompts_off_the_log(
 # --- spoken commands: the same mic, a second use ----------------------------
 
 
+def _into(ran):
+    return lambda matched, said_at: ran.append(matched)
+
+
+def _ignore(matched, said_at):
+    return None
+
+
 def _command_steering(says="fix teeth"):
     listener = FakeListener(says)
     worker = VoiceWorker(lambda pos, neg, instr: (f"{pos}, {instr}", neg))
@@ -119,10 +127,20 @@ def _command_steering(says="fix teeth"):
     return steering, listener
 
 
+def test_a_command_goes_with_when_the_mic_heard_it_said(qtbot):
+    steering, listener = _command_steering()
+    ran = []
+    steering.start_commands(lambda matched, said_at: ran.append((matched, said_at)))
+
+    listener.hear(spoken_at=7.5)
+
+    assert ran == [("teeth", 7.5)]
+
+
 def test_commands_alone_open_the_mic_and_execute_what_they_match(qtbot):
     steering, listener = _command_steering()
     ran = []
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
 
     assert listener.started
     listener.hear()
@@ -137,7 +155,7 @@ def test_a_matched_command_is_consumed_not_steered(qtbot):
     prompts = {"positive": "a woman", "negative": ""}
     ran = []
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
 
     listener.hear()
 
@@ -150,7 +168,7 @@ def test_an_unmatched_utterance_still_steers_the_prompt(qtbot):
     prompts = {"positive": "a woman", "negative": ""}
     ran = []
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
 
     listener.hear()
 
@@ -161,7 +179,7 @@ def test_an_unmatched_utterance_still_steers_the_prompt(qtbot):
 def test_the_mic_stays_open_while_either_use_still_wants_it(qtbot):
     steering, listener = _command_steering()
     steering.start(lambda: {"positive": "", "negative": ""}, lambda new: None)
-    steering.start_commands(lambda part: None)
+    steering.start_commands(_ignore)
 
     steering.stop()  # the loop ended; a slideshow is still up
     assert not listener.stopped
@@ -184,7 +202,7 @@ def test_left_to_itself_it_listens_for_the_phrases_it_was_given(qtbot, monkeypat
 
 def test_a_command_is_logged_by_what_it_matched_and_how_many_words_it_was(qtbot, caplog):
     steering, listener = _command_steering(says="please fix the teeth on this one")
-    steering.start_commands(lambda matched: None)
+    steering.start_commands(_ignore)
 
     with caplog.at_level(logging.DEBUG):
         listener.hear()
@@ -195,7 +213,7 @@ def test_a_command_is_logged_by_what_it_matched_and_how_many_words_it_was(qtbot,
 def test_words_that_miss_every_command_go_to_the_screen_and_only_their_count_to_the_log(
         qtbot, caplog):
     steering, listener = _command_steering(says="put the kettle on")
-    steering.start_commands(lambda matched: None)
+    steering.start_commands(_ignore)
     shown = []
     steering.heard.connect(shown.append)
 
@@ -209,7 +227,7 @@ def test_words_that_miss_every_command_go_to_the_screen_and_only_their_count_to_
 def test_stopping_commands_ends_their_execution(qtbot):
     steering, listener = _command_steering()
     ran = []
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
     steering.stop_commands()
 
     listener.hear()  # a late utterance after the surface closed
@@ -248,11 +266,19 @@ def test_a_request_keeps_the_time_the_mic_heard_its_first_step_said(qtbot):
     steering, listener = _request_steering()
     spoken = []
     steering.request.connect(spoken.append)
-    steering.start_commands(lambda matched: None)
+    steering.start_commands(_ignore)
 
     listener.hear(spoken_at=7.5)
 
     assert [s.opened_at for s in spoken] == [7.5]
+
+
+def test_a_request_the_session_heard_keeps_when_it_was_said(qtbot):
+    steering, _listener = _request_steering()
+
+    spoken = steering.push_dictation("Request, no hat, over.", spoken_at=7.5)
+
+    assert spoken.opened_at == 7.5
 
 
 def test_an_open_request_swallows_what_would_be_a_command(qtbot):
@@ -262,7 +288,7 @@ def test_an_open_request_swallows_what_would_be_a_command(qtbot):
     ran = []
     spoken = []
     steering.request.connect(spoken.append)
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
 
     listener.hear()          # opens the request
     listener.says = "fix teeth"
@@ -289,7 +315,7 @@ def test_a_request_is_logged_by_where_it_stands_and_never_by_its_words(qtbot, ca
     steering, listener = _request_steering(says="Request, no example lantern, over.")
     spoken = []
     steering.request.connect(spoken.append)
-    steering.start_commands(lambda matched: None)
+    steering.start_commands(_ignore)
 
     with caplog.at_level(logging.INFO, logger="origenerator.voice"):
         listener.hear()
@@ -300,7 +326,7 @@ def test_a_request_is_logged_by_where_it_stands_and_never_by_its_words(qtbot, ca
 
 def test_closing_the_mic_drops_a_half_said_request(qtbot):
     steering, listener = _request_steering(says="Request.")
-    steering.start_commands(lambda part: None)
+    steering.start_commands(_ignore)
     listener.hear()
     assert steering._dictation.listening
 
@@ -331,7 +357,7 @@ def test_a_word_a_request_opens_on_opens_one_whatever_else_it_matches(qtbot):
     steering, listener = _bare_steering("requests")
     ran, spoken = [], []
     steering.request.connect(spoken.append)
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
 
     listener.hear()
 
@@ -344,7 +370,7 @@ def test_a_bare_command_word_is_the_command(qtbot):
     steering, listener = _bare_steering("weird")
     ran, spoken = [], []
     steering.request.connect(spoken.append)
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
 
     listener.hear()
 
@@ -358,7 +384,7 @@ def test_an_open_request_takes_the_word_back(qtbot):
     steering, listener = _bare_steering("Request.")
     ran, spoken = [], []
     steering.request.connect(spoken.append)
-    steering.start_commands(ran.append)
+    steering.start_commands(_into(ran))
 
     listener.hear()          # opens the request
     listener.says = "requests"
@@ -384,7 +410,7 @@ def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):
     steering, listener = _steering()
     errors = []
     steering.error.connect(errors.append)
-    steering.start_commands(lambda part: None)
+    steering.start_commands(_ignore)
 
     listener.failed.emit("No module named 'sounddevice'")
 

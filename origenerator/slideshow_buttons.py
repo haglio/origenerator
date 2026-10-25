@@ -162,6 +162,8 @@ PANEL_MINIMIZED = "hud_minimized"
 PANEL_PLACES: dict[str, str] = {PANEL_CORNER: "{corner}", PANEL_MINIMIZED: "{on}"}
 
 PRESSES = tuple(_PRESSES)
+PRESSES_ABOUT_THE_SLIDE = frozenset({"lock", "lock_on", "trash", "lock_action", "seed_loop",
+                                     "action_loop", "loop", "cycle_seed", "cycle_action"})
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 
 

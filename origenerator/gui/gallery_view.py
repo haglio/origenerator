@@ -2737,10 +2737,10 @@ class GalleryView(QWidget):
         self._tree.setCurrentItem(item)  # whose signal draws it
         return True
 
-    def run_spoken_command(self, text: str) -> bool:
+    def run_spoken_command(self, text: str, said_at: float | None = None) -> bool:
         """Run a command the hosting session's own microphone heard, and say
         whether it was one. The session's bridge posts them here."""
-        return self._voice.run_spoken_command(text)
+        return self._voice.run_spoken_command(text, said_at)
 
     def taking_a_request(self) -> bool:
         return self._voice.listener.taking_a_request

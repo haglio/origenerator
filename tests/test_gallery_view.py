@@ -12128,7 +12128,7 @@ class _VoiceSurface:
     def locked_on(self):
         return self._prompt_id if self.locked else None
 
-    def voice_target(self):
+    def back_to_what_was_said_over(self, said_at):
         return self._prompt_id
 
     def note_voice_run(self, prompt_id, message, *, kind):

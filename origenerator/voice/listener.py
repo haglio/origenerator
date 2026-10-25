@@ -66,7 +66,7 @@ class CommandAndRequestListener(QObject):
         """
         return self._bare_matcher(text) if self._bare_matcher is not None else None
 
-    def push_dictation(self, text: str):
+    def push_dictation(self, text: str, spoken_at: float | None = None):
         """Feed the open request one transcription, and answer what it meant
         (``None`` when it is not part of a request).
 
@@ -75,7 +75,8 @@ class CommandAndRequestListener(QObject):
         so the words of a request arrive here from there, into the same dictation:
         half a request must never be held in one place and half in another.
         """
-        return self._dictation.push(text) if self._dictation is not None else None
+        return (self._dictation.push(text, spoken_at=spoken_at)
+                if self._dictation is not None else None)
 
     @property
     def taking_a_request(self) -> bool:
@@ -85,14 +86,14 @@ class CommandAndRequestListener(QObject):
         if self._dictation is not None:
             self._dictation.reset()
 
-    def _on_said(self, text: str) -> None:
+    def _on_said(self, text: str, spoken_at: float) -> None:
         if self._execute_command is None:
             return  # a late utterance after the mic was shut
         self.heard.emit(text)
         if not any(char.isalpha() for char in text):  # '', '. . . .', noise
             self.error.emit("Didn't catch that.")
             return
-        meaning = self._meaning(text)
+        meaning = self._meaning(text, spoken_at)
         length = len(text.split())
         if isinstance(meaning, SpokenRequest):
             logger.info("Voice: request %s", meaning.state.value)
@@ -103,14 +104,14 @@ class CommandAndRequestListener(QObject):
         else:
             logger.info("Voice: a %d-word utterance matched no command", length)
 
-    def _meaning(self, text: str):
+    def _meaning(self, text: str, spoken_at: float):
         """What one transcription meant, or ``None`` for nothing at all.
 
         The dictation first, which has first refusal because it is collecting a
         sentence, then the whole-utterance vocabulary and after it the general
         command matcher.
         """
-        spoken = self.push_dictation(text)
+        spoken = self.push_dictation(text, spoken_at)
         if spoken is not None:
             return spoken
         bare = self.bare_command(text)

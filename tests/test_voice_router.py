@@ -105,8 +105,10 @@ class FakeButton:
 
 
 class FakeSlideshow:
-    def __init__(self, target="g1"):
+    def __init__(self, target="g1", said_over=None):
         self.target = target
+        self.said_over = said_over or {}
+        self.went_back_for = []
         self.said = []
         self.runs = []
         self.pauses = []
@@ -114,6 +116,10 @@ class FakeSlideshow:
 
     def voice_target(self):
         return self.target
+
+    def back_to_what_was_said_over(self, said_at):
+        self.went_back_for.append(said_at)
+        return self.said_over.get(said_at, self.target)
 
     def note_voice_command(self, message, *, kind=NOTICE):
         self.said.append(message)
@@ -257,11 +263,12 @@ class Spoken:
     """One step of a dictated request, as the dictation hands it over."""
 
     def __init__(self, text="no hat", *, listening=False, state=COMPLETED,
-                 heard="Request, no hat, over."):
+                 heard="Request, no hat, over.", opened_at=None):
         self.text = text
         self.listening = listening
         self.state = state
         self.heard = heard
+        self.opened_at = opened_at
 
 
 @pytest.fixture
@@ -687,6 +694,19 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
 
     assert begun == ["g1"]
     assert voice._request_target is None
+
+
+def test_a_request_is_about_the_image_it_was_opened_over_and_puts_it_back(router):
+    slideshow = FakeSlideshow(target="g2", said_over={7.5: "g1"})
+    voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
+                                       db=FakeDB([_row("g1"), _row("g2")]))
+    begun = []
+    voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
+
+    voice.on_spoken_request(Spoken("no hat", opened_at=7.5))
+
+    assert begun == ["g1"]
+    assert slideshow.went_back_for == [7.5]
 
 
 def test_words_in_a_request_are_a_request_even_when_they_name_a_fix(router):

@@ -57,7 +57,6 @@ class VideoHeader:
 
 
 def video_header(video_path) -> VideoHeader | None:
-    """The header of the video at ``video_path``, or ``None`` for anything else."""
     import cv2  # noqa: PLC0415 (heavy; the pure helpers must not pull it in)
 
     if not video_path:

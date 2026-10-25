@@ -137,6 +137,9 @@ COMFYUI_LOG_DIR = COMFYUI_DIR / "user"
 COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
 
+LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
+LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
+
 # Evolver (the sibling video-maintenance app) watches this inbox and ingests any
 # finalized video dropped under a per-source subfolder; we write under our own
 # source name so it can route Origenerator's videos distinctly from other inbox
@@ -147,9 +150,6 @@ COMFYUI_PORT = 8188
 # in `evolver_contract.json` at the checkout `project_dir("evolver")` resolves, and
 # tests/test_evolver_pipeline_contract.py holds these to that document -- the
 # only place the two can be compared, since neither repo's gate clones the other.
-# The library's videos, and their scripts filed at each video's own place.
-LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
-LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 _EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
 EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"

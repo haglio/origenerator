@@ -2424,7 +2424,7 @@ def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
     assert form._widgets["input_image"].toolTip() == "AB12CD34 001"
 
 
-def test_a_dropped_item_is_named_under_the_zones_picture(qtbot):
+def test_a_dropped_item_is_named_under_the_zones_image(qtbot):
     form = ParamForm([ParamDef("input_image", "Picture", "image", "")], items=_Lends())
     qtbot.addWidget(form)
 

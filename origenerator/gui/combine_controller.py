@@ -195,9 +195,9 @@ class CombineController(QObject):
             self.panel.image_slot.set_item(path)
 
     def _picture_lent_by(self, prompt_id: str) -> str | None:
-        picture = gallery.picture_lent_by(prompt_id, self._db.get_generation,
-                                          self._host.image_config_index())
-        return picture["prompt_id"] if picture is not None else None
+        lent = gallery.image_lent_by(prompt_id, self._db.get_generation,
+                                     self._host.image_config_index())
+        return lent["prompt_id"] if lent is not None else None
 
     def _rebuildable_video_row(self, row) -> bool:
         """Whether ``row`` is a video whose i2v settings the app can rebuild — so its

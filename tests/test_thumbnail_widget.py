@@ -139,7 +139,7 @@ def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
     assert _RecordingDrag.last.pixmap is None
 
 
-def test_a_left_click_picks_and_opens_the_picture_and_a_right_click_does_neither(qtbot):
+def test_a_left_click_picks_and_opens_the_image_and_a_right_click_does_neither(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)
     picked, opened = [], []

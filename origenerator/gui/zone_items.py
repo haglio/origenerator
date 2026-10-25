@@ -60,7 +60,7 @@ class ZoneItems(FilesOnly):
 
     def lends(self, prompt_id: str, kind: MediaType) -> str | None:
         if kind == MediaType.IMAGE:
-            return gallery.input_image_reference(gallery.picture_lent_by(
+            return gallery.input_image_reference(gallery.image_lent_by(
                 prompt_id, self._db.get_generation, self._library.now().image_config_index))
         row = self._db.get_generation(prompt_id)
         if row is None or gallery.media_type_of_row(row) != kind:

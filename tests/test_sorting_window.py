@@ -9,22 +9,28 @@ from PIL import Image
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QToolButton
+from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.gui.sorting_window import (
     LAST_LINE,
     SAME_BUTTON,
     SKIP_BUTTON,
     STATUS_LINE,
+    TILE_HEIGHT,
     UNDO_BUTTON,
     SortingWindow,
     on_a_white_square,
     one_scale_for_all,
+    one_term_to_a_line,
     state_button,
+    wrapped_to_fit,
 )
+from origenerator.picture_states import Tile
 from origenerator.sorting_session import SortingSession
 
 _STATES = ("state one", "state two", "state three")
-_ROWS = (("state one", "state two"), ("state three",))
+_TILES = (Tile("state one", 0, 0), Tile("state two", 0, 1),
+          Tile("state three", 1, 0))
 
 
 class _Store:
@@ -58,11 +64,12 @@ def _picture(made) -> QLabel:
 
 @pytest.fixture
 def window(qtbot):
-    def build(*prompt_ids, pictures=None, marks=None):
+    def build(*prompt_ids, pictures=None, marks=None, tiles=None):
         store = _Store()
         listed = pictures or [{"prompt_id": p, "name": "3FA9C0D2 000", "picture_path": None}
                               for p in prompt_ids]
-        made = SortingWindow(SortingSession(listed, store), _ROWS, marks or {})
+        made = SortingWindow(SortingSession(listed, store),
+                             tiles or _TILES, marks or {})
         qtbot.addWidget(made)
         return made, store
 
@@ -80,7 +87,8 @@ def test_a_tile_is_offered_for_every_state_and_pressing_one_sorts_the_picture(wi
 
     _tile(made, "state two").click()
 
-    assert sorted(tile.text() for tile in made.findChildren(QToolButton)) == sorted(_STATES)
+    assert sorted(tile.objectName() for tile in made.findChildren(QToolButton)) == sorted(
+        state_button(state) for state in _STATES)
     assert store.states == {"first": "state two"}
 
 
@@ -167,14 +175,15 @@ def test_a_state_with_no_drawing_installed_stands_on_its_words(window):
     made, _store = window("first")
 
     assert _tile(made, "state one").icon().isNull()
-    assert _tile(made, "state one").text() == "state one"
+    assert _tile(made, "state one").text().replace("\n", " ") == "state one"
 
 
-def test_a_state_of_several_terms_reads_one_term_to_a_line(qtbot):
-    made = SortingWindow(SortingSession([], _Store()), (("alpha, beta gamma",),), {})
-    qtbot.addWidget(made)
+def test_a_state_of_several_terms_reads_one_term_to_a_line():
+    """A comma, a plus and a parenthesis each start the next line."""
+    named = ("alpha, beta gamma", "delta (with epsilon)", "eta + theta")
 
-    assert _tile(made, "alpha, beta gamma").text() == "alpha\nbeta gamma"
+    assert tuple(one_term_to_a_line(name) for name in named) == (
+        "alpha\nbeta gamma", "delta\n(with epsilon)", "eta +\ntheta")
 
 
 def test_a_drawing_that_will_not_load_is_no_worse_than_none(window, tmp_path):
@@ -278,3 +287,50 @@ def test_a_drawing_that_will_not_load_does_not_set_the_scale():
     torn = QPixmap()
 
     assert one_scale_for_all((torn,), 96) == 1.0
+
+
+def _where(made, state):
+    tile = _tile(made, state)
+    layout = tile.parentWidget().layout().itemAt(0).layout()
+    return layout.getItemPosition(layout.indexOf(tile))
+
+
+def test_a_tile_the_grid_merges_covers_both_columns_at_one_tile_wide(window):
+    """His words: "the merged cells can still be the same size, just shift them
+    over to be centered"."""
+    made, _ = window("gen-one", tiles=(Tile("state one", 0, 0, columns=2),
+                                       Tile("state two", 0, 2)))
+
+    assert _where(made, "state one") == (0, 0, 1, 2)
+    assert _tile(made, "state one").width() == _tile(made, "state two").width()
+
+
+def test_the_tile_down_every_row_is_as_tall_as_all_of_them_and_their_gaps(window):
+    """His words for the tile down the fourth column: its background "should be 9x
+    taller than the others and actually span the whole thing"."""
+    made, _ = window("gen-one", tiles=(Tile("state one", 0, 0),
+                                       Tile("state two", 1, 0),
+                                       Tile("state three", 0, 1, rows=2)))
+
+    one = _tile(made, "state one")
+    assert _where(made, "state three") == (0, 1, 2, 1)
+    assert _tile(made, "state three").height() == one.height() * 2 + GAP_MEDIUM
+
+
+def test_nine_rows_of_buttons_stand_in_the_room_the_window_has():
+    """His words: "shrink the buttons", so that all nine rows of his sheet are
+    there to press without the strip of them scrolling. The shortest screen he
+    works on leaves a window 1410 pixels tall, and what is not the grid's -- the
+    controls under it, the margins, the window's own frame -- takes 150."""
+    rows, room = 9, 1260
+
+    assert rows * TILE_HEIGHT + GAP_MEDIUM * (rows - 1) <= room
+
+
+def test_a_term_too_wide_for_a_button_goes_on_to_the_next_line():
+    """Wrapped on its spaces, so no button is wider than the widest word in it."""
+    assert wrapped_to_fit("alpha beta\ngamma", 9, len) == "alpha\nbeta\ngamma"
+
+
+def test_a_term_that_fits_is_left_on_its_line():
+    assert wrapped_to_fit("alpha beta", 10, len) == "alpha beta"

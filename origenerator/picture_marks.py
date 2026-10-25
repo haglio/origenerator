@@ -5,9 +5,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from origenerator.config import LIBRARY_STATE_DIR
+from origenerator.config import LIBRARY_STATE_DIR, STATE_DIR
 
 MARKS_DIR = LIBRARY_STATE_DIR / "picture_states"
+OWN_MARKS_DIR = STATE_DIR / "picture_states"
 
 
 def _slug(state: str) -> str:
@@ -19,5 +20,8 @@ def mark_path(state: str) -> Path:
 
 
 def mark_for(state: str) -> Path | None:
+    own = OWN_MARKS_DIR / f"{_slug(state)}.png"
+    if own.is_file():
+        return own
     drawn = mark_path(state)
     return drawn if drawn.is_file() else None

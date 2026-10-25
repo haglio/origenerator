@@ -150,10 +150,18 @@
   "picture_state_grid": [
     [
       "state one",
-      "state two"
+      "",
+      [
+        "state three",
+        1,
+        2
+      ]
     ],
     [
-      "state three"
+      [
+        "state two",
+        2
+      ]
     ]
   ],
   "animation_paths": {

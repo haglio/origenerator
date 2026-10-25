@@ -3,8 +3,17 @@ next. The picture fills the left and every action is a button in the grid down
 the right, wearing the drawing :mod:`origenerator.picture_marks` found for it."""
 from __future__ import annotations
 
+import re
+
 from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
+from PyQt6.QtGui import (
+    QFontMetrics,
+    QIcon,
+    QKeySequence,
+    QPainter,
+    QPixmap,
+    QShortcut,
+)
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -19,9 +28,8 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import WHITE
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
-# Sized so every action fits down one side of this screen without scrolling.
-_MARK = 96
-_TILE_HEIGHT = _MARK + 62
+MARK = 48
+TILE_HEIGHT = MARK + 62
 
 STATUS_LINE = "sorting.status"
 LAST_LINE = "sorting.last"
@@ -35,7 +43,24 @@ def state_button(state: str) -> str:
 
 
 def one_term_to_a_line(state: str) -> str:
-    return "\n".join(term.strip() for term in state.split(","))
+    lines = re.sub(r",\s*", "\n", state)
+    lines = re.sub(r"\s*\+\s*", " +\n", lines)
+    return re.sub(r"\s+\(", "\n(", lines).strip()
+
+
+def wrapped_to_fit(text: str, room: int, width_of) -> str:
+    lines = []
+    for line in text.split("\n"):
+        standing = ""
+        for word in line.split(" "):
+            tried = f"{standing} {word}".strip()
+            if standing and width_of(tried) > room:
+                lines.append(standing)
+                standing = word
+            else:
+                standing = tried
+        lines.append(standing)
+    return "\n".join(lines)
 
 
 def _fitted(source: QPixmap, width: int, height: int) -> QPixmap:
@@ -73,7 +98,7 @@ class SortingWindow(QWidget):
     NOTHING_LEFT = "Nothing left to sort."
     MISSING = "(this one's file is missing)"
 
-    def __init__(self, session, rows, marks: dict[str, str], parent=None):
+    def __init__(self, session, tiles, marks: dict[str, str], parent=None):
         super().__init__(parent)
         self._session = session
         self._marks = dict(marks)
@@ -103,25 +128,27 @@ class SortingWindow(QWidget):
                                   MARGIN_STANDARD, MARGIN_STANDARD)
         layout.setSpacing(GAP_MEDIUM)
         layout.addLayout(stage, 1)
-        layout.addWidget(self._build_states(rows))
+        layout.addWidget(self._build_states(tiles))
 
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
         self._show_current()
 
 
-    def _build_states(self, rows) -> QWidget:
+    def _build_states(self, tiles) -> QWidget:
         column = QVBoxLayout()
         column.setSpacing(GAP_MEDIUM)
         grid = QGridLayout()
         grid.setSpacing(GAP_MEDIUM)
-        drawings = {state: QPixmap(str(self._marks[state]))
-                    for row in rows for state in row if self._marks.get(state)}
-        scale = one_scale_for_all(drawings.values(), _MARK)
-        for down, row in enumerate(rows):
-            for across, state in enumerate(row):
-                grid.addWidget(self._state_tile(state, drawings.get(state), scale),
-                               down, across)
-        self._make_every_tile_one_size()
+        drawings = {tile.state: QPixmap(str(self._marks[tile.state]))
+                    for tile in tiles if self._marks.get(tile.state)}
+        scale = one_scale_for_all(drawings.values(), MARK)
+        room = self._room_for_a_name(tiles)
+        for tile in tiles:
+            grid.addWidget(
+                self._state_tile(tile.state, drawings.get(tile.state), scale, room),
+                tile.row, tile.column, tile.rows, tile.columns,
+                Qt.AlignmentFlag.AlignCenter)
+        self._make_every_tile_one_size(tiles)
         column.addLayout(grid)
 
         divider = QFrame()
@@ -157,29 +184,37 @@ class SortingWindow(QWidget):
         panel.setFixedWidth(inside.sizeHint().width() + 28)  # room for the scrollbar
         return panel
 
-    def _make_every_tile_one_size(self) -> None:
-        tiles = list(self._tiles.values())
-        if not tiles:
+    def _make_every_tile_one_size(self, tiles) -> None:
+        buttons = list(self._tiles.values())
+        if not buttons:
             return
-        widest = max(tile.sizeHint().width() for tile in tiles)
-        tallest = max(_TILE_HEIGHT, *(tile.sizeHint().height() for tile in tiles))
+        widest = max(button.sizeHint().width() for button in buttons)
+        tallest = max(TILE_HEIGHT, *(button.sizeHint().height() for button in buttons))
         for tile in tiles:
-            tile.setFixedSize(widest, tallest)
+            self._tiles[tile.state].setFixedSize(
+                widest, tallest * tile.rows + GAP_MEDIUM * (tile.rows - 1))
+
+    def _room_for_a_name(self, tiles) -> int:
+        metrics = QFontMetrics(self.font())
+        words = [word for tile in tiles
+                 for word in one_term_to_a_line(tile.state).replace("\n", " ").split()]
+        return max(MARK, *(metrics.horizontalAdvance(word) for word in words))
 
     def _state_tile(self, state: str, drawing: QPixmap | None,
-                    scale: float) -> QToolButton:
+                    scale: float, room: int) -> QToolButton:
         tile = QToolButton(objectName=state_button(state))
-        tile.setText(one_term_to_a_line(state))
+        tile.setText(wrapped_to_fit(one_term_to_a_line(state), room,
+                                    QFontMetrics(self.font()).horizontalAdvance))
         tile.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-        tile.setIconSize(QSize(_MARK, _MARK))
-        tile.setMinimumHeight(_TILE_HEIGHT)
+        tile.setIconSize(QSize(MARK, MARK))
+        tile.setMinimumHeight(TILE_HEIGHT)
         # Never the keyboard's: Space would otherwise re-fire whichever tile was
         # pressed last, and Escape has to go on closing the window.
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tile.clicked.connect(lambda _checked=False, state=state: self._on_state(state))
         self._tiles[state] = tile
         if drawing is not None and not drawing.isNull():
-            tile.setIcon(QIcon(on_a_white_square(drawing, _MARK, scale)))
+            tile.setIcon(QIcon(on_a_white_square(drawing, MARK, scale)))
         return tile
 
 

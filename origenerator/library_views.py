@@ -32,6 +32,9 @@ class LibrarySnapshot:
     def image_config_index(self) -> dict:
         return gallery.build_image_config_index(self.image_rows)
 
+    def rows_of(self, kind: MediaType) -> list[dict]:
+        return self.image_rows if kind == MediaType.IMAGE else self.video_rows
+
     def in_settings(self, key: tuple[str, str] | None) -> list[dict]:
         if key is None:
             return []

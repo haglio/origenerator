@@ -9,6 +9,7 @@ import pytest
 from origenerator.db import Database
 from origenerator.gui.zone_items import FilesOnly, ZoneItems
 from origenerator.item_names import ItemNames
+from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from tests.media_files import write_mp4
@@ -28,11 +29,8 @@ def library(tmp_path):
     _row(db, "gen-pic", "sdxl_t2i", "image/pic_00001_.png", thumb)
     _row(db, "gen-run", "wan22_i2v", "video/run_00002_.mp4", thumb)
     names = ItemNames.from_library(db)
-    rows = db.list_generations()
     items = ZoneItems(
-        db, names,
-        lambda kind: [row for row in rows if (row["workflow_name"] == "sdxl_t2i")
-                      == (kind == MediaType.IMAGE)],
+        db, names, LibraryViews(db),
         places=OutputPlaces.in_one_folder(output_dir), input_dir=tmp_path / "input",
         thumb_dir=tmp_path / "thumbs", moving_preview=lambda row: None)
     return items, names, output_dir, thumb

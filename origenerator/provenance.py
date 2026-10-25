@@ -23,7 +23,7 @@ from origenerator.generation_state import made_here
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
 
 APP = "origenerator"
-WORKFLOW, WORKFLOW_VERSION = "recipe", "recipe_version"
+WORKFLOW, WORKFLOW_VERSION = family.METHOD, family.METHOD_VERSION
 BASIS = "recipe_version_basis"
 RECORDED = "recorded"
 FILE_DATE = "file_date"
@@ -52,8 +52,8 @@ def version_history(source: Path) -> list[tuple[datetime, str]] | None:
 
 
 def at_launch(workflow) -> dict:
-    return {**family.stamp(APP, anchor=__file__, recipe=workflow.name,
-                           recipe_version=workflow.version),
+    return {**family.stamp(APP, anchor=__file__, method=workflow.name,
+                           method_version=workflow.version),
             BASIS: RECORDED}
 
 

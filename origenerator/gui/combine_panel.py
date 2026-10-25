@@ -3,7 +3,7 @@
 Drop an image into the top slot, then supply *settings* either by picking an act
 from the Action list, which sends the app looking for a fitting past video, or by
 dropping a specific i2v video (shown in gray: it is here for its settings). The two
-are mutually exclusive. A video dropped into the top slot lends it only the picture
+are mutually exclusive. A video dropped into the top slot lends it only the image
 it was made from, and one let go between the slots lends each what it can. Generate
 re-runs the chosen settings on the dropped image; “Edit individual…” hands them to a
 generate tab first.
@@ -80,7 +80,7 @@ def _keep_its_room_when_hidden(widget: QWidget) -> None:
 
 @dataclass(frozen=True)
 class CombineRequest:
-    """One press of Generate or “Edit individual…”: the picture, the settings —
+    """One press of Generate or “Edit individual…”: the image, the settings —
     a dropped video or a picked act, never both — the lane it is answered from,
     and whether it is bound for the generator rather than for a run now."""
 
@@ -97,7 +97,7 @@ class CombinePanel(QWidget):
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
     animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
     intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the acts
-    item_activated = pyqtSignal(str)  # a slot's picture or clip was clicked (prompt_id)
+    item_activated = pyqtSignal(str)  # a slot's image or clip was clicked (prompt_id)
     video_used = pyqtSignal(str, str)  # (intent, prompt_id) a video put in the slot by hand
 
     def __init__(
@@ -110,14 +110,14 @@ class CombinePanel(QWidget):
         *,
         named: Callable[[str], str | None] = lambda name: None,
         name_of: Callable[[str], str] = lambda held: "",
-        browse_picture: Callable[[], None] | None = None,
+        browse_image: Callable[[], None] | None = None,
         leads_to: Callable[[str], str | None] = lambda held: held,
     ):
         super().__init__(parent)
         self._preview = preview
         self._history = history
         self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, DROP_AN_IMAGE,
-                                   named=named, name_of=name_of, browse=browse_picture,
+                                   named=named, name_of=name_of, browse=browse_image,
                                    leads_to=leads_to)
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
@@ -212,7 +212,7 @@ class CombinePanel(QWidget):
         self._defaults_btn = QPushButton("Edit default…")
         self._defaults_btn.setToolTip(
             "Settle what each animation runs: an act, in a lane, from each kind "
-            "of picture")
+            "of image")
         self._defaults_btn.clicked.connect(self.animation_settings_requested)
 
         layout = QVBoxLayout(self)
@@ -395,7 +395,7 @@ class CombinePanel(QWidget):
 
     def _dispatch(self, *, edit_first: bool):
         """Announce what was asked for: a picked act, else the dropped video, and
-        nothing at all while either the picture or the settings are missing."""
+        nothing at all while either the image or the settings are missing."""
         image_id = self.image_slot.current_id()
         category = self.selected_category()
         video_id = "" if category else (self.video_slot.current_id() or "")

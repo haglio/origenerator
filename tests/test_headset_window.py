@@ -88,7 +88,7 @@ def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog
     assert "input.txt" in caplog.text
 
 
-def test_the_frame_a_preview_is_playing_is_in_the_picture_the_room_gets(tmp_path, qtbot):
+def test_the_frame_a_preview_is_playing_is_in_the_frame_the_room_gets(tmp_path, qtbot):
     preview = PreviewWidget(player=MagicMock())
     qtbot.addWidget(preview)
     preview.resize(200, 100)
@@ -108,16 +108,16 @@ def test_the_frame_a_preview_is_playing_is_in_the_picture_the_room_gets(tmp_path
     assert _published_color(tmp_path, middle) == QColor("red")
 
 
-class TestHowBigAPublishedPictureMayBe:
+class TestHowBigAPublishedFrameMayBe:
     """The rect a session names is not a promise about the window: Qt gives it
     the size its own minimums allow, and it can be resized after.  So the
     channel is sized to a cap and anything bigger is scaled into it, rather
     than refused with a frame nobody gets."""
 
     def test_a_window_within_the_cap_is_published_at_its_own_size(self):
-        picture = QImage(200, 100, QImage.Format.Format_RGBA8888)
+        frame = QImage(200, 100, QImage.Format.Format_RGBA8888)
 
-        assert within_the_cap(picture).size() == picture.size()
+        assert within_the_cap(frame).size() == frame.size()
 
     def test_a_window_past_the_cap_is_scaled_until_it_fits(self):
         within = within_the_cap(QImage(CAP_PX * 2, CAP_PX, QImage.Format.Format_RGBA8888))
@@ -128,7 +128,7 @@ class TestHowBigAPublishedPictureMayBe:
 
 
 class TestTheRoomsPressesReachTheWindow:
-    """The room's pointer lands on a pixel of the published picture, and this
+    """The room's pointer lands on a pixel of the published frame, and this
     window has to feel it where a mouse on that pixel would have landed."""
 
     def _window(self, qtbot) -> QWidget:
@@ -159,7 +159,7 @@ class TestTheRoomsPressesReachTheWindow:
         """Every right-click menu in the gallery ends in menu.exec(), which runs
         an event loop of its own and does not return until the menu is answered.
         Handed such a click inside the poll's own tick, the poll never returned:
-        the picture stopped and so did the reading of his clicks, so he could not
+        the frame stopped and so did the reading of his clicks, so he could not
         answer the menu either.  His 2026-10-12 room froze on the first one."""
         window = self._window(qtbot)
         opened: list[str] = []
@@ -193,9 +193,9 @@ class TestTheRoomsPressesReachTheWindow:
 
         assert asked == ["5,5"], "the menu was not asked for where it was aimed"
 
-    def test_a_press_lands_where_it_was_aimed_on_a_picture_drawn_smaller(
+    def test_a_press_lands_where_it_was_aimed_on_a_frame_drawn_smaller(
             self, tmp_path, qtbot):
-        """A picture the room presses is not always the window's own size: past
+        """A frame the room presses is not always the window's own size: past
         the cap it is published scaled, and hosted this app draws at a scale of
         its own, so a pixel of it is that many Qt coordinates of the window."""
         window = QWidget()
@@ -222,7 +222,7 @@ class TestTheRoomsPressesReachTheWindow:
         """The room sends a pull of the trigger as a press, a few moves as the
         hand shakes, and a release.  A move carried far enough starts a drag,
         and Windows runs a drag off the real mouse -- the one nobody holds in a
-        headset -- so the app waits on it and stops: its picture, the room's
+        headset -- so the app waits on it and stops: its frame, the room's
         presses, the session's own verbs, all of it until the session kills it."""
         window = self._window(qtbot)
         label = window.findChild(QLabel, "target")
@@ -308,7 +308,7 @@ class TestTheRoomsPressesReachTheWindow:
 
         assert first[1] == window.width(), "the window was not published at its own width"
         assert first[0] % 2 == 0, "the frame was left mid-write"
-        assert again == first, "the same picture was published twice"
+        assert again == first, "the same frame was published twice"
 
 
     def _counting_grabs(self, window) -> list[int]:
@@ -398,7 +398,7 @@ class TestWhatOpensOverTheWindow:
 
         assert combo.currentText() == "gamma"
 
-    def test_a_menu_open_over_the_window_is_in_its_picture(self, tmp_path, qtbot):
+    def test_a_menu_open_over_the_window_is_in_its_frame(self, tmp_path, qtbot):
         window = self._window(qtbot)
         menu = QMenu(window)
         menu.addAction("one")
@@ -437,7 +437,7 @@ class TestWhatOpensOverTheWindow:
 
     def test_a_press_off_a_menu_puts_it_away(self, tmp_path, qtbot):
         """As a mouse pressed anywhere else would: a list left open is a list
-        covering the picture until something else closes it."""
+        covering the frame until something else closes it."""
         window = self._window(qtbot)
         menu = QMenu(window)
         menu.addAction("one")

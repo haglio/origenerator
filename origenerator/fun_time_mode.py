@@ -78,7 +78,7 @@ SESSION_FILES = ("command-file", "paused-file", "status-file", "dashboard-cmd-fi
 SIDES = ("portrait", "landscape")
 FUNESTRA_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
 
-#: Where a session in the headset asks for this window's PICTURE instead: the
+#: Where a session in the headset asks for this window's frames instead: the
 #: memory-mapped file to write it into (``app_support.frame_channel``) and the
 #: file its pointer's presses arrive through.  Both or neither; named, they say
 #: this window has no monitor to be seen on.
@@ -294,7 +294,7 @@ class FunTimeSession:
     # still wants a window of this app's over that region instead.
     portrait_funestra: FunestraChannel | None = None
     landscape_funestra: FunestraChannel | None = None
-    # Where this window's picture goes when the room is in the headset, and
+    # Where this window's frames go when the room is in the headset, and
     # where the pointer's presses on it come back through.
     frames_file: Path | None = None
     input_file: Path | None = None
@@ -302,7 +302,7 @@ class FunTimeSession:
 
     @property
     def in_a_headset(self) -> bool:
-        """Whether this window is shown as a picture rather than on a monitor."""
+        """Whether this window is shown in the headset rather than on a monitor."""
         return self.frames_file is not None and self.input_file is not None
 
     def region_rect(self, side: str) -> Rect:

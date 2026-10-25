@@ -2,7 +2,7 @@
 
 Run as ``python -m tests.real_close_handing_over <file>`` by test_app, with the
 state folder it is to use in ``ORIGENERATOR_STATE_DIR``. The library holds three
-pictures the queue was holding when the app last closed: the window takes them
+images the queue was holding when the app last closed: the window takes them
 back into its line and hands ComfyUI the first, so two are still waiting when it
 is closed, and ComfyUI is a stand-in that takes a moment over each. It writes to
 *file*, as JSON, when the window was asked to close, when the app's last window
@@ -31,7 +31,7 @@ A_MOMENT_S = 0.3
 _when = {"asked_to_close": [], "went": [], "asked": []}
 
 
-def _pictures_waiting_in_the_line() -> None:
+def _images_waiting_in_the_line() -> None:
     workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
     db = Database(config.DB_PATH)
     for seed in (1, 2, 3):
@@ -67,7 +67,7 @@ def _note_when_the_window_goes(window) -> None:
 
 
 def main() -> int:
-    _pictures_waiting_in_the_line()
+    _images_waiting_in_the_line()
     ComfyUIApi.submit_job = _take_a_moment_over_it
     ended = open_and_close(_note_when_the_window_goes)
     Path(sys.argv[1]).write_text(json.dumps(_when), encoding="utf-8")

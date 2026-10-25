@@ -39,7 +39,7 @@ def _a_cache_of_this_files_own(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _every_path_reads_as_a_tall_picture(monkeypatch):
+def _every_path_reads_as_a_tall_image(monkeypatch):
     """Measure without a file: what is on disk is not what these tests are about,
     and a thousand real PNGs would only be a slower way to ask the same thing."""
     monkeypatch.setattr(
@@ -59,7 +59,7 @@ def test_the_remembered_shapes_stop_piling_up():
 
 def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypatch):
     """A slideshow on a Fun Time region re-sorts the whole library by shape on every
-    picture a running generation streams; looking each item's file up on disk
+    image a running generation streams; looking each item's file up on disk
     again, for a shape already known, froze the window long enough for Windows
     to close it."""
     row = {"thumbnail_path": "/library/known.png",

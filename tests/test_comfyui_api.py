@@ -519,11 +519,11 @@ def _folders(tmp_path):
     return folders
 
 
-def _picture_elsewhere(tmp_path):
-    picture = tmp_path / "elsewhere" / "jane_doe.png"
-    picture.parent.mkdir()
-    picture.write_bytes(b"fabricated picture bytes")
-    return picture
+def _image_elsewhere(tmp_path):
+    image = tmp_path / "elsewhere" / "jane_doe.png"
+    image.parent.mkdir()
+    image.write_bytes(b"fabricated image bytes")
+    return image
 
 
 def _posted_prompt(mock_urlopen) -> dict:
@@ -531,16 +531,16 @@ def _posted_prompt(mock_urlopen) -> dict:
 
 
 def test_submit_job_hands_comfyui_a_run_it_can_open(tmp_path):
-    picture = _picture_elsewhere(tmp_path)
+    image = _image_elsewhere(tmp_path)
     client = ComfyUIApi(client_id="test-client", folders=_folders(tmp_path))
-    payload = {"1": {"class_type": "LoadImage", "inputs": {"image": str(picture)}}}
+    payload = {"1": {"class_type": "LoadImage", "inputs": {"image": str(image)}}}
 
     with patch("urllib.request.urlopen",
                return_value=_mock_response(200, b'{"prompt_id": "our-id"}')) as mock_urlopen:
         client.submit_job(payload, "our-id")
 
     assert _posted_prompt(mock_urlopen)["1"]["inputs"]["image"].endswith("/jane_doe.png [temp]")
-    assert payload["1"]["inputs"]["image"] == str(picture), "the run keeps the name it was given"
+    assert payload["1"]["inputs"]["image"] == str(image), "the run keeps the name it was given"
 
 
 def test_no_client_is_made_without_the_folders_comfyui_opens_files_from():

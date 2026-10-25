@@ -1,7 +1,7 @@
 """MotionPanel — Genau's console, shown here, and what a press on it does.
 
 The console is funestra's and tested there. What this covers is the two
-things that are this app's: that the picture really is that console (not a
+things that are this app's: that the drawing really is that console (not a
 lookalike), and that each command it posts reaches the right thing here.
 """
 from __future__ import annotations
@@ -78,7 +78,7 @@ def test_the_console_is_up_while_nothing_drives_since_its_switch_is_what_starts_
     assert panel._repaint.isActive()       # the trace scrolls, so now it does
 
 
-def test_the_picture_is_the_console_funestra_paints(qtbot):
+def test_the_drawing_is_the_console_funestra_paints(qtbot):
     # Not a repaint of the design, and not a third of it: the same painter, the
     # same rows, the same bitmap.
     panel, motion = _panel(qtbot)
@@ -574,7 +574,7 @@ def test_no_state_draws_the_console_outside_the_room_kept_for_it():
         assert width <= room_width and height <= room_height, (control, active, device)
 
 
-def test_the_readout_holds_the_waves_picture_still_between_knots(qtbot):
+def test_the_readout_holds_the_waves_drawing_still_between_knots(qtbot):
     motion = FakeMotion()
     live = motion.state
     live.state.playing = True
@@ -588,7 +588,7 @@ def test_the_readout_holds_the_waves_picture_still_between_knots(qtbot):
     assert after.slide > before.slide
 
 
-def test_the_readout_holds_the_learned_motions_picture_still_between_knots(qtbot):
+def test_the_readout_holds_the_learned_motions_drawing_still_between_knots(qtbot):
     # The learned motion is read on knots: a tick later the same heights are
     # drawn, shifted left by the fraction of a knot the clock has moved.
 

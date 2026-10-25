@@ -1,4 +1,4 @@
-"""What a bare spoken word asks of the app — a collection, a button, the picture.
+"""What a bare spoken word asks of the app — a collection, a button, the image.
 
 Fun Time's Funestras answer single words: "weird" condemns the clip, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
@@ -82,7 +82,7 @@ class AppCommand(Enum):
     MIC_OFF = "mic_off"
 
     # What a slideshow may play: the switch beside F-mode on its HUD, which keeps
-    # only the pictures it has enhanced. Said either way round rather than as
+    # only the images it has enhanced. Said either way round rather than as
     # one toggle: a speaker mid-show is not looking at the HUD to see which way
     # it is set, and "filter enhanced" that turned the filter OFF half the time
     # would be a command nobody could rely on. "clear filter" is the way back
@@ -213,7 +213,7 @@ for _osr2 in ("osr 2", "o s r 2", "osr two", "o s r two"):
 # The slideshow's own narrowing filter, in Fun Time's own grammar: "filter <what to
 # keep>" turns one on, and "clear filter" is the way back to all of it — the
 # very phrase the satellites answer, so one gesture has one wording in both
-# rooms. "Upscales" is what the enhanced pictures are called at the desk, so it
+# rooms. "Upscales" is what the enhanced images are called at the desk, so it
 # is heard too; inside a Fun Time session the room's recognizer has no such
 # word, and "enhanced only" is the one that carries there.
 _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
@@ -291,7 +291,7 @@ for _bar in _BARS:
 
 def phrases_heard_only_outright() -> frozenset[str]:
     """What a recognizer's near miss is never repaired into: the switch with no spoken way
-    back, and the word that takes a picture away."""
+    back, and the word that takes an item away."""
     return phrases_for(AppCommand.MIC_OFF, AppCommand.CULL)
 
 

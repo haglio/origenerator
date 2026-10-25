@@ -1,4 +1,4 @@
-' Rendered from [tool.haglio.launchers."sort_pictures.vbs"] in pyproject.toml.
+' Rendered from [tool.haglio.launchers."sort_images.vbs"] in pyproject.toml.
 ' Change the spec, then run  python -m app_support.launcher --write  in this
 ' folder: the suite fails on a launcher that differs from its spec.
 
@@ -17,10 +17,10 @@ Else
 End If
 
 Sub Decide()
-  app = "Origenerator (sorting pictures)"
+  app = "Origenerator (sorting images)"
   primary = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(root)))
-  logPath = fso.BuildPath(root, "state\sort_pictures_launcher.log")
-  arguments = "-m origenerator.sort_pictures"
+  logPath = fso.BuildPath(root, "state\sort_images_launcher.log")
+  arguments = "-m origenerator.sort_images"
   interpreter = fso.BuildPath(primary, ".venv\Scripts\python.exe")
   directory = root
   base = primary

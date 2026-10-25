@@ -32,7 +32,7 @@ def _set(items=_ITEMS, *, hud=None, start=None, **asked_of_the_library):
 
 def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
     """A switch is a narrowing of what you are looking through, not a new slideshow:
-    the picture stays where it is kept, so the surface only has to say where in
+    the image stays where it is kept, so the surface only has to say where in
     the set it now sits."""
     slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
     slideshow_set.playlist.jump_to(1)          # standing on the favorite
@@ -44,7 +44,7 @@ def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
 
 def test_narrowing_past_the_slide_on_screen_stands_another_pass_up():
     """Kept out by the switch, it is gone from the pass — so the surface has to
-    show whatever the new pass opens on rather than leave the old picture up."""
+    show whatever the new pass opens on rather than leave the old image up."""
     slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-3"}))
 
     assert slideshow_set.set_filters(SlideshowFilters(favorites=True)) is True
@@ -84,7 +84,7 @@ def test_a_reset_widens_only_where_something_was_narrowed():
     dealt.clear()
 
     assert slideshow_set.drop_the_filters() is True
-    # A reset starts the set over rather than keeping the picture: the surface
+    # A reset starts the set over rather than keeping the image: the surface
     # shows whatever the fresh pass opens on.
     assert dealt == [False]
     assert len(slideshow_set.playlist) == 3
@@ -180,16 +180,16 @@ def test_a_shuffled_pass_begun_on_a_slide_plays_every_other_one_before_coming_ba
     assert sorted(played) == sorted(item[2] for item in _TWELVE)
 
 
-# --- a picture that something is being made of -------------------------------
+# --- an image that something is being made of -------------------------------
 
-def test_a_pass_dealt_while_a_picture_of_it_is_being_enhanced_opens_on_it():
+def test_a_pass_dealt_while_an_image_of_it_is_being_enhanced_opens_on_it():
     slideshow_set, _dealt = _set(hud=HudFacts(enhancing={"id-3": "running"}))
 
     assert _pass(slideshow_set) == ["id-3", "id-1", "id-2"]
     assert slideshow_set.current_prompt_id() == "id-3"
 
 
-def test_a_picture_whose_enhancement_is_still_waiting_keeps_its_place():
+def test_an_image_whose_enhancement_is_still_waiting_keeps_its_place():
     slideshow_set, _dealt = _set(hud=HudFacts(enhancing={"id-3": "queued"}))
 
     assert _pass(slideshow_set) == ["id-1", "id-2", "id-3"]
@@ -201,7 +201,7 @@ def test_a_pass_opened_on_a_named_slide_stays_on_it_whatever_is_being_made():
     assert slideshow_set.current_prompt_id() == "id-2"
 
 
-def test_a_new_set_opens_on_the_picture_being_made_in_it():
+def test_a_new_set_opens_on_the_image_being_made_in_it():
     slideshow_set, _dealt = _set()
     slideshow_set.note_enhancing({"id-2": "running"})
 
@@ -218,7 +218,7 @@ def test_a_run_still_streaming_its_frames_leads_when_the_slideshow_is_asked_to()
     assert slideshow_set.current_prompt_id() == "id-run"
 
 
-def test_a_picture_being_made_holds_the_screen_half_as_long_as_the_pace():
+def test_an_image_being_made_holds_the_screen_half_as_long_as_the_pace():
     slideshow_set, _dealt = _set(hud=HudFacts(enhancing={"id-2": "queued", "id-3": "running"}))
     plain, waiting, being_made = (Slide.of(item) for item in _ITEMS)
 
@@ -230,7 +230,7 @@ def test_a_picture_being_made_holds_the_screen_half_as_long_as_the_pace():
 _TWO_VERSIONS = [("one_enhanced.png", "image", "Enhancement 1/1"), ("one.png", "image", "Original")]
 
 
-def test_the_note_on_a_picture_filed_once_with_nothing_in_flight_says_nothing():
+def test_the_note_on_an_image_filed_once_with_nothing_in_flight_says_nothing():
     slideshow_set, _dealt = _set()
 
     assert item_note(slideshow_set, levels=[], level_index=0) == ""
@@ -371,7 +371,7 @@ def test_ending_the_loop_goes_back_to_browsing_with_the_slide_kept():
 
 def test_a_slide_taken_away_leaves_the_loop_it_was_in():
     """A running loop is drawn on the map from the pool it was dealt, not from
-    the library — so a picture taken away has to leave that pool too, or the map
+    the library — so an image taken away has to leave that pool too, or the map
     goes on drawing it beside the ones still there."""
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
@@ -384,7 +384,7 @@ def test_a_slide_taken_away_leaves_the_loop_it_was_in():
 
 def test_a_loop_down_to_one_slide_is_one_to_end():
     """A cull can leave a loop holding only the slide on screen, and stepping
-    round a row of one is that same picture again — so a forward step ends it."""
+    round a row of one is that same image again — so a forward step ends it."""
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
     slideshow_set.playlist.drop("id-1b")
@@ -416,7 +416,7 @@ def test_the_loop_key_steps_seeds_then_configs_then_off_and_round_again():
 
 def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
     """The column steps between acts, so twins of one act share a row; the
-    loop is the picture and every video of it, and its map is the loop."""
+    loop is the image and every video of it, and its map is the loop."""
     twin = Slide("one-y.png", "image", "id-1y")
     whole = lambda pid: MapNeighbors(  # noqa: E731
         column=tuple(MapRow(slide, "dawn") for slide in _ACTIONS.get(pid, ())),
@@ -545,7 +545,7 @@ _ROW = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b"),
 
 
 def _row_mates(prompt_id):
-    """Every slide of the one row is every other's seed, as a folder's pictures are."""
+    """Every slide of the one row is every other's seed, as a folder's images are."""
     in_the_row = any(item[2] == prompt_id for item in _ROW)
     return MapNeighbors(seeds=tuple(Slide.of(item) for item in _ROW
                                     if in_the_row and item[2] != prompt_id), label="fox")
@@ -784,7 +784,7 @@ def test_a_reset_drops_the_act_filter_with_the_other_switches():
 
 
 def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
-    """A video landing makes its picture a source, so what the library said
+    """A video landing makes its image a source, so what the library said
     before it landed is not what a filter may go on matching by."""
     named_for = dict(_NAMED_FOR)
     slideshow_set, _dealt = _set(acts=lambda ids: {pid: named_for.get(pid, "") for pid in ids})
@@ -813,7 +813,7 @@ def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
     assert slideshow_set.configuration_row("nobody") is None
 
 
-def test_the_frame_of_a_picture_being_made_is_its_newest():
+def test_the_frame_of_an_image_being_made_is_its_newest():
     slideshow_set, _dealt = _set()
     plain, waiting, enhancing = (Slide.of(item) for item in _ITEMS)
     live = Slide(b"run-frame", LIVE, "id-run")

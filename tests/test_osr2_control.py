@@ -90,7 +90,7 @@ def test_the_park_is_in_place_before_the_switch_says_so():
 
 def test_driving_to_parked_still_says_so():
     """The app holds the device either way, so nothing engages anew -- and if
-    that reached nobody, the press would change the picture and leave the
+    that reached nobody, the press would change the image and leave the
     device where it was."""
     control = _control()
     control.set_state(OSR2_DRIVING)

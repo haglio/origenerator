@@ -1,4 +1,4 @@
-"""The sorting window: one picture, one press, the next picture.
+"""The sorting window: one image, one press, the next image.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
@@ -25,7 +25,7 @@ from origenerator.gui.sorting_window import (
     state_button,
     wrapped_to_fit,
 )
-from origenerator.picture_states import Tile
+from origenerator.image_states import Tile
 from origenerator.sorting_session import SortingSession
 
 _STATES = ("state one", "state two", "state three")
@@ -37,7 +37,7 @@ class _Store:
     def __init__(self):
         self.states = {}
 
-    def set_picture_state(self, prompt_id, state):
+    def set_image_state(self, prompt_id, state):
         self.states[prompt_id] = state
 
 
@@ -58,31 +58,31 @@ def _said(made, name) -> str:
     return made.findChild(QLabel, name).text()
 
 
-def _picture(made) -> QLabel:
+def _image(made) -> QLabel:
     return made.findChildren(QLabel)[0]
 
 
 @pytest.fixture
 def window(qtbot):
-    def build(*prompt_ids, pictures=None, marks=None, tiles=None):
+    def build(*prompt_ids, images=None, drawings=None, tiles=None):
         store = _Store()
-        listed = pictures or [{"prompt_id": p, "name": "3FA9C0D2 000", "picture_path": None}
-                              for p in prompt_ids]
+        listed = images or [{"prompt_id": p, "name": "3FA9C0D2 000", "image_path": None}
+                            for p in prompt_ids]
         made = SortingWindow(SortingSession(listed, store),
-                             tiles or _TILES, marks or {})
+                             tiles or _TILES, drawings or {})
         qtbot.addWidget(made)
         return made, store
 
     return build
 
 
-def test_the_status_line_calls_the_picture_by_the_name_the_gallery_gives_it(window):
-    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 004",
-                                     "picture_path": None}])
+def test_the_status_line_calls_the_image_by_the_name_the_gallery_gives_it(window):
+    made, _store = window(images=[{"prompt_id": "first", "name": "3FA9C0D2 004",
+                                     "image_path": None}])
 
     assert _said(made, STATUS_LINE) == "1 left · 3FA9C0D2 004"
 
-def test_a_tile_is_offered_for_every_state_and_pressing_one_sorts_the_picture(window):
+def test_a_tile_is_offered_for_every_state_and_pressing_one_sorts_the_image(window):
     made, store = window("first", "second")
 
     _tile(made, "state two").click()
@@ -117,7 +117,7 @@ def test_the_window_says_when_there_is_nothing_left_to_sort(window):
     assert _said(made, STATUS_LINE) == SortingWindow.NOTHING_LEFT
 
 
-def test_same_as_last_gives_this_picture_the_state_the_last_one_got(window):
+def test_same_as_last_gives_this_image_the_state_the_last_one_got(window):
     made, store = window("first", "second")
     _tile(made, "state three").click()
 
@@ -135,7 +135,7 @@ def test_same_as_last_with_nothing_sorted_yet_says_so_and_sorts_nothing(window):
     assert "Nothing sorted yet" in _said(made, LAST_LINE)
 
 
-def test_skipping_leaves_the_picture_unsorted_and_brings_up_the_next(window):
+def test_skipping_leaves_the_image_unsorted_and_brings_up_the_next(window):
     made, store = window("first", "second")
 
     _press(made, SKIP_BUTTON).click()
@@ -144,7 +144,7 @@ def test_skipping_leaves_the_picture_unsorted_and_brings_up_the_next(window):
     assert _said(made, STATUS_LINE).startswith("2 ")
 
 
-def test_undo_takes_the_last_answer_back_and_puts_its_picture_up_again(window):
+def test_undo_takes_the_last_answer_back_and_puts_its_image_up_again(window):
     made, store = window("first", "second")
     _tile(made, "state one").click()
 
@@ -166,7 +166,7 @@ def test_undo_with_nothing_answered_yet_says_so(window):
 
 
 def test_each_state_wears_its_own_drawing(window, tmp_path):
-    made, _store = window("first", marks={"state two": _drawn(tmp_path / "two.png")})
+    made, _store = window("first", drawings={"state two": _drawn(tmp_path / "two.png")})
 
     assert not _tile(made, "state two").icon().isNull()
 
@@ -188,50 +188,50 @@ def test_a_state_of_several_terms_reads_one_term_to_a_line():
 
 def test_a_drawing_that_will_not_load_is_no_worse_than_none(window, tmp_path):
     torn = tmp_path / "torn.png"
-    torn.write_bytes(b"not a picture at all")
+    torn.write_bytes(b"not an image at all")
 
-    made, _store = window("first", marks={"state one": str(torn)})
+    made, _store = window("first", drawings={"state one": str(torn)})
 
     assert _tile(made, "state one").icon().isNull()
 
 
-# --- the picture itself ------------------------------------------------------
+# --- the image itself ------------------------------------------------------
 
 
-def test_the_picture_is_drawn_at_the_size_the_window_gives_it(window, tmp_path):
-    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 001",
-                                     "picture_path": _drawn(tmp_path / "p.png",
-                                                            size=(400, 600))}])
+def test_the_image_is_drawn_at_the_size_the_window_gives_it(window, tmp_path):
+    made, _store = window(images=[{"prompt_id": "first", "name": "3FA9C0D2 001",
+                                     "image_path": _drawn(tmp_path / "p.png",
+                                                          size=(400, 600))}])
     made.resize(900, 900)
-    _picture(made).resize(500, 700)
+    _image(made).resize(500, 700)
 
-    made._fill_with_the_picture()
+    made._fill_with_the_image()
 
-    drawn = _picture(made).pixmap()
+    drawn = _image(made).pixmap()
     assert drawn.height() == 700  # the taller side fills, the shape is kept
     assert drawn.width() == 466
 
 
-def test_growing_the_window_re_reads_the_picture_rather_than_stretching_a_copy(
+def test_growing_the_window_re_reads_the_image_rather_than_stretching_a_copy(
         window, tmp_path):
-    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 001",
-                                     "picture_path": _drawn(tmp_path / "p.png",
-                                                            size=(400, 600))}])
-    _picture(made).resize(50, 75)
-    made._fill_with_the_picture()
+    made, _store = window(images=[{"prompt_id": "first", "name": "3FA9C0D2 001",
+                                     "image_path": _drawn(tmp_path / "p.png",
+                                                          size=(400, 600))}])
+    _image(made).resize(50, 75)
+    made._fill_with_the_image()
 
-    _picture(made).resize(400, 600)
-    made._fill_with_the_picture()
+    _image(made).resize(400, 600)
+    made._fill_with_the_image()
 
-    drawn = _picture(made).pixmap()
+    drawn = _image(made).pixmap()
     assert (drawn.width(), drawn.height()) == (400, 600)
 
 
-def test_a_picture_whose_file_has_gone_says_so_rather_than_showing_nothing(window):
-    made, _store = window(pictures=[{"prompt_id": "first", "name": "3FA9C0D2 001",
-                                     "picture_path": None}])
+def test_an_image_whose_file_has_gone_says_so_rather_than_showing_nothing(window):
+    made, _store = window(images=[{"prompt_id": "first", "name": "3FA9C0D2 001",
+                                     "image_path": None}])
 
-    assert _picture(made).text() == SortingWindow.MISSING
+    assert _image(made).text() == SortingWindow.MISSING
 
 
 # --- the grid of buttons -----------------------------------------------------
@@ -240,7 +240,7 @@ def test_a_picture_whose_file_has_gone_says_so_rather_than_showing_nothing(windo
 def test_every_button_is_the_same_shape_and_size(window, tmp_path):
     """A column was as wide as its own widest name, so the three columns came
     out three widths and the grid did not read as a grid."""
-    made, _store = window("first", marks={
+    made, _store = window("first", drawings={
         "state one": _drawn(tmp_path / "one.png"),
         "state three": _drawn(tmp_path / "three.png", size=(140, 60)),
     })
@@ -329,9 +329,9 @@ def _drawing_rows(made, state):
 def test_a_tile_down_several_rows_draws_in_the_middle_of_them(window, tmp_path):
     """His words: on the tile down seven rows the "image should be aligned in a
     horizontal row w/ the images for" the single-row tiles beside its middle."""
-    marks = {state: _drawn(tmp_path / f"{state}.png", color="red")
-             for state in ("state one", "state two", "state three", "state four")}
-    made, _ = window("gen-one", marks=marks,
+    drawings = {state: _drawn(tmp_path / f"{state}.png", color="red")
+                for state in ("state one", "state two", "state three", "state four")}
+    made, _ = window("gen-one", drawings=drawings,
                      tiles=(Tile("state one", 0, 0), Tile("state two", 1, 0),
                             Tile("state three", 2, 0), Tile("state four", 0, 1, rows=3)))
 

@@ -177,13 +177,13 @@ def fold_completed_enhancements(db) -> int:
     return folded
 
 
-def enhancements_of_pictures_gone(rows, *, places: OutputPlaces, input_dir: Path) -> list[dict]:
+def enhancements_of_images_gone(rows, *, places: OutputPlaces, input_dir: Path) -> list[dict]:
     return [
         row for row in rows
         if row.get("workflow_name") == ENHANCE_WORKFLOW
         and row.get("status") == GenerationStatus.COMPLETED
-        and (picture := parse_params(row.get("params_json")).get("input_image"))
-        and reference_path(picture, places=places, input_dir=input_dir) is None
+        and (image := parse_params(row.get("params_json")).get("input_image"))
+        and reference_path(image, places=places, input_dir=input_dir) is None
     ]
 
 

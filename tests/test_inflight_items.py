@@ -158,7 +158,7 @@ def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build):
     assert card.cancel is not None
 
 
-def test_a_video_waiting_out_the_minute_after_a_picture_carries_when_it_starts(build):
+def test_a_video_waiting_out_the_minute_after_an_image_carries_when_it_starts(build):
     job = FakeJob("g1", state="queued", starts_at=1060.0)
     items = build([_row("g1", status="pending")],
                   jobs_by_folder={"video/wan22_i2v/aaa": [job]})
@@ -276,18 +276,18 @@ def test_a_cards_shield_is_its_jobs_and_is_set_through_the_caller(build):
     assert shielded == [("g1", False)]
 
 
-def test_a_run_asked_for_of_a_picture_stands_under_that_picture(build):
+def test_a_run_asked_for_of_an_image_stands_under_that_image(build):
     # A folder-wide request queues a run per image and every one of them animates
-    # nothing, so the thing it was asked about is the only picture it has.
+    # nothing, so the thing it was asked about is the only image it has.
     rows = [_row("asked-of"), _row("g1")]
     items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of"}])
 
     card = next(item for item in items if item.key == "g1")
     assert card.requested
-    assert card.source_picture == "asked-of.jpg"
+    assert card.source_file == "asked-of.jpg"
 
 
-def test_a_queued_run_with_no_picture_shows_what_its_folder_already_holds(build):
+def test_a_queued_run_with_no_thumbnail_shows_what_its_folder_already_holds(build):
     # Its output does not exist yet, but the folder it will join is full of what
     # the same settings made last time.
     key = "image/sdxl_t2i/aaa"

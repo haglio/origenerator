@@ -125,7 +125,7 @@ def crop(job: dict, find=None) -> int:
             with Image.open(photo) as opened:
                 image = opened.convert("RGB")
         except (OSError, ValueError) as error:
-            raise Stopped(f"{Path(photo).name} couldn't be opened as a picture. Take it out of "
+            raise Stopped(f"{Path(photo).name} couldn't be opened as an image. Take it out of "
                           f"{Path(photo).parent} or replace it, then press Train "
                           "again.") from error
         box = find(image)

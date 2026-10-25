@@ -17,7 +17,7 @@ def _library(tmp_path: Path) -> dict:
     library = tmp_path / "library"
     return {
         "comfyui_output_dir": str(tmp_path / "comfyui saves"),
-        "origenerator_pictures_dir": str(library / "pictures"),
+        "origenerator_pictures_dir": str(library / "images"),
         "origenerator_videos_dir": str(library / "videos"),
         "origenerator_scripts_dir": str(library / "scripts"),
         "origenerator_audio_dir": str(library / "sounds"),
@@ -28,7 +28,7 @@ def test_the_settings_send_each_kind_of_output_to_its_own_library_folder(tmp_pat
     places = OutputPlaces.from_settings(_library(tmp_path), comfyui_dir=tmp_path / "ComfyUI")
 
     library = tmp_path / "library"
-    assert places.folder("image") == library / "pictures"
+    assert places.folder("image") == library / "images"
     assert places.folder("video/kept") == library / "videos" / "video" / "kept"
     assert places.folder("funscript/video") == library / "scripts" / "video"
     assert places.folder("audio") == library / "sounds"

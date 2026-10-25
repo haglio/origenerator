@@ -117,7 +117,7 @@ class Osr2Driver(QObject):
         funscript has the device.
 
         Folded onto the script the same way the stream is (the preview loops),
-        so the picture and the wire read the same script at the same moment.
+        so the drawing and the wire read the same script at the same moment.
         """
         if self._script is None or self._player is None or count <= 0:
             return ()

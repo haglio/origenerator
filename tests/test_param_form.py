@@ -20,7 +20,7 @@ from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
-from origenerator.gui import file_pick, icons, param_sections, pictured_dropdown
+from origenerator.gui import file_pick, icons, param_sections, thumbnail_dropdown
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.eliding import ElidingLabel
@@ -43,7 +43,7 @@ from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
 from origenerator.workflows.model_files import NO_LORA
-from tests.pictured_rows import painted_row, square
+from tests.thumbnail_rows import painted_row, square
 
 
 def test_field_labels_fit_the_heading_font(qtbot):
@@ -299,7 +299,7 @@ def _red_square(tmp_path):
     return square(tmp_path, "red")
 
 
-def test_each_seed_in_the_dropdown_wears_a_picture_of_what_it_made(qtbot, tmp_path):
+def test_each_seed_in_the_dropdown_wears_a_thumbnail_of_what_it_made(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
@@ -310,7 +310,7 @@ def test_each_seed_in_the_dropdown_wears_a_picture_of_what_it_made(qtbot, tmp_pa
     field.hidePopup()
 
 
-def test_a_stretch_is_one_row_wearing_each_of_its_pictures_newest_on_top(qtbot, tmp_path):
+def test_a_stretch_is_one_row_wearing_each_of_its_thumbnails_newest_on_top(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(5, square(tmp_path, "red")),
                                      SeedUse(5, square(tmp_path, "blue")),
                                      SeedUse(6, None)])
@@ -330,7 +330,7 @@ def _lettering_in(row: QImage, *, right_of: int) -> list[QPoint]:
             if row.pixelColor(x, y).lightness() > 180]
 
 
-def test_a_stretch_is_braced_between_its_pictures_and_its_seed(qtbot):
+def test_a_stretch_is_braced_between_its_thumbnails_and_its_seed(qtbot):
     form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None)])
     field.showPopup()
 
@@ -343,7 +343,7 @@ def test_a_stretch_is_braced_between_its_pictures_and_its_seed(qtbot):
     field.hidePopup()
 
 
-def test_a_stretch_prints_its_seed_once_beside_the_middle_of_its_pictures(qtbot):
+def test_a_stretch_prints_its_seed_once_beside_the_middle_of_its_thumbnails(qtbot):
     form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(5, None),
                                      SeedUse(6, None)])
     field.showPopup()
@@ -358,7 +358,7 @@ def test_a_stretch_prints_its_seed_once_beside_the_middle_of_its_pictures(qtbot)
     field.hidePopup()
 
 
-def test_a_picture_in_the_dropdown_is_set_in_from_the_edges_of_its_row(qtbot, tmp_path):
+def test_a_thumbnail_in_the_dropdown_is_set_in_from_the_edges_of_its_row(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
@@ -371,7 +371,7 @@ def test_a_picture_in_the_dropdown_is_set_in_from_the_edges_of_its_row(qtbot, tm
     field.hidePopup()
 
 
-def test_a_picture_keeps_its_own_colors_on_the_row_under_the_mouse(qtbot, tmp_path):
+def test_a_thumbnail_keeps_its_own_colors_on_the_row_under_the_mouse(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
@@ -398,12 +398,12 @@ def test_a_seed_nothing_was_made_with_shows_a_blank_of_the_shape_it_would_make(
     field.hidePopup()
 
 
-def _bounds_of(picture: QImage, color: str, *, left_of: int) -> QRect:
+def _bounds_of(image: QImage, color: str, *, left_of: int) -> QRect:
     wanted = QColor(color)
     xs, ys = [], []
-    for y in range(picture.height()):
-        for x in range(min(left_of, picture.width())):
-            if picture.pixelColor(x, y) == wanted:
+    for y in range(image.height()):
+        for x in range(min(left_of, image.width())):
+            if image.pixelColor(x, y) == wanted:
                 xs.append(x)
                 ys.append(y)
     return QRect(QPoint(min(xs), min(ys)), QPoint(max(xs), max(ys)))
@@ -422,7 +422,7 @@ def test_the_question_mark_on_a_blank_nearly_fills_it(qtbot, size):
     field.hidePopup()
 
 
-def test_the_dropdown_opens_wide_enough_for_a_whole_seed_beside_its_picture(qtbot):
+def test_the_dropdown_opens_wide_enough_for_a_whole_seed_beside_its_thumbnail(qtbot):
     form, field = _seed_form(qtbot, [SeedUse(20, None), SeedUse((1 << 63) - 1, None)])
     form.resize(160, 400)
     form.show()
@@ -484,14 +484,14 @@ def _middle_of(pixmap):
     return image.pixelColor(image.width() // 2, image.height() // 2)
 
 
-def test_the_closed_seed_shows_the_picture_of_the_item_its_seed_came_from(qtbot, tmp_path):
+def test_the_closed_seed_shows_the_thumbnail_of_the_item_its_seed_came_from(qtbot, tmp_path):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
     form.set_values({"seed": 42})
 
     form.show_item({"seed": 42}, _red_square(tmp_path))
 
-    assert _middle_of(form._widgets["seed"]._picture.pixmap()) == QColor("red")
+    assert _middle_of(form._widgets["seed"]._thumbnail.pixmap()) == QColor("red")
 
 
 def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made(qtbot):
@@ -500,13 +500,13 @@ def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made
                       ParamDef("height", "Height", "int", 800, max_val=4096)])
     qtbot.addWidget(form)
 
-    picture = form._widgets["seed"]._picture.pixmap()
+    image = form._widgets["seed"]._thumbnail.pixmap()
 
-    assert abs(picture.height() - 2 * picture.width()) <= 1
+    assert abs(image.height() - 2 * image.width()) <= 1
 
 
 def test_the_derived_size_follows_the_field_the_workflow_sizes_itself_off(qtbot):
-    form = ParamForm([ParamDef("input_image", "Picture", "image", ""),
+    form = ParamForm([ParamDef("input_image", "Image", "image", ""),
                       ParamDef("video", "Video to Perform", "video", "")],
                      size_deriver=lambda values: (864, 480) if values.get("video") else None,
                      size_source="video")
@@ -527,11 +527,11 @@ def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qt
 
     form._widgets["input_image"].set_item("frame.png")
 
-    picture = form._widgets["seed"]._picture.pixmap()
-    assert abs(picture.height() - 2 * picture.width()) <= 1
+    image = form._widgets["seed"]._thumbnail.pixmap()
+    assert abs(image.height() - 2 * image.width()) <= 1
 
 
-def test_a_seed_picked_from_the_dropdown_keeps_its_picture_closed(qtbot, tmp_path):
+def test_a_seed_picked_from_the_dropdown_keeps_its_thumbnail_closed(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path)), SeedUse(20, None)])
     field.showPopup()
     view = field.view()
@@ -539,10 +539,10 @@ def test_a_seed_picked_from_the_dropdown_keeps_its_picture_closed(qtbot, tmp_pat
     qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
                      pos=view.visualRect(field.model().index(0, 0)).center())
 
-    assert _middle_of(field._picture.pixmap()) == QColor("red")
+    assert _middle_of(field._thumbnail.pixmap()) == QColor("red")
 
 
-def test_picking_anywhere_on_a_stretch_takes_its_seed_with_its_newest_picture(qtbot, tmp_path):
+def test_picking_anywhere_on_a_stretch_takes_its_seed_with_its_newest_thumbnail(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(30, square(tmp_path, "red")),
                                      SeedUse(30, square(tmp_path, "blue")),
                                      SeedUse(20, None)])
@@ -554,21 +554,21 @@ def test_picking_anywhere_on_a_stretch_takes_its_seed_with_its_newest_picture(qt
                      pos=QPoint(stretch.center().x(), stretch.bottomLeft().y() - 4))
 
     assert field.currentText() == "30"
-    assert _middle_of(field._picture.pixmap()) == QColor("red")
+    assert _middle_of(field._thumbnail.pixmap()) == QColor("red")
 
 
-def test_the_closed_seeds_picture_stands_the_fields_height_and_clear_of_its_number(qtbot):
+def test_the_closed_seeds_thumbnail_stands_the_fields_height_and_clear_of_its_number(qtbot):
     form, field = _seed_form(qtbot, [])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     form.resize(430, 300)
     form.show()
     QApplication.processEvents()
 
-    picture = field._picture.geometry()
+    image = field._thumbnail.geometry()
     number = field.lineEdit().geometry()
 
-    assert picture.height() >= field.height() - 8
-    assert number.x() + field.lineEdit().textMargins().left() >= picture.right()
+    assert image.height() >= field.height() - 8
+    assert number.x() + field.lineEdit().textMargins().left() >= image.right()
 
 
 class _HeightWhenShown(QObject):
@@ -622,9 +622,9 @@ def test_a_stretch_too_tall_for_one_row_carries_on_in_the_next(qtbot):
     pitch = view.visualRect(model.index(field.count() - 1, 0)).height()
     stretch_rows = range(field.count() - 1)
     assert {field.itemText(row) for row in stretch_rows} == {"5"}
-    assert sum(len(field.itemData(row, pictured_dropdown.PICTURES_ROLE)) for row in stretch_rows) == 3000
+    assert sum(len(field.itemData(row, thumbnail_dropdown.THUMBNAILS_ROLE)) for row in stretch_rows) == 3000
     assert all(view.visualRect(model.index(row, 0)).height()
-               == pitch * len(field.itemData(row, pictured_dropdown.PICTURES_ROLE)) for row in stretch_rows)
+               == pitch * len(field.itemData(row, thumbnail_dropdown.THUMBNAILS_ROLE)) for row in stretch_rows)
     field.hidePopup()
 
 
@@ -642,10 +642,10 @@ def test_a_stretch_taller_than_the_list_scrolls_a_little_at_a_time(qtbot):
 
 
 @pytest.mark.parametrize("seed_of", [lambda n: n, lambda n: 5])
-def test_a_long_history_reads_pictures_only_for_the_seeds_on_screen(qtbot, monkeypatch,
+def test_a_long_history_reads_thumbnails_only_for_the_seeds_on_screen(qtbot, monkeypatch,
                                                                      seed_of):
     read = []
-    monkeypatch.setattr(pictured_dropdown, "fitted_picture",
+    monkeypatch.setattr(thumbnail_dropdown, "fitted_thumbnail",
                         lambda path, side, gray: read.append(path))
     history = [SeedUse(seed_of(n), f"thumbs/{n}.jpg") for n in range(3000)]
     form, field = _seed_form(qtbot, history)
@@ -2365,7 +2365,7 @@ def test_a_recommended_choices_tooltip_opens_with_recommended(qtbot):
         "sampler_name", "euler_ancestral")
 
 
-# --- a picture or video input is a drop zone ---------------------------------
+# --- an image or video input is a drop zone ---------------------------------
 
 class _Lends:
     def lends(self, prompt_id, kind):
@@ -2392,7 +2392,7 @@ def _let_go(slot, prompt_id):
 
 
 @pytest.mark.parametrize("kind", ["image", "video"])
-def test_a_picture_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(qtbot, kind):
+def test_an_image_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(qtbot, kind):
     form = ParamForm([ParamDef("source", "Source", kind, "")])
     qtbot.addWidget(form)
     zone = form._widgets["source"]
@@ -2409,14 +2409,14 @@ def test_a_picture_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(q
 
 
 def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
-    form = ParamForm([ParamDef("input_image", "Picture", "image", ""),
+    form = ParamForm([ParamDef("input_image", "Image", "image", ""),
                       ParamDef("video", "Video to Perform", "video", "")], items=_Lends())
     qtbot.addWidget(form)
     edits = []
     form.changed.connect(lambda: edits.append(form.get_values()))
 
     _let_go(form._widgets["input_image"], "image1")
-    _let_go(form._widgets["video"], "image1")  # a picture lends a video zone nothing
+    _let_go(form._widgets["video"], "image1")  # an image lends a video zone nothing
 
     assert form.get_values()["input_image"] == "image/image1.file [output]"
     assert form.get_values()["video"] == ""
@@ -2425,7 +2425,7 @@ def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
 
 
 def test_a_dropped_item_is_named_under_the_zones_image(qtbot):
-    form = ParamForm([ParamDef("input_image", "Picture", "image", "")], items=_Lends())
+    form = ParamForm([ParamDef("input_image", "Image", "image", "")], items=_Lends())
     qtbot.addWidget(form)
 
     _let_go(form._widgets["input_image"], "image1")
@@ -2434,7 +2434,7 @@ def test_a_dropped_item_is_named_under_the_zones_image(qtbot):
 
 
 def test_clicking_a_held_item_leads_back_to_it(qtbot):
-    form = ParamForm([ParamDef("input_image", "Picture", "image", "")], items=_Lends())
+    form = ParamForm([ParamDef("input_image", "Image", "image", "")], items=_Lends())
     qtbot.addWidget(form)
     led_to = []
     form.item_activated.connect(led_to.append)

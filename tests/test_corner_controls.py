@@ -1,4 +1,4 @@
-"""The three controls a generation's picture wears in its own corners."""
+"""The three controls a generation wears in the corners of its thumbnail or preview."""
 from __future__ import annotations
 
 import json
@@ -106,7 +106,7 @@ def test_every_corner_is_up_the_moment_there_is_an_item_under_it(qtbot):
     assert all(not b.isHidden() for b in controls.buttons())
 
 
-def test_a_picture_the_enhancer_cannot_take_grows_no_plus(qtbot):
+def test_an_item_the_enhancer_cannot_take_grows_no_plus(qtbot):
     host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=None)
     star, trash, plus = controls.buttons()
@@ -125,7 +125,7 @@ def test_a_spent_enhance_corner_is_a_badge_rather_than_a_button(qtbot):
     assert plus.isEnabled()
 
 
-def test_taking_the_picture_away_takes_every_corner_with_it(qtbot):
+def test_taking_the_item_away_takes_every_corner_with_it(qtbot):
     host, controls = _controls(qtbot)
     controls.show_for(favorite=True, enhance=icons.ENHANCE_HELD)
 
@@ -180,17 +180,17 @@ def test_a_chip_under_the_pointer_wears_its_armed_mark(qtbot):
 
 def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
     host, controls = _controls(qtbot)
-    picture = QRect(20, 30, 120, 100)
+    area = QRect(20, 30, 120, 100)
 
-    controls.place(picture)
+    controls.place(area)
 
     star, trash, plus = (b.geometry() for b in controls.buttons())
     for corner in (star, trash, plus):
-        assert picture.contains(corner)
+        assert area.contains(corner)
         assert corner.size().width() == CORNER_SIZE
     # Top-right, lower-left, lower-right — and never top-left, which the
     # media-type badge has always had.
-    assert star.left() == plus.left() > picture.center().x()
-    assert star.top() < picture.center().y() < plus.top()
-    assert trash.left() < picture.center().x()
+    assert star.left() == plus.left() > area.center().x()
+    assert star.top() < area.center().y() < plus.top()
+    assert trash.left() < area.center().x()
     assert trash.top() == plus.top()

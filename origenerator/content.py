@@ -50,7 +50,8 @@ def overlay_path(
 
 
 _RENAMED_KEYS = {"recipe_categories": "acts", "combine_recipes": "pinned_kino_settings",
-                 "genau_recipes": "pinned_genau_settings"}
+                 "genau_recipes": "pinned_genau_settings", "picture_states": "image_states",
+                 "picture_state_grid": "image_state_grid"}
 
 
 def _current(content: dict[str, Any]) -> dict[str, Any]:

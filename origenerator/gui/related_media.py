@@ -161,7 +161,7 @@ class RelatedMedia(QWidget):
         Three relations, most particular first. A cycle the Genau lane cut is
         the only one whose source is a VIDEO, and it has to be asked about first:
         a cut carries its source clip's params, start frame included, so asking
-        for a start frame would answer with the picture the ORIGINAL was animated
+        for a start frame would answer with the image the ORIGINAL was animated
         from and quietly point the link past the clip the user is looking for. A
         video that is not a cut links to its start frame; something a spoken
         request made links to the item the request was asked about — a requested

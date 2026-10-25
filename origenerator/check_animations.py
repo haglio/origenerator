@@ -7,7 +7,7 @@ import json
 
 
 def _launcher(db, client, enhance_settings):
-    """Queue one video of a sample's own picture with the prompts as edited: the
+    """Queue one video of a sample's own image with the prompts as edited: the
     same settings, their seeds re-rolled so it cannot reproduce the sample."""
     from origenerator import gallery
     from origenerator.generation_config import randomize_seeds
@@ -23,17 +23,17 @@ def _launcher(db, client, enhance_settings):
             [row for row in db.list_generations()
              if gallery.media_type_of_row(row) == MediaType.IMAGE])
 
-    def enhance(picture: dict) -> None:
-        params = gallery.enhance_params_for(picture, enhance_settings)
+    def enhance(image: dict) -> None:
+        params = gallery.enhance_params_for(image, enhance_settings)
         if params is not None:
-            launch_enhancements(jobs, db, [(picture, params)], image_index())
+            launch_enhancements(jobs, db, [(image, params)], image_index())
 
     def fold(_key: str, prompt_id: str, _origin: str) -> None:
         row = db.get_generation(prompt_id)
         if row is not None and row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             gallery.fold_enhancement(db, row)
 
-    jobs.enhance_pictures_with(enhance)
+    jobs.enhance_images_with(enhance)
     jobs.finished.connect(fold)
 
     def submit(sample: dict, positive: str, negative: str) -> str:
@@ -76,12 +76,12 @@ def the_animation_window():
 
     db = Database(DB_PATH)
     rows = db.list_generations()
-    pictures = [row for row in rows
-                if gallery.media_type_of_row(row) == MediaType.IMAGE]
+    images = [row for row in rows
+              if gallery.media_type_of_row(row) == MediaType.IMAGE]
 
     def look(sample: dict):
-        """The picture this clip was made from, and the clip's own loop."""
-        source = gallery.find_source_image_id(sample, pictures)
+        """The image this clip was made from, and the clip's own loop."""
+        source = gallery.find_source_image_id(sample, images)
         row = db.get_generation(source) if source else None
         still = gallery.resolve_preview(row, OUTPUT_PLACES) if row else None
         return (str(still[0]) if still and still[1] == MediaType.IMAGE else None,

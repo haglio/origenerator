@@ -1,15 +1,15 @@
-"""A folder's pictures, all of them, tiled edge to edge.
+"""A folder's thumbnails, all of them, tiled edge to edge.
 
 What the preview shows when the tab is about a whole folder rather than one
-generation: the folder itself. A rewrite lands on every picture in it, so the
-pane above the prompt has to be every picture — showing the newest one alone
-would say the edit was about that picture.
+generation: the folder itself. A rewrite lands on every item in it, so the
+pane above the prompt has to be every item — showing the newest one alone
+would say the edit was about that item.
 
 The wall fills the pane. The grid is whichever column count leaves the cells
 squarest for the space there is (:func:`rows_for`), the last rows share out the
-remainder so no row ends ragged (:func:`row_counts`), and each picture is scaled
+remainder so no row ends ragged (:func:`row_counts`), and each thumbnail is scaled
 to cover its cell and cropped to it. Nothing is letterboxed and nothing is
-lettered: this is a picture of a folder, not a sheet to read filenames off.
+lettered: this shows a folder, not a sheet to read filenames off.
 
 Both grid functions are pure, so how the wall lays out is testable without a
 screen.
@@ -28,7 +28,7 @@ def rows_for(count: int, width: int, height: int) -> int:
     """How many rows ``count`` cells take filling a ``width``×``height`` rect.
 
     Chosen by trying every row count and keeping the one whose cells come out
-    least oblong — which is what makes a wall of pictures read as a wall rather
+    least oblong — which is what makes a wall of thumbnails read as a wall rather
     than as a row of slivers or a stack of bands. A rect with no area, or nothing
     to put in it, is ``0``.
 
@@ -51,8 +51,8 @@ def rows_for(count: int, width: int, height: int) -> int:
 def row_counts(count: int, rows: int) -> list[int]:
     """How many cells each row holds, sharing out the remainder from the top.
 
-    Nine pictures over four rows is 3/2/2/2, not 3/3/3/0 — the wall fills, and no
-    row ends in a gap where the grid simply ran out of pictures.
+    Nine thumbnails over four rows is 3/2/2/2, not 3/3/3/0 — the wall fills, and no
+    row ends in a gap where the grid simply ran out of thumbnails.
     """
     if rows <= 0 or count <= 0:
         return []
@@ -61,19 +61,19 @@ def row_counts(count: int, rows: int) -> list[int]:
 
 
 def _readable(path) -> QPixmap | None:
-    """The picture at ``path``, or ``None`` when there is none to load — a file
+    """The thumbnail at ``path``, or ``None`` when there is none to load — a file
     the library has since moved is an ordinary case here, not an error."""
     if not path or not Path(path).is_file():
         return None
-    picture = QPixmap(str(path))
-    return None if picture.isNull() else picture
+    thumbnail = QPixmap(str(path))
+    return None if thumbnail.isNull() else thumbnail
 
 
-def _cover(picture: QPixmap, cell: QRect) -> QPixmap:
-    """``picture`` filling ``cell`` exactly: scaled up until it covers, then
+def _cover(thumbnail: QPixmap, cell: QRect) -> QPixmap:
+    """``thumbnail`` filling ``cell`` exactly: scaled up until it covers, then
     cropped about its middle."""
-    scaled = picture.scaled(cell.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                            Qt.TransformationMode.SmoothTransformation)
+    scaled = thumbnail.scaled(cell.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                              Qt.TransformationMode.SmoothTransformation)
     return scaled.copy(
         (scaled.width() - cell.width()) // 2, (scaled.height() - cell.height()) // 2,
         cell.width(), cell.height(),
@@ -81,35 +81,35 @@ def _cover(picture: QPixmap, cell: QRect) -> QPixmap:
 
 
 class ContactSheet(QWidget):
-    """Every picture handed to it, tiled to fill the widget."""
+    """Every thumbnail handed to it, tiled to fill the widget."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._pictures: list[QPixmap] = []
+        self._thumbnails: list[QPixmap] = []
 
-    def show_pictures(self, paths) -> None:
+    def show_thumbnails(self, paths) -> None:
         """Tile these files. Ones that can't be read are left out rather than
         drawn as gaps — the wall says how big the folder is, and a missing file
-        is not a picture in it."""
-        self._pictures = [p for path in paths if (p := _readable(path)) is not None]
+        is not a thumbnail in it."""
+        self._thumbnails = [p for path in paths if (p := _readable(path)) is not None]
         self.update()
 
     def clear(self) -> None:
-        self._pictures = []
+        self._thumbnails = []
         self.update()
 
     def count(self) -> int:
-        """How many pictures are actually on the wall."""
-        return len(self._pictures)
+        """How many thumbnails are actually on the wall."""
+        return len(self._thumbnails)
 
     def cells(self) -> list[QRect]:
-        """Where each picture goes, in drawing order — the layout on its own, so
+        """Where each thumbnail goes, in drawing order — the layout on its own, so
         it can be read without painting."""
-        if not self._pictures:
+        if not self._thumbnails:
             return []
-        rows = rows_for(len(self._pictures), self.width(), self.height())
+        rows = rows_for(len(self._thumbnails), self.width(), self.height())
         laid = []
-        for row, columns in enumerate(row_counts(len(self._pictures), rows)):
+        for row, columns in enumerate(row_counts(len(self._thumbnails), rows)):
             top = round(row * self.height() / rows)
             lower = round((row + 1) * self.height() / rows)
             for column in range(columns):
@@ -120,6 +120,6 @@ class ContactSheet(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        for picture, cell in zip(self._pictures, self.cells()):
+        for thumbnail, cell in zip(self._thumbnails, self.cells()):
             if cell.width() > 0 and cell.height() > 0:
-                painter.drawPixmap(cell, _cover(picture, cell))
+                painter.drawPixmap(cell, _cover(thumbnail, cell))

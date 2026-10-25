@@ -113,11 +113,11 @@ CREATE TABLE IF NOT EXISTS generations (
     -- What made the row, as a JSON block (origenerator.provenance): stamped at
     -- launch, or worked out later for a row from before launches were stamped.
     provenance TEXT,
-    -- What a still picture was sorted as showing: one of the overlay's
-    -- picture_states, by name. The user's own reading of the finished picture
+    -- What a still image was sorted as showing: one of the overlay's
+    -- image_states, by name. The user's own reading of the finished image
     -- rather than anything its prompt asked for, which is why it is a column and
     -- not a param: NULL until someone has looked, and free to differ between two
-    -- pictures of one settings folder. Never set on a video.
+    -- images of one settings folder. Never set on a video. Read as ``image_state``.
     picture_state TEXT,
     -- The shield on a queue row: while set, nothing the queue does for later
     -- work stops this run partway. On the row so a restart keeps it.
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS custom_folder_generations (
 -- resolve rather than the record being dropped.
 --
 -- Spoken ("Request … over") or typed: a folder rewrite asks the same thing of
--- every picture in a folder at once and records one of these per picture, which
+-- every image in a folder at once and records one of these per image, which
 -- is what links each result to the one it was rewritten from. Such a record has
 -- nothing heard and no single term — it says what it wanted by rewriting the
 -- prompt, which the old/new pair holds — so `heard` is empty there and
@@ -309,7 +309,8 @@ GENERATION_COLUMNS = (
 
 
 # Every copy of the app opens this database, older ones too, so the columns keep their names.
-STORED_NAMES = {"act": "recipe_category", "source_video": "recipe_video_id"}
+STORED_NAMES = {"act": "recipe_category", "source_video": "recipe_video_id",
+                "image_state": "picture_state"}
 
 
 def as_read(row) -> dict:

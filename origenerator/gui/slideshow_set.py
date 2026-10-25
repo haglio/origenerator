@@ -2,7 +2,7 @@
 the slide on screen.
 
 A slideshow is handed a set of generations and deals a pass from it — shuffled, or
-in the browser's own order — narrows it to the favorites or to the pictures it
+in the browser's own order — narrows it to the favorites or to the images it
 has enhanced, and grows it as generations land in the folder it is playing.
 None of that is about a window: a slideshow drawn full screen by this app and a slideshow
 handed to one of a Fun Time session's Funestras keep exactly this set and differ
@@ -17,7 +17,7 @@ re-renders; a Funestra is handed a new playlist), so it arrives as
 the new pass.
 
 The map is the Funestras' own (:mod:`origenerator.gui.slideshow_map`): the slide's
-act under other seeds runs right, what else was made of its picture runs
+act under other seeds runs right, what else was made of its image runs
 down, and a
 loop along either axis deals THAT row or column as the pass, the way a
 satellite loops a seed family, until it is stepped off or ended.  The set it
@@ -76,7 +76,7 @@ class SlideshowSet:
                  shuffle=None, start=None, hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None) -> None:
         # Kept so a re-dealt pass is laid out the way this slideshow's was: a
-        # double-clicked picture's slideshow reads its folder in order, and a filter
+        # double-clicked item's slideshow reads its folder in order, and a filter
         # applied over one must not quietly shuffle it.  None means the
         # playlist's own random shuffle, here and on the way back in.
         self._shuffle = shuffle
@@ -142,7 +142,7 @@ class SlideshowSet:
 
         *keep_slide* keeps the slide on screen when it is among them: a switch
         is a narrowing of what you are looking through, not a new slideshow, and
-        taking the picture away as well would make the switch impossible to
+        taking the slide away as well would make the switch impossible to
         try.  A reset says otherwise — it starts the set over from the top.
         *shuffle* lays the pass out some other way than this slideshow's own — a
         loop plays its row in the row's order.
@@ -315,7 +315,7 @@ class SlideshowSet:
 
     def _forget(self, is_gone) -> None:
         """Take slides out of the whole set — and out of a running loop's pool,
-        which the map is drawn from rather than from the library, so a picture
+        which the map is drawn from rather than from the library, so a slide
         left in it goes on being drawn after it has gone."""
         self._library_moved()
         self.all_items = [kept for kept in self.all_items if not is_gone(kept)]
@@ -494,7 +494,7 @@ class SlideshowSet:
     def jump_to(self, slide: Slide) -> bool:
         """Stand the pass on *slide*, splicing it in after the slide on screen
         when the pass has never held it — a map cell can name a generation the
-        set does not: a video of a picture it holds, a widened seed.  A jump off a
+        set does not: a video of an image it holds, a widened seed.  A jump off a
         running loop's axis ends the loop first.  ``False`` when it is the slide
         already on screen."""
         current = self.playlist.current()
@@ -653,7 +653,7 @@ def looping_note(slideshow_set: SlideshowSet) -> str:
 def thumb_of(slide: Slide) -> str:
     """The still a map cell draws for *slide*, as the path the panel takes: its
     stored thumbnail when it carries one (a video's only still), else the
-    picture itself, and nothing for a generation still being made."""
+    image itself, and nothing for a generation still being made."""
     if slide.is_live:
         return ""
     if slide.still:

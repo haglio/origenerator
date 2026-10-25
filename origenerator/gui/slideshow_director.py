@@ -163,7 +163,7 @@ class SlideshowHost(Protocol):
         """Re-pick what the device follows, a surface having changed."""
 
     def set_room_paused(self, paused: bool) -> None:
-        """Stop the room or play it again: the slideshows, the pictures, the sound
+        """Stop the room or play it again: the slideshows, the thumbnails, the sound
         and the device."""
 
     def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
@@ -261,7 +261,7 @@ class SlideshowDirector:
         self._fun_time = fun_time
         # The fullscreen slideshow window while one is open — whether it was
         # started from the toolbar (a whole folder, shuffled) or by
-        # double-clicking a picture (that folder in order). One slot, because
+        # double-clicking an item (that folder in order). One slot, because
         # it is one view.
         self._slideshow = None
         self._standalone_side: str | None = None
@@ -347,7 +347,7 @@ class SlideshowDirector:
         one, else the slideshow that is up.
 
         Hosted, a named side that holds nothing is an answer in itself —
-        falling back to the other region's slideshow would act on the picture the
+        falling back to the other region's slideshow would act on the slide the
         speaker did not name."""
         if side is not None and self._fun_time is not None:
             return self.region_slideshow(side)
@@ -700,7 +700,7 @@ class SlideshowDirector:
         upscale.
 
         A row with no file is left out, whether it never got one or is still
-        being made: a slide with nothing to look at is a gap between pictures,
+        being made: a slide with nothing to look at is a gap between slides,
         and one still in flight joins the running slideshow the moment it lands (see
         :meth:`note_finished`)."""
         upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
@@ -745,8 +745,8 @@ class SlideshowDirector:
         """What the library says about one generation, for the map a slideshow on
         *side* draws around it: its act under other seeds along the row, and
         down the column the same seed under other configurations, then what
-        else was made of its picture — the videos animated from it, and for a
-        video the picture itself (:mod:`origenerator.nav_map`).  A
+        else was made of its image — the videos animated from it, and for a
+        video the image itself (:mod:`origenerator.nav_map`).  A
         configuration is named by its folder, as the tree names it, and the
         rest by the act each shows.  Nothing at all for a generation the
         gallery does not have a row for — a file being written, a set
@@ -953,7 +953,7 @@ class SlideshowDirector:
         once: closing the portrait one must not forget the landscape one.
         """
         # Where it had got to, so the next one opens back on that slide: the
-        # look at the folder under a picture doesn't cost the place among them.
+        # look at the folder under an item doesn't cost the place among them.
         if slideshow is not None:
             self._slideshow_state = self._where_it_stands(slideshow)
         self._live_slideshows = [entry for entry in self._live_slideshows
@@ -1068,7 +1068,7 @@ class SlideshowDirector:
             slideshow.close()
 
     def _pick_where_it_played(self, prompt_id: str):
-        """A slideshow handed its slide over on the way out: pick that picture where
+        """A slideshow handed its slide over on the way out: pick that item where
         the slideshow was playing, or open its own folder on it when what is on
         screen does not hold it, and put it in a tab the way a click on it would."""
         self._slideshow = None
@@ -1129,7 +1129,7 @@ class SlideshowDirector:
         put there.
 
         Timed, because what the owner judges this mode by is the wait between
-        the press that opens it and the pictures arriving -- and that press is
+        the press that opens it and the slides arriving -- and that press is
         answered on the same thread as everything else this window does, so a
         slow fill is a report about that thread rather than about how big the
         library has grown.
@@ -1312,8 +1312,8 @@ class SlideshowDirector:
         search's hits are a set that was already asked for.
 
         An enhancement is nobody's slide, wherever it is running. It is a better
-        version of a picture the slideshow may already be playing, and the HUD says
-        so beside that picture's name — a second slide of it half-rendered
+        version of an image the slideshow may already be playing, and the HUD says
+        so beside that image's name — a second slide of it half-rendered
         would be the same image twice, one of them worse.
         """
         row = self._db.get_generation(prompt_id)
@@ -1509,7 +1509,7 @@ class SlideshowDirector:
         self._host.say("F-mode on" if slideshow.hud_favorites_filter else "F-mode off")
 
     def filter_enhanced(self, enhanced_only: bool, side: str | None = None):
-        """Narrow the slideshow in front of the speaker to its enhanced pictures, or
+        """Narrow the slideshow in front of the speaker to its enhanced images, or
         put them all back — the switch beside F-mode on its HUD, spoken.
 
         The slideshow's own switch, like the spoken "favorites": a word that set

@@ -135,7 +135,7 @@ def test_a_second_pass_lands_where_it_is_told(qtbot, tmp_path):
 FACE = ((0.4, 0.1, 0.6, 0.3),)
 
 
-def test_a_second_pass_brings_the_places_of_the_picture_on_screen(qtbot, tmp_path):
+def test_a_second_pass_brings_the_places_of_the_image_on_screen(qtbot, tmp_path):
     pane, engine, _running = _pane(qtbot)
     one, two = _items(tmp_path, "one", "two")
     _hand_over(pane, [one, two])
@@ -145,7 +145,7 @@ def test_a_second_pass_brings_the_places_of_the_picture_on_screen(qtbot, tmp_pat
     assert engine.points_told == [FACE]
 
 
-def test_a_pass_landing_on_a_picture_brings_its_places(qtbot, tmp_path):
+def test_a_pass_landing_on_an_image_brings_its_places(qtbot, tmp_path):
     pane, engine, _running = _pane(qtbot)
     one, two = _items(tmp_path, "one", "two")
     _hand_over(pane, [one, two])
@@ -164,7 +164,7 @@ def test_a_pass_with_nothing_in_it_opens_nothing(qtbot):
     assert pane.playback is None
 
 
-def test_a_line_stands_where_the_picture_would_until_there_is_one(qtbot, tmp_path):
+def test_a_line_stands_where_the_slide_would_until_there_is_one(qtbot, tmp_path):
     pane, _engine, _running = _pane(qtbot)
 
     pane.show_message("Generating…")
@@ -174,7 +174,7 @@ def test_a_line_stands_where_the_picture_would_until_there_is_one(qtbot, tmp_pat
     assert pane.message() == ""
 
 
-def test_the_panel_the_slideshow_hands_over_is_drawn_over_the_picture(qtbot, tmp_path):
+def test_the_panel_the_slideshow_hands_over_is_drawn_over_the_slide(qtbot, tmp_path):
     pane, engine, _running = _pane(qtbot, panel=lambda: HudModel(funestra="portrait"))
     _hand_over(pane, _items(tmp_path, "one"))
 
@@ -192,7 +192,7 @@ def test_each_tick_gives_the_slideshow_a_pass_of_its_own(qtbot, tmp_path):
     assert running[0].ticks == 1
 
 
-def test_a_press_on_the_picture_reaches_the_slideshow(qtbot, tmp_path):
+def test_a_press_on_the_slide_reaches_the_slideshow(qtbot, tmp_path):
     pane, _engine, running = _pane(qtbot)
     _hand_over(pane, _items(tmp_path, "one"))
     pane.tick()
@@ -406,7 +406,7 @@ def test_the_app_runs_ahead_of_background_work_while_its_funestra_is_open(qtbot,
     assert raised == ["ahead", "back"]
 
 
-def test_the_picture_keeps_moving_while_the_window_and_the_computer_are_busy(qtbot, tmp_path, monkeypatch):
+def test_the_image_keeps_moving_while_the_window_and_the_computer_are_busy(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(running_ahead, "_THIS_APP", running_ahead.AheadWhilePlaying())
     pane, engine, _running = _pane(qtbot)
     try:
@@ -419,7 +419,7 @@ def test_the_picture_keeps_moving_while_the_window_and_the_computer_are_busy(qtb
     assert moved_while_busy >= 5
 
 
-def test_a_picture_that_stops_moving_says_why_in_the_log(qtbot, tmp_path, caplog):
+def test_an_image_that_stops_moving_says_why_in_the_log(qtbot, tmp_path, caplog):
     engine = FakeEngine()
 
     def the_engine_gives_out():
@@ -451,7 +451,7 @@ def test_a_pass_handed_over_before_the_pane_is_shown_opens_the_moment_it_is(qtbo
     assert engine.opened == [items[0].path]
 
 
-def test_a_line_said_once_a_pass_is_owed_does_not_stand_in_front_of_the_picture(qtbot, tmp_path):
+def test_a_line_said_once_a_pass_is_owed_does_not_stand_in_front_of_the_slide(qtbot, tmp_path):
     engine = FakeEngine()
     pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), panel=lambda: None,
                         engine_for=lambda wid: engine if pane._window.isVisible() else None)

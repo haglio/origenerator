@@ -519,7 +519,7 @@ class BrowserPane(QObject):
         ``runs`` is ``{prompt_id: RunReading}`` for the enhances in flight
         right now — the latest frame, how far along the run is, and how long it
         has been going. A tile not named there is handed ``None`` and goes back
-        to resting. The tile keeps its own picture until a frame arrives — the
+        to resting. The tile keeps its own thumbnail until a frame arrives — the
         base render is out and worth looking at, which is the point of
         generating it first — and gets it back when the run ends.
         """
@@ -890,7 +890,7 @@ class BrowserPane(QObject):
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
-            enhance=self._enhance_state(row),           # the plus in the picture's corner
+            enhance=self._enhance_state(row),           # the plus in the thumbnail's corner
             enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
         )
@@ -1110,7 +1110,7 @@ class BrowserPane(QObject):
 
     @staticmethod
     def _requests_empty_hint() -> str:
-        return ("Nothing requested yet.\n\nWith a picture on screen, say "
+        return ("Nothing requested yet.\n\nWith an image on screen, say "
                 "“Request”, then what you want changed, then “over” — "
                 "“Request… no hat… over”. The revision is queued straight away "
                 "and lands here; open one and its prompt shows what moved.\n\n"
@@ -1309,13 +1309,13 @@ class BrowserPane(QObject):
                 flow, row, _SEEDS_TILE if i2v else _FOLDER_TILE, wire,
                 movie_path=self._host.animated_preview(row),  # videos loop; images stay still
                 favorite=bool(row.get("starred")),
-                enhance=self._enhance_state(row),           # the plus in the picture's corner
+                enhance=self._enhance_state(row),           # the plus in the thumbnail's corner
                 enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
 
         # The + leads, and the run in front of this folder's line stands last,
-        # where its picture will land; the runs waiting after it stand before it.
+        # where its tile will land; the runs waiting after it stand before it.
         # Rows still in flight stay out of the grid below rather than standing in
         # it as broken, output-less thumbnails.
         finished = [row for row in group.rows if gallery.produced_output(row)]
@@ -1414,12 +1414,12 @@ class BrowserPane(QObject):
         self._refresh_selection_highlights()
 
     def reveal_tile(self, prompt_id: str) -> bool:
-        """Land on a picture the way arriving from elsewhere should: picked, and
+        """Land on a tile the way arriving from elsewhere should: picked, and
         scrolled to if it sits outside the visible part of the pane. What a
         followed link needs — a folder of dozens otherwise leaves you looking at
         its newest items with the one you asked for highlighted off-screen.
 
-        False where this pane has no picture of its own for it."""
+        False where this pane has no tile of its own for it."""
         self._pages.draw_past(lambda entry: entry.item == prompt_id, _NEIGHBORS_PAST_A_REVEAL)
         widget = self._thumb_widgets.get(prompt_id)
         if widget is None:
@@ -1497,7 +1497,7 @@ class BrowserPane(QObject):
         """A tile's corner control was pressed: bookmark, bin or enhance THIS one.
 
         One item, never the selection — the control is drawn on a particular
-        picture, in that picture's own corner, so it has already said which item
+        thumbnail, in that thumbnail's own corner, so it has already said which item
         it is about. The menu is where a whole selection is acted on.
         """
         self.item_action_triggered.emit(prompt_id, action)
@@ -1510,7 +1510,7 @@ class BrowserPane(QObject):
     def refresh_corners(self):
         """Re-read every drawn tile's enhance corner, without rebuilding the pane.
 
-        Turning a setting in the Enhance subpanel changes what every picture on
+        Turning a setting in the Enhance subpanel changes what every item on
         screen would get from a press — an image holding the version the panel
         described a moment ago is now one enhancement short of the new one — and
         none of those tiles were touched, so nothing else would tell them.

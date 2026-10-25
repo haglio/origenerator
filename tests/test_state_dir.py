@@ -45,7 +45,7 @@ def _settings_naming_this_checkout_the_production_one(tmp_path: Path) -> Path:
     return settings
 
 
-def test_the_production_app_keeps_its_state_in_its_checkout_and_its_pictures_files_in_the_library(
+def test_the_production_app_keeps_its_state_in_its_checkout_and_its_items_files_in_the_library(
         tmp_path):
     state, db, thumbs, ui, project, trash, _primary, records, production = _paths(
         None, settings=_settings_naming_this_checkout_the_production_one(tmp_path))
@@ -78,7 +78,7 @@ def test_a_process_told_where_its_state_is_keeps_every_path_there(tmp_path):
 
 def test_a_branch_session_shares_the_live_installs_library_and_keeps_its_own_window_state():
     # The library -- its database, and the thumbnails and trash kept beside the
-    # pictures -- is the production app's wherever the app runs from, so every
+    # items -- is the production app's wherever the app runs from, so every
     # instance shows every generation, made in a preview or not. What is about
     # this window alone (its saved geometry and tabs, its logs) stays in the
     # checkout that runs it.

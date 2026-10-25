@@ -228,7 +228,7 @@ def test_configs_differ_on_any_changed_param():
 
 
 def test_configs_differ_on_a_changed_seed():
-    # A different seed is a different picture, so it counts as a modification
+    # A different seed is a different image, so it counts as a modification
     # even though it lands the run in the same gallery folder.
     assert not configs_match(_snapshot(params={"seed": 5}),
                              _snapshot(params={"seed": 6}))
@@ -241,7 +241,7 @@ def test_configs_differ_on_a_changed_workflow():
 
 def test_configs_differ_once_the_seed_is_set_to_random():
     # Same seed in the field, but one of them re-rolls it on Generate — so they
-    # would not make the same picture.
+    # would not make the same image.
     assert not configs_match(_snapshot(params={"seed": 5}),
                              _snapshot(params={"seed": 5}, seed_is_random=True))
 

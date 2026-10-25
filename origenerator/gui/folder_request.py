@@ -29,8 +29,8 @@ _REQUEST_TITLE = "Request {folder}"
 class FolderRequest:
     """A tab that is a whole folder's prompt rewrite rather than one config.
 
-    A tab opened this way is about a folder: it shows the folder's pictures
-    instead of a file, its Generate asks for one run per picture rather than one
+    A tab opened this way is about a folder: it shows the folder's thumbnails
+    instead of a file, its Generate asks for one run per item rather than one
     run, and its name is the folder's. That is a distinct state, and it used to
     be a four-key dict tested for None at four sites — each site knowing on its
     own which key it wanted and what to make of it.

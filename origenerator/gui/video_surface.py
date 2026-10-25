@@ -17,7 +17,7 @@ class VideoSurface(QWidget):
     def video_sink(self) -> QVideoSink:
         return self._sink
 
-    def picture(self) -> QImage:
+    def current_frame(self) -> QImage:
         return self._frame.toImage() if self._frame.isValid() else QImage()
 
     def _take(self, frame: QVideoFrame) -> None:
@@ -27,11 +27,11 @@ class VideoSurface(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.fillRect(self.rect(), BLACK)
-        picture = self.picture()
-        if picture.isNull():
+        frame = self.current_frame()
+        if frame.isNull():
             return
         shown = QRect(0, 0, 0, 0)
-        shown.setSize(picture.size().scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio))
+        shown.setSize(frame.size().scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio))
         shown.moveCenter(self.rect().center())
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        painter.drawImage(shown, picture)
+        painter.drawImage(shown, frame)

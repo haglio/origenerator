@@ -59,9 +59,9 @@ def test_the_widest_name_an_item_can_wear_fits_its_tab_whole(qtbot, point_size):
     bar.setFont(font)
     bar.setTabsClosable(True)
     bar.setIconSize(MARK_CANVAS)
-    picture = QPixmap(40, 30)
-    picture.fill(Qt.GlobalColor.gray)
-    bar.addTab(tab_mark(QIcon(picture)), _widest_name(bar))
+    pixmap = QPixmap(40, 30)
+    pixmap.fill(Qt.GlobalColor.gray)
+    bar.addTab(tab_mark(QIcon(pixmap)), _widest_name(bar))
 
     assert bar.tabSizeHint(0).width() == QTabBar.tabSizeHint(bar, 0).width()
 
@@ -285,7 +285,7 @@ def _painted_label_font(bar, index):
 
     Read at the drawing call rather than off a rendered pixmap: the offscreen
     platform this suite runs on paints italic and upright text identically, so a
-    picture of the bar cannot tell them apart.
+    grab of the bar cannot tell them apart.
     """
     pixmap = QPixmap(400, 60)
     painter = QPainter(pixmap)
@@ -360,26 +360,26 @@ def test_the_italic_mark_survives_the_app_being_themed(qtbot):
 
 # --- the mark a tab wears, and the space around it ---------------------------
 
-def _picture(width, height, color=Qt.GlobalColor.red) -> QIcon:
+def _icon(width, height, color=Qt.GlobalColor.red) -> QIcon:
     pixmap = QPixmap(width, height)
     pixmap.fill(color)
     return QIcon(pixmap)
 
 
 @pytest.mark.parametrize("shape", [(256, 144), (144, 256), (200, 200)])
-def test_a_mark_is_the_same_width_whatever_shape_the_picture_is(shape):
+def test_a_mark_is_the_same_width_whatever_shape_the_thumbnail_is(shape):
     # The row's spacing is built on the mark's width, so a portrait thumbnail
     # must not push the label further out than a landscape one does.
-    mark = tab_mark(_picture(*shape))
+    mark = tab_mark(_icon(*shape))
     assert mark.actualSize(MARK_CANVAS) == MARK_CANVAS
 
 
 def test_a_mark_trails_the_gap_its_label_needs(qtbot):
     # Qt's own tab layout puts the text a fixed 4px after whatever the icon
     # measures, so the rest of the gap rides on the canvas as transparency.
-    canvas = tab_mark(_picture(256, 144)).pixmap(MARK_CANVAS).toImage()
+    canvas = tab_mark(_icon(256, 144)).pixmap(MARK_CANVAS).toImage()
     assert canvas.width() == MARK + EDGE - 4
-    assert canvas.pixelColor(MARK - 1, MARK // 2).alpha() == 255   # picture
+    assert canvas.pixelColor(MARK - 1, MARK // 2).alpha() == 255   # thumbnail
     assert canvas.pixelColor(MARK, MARK // 2).alpha() == 0         # its gap
 
 
@@ -401,7 +401,7 @@ def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot):
         qtbot.addWidget(tabs)
         tabs.setTabsClosable(True)
         tabs.setIconSize(MARK_CANVAS)
-        tabs.addTab(QWidget(), tab_mark(_picture(256, 144)), "a tab")
+        tabs.addTab(QWidget(), tab_mark(_icon(256, 144)), "a tab")
         tabs.resize(600, 400)
         tabs.show()
         QApplication.processEvents()

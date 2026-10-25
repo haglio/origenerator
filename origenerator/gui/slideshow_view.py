@@ -1,4 +1,4 @@
-"""The full-screen slideshow window -- the one way this app fills the screen with a picture.
+"""The full-screen slideshow window -- the one way this app fills the screen with an item.
 
 The slideshow in it is the one every Funestra runs
 (:class:`~origenerator.gui.funestra_slideshow.FunestraSlideshow`), driving the
@@ -6,7 +6,7 @@ Funestra in this window's pane through the pane's channel exactly as it drives
 one of a session's through its files.  What the window answers for is what
 only a window has: the screen it fills, the keys pressed on it, the panel's
 place and the block at its foot, the OSR2 this app drives standalone, the lines
-it flashes over the picture, and the room's pause.
+it flashes over the slide, and the room's pause.
 
 What every key does, what the lock takes with it, what a filter narrows and
 where a closing slideshow leaves you are `tests/test_slideshow_view.py`'s to state:
@@ -216,7 +216,7 @@ class SlideshowView(QWidget):
         — or, with no session under this slideshow, onto the slideshow as well —
         and the device's own verbs land on this window either way, the OSR2
         being this app's to drive wherever the slideshow is drawn.  A press on
-        the picture asks for the pause, and a double-click there leaves.
+        the slide asks for the pause, and a double-click there leaves.
         """
         if not self._route(command):
             return False
@@ -229,7 +229,7 @@ class SlideshowView(QWidget):
             self._press_the_queue(verb, payload)
             return True
         if verb == OMNIPAUSE_TOGGLE:
-            self._press_on_the_picture()
+            self._press_on_the_slide()
             return True
         action, path = side_press(self._hud_side, verb, payload)
         if action in COLLAPSES or action == OPENS_IN:
@@ -358,12 +358,12 @@ class SlideshowView(QWidget):
 
     def room_paused(self, paused: bool) -> None:
         """Freeze or resume the Funestra here whole, with the room: a frozen
-        picture stops counting down its pace, a frozen clip stops, and a slide
+        image stops counting down its pace, a frozen clip stops, and a slide
         stepped to while frozen arrives frozen too."""
         self._paused = paused
         self._pane.set_paused(paused)
 
-    def _press_on_the_picture(self) -> None:
+    def _press_on_the_slide(self) -> None:
         self._toggle_pause()
         if self._pane.pressing_again:
             defer(self, self.close)
@@ -374,7 +374,7 @@ class SlideshowView(QWidget):
         else:
             self.room_paused(not self._paused)
 
-    # --- the lines it flashes over the picture --------------------------------
+    # --- the lines it flashes over the slide --------------------------------
 
     def flash(self, text: str, *, kind: str = NOTICE, ms: int = 1500, mark: str = "") -> None:
         """Say something for a moment, then fall back to whatever the note would
@@ -476,7 +476,7 @@ class SlideshowView(QWidget):
         """Leave, handing the gallery the slide that was on screen.
 
         However the slideshow is left — a double-click, Enter, the spoken
-        "close", or ending on a locked slide — the picture you were looking at is
+        "close", or ending on a locked slide — the item you were looking at is
         the one you want to find afterwards, so the gallery picks it where the
         slideshow was playing.
         """

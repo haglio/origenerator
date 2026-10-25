@@ -99,7 +99,7 @@ def test_a_video_points_back_at_the_image_that_seeded_its_start_frame(related):
     assert related._animated_strip.isHidden()   # a video is animated into nothing
 
 
-def test_the_start_picture_is_called_by_its_name_not_its_file(related):
+def test_the_start_image_is_called_by_its_name_not_its_file(related):
     related.show_row(_video_row(), [_image_row()])
 
     assert related._source_tile._name.text() == "3FA9C0D2 004"
@@ -202,7 +202,7 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
 
 def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_related):
     # A cut carries its source's params, start frame included. Asking for a start
-    # frame first would answer with the picture the ORIGINAL was animated from and
+    # frame first would answer with the image the ORIGINAL was animated from and
     # quietly send the link past the clip the user is actually looking for.
     clip = _video_row()
     related = make_related(clip)

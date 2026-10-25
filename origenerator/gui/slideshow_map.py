@@ -4,7 +4,7 @@ holds it still.
 The Funestras' map is a gamma: the clip on screen in the corner, its seed row
 running right, its column running down, one cell lit for what is playing.  A
 slideshow draws the same gamma over its own generations — the seed row is the same
-act under other seeds, the column what else was made of the same picture
+act under other seeds, the column what else was made of the same image
 (:mod:`origenerator.nav_map` says which is which) — and the
 map hangs on whatever is on screen until a loop is started along one of its
 axes, when it hangs on the slide the loop began on and the lit cell walks the
@@ -50,8 +50,8 @@ class MapRow(NamedTuple):
 class MapNeighbors:
     """What the library says about one generation: the slides showing its act
     under other seeds (the seed row), the column of rows under it — the same
-    seed under other configurations, then what else was made of its picture —
-    the act its own row is named for, and the rest of that picture's whole
+    seed under other configurations, then what else was made of its image —
+    the act its own row is named for, and the rest of that image's whole
     group, which is what a loop down the column plays."""
 
     seeds: tuple[Slide, ...] = ()
@@ -108,7 +108,7 @@ def build_map(current: Slide, loop: Loop | None,
     A running loop keeps the map where it started and walks the lit cell along
     the looped axis, so the row does not re-orient as it plays.  The column
     belongs to the lit seed rather than to the corner: it is what else was
-    made of that seed's picture, and along the row every seed has its own.
+    made of that seed's image, and along the row every seed has its own.
     """
     at = loop.position_of(current) if loop is not None else None
     if loop is None or at is None:

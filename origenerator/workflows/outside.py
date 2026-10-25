@@ -82,7 +82,7 @@ class OutsideWorkflow(WorkflowTemplate):
     def pins_reused_seed(self) -> bool:
         return True
 
-    def starts_from_a_picture(self) -> bool:
+    def starts_from_an_image(self) -> bool:
         return self.kind == VideoKind.IMAGE_TO_VIDEO
 
     def build_api_payload(self, params: dict) -> dict:

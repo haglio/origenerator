@@ -294,7 +294,7 @@ class WorkflowTemplate(ABC):
         return tuple(pd.key for pd in self.param_definitions() if pd.type == ParamType.SEED)
 
     def missing_inputs(self, params: dict) -> list[str]:
-        """The labels of the pictures and videos ``params`` leave unpicked."""
+        """The labels of the images and videos ``params`` leave unpicked."""
         return [label for key, label in self._input_params
                 if not str(params.get(key) or "").strip()]
 
@@ -303,7 +303,7 @@ class WorkflowTemplate(ABC):
         return tuple((pd.key, pd.label) for pd in self.param_definitions()
                      if pd.type in (ParamType.IMAGE, ParamType.VIDEO))
 
-    def starts_from_a_picture(self) -> bool:
+    def starts_from_an_image(self) -> bool:
         return "input_image" in self.default_params()
 
     def pins_reused_seed(self) -> bool:
@@ -663,7 +663,7 @@ class WorkflowTemplate(ABC):
         feathered mask — so a mouth or a finger is redrawn at real resolution
         while every pixel outside the rects is left untouched. A part found as
         an outline (skin, hair) is redrawn inside that outline instead, toward
-        its own prompts put ahead of the picture's.
+        its own prompts put ahead of the image's.
 
         One pass per part asked for (:func:`~origenerator.workflows.detail_parts.
         detail_fix_passes` reads ``enhance_detail_fixes`` and drops what isn't
@@ -680,9 +680,9 @@ class WorkflowTemplate(ABC):
         """
         nodes: dict = {}
         prompts = fix_prompts(params)
-        picture = image_ref
+        original = image_ref
         for index, fix in enumerate(detail_fix_passes(params)):
-            found, segs_ref = finding_nodes(index, fix, image_ref, picture)
+            found, segs_ref = finding_nodes(index, fix, image_ref, original)
             nodes.update(found)
             detailer_id = f"fix{index}_detailer"
             own = prompts[fix.part.name]

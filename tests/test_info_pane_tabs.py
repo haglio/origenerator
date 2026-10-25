@@ -674,7 +674,7 @@ def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
     assert panel.is_awaiting_frame()
 
 
-def test_a_run_with_a_picture_behind_it_stands_that_instead_of_a_note(tabs):
+def test_a_run_with_an_image_behind_it_stands_that_instead_of_a_note(tabs):
     # The complaint this answers: the pane sat blank under "Waiting for preview…"
     # for the minute a WAN run spends loading models, while the strip's corner
     # showed the frame and the folder's tile showed a blurred copy of it. All
@@ -706,7 +706,7 @@ def test_the_pair_is_repainted_only_when_it_changes(tabs):
 
 @pytest.mark.parametrize("made_from", [Combination(), Combination(prompt_edited=True)])
 def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs, made_from):
-    # A T2V has no picture to stand, so the words are all there is.
+    # A T2V has no image to stand, so the words are all there is.
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
 
@@ -805,7 +805,7 @@ def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, monke
 
 
 def test_pointing_a_tab_at_a_saved_generation_ends_its_watch(tabs):
-    # The next frame would land over the picture just put here.
+    # The next frame would land over the image just put here.
     cat, dog = _two_generations(tabs)
     panel = tabs.currentWidget()
     panel.watch_folder("k", b"frame")
@@ -817,7 +817,7 @@ def test_pointing_a_tab_at_a_saved_generation_ends_its_watch(tabs):
 
 def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
     # What a click on a folder's live tile lands in a tab: the run's own settings
-    # on the form, as a clicked thumbnail's would be, and no picture, footer or
+    # on the form, as a clicked thumbnail's would be, and no image, footer or
     # generation on display until the run lands. The tab is named after the
     # folder the run will land in, so it is not blank and the next open forks.
     cat, _dog = _two_generations(tabs)
@@ -835,10 +835,10 @@ def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
     assert not panel.is_blank()
 
 
-def test_a_landed_picture_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
+def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
     # show_finished_media puts the landed file where the frames were; the tab
     # is no longer waiting for anything, so a later poll must not paint a wait
-    # note over the picture.
+    # note over the image.
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
     cat, _dog = _two_generations(tabs)
     panel = tabs.currentWidget()
@@ -870,7 +870,7 @@ def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
 def test_a_run_no_tab_launched_belongs_to_no_tab(tabs):
     # The gallery's own launches — the folder tile's "+", Auto-Generate —
     # are nobody's Generate. Their results must not land in whatever tab happens to
-    # be in front: filling the pane's blank resting tab with a picture stopped it
+    # be in front: filling the pane's blank resting tab with an image stopped it
     # being the tab a click loads into, so the next click opened one beside it.
     assert tabs.panel_that_launched("never-launched-here") is None
     assert tabs.panel_that_launched(None) is None
@@ -1217,7 +1217,7 @@ def test_release_media_reaches_a_tab_that_is_not_in_front(tabs, tmp_path):
 
 def test_a_deleted_generation_leaves_every_tab_showing_it_empty(tabs, tmp_path):
     # A rebuild takes in a deletion, and a tab left open on the row that went
-    # would otherwise go on showing a picture that is not there any more. Every
+    # would otherwise go on showing an image that is not there any more. Every
     # tab, and only what has gone: a rebuild happens whenever anything lands.
     gone, kept = tmp_path / "gone.png", tmp_path / "kept.png"
     gone.write_bytes(b"x")

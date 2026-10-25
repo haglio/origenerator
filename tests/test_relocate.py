@@ -80,7 +80,7 @@ def test_a_record_that_still_resolves_is_left_untouched(tmp_path):
 
 def test_a_name_in_two_places_is_left_alone(tmp_path):
     """ComfyUI counts per filename prefix, so one name really can name two
-    files. Repointing at the wrong one would show another generation's picture
+    files. Repointing at the wrong one would show another generation's item
     under this row's prompt, and nothing about it would look wrong."""
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00007_.mp4")]})
     for folder in ("video", "harem"):

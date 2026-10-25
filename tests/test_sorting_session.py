@@ -8,17 +8,17 @@ class _Store:
     def __init__(self):
         self.states = {}
 
-    def set_picture_state(self, prompt_id, state):
+    def set_image_state(self, prompt_id, state):
         self.states[prompt_id] = state
 
 
-def _pictures(*prompt_ids):
+def _images(*prompt_ids):
     return [{"prompt_id": prompt_id} for prompt_id in prompt_ids]
 
 
-def test_a_pick_is_recorded_on_the_picture_on_screen_and_the_next_one_comes_up():
+def test_a_pick_is_recorded_on_the_image_on_screen_and_the_next_one_comes_up():
     store = _Store()
-    session = SortingSession(_pictures("first", "second"), store)
+    session = SortingSession(_images("first", "second"), store)
 
     session.sort_as("state two")
 
@@ -37,9 +37,9 @@ def test_a_pick_with_nothing_on_screen_does_nothing():
     assert session.current is None
 
 
-def test_skipping_sends_the_picture_to_the_back_of_the_line_unsorted():
+def test_skipping_sends_the_image_to_the_back_of_the_line_unsorted():
     store = _Store()
-    session = SortingSession(_pictures("first", "second"), store)
+    session = SortingSession(_images("first", "second"), store)
 
     session.skip()
 
@@ -48,9 +48,9 @@ def test_skipping_sends_the_picture_to_the_back_of_the_line_unsorted():
     assert session.remaining == 2
 
 
-def test_undo_takes_the_last_pick_back_and_puts_its_picture_on_screen_again():
+def test_undo_takes_the_last_pick_back_and_puts_its_image_on_screen_again():
     store = _Store()
-    session = SortingSession(_pictures("first", "second"), store)
+    session = SortingSession(_images("first", "second"), store)
     session.sort_as("state two")
 
     session.undo()
@@ -62,7 +62,7 @@ def test_undo_takes_the_last_pick_back_and_puts_its_picture_on_screen_again():
 
 def test_undo_with_nothing_picked_yet_changes_nothing():
     store = _Store()
-    session = SortingSession(_pictures("first"), store)
+    session = SortingSession(_images("first"), store)
 
     session.undo()
 
@@ -70,9 +70,9 @@ def test_undo_with_nothing_picked_yet_changes_nothing():
     assert session.current["prompt_id"] == "first"
 
 
-def test_same_gives_the_picture_on_screen_the_last_state_picked():
+def test_same_gives_the_image_on_screen_the_last_state_picked():
     store = _Store()
-    session = SortingSession(_pictures("first", "second", "third"), store)
+    session = SortingSession(_images("first", "second", "third"), store)
     session.sort_as("state two")
     session.skip()
 
@@ -83,7 +83,7 @@ def test_same_gives_the_picture_on_screen_the_last_state_picked():
 
 
 def test_the_session_says_what_the_last_state_picked_was():
-    session = SortingSession(_pictures("first", "second"), _Store())
+    session = SortingSession(_images("first", "second"), _Store())
     assert session.last_state is None
 
     session.sort_as("state two")
@@ -94,7 +94,7 @@ def test_the_session_says_what_the_last_state_picked_was():
 
 
 def test_the_session_says_whether_there_is_anything_to_undo():
-    session = SortingSession(_pictures("first"), _Store())
+    session = SortingSession(_images("first"), _Store())
     assert session.can_undo is False
 
     session.sort_as("state one")

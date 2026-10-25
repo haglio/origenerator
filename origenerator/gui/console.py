@@ -61,7 +61,7 @@ def drive_hud(state, active: bool) -> DriveHud:
     The bars, where the device is, and the motion sampled forward — the same
     samples it is being sent, so the trace is the motion rather than a drawing
     of it. ``driven`` is what dims the whole readout: nothing reaching the
-    device is a picture of a motion nobody is making, and it goes gray exactly
+    device is a drawing of a motion nobody is making, and it goes gray exactly
     as Fun Time's does.
     """
     heights, slide = motion_engine.trace_window(state, drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)
@@ -108,7 +108,7 @@ def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2
     ``script`` is the funscript driver, when this app has one: while it has the
     device the readout is the script's line rather than the motion's, and the
     OSR2 row says FunScript -- the motion is stopped, and drawing it would be a
-    picture of something nobody is sending.
+    drawing of something nobody is sending.
     """
     shown = slideshow_device(motion, device=device, trouble=trouble, control=control, script=script)
     return ConsoleHud(

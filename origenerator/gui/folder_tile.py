@@ -19,10 +19,10 @@ from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL, HAIRLINE
 
 from origenerator.gui import grid_card, palette
 
-# The collage's four cells fill the card's picture area, a gap apart.
+# The collage's four cells fill the card's thumbnail area, a gap apart.
 _CELL_GAP = HAIRLINE
-_CELL_SIZE = ((grid_card.PICTURE_SIZE[0] - _CELL_GAP) // 2,
-              (grid_card.PICTURE_SIZE[1] - _CELL_GAP) // 2)
+_CELL_SIZE = ((grid_card.THUMBNAIL_SIZE[0] - _CELL_GAP) // 2,
+              (grid_card.THUMBNAIL_SIZE[1] - _CELL_GAP) // 2)
 _INNER_WIDTH = grid_card.CARD_WIDTH - 2 * grid_card.CARD_MARGIN
 
 
@@ -88,7 +88,7 @@ class FolderTile(QFrame):
         grid_card.style_caption(caption)  # the grid's shared caption size
         # A settings folder is named by a code, so what it holds — the prompt and
         # the settings that set it apart — is read on hover rather than under the
-        # collage, where it would take more of the tile than the pictures do.
+        # collage, where it would take more of the tile than the thumbnails do.
         caption.setToolTip(text)
         caption_row.addWidget(caption, 1)
         layout.addLayout(caption_row)
@@ -129,7 +129,7 @@ class FolderTile(QFrame):
     @staticmethod
     def _build_collage(preview_paths) -> QWidget:
         collage = QWidget()
-        collage.setFixedSize(grid_card.picture_size())
+        collage.setFixedSize(grid_card.thumbnail_size())
         grid = QGridLayout(collage)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(_CELL_GAP)
@@ -140,7 +140,7 @@ class FolderTile(QFrame):
             placeholder.setStyleSheet(
                 f"color: {as_hex(TEXT_MUTED)}; background: {palette.EMPTY_PLATE};"
                 f" border-radius: {BUTTON_RADIUS}px;")
-            placeholder.setFixedSize(grid_card.picture_size())
+            placeholder.setFixedSize(grid_card.thumbnail_size())
             grid.addWidget(placeholder, 0, 0)
             return collage
         for idx in range(4):

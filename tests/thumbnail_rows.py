@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem
 
 def square(tmp_path, color):
     path = tmp_path / f"made-{color}.png"
-    picture = QImage(40, 40, QImage.Format.Format_RGB32)
-    picture.fill(QColor(color))
-    picture.save(str(path))
+    thumbnail = QImage(40, 40, QImage.Format.Format_RGB32)
+    thumbnail.fill(QColor(color))
+    thumbnail.save(str(path))
     return str(path)
 
 
@@ -22,7 +22,7 @@ def looping_clip(tmp_path) -> str:
     return str(path)
 
 
-def where_the_picture_is(row: QImage) -> QRect:
+def where_the_thumbnail_is(row: QImage) -> QRect:
     inked = [(x, y) for y in range(row.height()) for x in range(row.width())
              if QColor(row.pixel(x, y)).lightness() > 40]
     xs, ys = [x for x, _ in inked], [y for _, y in inked]

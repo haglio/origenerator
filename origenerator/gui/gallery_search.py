@@ -354,7 +354,7 @@ class GallerySearchController(QObject):
 
         Every row in a settings folder shares a prompt and settings and differs
         only by seed, so a prompt match hits all of them — and drawing eight
-        near-copies of one picture buries the other places the query reached.
+        near-copies of one item buries the other places the query reached.
         The folder stands for them instead, and a folder's lone hit stays itself.
         Order is by first hit, so the newest thing found still leads.
 

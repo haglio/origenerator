@@ -1,13 +1,13 @@
 """The dimming banner a tile wears while something is being made of it.
 
-Three surfaces say the same thing about a picture that isn't finished — the
+Three surfaces say the same thing about an item that isn't finished — the
 Recents collection's in-flight cards, a folder's generating tile, and a finished
 thumbnail whose enhancement is in flight — and they say it the same way: the
-message sits *over* the picture, dimmed, rather than replacing it.
+message sits *over* the thumbnail, dimmed, rather than replacing it.
 
 That is the whole point of the scrim. Whatever is under it is worth looking at
 — a live frame off ComfyUI, or the base render an enhancement is being made
-from — and a stage message that took the picture's place hid the one thing the
+from — and a stage message that took the thumbnail's place hid the one thing the
 user opened the pane for. The dimming is what keeps the message readable over
 an arbitrary frame while leaving the frame legible underneath.
 """
@@ -20,7 +20,7 @@ from shared_ui.spacing import BUTTON_RADIUS
 
 # Dark enough to read white letters against any frame, light enough to leave the
 # frame itself visible — which is the reason the scrim exists rather than a
-# placeholder that replaces the picture.
+# placeholder that replaces the thumbnail.
 _SCRIM_CSS = (
     f"background-color: {as_rgba(BLACK, 0.45)}; color: {as_hex(WHITE)};"
     f" font-weight: bold; border-radius: {BUTTON_RADIUS}px;"
@@ -43,7 +43,7 @@ class StageScrim(QLabel):
         """Lay the scrim over ``widget`` reading ``message``, or take it away.
 
         Re-read from the covered widget every time rather than positioned once:
-        the picture it covers is laid out after the tile is built, and a scrim
+        the thumbnail it covers is laid out after the tile is built, and a scrim
         placed before that sits in the tile's top-left corner instead of over
         the frame.
 

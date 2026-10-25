@@ -42,7 +42,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
 def test_the_switches_light_and_the_things_done_never_do():
     """The lock and the two filters are states the slideshow sits in — the lock and
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
-    picture's own amber; a step, the bin and reset are things done."""
+    image's own amber; a step, the bin and reset are things done."""
     band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
                     _band(locked=True, favorites_filter=True, enhanced=True)))
 
@@ -77,7 +77,7 @@ def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize(
 
 def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
     """Standalone there is no Funestra under it and no mode to leave, so the pair
-    is not drawn — a lit button nothing answers would be a picture of one."""
+    is not drawn — a lit button nothing answers would be a drawing of one."""
     rows = slideshow_rows("portrait")
 
     assert len(rows) == 1
@@ -181,7 +181,7 @@ def test_filter_said_of_a_side_narrows_to_the_act_on_screen():
 
 
 def test_the_versions_button_is_dim_where_the_item_has_only_itself():
-    """A picture nobody enhanced, a video Evolver never upscaled: there is
+    """An image nobody enhanced, a video Evolver never upscaled: there is
     nothing to step to, so the button is drawn faded rather than offered."""
     assert dict(zip(_names(_band()), _band()))["cycle_version"].dim
     lively = _band(has_other_versions=True)

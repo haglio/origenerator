@@ -21,7 +21,7 @@ def _folders(tmp_path: Path) -> ComfyFolders:
     return folders
 
 
-def _picture(path: Path, content: bytes = b"fabricated picture bytes") -> Path:
+def _image(path: Path, content: bytes = b"fabricated image bytes") -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
     return path
@@ -35,26 +35,26 @@ def _handed_over(folders: ComfyFolders) -> list[Path]:
     return sorted((folders.temp / HANDED_OVER).rglob("*.*"))
 
 
-def test_a_picture_named_by_its_whole_path_goes_to_comfyui_as_a_copy_in_its_temp_folder(tmp_path):
+def test_an_image_named_by_its_whole_path_goes_to_comfyui_as_a_copy_in_its_temp_folder(tmp_path):
     folders = _folders(tmp_path)
-    picture = _picture(tmp_path / "elsewhere" / "jane_doe.png")
-    payload = _load_image(str(picture))
+    image = _image(tmp_path / "elsewhere" / "jane_doe.png")
+    payload = _load_image(str(image))
 
     posted = within_reach(payload, folders)
 
     ref = posted["1"]["inputs"]["image"]
     assert ref.startswith(f"{HANDED_OVER}/") and ref.endswith("/jane_doe.png [temp]")
     copies = _handed_over(folders)
-    assert len(copies) == 1 and copies[0].read_bytes() == picture.read_bytes()
+    assert len(copies) == 1 and copies[0].read_bytes() == image.read_bytes()
     assert ref == f"{copies[0].relative_to(folders.temp).as_posix()} [temp]"
-    assert payload["1"]["inputs"]["image"] == str(picture), "the run keeps the name it was given"
+    assert payload["1"]["inputs"]["image"] == str(image), "the run keeps the name it was given"
 
 
 def test_a_file_comfyui_can_already_open_is_left_as_it_was_named(tmp_path):
     folders = _folders(tmp_path)
-    _picture(folders.input / "in_reach.png")
-    _picture(folders.places.pictures / "made_here.png")
-    _picture(folders.temp / "scratch" / "preview.png")
+    _image(folders.input / "in_reach.png")
+    _image(folders.places.images / "made_here.png")
+    _image(folders.temp / "scratch" / "preview.png")
     payload = {
         "1": {"class_type": "LoadImage", "inputs": {"image": "in_reach.png"}},
         "2": {"class_type": "LoadImage", "inputs": {"image": "image/made_here.png [output]"}},
@@ -68,33 +68,33 @@ def test_a_file_comfyui_can_already_open_is_left_as_it_was_named(tmp_path):
 def test_an_output_reference_reached_through_a_link_into_another_place_is_copied_too(tmp_path):
     folders = _folders(tmp_path)
     library = tmp_path / "library"
-    picture = _picture(library / "jane_doe.png")
-    _winapi.CreateJunction(str(library), str(folders.places.pictures))
+    image = _image(library / "jane_doe.png")
+    _winapi.CreateJunction(str(library), str(folders.places.images))
 
     posted = within_reach(_load_image("image/jane_doe.png [output]"), folders)
 
     assert posted["1"]["inputs"]["image"].endswith("/jane_doe.png [temp]")
-    assert [copy.read_bytes() for copy in _handed_over(folders)] == [picture.read_bytes()]
+    assert [copy.read_bytes() for copy in _handed_over(folders)] == [image.read_bytes()]
 
 
 def test_an_output_kept_in_the_library_goes_to_comfyui_as_a_copy_in_its_temp_folder(tmp_path):
     library = tmp_path / "library"
-    places = OutputPlaces(comfyui=tmp_path / "output", pictures=library / "pictures",
+    places = OutputPlaces(comfyui=tmp_path / "output", images=library / "images",
                           videos=library / "videos", scripts=library / "scripts",
                           audio=library / "sounds")
     folders = ComfyFolders(input=tmp_path / "input", places=places, temp=tmp_path / "temp")
-    picture = _picture(places.pictures / "alpha_t2i_00007_.png")
+    image = _image(places.images / "alpha_t2i_00007_.png")
 
     posted = within_reach(_load_image("image/alpha_t2i_00007_.png [output]"), folders)
 
     assert posted["1"]["inputs"]["image"].endswith("/alpha_t2i_00007_.png [temp]")
-    assert [copy.read_bytes() for copy in _handed_over(folders)] == [picture.read_bytes()]
+    assert [copy.read_bytes() for copy in _handed_over(folders)] == [image.read_bytes()]
 
 
-def test_a_reference_video_and_a_reference_sound_are_handed_over_like_a_picture(tmp_path):
+def test_a_reference_video_and_a_reference_sound_are_handed_over_like_an_image(tmp_path):
     folders = _folders(tmp_path)
-    video = _picture(tmp_path / "elsewhere" / "jane_doe.mp4", b"fabricated video bytes")
-    sound = _picture(tmp_path / "elsewhere" / "jane_doe.wav", b"fabricated sound bytes")
+    video = _image(tmp_path / "elsewhere" / "jane_doe.mp4", b"fabricated video bytes")
+    sound = _image(tmp_path / "elsewhere" / "jane_doe.wav", b"fabricated sound bytes")
     payload = {
         "1": {"class_type": "LoadVideo", "inputs": {"file": str(video)}},
         "2": {"class_type": "LoadAudio", "inputs": {"audio": str(sound)}},
@@ -107,12 +107,12 @@ def test_a_reference_video_and_a_reference_sound_are_handed_over_like_a_picture(
     assert sorted(copy.name for copy in _handed_over(folders)) == ["jane_doe.mp4", "jane_doe.wav"]
 
 
-def test_the_same_picture_handed_over_twice_is_copied_once(tmp_path):
+def test_the_same_image_handed_over_twice_is_copied_once(tmp_path):
     folders = _folders(tmp_path)
-    picture = _picture(tmp_path / "elsewhere" / "jane_doe.png")
+    image = _image(tmp_path / "elsewhere" / "jane_doe.png")
 
-    first = within_reach(_load_image(str(picture)), folders)
-    second = within_reach(_load_image(str(picture)), folders)
+    first = within_reach(_load_image(str(image)), folders)
+    second = within_reach(_load_image(str(image)), folders)
 
     assert first == second
     assert len(_handed_over(folders)) == 1
@@ -120,7 +120,7 @@ def test_the_same_picture_handed_over_twice_is_copied_once(tmp_path):
 
 def test_an_image_in_the_trash_goes_to_comfyui_as_a_copy_in_its_temp_folder(tmp_path):
     folders = _folders(tmp_path)
-    trashed = _picture(tmp_path / "trash" / "batch" / "1_alpha_t2i_00007_.png")
+    trashed = _image(tmp_path / "trash" / "batch" / "1_alpha_t2i_00007_.png")
     folders = folders._replace(trashed={folders.places.file("image/alpha_t2i_00007_.png"): trashed}.get)
 
     posted = within_reach(_load_image("image/alpha_t2i_00007_.png [output]"), folders)
@@ -139,10 +139,10 @@ def test_a_reference_to_a_file_that_is_not_there_is_left_for_comfyui_to_refuse(t
 
 def test_only_the_loading_nodes_file_inputs_are_touched(tmp_path):
     folders = _folders(tmp_path)
-    picture = _picture(tmp_path / "elsewhere" / "jane_doe.png")
+    image = _image(tmp_path / "elsewhere" / "jane_doe.png")
     payload = {
-        "1": {"class_type": "LoadImage", "inputs": {"image": str(picture)}},
-        "2": {"class_type": "Fabricated", "inputs": {"image": str(picture), "images": ["1", 0]}},
+        "1": {"class_type": "LoadImage", "inputs": {"image": str(image)}},
+        "2": {"class_type": "Fabricated", "inputs": {"image": str(image), "images": ["1", 0]}},
         "3": {"class_type": "SaveImage", "inputs": {"images": ["1", 0], "filename_prefix": "image/sample"}},
     }
 
@@ -159,7 +159,7 @@ def test_the_apps_folders_are_comfyuis_input_and_temp_and_the_places_outputs_are
 def test_the_app_finds_an_image_gone_from_its_place_in_the_librarys_trash(tmp_path):
     db = Database(config.DB_PATH)
     original = config.OUTPUT_PLACES.file("image/alpha_t2i_00007_.png")
-    held = _picture(tmp_path / "1_alpha_t2i_00007_.png")
+    held = _image(tmp_path / "1_alpha_t2i_00007_.png")
     db.record_deletion("held-for-this-test", {"prompt_id": "held-for-this-test"},
                        {"moves": [[str(original), str(held)]], "subdir": str(tmp_path)})
     try:

@@ -326,7 +326,7 @@ def test_sdxl_t2i_build_api_payload_structure():
 
 
 @pytest.mark.parametrize("name", ["sdxl_t2i", "sdxl_pose_transfer", "krea2_t2i"])
-def test_a_picture_drawn_from_nothing_is_always_drawn_fully(name):
+def test_an_image_drawn_from_nothing_is_always_drawn_fully(name):
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), input_image="x.png", denoise=0.4))
 
@@ -741,7 +741,7 @@ def test_every_part_is_at_zero_by_default_and_adds_nothing():
 
 
 def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
-    # What the whole-frame tail cannot do: 0.15 denoise over the full picture
+    # What the whole-frame tail cannot do: 0.15 denoise over the full image
     # refines texture and leaves a six-fingered hand six-fingered, while the
     # denoise that could redraw it wrecks everything else. So the regions are
     # found, cropped, re-sampled hard, and pasted back — one part over the last
@@ -788,7 +788,7 @@ def _linked(payload: dict, ref) -> dict:
     return payload[ref[0]]
 
 
-def test_each_pass_reports_the_regions_its_detector_found_then_the_whole_picture():
+def test_each_pass_reports_the_regions_its_detector_found_then_the_whole_image():
     payload = _enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.6})
 
     reports = _nodes_of(payload, "PreviewAny")
@@ -809,17 +809,17 @@ def _region(*edges) -> str:
     return json.dumps(list(edges), indent=4)
 
 
-WHOLE_PICTURE = _region(0, 0, 2000, 1000)
+WHOLE_IMAGE = _region(0, 0, 2000, 1000)
 FACE_PLACE = {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.5}
 HAND_PLACE = {"left": 0.6, "top": 0.5, "right": 0.9, "bottom": 0.9}
 ENHANCED = {"filename": "image_enhance_00007_.png", "subfolder": "image", "type": "output"}
 
 
-def test_the_places_the_fixes_found_ride_with_the_picture_they_were_found_in_in_the_order_they_ran():
+def test_the_places_the_fixes_found_ride_with_the_image_they_were_found_in_in_the_order_they_ran():
     history = {"outputs": {
         "12": {"images": [ENHANCED]},
-        "fix1_points": {"text": [_region(1200, 500, 1800, 900), WHOLE_PICTURE]},
-        "fix0_points": {"text": [_region(200, 100, 600, 500), WHOLE_PICTURE]},
+        "fix1_points": {"text": [_region(1200, 500, 1800, 900), WHOLE_IMAGE]},
+        "fix0_points": {"text": [_region(200, 100, 600, 500), WHOLE_IMAGE]},
     }}
 
     files = WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history)
@@ -833,7 +833,7 @@ def test_the_places_say_which_part_found_them_and_each_eye_is_kept_as_it_was_fou
                                                  "inputs": {"model_name": "bbox/eye_finder.pt"}}}, {}, []],
         "outputs": {
             "12": {"images": [ENHANCED]},
-            "fix0_points": {"text": [_region(200, 100, 600, 500), _region(500, 120, 900, 520), WHOLE_PICTURE]},
+            "fix0_points": {"text": [_region(200, 100, 600, 500), _region(500, 120, 900, 520), WHOLE_IMAGE]},
         },
     }
 
@@ -845,7 +845,7 @@ def test_the_places_say_which_part_found_them_and_each_eye_is_kept_as_it_was_fou
 
 
 def test_an_enhancement_whose_fixes_found_nothing_says_it_looked_and_found_no_places():
-    history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {"text": [WHOLE_PICTURE]}}}
+    history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {"text": [WHOLE_IMAGE]}}}
 
     assert WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history) == [
         {**ENHANCED, **points_of_interest.kept([])}]
@@ -859,7 +859,7 @@ def test_an_enhancement_that_fixed_no_part_carries_no_places_at_all():
 
 def test_a_region_reported_in_a_shape_no_fix_writes_is_passed_over():
     history = {"outputs": {"12": {"images": [ENHANCED]}, "fix0_points": {
-        "text": ["a corner", _region(200, 100, 600, 500), _region(1, 2), WHOLE_PICTURE]}}}
+        "text": ["a corner", _region(200, 100, 600, 500), _region(1, 2), WHOLE_IMAGE]}}}
 
     files = WORKFLOW_REGISTRY["image_enhance"].extract_output_info(history)
 
@@ -877,8 +877,8 @@ def test_a_third_part_is_a_third_pass_on_the_chain():
 
 def test_the_detail_pass_borrows_the_enhances_model_settings_and_vae():
     # It is the same enhancement, spent where it matters: the checkpoint
-    # refining the picture refines its faces too, steered by the same prompts,
-    # so a redrawn mouth stays in the picture's own style rather than the
+    # refining the image refines its faces too, steered by the same prompts,
+    # so a redrawn mouth stays in the image's own style rather than the
     # sampler's idea of a mouth.
     payload = _enhance_payload(
         positive_prompt="a lantern on a jetty",
@@ -2040,7 +2040,7 @@ def test_every_enhance_capable_workflow_keeps_its_base_render():
         ]
         assert f"{params['filename_prefix']}_base" in saves, wf.name
         # And the run's history reads that file back as the row's original, which
-        # is what makes it a level rather than a second picture.
+        # is what makes it a level rather than a second image.
         history = {"outputs": {
             wf.output_node_id: {"images": [{"filename": "enhanced.png"}]},
             wf.base_output_node_id: {"images": [{"filename": "base.png"}]},
@@ -2521,8 +2521,8 @@ def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
 # ---- what the form calls a setting ----
 
 # The graph's names for these stay in the tooltips; the label says what the
-# setting does to the picture. The prompts, the LoRAs and the sampler are the
-# exceptions the test below pins: those are what everyone who makes pictures
+# setting does to the image. The prompts, the LoRAs and the sampler are the
+# exceptions the test below pins: those are what everyone who makes images
 # calls them, so renaming them cost the user the words he uses.
 _GRAPH_JARGON = re.compile(
     r"CFG|Denoise|Stage|Guidance|Input Image|ControlNet|Scheduler|Shift"
@@ -2598,7 +2598,7 @@ def test_a_wan_2_2_form_offers_no_seed_for_the_pass_that_draws_no_new_noise(name
 
 def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around_it():
     # A box around the hair takes the face with it, and a box around the skin is
-    # most of the picture; their detectors draw the part's outline, and the
+    # most of the image; their detectors draw the part's outline, and the
     # redraw stays inside it.
     payload = _enhance_payload(outlined=["skin_finder.pt"], enhance_detail_fixes={"skin": 0.4})
 
@@ -2613,7 +2613,7 @@ def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around
     assert segs["inputs"]["image"] == detailer["inputs"]["image"]
 
 
-def test_a_part_with_its_own_prompts_is_redrawn_toward_them_ahead_of_the_pictures_prompt():
+def test_a_part_with_its_own_prompts_is_redrawn_toward_them_ahead_of_the_images_prompt():
     skin = next(part for part in detail_module.part_table() if part.name == "skin")
     payload = _enhance_payload(
         outlined=["skin_finder.pt"], positive_prompt="a lantern on a jetty",
@@ -2633,7 +2633,7 @@ def test_a_part_with_its_own_prompts_is_redrawn_toward_them_ahead_of_the_picture
     assert payload[sampler["negative"][0]]["inputs"]["text"] == "blurry"
 
 
-def test_a_picture_with_no_prompt_leaves_a_part_its_own_prompts_alone():
+def test_an_image_with_no_prompt_leaves_a_part_its_own_prompts_alone():
     skin = next(part for part in detail_module.part_table() if part.name == "skin")
     payload = _enhance_payload(outlined=["skin_finder.pt"], positive_prompt="",
                                negative_prompt="", enhance_detail_fixes={"skin": 0.4})

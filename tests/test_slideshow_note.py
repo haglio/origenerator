@@ -50,7 +50,7 @@ def _mid_request(qtbot, tmp_path, monkeypatch, *, showing=True):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     if not showing:
         view._slideshows.showing.close()  # the request is then this pane's to answer,
-        view.select_generation("orig")  # about the picture picked in it
+        view.select_generation("orig")  # about the image picked in it
     view._voice.listener.speak("Request.")
     view._voice.listener.speak("no hat. Over.")
     return view

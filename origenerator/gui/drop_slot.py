@@ -200,8 +200,8 @@ class DropSlot(DropZone):
                 self._label.setMovie(self._movie)
         elif thumb_path and Path(thumb_path).exists() and not QPixmap(str(thumb_path)).isNull():
             self._label.setText("")
-            picture = fitted_in_the_box(QPixmap(str(thumb_path)))
-            self._label.setPixmap(grayscale_pixmap(picture) if self._grayscale else picture)
+            thumbnail = fitted_in_the_box(QPixmap(str(thumb_path)))
+            self._label.setPixmap(grayscale_pixmap(thumbnail) if self._grayscale else thumbnail)
         else:
             self._label.setText("")  # held, but no thumbnail to show
             self._label.setPixmap(glyph_pixmap("check", 2 * self._label.fontMetrics().height(),

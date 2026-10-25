@@ -30,10 +30,10 @@ _SEAM_FRAMES = 1
 
 
 class Wan22AnimateWorkflow(WorkflowTemplate):
-    """WAN 2.2 Animate: the picture's person performs a library video's movements.
+    """WAN 2.2 Animate: the person in the image performs a library video's movements.
 
     ComfyUI's own ``video_wan2_2_14B_animate`` template in its animation mode, the
-    run shaped like the video and the picture fitted into it, never cropped; the
+    run shaped like the video and the image fitted into it, never cropped; the
     video's sound and script (:meth:`authored_actions`) come along."""
 
     name = "wan22_animate"
@@ -77,7 +77,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            ParamDef("input_image", "Picture", ParamType.IMAGE, defaults["input_image"]),
+            ParamDef("input_image", "Image", ParamType.IMAGE, defaults["input_image"]),
             ParamDef("video", "Video to Perform", ParamType.VIDEO, defaults["video"],
                      browse_dir=config.LIBRARY_VIDEOS_DIR),
             ParamDef("video_start", "Start in the Video (s)", ParamType.FLOAT, defaults["video_start"],

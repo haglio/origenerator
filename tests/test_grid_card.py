@@ -31,13 +31,13 @@ def test_the_band_holds_two_whole_lines_of_the_caption(qtbot):
     assert grid_card.caption_height() == 2 * line
 
 
-def test_the_card_is_as_tall_as_its_picture_and_its_caption_need(qtbot):
-    # The picture is what the grid is for, so the card's height is what gives when
+def test_the_card_is_as_tall_as_its_thumbnail_and_its_caption_need(qtbot):
+    # The thumbnail is what the grid is for, so the card's height is what gives when
     # the caption needs more room — a bigger caption never quietly costs a line.
     width, height = grid_card.card_size()
 
     assert width == grid_card.CARD_WIDTH
-    assert height == (2 * grid_card.CARD_MARGIN + grid_card.PICTURE_SIZE[1]
+    assert height == (2 * grid_card.CARD_MARGIN + grid_card.THUMBNAIL_SIZE[1]
                       + grid_card.CARD_SPACING + grid_card.caption_height())
 
 

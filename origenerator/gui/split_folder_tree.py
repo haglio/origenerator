@@ -51,7 +51,7 @@ _TOGETHER_WORD = "Together"
 _SEPARATE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
                  "slideshow started in one plays that shape alone")
 _TOGETHER_TIP = ("One list of both shapes, for a slideshow that mixes portrait and "
-                 "landscape pictures")
+                 "landscape items")
 
 
 class _Choice(QFrame):
@@ -80,7 +80,7 @@ def _heading(side: str) -> QFrame:
     heading = QFrame()
     heading.setObjectName("treeSectionLabel")
     heading.setToolTip(f"Everything {side}-shaped — its own collections, folders and "
-                       f"library. A slideshow started here plays {side} pictures alone.")
+                       f"library. A slideshow started here plays {side} items alone.")
 
     row = QHBoxLayout(heading)
     row.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, _HEADING_FOOT)

@@ -1,6 +1,6 @@
 """Turning a spoken request into an edit of a prompt pair.
 
-A request is a wish about the picture on screen — "no silver earrings", "more
+A request is a wish about the image on screen — "no silver earrings", "more
 freckles" — and what it means for the prompt pair follows a fixed policy:
 
 * A request AGAINST something. In the positive prompt? Take it out. Otherwise
@@ -217,7 +217,7 @@ def bare_terms(prompt: str) -> list[str]:
 def literal_match(terms: list[str], term: str) -> int | None:
     """Which of ``terms`` says ``term`` in so many words, or ``None``.
 
-    A segment is the unit: "small silver earrings" is one thing the picture has,
+    A segment is the unit: "small silver earrings" is one thing the image has,
     so a request about silver earrings acts on the whole of it rather than
     editing the words inside it.
     """

@@ -71,7 +71,7 @@ from origenerator.gallery.enhance import (
 )
 from origenerator.gallery.enhance_fold import (
     disown_foreign_runs,
-    enhancements_of_pictures_gone,
+    enhancements_of_images_gone,
     fold_completed_enhancements,
     fold_enhancement,
 )
@@ -235,7 +235,7 @@ __all__ = [
     "enhanced_generations",
     "enhanced_version_of",
     "enhancement_recency",
-    "enhancements_of_pictures_gone",
+    "enhancements_of_images_gone",
     "favorite_folders",
     "favorite_generations",
     "find_source_image_id",

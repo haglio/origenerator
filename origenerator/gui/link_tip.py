@@ -1,6 +1,6 @@
 """A tooltip you can click into.
 
-Qt's own tooltip is a picture of some text: its window is transparent to the
+Qt's own tooltip is a rendering of some text: its window is transparent to the
 mouse and vanishes the moment the pointer moves toward it, so a link inside one
 can be drawn but never followed. Where the useful thing to say about a control is
 "it is happening over there", that is exactly the wrong tooltip — naming the

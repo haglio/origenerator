@@ -11,7 +11,7 @@ Its rules are about what the user is doing while the GPU works:
 
 * **What a slideshow is locked on is made first:** the user is looking at it, so its
   enhancement leads the line and nothing takes the machine from it.
-* **An image joins the front, newest first.** A picture is seconds of GPU and it
+* **An image joins the front, newest first.** An image is seconds of GPU and it
   is usually the thing being waited for — a fresh variation, an enhancement of
   what is on screen. Asking for one means "now", so it goes next, after only
   what a slideshow is locked on.
@@ -19,9 +19,9 @@ Its rules are about what the user is doing while the GPU works:
   it goes after every image, and after every video asked for before it. That
   is what keeps a handful of queued videos from taking the machine away from the
   work in front of the user. A chained i2v's start frame counts as the video it
-  opens, not as the picture it draws: placed by what its own prompt makes, it
+  opens, not as the image it draws: placed by what its own prompt makes, it
   would take the very front, and asking for a video would land it ahead of every
-  picture already waiting.
+  image already waiting.
 
 Work nobody asked for — a background experiment, a base re-render — never joins
 the front whatever it makes, because putting one in front of the user's own work
@@ -30,15 +30,15 @@ would be the whole cost of the feature.
 The front of the line is not enough on its own, because a run already on the GPU
 holds it until it is done, minutes for a video. So **whatever is being rendered
 is set aside for the user's image work**: stopped, put back in the line, and
-started over once the pictures are done -- a run cannot be paused, so what it
+started over once the images are done -- a run cannot be paused, so what it
 had rendered is thrown away, however close to done. That is the user's own call
 for this queue: their work goes first while they are working, and everything
 else's turn comes when they are not, except a run they shield, which keeps the
 machine while its shield is on. A video set aside goes back ahead of the videos
-still waiting and after every picture; a picture set aside goes right after the
+still waiting and after every image; an image set aside goes right after the
 one that took its place; work nobody asked for goes to the back. A video asked
 for takes the machine from nothing, and so does work nobody asked for. Nor does a
-video start within a minute of the last picture asked for, when the next picture
+video start within a minute of the last image asked for, when the next image
 would only set it aside again, or wait for it behind its shield.
 
 Pure rules, no Qt and no server: they work on anything carrying a
@@ -51,7 +51,7 @@ from __future__ import annotations
 from origenerator.generation_state import GenerationSource
 from origenerator.media import MediaType
 
-VIDEOS_WAIT_AFTER_A_PICTURE_S = 60.0
+VIDEOS_WAIT_AFTER_AN_IMAGE_S = 60.0
 
 
 def is_video(job) -> bool:
@@ -85,7 +85,7 @@ def insertion_index(line: list, job) -> int:
     """Where ``job`` joins ``line`` — the front for an image, the back otherwise.
 
     The front is index 0 rather than "ahead of the videos": images stack newest
-    first, so the last picture asked for is the next one made. That is the whole
+    first, so the last image asked for is the next one made. That is the whole
     point of putting them there — the user asks for a variation because they are
     looking at the one before it.
     """
@@ -117,10 +117,10 @@ def behind_the_enhancements_they_wait_for(line: list) -> None:
 def rejoin_index(line: list, job, newcomer) -> int:
     """Where ``job``, taken off the machine for ``newcomer``, rejoins ``line``.
 
-    The user's own picture goes right after the newcomer: it was the front
-    until the newcomer took it. The user's video goes after the last picture,
+    The user's own image goes right after the newcomer: it was the front
+    until the newcomer took it. The user's video goes after the last image,
     ahead of the videos still waiting: it was in front of those, and the
-    pictures are what it was set aside for. Work nobody asked for goes to the
+    images are what it was set aside for. Work nobody asked for goes to the
     back, where it joined.
     """
     if not _users_own(job):
@@ -131,7 +131,7 @@ def rejoin_index(line: list, job, newcomer) -> int:
                    default=-1)
 
 
-def wait_before_starting(job, seconds_since_a_picture: float | None) -> float:
-    if seconds_since_a_picture is None or not is_video(job):
+def wait_before_starting(job, seconds_since_an_image: float | None) -> float:
+    if seconds_since_an_image is None or not is_video(job):
         return 0.0
-    return max(0.0, VIDEOS_WAIT_AFTER_A_PICTURE_S - seconds_since_a_picture)
+    return max(0.0, VIDEOS_WAIT_AFTER_AN_IMAGE_S - seconds_since_an_image)

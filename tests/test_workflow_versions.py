@@ -180,7 +180,7 @@ _VARIATIONS = {
         "frame_rate": 48.0,
     },
     "with both LoRAs bypassed": {"lora_high": "None", "lora_low": "None"},
-    "with a picture's LoRA": {"lora": "a_lora.safetensors"},
+    "with an image's LoRA": {"lora": "a_lora.safetensors"},
     "sized by hand": {"width": 832, "height": 480},
     "posed from a skeleton, through a union ControlNet": {
         "control_mode": "pose",

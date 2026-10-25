@@ -302,20 +302,20 @@ def test_fold_completed_enhancements_sweeps_only_finished_rows(tmp_path):
     assert is_enhanced_row(db.get_generation("src_b"))
 
 
-def test_an_enhancement_whose_picture_is_gone_is_one_to_scrap(tmp_path):
+def test_an_enhancement_whose_image_is_gone_is_one_to_scrap(tmp_path):
     output_dir = tmp_path / "output"
     (output_dir / "image").mkdir(parents=True)
     (output_dir / "image" / "sdxl_t2i_here.png").write_bytes(b"still here")
     db = Database(tmp_path / "t.db")
-    _add_enhance(db, "of_a_deleted_picture", "image/sdxl_t2i_gone.png [output]", "e1.png")
-    _add_enhance(db, "of_a_picture_on_disk", "image/sdxl_t2i_here.png [output]", "e2.png")
+    _add_enhance(db, "of_a_deleted_image", "image/sdxl_t2i_gone.png [output]", "e1.png")
+    _add_enhance(db, "of_an_image_on_disk", "image/sdxl_t2i_here.png [output]", "e2.png")
     _add_enhance(db, "still_running", "image/sdxl_t2i_gone.png [output]", "e3.png",
                  status="running")
 
-    gone = gallery.enhancements_of_pictures_gone(
+    gone = gallery.enhancements_of_images_gone(
         db.list_generations(), places=OutputPlaces.in_one_folder(output_dir), input_dir=tmp_path / "input")
 
-    assert [row["prompt_id"] for row in gone] == ["of_a_deleted_picture"]
+    assert [row["prompt_id"] for row in gone] == ["of_a_deleted_image"]
 
 
 def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
@@ -453,7 +453,7 @@ def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
     # A branch session's enhance folds in the worktree database, which adoption
     # never carries home (a fold creates no row to adopt), so the enhanced file
     # reaches the production app bare and the scan rebuilds it as a standalone
-    # image — pointing a start-frame tile at the very picture it is a version of.
+    # image — pointing a start-frame tile at the very image it is a version of.
     db = Database(tmp_path / "t.db")
     _add_source(db, favorite=True)
     _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
@@ -514,7 +514,7 @@ def test_sweep_stacks_a_rebuilt_chain_oldest_first(tmp_path):
 
 
 def test_sweep_leaves_an_ordinary_image_alone(tmp_path):
-    # A hand-run img2img in ComfyUI is a picture of its own however low its
+    # A hand-run img2img in ComfyUI is an image of its own however low its
     # denoise: the enhance workflow did not write it, and nothing folds it away.
     db = Database(tmp_path / "t.db")
     _add_source(db)
@@ -525,7 +525,7 @@ def test_sweep_leaves_an_ordinary_image_alone(tmp_path):
     assert db.get_generation("i1") is not None
 
 
-def test_a_folded_pictures_plain_version_is_superseded_by_its_enhancement(tmp_path):
+def test_a_folded_images_plain_version_is_superseded_by_its_enhancement(tmp_path):
     db = Database(tmp_path / "t.db")
     plain = _add_source(db)
     fold_enhancement(db, _add_enhance(db, "enh", "image/sdxl_t2i_src.png [output]",

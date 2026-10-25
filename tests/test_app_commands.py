@@ -172,7 +172,7 @@ def test_the_mic_can_be_shut_by_voice_but_not_opened():
 
 
 def test_the_enhanced_filter_answers_to_upscales_as_well():
-    # "Upscales" is what the enhanced pictures are called at the desk, so the
+    # "Upscales" is what the enhanced images are called at the desk, so the
     # word turns the same switch on; the way back is the same "clear filter".
     for phrase in ("upscales", "upscales only", "filter upscales", "upscaled only"):
         assert match_app_command(phrase) is AppCommand.FILTER_ENHANCED, phrase
@@ -235,9 +235,9 @@ def test_the_recognizer_is_asked_to_hear_every_way_a_command_is_said_in_words():
         assert phrase in heard
 
 
-def test_taking_a_picture_away_and_shutting_the_mic_are_heard_only_when_said_outright():
+def test_taking_an_item_away_and_shutting_the_mic_are_heard_only_when_said_outright():
     # A near miss is never repaired into either: one has no spoken way back, and the
-    # other is not something to do to a picture on a guess.
+    # other is not something to do to an item on a guess.
     assert phrases_heard_only_outright() == {
         "mic off", "voice off", "weird", "delete", "delete it"}
 

@@ -1,7 +1,7 @@
-"""The spoken ``animate as [Video|Genau] [act]``, said over a picture.
+"""The spoken ``animate as [Video|Genau] [act]``, said over an image.
 
 The lane defaults to the full-length video and an act left unsaid comes back as
-``""`` for :mod:`origenerator.animation_paths` to settle against what the picture
+``""`` for :mod:`origenerator.animation_paths` to settle against what the image
 shows. The loop lane answers to "go now" too and is said back as "Genau".
 """
 from __future__ import annotations
@@ -38,8 +38,8 @@ class AnimateRequest:
 
 
 class Answer(NamedTuple):
-    """What one request comes to for one picture: the act to run, or the line to
-    say instead, and whether that line refuses something the picture cannot do
+    """What one request comes to for one image: the act to run, or the line to
+    say instead, and whether that line refuses something the image cannot do
     (said as an error rather than as a question)."""
 
     act: str | None
@@ -95,20 +95,20 @@ def animate_command_phrases(acts=CATEGORIES) -> frozenset[str]:
 
 def what_to_animate(asked: AnimateRequest, state: str, *, content: dict | None = None
                     ) -> Answer:
-    """The act to run for a picture already in ``state``, or what to say instead:
-    two questions (an unsorted picture, an unsaid act with a choice to make) and
+    """The act to run for an image already in ``state``, or what to say instead:
+    two questions (an unsorted image, an unsaid act with a choice to make) and
     two refusals, which are marked so the surface says them as errors."""
     if not state:
-        return Answer(None, "this picture hasn't been sorted yet — say what it "
+        return Answer(None, "this image hasn't been sorted yet — say what it "
                             "shows, then ask again")
     if asked.act:
         if animation_paths.allows(asked.lane, asked.act, state, content=content):
             return Answer(asked.act)
-        return Answer(None, f"a “{state}” picture can't be animated as "
+        return Answer(None, f"a “{state}” image can't be animated as "
                             f"“{asked.act}”", unsupported=True)
     offered = animation_paths.acts_for(state, asked.lane, content=content)
     if not offered:
-        return Answer(None, f"nothing can be animated from a “{state}” picture "
+        return Answer(None, f"nothing can be animated from a “{state}” image "
                             "in this lane", unsupported=True)
     if len(offered) > 1:
         named = ", ".join(f"“{act}”" for act in offered)

@@ -144,7 +144,7 @@ def test_start_prepared_records_the_callers_source(qtbot, tmp_path):
 
 
 def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
-    # Two pictures of one folder's settings, both wanted: the second queues with the first
+    # Two images of one folder's settings, both wanted: the second queues with the first
     # rather than being refused, which is what stopped them being made together.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
@@ -162,7 +162,7 @@ def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
 def test_the_folders_live_tile_follows_the_folders_job_nearest_the_front(qtbot, tmp_path):
     # Things keyed by folder — the one live re-roll tile, the selection that
     # follows it — show the job being made or next to be, not whichever was
-    # asked for first: a picture asked for second takes the machine from the
+    # asked for first: an image asked for second takes the machine from the
     # first, and the tile has to follow it there.
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     first = _launch_image(queue, "k", seed=3)
@@ -270,7 +270,7 @@ def test_start_rerolls_both_the_frame_and_the_video_seed(qtbot, tmp_path):
     assert video_params["noise_seed"] != 11                             # video seed re-rolled too
 
 
-def test_a_folder_reroll_launches_nothing_when_no_row_names_its_starting_picture(qtbot, tmp_path):
+def test_a_folder_reroll_launches_nothing_when_no_row_names_its_starting_image(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
 
@@ -777,10 +777,10 @@ def test_a_run_that_cannot_even_be_built_is_reported_as_failed(qtbot, tmp_path):
     assert "width" in message
 
 
-def test_a_folder_rerolls_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_path):
+def test_a_folder_rerolls_start_frame_queues_behind_the_images_waiting(qtbot, tmp_path):
     # A chained i2v draws its start frame first, but a video is what was asked
     # for: placed as the image that prompt makes, it would take the front of the
-    # line and put minutes of GPU ahead of every picture already queued.
+    # line and put minutes of GPU ahead of every image already queued.
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, _client())
     image = _image_row(seed=100)
@@ -1170,22 +1170,22 @@ def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
                                 generation=made)]
 
 
-def test_an_enhance_reports_the_picture_it_improved_rather_than_itself(qtbot, tmp_path):
-    # An enhance is an upgrade of a picture already in the gallery: its own row is
-    # folded into that picture and deleted the moment it lands, so a notice
+def test_an_enhance_reports_the_image_it_improved_rather_than_itself(qtbot, tmp_path):
+    # An enhance is an upgrade of an image already in the gallery: its own row is
+    # folded into that image and deleted the moment it lands, so a notice
     # pointing at the run's own id would point at nothing by the time it is read.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     queue.start_prepared("k", _I2V, _params())
     job = queue.job_for("k")
-    db.set_enhance_target(job.prompt_id, "the-picture-it-improved")
+    db.set_enhance_target(job.prompt_id, "the-image-it-improved")
     ended = []
     queue.run_ended.connect(ended.append)
 
     job.finished.emit([{"filename": "out.png"}], None, 252.0)
 
-    assert ended[0].generation == "the-picture-it-improved"
+    assert ended[0].generation == "the-image-it-improved"
 
 
 def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):
@@ -1272,8 +1272,8 @@ def test_the_video_set_aside_starts_over_a_minute_after_the_image_was_asked_for(
     assert queue.queue_order == [video.prompt_id]
 
 
-def _a_video_waiting_on_a_picture(tmp_path, now):
-    """A video set aside for a picture asked for at ``now``, the picture done
+def _a_video_waiting_on_an_image(tmp_path, now):
+    """A video set aside for an image asked for at ``now``, the image done
     ten seconds later: the video is waiting out the rest of the minute."""
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
@@ -1286,16 +1286,16 @@ def _a_video_waiting_on_a_picture(tmp_path, now):
 
 
 def test_the_wait_is_timed_for_what_is_left_of_the_minute(qtbot, tmp_path):
-    _client_, queue, _video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+    _client_, queue, _video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     assert queue._videos_wait.isActive()
     assert queue._videos_wait.interval() == 50_000
 
 
-def test_a_picture_asked_for_during_the_wait_starts_at_once_and_the_minute_starts_again(
+def test_an_image_asked_for_during_the_wait_starts_at_once_and_the_minute_starts_again(
         qtbot, tmp_path):
     now = [1000.0]
-    client, queue, video = _a_video_waiting_on_a_picture(tmp_path, now)
+    client, queue, video = _a_video_waiting_on_an_image(tmp_path, now)
     now[0] = 1030.0
 
     another = _launch_image(queue, "i2")
@@ -1312,14 +1312,14 @@ def test_a_picture_asked_for_during_the_wait_starts_at_once_and_the_minute_start
 
 
 def test_the_video_waiting_out_the_minute_says_when_it_starts(qtbot, tmp_path):
-    _client_, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+    _client_, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     assert queue.starts_at(video.prompt_id) == 1060.0
 
 
-def test_a_video_set_aside_says_no_start_while_the_picture_is_being_made(qtbot, tmp_path):
-    # Until the picture is done it is the picture the video waits on, which
-    # has its own bar; a start time would be a promise the picture could break.
+def test_a_video_set_aside_says_no_start_while_the_image_is_being_made(qtbot, tmp_path):
+    # Until the image is done it is the image the video waits on, which
+    # has its own bar; a start time would be a promise the image could break.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: 1000.0)
     video = _launch_video(queue, "v", seed=1)
@@ -1330,7 +1330,7 @@ def test_a_video_set_aside_says_no_start_while_the_picture_is_being_made(qtbot, 
 
 
 def test_start_now_starts_the_video_waiting_out_the_minute_at_once(qtbot, tmp_path):
-    client, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+    client, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     queue.start_now()
 
@@ -1339,7 +1339,7 @@ def test_start_now_starts_the_video_waiting_out_the_minute_at_once(qtbot, tmp_pa
 
 
 def test_a_video_held_for_a_training_says_no_start(qtbot, tmp_path):
-    _client_, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+    _client_, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     queue.hold_for_training(_Training())
 
@@ -1348,7 +1348,7 @@ def test_a_video_held_for_a_training_says_no_start(qtbot, tmp_path):
 
 def test_only_the_video_at_the_front_says_when_it_starts(qtbot, tmp_path):
     now = [1000.0]
-    _client_, queue, _video = _a_video_waiting_on_a_picture(tmp_path, now)
+    _client_, queue, _video = _a_video_waiting_on_an_image(tmp_path, now)
 
     behind = _launch_video(queue, "v2", seed=2)
 
@@ -1356,7 +1356,7 @@ def test_only_the_video_at_the_front_says_when_it_starts(qtbot, tmp_path):
 
 
 def test_a_video_waiting_out_the_minute_goes_to_comfyui_as_the_app_closes(qtbot, tmp_path):
-    client, queue, video = _a_video_waiting_on_a_picture(tmp_path, [1000.0])
+    client, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     assert queue.flush_to_server() == 1
     assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
@@ -1398,7 +1398,7 @@ def test_a_video_asked_for_leaves_a_video_being_rendered_alone(qtbot, tmp_path):
 
 def test_a_videos_start_frame_being_drawn_is_set_aside_with_the_videos(qtbot, tmp_path):
     # The prompt on the GPU is a still, but the run it opens is a video, and it
-    # rejoins the line as one: after the picture, ahead of the videos waiting.
+    # rejoins the line as one: after the image, ahead of the videos waiting.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1415,10 +1415,10 @@ def test_a_videos_start_frame_being_drawn_is_set_aside_with_the_videos(qtbot, tm
     assert queue.queue_order == [image.prompt_id, frame.prompt_id, waiting.prompt_id]
 
 
-def test_a_picture_being_rendered_is_set_aside_right_after_the_newer_one(qtbot, tmp_path):
-    # Anything on the GPU yields to the user's image work, a picture included:
+def test_an_image_being_rendered_is_set_aside_right_after_the_newer_one(qtbot, tmp_path):
+    # Anything on the GPU yields to the user's image work, an image included:
     # it was the front until the newer one took it, so it goes right after it,
-    # ahead of the pictures asked for before it.
+    # ahead of the images asked for before it.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     oldest = _launch_image(queue, "i1", seed=1)
@@ -1433,7 +1433,7 @@ def test_a_picture_being_rendered_is_set_aside_right_after_the_newer_one(qtbot, 
     assert queue.queue_order == [newest.prompt_id, middle.prompt_id, oldest.prompt_id]
 
 
-def test_a_batch_of_pictures_is_made_in_the_order_asked_without_stopping_itself(
+def test_a_batch_of_images_is_made_in_the_order_asked_without_stopping_itself(
         qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
@@ -1447,7 +1447,7 @@ def test_a_batch_of_pictures_is_made_in_the_order_asked_without_stopping_itself(
     assert [queue.job_for_prompt(pid).params["seed"] for pid in launched] == [1, 2, 3]
 
 
-def test_what_a_batch_of_pictures_takes_the_machine_from_waits_for_the_whole_batch(
+def test_what_a_batch_of_images_takes_the_machine_from_waits_for_the_whole_batch(
         qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
@@ -1602,7 +1602,7 @@ def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_
 
 def test_an_image_asked_for_while_a_videos_hand_over_is_out_takes_the_machine_when_it_lands(
         qtbot, tmp_path):
-    # The server can take a minute to accept a prompt. A picture asked for in
+    # The server can take a minute to accept a prompt. An image asked for in
     # that minute cannot take the machine from a video that is not on it yet,
     # so it takes it the moment the video lands, as one asked for later would.
     client, gate = _gated_client()
@@ -1640,7 +1640,7 @@ def test_a_job_put_first_leads_the_line_and_takes_the_machine(qtbot, tmp_path):
     assert queue.queue_order == [oldest.prompt_id, newest.prompt_id, middle.prompt_id]
 
 
-def test_a_picture_asked_for_leaves_a_job_put_first_on_the_machine(qtbot, tmp_path):
+def test_an_image_asked_for_leaves_a_job_put_first_on_the_machine(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     locked = _launch_image(queue, "i1", seed=1)
@@ -1653,7 +1653,7 @@ def test_a_picture_asked_for_leaves_a_job_put_first_on_the_machine(qtbot, tmp_pa
     assert queue.queue_order == [locked.prompt_id, newer.prompt_id]
 
 
-def test_a_picture_asked_for_joins_behind_every_job_put_first(qtbot, tmp_path):
+def test_an_image_asked_for_joins_behind_every_job_put_first(qtbot, tmp_path):
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     waiting = _launch_image(queue, "i1", seed=1)
     rendering = _launch_image(queue, "i2", seed=2)
@@ -1664,7 +1664,7 @@ def test_a_picture_asked_for_joins_behind_every_job_put_first(qtbot, tmp_path):
     assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id, newer.prompt_id]
 
 
-def test_a_batch_of_pictures_lines_up_after_a_job_put_first_and_leaves_it_running(
+def test_a_batch_of_images_lines_up_after_a_job_put_first_and_leaves_it_running(
         qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
@@ -1679,7 +1679,7 @@ def test_a_batch_of_pictures_lines_up_after_a_job_put_first_and_leaves_it_runnin
     assert queue.queue_order == [locked.prompt_id, *launched]
 
 
-def test_the_picture_set_aside_for_a_job_put_first_goes_back_behind_all_of_them(
+def test_the_image_set_aside_for_a_job_put_first_goes_back_behind_all_of_them(
         qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
@@ -1729,7 +1729,7 @@ def test_a_job_put_first_while_a_hand_over_is_out_takes_the_machine_when_it_land
 
 # --- a shielded run keeps the machine until it is done ---------------------------
 
-def test_a_picture_asked_for_waits_behind_a_shielded_video_being_rendered(qtbot, tmp_path):
+def test_an_image_asked_for_waits_behind_a_shielded_video_being_rendered(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     video = _launch_video(queue, "v", seed=1)
@@ -1814,7 +1814,7 @@ def test_a_shield_on_a_videos_start_frame_stays_on_the_video_made_from_it(qtbot,
     assert db.get_generation(video.prompt_id)["shielded"]
 
 
-def test_taking_the_shield_off_hands_the_machine_to_the_picture_waiting_behind_it(
+def test_taking_the_shield_off_hands_the_machine_to_the_image_waiting_behind_it(
         qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
@@ -1861,34 +1861,34 @@ def test_taking_the_shield_off_with_only_videos_waiting_leaves_the_run_going(qtb
     assert queue.queue_order == [video.prompt_id, later.prompt_id]
 
 
-# --- a video waits for the enhancement of the picture it starts from ----------
+# --- a video waits for the enhancement of the image it starts from ----------
 
 _ENHANCE = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
-_PICTURE = "image/picture_00001_.png [output]"
+_IMAGE = "image/image_00001_.png [output]"
 _ENHANCED = {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}
 _ENHANCED_REF = "image/image_enhance_00001_.png [output]"
 
 
-def _launch_enhance(queue, key, picture=_PICTURE):
-    queue.start_prepared(key, _ENHANCE, {**_ENHANCE.default_params(), "input_image": picture})
+def _launch_enhance(queue, key, image=_IMAGE):
+    queue.start_prepared(key, _ENHANCE, {**_ENHANCE.default_params(), "input_image": image})
     return queue.newest_job_for(key)
 
 
 def _a_minute_later(queue, now):
-    """The minute a video waits after the last picture asked for, here an
+    """The minute a video waits after the last image asked for, here an
     enhancement, gone by, and the timer's call delivered."""
     now[0] += 60
     queue._videos_wait.timeout.emit()
 
 
-def test_a_video_asked_for_while_its_picture_is_enhanced_is_made_from_the_enhancement(
+def test_a_video_asked_for_while_its_image_is_enhanced_is_made_from_the_enhancement(
         qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
     now = [1000.0]
     queue = JobQueue(db, client, clock=lambda: now[0])
     enhance = _launch_enhance(queue, "e")
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
 
     enhance.finished.emit([_ENHANCED], None, 1.0)
     _a_minute_later(queue, now)
@@ -1907,7 +1907,7 @@ def test_the_video_waiting_on_an_enhancement_is_sent_after_the_enhancement_is_an
     now = [1000.0]
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
     enhance = _launch_enhance(queue, "e")
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
     now[0] += 120  # the enhancement asked for long ago: no minute left to wait
     sent_by_the_announcement = []
     queue.finished.connect(
@@ -1919,25 +1919,25 @@ def test_the_video_waiting_on_an_enhancement_is_sent_after_the_enhancement_is_an
     assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
 
 
-def test_a_video_dragged_ahead_of_its_pictures_enhancement_stays_behind_it(qtbot, tmp_path):
+def test_a_video_dragged_ahead_of_its_images_enhancement_stays_behind_it(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     locked = _launch_image(queue, "i", seed=1)
     queue.put_first({locked.prompt_id})
     enhance = _launch_enhance(queue, "e")
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
 
     queue.reorder([video.prompt_id, enhance.prompt_id])
 
     assert queue.queue_order == [locked.prompt_id, enhance.prompt_id, video.prompt_id]
 
 
-def test_closing_keeps_back_a_video_waiting_for_its_pictures_enhancement(qtbot, tmp_path):
+def test_closing_keeps_back_a_video_waiting_for_its_images_enhancement(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     enhance = _launch_enhance(queue, "e")
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
     other = _launch_video(queue, "w", input_image="image/another_00002_.png [output]")
 
     queue.flush_to_server()
@@ -1947,56 +1947,56 @@ def test_closing_keeps_back_a_video_waiting_for_its_pictures_enhancement(qtbot, 
     assert db.get_generation(video.prompt_id)["status"] == "pending"
 
 
-_PLAIN = {"filename": "picture_00001_.png", "subfolder": "image", "type": "output"}
+_PLAIN = {"filename": "image_00001_.png", "subfolder": "image", "type": "output"}
 
 
-def _picture(db, *, enhanced=False):
+def _image(db, *, enhanced=False):
     """The image a video starts from, enhanced or still plain."""
-    db.insert_generation(prompt_id="picture", workflow_name=_IMAGE_WF, workflow_version="v",
+    db.insert_generation(prompt_id="image", workflow_name=_IMAGE_WF, workflow_version="v",
                          params_json="{}", workflow_json="{}")
     db.update_generation(
-        "picture", status="completed",
+        "image", status="completed",
         output_files=json.dumps([_ENHANCED, _PLAIN] if enhanced else [_PLAIN]),
         original_files=json.dumps([_PLAIN]) if enhanced else None)
 
 
 def _enhanced_into(queue, enhanced):
-    queue.enhance_pictures_with(lambda picture: enhanced.append(picture["prompt_id"]))
+    queue.enhance_images_with(lambda image: enhanced.append(image["prompt_id"]))
     return queue
 
 
-def test_a_video_from_a_picture_never_enhanced_has_the_picture_enhanced_first(qtbot, tmp_path):
+def test_a_video_from_an_image_never_enhanced_has_the_image_enhanced_first(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    _picture(db)
+    _image(db)
     enhanced = []
     queue = _enhanced_into(JobQueue(db, _client()), enhanced)
 
-    _launch_video(queue, "v", input_image=_PICTURE)
+    _launch_video(queue, "v", input_image=_IMAGE)
 
-    assert enhanced == ["picture"]
+    assert enhanced == ["image"]
 
 
-def test_a_picture_already_being_enhanced_is_not_enhanced_again_for_a_video(qtbot, tmp_path):
+def test_an_image_already_being_enhanced_is_not_enhanced_again_for_a_video(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    _picture(db)
+    _image(db)
     enhanced = []
     queue = _enhanced_into(JobQueue(db, _client()), enhanced)
     _launch_enhance(queue, "e")
 
-    _launch_video(queue, "v", input_image=_PICTURE)
+    _launch_video(queue, "v", input_image=_IMAGE)
 
     assert enhanced == []
 
 
-def test_a_video_from_the_plain_version_of_an_enhanced_picture_is_made_from_the_enhancement(
+def test_a_video_from_the_plain_version_of_an_enhanced_image_is_made_from_the_enhancement(
         qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
-    _picture(db, enhanced=True)
+    _image(db, enhanced=True)
     enhanced = []
     queue = _enhanced_into(JobQueue(db, client), enhanced)
 
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
 
     payload, prompt_id = client.submit_job.call_args_list[-1].args
     assert prompt_id == video.prompt_id
@@ -2009,7 +2009,7 @@ def test_a_video_from_the_plain_version_of_an_enhanced_picture_is_made_from_the_
 
 def test_a_video_asked_for_on_an_enhancement_is_made_from_it_as_asked(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    _picture(db, enhanced=True)
+    _image(db, enhanced=True)
     enhanced = []
     queue = _enhanced_into(JobQueue(db, _client()), enhanced)
 
@@ -2019,9 +2019,9 @@ def test_a_video_asked_for_on_an_enhancement_is_made_from_it_as_asked(qtbot, tmp
     assert enhanced == []
 
 
-def test_a_start_image_no_gallery_picture_holds_is_made_from_as_it_is(qtbot, tmp_path):
+def test_a_start_image_no_gallery_image_holds_is_made_from_as_it_is(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    _picture(db)
+    _image(db)
     enhanced = []
     queue = _enhanced_into(JobQueue(db, _client()), enhanced)
 
@@ -2035,12 +2035,12 @@ def test_a_video_whose_start_image_is_sent_for_enhancement_waits_and_is_made_fro
         qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
-    _picture(db)
+    _image(db)
     now = [1000.0]
     queue = JobQueue(db, client, clock=lambda: now[0])
-    queue.enhance_pictures_with(lambda picture: _launch_enhance(queue, "e"))
+    queue.enhance_images_with(lambda image: _launch_enhance(queue, "e"))
 
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
     enhance = queue.newest_job_for("e")
     enhance.finished.emit([_ENHANCED], None, 1.0)
     _a_minute_later(queue, now)
@@ -2050,12 +2050,12 @@ def test_a_video_whose_start_image_is_sent_for_enhancement_waits_and_is_made_fro
     assert _ENHANCED_REF in json.dumps(client.submit_job.call_args_list[-1].args[0])
 
 
-def test_a_video_held_over_a_restart_starts_from_the_enhancement_its_picture_gained(
+def test_a_video_held_over_a_restart_starts_from_the_enhancement_its_image_gained(
         qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
-    _pending_row(db, "video", params=_params(input_image=_PICTURE))
-    _picture(db, enhanced=True)
+    _pending_row(db, "video", params=_params(input_image=_IMAGE))
+    _image(db, enhanced=True)
     queue = _enhanced_into(JobQueue(db, client), [])
 
     queue.reconnect_running()
@@ -2067,11 +2067,11 @@ def test_a_video_held_over_a_restart_starts_from_the_enhancement_its_picture_gai
 def test_a_video_held_over_a_restart_does_not_ask_again_for_the_enhance_a_newer_row_holds(
         qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    _pending_row(db, "video", params=_params(input_image=_PICTURE))
+    _pending_row(db, "video", params=_params(input_image=_IMAGE))
     _pending_row(db, "enhance", workflow_name=gallery.ENHANCE_WORKFLOW,
-                 params={**_ENHANCE.default_params(), "input_image": _PICTURE})
+                 params={**_ENHANCE.default_params(), "input_image": _IMAGE})
     db.update_generation("enhance", status="running")
-    _picture(db)
+    _image(db)
     enhanced = []
     queue = _enhanced_into(JobQueue(db, _client()), enhanced)
 
@@ -2087,7 +2087,7 @@ def test_a_video_waiting_on_an_enhancement_that_fails_fails_with_it(qtbot, tmp_p
     failed = []
     queue.failed.connect(lambda key, message: failed.append(key))
     enhance = _launch_enhance(queue, "e")
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
 
     enhance.failed.emit("the sampler ran out of memory")
 
@@ -2101,7 +2101,7 @@ def test_cancelling_the_enhancement_a_video_waits_on_cancels_the_video_too(qtbot
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     enhance = _launch_enhance(queue, "e")
-    video = _launch_video(queue, "v", input_image=_PICTURE)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
 
     queue.cancel_job(enhance.prompt_id)
 

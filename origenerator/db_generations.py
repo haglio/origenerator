@@ -247,8 +247,8 @@ class GenerationStore(Store):
         """
         self._set(prompt_id, "experiment_verdict", verdict)
 
-    def set_picture_state(self, prompt_id: str, state: str | None):
-        """Record what a still picture was sorted as showing, or ``None`` to take
+    def set_image_state(self, prompt_id: str, state: str | None):
+        """Record what a still image was sorted as showing, or ``None`` to take
         the sorting back, which puts it among the ones still to be looked at."""
         self._set(prompt_id, "picture_state", state or None)
 

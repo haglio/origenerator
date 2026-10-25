@@ -36,14 +36,14 @@ def test_restore_puts_files_back_where_they_were(tmp_path):
 
 
 def test_a_file_whose_name_a_newer_file_took_comes_back_under_the_next_number(tmp_path):
-    deleted = _file(tmp_path / "pictures" / "alpha_t2i_00005_.png", b"deleted")
+    deleted = _file(tmp_path / "images" / "alpha_t2i_00005_.png", b"deleted")
     batch = Trash(tmp_path / "trash").store([deleted])
     _file(deleted, b"newer")
 
     renamed = batch.restore()
 
     assert deleted.read_bytes() == b"newer"
-    assert (tmp_path / "pictures" / "alpha_t2i_00006_.png").read_bytes() == b"deleted"
+    assert (tmp_path / "images" / "alpha_t2i_00006_.png").read_bytes() == b"deleted"
     assert renamed == {"alpha_t2i_00005_.png": "alpha_t2i_00006_.png"}
 
 
@@ -60,12 +60,12 @@ def test_a_videos_files_come_back_together_under_one_new_number(tmp_path):
 
 
 def test_a_new_number_passes_over_the_names_other_deleted_files_hold(tmp_path):
-    pictures = tmp_path / "pictures"
+    images = tmp_path / "images"
     trash = Trash(tmp_path / "trash")
-    deleted = _file(pictures / "alpha_t2i_00005_.png", b"deleted")
+    deleted = _file(images / "alpha_t2i_00005_.png", b"deleted")
     batch = trash.store([deleted])
     _file(deleted, b"newer")
-    trash.store([_file(pictures / "alpha_t2i_00006_.png", b"also deleted")])
+    trash.store([_file(images / "alpha_t2i_00006_.png", b"also deleted")])
 
     assert batch.restore() == {"alpha_t2i_00005_.png": "alpha_t2i_00007_.png"}
 

@@ -56,9 +56,9 @@ def test_the_settings_the_enhance_panel_shows_are_all_explained():
     assert all(param_help(key) for key in ENHANCE_SETTING_KEYS)
 
 
-def test_help_calls_the_picture_a_run_starts_from_what_its_field_is_called():
+def test_help_calls_the_image_a_run_starts_from_what_its_field_is_called():
     stale = sorted(key for key, text in PARAM_HELP.items()
-                   if "input picture" in text or "the input's" in text)
+                   if "input image" in text or "the input's" in text)
     assert stale == []
 
 

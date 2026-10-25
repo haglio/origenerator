@@ -3,7 +3,7 @@
 Standalone, the radio's switch tunes three stations in at once.  Inside a Fun
 Time session each Satellite Funestra is dealt three of its own the moment this
 app is ready, which play on out of earshot and are tuned in one at a time while
-a picture is up (:mod:`funestra.radio`).  Either way the clips come from the one
+an image is up (:mod:`funestra.radio`).  Either way the clips come from the one
 folder the settings all of Haglio share name, and a station walks its own share
 of them round and round.
 """
@@ -111,7 +111,7 @@ class OrigeneratorRadio:
 
     def held_by_a_slideshow(self) -> Tuner:
         """The radio as the Standalone Slideshow's Funestra plays it, heard
-        while its picture is up at its volume, until that Funestra lets it go."""
+        while its image is up at its volume, until that Funestra lets it go."""
         self._held_by = _HeldByASlideshow(self)
         return self._held_by
 

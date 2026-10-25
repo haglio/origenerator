@@ -1,11 +1,11 @@
 """The whole spoken vocabulary: what an utterance means, if anything.
 
 Three things can be said, and any of them may be led by a side: a command about
-the picture on screen (:mod:`origenerator.gallery.voice_commands`), one of the
+the image on screen (:mod:`origenerator.gallery.voice_commands`), one of the
 show's own controls (:mod:`origenerator.voice.show_commands`), or a shelf name,
 which plays that shelf the way its slideshow button would.
 
-* a command about the picture on screen — ``fix <part>``, ``animate as <lane>
+* a command about the image on screen — ``fix <part>``, ``animate as <lane>
   <act>`` or ``enhance`` (:mod:`origenerator.gallery.voice_commands` owns all
   three).
 * ``start`` / ``pause`` / ``stop slideshow`` — the slideshow's own controls
@@ -69,7 +69,7 @@ _MAX_COLLECTION_WORDS = 3
 
 
 class SurfaceCommand(NamedTuple):
-    """A command about the picture on screen — a
+    """A command about the image on screen — a
     :class:`~origenerator.gallery.detail_parts.DetailPart` to fix, an
     :class:`~origenerator.animate_command.AnimateRequest` or
     :data:`~origenerator.gallery.voice_commands.ENHANCE_COMMAND` — aimed at
@@ -145,7 +145,7 @@ def sided_app_command(text: str):
     be asked ahead of an opening request.  A side may still lead one, for the
     same reason it may lead any other order here: hosted, two slideshows run and
     neither is the active window, so "landscape lock" is the only way to say
-    which picture is meant.  Unsided, it comes back bare, exactly as the
+    which image is meant.  Unsided, it comes back bare, exactly as the
     standalone app expects it.
     """
     # The side is taken off the RAW words, not off split_side's letters-only

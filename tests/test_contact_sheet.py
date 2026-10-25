@@ -1,4 +1,4 @@
-"""The wall of a folder's pictures that fills a rewrite tab's preview."""
+"""The wall of a folder's thumbnails that fills a rewrite tab's preview."""
 from __future__ import annotations
 
 from PIL import Image
@@ -6,7 +6,7 @@ from PIL import Image
 from origenerator.gui.contact_sheet import ContactSheet, row_counts, rows_for
 
 
-def _picture(path, color=(200, 40, 40), size=(16, 12)):
+def _thumbnail(path, color=(200, 40, 40), size=(16, 12)):
     Image.new("RGB", size, color).save(path)
     return str(path)
 
@@ -19,13 +19,13 @@ def test_nothing_to_tile_lays_out_no_grid():
     assert row_counts(4, 0) == []
 
 
-def test_one_picture_takes_the_whole_pane():
+def test_one_thumbnail_takes_the_whole_pane():
     assert rows_for(1, 400, 300) == 1
     assert row_counts(1, 1) == [1]
 
 
 def test_the_grid_picks_the_squarest_cells_the_pane_allows():
-    # Nine pictures in a 4:3 pane come out 3x3 — square cells. Laid 9x1 or 1x9
+    # Nine thumbnails in a 4:3 pane come out 3x3 — square cells. Laid 9x1 or 1x9
     # they would be slivers, which is what the search is for.
     assert rows_for(9, 400, 300) == 3
     assert row_counts(9, 3) == [3, 3, 3]
@@ -60,22 +60,22 @@ def test_the_last_rows_share_the_remainder_rather_than_leaving_a_gap():
 
 # --- the widget -------------------------------------------------------------
 
-def test_the_sheet_tiles_every_readable_picture(qtbot, tmp_path):
+def test_the_sheet_tiles_every_readable_thumbnail(qtbot, tmp_path):
     sheet = ContactSheet()
     qtbot.addWidget(sheet)
     sheet.resize(400, 300)
-    sheet.show_pictures([_picture(tmp_path / f"p{n}.png") for n in range(6)])
+    sheet.show_thumbnails([_thumbnail(tmp_path / f"p{n}.png") for n in range(6)])
 
     assert sheet.count() == 6
     assert len(sheet.cells()) == 6
 
 
-def test_a_picture_the_library_has_moved_is_left_out_rather_than_drawn_as_a_gap(
+def test_a_thumbnail_the_library_has_moved_is_left_out_rather_than_drawn_as_a_gap(
         qtbot, tmp_path):
     sheet = ContactSheet()
     qtbot.addWidget(sheet)
     sheet.resize(400, 300)
-    sheet.show_pictures([_picture(tmp_path / "here.png"), str(tmp_path / "gone.png"), None])
+    sheet.show_thumbnails([_thumbnail(tmp_path / "here.png"), str(tmp_path / "gone.png"), None])
 
     assert sheet.count() == 1
 
@@ -84,7 +84,7 @@ def test_the_tiles_fill_the_pane_edge_to_edge(qtbot, tmp_path):
     sheet = ContactSheet()
     qtbot.addWidget(sheet)
     sheet.resize(400, 300)
-    sheet.show_pictures([_picture(tmp_path / f"p{n}.png") for n in range(5)])
+    sheet.show_thumbnails([_thumbnail(tmp_path / f"p{n}.png") for n in range(5)])
 
     cells = sheet.cells()
     assert min(c.left() for c in cells) == 0
@@ -95,11 +95,11 @@ def test_the_tiles_fill_the_pane_edge_to_edge(qtbot, tmp_path):
     assert sum(c.width() * c.height() for c in cells) == 400 * 300
 
 
-def test_clearing_the_sheet_lets_go_of_its_pictures(qtbot, tmp_path):
+def test_clearing_the_sheet_lets_go_of_its_thumbnails(qtbot, tmp_path):
     sheet = ContactSheet()
     qtbot.addWidget(sheet)
     sheet.resize(400, 300)
-    sheet.show_pictures([_picture(tmp_path / "p.png")])
+    sheet.show_thumbnails([_thumbnail(tmp_path / "p.png")])
 
     sheet.clear()
 

@@ -129,15 +129,15 @@ def workflow_enhance_keys(workflow_name: str | None) -> frozenset:
     return _workflow_enhance_keys(workflow_name) if wf is not None else ENHANCE_KEYS
 
 
-def made_from_a_picture(workflow_name: str | None) -> bool:
+def made_from_an_image(workflow_name: str | None) -> bool:
     wf = workflow_named(workflow_name)
-    return wf is not None and wf.starts_from_a_picture()
+    return wf is not None and wf.starts_from_an_image()
 
 
 def is_image_conditioned(workflow_name: str | None) -> bool:
     """True when one of this app's workflows drives its output from an
     ``input_image`` — an i2v whose start frame is itself (usually) a generation."""
-    return _registered(workflow_name) is not None and made_from_a_picture(workflow_name)
+    return _registered(workflow_name) is not None and made_from_an_image(workflow_name)
 
 
 def rerollable(row: dict) -> bool:
@@ -274,27 +274,27 @@ def _input_image_config(input_image: str | None, image_index: dict | None,
                         *, identify: bool = False) -> str:
     """The grouping key for a row's start frame.
 
-    ``identify`` picks which question is being asked of the frame. *Which picture
+    ``identify`` picks which question is being asked of the frame. *Which image
     is it* (``True``) is what a video's folders need: their source-image tier means
-    one picture, and every settings folder under that tier explores the same
+    one image, and every settings folder under that tier explores the same
     frame — a different prompt, a different CFG — so opening any of them must
     show videos of the one image. *What configuration produced it* (``False``,
     the default) is what everything else needs, where there is no such tier and a
-    batch of enhances of a dozen different pictures is one folder of work.
+    batch of enhances of a dozen different images is one folder of work.
 
-    Identity is the generation that produced the frame, so a picture answers as
+    Identity is the generation that produced the frame, so an image answers as
     itself however it is named: an enhanced image keeps its original file listed
     beside the enhanced one, and a video that ran on either is a video of that
-    picture. Both modes fall back to the frame's own filename when it isn't a
+    image. Both modes fall back to the frame's own filename when it isn't a
     known generation (hand-picked, external, or since deleted) — distinct frames
     still separate — and to ``""`` when there is no input image at all.
 
     Videos grouped by configuration here until 2026-08-18, so that a video stayed
     with its own image-seed re-rolls: a fresh draw of the same settings is the
     same settings, so it read as the same folder. But two draws of one prompt are
-    two different pictures, and collecting them made a source-image folder that
+    two different images, and collecting them made a source-image folder that
     held several — precisely what that tier promises it never does. A re-drawn
-    frame now opens its own folder, which is what a new picture is.
+    frame now opens its own folder, which is what a new image is.
     """
     name = _frame_name(input_image)
     if not name:
@@ -339,10 +339,10 @@ def settings_signature(
 
     For an image-conditioned workflow the start frame is folded in — resolved
     through ``image_index`` (see :func:`build_image_config_index`) — so rows built
-    from different frames get distinct keys. A video folds in *which picture* the
-    frame is, because a video is filed under that picture's own folder;
+    from different frames get distinct keys. A video folds in *which image* the
+    frame is, because a video is filed under that image's own folder;
     anything else folds in the frame's configuration, so a batch of enhances of
-    many pictures stays one folder of work (see :func:`_input_image_config`).
+    many images stays one folder of work (see :func:`_input_image_config`).
     ``image_index`` may be omitted for rows that aren't image-conditioned.
 
     The workflow generation is folded in too (see :func:`_grouping_version`), so
@@ -368,7 +368,7 @@ def folder_signature(
 
 def _frame_of(workflow_name: str | None, params_json: str | None,
               image_index: dict | None) -> str | None:
-    if not made_from_a_picture(workflow_name):
+    if not made_from_an_image(workflow_name):
         return None
     return _input_image_config(_input_image_of(params_json), image_index,
                                identify=_outputs_video(workflow_name))

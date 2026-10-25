@@ -10,7 +10,7 @@ item should come back with the request that made it, so the collection skips a r
 it cannot resolve rather than the record being dropped.
 
 Spoken ("Request ... over") or typed: a folder rewrite asks the same thing of
-every picture in a folder at once and records one of these per picture, which is
+every image in a folder at once and records one of these per image, which is
 what links each result to the one it was rewritten from. Such a record has
 nothing heard and no single term -- it says what it wanted by rewriting the
 prompt, which the old/new pair holds -- so `heard` is empty there and
@@ -30,7 +30,7 @@ class RequestStore(Store):
                        old_negative: str = "", new_positive: str = "",
                        new_negative: str = ""):
         """Record that ``prompt_id`` was queued by a request about
-        ``source_prompt_id`` — spoken, or typed as one picture of a folder-wide
+        ``source_prompt_id`` — spoken, or typed as one image of a folder-wide
         rewrite, which leaves ``heard`` empty. Replaces any earlier record for
         the same generation, which only a re-used prompt id could produce."""
         with self._connect() as conn:

@@ -1,4 +1,4 @@
-"""Combine: a video's settings run again on a dropped picture.
+"""Combine: a video's settings run again on a dropped image.
 
 The fifth of the gallery's screen concerns to come out of the view that used to
 hold all of them. What lives here is the whole act -- the panel with its two drop
@@ -11,11 +11,11 @@ Two things ride with it because nothing else has them. The stand-in row a press
 puts in the queue before there is a job: everything between the press and a real
 job takes seconds, and a button that seems to do nothing reads as an app that has
 died. And the spoken "animate as", which is this same act asked for out loud: the
-clip handed on the moment it exists, and a second ask over the same picture
+clip handed on the moment it exists, and a second ask over the same image
 refused, so saying it twice does not spend the GPU twice.
 
 What stays with the host is what a launch is *of* and where it lands: the folder
-key a config belongs to, the pictures the gallery is holding, and the tree move
+key a config belongs to, the images the gallery is holding, and the tree move
 that shows a launch. :class:`CombineHost` names each of those.
 """
 from __future__ import annotations
@@ -56,11 +56,11 @@ logger = logging.getLogger(__name__)
 ALREADY_GENAUD = "already Genau'd"
 ALREADY_MAKING_ONE = "already making it — handing that one over"
 
-# What a picture can be animated as is read off what it SHOWS, and a picture
+# What an image can be animated as is read off what it SHOWS, and an image
 # nobody has said that about yet can be animated as nothing at all. Said
-# rather than guessed: the guess would be an act the picture cannot do, which
+# rather than guessed: the guess would be an act the image cannot do, which
 # is minutes of the one machine spent on a clip that was never going to work.
-NOT_A_PICTURE = "only a picture can be animated"
+NOT_AN_IMAGE = "only an image can be animated"
 
 NO_PAST_VIDEO = "No past video yet"
 
@@ -69,7 +69,7 @@ class CombineHost(Protocol):
     """What a combine needs of the gallery around it, and nothing else."""
 
     def image_config_index(self) -> dict:
-        """Which picture made each file the gallery holds."""
+        """Which image made each file the gallery holds."""
 
     def animated_preview(self, row: dict) -> str | None:
         """A looping preview of a video row, for a slot and for a prepared tab."""
@@ -93,11 +93,11 @@ class CombineHost(Protocol):
 
     def tell(self, title: str, message: str) -> None:
         """Say something that needs acknowledging, where nobody is watching a
-        fullscreen picture."""
+        fullscreen image."""
 
 
 class CombineController(QObject):
-    """The combine panel, and every way settings reach a dropped picture."""
+    """The combine panel, and every way settings reach a dropped image."""
 
     def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
                  info_tabs_of, slideshows, inbox: evolver_export.EvolverInbox | None = None,
@@ -127,9 +127,9 @@ class CombineController(QObject):
         # Combine: drop an image + an i2v video, Generate re-runs that video's
         # settings on the image. Needs a client to generate, so it hides without one.
         self.panel = CombinePanel(
-            self._picture_lent_by, self._video_lent_by, self._slot_preview,
+            self._image_lent_by, self._video_lent_by, self._slot_preview,
             self._video_history, named=self._names.prompt_id_of, name_of=self._name_of,
-            browse_picture=self._browse_picture, leads_to=self._item_held)
+            browse_image=self._browse_image, leads_to=self._item_held)
         self.panel.video_used.connect(self._db.record_combine_video_use)
         # Both Generate paths go through a wrapper that puts a stand-in row in the
         # line first: the work between the press and a real job is seconds long,
@@ -141,9 +141,9 @@ class CombineController(QObject):
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
         self.panel.intent_changed.connect(self._on_intent_changed)
-        # A picture dropped in narrows the acts too, so the list is re-asked
+        # An image dropped in narrows the acts too, so the list is re-asked
         # for the moment one lands rather than only when the lane changes.
-        self.panel.image_slot.changed.connect(self.picture_dropped)
+        self.panel.image_slot.changed.connect(self.image_dropped)
         self.panel.video_slot.changed.connect(self.reconcile_generating)
         if client is None:
             self.panel.hide()
@@ -162,13 +162,13 @@ class CombineController(QObject):
     # --- what the slots take, and what the session keeps ---------------------
 
     def _accepts_image(self, image_id: str) -> bool:
-        """Whether the image slot can hold this: a generation that is a picture
+        """Whether the image slot can hold this: a generation that is an image
         with a file to seed an i2v from (a video's clip can't be a start frame),
-        or a picture file from outside the gallery."""
-        return self._picture_reference(image_id) is not None
+        or an image file from outside the gallery."""
+        return self._image_reference(image_id) is not None
 
-    def _picture_reference(self, image_id: str) -> str | None:
-        """What a graph loads the held picture by, ``None`` for what is no picture."""
+    def _image_reference(self, image_id: str) -> str | None:
+        """What a graph loads the held image by, ``None`` for what is no image."""
         row = self._db.get_generation(image_id)
         if row is not None:
             return gallery.input_image_reference(row)
@@ -177,9 +177,9 @@ class CombineController(QObject):
             return None
         return str(path)
 
-    def _picture_still(self, image_id: str) -> str | None:
+    def _image_still(self, image_id: str) -> str | None:
         row = self._db.get_generation(image_id)
-        return self._still_path(row) if row is not None else self._picture_reference(image_id)
+        return self._still_path(row) if row is not None else self._image_reference(image_id)
 
     def _item_held(self, held: str) -> str | None:
         return held if self._db.get_generation(held) is not None else None
@@ -189,12 +189,12 @@ class CombineController(QObject):
             return self._names.of(held)
         return self._files.name_of(held)
 
-    def _browse_picture(self) -> None:
+    def _browse_image(self) -> None:
         path = pick_a_file(self.panel, "Image", FILE_FILTERS[MediaType.IMAGE])
         if path:
             self.panel.image_slot.set_item(path)
 
-    def _picture_lent_by(self, prompt_id: str) -> str | None:
+    def _image_lent_by(self, prompt_id: str) -> str | None:
         lent = gallery.image_lent_by(prompt_id, self._db.get_generation,
                                      self._host.image_config_index())
         return lent["prompt_id"] if lent is not None else None
@@ -273,8 +273,8 @@ class CombineController(QObject):
 
     def offer_the_acts(self, rows: list[dict]) -> None:
         """Gray out the acts this press could not answer: those with no video to
-        mine settings from, and -- once a picture is in the slot -- those
-        :mod:`origenerator.animation_paths` says it cannot start from. A picture
+        mine settings from, and -- once an image is in the slot -- those
+        :mod:`origenerator.animation_paths` says it cannot start from. An image
         nobody has sorted yet narrows nothing."""
         lane = self.panel.selected_intent()
         offered = act_settings.available_categories(
@@ -285,13 +285,13 @@ class CombineController(QObject):
         self.panel.set_available_categories(offered)
 
     def _state_of(self, image_id: str | None) -> str:
-        """What the picture in the slot was sorted as showing, ``""`` for an
-        empty slot or a picture nobody has sorted yet."""
+        """What the image in the slot was sorted as showing, ``""`` for an
+        empty slot or an image nobody has sorted yet."""
         row = self._db.get_generation(image_id) if image_id else None
-        return (row or {}).get("picture_state") or ""
+        return (row or {}).get("image_state") or ""
 
-    def picture_dropped(self) -> None:
-        """The picture in the slot changed: re-ask which acts it can start from."""
+    def image_dropped(self) -> None:
+        """The image in the slot changed: re-ask which acts it can start from."""
         self.offer_the_acts(self._db.list_generations())
         self.reconcile_generating()
 
@@ -390,7 +390,7 @@ class CombineController(QObject):
             # the text, and only a dropped video is shown.
             source_video_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
             prompt_edited=edited,
-            source_image=self._picture_reference(image_id),
+            source_image=self._image_reference(image_id),
             starting=True,
         )
         self._host.queue_changed()
@@ -413,8 +413,8 @@ class CombineController(QObject):
                          intent: str = act_settings.VIDEO, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s settings on ``image_id`` — the video's workflow and params,
-        fresh seeds, and the dropped picture as the input image; ``image_row``
-        is ``None`` for a picture browsed from outside the gallery.
+        fresh seeds, and the dropped image as the input image; ``image_row``
+        is ``None`` for an image browsed from outside the gallery.
 
         Under ``GENAU`` the settings are then re-cut to hold one cycle and smoothed
         back out (:func:`~origenerator.gallery.combine.cycle_shaped`). The lane
@@ -424,7 +424,7 @@ class CombineController(QObject):
         being mined was made before anyone knew that.
 
         ``None`` when the pair can't be combined: the video row is gone or isn't
-        a rebuildable image-conditioned video, or there is no picture file to
+        a rebuildable image-conditioned video, or there is no image file to
         seed from. Shared by the Generate and Open-in-generator paths.
         """
         image_row = self._db.get_generation(image_id)
@@ -435,9 +435,9 @@ class CombineController(QObject):
         workflow = WORKFLOW_REGISTRY.get(workflow_name)
         if workflow is None or not gallery.is_image_conditioned(workflow_name):
             return None  # the video must be rebuildable and image-conditioned
-        params = gallery.combined_params(video_row, self._picture_reference(image_id), workflow)
+        params = gallery.combined_params(video_row, self._image_reference(image_id), workflow)
         if params is None:
-            return None  # no picture file to seed from
+            return None  # no image file to seed from
         if intent == act_settings.GENAU:
             params = gallery.cycle_shaped(params, workflow, category)
         return workflow, params, video_row, image_row
@@ -452,7 +452,7 @@ class CombineController(QObject):
         if built is None:
             return
         workflow, params, video_row, _image_row = built
-        self._open_prepared(workflow, params, self._picture_still(image_id), video_row,
+        self._open_prepared(workflow, params, self._image_still(image_id), video_row,
                             "", video_id, intent)
 
     def _open_prepared(self, workflow, params, still: str | None, video_row,
@@ -474,7 +474,7 @@ class CombineController(QObject):
             still, self._host.animated_preview(video_row) if video_row is not None else None))
 
     def _still_path(self, row: dict) -> str | None:
-        """The best picture of ``row`` for a pane to show: its full-size output
+        """The best still of ``row`` for a pane to show: its full-size output
         where that is a still, else the stored thumbnail (which a pane this big
         would be enlarging), else nothing."""
         preview = gallery.resolve_preview(row, OUTPUT_PLACES)
@@ -533,7 +533,7 @@ class CombineController(QObject):
     def _most_used_video(self, image_id: str, category: str, intent: str) -> str | None:
         """The ``prompt_id`` of the act's most-used rebuildable video, or ``None``
         with a hint on screen so a press never silently does nothing."""
-        if self._picture_reference(image_id) is None:
+        if self._image_reference(image_id) is None:
             return None
         video_id = act_settings.most_used_video(category, self._category_candidates(), intent)
         logger.info("combine: category=%s intent=%s image=%s -> settings from %s",
@@ -545,7 +545,7 @@ class CombineController(QObject):
     def _say_no_past_video(self, category: str, intent: str) -> None:
         """Say the act has no past video to take settings from — in the notice of the
         fullscreen surface being spoken to when one is up, and in a dialog
-        otherwise. A dialog thrown over a picture someone is looking at is the one
+        otherwise. A dialog thrown over an image someone is looking at is the one
         place this must never appear."""
         said = act_settings.no_past_video(category, intent)
         if self._slideshows.showing is not None:
@@ -565,7 +565,7 @@ class CombineController(QObject):
         non-image-conditioned workflow, or the image row is gone or has no output
         file to seed from.
         """
-        reference = self._picture_reference(image_id)
+        reference = self._image_reference(image_id)
         if reference is None:
             return None
         settings = (animation_settings.settings_for(intent, category, self._state_of(image_id))
@@ -639,7 +639,7 @@ class CombineController(QObject):
 
     def _open_category(self, image_id: str, category: str,
                        intent: str = act_settings.VIDEO) -> None:
-        """Open the settings assigned for ``category`` from this picture as an
+        """Open the settings assigned for ``category`` from this image as an
         editable generate tab: "Edit individual…". With nothing assigned it opens
         the lane's own workflow as it starts, never a past video's settings.
 
@@ -647,14 +647,14 @@ class CombineController(QObject):
         this way is not auto-sent; the tab's own Send-to-Genau does it once the clip
         is there.
         """
-        reference = self._picture_reference(image_id)
+        reference = self._image_reference(image_id)
         if reference is None:
             return
         built = (self._curated_combination(image_id, category, intent)
                  or self._readied(act_settings.starting_settings(intent), reference))
         if built is not None:
             workflow, params = built
-            self._open_prepared(workflow, params, self._picture_still(image_id), None,
+            self._open_prepared(workflow, params, self._image_still(image_id), None,
                                 category, None, intent)
 
     # --- the Genau lane: said out loud, and handed on ------------------------
@@ -682,13 +682,13 @@ class CombineController(QObject):
         logger.info("genau: sent %s down the Genau lane", preview[0].name)
 
     def _already_genaud(self, row: dict) -> bool:
-        """Whether this picture has been Genau'd — a clip made from it already, or
+        """Whether this image has been Genau'd — a clip made from it already, or
         one on the way. Saying it twice is what someone does when the first time
         appeared to do nothing, and a second identical run spends minutes of the
         one GPU on a clip that already exists.
 
         A run is a row stamped as spoken for (:meth:`_mark_for_sending`) and
-        matched to this picture by its start frame, counted whether it is still
+        matched to this image by its start frame, counted whether it is still
         coming or has landed, and read from the database so one reconnected after
         a restart still counts. A row that errored counts as nothing.
         """
@@ -700,11 +700,11 @@ class CombineController(QObject):
         )
 
     def animate_it(self, image_id: str | None, asked) -> tuple[str | None, str, str]:
-        """Animate a picture as the act an "animate as" named, in the lane it
+        """Animate an image as the act an "animate as" named, in the lane it
         named: the id it launched on (``None`` when it didn't), the line the
         speaking surface should say, and its kind.
 
-        An act left unsaid is settled by what the picture shows, through
+        An act left unsaid is settled by what the image shows, through
         :func:`~origenerator.animate_command.what_to_animate`. From there it is the
         ordinary category path: the loop lane is stamped to hand its clip on and
         guarded against being said twice (:meth:`_already_genaud`), and the
@@ -712,11 +712,11 @@ class CombineController(QObject):
         """
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != MediaType.IMAGE:
-            return None, NOT_A_PICTURE, WARNING
+            return None, NOT_AN_IMAGE, WARNING
         loop = asked.lane == act_settings.GENAU
         if loop and self._already_genaud(row):
             return None, ALREADY_GENAUD, WARNING
-        answer = what_to_animate(asked, row.get("picture_state") or "")
+        answer = what_to_animate(asked, row.get("image_state") or "")
         if answer.act is None:
             return None, answer.said, ERROR if answer.unsupported else WARNING
         act = answer.act

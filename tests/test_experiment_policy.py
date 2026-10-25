@@ -288,7 +288,7 @@ def test_proposal_mutates_declared_dims_and_rerolls_the_seed():
             assert proposal.params[key] == base_params[key]
 
 
-def test_an_experiment_leaves_a_videos_size_to_the_picture_it_animates():
+def test_an_experiment_leaves_a_videos_size_to_the_image_it_animates():
     base = make_row("v1", workflow_name="fake_i2v",
                     params={"input_image": "face.png", "width": 720, "height": 544})
     policy = ExperimentPolicy(REGISTRY, random.Random(0))

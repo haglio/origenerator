@@ -28,7 +28,7 @@ from origenerator.workflows.wan_experts import (
 # it, under the lightning LoRA Comfy's own S2V template runs it with -- four
 # steps at no guidance, which is what the probe he judged by eye ran
 # (2026-09-06). His LoRAs stay off it: the one tried put artifacts all over
-# the picture.
+# the video.
 _SPEECH_LORA = "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
 _SPEECH_STEPS = 4
 _SPEECH_CFG = 1.0

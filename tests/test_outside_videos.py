@@ -31,6 +31,7 @@ from origenerator.gallery import (
     start_frame_index,
 )
 from origenerator.generation_state import GenerationSource
+from origenerator.image_sorting import images_to_sort
 from origenerator.importer import backfill_shared_thumbnails, merge_video_sidecar_rows
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
@@ -49,7 +50,6 @@ from origenerator.outside_videos import (
     rows_bringing_in,
     scan,
 )
-from origenerator.picture_sorting import pictures_to_sort
 from origenerator.provenance import stamp_unstamped
 from origenerator.relocate import relocate_moved_outputs
 from origenerator.workflows.outside import outside_workflow
@@ -87,8 +87,8 @@ _VIDEO_BLOCK = {"prompt": "a slow walk on the shore", "seed": "11", "action": "W
                 "resolution": "720p", "aspect_ratio": "9:16", "quality": "High",
                 "creativity": "Low", "duration_seconds": 5.0, "orientation": "portrait",
                 "type": "image"}
-_PICTURE_BLOCK = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", "seed": "22",
-                  "created": "2025-03-01", "model": "Picture Model", "style": "Picture Style",
+_IMAGE_BLOCK = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", "seed": "22",
+                  "created": "2025-03-01", "model": "Image Model", "style": "Image Style",
                   "resolution": "1024", "aspect_ratio": "9:16", "quality": "Medium",
                   "creativity": "High"}
 
@@ -97,7 +97,7 @@ def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
     video = _filed(tmp_path / "videos" / "videos" / "outbox", "portrait", "a-site", "c1_topaz.mp4")
     recorded = {"favorite": True, "watch": {"weight": 2.5},
                 "provenance": {"upscale": {"app": "an-upscaler"}},
-                "video": _VIDEO_BLOCK, "source_image": _PICTURE_BLOCK}
+                "video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK}
     _record(tmp_path, video, recorded)
 
     record = record_of(video, tmp_path / "videos" / "metadata")
@@ -107,15 +107,15 @@ def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
                     "model": "Video Model", "style": "Video Style",
                     "resolution": "720p", "aspect_ratio": "9:16", "quality": "High",
                     "creativity": "Low"}, created="2025-03-02"),
-        picture=Made({"positive_prompt": "a quiet shore", "negative_prompt": "rain",
-                      "seed": "22", "model": "Picture Model", "style": "Picture Style",
+        image=Made({"positive_prompt": "a quiet shore", "negative_prompt": "rain",
+                      "seed": "22", "model": "Image Model", "style": "Image Style",
                       "resolution": "1024", "aspect_ratio": "9:16", "quality": "Medium",
                       "creativity": "High"}, created="2025-03-01"),
-        act="Wave", picture_key=seed_group_key(recorded),
+        act="Wave", image_key=seed_group_key(recorded),
         favorite=True)
 
 
-def test_a_video_made_from_words_alone_has_no_picture_and_a_missing_record_says_nothing(tmp_path):
+def test_a_video_made_from_words_alone_has_no_image_and_a_missing_record_says_nothing(tmp_path):
     video = _filed(tmp_path / "videos" / "videos" / "outbox", "portrait", "a-site", "c1_topaz.mp4")
     unrecorded = _filed(tmp_path / "videos" / "videos" / "outbox", "portrait", "a-site", "c2_topaz.mp4")
     _record(tmp_path, video, {"video": {"model": "Video Model"}})
@@ -145,7 +145,7 @@ def _frame_of(db, video_row: dict) -> dict:
     return source_image_of(video_row, db.list_generations())
 
 
-def test_a_video_comes_in_with_its_starting_frame_as_the_picture_it_starts_from(tmp_path):
+def test_a_video_comes_in_with_its_starting_frame_as_the_image_it_starts_from(tmp_path):
     db, video = _bring_in(tmp_path, Record(video=Made({"model": "Video Model",
                                                         "style": "Video Style"}), favorite=True))
 
@@ -165,25 +165,25 @@ def test_a_video_comes_in_with_its_starting_frame_as_the_picture_it_starts_from(
 _VIDEO_PARAMS = {"positive_prompt": "a slow walk on the shore", "seed": "11",
                  "model": "Video Model", "style": "Video Style", "resolution": "720p",
                  "aspect_ratio": "9:16", "quality": "High", "creativity": "Low"}
-_PICTURE_PARAMS = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", "seed": "22",
-                   "model": "Picture Model", "style": "Picture Style", "resolution": "1024",
+_IMAGE_PARAMS = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", "seed": "22",
+                   "model": "Image Model", "style": "Image Style", "resolution": "1024",
                    "aspect_ratio": "9:16", "quality": "Medium", "creativity": "High"}
 
 
-def test_a_video_and_the_picture_it_was_made_from_come_in_with_all_their_record_says(tmp_path):
+def test_a_video_and_the_image_it_was_made_from_come_in_with_all_their_record_says(tmp_path):
     db, _video = _bring_in(tmp_path, Record(
         video=Made(_VIDEO_PARAMS, created="2025-03-02"),
-        picture=Made(_PICTURE_PARAMS, created="2025-03-01"), act="Wave"))
+        image=Made(_IMAGE_PARAMS, created="2025-03-01"), act="Wave"))
 
     [shown] = _videos(db)
-    picture = _frame_of(db, shown)
+    image = _frame_of(db, shown)
     assert {key: value for key, value in json.loads(shown["params_json"]).items()
             if key != "input_image"} == _VIDEO_PARAMS
     assert (shown["positive_prompt"], shown["seed"], shown["act"],
             shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
-    assert json.loads(picture["params_json"]) == _PICTURE_PARAMS
-    assert (picture["positive_prompt"], picture["negative_prompt"], picture["seed"],
-            picture["created_at"]) == ("a quiet shore", "rain", 22, "2025-03-01 00:00:00")
+    assert json.loads(image["params_json"]) == _IMAGE_PARAMS
+    assert (image["positive_prompt"], image["negative_prompt"], image["seed"],
+            image["created_at"]) == ("a quiet shore", "rain", 22, "2025-03-01 00:00:00")
 
 
 def test_a_video_made_from_words_alone_keeps_its_starting_frame_out_of_the_toc(tmp_path):
@@ -202,17 +202,17 @@ def test_a_hidden_starting_frame_is_not_on_latest(tmp_path):
 def test_a_hidden_starting_frame_never_waits_to_be_sorted(tmp_path):
     db, _video = _bring_in(tmp_path, Record())
 
-    assert pictures_to_sort(db.list_generations()) == []
+    assert images_to_sort(db.list_generations()) == []
 
 
-def test_a_video_made_from_a_picture_shows_its_frame_as_that_picture(tmp_path):
-    db, _video = _bring_in(tmp_path, Record(picture=Made({"model": "Picture Model",
-                                                          "style": "Picture Style"})))
+def test_a_video_made_from_an_image_shows_its_frame_as_that_image(tmp_path):
+    db, _video = _bring_in(tmp_path, Record(image=Made({"model": "Image Model",
+                                                          "style": "Image Style"})))
 
-    picture = [row for row in db.list_generations()
-               if json.loads(row["output_files"])[0]["filename"].endswith(".jpg")][0]
-    assert picture["source"] == GenerationSource.OUTSIDE
-    assert json.loads(picture["params_json"]) == {"model": "Picture Model", "style": "Picture Style"}
+    image = [row for row in db.list_generations()
+             if json.loads(row["output_files"])[0]["filename"].endswith(".jpg")][0]
+    assert image["source"] == GenerationSource.OUTSIDE
+    assert json.loads(image["params_json"]) == {"model": "Image Model", "style": "Image Style"}
 
 
 def test_a_video_whose_first_frame_cannot_be_read_is_left_for_the_next_scan(tmp_path):
@@ -420,7 +420,7 @@ def test_the_look_journals_where_the_shared_settings_say_the_journals_are(tmp_pa
     assert places_here().journal == tmp_path / "journals" / JOURNAL_NAME
 
 
-def test_a_picture_in_comfyuis_output_named_like_another_sources_video_stays_a_picture(tmp_path):
+def test_an_image_in_comfyuis_output_named_like_another_sources_video_stays_an_image(tmp_path):
     _brought_in(tmp_path)
     db = Database(tmp_path / "test.db")
     db.insert_rows([{"prompt_id": "pic", "source": GenerationSource.IMPORTED,
@@ -548,11 +548,11 @@ def test_a_star_set_here_since_its_record_was_written_stands_until_evolver_carri
     assert db.get_generation(shown["prompt_id"])["starred"] == 1
 
 
-def _source_picture_folders(groups):
+def _source_image_folders(groups):
     for group in groups:
         if isinstance(group, SourceImageGroup):
             yield group
-        yield from _source_picture_folders(child_groups(group))
+        yield from _source_image_folders(child_groups(group))
 
 
 def _made_here_from(db, frame: dict) -> None:
@@ -571,8 +571,8 @@ def test_a_video_made_from_a_hidden_starting_frame_is_filed_under_the_frames_ite
     _made_here_from(db, frame)
     names = ItemNames.from_library(db)
 
-    [folder] = _source_picture_folders(build_gallery_tree(db.list_generations(),
-                                                          name_of=names.of))
+    [folder] = _source_image_folders(build_gallery_tree(db.list_generations(),
+                                                        name_of=names.of))
 
     assert folder.label == names.of(frame["prompt_id"])
     assert re.fullmatch(r"\S+ \d{3}", folder.label)
@@ -599,27 +599,27 @@ def _brought_in_with_records(tmp_path, records: dict[str, dict]) -> Database:
     return db
 
 
-def _made_from_a_picture(video_prompt: str, picture_prompt: str, picture_seed: str,
-                         video_seed: str | None = None) -> dict:
-    return {"video": {"prompt": video_prompt, "seed": video_seed or picture_seed,
+def _made_from_an_image(video_prompt: str, image_prompt: str, image_seed: str,
+                        video_seed: str | None = None) -> dict:
+    return {"video": {"prompt": video_prompt, "seed": video_seed or image_seed,
                       "model": "Video Model"},
-            "source_image": {"positive_prompt": picture_prompt, "seed": picture_seed,
-                             "model": "Picture Model"}}
+            "source_image": {"positive_prompt": image_prompt, "seed": image_seed,
+                             "model": "Image Model"}}
 
 
-def test_videos_made_from_one_picture_that_differ_only_by_seed_share_a_folder(tmp_path):
+def test_videos_made_from_one_image_that_differ_only_by_seed_share_a_folder(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22", "31"),
-        "c2_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22", "32"),
-        "c3_topaz.mp4": _made_from_a_picture("turn to the right", "a busy street", "24")})
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22", "31"),
+        "c2_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22", "32"),
+        "c3_topaz.mp4": _made_from_an_image("turn to the right", "a busy street", "24")})
 
     assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4"], ["c3_topaz.mp4"]]
 
 
-def test_videos_made_from_two_pictures_with_one_prompt_are_two_folders(tmp_path):
+def test_videos_made_from_two_images_with_one_prompt_are_two_folders(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
-        "c2_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "23")})
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
+        "c2_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "23")})
 
     assert _leaves(db, "Videos") == [["c1_topaz.mp4"], ["c2_topaz.mp4"]]
 
@@ -656,10 +656,10 @@ def _workflow_folders(db, media_label: str) -> list[str]:
     return sorted(group.label for group in child_groups(media))
 
 
-def test_a_sites_videos_made_from_pictures_and_from_words_are_two_workflows_named_for_each(
+def test_a_sites_videos_made_from_images_and_from_words_are_two_workflows_named_for_each(
         tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
 
     assert _workflow_folders(db, "Videos") == ["a-site I2V", "a-site T2V"]
@@ -673,30 +673,30 @@ def test_a_site_whose_videos_are_all_made_from_words_keeps_its_own_name(tmp_path
     assert _workflow_folders(db, "Videos") == ["a-site"]
 
 
-def test_a_site_whose_videos_are_all_made_from_pictures_names_their_kind(tmp_path):
+def test_a_site_whose_videos_are_all_made_from_images_names_their_kind(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22")})
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22")})
 
     assert _workflow_folders(db, "Videos") == ["a-site I2V"]
 
 
-def test_a_video_made_from_a_picture_is_filed_under_that_pictures_folder(tmp_path):
+def test_a_video_made_from_an_image_is_filed_under_that_images_folder(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
-        "c2_topaz.mp4": _made_from_a_picture("turn to the right", "a quiet shore", "22")})
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
+        "c2_topaz.mp4": _made_from_an_image("turn to the right", "a quiet shore", "22")})
     names, rows = ItemNames.from_library(db), db.list_generations()
-    [picture] = _pictures(db)
+    [image] = _images(db)
 
-    [folder] = _source_picture_folders(build_gallery_tree(
+    [folder] = _source_image_folders(build_gallery_tree(
         rows, image_index=start_frame_index(rows), name_of=names.of))
 
-    assert folder.label == names.of(picture["prompt_id"])
+    assert folder.label == names.of(image["prompt_id"])
     assert sorted(len(leaf.rows) for leaf in child_groups(folder)) == [1, 1]
 
 
 def test_videos_brought_in_under_their_sites_name_move_to_their_kinds_at_the_next_look(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
     first_preview = sqlite3.connect(tmp_path / "test.db")
     with closing(first_preview), first_preview:
@@ -710,7 +710,7 @@ def test_videos_brought_in_under_their_sites_name_move_to_their_kinds_at_the_nex
 
 
 def test_a_family_animated_with_two_models_is_a_folder_of_its_own_under_each(tmp_path):
-    first, second = (_made_from_a_picture("turn to the left", "a quiet shore", seed)
+    first, second = (_made_from_an_image("turn to the left", "a quiet shore", seed)
                      for seed in ("22", "23"))
     second["video"]["model"] = "Another Video Model"
     db = _brought_in_with_records(tmp_path, {"c1_topaz.mp4": first, "c2_topaz.mp4": second})
@@ -741,39 +741,43 @@ def test_a_look_brings_a_video_already_brought_in_up_to_its_record(tmp_path):
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
     scan(db, places, grab=_still)
-    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _PICTURE_BLOCK})
+    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK})
 
     scan(db, places, grab=_still)
 
     [shown] = _videos(db)
-    picture = _frame_of(db, shown)
+    image = _frame_of(db, shown)
     assert (shown["positive_prompt"], shown["seed"], shown["act"],
             shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
-    assert (picture["source"], picture["positive_prompt"], picture["seed"]) == (
+    assert (image["source"], image["positive_prompt"], image["seed"]) == (
         GenerationSource.OUTSIDE, "a quiet shore", 22)
 
 
-def test_a_look_files_a_picture_brought_in_under_its_videos_workflow_under_its_own(tmp_path):
+def test_a_look_files_an_image_brought_in_under_its_videos_workflow_under_its_own(tmp_path):
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
-    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _PICTURE_BLOCK})
+    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK})
     scan(db, places, grab=_still)
-    [picture] = _pictures(db)
+    [image] = _images(db)
     first_preview = sqlite3.connect(tmp_path / "test.db")
     with closing(first_preview), first_preview:
         first_preview.execute("UPDATE generations SET workflow_name = ? WHERE prompt_id = ?",
-                              (outside_workflow("a-site"), picture["prompt_id"]))
+                              (outside_workflow("a-site"), image["prompt_id"]))
 
     scan(db, places, grab=_still)
 
-    assert db.get_generation(picture["prompt_id"])["workflow_name"] == outside_workflow(
+    assert db.get_generation(image["prompt_id"])["workflow_name"] == outside_workflow(
         "a-site", MediaType.IMAGE)
+
+
+def test_an_outside_image_keeps_the_workflow_name_its_row_and_folder_keys_were_saved_under():
+    assert outside_workflow("a-site", MediaType.IMAGE) == "outside picture:a-site"
 
 
 def test_a_look_rewrites_no_row_whose_record_is_unchanged(tmp_path):
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
-    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _PICTURE_BLOCK})
+    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK})
     scan(db, places, grab=_still)
     written, write = [], db.set_recorded_fields
     db.set_recorded_fields = lambda rows: (written.extend(rows), write(rows))
@@ -799,8 +803,8 @@ def test_items_numbered_in_a_folder_the_look_no_longer_files_them_in_are_numbere
 
 def test_videos_moved_to_their_kinds_folder_are_numbered_afresh_in_it(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22", "31"),
-        "c2_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22", "32"),
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22", "31"),
+        "c2_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22", "32"),
         "c3_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
     first_preview = sqlite3.connect(tmp_path / "test.db")
     with closing(first_preview), first_preview:
@@ -827,37 +831,37 @@ def test_a_word_made_videos_starting_frame_is_numbered_in_its_videos_family(tmp_
     assert [names.of(_frame_of(db, row)["prompt_id"])[-3:] for row in _videos(db)] == ["000", "000"]
 
 
-def _pictures(db) -> list[dict]:
+def _images(db) -> list[dict]:
     return sorted((row for row in db.list_generations()
                    if row["source"] == GenerationSource.OUTSIDE
                    and media_type_of_row(row) == MediaType.IMAGE), key=lambda row: row["id"])
 
 
-def test_videos_animated_from_one_picture_bring_it_in_once(tmp_path):
+def test_videos_animated_from_one_image_bring_it_in_once(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
-        "c2_topaz.mp4": _made_from_a_picture("turn to the right", "a quiet shore", "22")})
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
+        "c2_topaz.mp4": _made_from_an_image("turn to the right", "a quiet shore", "22")})
 
-    [picture] = _pictures(db)
-    assert {_frame_of(db, row)["prompt_id"] for row in _videos(db)} == {picture["prompt_id"]}
+    [image] = _images(db)
+    assert {_frame_of(db, row)["prompt_id"] for row in _videos(db)} == {image["prompt_id"]}
 
 
-def test_a_video_made_from_a_picture_already_in_points_at_it_at_a_site_of_both_kinds(tmp_path):
+def test_a_video_made_from_an_image_already_in_points_at_it_at_a_site_of_both_kinds(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
     places = _places(tmp_path)
     later = _filed(places.upscaled_dir, "portrait", "a-site", "c3_topaz.mp4")
-    _record(tmp_path, later, _made_from_a_picture("turn to the right", "a quiet shore", "22"))
+    _record(tmp_path, later, _made_from_an_image("turn to the right", "a quiet shore", "22"))
 
     scan(db, places, grab=_still)
 
-    assert len(_pictures(db)) == 1
+    assert len(_images(db)) == 1
 
 
 def test_at_a_site_of_both_kinds_each_video_still_starts_from_its_own_frame(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
 
     started_from = {json.loads(video["output_files"])[0]["filename"]: _frame_of(db, video)["source"]
@@ -867,10 +871,10 @@ def test_at_a_site_of_both_kinds_each_video_still_starts_from_its_own_frame(tmp_
                             "c2_topaz.mp4": GenerationSource.STARTING_FRAME}
 
 
-def test_pictures_whose_records_name_no_seed_are_never_taken_for_one_picture(tmp_path):
+def test_images_whose_records_name_no_seed_are_never_taken_for_one_image(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", ""),
-        "c2_topaz.mp4": _made_from_a_picture("turn to the right", "a quiet shore", "")})
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", ""),
+        "c2_topaz.mp4": _made_from_an_image("turn to the right", "a quiet shore", "")})
 
     assert [len(leaf) for leaf in _leaves(db, "Images")] == [2]
 
@@ -886,25 +890,25 @@ def _brought_in_one_by_one(tmp_path, records: dict[str, dict]) -> Database:
     return db
 
 
-_ONE_PICTURE_TWICE = {
-    "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22"),
-    "c2_topaz.mp4": _made_from_a_picture("turn to the right", "a quiet shore", "22")}
+_ONE_IMAGE_TWICE = {
+    "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
+    "c2_topaz.mp4": _made_from_an_image("turn to the right", "a quiet shore", "22")}
 
 
-def test_a_look_folds_a_picture_brought_in_twice_into_one(tmp_path):
-    db = _brought_in_one_by_one(tmp_path, _ONE_PICTURE_TWICE)
-    first, second = _pictures(db)
+def test_a_look_folds_an_image_brought_in_twice_into_one(tmp_path):
+    db = _brought_in_one_by_one(tmp_path, _ONE_IMAGE_TWICE)
+    first, second = _images(db)
 
     scan(db, _places(tmp_path), grab=_still)
 
-    assert [row["prompt_id"] for row in _pictures(db)] == [first["prompt_id"]]
+    assert [row["prompt_id"] for row in _images(db)] == [first["prompt_id"]]
     assert {_frame_of(db, row)["prompt_id"] for row in _videos(db)} == {first["prompt_id"]}
     assert not Path(json.loads(second["output_files"])[0]["path"]).exists()
 
 
-def test_a_picture_folded_into_its_twin_hands_it_its_star(tmp_path):
-    db = _brought_in_one_by_one(tmp_path, _ONE_PICTURE_TWICE)
-    first, second = _pictures(db)
+def test_an_image_folded_into_its_twin_hands_it_its_star(tmp_path):
+    db = _brought_in_one_by_one(tmp_path, _ONE_IMAGE_TWICE)
+    first, second = _images(db)
     db.set_generation_favorite(second["prompt_id"], True)
 
     scan(db, _places(tmp_path), grab=_still)
@@ -912,30 +916,30 @@ def test_a_picture_folded_into_its_twin_hands_it_its_star(tmp_path):
     assert db.get_generation(first["prompt_id"])["starred"] == 1
 
 
-def test_what_a_picture_shows_said_by_hand_survives_the_next_look(tmp_path):
+def test_what_an_image_shows_said_by_hand_survives_the_next_look(tmp_path):
     db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_a_picture("turn to the left", "a quiet shore", "22")})
-    [picture] = _pictures(db)
-    db.set_picture_state(picture["prompt_id"], "Standing")
+        "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22")})
+    [image] = _images(db)
+    db.set_image_state(image["prompt_id"], "Standing")
 
     scan(db, _places(tmp_path), grab=_still)
 
-    assert db.get_generation(picture["prompt_id"])["picture_state"] == "Standing"
+    assert db.get_generation(image["prompt_id"])["image_state"] == "Standing"
 
 
-def test_a_picture_folded_into_its_twin_hands_it_what_it_was_said_to_show(tmp_path):
-    db = _brought_in_one_by_one(tmp_path, _ONE_PICTURE_TWICE)
-    first, second = _pictures(db)
-    db.set_picture_state(second["prompt_id"], "Standing")
+def test_an_image_folded_into_its_twin_hands_it_what_it_was_said_to_show(tmp_path):
+    db = _brought_in_one_by_one(tmp_path, _ONE_IMAGE_TWICE)
+    first, second = _images(db)
+    db.set_image_state(second["prompt_id"], "Standing")
 
     scan(db, _places(tmp_path), grab=_still)
 
-    assert db.get_generation(first["prompt_id"])["picture_state"] == "Standing"
+    assert db.get_generation(first["prompt_id"])["image_state"] == "Standing"
 
 
-def test_a_twin_picture_a_video_here_was_made_from_is_kept(tmp_path):
-    db = _brought_in_one_by_one(tmp_path, _ONE_PICTURE_TWICE)
-    _first, second = _pictures(db)
+def test_a_twin_image_a_video_here_was_made_from_is_kept(tmp_path):
+    db = _brought_in_one_by_one(tmp_path, _ONE_IMAGE_TWICE)
+    _first, second = _images(db)
     _made_here_from(db, second)
 
     scan(db, _places(tmp_path), grab=_still)

@@ -1,4 +1,4 @@
-"""The controls a generation's picture wears in its own corners.
+"""The controls a generation wears in the corners of its thumbnail or preview.
 
 A thumbnail in the browser pane and the preview in a config tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
@@ -11,7 +11,7 @@ you happened to open.
 Each mark is the state and the button at once. A filled green star IS the
 bookmark, and pressing it is what takes the bookmark away; the yellow plus IS
 the enhancement the image holds. That is why the badges these replaced are gone
-rather than sitting beside them: a picture can no longer carry a badge saying
+rather than sitting beside them: an item can no longer carry a badge saying
 one thing next to a control doing another, because there is only the one mark.
 
 All three are up whenever there is a generation under them — they are not
@@ -39,8 +39,8 @@ ENHANCE = "enhance"
 # a stray chip beside two matching ones.
 CORNER_SIZE = BUTTON_SIZE
 CORNER_GAP = BUTTON_GAP
-# How far a control sits inside the picture it is laid over. Small: the corners
-# of the picture are what these mark, and a control floated well inside one
+# How far a control sits inside the item it is laid over. Small: the corners
+# of the item are what these mark, and a control floated well inside one
 # reads as sitting ON the image rather than as belonging to its corner.
 CORNER_INSET = GAP_SMALL
 _GLYPH_SIZE = CORNER_SIZE - 8
@@ -63,7 +63,7 @@ _TIPS = {
 
 def enhance_state(row: dict, settings) -> str | None:
     """Which of :mod:`~origenerator.gui.icons`' three readings the enhance corner
-    shows for ``row`` at ``settings`` — or ``None`` for a picture the enhancer
+    shows for ``row`` at ``settings`` — or ``None`` for an item the enhancer
     cannot take at all, which grows no plus.
 
     The middle answer is the one worth having: an image that already holds an
@@ -121,11 +121,11 @@ class _CornerButton(QPushButton):
 
 
 class CornerControls(QObject):
-    """The three controls laid over one host widget's picture.
+    """The three controls laid over the item one host widget shows.
 
-    The host says where the picture currently is (:meth:`place`), because only
-    the host knows — a thumbnail's picture is a fixed rectangle and a preview's
-    moves with every resize and every change of aspect ratio.
+    The host says where the item currently is (:meth:`place`), because only
+    the host knows — the item in a thumbnail is a fixed rectangle and the one in a
+    preview moves with every resize and every change of aspect ratio.
     """
 
     triggered = pyqtSignal(str)  # STAR / TRASH / ENHANCE
@@ -150,7 +150,7 @@ class CornerControls(QObject):
 
     def buttons(self) -> list[QPushButton]:
         """The three, for a host that has to know its own children — telling a
-        cursor that left for a button from one that left the picture entirely."""
+        cursor that left for a button from one that left the item entirely."""
         return [self._star, self._trash, self._enhance_button]
 
     def show_for(self, *, favorite: bool, enhance: str | None):
@@ -167,21 +167,21 @@ class CornerControls(QObject):
 
     def set_enhance(self, enhance: str | None):
         """Follow the enhance corner's reading changing under the item — which a
-        turn of the Enhance panel's settings does to every picture on screen at
+        turn of the Enhance panel's settings does to every item on screen at
         once, without any of them being touched."""
         if enhance == self._enhance:
             return
         self._enhance = enhance
         self._redraw()
 
-    def place(self, picture: QRect):
-        """Put each control in its own corner of ``picture``, in host coordinates.
+    def place(self, area: QRect):
+        """Put each control in its own corner of ``area``, in host coordinates.
 
         Three of the four: top-left belongs to the media-type badge, and to the
         review controls a collection lays along that edge.
         """
-        inner = picture.adjusted(CORNER_INSET, CORNER_INSET,
-                                 -CORNER_INSET, -CORNER_INSET)
+        inner = area.adjusted(CORNER_INSET, CORNER_INSET,
+                              -CORNER_INSET, -CORNER_INSET)
         right = inner.right() - CORNER_SIZE + 1
         lower = inner.bottomLeft().y() - CORNER_SIZE + 1
         self._star.move(right, inner.top())
@@ -217,6 +217,6 @@ class CornerControls(QObject):
         self._enhance_button.setVisible(self._available and self._enhance is not None)
         # The solid plus is a finished statement rather than an offer: this image
         # already holds the very version the panel describes, so pressing would
-        # spend a generation arriving at the picture that is already there. Turn
+        # spend a generation arriving at the image that is already there. Turn
         # any setting and it becomes an offer again.
         self._enhance_button.setEnabled(self._enhance != icons.ENHANCE_HELD)

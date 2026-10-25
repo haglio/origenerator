@@ -207,7 +207,7 @@ def test_backfill_fills_the_size_and_prompts_an_imports_graph_states(tmp_path):
 
 
 
-def test_backfill_gives_an_import_whose_graph_states_no_size_the_size_of_its_picture(tmp_path):
+def test_backfill_gives_an_import_whose_graph_states_no_size_the_size_of_its_image(tmp_path):
     output_dir = tmp_path / "output"
     (output_dir / "image").mkdir(parents=True)
     Image.new("RGB", (720, 1072)).save(output_dir / "image" / "sdxl_t2i_00009_.png")
@@ -330,21 +330,21 @@ def _add_import(db, prompt_id, workflow_name, filename):
     ))
 
 
-def test_backfill_takes_a_video_out_of_a_workflow_that_only_makes_pictures(tmp_path):
+def test_backfill_takes_a_video_out_of_a_workflow_that_only_makes_images(tmp_path):
     db = Database(tmp_path / "test.db")
     _add_import(db, "video", "sdxl_t2i", "renamed_00001.mp4")
-    _add_import(db, "picture", "sdxl_t2i", "renamed_00002.png")
+    _add_import(db, "image", "sdxl_t2i", "renamed_00002.png")
     _add_import(db, "first-frame", "wan22_flf2v_loop", "renamed_00003.png")
-    _add_import(db, "named-like-a-picture", "unknown", "sdxl_t2i_00004_.mp4")
+    _add_import(db, "named-like-a-image", "unknown", "sdxl_t2i_00004_.mp4")
 
     assert backfill_import_workflows(db) == 1
     assert db.get_generation("video")["workflow_name"] == "unknown"
-    assert db.get_generation("picture")["workflow_name"] == "sdxl_t2i"
+    assert db.get_generation("image")["workflow_name"] == "sdxl_t2i"
     assert db.get_generation("first-frame")["workflow_name"] == "wan22_flf2v_loop"
-    assert db.get_generation("named-like-a-picture")["workflow_name"] == "unknown"
+    assert db.get_generation("named-like-a-image")["workflow_name"] == "unknown"
 
 
-_A_FLUX_PICTURES_GRAPH = {
+_A_FLUX_IMAGES_GRAPH = {
     "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "example_flux.gguf"}},
     "2": {"class_type": "DualCLIPLoader", "inputs": {"type": "flux"}},
     "5": {"class_type": "FluxGuidance", "inputs": {"guidance": 3.5}},
@@ -362,27 +362,27 @@ def _import_filed_as_an_enhancement(db, prompt_id, graph):
 def test_an_import_filed_as_an_enhancement_that_a_flux_workflow_made_is_filed_under_flux(tmp_path):
     db = Database(tmp_path / "test.db")
     enhance = WORKFLOW_REGISTRY["image_enhance"]
-    _import_filed_as_an_enhancement(db, "flux-picture", _A_FLUX_PICTURES_GRAPH)
+    _import_filed_as_an_enhancement(db, "flux-image", _A_FLUX_IMAGES_GRAPH)
     _import_filed_as_an_enhancement(db, "enhancement", enhance.build_api_payload(
         dict(enhance.default_params(), input_image="image/scene_one.png [output]")))
 
     assert imp.refile_enhancements_another_workflow_made(db) == 1
 
-    assert db.get_generation("flux-picture")["workflow_name"] == "flux_t2i_upscaled"
+    assert db.get_generation("flux-image")["workflow_name"] == "flux_t2i_upscaled"
     assert db.get_generation("enhancement")["workflow_name"] == "image_enhance"
 
 
 def test_backfill_files_an_import_whose_name_says_nothing_under_the_workflow_its_graph_names(
         tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="flux-picture", workflow_name="unknown",
+    db.insert_generation(prompt_id="flux-image", workflow_name="unknown",
                          workflow_version="imported", params_json="{}",
-                         workflow_json=json.dumps(_A_FLUX_PICTURES_GRAPH), source="imported")
-    db.update_generation("flux-picture", output_files=json.dumps(
+                         workflow_json=json.dumps(_A_FLUX_IMAGES_GRAPH), source="imported")
+    db.update_generation("flux-image", output_files=json.dumps(
         [{"filename": "my_flux_00001_.png", "subfolder": "image", "type": "output"}]))
 
     assert backfill_import_workflows(db) == 1
-    assert db.get_generation("flux-picture")["workflow_name"] == "flux_t2i_upscaled"
+    assert db.get_generation("flux-image")["workflow_name"] == "flux_t2i_upscaled"
 
 
 def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monkeypatch):
@@ -596,7 +596,7 @@ def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
     assert row["workflow_name"] == "wan22_flf2v_loop"
 
 
-def test_a_video_is_never_filed_under_a_workflow_that_only_makes_pictures(tmp_path):
+def test_a_video_is_never_filed_under_a_workflow_that_only_makes_images(tmp_path):
     output_dir = tmp_path / "output" / "video"
     output_dir.mkdir(parents=True)
     _make_png_with_metadata(output_dir / "renamed_00001.png",
@@ -645,7 +645,7 @@ def test_import_standalone_video_without_sidecar_still_imports(tmp_path):
     assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
 
 
-def test_a_finished_videos_soundless_copy_and_picture_are_not_found_as_a_new_item(tmp_path):
+def test_a_finished_videos_soundless_copy_and_image_are_not_found_as_a_new_item(tmp_path):
     output_dir = tmp_path / "output"
     (output_dir / "video").mkdir(parents=True)
     _make_png_with_metadata(output_dir / "video" / "flf2v_loop_00001.png", {"2": {}})
@@ -800,7 +800,7 @@ def test_a_videos_first_frame_filed_apart_from_it_is_one_to_scrap(tmp_path):
     _completed(db, "video", "scene_one_00001.mp4", "video", workflow_json=one)
     _completed(db, "its-first-frame", "scene_one_00001.png", "image", workflow_json=one)
     _completed(db, "another-video", "scene_two_00001.mp4", "video", workflow_json=one)
-    _completed(db, "a-picture-of-its-own", "scene_two_00001.png", "image", workflow_json=another)
+    _completed(db, "a-image-of-its-own", "scene_two_00001.png", "image", workflow_json=another)
 
     scrap = imp.first_frames_filed_apart_from_their_videos(db.list_generations())
 
@@ -1006,8 +1006,8 @@ def test_extract_metadata_identifies_flux_t2i_upscaled_from_graph(tmp_path):
     assert meta["params"]["unet"] == "ultrarealFineTune_v4_fp16.gguf"
 
 
-def test_a_krea2_pictures_own_graph_re_imports_as_krea2(tmp_path):
-    # Dropped back in under a name that says nothing, a Krea 2 picture is named
+def test_a_krea2_images_own_graph_re_imports_as_krea2(tmp_path):
+    # Dropped back in under a name that says nothing, a Krea 2 image is named
     # by its graph alone, and its model is read off the loader so the gallery
     # files it under the checkpoint that made it.
     wf = WORKFLOW_REGISTRY["krea2_t2i"]
@@ -1064,7 +1064,7 @@ def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(t
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
-        params_json="{}", workflow_json=json.dumps(_A_FLUX_PICTURES_GRAPH), source="imported",
+        params_json="{}", workflow_json=json.dumps(_A_FLUX_IMAGES_GRAPH), source="imported",
     )
 
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
@@ -1073,7 +1073,7 @@ def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(t
 
 def test_backfill_fills_the_lora_a_flux_imports_graph_loaded_at_the_strength_it_ran(tmp_path):
     graph = {
-        **_A_FLUX_PICTURES_GRAPH,
+        **_A_FLUX_IMAGES_GRAPH,
         "11": {"class_type": "LoraLoader",
                "inputs": {"model": ["1", 0], "clip": ["2", 0],
                           "lora_name": "example_style.safetensors",
@@ -1168,7 +1168,7 @@ def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
     assert meta["params"]["denoise"] == 1.0
 
 
-def test_a_picture_this_app_made_re_imports_at_the_size_it_was_made(tmp_path):
+def test_an_image_this_app_made_re_imports_at_the_size_it_was_made(tmp_path):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     portrait = dict(wf.default_params(), width=720, height=1280)
     path = tmp_path / "sdxl_t2i_00001_.png"
@@ -1179,7 +1179,7 @@ def test_a_picture_this_app_made_re_imports_at_the_size_it_was_made(tmp_path):
     assert (params["width"], params["height"]) == (720, 1280)
 
 
-def test_a_picture_this_app_made_re_imports_with_what_it_was_told_to_avoid(tmp_path):
+def test_an_image_this_app_made_re_imports_with_what_it_was_told_to_avoid(tmp_path):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     made_with = dict(wf.default_params(), positive_prompt="a lighthouse", negative_prompt="fog")
     path = tmp_path / "sdxl_t2i_00001_.png"
@@ -1208,7 +1208,7 @@ def test_the_prompts_wired_to_the_sampler_beat_a_title_left_on_an_unused_one(tmp
 
 
 
-def test_an_import_whose_graph_states_no_size_takes_the_size_of_its_own_picture(tmp_path):
+def test_an_import_whose_graph_states_no_size_takes_the_size_of_its_own_image(tmp_path):
     img2img = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "model.safetensors"}},
         "2": {"class_type": "LoadImage", "inputs": {"image": "start.png"}},

@@ -24,7 +24,7 @@ from origenerator.generation_state import GenerationSource, in_sight, made_here,
 class _ImageConfig:
     """How the gallery keys and names an image used as an i2v's start frame."""
 
-    prompt_id: str  # which picture it is — what the source-image tier groups on
+    prompt_id: str  # which image it is — what the source-image tier groups on
     signature: str  # the image's settings signature — what names it below
 
 
@@ -92,11 +92,11 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
     """Map each image's output filename to the generation that produced it.
 
     Keyed by output basename (lowercased, matching how an ``input_image`` value
-    resolves), so an i2v row can look up which picture its start frame is, plus
-    that picture's settings signature and folder name, in O(1). Built once per
+    resolves), so an i2v row can look up which image its start frame is, plus
+    that image's settings signature and folder name, in O(1). Built once per
     tree. Images that produced no file contribute nothing.
 
-    Every file an image row lists points at the same entry, so a picture answers
+    Every file an image row lists points at the same entry, so an image answers
     as itself under any of its names — which is what keeps a video made from an
     enhanced frame with one made from the frame before it was enhanced.
     """
@@ -122,5 +122,5 @@ def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[di
             and was_made_from(v, image_row)]
 
 
-def was_made_from(video: dict, picture: dict) -> bool:
-    return made_here(video) or in_sight(picture)
+def was_made_from(video: dict, image: dict) -> bool:
+    return made_here(video) or in_sight(image)

@@ -60,7 +60,7 @@ def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
     card = InFlightCard(_item(status="running", frame=_png_bytes()))
     qtbot.addWidget(card)
 
-    assert not card._image.pixmap().isNull()   # the picture is still there
+    assert not card._image.pixmap().isNull()   # the thumbnail is still there
     assert card._scrim.text() == "Generating…"  # and the stage is on top of it
     assert card._scrim.geometry().intersects(card._image.geometry())
 
@@ -103,7 +103,7 @@ def test_card_names_another_apps_hold_instead_of_a_bare_queued(qtbot):
     assert card._scrim.text() == "Waiting on 2 jobs from another app"
 
 
-def test_a_video_waiting_out_the_minute_after_a_picture_counts_down_to_its_start(qtbot):
+def test_a_video_waiting_out_the_minute_after_an_image_counts_down_to_its_start(qtbot):
     # The half-second keeps the count a clear half-second off a rollover.
     card = InFlightCard(_item(status="queued", starts_at=time.monotonic() + 42.5))
     qtbot.addWidget(card)
@@ -165,7 +165,7 @@ def test_the_clock_advances_between_polls(qtbot):
 
 
 def test_the_bar_sits_along_the_foot_of_the_frame(qtbot):
-    # Overlaid rather than laid out beneath, so the card keeps the picture the
+    # Overlaid rather than laid out beneath, so the card keeps the thumbnail the
     # full height a finished tile's has.
     card = InFlightCard(_item(status="running"))
     qtbot.addWidget(card)
@@ -196,27 +196,27 @@ def _source_file(tmp_path):
 
 def test_a_queued_run_stands_what_it_came_from_behind_the_wait(qtbot, tmp_path):
     # A line of queued runs is otherwise a line of identical blank plates. What
-    # each one was asked of is the only picture it has until it draws its own.
-    card = InFlightCard(_item(status="queued", source_picture=_source_file(tmp_path)))
+    # each one was asked of is the only image it has until it draws its own.
+    card = InFlightCard(_item(status="queued", source_file=_source_file(tmp_path)))
     qtbot.addWidget(card)
 
     assert not card._image.pixmap().isNull()
 
 
 def test_a_run_that_came_from_nothing_keeps_its_plain_plate(qtbot):
-    card = InFlightCard(_item(status="queued", source_picture=None))
+    card = InFlightCard(_item(status="queued", source_file=None))
     qtbot.addWidget(card)
 
     assert card._image.pixmap().isNull()
 
 
 def test_the_run_s_own_frame_replaces_what_it_came_from(qtbot, tmp_path):
-    backdrop = InFlightCard(_item(status="queued", source_picture=_source_file(tmp_path)))
+    backdrop = InFlightCard(_item(status="queued", source_file=_source_file(tmp_path)))
     qtbot.addWidget(backdrop)
     standing_in = backdrop._image.pixmap().toImage()
 
     backdrop.update_item(_item(status="running", frame=_png_bytes(),
-                               source_picture=_source_file(tmp_path)))
+                               source_file=_source_file(tmp_path)))
 
     assert backdrop._image.pixmap().toImage() != standing_in
 

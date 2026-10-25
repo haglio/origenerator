@@ -1,4 +1,4 @@
-"""Which animations a picture can be asked for, given what it already shows: a
+"""Which animations an image can be asked for, given what it already shows: a
 lane, an act and a starting state, from the content overlay."""
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def acts(lane: str = VIDEO, *, content: dict | None = None) -> tuple[str, ...]:
 
 def acts_for(state: str, lane: str = VIDEO, *, content: dict | None = None
              ) -> tuple[str, ...]:
-    """The acts ``lane`` can animate a picture already in ``state`` as, in the
+    """The acts ``lane`` can animate an image already in ``state`` as, in the
     table's own order, and empty for a state the table says nothing about."""
     return tuple(act for act, states in _table(content).get(lane, {}).items()
                  if state in states)

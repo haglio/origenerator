@@ -1,6 +1,6 @@
 """Opening each of the two windows this app has no button for.
 
-Everything else about them is tested a piece at a time -- the line of pictures,
+Everything else about them is tested a piece at a time -- the line of images,
 the walk, the two windows themselves -- and none of that runs the launch. The
 launcher's own test asks what the script starts, and the smoke test imports what
 the app names; between them sits the thing a user actually meets, which is
@@ -26,7 +26,7 @@ from origenerator import (
     check_animations,
     config,
     own_window,
-    sort_pictures,
+    sort_images,
 )
 from origenerator.gui import stylesheet
 from origenerator.gui.animation_check_window import (
@@ -54,11 +54,11 @@ def a_library_of_its_own(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_sorting_says_so_when_every_picture_already_has_an_action(
+def test_sorting_says_so_when_every_image_already_has_an_action(
         qapp, a_library_of_its_own, said):
-    assert sort_pictures.main() == 0
+    assert sort_images.main() == 0
 
-    assert said == ["Every picture already says what it shows."]
+    assert said == ["Every image already says what it shows."]
 
 
 def test_checking_animations_opens_on_the_first_of_them(
@@ -97,7 +97,7 @@ def test_each_window_names_itself_to_windows_under_the_apps_own_name():
     that launched it, and wears that icon; one that claims the app's own name
     would answer the pinned Origenerator button in the app's place."""
     assert own_window.taskbar_identity(
-        "Sorting pictures", None) == "Origenerator.SortingPictures"
+        "Sorting images", None) == "Origenerator.SortingImages"
     assert own_window.taskbar_identity(
         "Checking animations", None) == "Origenerator.CheckingAnimations"
 
@@ -107,14 +107,14 @@ def test_a_window_out_of_a_branch_is_shown_as_a_preview():
     preview in the family shows -- the production app's windows keep both."""
     preview = Preview(feature="a branch")
 
-    assert own_window.taskbar_identity("Sorting pictures", preview).endswith(
+    assert own_window.taskbar_identity("Sorting images", preview).endswith(
         ".Preview")
 
 
 def test_a_window_out_of_a_branch_wears_the_preview_ink(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "STATE_DIR", tmp_path)
 
-    told = own_window.taskbar_app("Sorting pictures", "sort_pictures.vbs",
+    told = own_window.taskbar_app("Sorting images", "sort_images.vbs",
                                   Preview(feature="a branch"))
 
     assert told.icon == tmp_path / "preview_icon.ico"
@@ -122,7 +122,7 @@ def test_a_window_out_of_a_branch_wears_the_preview_ink(tmp_path, monkeypatch):
 
 
 def test_the_production_apps_own_windows_wear_its_own_icon():
-    told = own_window.taskbar_app("Sorting pictures", "sort_pictures.vbs", None)
+    told = own_window.taskbar_app("Sorting images", "sort_images.vbs", None)
 
     assert told.icon.name == "icon.ico"
 
@@ -137,7 +137,7 @@ def test_what_the_window_is_dressed_as_is_what_this_copy_is(
     monkeypatch.setattr(stylesheet, "dress_application",
                         lambda app, preview: dressed.append(preview))
 
-    assert sort_pictures.main() == 0
+    assert sort_images.main() == 0
 
     assert dressed == [Preview(feature="a branch")]
 
@@ -147,19 +147,19 @@ def test_opening_the_sorting_window_claims_that_name(
     claimed = []
     monkeypatch.setattr(own_window, "_claim_the_taskbar", claimed.append)
 
-    assert sort_pictures.main() == 0
+    assert sort_images.main() == 0
 
-    assert claimed == ["Origenerator.SortingPictures"]
+    assert claimed == ["Origenerator.SortingImages"]
 
 
 def test_the_taskbar_is_told_the_apps_icon_and_how_to_reopen_the_window():
     """Told neither, the button wears the icon of the python that started the
     window whenever the window is too busy to answer for itself."""
-    told = own_window.taskbar_app("Sorting pictures", "sort_pictures.vbs", None)
+    told = own_window.taskbar_app("Sorting images", "sort_images.vbs", None)
 
-    assert told.name == "Origenerator — Sorting pictures"
+    assert told.name == "Origenerator — Sorting images"
     assert told.icon.name == "icon.ico"
-    assert told.relaunch.endswith('sort_pictures.vbs"')
+    assert told.relaunch.endswith('sort_images.vbs"')
 
 
 def test_opening_the_sorting_window_dresses_its_taskbar_button(
@@ -169,6 +169,6 @@ def test_opening_the_sorting_window_dresses_its_taskbar_button(
         own_window, "_dress_the_taskbar_button",
         lambda app, title, launcher, preview: dressed.append((title, launcher)))
 
-    assert sort_pictures.main() == 0
+    assert sort_images.main() == 0
 
-    assert dressed == [("Sorting pictures", "sort_pictures.vbs")]
+    assert dressed == [("Sorting images", "sort_images.vbs")]

@@ -855,7 +855,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
 
 
 def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
-    """The room shows this window's picture there, and Qt draws nothing for a
+    """The room shows this window's frame there, and Qt draws nothing for a
     window Windows has unmapped: parked, it would hand over an empty frame."""
     window = MagicMock()
 
@@ -1120,12 +1120,12 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
                          workflow_version="imported", params_json="{}",
                          workflow_json="{}", source="imported")
     finished = datetime(2026, 6, 29, 12, 20, 53).timestamp()
-    picture = config.OUTPUT_PLACES.folder("image") / "sdxl_t2i_00001_.png"
-    picture.parent.mkdir(parents=True, exist_ok=True)
-    picture.write_bytes(b"")
+    image = config.OUTPUT_PLACES.folder("image") / "sdxl_t2i_00001_.png"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"")
     db.update_generation(
         "p1", status="completed",
-        output_files=json.dumps([{"filename": picture.name, "subfolder": "image"}]),
+        output_files=json.dumps([{"filename": image.name, "subfolder": "image"}]),
         completed_at=datetime.fromtimestamp(finished, tz=UTC).isoformat())
     (config.COMFYUI_LOG_DIR / "comfyui.log").write_text(
         "[2026-06-29 12:20:53.244] Prompt executed in 15.26 seconds\n",
@@ -1200,7 +1200,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "backfill_import_params"),
     ("origenerator.importer", "backfill_imported_video_seeds"),
     ("origenerator.gallery", "fold_completed_enhancements"),
-    ("origenerator.gallery", "enhancements_of_pictures_gone"),
+    ("origenerator.gallery", "enhancements_of_images_gone"),
     ("origenerator.gallery", "disown_foreign_runs"),
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
@@ -1348,7 +1348,7 @@ def test_a_backfilled_video_that_landed_while_the_app_was_closed_replaces_its_ol
     assert not (output / "video" / "first_00001.mp4").exists()
 
 
-def test_an_enhancement_of_a_deleted_picture_goes_to_the_trash_at_startup(tmp_path, monkeypatch):
+def test_an_enhancement_of_a_deleted_image_goes_to_the_trash_at_startup(tmp_path, monkeypatch):
     output = tmp_path / "output"
     (output / "image").mkdir(parents=True)
     (output / "image" / "image_enhance_00001_.png").write_bytes(b"enhanced")
@@ -1422,7 +1422,7 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
 
 def test_the_launch_files_what_a_finished_run_left_and_leaves_a_run_still_going(tmp_path):
     library_root = tmp_path / "library"
-    places = OutputPlaces(comfyui=tmp_path / "saves", pictures=library_root / "pictures",
+    places = OutputPlaces(comfyui=tmp_path / "saves", images=library_root / "images",
                           videos=library_root / "videos", scripts=library_root / "scripts",
                           audio=library_root / "sounds")
     db = Database(tmp_path / "test.db")
@@ -1438,7 +1438,7 @@ def test_the_launch_files_what_a_finished_run_left_and_leaves_a_run_still_going(
 
     assert _file_what_comfyui_left(library) == 1
 
-    assert (places.pictures / "gone_t2i_00001_.png").is_file()
+    assert (places.images / "gone_t2i_00001_.png").is_file()
     assert (places.run("going") / "image" / "going_t2i_00001_.png").is_file()
 
 
@@ -1558,7 +1558,7 @@ class TestAnOverlayShortOfAKey:
 
 class TestACopyThatWouldStartALibraryOfItsOwn:
     """A checkout that is neither the production one nor started as a preview
-    would open a database of its own beside the library's pictures and Trash."""
+    would open a database of its own beside the library's thumbnails and Trash."""
 
     def test_it_stops_before_it_opens_a_database(self, qapp, monkeypatch):
         monkeypatch.setattr(config, "STARTS_A_LIBRARY_OF_ITS_OWN", True)

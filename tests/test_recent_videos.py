@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import QProxyStyle, QStyle, QStyleOptionViewItem
 
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
-from tests.pictured_rows import looping_clip, painted_row, square
-from tests.pictured_rows import where_the_picture_is as _where_the_picture_is
+from tests.thumbnail_rows import looping_clip, painted_row, square
+from tests.thumbnail_rows import where_the_thumbnail_is as _where_the_thumbnail_is
 
 
 def _dropdown(qtbot, videos, looping_previews=None):
@@ -22,25 +22,25 @@ def test_the_closed_dropdown_reads_recent(qtbot):
     assert dropdown.display_text(1000) == "Recent"
 
 
-def test_each_video_is_a_row_wearing_its_picture_drained_of_color(qtbot, tmp_path):
+def test_each_video_is_a_row_wearing_its_thumbnail_drained_of_color(qtbot, tmp_path):
     dropdown = _dropdown(qtbot, [RecentVideo("vid1", square(tmp_path, "red"))])
     dropdown.showPopup()
 
     row = painted_row(dropdown, 0)
 
-    middle = row.pixelColor(_where_the_picture_is(row).center())
+    middle = row.pixelColor(_where_the_thumbnail_is(row).center())
     assert dropdown.count() == 1
     assert middle.saturation() == 0 and middle.lightness() > 0
     dropdown.hidePopup()
 
 
-def test_a_video_with_no_picture_shows_a_blank_square(qtbot):
+def test_a_video_with_no_thumbnail_shows_a_blank_square(qtbot):
     dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)])
     dropdown.showPopup()
 
     row = painted_row(dropdown, 0)
 
-    assert _where_the_picture_is(row).size() == THUMBNAIL_BOX
+    assert _where_the_thumbnail_is(row).size() == THUMBNAIL_BOX
     dropdown.hidePopup()
 
 
@@ -90,7 +90,7 @@ class _LitOverWhatItIsHanded(QProxyStyle):
         super().drawControl(element, option, painter, widget)
 
 
-def test_the_row_under_the_mouse_is_lit_once_all_around_its_picture(qtbot, tmp_path):
+def test_the_row_under_the_mouse_is_lit_once_all_around_its_thumbnail(qtbot, tmp_path):
     dropdown = _dropdown(qtbot, [RecentVideo("vid1", square(tmp_path, "red"))])
     style = _LitOverWhatItIsHanded("fusion")
     style.setParent(dropdown)  # gone with the view it styles, never before it
@@ -101,39 +101,39 @@ def test_the_row_under_the_mouse_is_lit_once_all_around_its_picture(qtbot, tmp_p
     lit = painted_row(dropdown, 0, under_the_mouse=True)
 
     middle = plain.height() // 2
-    picture = [x for x in range(plain.width()) if QColor(plain.pixel(x, middle)).saturation() == 0
-               and QColor(plain.pixel(x, middle)).lightness() > 60]
-    top = [y for y in range(plain.height()) if plain.pixel(picture[0], y) == plain.pixel(
-        picture[0], middle)]
-    around = ((picture[0] - 1, middle), (picture[-1] + 1, middle), (picture[0], top[0] - 1),
-              (picture[0], top[-1] + 1), (plain.width() - 4, middle))
+    thumbnail = [x for x in range(plain.width()) if QColor(plain.pixel(x, middle)).saturation() == 0
+                 and QColor(plain.pixel(x, middle)).lightness() > 60]
+    top = [y for y in range(plain.height()) if plain.pixel(thumbnail[0], y) == plain.pixel(
+        thumbnail[0], middle)]
+    around = ((thumbnail[0] - 1, middle), (thumbnail[-1] + 1, middle), (thumbnail[0], top[0] - 1),
+              (thumbnail[0], top[-1] + 1), (plain.width() - 4, middle))
     assert len({lit.pixel(x, y) for x, y in around}) == 1
     assert all(lit.pixel(x, y) != plain.pixel(x, y) for x, y in around)
     dropdown.hidePopup()
 
 
-def _picture(tmp_path, width, height) -> str:
+def _thumbnail(tmp_path, width, height) -> str:
     path = tmp_path / f"made-{width}x{height}.png"
-    picture = QImage(width, height, QImage.Format.Format_RGB32)
-    picture.fill(QColor("red"))
-    picture.save(str(path))
+    thumbnail = QImage(width, height, QImage.Format.Format_RGB32)
+    thumbnail.fill(QColor("red"))
+    thumbnail.save(str(path))
     return str(path)
 
 
-def test_a_row_draws_its_picture_the_size_the_drop_box_does(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", _picture(tmp_path, 300, 150))])
+def test_a_row_draws_its_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", _thumbnail(tmp_path, 300, 150))])
     dropdown.showPopup()
 
     row = painted_row(dropdown, 0)
 
-    assert _where_the_picture_is(row).size() == QSize(300, 150).scaled(
+    assert _where_the_thumbnail_is(row).size() == QSize(300, 150).scaled(
         THUMBNAIL_BOX, Qt.AspectRatioMode.KeepAspectRatio)
     dropdown.hidePopup()
 
 
-def test_a_tall_pictures_row_is_taller_than_a_wide_pictures_row(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("tall", _picture(tmp_path, 150, 300)),
-                                 RecentVideo("wide", _picture(tmp_path, 300, 150))])
+def test_a_tall_thumbnails_row_is_taller_than_a_wide_thumbnails_row(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("tall", _thumbnail(tmp_path, 150, 300)),
+                                 RecentVideo("wide", _thumbnail(tmp_path, 300, 150))])
     dropdown.showPopup()
 
     tall, wide = (dropdown.view().visualRect(dropdown.model().index(row, 0)).height()
@@ -143,21 +143,21 @@ def test_a_tall_pictures_row_is_taller_than_a_wide_pictures_row(qtbot, tmp_path)
     dropdown.hidePopup()
 
 
-def test_a_rows_picture_sits_in_the_middle_of_the_row(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", _picture(tmp_path, 150, 300))])
+def test_a_rows_thumbnail_sits_in_the_middle_of_the_row(qtbot, tmp_path):
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", _thumbnail(tmp_path, 150, 300))])
     dropdown.showPopup()
 
     row = painted_row(dropdown, 0)
 
-    assert abs(_where_the_picture_is(row).center().x() - row.width() // 2) <= 1
+    assert abs(_where_the_thumbnail_is(row).center().x() - row.width() // 2) <= 1
     dropdown.hidePopup()
 
 
-def test_a_videos_picture_plays_in_its_row(qtbot, tmp_path):
+def test_a_videos_thumbnail_plays_in_its_row(qtbot, tmp_path):
     dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_clip(tmp_path)})
     dropdown.showPopup()
     first = painted_row(dropdown, 0)
-    middle = _where_the_picture_is(first).center()
+    middle = _where_the_thumbnail_is(first).center()
 
     qtbot.waitUntil(lambda: painted_row(dropdown, 0).pixel(middle) != first.pixel(middle),
                     timeout=3000)

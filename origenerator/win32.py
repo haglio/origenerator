@@ -198,7 +198,7 @@ def _cloak(hwnd: int, hidden: bool) -> None:
 
 def keep_out_of_sight(hwnd: int) -> None:
     """Off the monitors, still drawn: DWM composites a cloaked window, so one
-    handed to a room in the headset still has a picture to publish."""
+    handed to a room in the headset still has a frame to publish."""
     if window_exists(hwnd):
         _cloak(hwnd, True)
 

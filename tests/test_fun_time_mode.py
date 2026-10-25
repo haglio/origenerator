@@ -82,7 +82,7 @@ def test_a_session_hands_over_each_funestras_own_channel():
 
 def test_a_session_in_a_headset_names_where_to_hand_its_window_over():
     """A room in the headset has no monitor to put this window on, so the
-    session asks for its picture instead: the file to write it into, and the
+    session asks for its frame instead: the file to write it into, and the
     file its pointer's presses come back through."""
     args = parse_app_args(hosted_launch(headset=True, **{
         "--frames-file": "st/origenerator_frame.bin",
@@ -95,7 +95,7 @@ def test_a_session_in_a_headset_names_where_to_hand_its_window_over():
     assert session.in_a_headset is True
 
 
-def test_a_session_on_the_monitors_asks_for_no_picture():
+def test_a_session_on_the_monitors_asks_for_no_frame():
     """The window itself is what it shows there, so nothing is handed over and
     this app must not spend a frame drawing one."""
     args = parse_app_args(hosted_launch())

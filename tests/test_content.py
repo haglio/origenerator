@@ -210,7 +210,7 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         "acts", "pinned_kino_settings", "search_synonyms",
         "pinned_genau_settings", "detail_fix_parts", "genau_flick_prompts",
         "model_recommendations", "lora_recommendations",
-        "picture_states", "picture_state_grid", "animation_paths",
+        "image_states", "image_state_grid", "animation_paths",
     }
 
 
@@ -243,4 +243,20 @@ def test_an_overlay_written_before_three_keys_were_renamed_reads_under_the_new_o
     assert loaded["acts"] == ["alpha"]
     assert loaded["pinned_kino_settings"] == {"alpha": {"workflow": "wan22_i2v"}}
     assert loaded["pinned_genau_settings"] == {}
+    assert content.missing_overlay_keys(local, example) == ()
+
+
+def test_an_overlay_written_before_the_image_states_were_renamed_reads_under_the_new_names(
+        tmp_path):
+    example = tmp_path / "content.example.json"
+    example.write_text(json.dumps({"image_states": [], "image_state_grid": []}), encoding="utf-8")
+    local = tmp_path / "content.local.json"
+    local.write_text(json.dumps({"picture_states": ["state one", "state two"],
+                                 "picture_state_grid": [["state two", "state one"]]}),
+                     encoding="utf-8")
+
+    loaded = content.load_content(local, example)
+
+    assert loaded["image_states"] == ["state one", "state two"]
+    assert loaded["image_state_grid"] == [["state two", "state one"]]
     assert content.missing_overlay_keys(local, example) == ()

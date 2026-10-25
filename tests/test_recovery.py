@@ -139,24 +139,24 @@ def test_restore_puts_the_row_and_its_files_back(tmp_path):
     assert db.get_deletion("p1") is None
 
 
-def test_a_restored_item_whose_file_name_a_newer_picture_took_lists_its_new_name(tmp_path):
+def test_a_restored_item_whose_file_name_a_newer_image_took_lists_its_new_name(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("p1", output_files=json.dumps(
         [{"filename": "alpha_t2i_00005_.png", "subfolder": "image"}]))
     row = db.get_generation("p1")
-    picture = _file(tmp_path / "out" / "alpha_t2i_00005_.png", b"deleted")
-    batch = Trash(tmp_path / "trash").store([picture])
+    image = _file(tmp_path / "out" / "alpha_t2i_00005_.png", b"deleted")
+    batch = Trash(tmp_path / "trash").store([image])
     db.delete_generation("p1")
     db.record_deletion("p1", row, batch.record())
-    _file(picture, b"newer")
+    _file(image, b"newer")
 
     recovery.restore(db, db.get_deletion("p1"))
 
     assert json.loads(db.get_generation("p1")["output_files"]) == [
         {"filename": "alpha_t2i_00006_.png", "subfolder": "image"}]
-    assert picture.read_bytes() == b"newer"
+    assert image.read_bytes() == b"newer"
 
 
 def test_purge_takes_the_held_files_and_forgets_the_record(tmp_path):

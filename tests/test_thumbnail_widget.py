@@ -71,7 +71,7 @@ def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
 
 
 class _RecordingDrag:
-    """Stands in for QDrag, remembering the picture carried under the cursor."""
+    """Stands in for QDrag, remembering the thumbnail carried under the cursor."""
 
     last = None
 
@@ -95,7 +95,7 @@ def _drag_out(qtbot, tw):
     qtbot.mouseMove(tw, QPoint(120, 120))
 
 
-def test_a_dragged_still_trails_its_picture(qtbot, tmp_path, monkeypatch):
+def test_a_dragged_still_trails_its_thumbnail(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
     _RecordingDrag.last = None
     still = tmp_path / "i1.jpg"
@@ -112,7 +112,7 @@ def test_a_dragged_still_trails_its_picture(qtbot, tmp_path, monkeypatch):
 def test_a_dragged_video_trails_the_frame_it_is_playing(qtbot, tmp_path, monkeypatch):
     # A video tile shows a looping WebP, so its label has no pixmap of its own;
     # asked only for that, the drag used to trail nothing at all while an image
-    # dragged from the tile beside it trailed a picture.
+    # dragged from the tile beside it trailed a thumbnail.
     monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
     _RecordingDrag.last = None
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
@@ -126,7 +126,7 @@ def test_a_dragged_video_trails_the_frame_it_is_playing(qtbot, tmp_path, monkeyp
 
 
 def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
-    # No picture is the one case with nothing to show; the drag still goes.
+    # No thumbnail is the one case with nothing to show; the drag still goes.
     monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
     _RecordingDrag.last = None
     tw = ThumbnailWidget("p1", None, "label")  # "No preview"
@@ -272,7 +272,7 @@ def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):
 
 def test_an_enhanced_tile_keeps_its_plus_up_and_says_it_is_spent(qtbot):
     # Holding the very version the panel describes is a finished statement, not
-    # an offer: pressing would spend a generation arriving at the picture already
+    # an offer: pressing would spend a generation arriving at the image already
     # there, so the plus reports and does not act.
     tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_HELD)
     qtbot.addWidget(tw)
@@ -312,7 +312,7 @@ def test_the_corners_ignore_the_cursor_crossing_the_tile(qtbot):
 
 
 def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
-    # A setting turned on the Enhance panel changes what every picture on screen
+    # A setting turned on the Enhance panel changes what every item on screen
     # would get from a press, and none of those tiles were touched.
     tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_HELD)
     qtbot.addWidget(tw)
@@ -338,19 +338,19 @@ def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
                      ("p1", corner_controls.ENHANCE)]
 
 
-def test_the_corners_sit_one_to_a_corner_of_the_picture(qtbot):
+def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
     # Star top-right, trash lower-left, plus lower-right — and the media badge
     # keeps the top-left it has always had, so all four can coexist.
     tw = ThumbnailWidget("p1", None, "label", favorite=True,
                          enhance=icons.ENHANCE_HELD, media_type=MediaType.IMAGE)
     qtbot.addWidget(tw)
     star, trash, plus = (b.geometry() for b in _corners(tw))
-    picture = tw._image_label.geometry()
+    area = tw._image_label.geometry()
     for corner in (star, trash, plus):
-        assert picture.contains(corner)
-    assert star.left() > picture.center().x() and star.top() < picture.center().y()
-    assert trash.left() < picture.center().x() and trash.top() > picture.center().y()
-    assert plus.left() > picture.center().x() and plus.top() > picture.center().y()
+        assert area.contains(corner)
+    assert star.left() > area.center().x() and star.top() < area.center().y()
+    assert trash.left() < area.center().x() and trash.top() > area.center().y()
+    assert plus.left() > area.center().x() and plus.top() > area.center().y()
     (badge,) = tw.findChildren(MediaBadge)
     assert badge.x() < tw.width() // 2 and badge.y() < tw.height() // 2
     for corner in (star, trash, plus):
@@ -419,11 +419,11 @@ def test_selecting_fills_the_whole_tile_with_the_familys_blue(qtbot):
     assert img.pixelColor(8, 182) == BLUE    # under the caption text
 
 
-def test_a_picked_tiles_picture_wears_a_white_frame(qtbot):
+def test_a_picked_tiles_thumbnail_wears_a_white_frame(qtbot):
     tile, img = _picked_tile_drawn(qtbot)
-    picture = tile._image_label.geometry()
+    area = tile._image_label.geometry()
 
-    assert img.pixelColor(picture.left(), picture.center().y()) == TEXT_PRIMARY
+    assert img.pixelColor(area.left(), area.center().y()) == TEXT_PRIMARY
 
 
 def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
@@ -477,9 +477,9 @@ def test_a_resting_tile_wears_neither_overlay(qtbot):
     assert tw._enhancing_bar.isHidden()
 
 
-def test_an_enhancing_tile_says_so_over_the_picture_and_on_a_bar(qtbot):
+def test_an_enhancing_tile_says_so_over_the_thumbnail_and_on_a_bar(qtbot):
     # The same pair an in-flight card wears: the stage on a dimming scrim, and
-    # how far along the run is on a bar at the picture's foot. The tile used to
+    # how far along the run is on a bar at the thumbnail's foot. The tile used to
     # get the scrim alone, so the one thing it couldn't say was how long.
     tw = ThumbnailWidget("p1", None, "label", enhancing=_run(
         progress=(10, 20), started_at=time.time() - 90.5, typical_seconds=725.0))
@@ -513,15 +513,15 @@ def test_an_enhance_still_queued_draws_no_band(qtbot):
     assert tw._enhancing_bar.pass_progress() is None
 
 
-def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
+def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
     # Overlaid rather than laid out beneath, so an enhancing tile is the same
     # size and shape as a resting one and still flows with them.
     tw = ThumbnailWidget("p1", None, "label", enhancing=_run())
     qtbot.addWidget(tw)
-    picture, bar = tw._image_label.geometry(), tw._enhancing_bar.geometry()
+    area, bar = tw._image_label.geometry(), tw._enhancing_bar.geometry()
 
-    assert picture.contains(bar)
-    assert bar.top() > picture.center().y()
+    assert area.contains(bar)
+    assert bar.top() > area.center().y()
     assert tw.size() == ThumbnailWidget("p2", None, "label").size()
 
 
@@ -585,7 +585,7 @@ def test_the_clock_advances_between_polls(qtbot):
     assert tw._enhancing_bar.caption() == "~1:31 left"
 
 
-def test_a_streamed_frame_paints_the_picture_under_the_overlays(qtbot):
+def test_a_streamed_frame_paints_the_thumbnail_under_the_overlays(qtbot):
     tw = ThumbnailWidget("p1", None, "label", enhancing=_run())
     qtbot.addWidget(tw)
 

@@ -22,9 +22,9 @@ def _video(pid, act, created, **params):
         "prompt_id": pid,
         "workflow_name": "wan22_i2v",
         "act": act,
-        "positive_prompt": f"a picture of something, {pid}",
+        "positive_prompt": f"an image of something, {pid}",
         "created_at": created,
-        "params_json": json.dumps({"positive_prompt": f"a picture of something, {pid}",
+        "params_json": json.dumps({"positive_prompt": f"an image of something, {pid}",
                                    **params}),
     }
 
@@ -278,8 +278,8 @@ def test_a_generation_shows_the_act_picked_for_it_in_combine():
     assert act_settings.act_of(row) == "beta"
 
 
-def test_a_picture_shows_the_action_it_was_sorted_as():
-    assert act_settings.act_of({"picture_state": "state two"}) == "state two"
+def test_an_image_shows_the_action_it_was_sorted_as():
+    assert act_settings.act_of({"image_state": "state two"}) == "state two"
 
 
 def test_a_generation_nobody_has_said_an_act_for_shows_none():

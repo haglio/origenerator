@@ -14,24 +14,24 @@ REVEAL_MARGIN = 40
 class PanePlace:
     picks: Picks
     offset: int
-    picture: str | None = None
-    picture_at: int = 0
+    item: str | None = None
+    item_at: int = 0
 
 
 def place_of(scroll, selection: Picking, tiles: dict) -> PanePlace:
     offset = scroll.verticalScrollBar().value()
-    picture = _picked_in_view(scroll, selection, tiles) if offset else None
-    return PanePlace(selection.picks(), offset, picture,
-                     0 if picture is None else _below_the_top(scroll, tiles[picture]))
+    item = _picked_in_view(scroll, selection, tiles) if offset else None
+    return PanePlace(selection.picks(), offset, item,
+                     0 if item is None else _below_the_top(scroll, tiles[item]))
 
 
 def stand_at(scroll, tiles: dict, place: PanePlace, drawn) -> None:
     if scroll.widget() is not drawn:
         return
-    tile = tiles.get(place.picture) if place.picture else None
+    tile = tiles.get(place.item) if place.item else None
     scroll.verticalScrollBar().setValue(
         place.offset if tile is None
-        else tile.mapTo(drawn, QPoint(0, 0)).y() - place.picture_at)
+        else tile.mapTo(drawn, QPoint(0, 0)).y() - place.item_at)
 
 
 def _picked_in_view(scroll, selection: Picking, tiles: dict) -> str | None:

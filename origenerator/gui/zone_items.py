@@ -1,4 +1,4 @@
-"""What a drop zone holds: what a drag lends it, its pictures and name, a pasted name's item."""
+"""What a drop zone holds: what a drag lends it, its thumbnails and name, a pasted name's item."""
 from __future__ import annotations
 
 import hashlib
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class FilesOnly:
-    """A zone with no gallery around it: files alone, a picture shown as itself."""
+    """A zone with no gallery around it: files alone, an image shown as itself."""
 
     def __init__(self, *, places: OutputPlaces, input_dir: Path):
         self._places = places
@@ -45,7 +45,7 @@ class FilesOnly:
 
 
 class ZoneItems(FilesOnly):
-    """The gallery's reading: a generation's pictures and name, or a still for an outside video."""
+    """The gallery's reading: a generation's thumbnails and name, or a still for an outside video."""
 
     def __init__(self, db, names, rows_of: Callable[[MediaType], list[dict]], *,
                  places: OutputPlaces, input_dir: Path, thumb_dir: Path,

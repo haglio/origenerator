@@ -28,7 +28,7 @@ from origenerator.workflows.derived_size import resolve_input_image_path
 logger = logging.getLogger(__name__)
 
 # The kinds whose start frame is what the run is *of*, rather than one input
-# among several: a video animating a picture, and an enhancement of one.
+# among several: a video animating an image, and an enhancement of one.
 SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
 TRAINING_KEY = "fix training"
 
@@ -72,7 +72,7 @@ class InFlightItems:
         screen.
 
         The strip's rows carry more than the collection's cards do — a price, a kind, a
-        picture of what the job is made from or of the folder it will land in —
+        thumbnail of what the job is made from or of the folder it will land in —
         and all of it is read off the row and the tree already in hand, so a poll
         costs one listing whatever the queue is showing. ``rows``/``requests``
         take a listing the caller already read (the poll reads its own on the
@@ -160,7 +160,7 @@ class InFlightItems:
                 job_kind=kind,
                 requested=pid in requested,
                 # Only where the start frame is what the run is *of*: a video
-                # animating a picture, and an enhancement of one. An image
+                # animating an image, and an enhancement of one. An image
                 # workflow that happens to take an input (the pose transfer's
                 # structure image) is still an image being made, and its row is
                 # placed the way every other image's is — by the folder it joins.
@@ -168,7 +168,7 @@ class InFlightItems:
                               if kind in SOURCE_FRAME_KINDS else None),
                 # What to stand under the wait: the image this run was
                 # requested of, else the frame it animates or enhances.
-                source_picture=self._source_picture(
+                source_file=self._source_file(
                     requested.get(pid), row_by_id, params, kind),
                 # What the Combine panel was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
@@ -176,9 +176,9 @@ class InFlightItems:
                 # rather than the result. Never both. An act names what the video
                 # will do, which is the whole of what was chosen; the clip its
                 # settings were mined out of is an answer to a question the user
-                # never asked, and a picture of a video they did not pick reads
+                # never asked, and a thumbnail of a video they did not pick reads
                 # as a job that is that video. A dropped video *is* the choice,
-                # so there the picture is the only thing saying which.
+                # so there the thumbnail is the only thing saying which.
                 act=row.get("act") or "",
                 source_video_thumbnail=(source_video or {}).get("thumbnail_path"),
                 prompt_edited=bool(
@@ -207,13 +207,13 @@ class InFlightItems:
         self._on_go_to_item(image)
 
     @staticmethod
-    def _source_picture(requested_of, row_by_id: dict, params: dict,
-                        kind: str) -> str | None:
+    def _source_file(requested_of, row_by_id: dict, params: dict,
+                     kind: str) -> str | None:
         """A file showing what a queued run came from, or ``None``.
 
         The image a request was made of comes first: a folder-wide request
         queues a run per image and every one of them animates nothing, so the
-        thing it was asked about is the only picture it has. Failing that, the
+        thing it was asked about is the only thumbnail it has. Failing that, the
         start frame a video or an enhance is built on.
         """
         asked_of = (row_by_id.get(requested_of) or {}).get("thumbnail_path")
@@ -227,7 +227,7 @@ class InFlightItems:
     def _folder_thumbnails(self, folder_key: str, cache: dict) -> tuple:
         """A few thumbnails already in the folder a queued job is headed for.
 
-        What a queued job with no picture of its own can be recognized by: its
+        What a queued job with no thumbnail of its own can be recognized by: its
         output doesn't exist yet, but the folder it will join is full of what the
         same settings made last time. Newest first, since ``list_generations``
         hands them back that way and the newest are what the user was just looking
@@ -245,7 +245,7 @@ class InFlightItems:
         if folder_key not in cache:
             group = self._tree.group_for_key(folder_key)
             rows = gallery.rows_under(group) if group is not None else []
-            # Only what is finished and has a picture — the job asking, and
+            # Only what is finished and has a thumbnail — the job asking, and
             # every other row still in the line, is exactly what has none.
             cache[folder_key] = tuple(
                 row["thumbnail_path"] for row in rows if row.get("thumbnail_path")

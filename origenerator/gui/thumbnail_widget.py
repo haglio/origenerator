@@ -25,7 +25,7 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
-_IMAGE_SIZE = grid_card.picture_size()  # the picture area, inside the family card
+_IMAGE_SIZE = grid_card.thumbnail_size()  # the thumbnail area, inside the family card
 _BORDER_PX = 2
 # Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls, a review
 # collection's keep/reject): the same translucent chip the corner controls sit on, blue
@@ -80,7 +80,7 @@ class ThumbnailWidget(QWidget):
         self._favorite = favorite
         self._enhance = enhance       # what the enhance corner has to say, if anything
         self._enhancing = enhancing   # the run being made of this image, if any
-        # The tile's own picture, held aside while a running enhancement streams
+        # The tile's own thumbnail, held aside while a running enhancement streams
         # its frames over the top, so the end of the run restores it.
         self._resting_pixmap: QPixmap | None = None
         self._corner_buttons: list[QPushButton] = []
@@ -144,7 +144,7 @@ class ThumbnailWidget(QWidget):
         # passes controls=False — its item is already deleted, so there is nothing
         # here to bookmark, bin or enhance, and its own restore/purge controls are
         # the two acts left.
-        layout.activate()  # so the picture has a rectangle for the controls to sit in
+        layout.activate()  # so the thumbnail has a rectangle for the controls to sit in
         self._controls = CornerControls(self) if controls else None
         if self._controls is not None:
             self._controls.place(self._image_label.geometry())
@@ -157,8 +157,8 @@ class ThumbnailWidget(QWidget):
         # While an enhancement of this image is in flight, the tile wears the same
         # two overlays an in-flight card does, so work in progress reads the same
         # whichever kind of work it is: a scrim naming the stage, and a bar along
-        # the picture's foot saying how far along the run is. The scrim dims the
-        # picture rather than replacing it — the base render is out and worth
+        # the thumbnail's foot saying how far along the run is. The scrim dims the
+        # thumbnail rather than replacing it — the base render is out and worth
         # looking at, which is the point of generating it first.
         self._enhancing_overlay = StageScrim(self)
         self._enhancing_bar = ProgressCaption(self)
@@ -200,7 +200,7 @@ class ThumbnailWidget(QWidget):
 
     def set_enhance(self, enhance: str | None):
         """Re-read the enhance corner without rebuilding the tile — what a turn of
-        the Enhance panel's settings does to every picture on screen at once."""
+        the Enhance panel's settings does to every item on screen at once."""
         if enhance == self._enhance:
             return
         self._enhance = enhance
@@ -222,11 +222,11 @@ class ThumbnailWidget(QWidget):
         """Show the enhancement being made of this image, or clear it away.
 
         Fed on every reconcile, so a fresh frame and another step of progress
-        arrive the same way: the picture takes the run's latest frame, the scrim
+        arrive the same way: the thumbnail takes the run's latest frame, the scrim
         names the stage over it, and the bar at its foot carries how far along
         the run is and how much longer it has.
 
-        A run that ends puts the tile's own picture back: the streamed frames
+        A run that ends puts the tile's own thumbnail back: the streamed frames
         are a partial render of a file that doesn't exist yet, so once the run
         is over they are no longer of anything. (A landed enhancement folds onto
         the row and the rebuild redraws the tile from the new file; a cancelled
@@ -256,10 +256,10 @@ class ThumbnailWidget(QWidget):
         )
 
     def _show_enhancing_run(self):
-        """Put the scrim and the bar up over the picture, or take them away.
+        """Put the scrim and the bar up over the thumbnail, or take them away.
 
         The scrim's place is re-read each time: the streamed frames leave the
-        picture where it was, but a tile built before its layout ran has none yet.
+        thumbnail where it was, but a tile built before its layout ran has none yet.
         """
         run = self._enhancing
         self._enhancing_overlay.cover(
@@ -281,7 +281,7 @@ class ThumbnailWidget(QWidget):
             self._enhancing_tick.start()
 
     def _render_enhancing_timing(self):
-        """Write the run's reading across the bar at the picture's foot — the
+        """Write the run's reading across the bar at the thumbnail's foot — the
         compact one, since a tile is a third of the lower strip's width."""
         run = self._enhancing
         if run is None:
@@ -293,12 +293,12 @@ class ThumbnailWidget(QWidget):
         )
 
     def _place_enhancing_bar(self):
-        picture = self._image_label.geometry()
+        area = self._image_label.geometry()
         clear_of_a_corner = CORNER_INSET + CORNER_SIZE + CORNER_GAP
         self._enhancing_bar.setGeometry(QRect(
-            picture.x() + clear_of_a_corner,
-            picture.y() + picture.height() - _BORDER_PX - BAR_HEIGHT,
-            picture.width() - 2 * clear_of_a_corner,
+            area.x() + clear_of_a_corner,
+            area.y() + area.height() - _BORDER_PX - BAR_HEIGHT,
+            area.width() - 2 * clear_of_a_corner,
             BAR_HEIGHT,
         ))
 
@@ -387,7 +387,7 @@ class ThumbnailWidget(QWidget):
         # plain click still just selects, and a double-click still opens.
         if not self.drag_out.should_start(event):
             return
-        # The tile's picture trails the cursor — the frame a video tile's looping
+        # The tile's thumbnail trails the cursor — the frame a video tile's looping
         # WebP is on, as much as a still image's pixmap.
         self.drag_out.start(generation_mime(self.prompt_id), label_thumbnail(self._image_label))
 

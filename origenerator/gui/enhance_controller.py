@@ -2,18 +2,18 @@
 
 The sixth of the gallery's screen concerns to come out of the view that used to
 hold all of them. What lives here is an enhancement's whole life -- the settings
-panel and the app-wide settings it holds, which pictures the Enhance button would
+panel and the app-wide settings it holds, which images the Enhance button would
 act on and why a particular one is passed over, the launch of a batch under the
 folder its settings shape, and the run's appearance on every surface that shows
-the picture it improves: the tile's scrim, the version list's live row, a tab's
+the image it improves: the tile's scrim, the version list's live row, a tab's
 streaming preview, and an open slideshow's corner.
 
-The spoken words that ask for one are here too -- "enhance" over a picture, and
-"fix <part>" for the same picture with a detail pass aimed at what was named --
+The spoken words that ask for one are here too -- "enhance" over an image, and
+"fix <part>" for the same image with a detail pass aimed at what was named --
 because both are this act with a different gate in front of them, and what they
 answer with is what this side knows.
 
-What stays with the host is what an enhancement is *of*: which pictures are
+What stays with the host is what an enhancement is *of*: which images are
 picked, which folder is on screen, and the bank button that offers the act.
 :class:`EnhanceHost` names each of those.
 """
@@ -266,7 +266,7 @@ class EnhanceController:
         # Whether a picked image already holds this exact version is what the
         # button is answering, so turning a setting is what brings it back.
         self._host.enhance_offer_changed()
-        # Every picture on screen is answering it too, in its own corner.
+        # Every image on screen is answering it too, in its own corner.
         self._browser.refresh_corners()
 
     def sync_panel(self, offer: Offer) -> None:
@@ -333,7 +333,7 @@ class EnhanceController:
 
         And an image that already holds a version made at exactly the settings
         on the panel: running it again would spend a generation arriving at the
-        picture that is already there. Judged against what the run would *use*
+        image that is already there. Judged against what the run would *use*
         (:func:`~origenerator.gallery.enhance.level_matching_settings`), so a
         source-matched model resolves to this image's own checkpoint before the
         comparison rather than the panel's raw value. Change any setting and the
@@ -452,7 +452,7 @@ class EnhanceController:
     # --- said out loud ---------------------------------------------------------
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
-        """Enhance the picture on screen: the id it launched on (``None`` when it
+        """Enhance the image on screen: the id it launched on (``None`` when it
         didn't), the line the speaking surface should say, and its kind.
 
         Only an image that has received no enhancement gets one, the same gate a
@@ -521,7 +521,7 @@ class EnhanceController:
         """Locking a slide asked for it to be enhanced, first. Returns whether a
         run started — the slideshow shows its corner note only if one did.
 
-        The same ask as a spoken "enhance" over the same picture, so the same
+        The same ask as a spoken "enhance" over the same image, so the same
         decision makes it (:meth:`enhance_it`); a lock has no corner line to
         fill, so its answer is dropped. The decision is on this side rather than
         in the slideshow because it is this side that holds the levels — and a
@@ -564,7 +564,7 @@ class EnhanceController:
     def _job_for(self, row: dict, running=None):
         """The standalone enhance being made of this row's image, or ``None``.
 
-        The one walk under every surface that shows a run on the picture it
+        The one walk under every surface that shows a run on the image it
         improves. There were three of it, each with its own copy of which job
         counts and its own restatement of why a queued one has no frame; the two
         answers they gave differ only in the shape the surface wants, which is
@@ -598,7 +598,7 @@ class EnhanceController:
 
         The frame is the job's own latest, which a run that hasn't started has
         none of: a batch's queued jobs show as queued rather than borrowing the
-        picture of the one being rendered.
+        frame of the one being rendered.
         """
         return RunReading(
             status=display_status(job.state),
@@ -638,7 +638,7 @@ class EnhanceController:
         """Tell an open slideshow how the enhancements in flight are going.
 
         A slideshow is where a batch of them gets asked for — every locked slide is a
-        run — so it is the surface most likely to be looking at a picture whose
+        run — so it is the surface most likely to be looking at an image whose
         turn has not come. The slideshow cannot tell on its own: a lock hears only
         that a run started, not where in the line it landed. Told, its HUD
         says whether the version is being made or waiting to be.
@@ -714,7 +714,7 @@ class EnhanceController:
         :meth:`run_of`'s question asked the other way round — over a set of
         images rather than one — for the callers that act on a whole set: the
         tile menu's Cancel, the delete about to take those images out from
-        under their runs, and the pictures the slideshows are locked on.
+        under their runs, and the images the slideshows are locked on.
         """
         running = self._enhances_in_flight()
         return [job for job in running
@@ -743,7 +743,7 @@ class EnhanceController:
         The tile menu's Cancel. Everything the delete path's cancel does, minus
         the delete: the runs stop, their transient rows go with them, and the
         images they were being made of are left exactly as they were — the
-        picture on screen is the one that was already there.
+        image on screen is the one that was already there.
 
         Not a re-roll's cancel, which is why it doesn't go through the gallery's
         own: an auto-generating folder takes that as a discarded seed and

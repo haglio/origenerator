@@ -86,7 +86,7 @@ class InfoPaneTabs(QTabWidget):
     tab_added = pyqtSignal(object)  # a fresh GenerateConfigPanel, for the view to wire
     generate_requested = pyqtSignal(str, list)  # any tab's Generate: (workflow_name, each one's params)
     # A rewrite tab's Generate: (source folder key, workflow_name, params) — one
-    # run per picture in that folder rather than one run of these settings.
+    # run per item in that folder rather than one run of these settings.
     changes_requested = pyqtSignal(str, str, dict)
     # A tab's "Go to folder": the key of the folder its settings have been
     # generating into. The tab names it; the gallery, which owns the tree, goes.
@@ -99,10 +99,10 @@ class InfoPaneTabs(QTabWidget):
         self._previews = previews
         self._heights = heights  # the window's prompt heights, for its panels
         self._client = client
-        # The hosting session, or None standalone: a tab lays its picture out
+        # The hosting session, or None standalone: a tab lays its preview out
         # differently in Fun Time's upright column (GenerateConfigPanel).
         self._fun_time = fun_time
-        # A tab coming to the front re-asks what shape its picture is: the
+        # A tab coming to the front re-asks what shape its preview is: the
         # hosted layout depends on it, and nothing in the tab itself resized.
         self.currentChanged.connect(self._front_tab_relayout)
         self._db = db
@@ -136,7 +136,7 @@ class InfoPaneTabs(QTabWidget):
     # --- config tabs -------------------------------------------------------
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
-        """Let the tab now in front lay itself out for the picture it holds."""
+        """Let the tab now in front lay itself out for the item it holds."""
         panel = self.currentWidget()
         refresh = getattr(panel, "refresh_media_layout", None)
         if callable(refresh):
@@ -478,7 +478,7 @@ class InfoPaneTabs(QTabWidget):
         return panel
 
     def open_folder_request(self, folder_key: str, label: str, workflow_name: str,
-                      params: dict, pictures: list) -> GenerateConfigPanel | None:
+                      params: dict, thumbnails: list) -> GenerateConfigPanel | None:
         """Open a folder's prompt rewrite in a tab (see
         :meth:`GenerateConfigPanel.open_folder_request`).
 
@@ -491,7 +491,7 @@ class InfoPaneTabs(QTabWidget):
         if self._client is None:
             return None
         panel = self._landing_panel()
-        panel.open_folder_request(folder_key, label, workflow_name, params, pictures)
+        panel.open_folder_request(folder_key, label, workflow_name, params, thumbnails)
         self._pin_panel(panel)
         self.setCurrentWidget(panel)
         return panel
@@ -526,7 +526,7 @@ class InfoPaneTabs(QTabWidget):
 
         A run's result belongs to the tab that asked for it; every other tab is
         left alone, including the pane's resting tab, which an auto-generate loop
-        used to fill with a picture nothing in it had asked for — leaving it no
+        used to fill with an item nothing in it had asked for — leaving it no
         longer blank, so the next clicked generation opened a tab beside it and a
         loop running while the user browsed grew a row of them.
 
@@ -543,7 +543,7 @@ class InfoPaneTabs(QTabWidget):
     def watchers_of(self, key: str) -> list[GenerateConfigPanel]:
         """Every tab whose preview follows the run leading folder ``key`` (see
         :meth:`GenerateConfigPanel.watched_key`) — where that run's frames and
-        the picture it lands as go, and nowhere else. Usually one tab; two when
+        the item it lands as go, and nowhere else. Usually one tab; two when
         a Generate was pressed in one and the folder's live tile clicked into
         another, and both are the tab's own business to show."""
         return [panel for panel in self.config_panels()

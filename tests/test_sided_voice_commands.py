@@ -1,6 +1,6 @@
 """The routing around the spoken commands: which side, and which collection.
 
-The vocabularies themselves live where they are owned — the picture commands
+The vocabularies themselves live where they are owned — the image commands
 in :mod:`origenerator.gallery.voice_commands`, the slideshow's in
 :mod:`origenerator.voice.slideshow_commands`.  This is what wraps them: an optional
 leading side, and the collection names, so an utterance can say WHICH slideshow it means
@@ -39,7 +39,7 @@ from origenerator.voice.slideshow_commands import SlideshowCommand
 ])
 def test_a_fix_can_name_the_side_it_means(text, side):
     """Hosted, two slideshows run and neither is the active window, so the side word
-    is the only thing that says which picture is being looked at."""
+    is the only thing that says which image is being looked at."""
     command = match_voice_command(text)
 
     assert isinstance(command, SurfaceCommand)
@@ -110,8 +110,8 @@ def test_a_slideshow_command_can_name_the_side_it_means(text, side):
     ("landscape enhance", "landscape"),
     ("portrait animate as video alpha", "portrait"),
 ])
-def test_the_other_picture_commands_can_name_the_side_they_mean(text, side):
-    """The other picture commands take a side for the same reason a fix does."""
+def test_the_other_image_commands_can_name_the_side_they_mean(text, side):
+    """The other image commands take a side for the same reason a fix does."""
     command = match_voice_command(text)
 
     assert isinstance(command, SurfaceCommand)

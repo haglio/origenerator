@@ -495,7 +495,7 @@ def test_a_spoken_fix_on_an_unenhanced_image_runs_at_the_current_settings(monkey
 def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_ticks(
         monkeypatch):
     # The bug this is here for: a folder set to fix every part turned a spoken
-    # "fix teeth" into a pass over all of them — a redraw of the whole picture
+    # "fix teeth" into a pass over all of them — a redraw of the whole image
     # in answer to a command about one part of it. The panel's ticks configure
     # what an *enhancement* fixes; a spoken fix says its own parts out loud.
     _install_detectors(monkeypatch, "teeth_yolov8n.pt", "face_yolov8m.pt",

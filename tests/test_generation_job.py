@@ -546,7 +546,7 @@ def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
 def test_a_job_taken_back_lands_the_run_the_last_copy_had_already_sent(qtbot, tmp_path):
     # The previous copy sent this id and the server still holds its record:
     # the stop that set the job aside reached ComfyUI after its last node had
-    # saved. Sending it again makes a second picture nothing points at, and
+    # saved. Sending it again makes a second image nothing points at, and
     # leaves every read of the id answering with the first one.
     client = _client()
     client.fetch_history = MagicMock(return_value=SDXL_HISTORY)

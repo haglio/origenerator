@@ -10,7 +10,7 @@ builds per job, carrying what to draw, how to stop it, and how to go to it.
 How the run itself is going — what it is doing, its latest frame, how far along
 it is, how long it has left — is :class:`RunReading`, which an item carries and
 which is also all the tile of an image being enhanced is handed
-(:mod:`origenerator.gui.thumbnail_widget`): that tile has a picture, a name and
+(:mod:`origenerator.gui.thumbnail_widget`): that tile has a thumbnail, a name and
 a click of its own already.
 
 :func:`queue_wait_text` is here for the same reason: how a wait reads is one
@@ -50,7 +50,7 @@ class InFlightItem:
     # job for is not one this session can stop either.
     stop_auto: Callable[[], None] | None = None
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
-    starts_at: float | None = None  # when a video waiting out the minute after a picture starts
+    starts_at: float | None = None  # when a video waiting out the minute after an image starts
     # What kind of work this is in one word — "Image", "Video", "Enhance"
     # (:func:`gallery.job_kind_label`), or "" for a workflow this build has no
     # template for. The workflow's display name is in :attr:`caption` and answers
@@ -62,15 +62,15 @@ class InFlightItem:
     # likely to find in the line without recognizing it.
     requested: bool = False
     # The start frame this run is built from, as its ``LoadImage`` reference —
-    # what an i2v (and an enhance) is *of*. Its picture is the fastest way to
+    # what an i2v (and an enhance) is *of*. Its thumbnail is the fastest way to
     # tell two queued videos apart, their captions being their shared workflow.
     source_image: str | None = None
     # A file on disk showing what this run came from — the start frame above,
-    # or the image a request was made of. A queued run has no picture of its
+    # or the image a request was made of. A queued run has no thumbnail of its
     # own, so surfaces that would otherwise show a blank plate stand this
     # under the wait, blurred (:mod:`origenerator.gui.blurred`). ``None``
     # where the run came from nothing, which is most images.
-    source_picture: str | None = None
+    source_file: str | None = None
     # The act picked in the Combine panel's dropdown, for a run launched from
     # there — "" for every other run, and for a combine that was given a dropped
     # video instead of a picked act. It is the one word saying what this video
@@ -85,7 +85,7 @@ class InFlightItem:
     source_video_thumbnail: str | None = None
     prompt_edited: bool = False
     # Up to four thumbnail files from the folder this job will land in — what a
-    # run with no picture of its own can be recognized by, its own output being
+    # run with no thumbnail of its own can be recognized by, its own output being
     # the thing that doesn't exist yet.
     folder_thumbnails: tuple = ()
     # This one is not a job yet: it stands in for a press of Generate whose work
@@ -104,12 +104,12 @@ def queue_lead_text(item: InFlightItem) -> str:
     the job that is true before it starts, which is what a line of waiting work is
     read for — the price first, because that is what "how long until my turn" is
     added up out of, and because it is the one figure that makes a queue of four
-    videos read differently from a queue of four pictures.
+    videos read differently from a queue of four images.
 
     The act follows the kind, for a run the Combine panel launched from its
     dropdown: the kind says a video is being made, and the act says
     which video — the whole of what the user chose, and the one thing separating
-    two runs on the same picture. It rides through "Edit…" too, so a
+    two runs on the same image. It rides through "Edit…" too, so a
     combination edited before launching still says what it was asked for.
 
     The two marks at the end are only ever *added*: a job nobody typed a prompt
@@ -174,7 +174,7 @@ class RunReading:
 
     A queued or running generation carries one inside its :class:`InFlightItem`;
     the tile of an image being enhanced is handed one on its own, since the
-    picture, the name and the click there are the tile's already.
+    thumbnail, the name and the click there are the tile's already.
     """
 
     status: str                              # JobState.RUNNING, QUEUED or SPEAKING
@@ -240,7 +240,7 @@ def discard_run_tooltip(auto_generating: bool) -> str:
 
 
 START_NOW_TEXT = "Start now"
-START_NOW_TOOLTIP = "Start the video now instead of a minute after your last picture"
+START_NOW_TOOLTIP = "Start the video now instead of a minute after your last image"
 CLEAR_TEXT = "Clear"
 
 
@@ -273,7 +273,7 @@ def stop_loop_tooltip() -> str:
 def queue_wait_text(foreign_ahead: int | None, starts_at: float | None = None, *,
                     now=time.monotonic) -> str | None:
     """How a job's wait reads while another app's work is ahead of it on ComfyUI,
-    or while it is a video waiting out the minute after a picture
+    or while it is a video waiting out the minute after an image
     (:meth:`JobQueue.starts_at`, on the queue's clock). A wait on the user's own
     jobs earns no line: "waiting in ComfyUI" would send them hunting for phantom
     jobs that are their own. ``None`` is every surface's cue to say what it always said.

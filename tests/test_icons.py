@@ -95,7 +95,7 @@ def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
 
 def test_a_side_mark_is_a_frame_and_not_a_filled_block(qtbot):
     # A frame, like the family's screen and photo marks -- what it stands for is
-    # a region a picture goes in. Filled, it would read as a swatch, and the
+    # a region an image goes in. Filled, it would read as a swatch, and the
     # rounded corners that say "screen" would be lost against the heading's word.
 
     image = icons.side_mark("portrait").toImage()
@@ -156,7 +156,7 @@ def _corner_image(icon):
 def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     # The star is green because Fun Time's favorite ★ is (shared_ui's GREEN is
     # the value its HUD paints), so one color means "bookmarked" in both apps —
-    # which leaves the enhanced picture's plus this palette's yellow, since the
+    # which leaves the enhanced image's plus this palette's yellow, since the
     # two can sit on one tile and blue is genau's across this family. Both marks
     # are solid at their center, so the middle pixel is the color.
     star = _corner_image(icons.corner_star_icon(favorite=True, armed=False))
@@ -371,7 +371,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
 
 def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
     # The white line art on a thumbnail's hover buttons is the same family mark
-    # the toolbar wears, in the white these read in over a picture -- not a
+    # the toolbar wears, in the white these read in over an image -- not a
     # second set of drawings kept for the tiles.
     white = QColor(255, 255, 255)
     for icon, name in ((icons.experiment_verdict_icon("up"), "check"),

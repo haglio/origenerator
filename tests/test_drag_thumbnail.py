@@ -1,4 +1,4 @@
-"""The picture every drag hangs under the cursor, however its source shows it."""
+"""The thumbnail every drag hangs under the cursor, however its source shows it."""
 from __future__ import annotations
 
 from PIL import Image
@@ -24,7 +24,7 @@ def _webp(path, size=(64, 48)):
 
 
 class _RecordingDrag:
-    """Stands in for QDrag, remembering whether a picture was attached to it."""
+    """Stands in for QDrag, remembering whether a thumbnail was attached to it."""
 
     def __init__(self):
         self.pixmap = None
@@ -33,7 +33,7 @@ class _RecordingDrag:
         self.pixmap = pixmap
 
 
-def test_a_big_picture_shrinks_into_the_shared_size(qtbot):
+def test_a_big_thumbnail_shrinks_into_the_shared_size(qtbot):
     # A preview pane's still is the size of the pane; under the cursor it is a
     # thumbnail, the same as one dragged from anywhere else.
     big = QPixmap(800, 600)
@@ -43,7 +43,7 @@ def test_a_big_picture_shrinks_into_the_shared_size(qtbot):
     assert fitted.height() <= THUMBNAIL_MAX
 
 
-def test_a_small_picture_keeps_its_own_pixels(qtbot):
+def test_a_small_thumbnail_keeps_its_own_pixels(qtbot):
     # Only ever shrinks: blowing a 96px version tile up to that size would just
     # make it soft.
     small = QPixmap(96, 96)
@@ -65,7 +65,7 @@ def test_a_label_playing_a_movie_offers_the_frame_it_is_on(qtbot, tmp_path):
     movie.start()
 
     assert label.pixmap().isNull()          # the label itself has none
-    assert not label_thumbnail(label).isNull()  # but the movie's frame is a picture
+    assert not label_thumbnail(label).isNull()  # but the movie's frame is a thumbnail
 
 
 def test_a_label_showing_a_still_offers_it(qtbot):
@@ -84,7 +84,7 @@ def test_an_empty_label_offers_nothing(qtbot):
     assert label_thumbnail(label).isNull()
 
 
-def test_a_drag_with_a_picture_wears_it(qtbot):
+def test_a_drag_with_a_thumbnail_wears_it(qtbot):
     pixmap = QPixmap(64, 64)
     pixmap.fill()
     drag = _RecordingDrag()
@@ -92,7 +92,7 @@ def test_a_drag_with_a_picture_wears_it(qtbot):
     assert drag.pixmap is pixmap
 
 
-def test_a_drag_with_no_picture_is_left_bare(qtbot):
+def test_a_drag_with_no_thumbnail_is_left_bare(qtbot):
     # An empty square following the cursor says less than the plain drag cursor.
     drag = _RecordingDrag()
     set_drag_thumbnail(drag, QPixmap())

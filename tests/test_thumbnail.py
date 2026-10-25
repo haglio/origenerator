@@ -98,5 +98,5 @@ def test_a_streamed_frame_is_kept_as_a_thumbnail(tmp_path):
 
 
 def test_a_frame_that_will_not_decode_keeps_no_thumbnail(tmp_path):
-    assert frame_thumbnail(b"not a picture", tmp_path, name="run1_canceled") is None
+    assert frame_thumbnail(b"not an image", tmp_path, name="run1_canceled") is None
     assert list(tmp_path.iterdir()) == []

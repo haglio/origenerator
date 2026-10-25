@@ -54,7 +54,7 @@ def test_a_short_fix_utterance_names_its_part(text, part):
     ("fix face, hands and eyes", ["faces", "hands", "eyes"]),
 ])
 def test_one_command_can_ask_for_several_parts(text, parts):
-    # Two bad parts in one picture is one command, not two — and the answer
+    # Two bad parts in one image is one command, not two — and the answer
     # comes back in the table's order however they were said, so the same ask
     # always builds the same graph.
     assert _named(text) == parts
@@ -315,8 +315,8 @@ def test_a_part_the_vocabulary_no_longer_lists_is_dropped(monkeypatch):
 
 def test_skin_and_hair_are_redrawn_inside_their_outlines_toward_their_own_prompts():
     # Neither is box-shaped: a box around the hair takes the face with it, and a
-    # box around the skin is most of the picture. And a redraw that only reuses
-    # the picture's prompt gives back the same smooth skin it started from.
+    # box around the skin is most of the image. And a redraw that only reuses
+    # the image's prompt gives back the same smooth skin it started from.
     skin, hair = _part("skin"), _part("hair")
     assert skin.outline and hair.outline
     assert "pores" in skin.prompt and "strands" in hair.prompt
@@ -337,7 +337,7 @@ def test_an_overlay_part_can_be_an_outline_with_its_own_prompts(monkeypatch):
     assert part.avoid == "smooth zeta"
 
 
-def test_an_overlay_part_that_says_nothing_of_the_sort_is_a_box_on_the_pictures_prompt(monkeypatch):
+def test_an_overlay_part_that_says_nothing_of_the_sort_is_a_box_on_the_images_prompt(monkeypatch):
     _with_overlay(monkeypatch, [{"name": "zeta", "outline": "yes please", "prompt": 7}])
     (part,) = match_fix_command("fix zeta")
     assert part.outline is False

@@ -105,7 +105,7 @@ _INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
 
 
 class _Drop(FieldKind):
-    """A picture or video input: a zone, read back as the reference the graph loads."""
+    """An image or video input: a zone, read back as the reference the graph loads."""
 
     drops = True
 

@@ -1,4 +1,4 @@
-"""Every version of one image, a row each: its picture, and the facts about it.
+"""Every version of one image, a row each: its thumbnail, and the facts about it.
 
 An enhancement is a layer, not a replacement: the enhanced file leads the row's
 ``output_files`` and each earlier one stays listed, so an image can carry several
@@ -124,7 +124,7 @@ def _pass_mouse_through(widget) -> None:
     """Let clicks, hovers and right-clicks on this child reach the row it is in.
 
     A row is one thing to click — anywhere on it picks that version — but its
-    picture and its lines of text cover nearly all of it, and a child widget
+    thumbnail and its lines of text cover nearly all of it, and a child widget
     takes the press by default. That left only the margins around them live.
 
     It also settles which context menu a right-click gets. The value labels come
@@ -157,7 +157,7 @@ class EnhanceOffer(NamedTuple):
 
 
 class _Row(QWidget):
-    """The shape every entry in the list shares: a picture, then a bold title
+    """The shape every entry in the list shares: a thumbnail, then a bold title
     over a column of ``label: value`` facts.
 
     One shape for the finished levels, the one being made, and the card that
@@ -171,8 +171,8 @@ class _Row(QWidget):
         # at all, so the selection fill would never show.
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(_ROW_CSS)
-        # Two layouts, not one: the picture and the facts sit side by side while
-        # there is room for both, and the facts drop underneath the picture when
+        # Two layouts, not one: the thumbnail and the facts sit side by side while
+        # there is room for both, and the facts drop underneath the thumbnail when
         # there is not — see :meth:`_reflow`. A row that could only sit side by
         # side would be the widest thing in the tab, and would decide how narrow
         # the whole pane could be dragged before its settings scrolled sideways.
@@ -185,12 +185,12 @@ class _Row(QWidget):
         self._column.addLayout(row)
         self._beside = row
         self._wrapped = False
-        self._picture = QLabel()
-        self._picture.setFixedSize(THUMBNAIL_BOX)
-        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._picture.setWordWrap(True)
-        _pass_mouse_through(self._picture)
-        row.addWidget(self._picture, 0, Qt.AlignmentFlag.AlignTop)
+        self._thumbnail = QLabel()
+        self._thumbnail.setFixedSize(THUMBNAIL_BOX)
+        self._thumbnail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._thumbnail.setWordWrap(True)
+        _pass_mouse_through(self._thumbnail)
+        row.addWidget(self._thumbnail, 0, Qt.AlignmentFlag.AlignTop)
         # A grid rather than a row of rows: a container widget per fact would
         # take every click landing on it, and Qt's hit test skips a container
         # marked transparent along with the buttons inside it — so there would be
@@ -224,10 +224,10 @@ class _Row(QWidget):
     def minimumSizeHint(self):
         """As narrow as the row gets — which is the wrapped arrangement's width,
         whichever one it is in at the moment: the facts can always drop below the
-        picture, so the pair's widths never add up."""
+        thumbnail, so the pair's widths never add up."""
         hint = super().minimumSizeHint()
         margins = self._column.contentsMargins()
-        widest = max(self._picture.minimumSizeHint().width(),
+        widest = max(self._thumbnail.minimumSizeHint().width(),
                      self._facts.minimumSize().width())
         hint.setWidth(widest + margins.left() + margins.right())
         return hint
@@ -237,9 +237,9 @@ class _Row(QWidget):
         self._reflow(event.size().width())
 
     def _reflow(self, width: int) -> None:
-        """Put the facts beside the picture or underneath it, by whether both fit."""
+        """Put the facts beside the thumbnail or underneath it, by whether both fit."""
         margins = self._column.contentsMargins()
-        beside = (self._picture.sizeHint().width() + self._beside.spacing()
+        beside = (self._thumbnail.sizeHint().width() + self._beside.spacing()
                   + self._facts.minimumSize().width()
                   + margins.left() + margins.right())
         wrapped = width < beside
@@ -286,12 +286,12 @@ class _Row(QWidget):
                 if isinstance(widget, QLabel):
                     self._resting_ink[widget] = widget.styleSheet()
 
-    def _show_picture(self, pixmap: QPixmap) -> None:
-        self._picture.setPixmap(fitted_in_the_box(pixmap))
+    def _show_thumbnail(self, pixmap: QPixmap) -> None:
+        self._thumbnail.setPixmap(fitted_in_the_box(pixmap))
 
 
 class _LevelRow(_Row):
-    """One version: its picture, the enhancement that made it, its file and when
+    """One version: its thumbnail, the enhancement that made it, its file and when
     that file was written.
 
     Clicking puts it in the preview and picks it; dragging it carries those
@@ -309,18 +309,18 @@ class _LevelRow(_Row):
         self._params = dict(level.params)
         self.drag_out = DragOut()
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
-        # The picture that trails the cursor when this row is dragged, cut once
+        # The thumbnail that trails the cursor when this row is dragged, cut once
         # from the file rather than from the 96px tile — the same size every other
         # drag in the app trails.
-        self._drag_picture = fit_thumbnail(pixmap)
+        self._drag_thumbnail = fit_thumbnail(pixmap)
         if not pixmap.isNull():
-            self._show_picture(pixmap)
+            self._show_thumbnail(pixmap)
         else:
             # The file is gone (trashed, or moved out from under us). The level
             # still lists — its facts say which one it was — so the tile shows
             # the em dash the rest of the app uses for "nothing to show here".
-            self._picture.setText("—")
-            self._picture.setToolTip("This version's file is no longer on disk")
+            self._thumbnail.setText("—")
+            self._thumbnail.setToolTip("This version's file is no longer on disk")
         items = []
         if level.settings:
             items.append(MetaItem("Enhancement", level.settings))
@@ -348,9 +348,9 @@ class _LevelRow(_Row):
         return self._position
 
     def set_highlighted(self, on: bool) -> None:
-        """Light this level's picture — what the ``+ Enhance`` row points at
+        """Light this level's thumbnail — what the ``+ Enhance`` row points at
         when it is dimmed because this is the version it would duplicate."""
-        self._picture.setStyleSheet(
+        self._thumbnail.setStyleSheet(
             f"border: {_MATCH_BORDER}; border-radius: {BUTTON_RADIUS}px;" if on else ""
         )
 
@@ -363,7 +363,7 @@ class _LevelRow(_Row):
         if not self._params or not self.drag_out.should_start(event):
             return
         # The version's image trails the cursor.
-        self.drag_out.start(enhance_level_mime(self._params), self._drag_picture)
+        self.drag_out.start(enhance_level_mime(self._params), self._drag_thumbnail)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self.drag_out.pressed:
@@ -381,7 +381,7 @@ class _PendingRow(_Row):
 
     def __init__(self, parent=None):
         super().__init__("Enhancing", parent)
-        self._picture.setStyleSheet(
+        self._thumbnail.setStyleSheet(
             f"background-color: transparent; border: {_PENDING_BORDER};"
             f" border-radius: {BUTTON_RADIUS}px;"
         )
@@ -395,9 +395,9 @@ class _PendingRow(_Row):
     def update_pending(self, pending: RunningEnhancement):
         pixmap = QPixmap()
         if pending.frame and pixmap.loadFromData(pending.frame) and not pixmap.isNull():
-            self._show_picture(pixmap)
+            self._show_thumbnail(pixmap)
         else:
-            self._picture.setText(
+            self._thumbnail.setText(
                 "Generating…" if pending.status == JobState.RUNNING else "Queued…"
             )
         # Only when the text actually moves: a run streams several frames a
@@ -426,8 +426,8 @@ class _AddRow(_Row):
     def __init__(self, settings: str, duplicate_of: int | None, parent=None):
         super().__init__("Enhance", parent)
         self._enabled = duplicate_of is None
-        self._picture.setStyleSheet(_ADD_TILE_CSS)
-        self._picture.setPixmap(glyph_pixmap("plus", _PLUS, BG_PRIMARY))
+        self._thumbnail.setStyleSheet(_ADD_TILE_CSS)
+        self._thumbnail.setPixmap(glyph_pixmap("plus", _PLUS, BG_PRIMARY))
         if settings:
             self._show_facts([MetaItem("Enhancement", settings)])
         # Dimmed by opacity rather than by setEnabled: Qt delivers no mouse
@@ -585,7 +585,7 @@ class EnhanceVersions(QWidget):
         """Pick a level as a click picks a thumbnail, and put it in the preview.
 
         Ctrl and Shift leave the preview where it was — the gesture is "these
-        ones", aimed at the Delete that follows, and swapping the picture under
+        ones", aimed at the Delete that follows, and swapping the preview under
         each click would fight it."""
         ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
         shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)

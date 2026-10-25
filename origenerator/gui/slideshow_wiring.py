@@ -47,13 +47,13 @@ class SlideshowActions:
     the app's one OSR2 switch rather than straight to this slideshow's motion, and
     ``osr2_control`` is that same switch handed over whole, which is what the
     console's four control buttons read and set.
-    ``omnipause`` takes nothing: a click on the picture asks the room to pause,
+    ``omnipause`` takes nothing: a click on the slide asks the room to pause,
     the hosting session's or this app's own, and a slideshow handed none pauses
     itself.
 
     ``neighbors`` and ``widen`` take a prompt_id and answer for the library
     the slideshow cannot see: what shows that generation's act under other seeds
-    and what else was made of its picture (the map's two axes, as
+    and what else was made of its image (the map's two axes, as
     :class:`~origenerator.gui.slideshow_map.MapNeighbors`), and what lies just
     beyond the row (the slides "more seeds" adds to it).  ``acts`` takes
     prompt_ids and answers what each one's map row is named for, which is
@@ -97,7 +97,7 @@ class HudFacts:
 
     All of it is the Funestras' vocabulary, because the panel is the Funestras'
     panel: ``order_label`` is how the set is ordered — "Latest" for Recents and
-    for a folder opened on one of its pictures, both of which play newest
+    for a folder opened on one of its items, both of which play newest
     first, and "Shuffle" for everything else; ``favorite_ids`` is which of
     the items are favorites, so the star readout and the F-mode narrowing mean
     here what they mean on a Funestra.  Whether the slideshow is LOOPING is not a

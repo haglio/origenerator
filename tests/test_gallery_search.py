@@ -238,7 +238,7 @@ def test_leaving_a_search_that_was_never_running_does_nothing(controller):
 def test_several_hits_in_one_folder_come_back_as_that_folder(controller):
     # Every row in a settings folder shares a prompt and settings and differs
     # only by seed, so a prompt match hits all of them -- and drawing eight
-    # near-copies of one picture buries the other places the query reached.
+    # near-copies of one image buries the other places the query reached.
     rows = [_row("g1", "a tabby on a wall", seed=1),
             _row("g2", "a tabby on a wall", seed=2)]
     host = FakeHost()

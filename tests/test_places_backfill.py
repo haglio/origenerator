@@ -1,4 +1,4 @@
-"""Finding the places in pictures enhanced before the places were kept: only the Fixes' finding,
+"""Finding the places in images enhanced before the places were kept: only the Fixes' finding,
 run while the app is shut."""
 from __future__ import annotations
 
@@ -59,10 +59,10 @@ class FakeComfy:
 
 def _looked_over(db) -> list[tuple[str, str]]:
     return [(row["prompt_id"], level.file["filename"])
-            for row, level in places_backfill.pictures_to_look_over(db.list_generations())]
+            for row, level in places_backfill.images_to_look_over(db.list_generations())]
 
 
-def test_a_picture_enhanced_before_its_places_were_kept_is_one_to_look_over(tmp_path):
+def test_an_image_enhanced_before_its_places_were_kept_is_one_to_look_over(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "old", _file("enhanced_old.png"))
     _enhanced(db, "kept", _file("enhanced_kept.png", **points_of_interest.kept([])))
@@ -70,7 +70,7 @@ def test_a_picture_enhanced_before_its_places_were_kept_is_one_to_look_over(tmp_
     assert _looked_over(db) == [("old", "enhanced_old.png")]
 
 
-def test_a_picture_whose_places_were_kept_before_they_named_their_part_is_looked_over_again(tmp_path):
+def test_an_image_whose_places_were_kept_before_they_named_their_part_is_looked_over_again(tmp_path):
     db = Database(tmp_path / "t.db")
     unnamed = {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.3}
     _enhanced(db, "early", _file("enhanced_early.png", points_of_interest=[unnamed]))
@@ -79,7 +79,7 @@ def test_a_picture_whose_places_were_kept_before_they_named_their_part_is_looked
     assert _looked_over(db) == [("early", "enhanced_early.png")]
 
 
-def test_a_picture_whose_eyes_were_kept_already_joined_is_looked_over_again(tmp_path):
+def test_an_image_whose_eyes_were_kept_already_joined_is_looked_over_again(tmp_path):
     db = Database(tmp_path / "t.db")
     joined = {"left": 0.1, "top": 0.1, "right": 0.6, "bottom": 0.3, "part": "eyes"}
     _enhanced(db, "joined", _file("enhanced_joined.png", points_of_interest=[joined]))
@@ -87,10 +87,10 @@ def test_a_picture_whose_eyes_were_kept_already_joined_is_looked_over_again(tmp_
     assert _looked_over(db) == [("joined", "enhanced_joined.png")]
 
 
-def test_a_picture_is_looked_over_by_its_own_enhancements_detectors_and_nothing_is_redrawn(tmp_path):
+def test_an_image_is_looked_over_by_its_own_enhancements_detectors_and_nothing_is_redrawn(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "old", _file("enhanced_old.png"), settings={"enhance_detail_fixes": {"faces": 0.45, "eyes": 0.4}})
-    [(_row, level)] = places_backfill.pictures_to_look_over(db.list_generations())
+    [(_row, level)] = places_backfill.images_to_look_over(db.list_generations())
 
     graph = places_backfill.finding_graph(level)
 
@@ -103,7 +103,7 @@ def test_a_picture_is_looked_over_by_its_own_enhancements_detectors_and_nothing_
     assert not set(kinds) & {"DetailerForEach", "KSampler", "SaveImage", "VAEDecode"}
 
 
-def test_closing_hands_comfyui_one_finding_per_picture_and_writes_down_which_finds_which(tmp_path):
+def test_closing_hands_comfyui_one_finding_per_image_and_writes_down_which_finds_which(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     _enhanced(db, "b", _file("enhanced_b.png"))
@@ -117,7 +117,7 @@ def test_closing_hands_comfyui_one_finding_per_picture_and_writes_down_which_fin
         {"row": "a", "file": "enhanced_a.png"}, {"row": "b", "file": "enhanced_b.png"}]
 
 
-def test_one_absence_hands_comfyui_no_more_pictures_than_it_is_allowed(tmp_path):
+def test_one_absence_hands_comfyui_no_more_images_than_it_is_allowed(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     _enhanced(db, "b", _file("enhanced_b.png"))
@@ -130,7 +130,7 @@ class _TheProcessEnded(BaseException):
 
 
 class _ComfyEndedPartway(FakeComfy):
-    """The ComfyUI the closed app's turn was handing pictures to when that turn
+    """The ComfyUI the closed app's turn was handing images to when that turn
     was ended, as a turn that runs out of its time is."""
 
     def __init__(self, ended_after: int) -> None:
@@ -143,8 +143,8 @@ class _ComfyEndedPartway(FakeComfy):
         super().submit_job(payload, prompt_id)
 
 
-def test_a_hand_over_ended_partway_leaves_a_note_of_every_picture_it_sent(tmp_path):
-    # The next launch takes back off ComfyUI what the note names, so a picture
+def test_a_hand_over_ended_partway_leaves_a_note_of_every_image_it_sent(tmp_path):
+    # The next launch takes back off ComfyUI what the note names, so an image
     # sent and not written down would be looked over while the app is open again.
     db = Database(tmp_path / "t.db")
     for name in ("a", "b", "c"):
@@ -157,7 +157,7 @@ def test_a_hand_over_ended_partway_leaves_a_note_of_every_picture_it_sent(tmp_pa
     assert set(comfy.submitted) <= set(json.loads(record.read_text(encoding="utf-8")))
 
 
-def test_a_picture_already_handed_to_comfyui_is_not_handed_over_again(tmp_path):
+def test_an_image_already_handed_to_comfyui_is_not_handed_over_again(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     record = tmp_path / "finding.json"
@@ -190,7 +190,7 @@ def test_the_next_launch_keeps_what_each_finished_run_found_and_takes_back_the_r
     assert places_backfill.queue_finding(db.list_generations(), FakeComfy(), record) == 1
 
 
-def test_a_picture_whose_run_found_nothing_is_not_looked_over_again(tmp_path):
+def test_an_image_whose_run_found_nothing_is_not_looked_over_again(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     record, closing = tmp_path / "finding.json", FakeComfy()
@@ -204,7 +204,7 @@ def test_a_picture_whose_run_found_nothing_is_not_looked_over_again(tmp_path):
     assert _looked_over(db) == []
 
 
-def test_a_picture_gone_before_its_places_came_back_is_passed_over(tmp_path):
+def test_an_image_gone_before_its_places_came_back_is_passed_over(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     record, closing = tmp_path / "finding.json", FakeComfy()
@@ -217,7 +217,7 @@ def test_a_picture_gone_before_its_places_came_back_is_passed_over(tmp_path):
     assert places_backfill.fold_found_places(db, opening, record) == 0
 
 
-def test_once_closed_the_apps_turn_hands_comfyui_the_pictures_to_look_over(qtbot, tmp_path,
+def test_once_closed_the_apps_turn_hands_comfyui_the_images_to_look_over(qtbot, tmp_path,
                                                                              monkeypatch):
     submitted = []
     monkeypatch.setattr(ComfyUIClient, "submit_job", lambda self, payload, prompt_id: submitted.append(prompt_id))
@@ -237,7 +237,7 @@ def test_once_closed_the_apps_turn_hands_comfyui_the_pictures_to_look_over(qtbot
     assert set(looked_over) <= set(submitted)
 
 
-def test_a_branch_preview_hands_comfyui_no_pictures_to_look_over(tmp_path, monkeypatch):
+def test_a_branch_preview_hands_comfyui_no_images_to_look_over(tmp_path, monkeypatch):
     comfy = FakeComfy()
     monkeypatch.setattr(places_backfill, "RECORD", tmp_path / "finding.json")
     monkeypatch.setattr(places_backfill, "is_branch_session", lambda: True)
@@ -266,8 +266,12 @@ def test_opening_the_app_keeps_the_places_found_while_it_was_closed(qtbot, tmp_p
         {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.3, "part": "faces"}]
 
 
-def test_a_picture_whose_enhancement_fixed_no_part_has_nothing_to_look_for(tmp_path):
+def test_an_image_whose_enhancement_fixed_no_part_has_nothing_to_look_for(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "plain", _file("enhanced_plain.png"), settings={"enhance_detail_fixes": {}})
 
     assert _looked_over(db) == []
+
+
+def test_the_note_of_a_hand_over_keeps_the_name_an_older_copy_wrote_it_under():
+    assert places_backfill.RECORD.name == "pictures_being_looked_over.json"

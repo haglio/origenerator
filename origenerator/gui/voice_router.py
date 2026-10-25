@@ -9,13 +9,13 @@ What lives here is the whole path an utterance takes. The microphone and what it
 is listening for. The caption that says what was heard and what it did, with the
 one promise it holds while a request is still being worked out. The matching of
 an utterance to a collection, a switch, a bar, a bank button, an order about the
-picture on screen, or a request said over several breaths -- and, for a hosted
+image on screen, or a request said over several breaths -- and, for a hosted
 app, the same matching of words the session's own microphone heard and posted on
 this app's channel.
 
 What it does NOT hold is the doing. A slideshow's own words went to the slideshows when
 they came out (:mod:`origenerator.gui.slideshow_director`); a bank button's press is
-the button's own click; and the three orders about a picture -- enhance it, fix a
+the button's own click; and the three orders about an image -- enhance it, fix a
 part of it, make a Genau flick of it -- stay with the seams that run them.
 :class:`VoiceHost` names each of those.
 """
@@ -99,7 +99,7 @@ logger = logging.getLogger(__name__)
 # saying: long enough to read one, short enough that it is gone by the next.
 _FLASH_MS = 4000
 
-# What an "animate as" wants, said with no picture up. Its own line rather
+# What an "animate as" wants, said with no image up. Its own line rather
 # than the parts' own naming, because the command is a record rather than a word
 # and every act names itself differently.
 _WANTS_ANIMATING = "an animation"
@@ -180,7 +180,7 @@ class VoiceHost(Protocol):
         covering it."""
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
-        """Queue the better version of a picture: what it launched on, and the
+        """Queue the better version of an image: what it launched on, and the
         line to say about it with its kind."""
 
     def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
@@ -188,8 +188,8 @@ class VoiceHost(Protocol):
 
     def animate_it(self, image_id: str | None,
                    asked) -> tuple[str | None, str, str]:
-        """Animate a picture as the act an "animate as" named, in the lane it
-        named, the same way. The act may be unsaid, and what the picture
+        """Animate an image as the act an "animate as" named, in the lane it
+        named, the same way. The act may be unsaid, and what the image
         already shows is what settles it."""
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
@@ -467,7 +467,7 @@ class VoiceRouter(QObject):
 
         The order is this app's own mic's (``VoiceSteering._meaning``).  A
         whole-utterance word is that command first — "landscape enhanced only"
-        turns the slideshow's switch, and left to the looser picture matcher it
+        turns the slideshow's switch, and left to the looser image matcher it
         would read as "enhance" with a word after it — so long as no request
         is being said.  Then the request, which has first refusal over the
         rest: "Request … over" runs to as many utterances as the speaker takes
@@ -498,9 +498,9 @@ class VoiceRouter(QObject):
     def on_command(self, matched) -> None:
         """One recognized utterance: a collection to play, a slideshow command, a bare
         word about the app or the slide in front of the speaker, or an order
-        about the picture — each with the side it named, if it named one.
+        about the image — each with the side it named, if it named one.
 
-        An order about the picture always arrives wrapped in a
+        An order about the image always arrives wrapped in a
         :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
         how the side travels, and the matchers put every one of them in it.
         """
@@ -512,7 +512,7 @@ class VoiceRouter(QObject):
             if isinstance(matched.command, AppCommand):
                 self._run_app_command(matched.command, matched.side)
             else:
-                self._on_picture_command(matched)
+                self._on_image_command(matched)
         elif isinstance(matched, AppCommand):
             self._run_app_command(matched)
         elif isinstance(matched, BarSetting):
@@ -649,14 +649,14 @@ class VoiceRouter(QObject):
         act()
         self._slideshows.answer(said)
 
-    def _on_picture_command(self, command) -> None:
-        """A spoken command about the picture on screen: a targeted "fix <part>"
+    def _on_image_command(self, command) -> None:
+        """A spoken command about the image on screen: a targeted "fix <part>"
         (or several parts, or "fix all"), "enhance" for the better version of
         it, or "genau it" to animate it as a Genau flick.
 
         A named side takes that region's slideshow — hosted, two slideshows run at once
         and neither is the active window, so naming one is the only way to say
-        which picture is meant.  Unnamed, it goes to whichever slideshow is up.
+        which image is meant.  Unnamed, it goes to whichever slideshow is up.
         Answered out of the slideshow's own note — the speaker is looking at it, not
         at this pane. Said with no slideshow up, "enhance" falls to the bank button of
         the same name; the other two have no "on screen" to act on, and the
@@ -665,7 +665,7 @@ class VoiceRouter(QObject):
         slideshow = self._slideshows.surface_for(command.side)
         if slideshow is None:
             if command.command == gallery.ENHANCE_COMMAND:
-                # The word names a bank button too, and with no picture filling
+                # The word names a bank button too, and with no image filling
                 # the screen the button is what it means — aimed the way a click
                 # aims it, at the picked thumbnails else the folder's unenhanced
                 # images. A refusal here would be a dead end where there is a
@@ -675,7 +675,7 @@ class VoiceRouter(QObject):
             wants = (_WANTS_ANIMATING
                      if isinstance(command.command, AnimateRequest)
                      else f"a {name_parts(command.command)} fix")
-            self._show(f"{wants} needs a picture on screen", transient=True)
+            self._show(f"{wants} needs an image on screen", transient=True)
             return
         target = slideshow.voice_target()
         if isinstance(command.command, AnimateRequest):
@@ -695,9 +695,9 @@ class VoiceRouter(QObject):
         While it is still being said the slideshow pauses and its notice says so;
         finished, it queues a revision of the item it was opened over. The
         target is taken at the opening step and kept, because a request is about
-        the picture that prompted it, not whatever is up when the words run out.
+        the image that prompted it, not whatever is up when the words run out.
 
-        Hosted, *side* is what makes "the picture" a picture at all: two slideshows
+        Hosted, *side* is what makes "the image" an image at all: two slideshows
         run at once on the satellite regions and neither is the active window,
         so the region named is the only thing that says which one the words are
         about.

@@ -12,7 +12,7 @@ from PIL import Image
 from tools import fix_lora_trainer
 
 
-def _picture(size=(64, 48)) -> bytes:
+def _image(size=(64, 48)) -> bytes:
     written = io.BytesIO()
     Image.new("RGB", size).save(written, "PNG")
     return written.getvalue()
@@ -34,9 +34,9 @@ def _job(tmp_path, photos: dict, shared: dict | None = None) -> dict:
             "status": str(work / "status.json"), "log": str(work / "training.log")}
 
 
-def test_a_photo_that_is_no_picture_stops_the_cropping_and_says_which_to_take_out_of_where(
+def test_a_photo_that_is_no_image_stops_the_cropping_and_says_which_to_take_out_of_where(
         tmp_path):
-    job = _job(tmp_path, {"fine.png": _picture()}, shared={"broken.jpg": b"not a picture"})
+    job = _job(tmp_path, {"fine.png": _image()}, shared={"broken.jpg": b"not an image"})
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.crop(job, find=lambda image: None)
@@ -46,7 +46,7 @@ def test_a_photo_that_is_no_picture_stops_the_cropping_and_says_which_to_take_ou
 
 
 def test_photos_the_detector_finds_the_part_in_none_of_stop_the_training_and_say_so(tmp_path):
-    job = _job(tmp_path, {"one.png": _picture(), "two.png": _picture()})
+    job = _job(tmp_path, {"one.png": _image(), "two.png": _image()})
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.crop(job, find=lambda image: None)
@@ -56,7 +56,7 @@ def test_photos_the_detector_finds_the_part_in_none_of_stop_the_training_and_say
 
 
 def test_each_photo_the_part_is_found_in_becomes_a_square_crop_with_the_fixs_caption(tmp_path):
-    job = _job(tmp_path, {"found.png": _picture((400, 300)), "not.png": _picture()})
+    job = _job(tmp_path, {"found.png": _image((400, 300)), "not.png": _image()})
 
     kept = fix_lora_trainer.crop(
         job, find=lambda image: (10, 10, 50, 40) if image.size == (400, 300) else None)
@@ -75,7 +75,7 @@ def test_a_detector_that_cannot_be_read_says_so_and_where_an_agent_can_read_why(
         raise AttributeError("Can't get attribute 'Segment26'")
 
     monkeypatch.setitem(sys.modules, "ultralytics", types.SimpleNamespace(YOLO=unreadable))
-    job = _job(tmp_path, {"one.png": _picture()})
+    job = _job(tmp_path, {"one.png": _image()})
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.crop(job)
@@ -181,7 +181,7 @@ def _cropped_job(tmp_path, sd_script: str) -> dict:
     (scripts / "sdxl_train_network.py").write_text(sd_script, encoding="utf-8")
     crops = tmp_path / "work" / "crops"
     crops.mkdir(parents=True)
-    (crops / "0000.jpg").write_bytes(_picture())
+    (crops / "0000.jpg").write_bytes(_image())
     return dict(job, sd_scripts=str(scripts), base_model="base.safetensors",
                 output_dir=str(tmp_path / "loras"), output_name="hands 2026-10-21 1500")
 

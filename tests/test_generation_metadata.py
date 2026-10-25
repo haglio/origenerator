@@ -224,7 +224,7 @@ def test_a_files_row_can_be_pointed_at_a_different_output_folder(tmp_path):
 def test_created_reads_the_file_in_the_folder_it_is_given(tmp_path):
     written = tmp_path / "elsewhere" / "image"
     written.mkdir(parents=True)
-    (written / "alpha_00001_.png").write_bytes(b"a picture")
+    (written / "alpha_00001_.png").write_bytes(b"an image")
 
     item = created_item({"filename": "alpha_00001_.png", "subfolder": "image"},
                         "never", places=OutputPlaces.in_one_folder(tmp_path / "elsewhere"))

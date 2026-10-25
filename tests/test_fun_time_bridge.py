@@ -285,7 +285,7 @@ def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
         "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in portrait],
         "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in landscape],
     }
-    # The library's own row under the fabricated still, so whether a picture
+    # The library's own row under the fabricated still, so whether an image
     # carries an enhancement is read where the app reads it.
     monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [
         {**(view.row_for(item[2]) or {}), **_row_of(item)}
@@ -317,7 +317,7 @@ def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
     _press_filter_enhanced(bridge, tmp_path)
 
     assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [True, True]
-    # Each region down to the one enhanced picture it was playing.
+    # Each region down to the one enhanced image it was playing.
     assert [slideshow.pass_size() for slideshow in (portrait, landscape)] == [1, 1]
 
     _press_filter_enhanced(bridge, tmp_path)
@@ -387,7 +387,7 @@ def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, 
     assert _will_move_on(slideshow)
 
 
-def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path):
+def test_omnipause_stops_the_gallerys_own_moving_thumbnails(qtbot, tmp_path):
     """Every video tile loops a little clip of itself and the generate tabs
     play the real thing, so a paused room with the gallery in it was a wall of
     clips still going. OmniPause stops the room, not only its slideshows, and one
@@ -785,7 +785,7 @@ def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made_still_moving
     assert (locks[-1], "SET_PACE 0" in told) == ("LOCK_ON", False)
 
 
-def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_picture(
+def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_item(
         qtbot, tmp_path, monkeypatch):
     client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
     _told(tmp_path, "landscape")

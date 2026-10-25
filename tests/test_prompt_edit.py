@@ -130,7 +130,7 @@ def test_a_bracketed_weight_is_read_and_rewritten_explicitly():
 
 
 def test_the_segment_is_the_unit_a_request_acts_on():
-    # "small silver earrings" is one thing the picture has, so a request about
+    # "small silver earrings" is one thing the image has, so a request about
     # silver earrings takes the whole phrase rather than the two words inside it.
     revision = apply_request("a woman, small silver earrings, soft light", "",
                              "no silver earrings")

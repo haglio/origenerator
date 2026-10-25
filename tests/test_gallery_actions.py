@@ -70,7 +70,7 @@ def test_undo_restores_the_row_and_its_file(tmp_path):
     assert not actions.can_undo()
 
 
-def test_undoing_a_delete_after_a_newer_picture_took_its_name_lists_its_new_name(tmp_path):
+def test_undoing_a_delete_after_a_newer_image_took_its_name_lists_its_new_name(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     actions.delete_rows([_completed_row(db, output_dir, "p1", "alpha_t2i_00005_.png")])
     (output_dir / "alpha_t2i_00005_.png").write_bytes(b"newer")
@@ -467,7 +467,7 @@ def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
     assert (tmp_path / "thumbs" / "e1.jpg").exists()
 
 
-def test_undoing_a_rejection_after_a_newer_picture_took_its_name_lists_its_new_name(tmp_path):
+def test_undoing_a_rejection_after_a_newer_image_took_its_name_lists_its_new_name(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     actions.reject_experiment(_completed_row(db, output_dir, "e1", "alpha_t2i_00005_.png"))
     (output_dir / "alpha_t2i_00005_.png").write_bytes(b"newer")
@@ -569,7 +569,7 @@ def test_undoing_a_version_delete_puts_it_back(tmp_path):
     assert (output_dir / "image" / "enhanced.png").read_bytes() == b"better"
 
 
-def test_undoing_a_version_delete_after_a_newer_picture_took_its_name_lists_its_new_name(
+def test_undoing_a_version_delete_after_a_newer_image_took_its_name_lists_its_new_name(
         tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     _completed_row(db, output_dir, "p1", "alpha_t2i_00004_.png", subfolder="image")

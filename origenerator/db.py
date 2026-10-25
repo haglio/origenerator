@@ -102,8 +102,8 @@ class Database:
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
         return self.generations.set_experiment_verdict(prompt_id, verdict)
 
-    def set_picture_state(self, prompt_id: str, state: str | None):
-        return self.generations.set_picture_state(prompt_id, state)
+    def set_image_state(self, prompt_id: str, state: str | None):
+        return self.generations.set_image_state(prompt_id, state)
 
     def set_act(self, prompt_id: str, act: str | None):
         return self.generations.set_act(prompt_id, act)

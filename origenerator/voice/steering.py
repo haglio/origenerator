@@ -133,7 +133,7 @@ class VoiceSteering(QObject):
         transcription the HOSTING session heard, the way :meth:`_meaning`
         asks it of this app's own mic: first, and only while no request is
         being said.  Without this the session's "enhanced only" reached the
-        looser picture matcher, which reads it as "enhance" with a word after
+        looser image matcher, which reads it as "enhance" with a word after
         it and spends a generation on it.  Same lock as :meth:`push_dictation`,
         for the same reason.
         """

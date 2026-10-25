@@ -7,9 +7,9 @@ output, so selecting one gives an immediate moving preview without stealing audi
 
 A pane the owner has armed (:meth:`PreviewWidget.set_actions`) also carries the
 three controls a gallery thumbnail of the same generation wears in its corners,
-and offers the same right-click menu over the picture — because it IS the same
+and offers the same right-click menu over the item — because it IS the same
 generation, and where you are standing should not change what you can do to it.
-Unarmed — a live frame, a message — the picture is inert.
+Unarmed — a live frame, a message — the item is inert.
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ class PreviewWidget(QWidget):
         # something to carry, and these need a row to act on.
         self._actions_id: str | None = None
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        # Right-click the picture for the same menu a gallery thumbnail of it gives.
+        # Right-click the item for the same menu a gallery thumbnail of it gives.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
@@ -147,7 +147,7 @@ class PreviewWidget(QWidget):
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
         # Until a clip's resolution arrives, media_rect can only answer "the whole
-        # pane"; the corners have to move to the real picture once it can.
+        # pane"; the corners have to move to the real item once it can.
         self._player.metaDataChanged.connect(self._place_controls)
         self._stack.addWidget(self._video)
 
@@ -159,7 +159,7 @@ class PreviewWidget(QWidget):
         self._stack.addWidget(self._combination)
 
         # A fourth page, for what is not one generation but a whole folder of
-        # them: every picture in it, tiled to fill (see :meth:`show_folder`).
+        # them: every item in it, tiled to fill (see :meth:`show_folder`).
         self._sheet = ContactSheet()
         self._sheet.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._sheet)
@@ -201,15 +201,15 @@ class PreviewWidget(QWidget):
         This is what showing anything means, said once: the movie and the still
         are retired and the other pages put down (:meth:`_set_movie` clears the
         combination and the wall), the timeline drops, the playback stops,
-        the notice and the corner controls — both of which are about the picture
+        the notice and the corner controls — both of which are about the item
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
         anything that is not a file on disk).
 
         The two switches are the deliberate exceptions, one caller each.
         ``stop_player`` — a clip does not stop the player it is about to hand a
-        new source to. ``enhancing`` — frames of an enhancement of the picture
-        on screen are the coming state of that picture, so its notice and its
+        new source to. ``enhancing`` — frames of an enhancement of the item
+        on screen are the coming state of that item, so its notice and its
         corners are as true of them and stay.
         """
         self._set_movie(None)
@@ -237,9 +237,9 @@ class PreviewWidget(QWidget):
             self._set_movie(QMovie(str(path)), reader.size())
             self._stack.setCurrentWidget(self._image_label)
         else:
-            self._show_picture(QPixmap(str(path)))
+            self._show_image(QPixmap(str(path)))
 
-    def _show_picture(self, pixmap: QPixmap) -> None:
+    def _show_image(self, pixmap: QPixmap) -> None:
         self._pixmap = pixmap
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)
@@ -264,19 +264,19 @@ class PreviewWidget(QWidget):
         view untouched — which is why the decode happens before the pane is put
         down rather than after.
 
-        ``enhancing`` marks the frames as the coming state of the picture
+        ``enhancing`` marks the frames as the coming state of the item
         already on display — an enhancement of it — rather than a run of the
-        settings beside it. Whatever a notice says about that picture is just as
+        settings beside it. Whatever a notice says about that item is just as
         true of the version being made, so it stays where it is: cleared by each
         frame and re-asserted by each keystroke, it flickers at the rate the run
         streams while the form is being typed in. The corners stay for the same
-        reason, since what they act on is that picture.
+        reason, since what they act on is that item.
         """
         pixmap = QPixmap()
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
         self._take_the_pane(None, enhancing=enhancing, live=True)
-        self._show_picture(pixmap)
+        self._show_image(pixmap)
         self._raise_notice()  # a kept notice, back over the frame that just landed
 
     def show_combination(self, combination) -> None:
@@ -298,7 +298,7 @@ class PreviewWidget(QWidget):
         self._combination.mark_prompt_edited(edited)
 
     def show_folder(self, paths) -> None:
-        """Show a whole folder at once: every picture in ``paths``, tiled to fill.
+        """Show a whole folder at once: every item in ``paths``, tiled to fill.
 
         What a tab about a folder rather than a generation puts in the pane —
         the rewrite a folder's Request card opens. There is no one file on display, so
@@ -309,7 +309,7 @@ class PreviewWidget(QWidget):
         """
         self._take_the_pane(None)
         self._image_label.clear()
-        self._sheet.show_pictures(paths)
+        self._sheet.show_thumbnails(paths)
         self._stack.setCurrentWidget(self._sheet)
 
     def show_message(self, text: str, *, live: bool = False) -> None:
@@ -329,11 +329,11 @@ class PreviewWidget(QWidget):
     def set_notice(self, text: str | None) -> None:
         """Write ``text`` over the media, or take the notice away (``None``).
 
-        For a pane whose picture no longer answers the settings beside it: the
+        For a pane whose item no longer answers the settings beside it: the
         media stays on screen — it is still the last thing generated — but is
         plainly marked as not what those settings would now make. Anything that
         changes what's on screen clears it, so a notice can never outlive the
-        picture it was about; the owner re-asserts it if it still applies.
+        item it was about; the owner re-asserts it if it still applies.
         """
         if not text:
             self._notice.hide()
@@ -401,11 +401,11 @@ class PreviewWidget(QWidget):
 
         Media is fitted keeping its aspect ratio, so a portrait image on a wide
         screen leaves surround either side of it — which is what an overlay (the
-        slideshows' neighbor stills) needs to know to keep clear of the picture.
+        slideshows' neighbor stills) needs to know to keep clear of the item.
         Falls back to the whole media area whenever the drawn size isn't
         knowable yet -- a video whose resolution hasn't arrived, or nothing on
         screen at all -- and never to the timeline along the foot, which is no
-        picture: a corner chip laid over it, attached to the video's lower edge.
+        part of the item: a corner chip laid over it, attached to the video's lower edge.
         """
         drawn = self._drawn_size()
         if drawn is None or drawn.isEmpty():
@@ -481,11 +481,11 @@ class PreviewWidget(QWidget):
         lands on — with the state its corners report beside it: whether it is
         bookmarked, and what its enhance corner has to say
         (:func:`~origenerator.gui.corner_controls.enhance_state`). ``None`` leaves
-        the picture inert, which is what everything transient is: a live frame is
-        a file that does not exist yet, and a message is not a picture at all.
+        the item inert, which is what everything transient is: a live frame is
+        a file that does not exist yet, and a message is not an item at all.
 
         Re-armed rather than remembered, because the answers move under the
-        picture — a star toggled from the menu, an enhancement landing, a setting
+        item — a star toggled from the menu, an enhancement landing, a setting
         turned on the Enhance panel — and the owner is what hears about that.
         """
         self._actions_id = prompt_id
@@ -507,12 +507,12 @@ class PreviewWidget(QWidget):
             self.context_requested.emit(self._actions_id, self.mapToGlobal(pos))
 
     def _place_controls(self) -> None:
-        """Put the corner controls back in the corners of the picture.
+        """Put the corner controls back in the corners of the item.
 
         Re-run on every resize and every refit rather than once: what the corners
         are pinned to is the media's own rectangle, which moves whenever the pane
         does — and, for a video, again when its resolution finally arrives and the
-        pane stops guessing at where the picture is.
+        pane stops guessing at where the item is.
         """
         self._controls.place(self.media_rect())
 
@@ -552,12 +552,12 @@ class PreviewWidget(QWidget):
         """Carry the shown generation out under the shared drag type, so a combine
         slot can read its prompt_id — the same payload a gallery thumbnail drags."""
         self.drag_out.start(generation_mime(prompt_id),
-                            self._drag_picture())  # what is shown trails the cursor
+                            self._drag_thumbnail())  # what is shown trails the cursor
 
-    def _drag_picture(self) -> QPixmap:
+    def _drag_thumbnail(self) -> QPixmap:
         if self.is_showing_video():
-            picture = self._video.picture()
-            return QPixmap() if picture.isNull() else fit_thumbnail(QPixmap.fromImage(picture))
+            frame = self._video.current_frame()
+            return QPixmap() if frame.isNull() else fit_thumbnail(QPixmap.fromImage(frame))
         return label_thumbnail(self._image_label)
 
     def set_fullscreen_factory(self, make) -> None:
@@ -604,7 +604,7 @@ class PreviewWidget(QWidget):
         Every ``show_*`` passes through here, so it is also where the other pages
         are put down — a combination's clip would otherwise keep looping under
         whatever replaced it, and a folder's wall would hold every one of its
-        pictures in memory. Both :meth:`show_combination` and
+        items in memory. Both :meth:`show_combination` and
         :meth:`show_folder` call this before laying their own out, so neither
         is undoing itself.
         """

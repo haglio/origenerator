@@ -111,7 +111,7 @@ def test_a_video_asked_for_twice_is_made_once(tmp_path):
     assert asked == ["v1"]
 
 
-def test_a_picture_asks_for_no_moving_preview(tmp_path):
+def test_an_image_asks_for_no_moving_preview(tmp_path):
     previews, later, _asked = _previews(tmp_path)
 
     assert previews.of(_on_disk(tmp_path, "p1.png")) is None

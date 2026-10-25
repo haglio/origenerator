@@ -37,7 +37,7 @@ def _node(payload: dict, class_type: str) -> tuple[str, dict]:
     return found
 
 
-def test_the_workflow_is_a_video_from_a_picture_sized_off_its_inputs():
+def test_the_workflow_is_a_video_from_an_image_sized_off_its_inputs():
     wf = Wan22AnimateWorkflow()
     assert wf.name == "wan22_animate"
     assert wf.output_type == "video"
@@ -76,12 +76,12 @@ def test_the_output_size_is_derived_from_the_video_and_both_inputs_are_fitted_in
     _fitted_id, fitted_frames = _node(payload, "ImageScale")
     assert fitted_frames["inputs"] == {"image": [loader_id, 0], "upscale_method": "lanczos",
                                        "width": width, "height": height, "crop": "center"}
-    picture_id, picture = _node(payload, "LoadImage")
-    assert picture["inputs"] == {"image": "performer.png"}
-    _fitted_picture_id, fitted_picture = _node(payload, "ImageResizeKJv2")
-    assert fitted_picture["inputs"]["image"] == [picture_id, 0]
-    assert fitted_picture["inputs"]["keep_proportion"] == "pillarbox_blur"
-    assert (fitted_picture["inputs"]["width"], fitted_picture["inputs"]["height"]) == (width, height)
+    image_id, image = _node(payload, "LoadImage")
+    assert image["inputs"] == {"image": "performer.png"}
+    _fitted_image_id, fitted_image = _node(payload, "ImageResizeKJv2")
+    assert fitted_image["inputs"]["image"] == [image_id, 0]
+    assert fitted_image["inputs"]["keep_proportion"] == "pillarbox_blur"
+    assert (fitted_image["inputs"]["width"], fitted_image["inputs"]["height"]) == (width, height)
 
 
 def test_the_pose_and_the_face_are_read_off_the_fitted_frames_at_the_frames_own_resolution():
@@ -101,12 +101,12 @@ def test_the_pose_and_the_face_are_read_off_the_fitted_frames_at_the_frames_own_
         assert detector["pose_estimator"] == "dw-ll_ucoco_384_bs5.torchscript.pt"
 
 
-def test_the_animate_node_is_handed_the_picture_the_pose_and_the_face_for_the_clips_frames():
+def test_the_animate_node_is_handed_the_image_the_pose_and_the_face_for_the_clips_frames():
     payload = _payload()
-    picture_id, _ = _node(payload, "LoadImage")
-    fitted_picture_id, _ = _node(payload, "ImageResizeKJv2")
+    image_id, _ = _node(payload, "LoadImage")
+    fitted_image_id, _ = _node(payload, "ImageResizeKJv2")
     vision_id, vision = _node(payload, "CLIPVisionEncode")
-    assert vision["inputs"] == {"clip_vision": ["3", 0], "image": [picture_id, 0], "crop": "none"}
+    assert vision["inputs"] == {"clip_vision": ["3", 0], "image": [image_id, 0], "crop": "none"}
     pose_id = next(node_id for node_id, node in _nodes(payload, "DWPreprocessor")
                    if node["inputs"]["detect_face"] == "disable")
     face_id = next(node_id for node_id, node in _nodes(payload, "DWPreprocessor")
@@ -116,13 +116,13 @@ def test_the_animate_node_is_handed_the_picture_the_pose_and_the_face_for_the_cl
     assert node["inputs"] == {
         "positive": ["8", 0], "negative": ["9", 0], "vae": ["2", 0],
         "width": ["size_get", 0], "height": ["size_get", 1], "length": 81, "batch_size": 1,
-        "clip_vision_output": [vision_id, 0], "reference_image": [fitted_picture_id, 0],
+        "clip_vision_output": [vision_id, 0], "reference_image": [fitted_image_id, 0],
         "face_video": [face_id, 0], "pose_video": [pose_id, 0],
         "continue_motion_max_frames": 1, "video_frame_offset": 0,
     }
 
 
-def test_the_run_samples_on_the_distilled_model_and_trims_the_pictures_latent_before_decoding():
+def test_the_run_samples_on_the_distilled_model_and_trims_the_images_latent_before_decoding():
     payload = _payload(steps=6, cfg=1.0, shift=8.0, lora=NO_LORA)
     assert payload["4"] == {"class_type": "UNETLoader",
                             "inputs": {"unet_name": _params()["unet"], "weight_dtype": "default"}}
@@ -244,7 +244,7 @@ def test_a_video_with_no_script_leaves_the_script_to_the_metronome(tmp_path, mon
 def test_a_run_with_no_video_picked_has_nothing_to_start_from():
     wf = Wan22AnimateWorkflow()
     assert wf.missing_inputs(_params(video="")) == ["Video to Perform"]
-    assert wf.missing_inputs(_params(input_image="")) == ["Picture"]
+    assert wf.missing_inputs(_params(input_image="")) == ["Image"]
     assert wf.missing_inputs(_params()) == []
 
 

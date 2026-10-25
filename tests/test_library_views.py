@@ -13,7 +13,7 @@ from origenerator.library_views import LibraryViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
-def _picture(db, prompt_id, seed):
+def _image(db, prompt_id, seed):
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), seed=seed)
     db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version,
@@ -25,7 +25,7 @@ def _picture(db, prompt_id, seed):
 
 def test_the_same_library_is_one_reading(tmp_path):
     db = Database(tmp_path / "test.db")
-    _picture(db, "pic-1", 1)
+    _image(db, "pic-1", 1)
     views = LibraryViews(db)
 
     assert views.now() is views.now()
@@ -33,18 +33,18 @@ def test_the_same_library_is_one_reading(tmp_path):
 
 def test_a_change_to_the_library_is_read_at_once(tmp_path):
     db = Database(tmp_path / "test.db")
-    _picture(db, "pic-1", 1)
+    _image(db, "pic-1", 1)
     views = LibraryViews(db)
     views.now()
 
-    _picture(Database(tmp_path / "test.db"), "pic-2", 2)
+    _image(Database(tmp_path / "test.db"), "pic-2", 2)
 
     assert [row["prompt_id"] for row in views.now().image_rows] == ["pic-2", "pic-1"]
 
 
 def test_a_reading_holds_what_the_trash_holds(tmp_path):
     db = Database(tmp_path / "test.db")
-    _picture(db, "pic-1", 1)
+    _image(db, "pic-1", 1)
     db.record_deletion("pic-1", db.get_generation("pic-1"), {"moves": [], "subdir": None})
     db.delete_generation("pic-1")
 
@@ -53,7 +53,7 @@ def test_a_reading_holds_what_the_trash_holds(tmp_path):
 
 def test_a_settings_folder_is_looked_up_once_for_each_reading(tmp_path, monkeypatch):
     db = Database(tmp_path / "test.db")
-    _picture(db, "pic-1", 1)
+    _image(db, "pic-1", 1)
     lookups = []
     lookup = gallery.rows_in_settings
     monkeypatch.setattr(gallery, "rows_in_settings",

@@ -1,7 +1,7 @@
-"""This window as a picture, for a session whose room is in the headset.
+"""This window as a frame, for a session whose room is in the headset.
 
 A room in the headset has no monitor to put the gallery on, so the session asks
-for its picture instead (``origenerator.fun_time_mode``): every frame goes into
+for its frame instead (``origenerator.fun_time_mode``): every frame goes into
 a memory-mapped file the session names, the session draws it on a screen in the
 room, and its pointer's presses come back through a file as the words that
 module declares.  The same handover Fun Time's own library browser is shown by.
@@ -45,7 +45,7 @@ _IDLE_LOOK_S = 0.1
 
 HEARTBEAT_S = 10.0
 
-#: The longest edge a published picture may have.  The rect a session names is
+#: The longest edge a published frame may have.  The rect a session names is
 #: not a promise about the window: Qt gives it the size its own minimums allow,
 #: and it can be resized later.  So the channel is sized to this and anything
 #: bigger is scaled into it -- more pixels than the screen in the room has are
@@ -68,7 +68,7 @@ def _no_drag_can_start():
 @dataclass(frozen=True)
 class Patch:
 
-    picture: QImage
+    frame: QImage
     at: QPoint
     width: int
     height: int
@@ -108,9 +108,9 @@ def painted_over(image: QImage, patches: list[Patch]) -> QImage:
         for patch in patches:
             painter.drawImage(
                 patch.at,
-                patch.picture.scaled(patch.width, patch.height,
-                                     Qt.AspectRatioMode.KeepAspectRatio,
-                                     Qt.TransformationMode.SmoothTransformation))
+                patch.frame.scaled(patch.width, patch.height,
+                                   Qt.AspectRatioMode.KeepAspectRatio,
+                                   Qt.TransformationMode.SmoothTransformation))
     finally:
         painter.end()
     return image
@@ -130,7 +130,7 @@ def within_the_cap(image: QImage) -> QImage:
 
 
 class HeadsetWindow(QObject):
-    """The gallery's picture published for the headset, and the room's presses
+    """The gallery's frame published for the headset, and the room's presses
     on it delivered as this window's own mouse events."""
 
     def __init__(self, window: QWidget, session: FunTimeSession, parent=None) -> None:
@@ -158,7 +158,7 @@ class HeadsetWindow(QObject):
         self._timer.stop()
         self._frames.close()
         logger.info("Stopped publishing this window for the headset after %d "
-                    "pictures and %d presses", self._frames.written, self._taken)
+                    "frames and %d presses", self._frames.written, self._taken)
 
     # --- the room's presses, as this window's own events ---------------------
 
@@ -276,7 +276,7 @@ class HeadsetWindow(QObject):
             Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
             Qt.ScrollPhase.NoScrollPhase, False))
 
-    # --- this window's picture ----------------------------------------------
+    # --- this window's frame ----------------------------------------------
 
     def publish(self, now: float | None = None) -> None:
         """Write the window as it looks, unless it looks as it did last time."""

@@ -1,8 +1,8 @@
-"""This window's picture, written where the session showing it can read it.
+"""This window's frame, written where the session showing it can read it.
 
 One memory-mapped file, its header carrying a sequence number that is odd while
 a frame is being written, so a reader that looks mid-write is told to come back
-rather than handed half a picture.  The reader is the session's own
+rather than handed half a frame.  The reader is the session's own
 (``app_support.frame_channel``); the two cannot share a module until the
 family's app_support pin moves, which shared_ui and funestra hold in step.
 """

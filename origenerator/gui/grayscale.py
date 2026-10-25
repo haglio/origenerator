@@ -1,4 +1,4 @@
-"""Drain the color out of a picture shown only for what it configures.
+"""Drain the color out of a thumbnail shown only for what it configures.
 
 A video dropped into the combine panel is not what is being made — it is the
 video whose settings the run will follow. In full color beside the frame it will animate it
@@ -6,7 +6,7 @@ reads as a second subject, and a queue row showing it alone reads as a job that
 is that video. Gray says outright that it is a setting rather than a result, so
 every surface a config-only video reaches draws it through here.
 
-Alpha is carried across rather than flattened, so a picture with a cut-out edge
+Alpha is carried across rather than flattened, so a thumbnail with a cut-out edge
 stays cut out instead of gaining a gray square around it.
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ def grayscale_pixmap(pixmap: QPixmap) -> QPixmap:
     """``pixmap`` desaturated, keeping its alpha channel.
 
     A null pixmap comes back as it went in — there is nothing to drain, and the
-    callers all treat a null as "no picture" rather than as an error.
+    callers all treat a null as "no thumbnail" rather than as an error.
     """
     if pixmap.isNull():
         return pixmap

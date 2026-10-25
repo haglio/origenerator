@@ -28,9 +28,9 @@ from origenerator.gui.animation_check_window import (
     FORWARD,
     FROM_THE_ACTS_OWN,
     HEADING,
+    IMAGE,
     NEGATIVE,
     NO_SAMPLE,
-    PICTURE,
     POSITIVE,
     REJECT,
     SAID,
@@ -187,7 +187,7 @@ def test_the_pair_is_shown_at_the_size_the_window_gives_them(window, tmp_path):
     made, _store, _sent = window({(VIDEO, "alpha", "state one"): [_clip()]},
                                  look=lambda row: (str(still), None))
 
-    shown = made.findChild(QLabel, PICTURE).pixmap()
+    shown = made.findChild(QLabel, IMAGE).pixmap()
 
     assert not shown.isNull()
     assert shown.height() <= 600
@@ -240,7 +240,7 @@ def test_the_next_sample_can_only_be_asked_for_while_there_is_one(window):
 
 def test_an_animation_with_no_sample_says_so_across_the_whole_width(window):
     """Sharing the row with the sample's half it read as a caption on the
-    picture, off to the left of the window rather than centered in it."""
+    image, off to the left of the window rather than centered in it."""
     made, _store, _sent = window({})
     made.show()
     made.layout().activate()

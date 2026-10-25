@@ -35,7 +35,7 @@ PUBLISHED = {
     "disown_foreign_runs",
     "displayed_levels", "enhance_levels", "enhance_params_for",
     "enhance_run_targets_row", "enhance_target_id", "enhance_targets_row",
-    "enhanced_version_of", "enhancement_recency", "enhancements_of_pictures_gone", "find_source_image_id",
+    "enhanced_version_of", "enhancement_recency", "enhancements_of_images_gone", "find_source_image_id",
     "fix_params_for",
     "fold_completed_enhancements", "fold_enhancement",
     "folder_chain", "folder_id", "folder_key_at_level", "folder_key_for", "folder_level", "folder_names_by_row", "folder_signature",

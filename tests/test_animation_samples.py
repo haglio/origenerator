@@ -20,11 +20,11 @@ _PATHS = {
 }
 
 
-def _picture(prompt_id, state, filename=None):
+def _image(prompt_id, state, filename=None):
     return {
         "prompt_id": prompt_id, "workflow_name": "sdxl_t2i", "status": "completed",
         "positive_prompt": "scene one", "params_json": "{}",
-        "picture_state": state,
+        "image_state": state,
         "output_files": json.dumps([{"filename": filename or f"{prompt_id}.png"}]),
     }
 
@@ -48,8 +48,8 @@ def samples():
     return build
 
 
-def test_a_kept_clip_stands_as_the_example_for_its_act_and_its_pictures_state(samples):
-    rows = [_picture("pic", "state one"), _clip("clip", made_from="pic", starred=1)]
+def test_a_kept_clip_stands_as_the_example_for_its_act_and_its_images_state(samples):
+    rows = [_image("pic", "state one"), _clip("clip", made_from="pic", starred=1)]
 
     found = samples(rows)
 
@@ -63,26 +63,26 @@ def test_a_kept_clip_stands_as_the_example_for_its_act_and_its_pictures_state(sa
     {"evolver_exported_at": "2026-01-02 00:00:00"},
 ])
 def test_every_way_of_keeping_a_clip_counts(samples, mark):
-    rows = [_picture("pic", "state one"), _clip("clip", made_from="pic", **mark)]
+    rows = [_image("pic", "state one"), _clip("clip", made_from="pic", **mark)]
 
     assert samples(rows)
 
 
 def test_a_clip_nobody_kept_is_no_example(samples):
-    rows = [_picture("pic", "state one"), _clip("clip", made_from="pic")]
+    rows = [_image("pic", "state one"), _clip("clip", made_from="pic")]
 
     assert samples(rows) == {}
 
 
-def test_a_clip_whose_picture_nobody_sorted_is_no_example_yet(samples):
-    rows = [_picture("pic", None), _clip("clip", made_from="pic", starred=1)]
+def test_a_clip_whose_image_nobody_sorted_is_no_example_yet(samples):
+    rows = [_image("pic", None), _clip("clip", made_from="pic", starred=1)]
 
     assert samples(rows) == {}
 
 
 def test_only_a_looping_clip_is_an_example_for_the_loop_lane(samples):
     rows = [
-        _picture("pic", "state two"),
+        _image("pic", "state two"),
         _clip("long", made_from="pic", starred=1),
         _clip("loop", made_from="pic", starred=1, workflow="wan22_flf2v_loop"),
     ]
@@ -95,17 +95,17 @@ def test_only_a_looping_clip_is_an_example_for_the_loop_lane(samples):
 
 
 def test_an_animation_the_table_rules_out_gets_no_example_however_it_was_made(samples):
-    # A clip of an act its own picture cannot start is a clip made before the
-    # picture was sorted, or sorted since: the table is what decides.
-    rows = [_picture("pic", "state one"), _clip("clip", made_from="pic", act="beta",
-                                                starred=1)]
+    # A clip of an act its own image cannot start is a clip made before the
+    # image was sorted, or sorted since: the table is what decides.
+    rows = [_image("pic", "state one"), _clip("clip", made_from="pic", act="beta",
+                                              starred=1)]
 
     assert samples(rows) == {}
 
 
 def test_the_newest_kept_clip_leads(samples):
     rows = [
-        _picture("pic", "state one"),
+        _image("pic", "state one"),
         _clip("older", made_from="pic", starred=1, created="2026-01-01 00:00:00"),
         _clip("newest", made_from="pic", starred=1, created="2026-02-01 00:00:00"),
     ]
@@ -120,7 +120,7 @@ def test_the_newest_kept_clip_leads(samples):
 
 def test_the_animations_with_the_most_kept_clips_come_first(samples):
     rows = [
-        _picture("one", "state one"), _picture("two", "state two"),
+        _image("one", "state one"), _image("two", "state two"),
         _clip("a", made_from="two", act="beta", starred=1),
         _clip("b", made_from="two", act="beta", starred=1),
         _clip("c", made_from="one", act="alpha", starred=1),
@@ -133,7 +133,7 @@ def test_the_animations_with_the_most_kept_clips_come_first(samples):
 
 
 def test_the_animations_with_nothing_behind_them_fall_to_the_end(samples):
-    rows = [_picture("one", "state one"), _clip("c", made_from="one", starred=1)]
+    rows = [_image("one", "state one"), _clip("c", made_from="one", starred=1)]
 
     order = animation_samples.paths_in_order(rows, content=_PATHS)
 

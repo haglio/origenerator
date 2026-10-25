@@ -63,8 +63,8 @@ def _has_image(tile):
     return not tile._image.pixmap().isNull()
 
 
-def test_a_queued_tile_says_waiting_over_the_picture(qtbot):
-    # The stage is read on the scrim over the picture, the way an in-flight card
+def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
+    # The stage is read on the scrim over the thumbnail, the way an in-flight card
     # and an enhancing thumbnail say theirs.
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
@@ -195,9 +195,9 @@ def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
     tile = GeneratingTile(job, made_from=Combination(str(frame), str(clip)))
     qtbot.addWidget(tile)
 
-    picture = tile._image.pixmap()
-    assert picture is not None and not picture.isNull()
-    assert picture.width() > picture.height()   # the pair, not one picture alone
+    thumbnail = tile._image.pixmap()
+    assert thumbnail is not None and not thumbnail.isNull()
+    assert thumbnail.width() > thumbnail.height()   # the pair, not one thumbnail alone
 
 
 def test_a_tile_with_nothing_behind_it_keeps_its_plain_plate(qtbot):
@@ -249,16 +249,16 @@ def test_preview_signal_renders_image(qtbot):
     assert _has_image(tile)
 
 
-def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
-    # Overlaid rather than laid out beneath, so the picture keeps the full
+def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
+    # Overlaid rather than laid out beneath, so the thumbnail keeps the full
     # height every card in the grid gives it.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
-    picture, bar = tile._image.geometry(), tile._bar.geometry()
+    thumbnail, bar = tile._image.geometry(), tile._bar.geometry()
 
-    assert bar.bottomLeft().y() == picture.bottomLeft().y()
-    assert bar.left() == picture.left() and bar.width() == picture.width()
-    assert bar.top() > picture.center().y()
+    assert bar.bottomLeft().y() == thumbnail.bottomLeft().y()
+    assert bar.left() == thumbnail.left() and bar.width() == thumbnail.width()
+    assert bar.top() > thumbnail.center().y()
 
 
 def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):

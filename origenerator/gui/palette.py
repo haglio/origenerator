@@ -32,7 +32,7 @@ SELECTED_BORDER = as_hex(TEXT_PRIMARY)
 CARD_BORDER = as_hex(BG_BUTTON)
 CARD_HOVER_BORDER = as_hex(BORDER_PANEL)
 
-# The ground an empty slot sits on, where there is no picture to show yet.
+# The ground an empty slot sits on, where there is no thumbnail to show yet.
 EMPTY_PLATE = as_hex(BG_SECONDARY)
 
 # The frame around something still being made — a queued enhancement, a card

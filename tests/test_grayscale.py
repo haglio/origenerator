@@ -1,4 +1,4 @@
-"""Draining the color out of a picture shown only for what it configures."""
+"""Draining the color out of a thumbnail shown only for what it configures."""
 from __future__ import annotations
 
 from PIL import Image
@@ -15,7 +15,7 @@ def _filled(color, side=8):
     return QPixmap.fromImage(image)
 
 
-def test_a_colored_picture_comes_back_with_no_color_left(qapp):
+def test_a_colored_thumbnail_comes_back_with_no_color_left(qapp):
     gray = grayscale_pixmap(_filled((200, 30, 30)))
 
     color = gray.toImage().pixelColor(4, 4)
@@ -23,7 +23,7 @@ def test_a_colored_picture_comes_back_with_no_color_left(qapp):
 
 
 def test_light_and_dark_still_differ(qapp):
-    # Drained, not flattened: a gray square would say nothing about the picture.
+    # Drained, not flattened: a gray square would say nothing about the thumbnail.
     light = grayscale_pixmap(_filled((240, 240, 240))).toImage().pixelColor(4, 4)
     dark = grayscale_pixmap(_filled((20, 20, 20))).toImage().pixelColor(4, 4)
 
@@ -32,7 +32,7 @@ def test_light_and_dark_still_differ(qapp):
 
 def test_a_transparent_edge_stays_cut_out(qapp):
     # Grayscale8 carries no alpha, so a naive conversion hands back a gray square
-    # where the picture had a gap.
+    # where the thumbnail had a gap.
     image = QImage(8, 8, QImage.Format.Format_ARGB32)
     image.fill(Qt.GlobalColor.transparent)
     image.setPixelColor(4, 4, QColor(200, 30, 30, 255))
@@ -44,7 +44,7 @@ def test_a_transparent_edge_stays_cut_out(qapp):
 
 
 def test_a_null_pixmap_comes_back_as_it_went_in(qapp):
-    # Callers treat a null as "no picture", not as an error to convert.
+    # Callers treat a null as "no thumbnail", not as an error to convert.
     assert grayscale_pixmap(QPixmap()).isNull()
 
 

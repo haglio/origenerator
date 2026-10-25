@@ -18,7 +18,7 @@ class FadedBackground(QWidget):
         super().__init__(window, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         area = window.geometry()
-        self._picture = blurred_and_dimmed(_what_the_screen_shows(window, area), area.size())
+        self._grab = blurred_and_dimmed(_what_the_screen_shows(window, area), area.size())
         self.setGeometry(area)
         self.setWindowOpacity(0.0)
         self._fade_in = QPropertyAnimation(self, b"windowOpacity", self)
@@ -31,7 +31,7 @@ class FadedBackground(QWidget):
 
     def paintEvent(self, _event):
         painter = QPainter(self)
-        painter.drawPixmap(self.rect(), self._picture)
+        painter.drawPixmap(self.rect(), self._grab)
 
 
 def _what_the_screen_shows(window: QWidget, area: QRect) -> QPixmap:

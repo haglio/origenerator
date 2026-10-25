@@ -448,7 +448,7 @@ def _click_at(window, rect) -> None:
     window._pane.release()
 
 
-def test_a_picture_still_being_generated_is_drawn_on_the_map_without_its_frame_bytes(qtbot):
+def test_an_image_still_being_generated_is_drawn_on_the_map_without_its_frame_bytes(qtbot):
     window = _window(qtbot, [("scene one.png", "image", "id-one")])
     window.slideshow.note_generating("id-run", b"\x89PNG frame bytes")
     window.slideshow.slideshow_step(1)
@@ -465,7 +465,7 @@ class TestTheQueueOnTheOnePanel:
     A slideshow covers the strip, and a slideshow is when the user keeps adding to it
     (locking a slide asks for an enhancement).  It used to float in the
     lower-left corner as a plate of its own, which is a second panel over the
-    same picture.
+    same image.
     """
 
     def test_what_is_in_flight_is_a_block_of_the_panel(self, qtbot):
@@ -531,7 +531,7 @@ class TestTheRowOnTheOnePanel:
 
         assert panel_targets(window).row is not None
 
-    def test_a_slideshow_of_a_picture_keeps_the_scrubber_on_the_panel(self, qtbot):
+    def test_a_slideshow_of_an_image_keeps_the_scrubber_on_the_panel(self, qtbot):
         window = self._window(qtbot, [("scene one.png", "image")])
         window._pane._engine.showing_picture = True
 
@@ -552,7 +552,7 @@ class TestTheRowOnTheOnePanel:
 
         assert window._pane._engine.position_ms == pytest.approx(30_000, abs=200)
 
-    def test_pressing_the_middle_of_a_pictures_track_takes_its_time_back_to_the_middle(
+    def test_pressing_the_middle_of_an_images_track_takes_its_time_back_to_the_middle(
             self, qtbot):
         window = self._window(qtbot, [("scene one.png", "image")])
         engine = window._pane._engine
@@ -614,7 +614,7 @@ class TestTheRowOnTheOnePanel:
 class TestASlideshowOverASessionsRegion:
     """A slideshow over a session's region in a window of this app's hands the
     transport to the session; what only it holds -- which version of the
-    picture is on screen, how fast its own Funestra plays -- it answers here."""
+    image is on screen, how fast its own Funestra plays -- it answers here."""
 
     @staticmethod
     def _slideshow_over_a_region(qtbot, tmp_path, items, **kw):
@@ -626,7 +626,7 @@ class TestASlideshowOverASessionsRegion:
         window._pane.tick()
         return window
 
-    def test_its_versions_button_steps_the_picture_on_screen(self, qtbot, tmp_path):
+    def test_its_versions_button_steps_the_image_on_screen(self, qtbot, tmp_path):
         enhanced, original = str(tmp_path / "e1.png"), str(tmp_path / "src.png")
         window = self._slideshow_over_a_region(qtbot, tmp_path, [(enhanced, "image", "id-a")])
         window.slideshow.set_levels({enhanced: [(enhanced, "image", "Enhanced"), (original, "image", "Base")]})
@@ -644,7 +644,7 @@ class TestASlideshowOverASessionsRegion:
 
         assert window._pane.playback.speed > before
 
-    def test_a_double_click_on_its_picture_leaves_the_room_as_it_was(self, qtbot, tmp_path):
+    def test_a_double_click_on_its_image_leaves_the_room_as_it_was(self, qtbot, tmp_path):
         asked = []
         window = self._slideshow_over_a_region(
             qtbot, tmp_path, [("scene one.png", "image")],

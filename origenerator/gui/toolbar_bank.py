@@ -160,7 +160,7 @@ class ToolbarBank(QWidget):
 
     ``hosted`` builds no Origenerator Radio switch and no microphone: inside a
     Fun Time session each Satellite Funestra plays its own stations, tuned in
-    while a picture is up, and the session owns the mic, so a switch for either
+    while an image is up, and the session owns the mic, so a switch for either
     here would be a switch over something this window does not hold. There is
     no OSR2 switch here at all any more: the Funestras' console carries one, on
     driving and off parked, and that is where the device is switched now, on
@@ -226,7 +226,7 @@ class ToolbarBank(QWidget):
                 icons.mic_icon(),
                 "Listen: bare words for the collections and this bank (“experiments”, "
                 "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
-                "“weird”, “lock”), orders about the picture (“enhance”, “fix "
+                "“weird”, “lock”), orders about the image (“enhance”, “fix "
                 "hands”, “animate as kino”), and prompt steering while a folder is "
                 "auto-generating",
                 acts.toggle_mic, checkable=True,

@@ -480,7 +480,7 @@ def _session_with_dashboard(tmp_path):
 
 
 def _fox_library(tmp_path):
-    """Four portrait pictures — two of one configuration under two seeds, a
+    """Four portrait images — two of one configuration under two seeds, a
     third of the first seed under an edited prompt, and a stranger — and a
     video animated from the first of them."""
     tall = tmp_path / "tall.png"
@@ -501,7 +501,7 @@ def _fox_library(tmp_path):
 
 def _open_the_fox_slideshow(qtbot, view, monkeypatch, rows):
     """The fox library as a portrait slideshow, standing on the first fox."""
-    view.refresh()      # the pictures are indexed, as they are once the app is up
+    view.refresh()      # the images are indexed, as they are once the app is up
     monkeypatch.setattr(view, "rows_to_play", lambda: rows)
     monkeypatch.setattr(view._slideshows, "items_of", _as_items)
     monkeypatch.setattr(view, "slideshow_subject", lambda: "the fox folder")
@@ -516,7 +516,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     """The slide in the corner; the same configuration under its other seed
     running right; its own seed under another configuration running down,
     named by that folder, and then the video animated from it, named for its
-    act, with the picture's own row named as that video's source; the corner
+    act, with the image's own row named as that video's source; the corner
     lit and no loop — the Funestras' map, drawn against this app's library of
     that side's shape."""
     rows = _fox_library(tmp_path)
@@ -561,7 +561,7 @@ def test_the_map_re_homes_on_whatever_the_slideshow_moves_to(qtbot, tmp_path, mo
 
 def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, tmp_path, monkeypatch):
     """The column can name a generation outside the set a slideshow opened with —
-    a video of this picture, which lives in a folder of its own — and a
+    a video of this image, which lives in a folder of its own — and a
     click on it plays it, spliced in after the slide on screen."""
     rows = _fox_library(tmp_path)
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
@@ -852,7 +852,7 @@ def test_a_spoken_favorites_is_the_slideshows_own_f_mode(qtbot, tmp_path, monkey
 
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     """"landscape fix teeth": hosted, two slideshows run and NEITHER is the active
-    window, so the side word is the only thing that says which picture."""
+    window, so the side word is the only thing that says which image."""
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
@@ -907,7 +907,7 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
     slideshow.tick()
 
     # The item held, not a sibling of it: every seed of one set of settings shares a
-    # settings folder, so a tab picked by folder came up on the wrong picture.
+    # settings folder, so a tab picked by folder came up on the wrong image.
     assert opened == ["id-tall-0"]
     assert navigated == ["id-tall-0"]  # and the browser went there too
 
@@ -1162,7 +1162,7 @@ def _a_looping_clip(tmp_path):
     return rows, webp
 
 
-def _moving_pictures(view):
+def _moving_thumbnails(view):
     return [label for label in view.findChildren(QLabel)
             if label.movie() is not None
             and label.movie().state() == QMovie.MovieState.Running]
@@ -1184,14 +1184,14 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     view.animated_preview = lambda row: str(webp)
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
-    assert _moving_pictures(view), "nothing was moving, so the sweep would prove nothing"
+    assert _moving_thumbnails(view), "nothing was moving, so the sweep would prove nothing"
 
     view.set_room_paused(True)
 
-    assert _moving_pictures(view) == []
+    assert _moving_thumbnails(view) == []
 
     view.set_room_paused(False)
-    assert _moving_pictures(view)
+    assert _moving_thumbnails(view)
 
 
 def test_omnipause_reaches_a_slideshow_the_region_map_does_not_answer_for(
@@ -1233,10 +1233,10 @@ def test_a_frozen_slideshow_does_not_walk_past_an_unplayable_clip(qtbot, tmp_pat
     assert slideshow._set.playlist.index == at
 
 
-def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
-    """In the RFB's upright column a portrait picture stacked over the settings
+def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
+    """In the RFB's upright column a portrait image stacked over the settings
     pushes every prompt field off the foot, so the two go side by side —
-    settings left, picture right, the order they are read in."""
+    settings left, image right, the order they are read in."""
     panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(panel)
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
@@ -1249,8 +1249,8 @@ def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
     assert panel._media_split.indexOf(panel._preview_pane) == 1
 
 
-def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
-    """A wide picture beside a form gets a column too narrow to show it, and the
+def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
+    """A wide image beside a form gets a column too narrow to show it, and the
     form loses the width its prompt fields need."""
     panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(panel)
@@ -1262,7 +1262,7 @@ def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
     assert panel._media_split.indexOf(panel._preview_pane) == 0
 
 
-def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_form(qtbot):
+def test_a_panel_taken_into_a_session_stands_its_portrait_image_beside_the_form(qtbot):
     panel = GenerateConfigPanel(None, FakeDB([]))
     qtbot.addWidget(panel)
     panel._preview._pixmap = QPixmap(400, 900)
@@ -1274,7 +1274,7 @@ def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_for
     assert panel._media_split.indexOf(panel._settings_pane) == 0
 
 
-def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the_form(qtbot):
+def test_a_panel_handed_back_from_a_session_stacks_its_portrait_image_over_the_form(qtbot):
     panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(panel)
     panel._preview._pixmap = QPixmap(400, 900)
@@ -1287,8 +1287,8 @@ def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the
     assert panel._media_split.indexOf(panel._preview_pane) == 0
 
 
-def test_a_picture_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
-    """A landscape picture after a portrait one in the same tab came back with
+def test_an_image_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
+    """A landscape image after a portrait one in the same tab came back with
     a third of the column where a fresh tab gives it two thirds, and so did
     every portrait tab a session handed back."""
     panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
@@ -1304,8 +1304,8 @@ def test_a_picture_back_from_beside_the_form_takes_the_larger_share_again(qtbot)
     panel._reflow_for_the_media()
     qtbot.wait(1)
 
-    picture, settings = panel._media_split.sizes()
-    assert picture > settings
+    media, settings = panel._media_split.sizes()
+    assert media > settings
 
 
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
@@ -1490,7 +1490,7 @@ def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_
     assert slideshow.shown.isFullScreen()
 
 
-def test_a_gallery_handed_back_from_a_frozen_session_lets_its_pictures_move_again(qtbot, tmp_path):
+def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_again(qtbot, tmp_path):
     rows, webp = _a_looping_clip(tmp_path)
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -1502,7 +1502,7 @@ def test_a_gallery_handed_back_from_a_frozen_session_lets_its_pictures_move_agai
 
     view.become_standalone()
 
-    assert _moving_pictures(view)
+    assert _moving_thumbnails(view)
 
 
 def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qtbot):
@@ -1645,9 +1645,9 @@ def test_standalone_never_stands_them_side_by_side(qtbot):
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
 
 
-def test_a_tab_coming_to_the_front_lays_out_for_its_own_picture(qtbot):
+def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
     """The shape belongs to the tab, so switching to one holding a landscape
-    picture stands the panes back up — without waiting for something else to
+    image stands the panes back up — without waiting for something else to
     nudge the splitter, which is all that used to bring them back."""
     tabs = InfoPaneTabs(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tabs)
@@ -1656,7 +1656,7 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_picture(qtbot):
     portrait_tab.refresh_media_layout()
     assert portrait_tab._media_split.orientation() == Qt.Orientation.Horizontal
 
-    # A second tab holding a landscape picture; switching to it stands it up.
+    # A second tab holding a landscape image; switching to it stands it up.
     tabs._add_subtab()
     landscape_tab = tabs.currentWidget()
     landscape_tab._preview._pixmap = QPixmap(1200, 700)
@@ -1699,7 +1699,7 @@ def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
 
 def test_a_hosted_slideshows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp_path, monkeypatch):
     """The two filters a slideshow has are the two switches its HUD carries: F-mode
-    over the favorites, and beside it the switch keeping only the pictures the
+    over the favorites, and beside it the switch keeping only the images the
     slideshow has enhanced.  A press lands on the slideshow itself, hosted like standalone
     — it is the slideshow's own narrowing, not the session's — and the title
     names the cut beside the rest."""

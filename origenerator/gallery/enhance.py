@@ -188,11 +188,11 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     return []
 
 
-def enhanced_version_of(image_ref: str | None, picture: dict) -> str | None:
-    plain = {_frame_name(f.get("filename")) for f in original_files_of(picture)}
+def enhanced_version_of(image_ref: str | None, image: dict) -> str | None:
+    plain = {_frame_name(f.get("filename")) for f in original_files_of(image)}
     if _frame_name(image_ref) not in plain:
         return None
-    return output_file_reference(row_output_files(picture))
+    return output_file_reference(row_output_files(image))
 
 
 def is_enhanced_row(row: dict) -> bool:
@@ -325,7 +325,7 @@ def enhance_run_targets_row(enhance_of: str | None, input_image: str | None,
 
     The one predicate every live surface asks — the tile under its scrim, the
     tab's version list, the slideshow's notice — so they all point the same run at
-    the same picture.
+    the same image.
     """
     if enhance_of:
         return row.get("prompt_id") == enhance_of
@@ -544,17 +544,17 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
     model the image was finished at. An image never enhanced runs at
     ``settings`` the way any first enhance would.
 
-    **The passes are what was asked for and what the picture already carries —
+    **The passes are what was asked for and what the image already carries —
     never what the panel happens to have ticked.** A spoken fix is a targeted
     act made with no view of the Enhance panel, so a folder configured to fix
     every part must not turn "fix teeth" into a pass over all of them: that is
-    a redraw of the whole picture in answer to a command about one part of it.
+    a redraw of the whole image in answer to a command about one part of it.
     The panel is still read for the *number* each part runs at, since nobody
     says a denoise out loud —
     :data:`~origenerator.workflows.detail_parts.DEFAULT_FIX_DENOISE` where it
     has none.
 
-    What the picture already carries does ride along: a "fix eyes" after a "fix
+    What the image already carries does ride along: a "fix eyes" after a "fix
     teeth" redraws both rather than trading the mended teeth away — every
     enhance re-derives from the original, so a pass left out is a fix undone on
     screen. Asking for a part again replaces its earlier pass instead of
@@ -614,7 +614,7 @@ def is_enhance_product_row(row: dict) -> bool:
     and a fold creates none), so the enhanced file reaches the production app as a
     bare file on disk and the import scan reconstructs it from the embedded
     graph: a standalone image, workflow read as ``sdxl_t2i``, with a start-frame
-    tile pointing at the very picture it is a version of. That is the shape this
+    tile pointing at the very image it is a version of. That is the shape this
     recognizes — what the enhance workflow wrote, however the row got here.
 
     So the test is the file, not the workflow name: every output named with

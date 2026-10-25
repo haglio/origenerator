@@ -147,7 +147,7 @@ class TestOutOfSight:
     def test_a_window_stays_out_of_sight_until_it_is_brought_back(self):
         """A window handed to a room in the headset is out of sight for as long
         as the room has it, which is no block to hold.  DWM draws a cloaked
-        window as it always did, so there is still a picture to publish."""
+        window as it always did, so there is still a frame to publish."""
         with patch("origenerator.win32._user32") as user32, \
                 patch("origenerator.win32._dwmapi") as dwm:
             user32.IsWindow.return_value = 1

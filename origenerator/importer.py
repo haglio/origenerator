@@ -335,12 +335,12 @@ def backfill_import_params(db: Database, places: OutputPlaces) -> int:
     """Give every import the settings its own file states and its row is
     missing — the size it was made at, what it was told to avoid, the models it
     loaded, the image it started from, the sound it was scored with — read off
-    its stored graph, and its size off the picture itself where the graph gives
+    its stored graph, and its size off the file itself where the graph gives
     none.
 
     An import records only what the reading of a file knew to look for on the
     day it landed, and everything it missed then comes from the workflow's
-    defaults wherever the app shows that picture's configuration: a portrait
+    defaults wherever the app shows that item's configuration: a portrait
     import read before sizes were read offered a landscape re-roll. So the
     reading is run again, filling only keys the row lacks — what the app
     generated itself is already complete, and a re-roll's own edits (a fresh
@@ -649,7 +649,7 @@ def _extract_metadata(fpath: Path, suffix: str, kind: MediaType | None = None) -
     prefix is the first guess at which workflow ran and the graph overrules it
     where it can tell (:func:`_reconciled`), because a file can be renamed and a
     prefix reused. Where the graph states no size for a workflow that asks for
-    one, the picture itself does (:func:`_size_from_its_own_file`).
+    one, the file itself does (:func:`_size_from_its_own_file`).
     """
     kind = kind or media_type_from_filename(fpath.name)
     graph = graph_in_file(fpath, suffix)

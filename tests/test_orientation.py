@@ -66,7 +66,7 @@ def _thumbed(row: dict, tmp_path: Path, width: int, height: int) -> dict:
 
 
 def _shaped(row: dict, tmp_path: Path, width: int, height: int) -> dict:
-    """A picture of this shape in a folder whose size says the same."""
+    """An image of this shape in a folder whose size says the same."""
     params = gallery.parse_params(row["params_json"])
     row["params_json"] = json.dumps({**params, "width": width, "height": height})
     return _thumbed(row, tmp_path, width, height)
@@ -92,9 +92,9 @@ def test_rows_are_dealt_to_the_side_their_folders_shape_names(tmp_path):
     assert filter_rows([tall, wide], None) == [tall, wide]
 
 
-def test_a_picture_goes_to_the_side_its_folder_names_whatever_its_own_shape(tmp_path):
+def test_an_image_goes_to_the_side_its_folder_names_whatever_its_own_shape(tmp_path):
     # The side is the folder's, read off the size its configuration states, so
-    # every picture in one folder sits on one side -- and a picture that
+    # every image in one folder sits on one side -- and an image that
     # disagrees with its folder shows up there rather than hiding on the other.
     wide = _row("w1", "sdxl_t2i",
                 {"positive_prompt": "scene one", "width": 720, "height": 1280},
@@ -103,16 +103,16 @@ def test_a_picture_goes_to_the_side_its_folder_names_whatever_its_own_shape(tmp_
     assert row_orientation(wide) == "portrait"
 
 
-def test_a_generation_with_no_picture_yet_goes_by_the_size_it_asked_for():
+def test_a_generation_with_no_image_yet_goes_by_the_size_it_asked_for():
     """Its folder joins the tree the moment it starts running, and it has to
-    join on the side the picture will land on rather than move there later."""
+    join on the side the image will land on rather than move there later."""
     in_flight = _row("c1", "sdxl_t2i",
                    {"positive_prompt": "scene three", "width": 720, "height": 1280},
                    "sdxl_t2i_c1.png")  # nothing on disk yet, so only the size answers
     assert row_orientation(in_flight) == "portrait"
 
 
-def test_a_video_being_made_from_a_picture_goes_by_that_pictures_shape(tmp_path):
+def test_a_video_being_made_from_an_image_goes_by_that_images_shape(tmp_path):
     # An i2v asks for no size — it keeps its start frame's aspect at a fixed
     # pixel budget in-graph — so the frame is the only thing saying which way
     # the video will come out. Without it a running portrait video sat on the
@@ -145,7 +145,7 @@ def test_an_unreadable_shape_files_under_landscape():
 
 
 def _start_frame(tmp_path: Path, name: str, width: int, height: int) -> Path:
-    """A picture on disk for a run to be conditioned on, named as an image row's
+    """An image on disk for a run to be conditioned on, named as an image row's
     own output is — which is how a start frame resolves back to its generation."""
     path = tmp_path / name
     Image.new("RGB", (width, height)).save(path)
@@ -162,15 +162,15 @@ def _video_in_flight(prompt_id: str, frame: Path, **params) -> dict:
 
 
 def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
-    """A folder's key names the picture the run animates, and that picture can be
-    on the other side — here a tall picture in a folder whose size says
-    landscape, so the picture sits under Landscape while the clip made from its
+    """A folder's key names the image the run animates, and that image can be
+    on the other side — here a tall image in a folder whose size says
+    landscape, so the image sits under Landscape while the clip made from its
     tall frame sits under Portrait. Each side draws its own tree, but from the
-    whole library's start frames: keyed off its own side's pictures alone, the
+    whole library's start frames: keyed off its own side's images alone, the
     Portrait tree would draw this folder under a name nothing else in the app
     computes, and the click on its queue row would find no row and do nothing."""
     frame = _start_frame(tmp_path, "sdxl_t2i_p3.png", 90, 160)
-    picture = _thumbed(
+    image = _thumbed(
         _row("p3", "sdxl_t2i",
              {"positive_prompt": "scene three", "steps": 50, "seed": 3,
               "width": 1280, "height": 720},
@@ -178,13 +178,13 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
         tmp_path, 90, 160)
     in_flight = _video_in_flight("v3", frame)
 
-    view = GalleryView(FakeDB([picture, in_flight]))
+    view = GalleryView(FakeDB([image, in_flight]))
     qtbot.addWidget(view)
     view.refresh()
     view._update_queue()
 
     folder = gallery.settings_folder_key(
-        in_flight, gallery.build_image_config_index([picture]))
+        in_flight, gallery.build_image_config_index([image]))
     (row,) = view._queue.rows()
     qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
     assert view.selected_folder_key() == oriented_key(folder, "portrait")
@@ -235,7 +235,7 @@ def test_the_pane_puts_both_shapes_in_one_list_when_asked(qtbot, tmp_path):
 
 
 def _in_flight(prompt_id: str, width: int, height: int, status: str, seed: int = 1) -> dict:
-    """A picture still being made: no file yet, so its shape is the size it asked for."""
+    """An image still being made: no file yet, so its shape is the size it asked for."""
     return _row(prompt_id, "sdxl_t2i",
                 {"positive_prompt": "scene six", "steps": 50, "seed": seed,
                  "width": width, "height": height},

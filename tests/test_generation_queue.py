@@ -65,8 +65,8 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                         shield=shield, shielded=shielded)
 
 
-def _picture(path, color=(0, 0, 255)):
-    """A file standing in for a finished render, for the row's picture block."""
+def _image(path, color=(0, 0, 255)):
+    """A file standing in for a finished render, for the row's thumbnail block."""
     Image.new("RGB", (60, 40), color).save(path)
     return str(path)
 
@@ -251,7 +251,7 @@ def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):
 
 
 def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
-    # Sizing the label alone would leave the picture its old size in the middle
+    # Sizing the label alone would leave the thumbnail its old size in the middle
     # of a bigger blank square.
 
     queue.set_items([_item(status="running", frame=_png_bytes())])
@@ -267,22 +267,22 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
     # It shows what the config tab shows for the same job — the frame being
     # animated — until there is a frame of the run itself.
 
-    frame = _picture(tmp_path / "frame.png")
+    frame = _image(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame)])
     QApplication.processEvents()
     corner = queue._running._frame
 
     assert corner.pixmap() is not None and not corner.pixmap().isNull()
-    assert corner.width() == corner.height()   # one picture, one square
+    assert corner.width() == corner.height()   # one thumbnail, one square
 
 
 def test_the_corner_stands_the_source_video_beside_the_frame_where_there_is_one(queue, tmp_path):
-    # A combine's job is a picture and a past clip's settings, and that is what
+    # A combine's job is an image and a past clip's settings, and that is what
     # the config tab shows above the form. The corner says the same thing, the
     # clip drawn gray beside the frame — so it needs the room for two.
 
-    frame = _picture(tmp_path / "frame.png")
-    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
+    frame = _image(tmp_path / "frame.png")
+    video = _image(tmp_path / "source.png", color=(255, 0, 0))
     queue.set_items([_item(job_kind="Video", source_image=frame, source_video_thumbnail=video)])
     QApplication.processEvents()
     corner = queue._running._frame
@@ -291,9 +291,9 @@ def test_the_corner_stands_the_source_video_beside_the_frame_where_there_is_one(
 
 
 def test_a_live_frame_takes_the_corner_back_from_the_start_frame(queue, tmp_path):
-    # Once the run has a picture of its own, that is what the corner is for.
+    # Once the run has a thumbnail of its own, that is what the corner is for.
 
-    frame = _picture(tmp_path / "frame.png")
+    frame = _image(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame, frame=_png_bytes())])
     QApplication.processEvents()
     corner = queue._running._frame
@@ -303,8 +303,8 @@ def test_a_live_frame_takes_the_corner_back_from_the_start_frame(queue, tmp_path
 
 
 def test_a_run_made_from_nothing_leaves_the_corner_empty(queue):
-    # An image drawn from a prompt has no picture to its name yet, and a stand-in
-    # for one would be a picture of something that has nothing to do with it.
+    # An image drawn from a prompt has no thumbnail to its name yet, and a stand-in
+    # for one would be a thumbnail of something that has nothing to do with it.
 
     queue.set_items([_item(job_kind="Image")])
     QApplication.processEvents()
@@ -447,13 +447,13 @@ def test_our_first_job_beside_another_apps_backlog_brings_its_rule(dressed, qtbo
 
 def test_the_rule_keeps_to_the_gap_when_the_live_half_widens(dressed, qtbot, tmp_path):
     # A combine's job stands its frame and its source video side by side in the
-    # corner, twice the width of one picture, which pushes the line over.
+    # corner, twice the width of one thumbnail, which pushes the line over.
     dressed.set_items([_item(job_kind="Video")])
     _settled(dressed)
     was = dressed.head_rule()[0]
 
-    dressed.set_items([_item(job_kind="Video", source_image=_picture(tmp_path / "frame.png"),
-                             source_video_thumbnail=_picture(tmp_path / "source.png"))])
+    dressed.set_items([_item(job_kind="Video", source_image=_image(tmp_path / "frame.png"),
+                             source_video_thumbnail=_image(tmp_path / "source.png"))])
 
     qtbot.waitUntil(lambda: dressed.head_rule()[0].x() > was.x() and _rule_on_screen(dressed))
     assert _on_screen(dressed).pixelColor(was).name() != BORDER_SUBTLE.name()
@@ -505,7 +505,7 @@ def test_a_row_relabels_in_place_when_its_folders_loop_is_switched_off(queue):
     assert queue.rows()[0]._cancel.text() == "Cancel"
 
 
-# --- the shield, which keeps a run going for the pictures asked for after it ----
+# --- the shield, which keeps a run going for the images asked for after it ----
 
 def test_every_row_leads_with_its_shield_just_left_of_its_cancel(queue):
     queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None),
@@ -583,7 +583,7 @@ def test_double_clicking_a_row_opens_that_folder_too(queue, qtbot):
 
 
 def test_the_live_frame_opens_the_running_jobs_folder_too(queue, qtbot):
-    """The picture of what is being made is a picture of a job, so it goes where
+    """The thumbnail of what is being made is a thumbnail of a job, so it goes where
     that job's row goes — the same click, the same folder."""
     revealed = []
     queue.set_items([_item(key="a", reveal=lambda: revealed.append("a"))])
@@ -596,7 +596,7 @@ def test_the_live_frame_opens_the_running_jobs_folder_too(queue, qtbot):
 
 
 def test_the_bar_beside_the_live_frame_is_not_a_way_into_a_folder(queue, qtbot):
-    """The bar is a reading of the job rather than a picture of it, and the note
+    """The bar is a reading of the job rather than a thumbnail of it, and the note
     under it is about the shared server — neither is something you click through
     to a folder."""
     revealed = []
@@ -658,7 +658,7 @@ def test_a_job_of_ours_being_made_keeps_the_slot_for_its_bar(queue):
     assert not queue._running._caption.isVisible()
 
 
-def test_a_video_waiting_out_the_minute_after_a_picture_counts_down_under_the_bar(queue):
+def test_a_video_waiting_out_the_minute_after_an_image_counts_down_under_the_bar(queue):
     # The half-second keeps the count a clear half-second off a rollover.
     queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
     assert _timing(queue) == "Starts in 0:43"
@@ -1081,7 +1081,7 @@ def test_a_hand_launched_job_says_neither(queue):
 def test_a_row_names_the_act_it_was_asked_for(queue):
     # The kind says a video is being made; the act says which video —
     # the whole of what the user chose in Combine, and the one thing separating
-    # two runs on the same picture.
+    # two runs on the same image.
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
                            act="dancing")])
     assert queue.rows()[0]._lead.text() == "~2 min · Video · dancing"
@@ -1126,29 +1126,29 @@ def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
     assert "Queued by a request" in tip
 
 
-# --- the picture a queued job can be recognized by ----------------------------
+# --- the thumbnail a queued job can be recognized by ----------------------------
 
 def test_an_image_to_video_row_shows_the_frame_it_animates(queue, tmp_path):
     # Two i2v rows off one folder's settings carry the same caption; the frame is the whole
     # of what tells them apart.
-    frame = _picture(tmp_path / "frame.png")
+    frame = _image(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame,
-                           folder_thumbnails=(_picture(tmp_path / "other.png"),))])
+                           folder_thumbnails=(_image(tmp_path / "other.png"),))])
     assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame))
 
 
 def test_a_row_with_no_frame_shows_what_its_folder_holds(queue, tmp_path):
     # A job whose output doesn't exist yet is placed by the folder it will land
     # in — what the same settings made last time.
-    mates = tuple(_picture(tmp_path / f"{i}.png") for i in range(3))
+    mates = tuple(_image(tmp_path / f"{i}.png") for i in range(3))
     queue.set_items([_item(job_kind="Image", folder_thumbnails=mates)])
     assert queue.rows()[0]._thumbs._showing == ("folder", mates)
 
 
 def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_path):
     # A video queued after the image it animates names a start frame that isn't
-    # on disk. Better its folder than a blank square where a picture was promised.
-    mates = (_picture(tmp_path / "mate.png"),)
+    # on disk. Better its folder than a blank square where a thumbnail was promised.
+    mates = (_image(tmp_path / "mate.png"),)
     queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
                            folder_thumbnails=mates)])
     assert queue.rows()[0]._thumbs._showing == ("folder", mates)
@@ -1158,10 +1158,10 @@ def test_a_combine_row_shows_the_frame_and_the_source_video_it_follows(queue, tm
     # Not the source video alone: that reads as a job that IS that clip. The
     # frame being animated leads, and the video whose settings are being reused
     # sits beside it (drawn gray, see queue_thumbs).
-    frame = _picture(tmp_path / "frame.png")
-    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
+    frame = _image(tmp_path / "frame.png")
+    video = _image(tmp_path / "source.png", color=(255, 0, 0))
     queue.set_items([_item(job_kind="Video", source_image=frame, source_video_thumbnail=video,
-                           folder_thumbnails=(_picture(tmp_path / "other.png"),))])
+                           folder_thumbnails=(_image(tmp_path / "other.png"),))])
     assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, video))
 
 
@@ -1169,17 +1169,17 @@ def test_a_combine_row_keeps_its_source_video_while_the_frame_is_still_rendering
     # A chained run draws its frame first, so the video after it names one that
     # isn't on disk yet. The source video is about this run either way — better it than
     # the folder, which says only where the result will land.
-    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
+    video = _image(tmp_path / "source.png", color=(255, 0, 0))
     queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
                            source_video_thumbnail=video,
-                           folder_thumbnails=(_picture(tmp_path / "mate.png"),))])
+                           folder_thumbnails=(_image(tmp_path / "mate.png"),))])
     assert queue.rows()[0]._thumbs._showing == ("source", Combination(None, video))
 
 
 def test_a_combine_row_whose_prompt_was_edited_draws_its_source_video_in_parentheses(queue,
                                                                                      tmp_path):
-    frame = _picture(tmp_path / "frame.png")
-    video = _picture(tmp_path / "source.png", color=(255, 0, 0))
+    frame = _image(tmp_path / "frame.png")
+    video = _image(tmp_path / "source.png", color=(255, 0, 0))
     queue.set_items([_item(job_kind="I2V", source_image=frame, source_video_thumbnail=video,
                            prompt_edited=True)])
     assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, video, True))
@@ -1219,13 +1219,13 @@ def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
     assert row._note.toolTip() == "Starting…"
 
 
-def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
+def test_the_thumbnail_sits_at_the_near_edge_of_the_line(queue, tmp_path):
     # Straight after the button rather than out past the text: there the blocks
     # stack into a column at the edge the eye starts from, and a row whose text
     # runs long can never carry one off the far end.
 
     queue.set_items([_item(job_kind="Image", status="queued", starting=True,
-                           folder_thumbnails=(_picture(tmp_path / "m.png"),))])
+                           folder_thumbnails=(_image(tmp_path / "m.png"),))])
     QApplication.processEvents()
     row = queue.rows()[0]
 
@@ -1234,7 +1234,7 @@ def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
 
 def test_a_job_with_nothing_to_show_carries_no_block(queue):
     # The first run of brand-new settings: no frame, and an empty folder. An empty
-    # grid would read as a picture that failed to load.
+    # grid would read as a thumbnail that failed to load.
     queue.set_items([_item(job_kind="Image")])
     assert queue.rows()[0]._thumbs.isHidden()
 

@@ -12,7 +12,7 @@ from origenerator.trash import Trash
 
 def _places(tmp_path: Path) -> OutputPlaces:
     library = tmp_path / "library"
-    return OutputPlaces(comfyui=tmp_path / "comfyui saves", pictures=library / "pictures",
+    return OutputPlaces(comfyui=tmp_path / "comfyui saves", images=library / "images",
                         videos=library / "videos", scripts=library / "scripts",
                         audio=library / "sounds", trash=tmp_path / "trash")
 
@@ -40,29 +40,29 @@ def _listed(prompt_id: str, subfolder: str, name: str, **extra) -> dict:
             "type": "output", **extra}
 
 
-def test_a_finished_picture_is_filed_in_the_pictures_folder_after_the_highest_number_there(
+def test_a_finished_image_is_filed_in_the_images_folder_after_the_highest_number_there(
         tmp_path):
     places = _places(tmp_path)
-    places.pictures.mkdir(parents=True)
-    (places.pictures / "alpha_t2i_00041_.png").write_bytes(b"old")
+    places.images.mkdir(parents=True)
+    (places.images / "alpha_t2i_00041_.png").write_bytes(b"old")
     _saved_by_comfyui(places, "run-one", "image", "alpha_t2i_00001_.png")
 
     filed = file_into_library([_listed("run-one", "image", "alpha_t2i_00001_.png")],
                               places, "run-one")
 
     assert filed == [{"filename": "alpha_t2i_00042_.png", "subfolder": "image", "type": "output"}]
-    assert (places.pictures / "alpha_t2i_00042_.png").read_bytes() == b"new"
-    assert (places.pictures / "alpha_t2i_00041_.png").read_bytes() == b"old"
+    assert (places.images / "alpha_t2i_00042_.png").read_bytes() == b"new"
+    assert (places.images / "alpha_t2i_00041_.png").read_bytes() == b"old"
 
 
-def test_a_number_a_picture_in_trash_still_holds_is_passed_over(tmp_path):
-    # Undo and Restore put a deleted picture back under its own name, over
-    # whatever new picture had been given it.
+def test_a_number_an_image_in_trash_still_holds_is_passed_over(tmp_path):
+    # Undo and Restore put a deleted image back under its own name, over
+    # whatever new image had been given it.
     places = _places(tmp_path)
-    places.pictures.mkdir(parents=True)
-    (places.pictures / "alpha_t2i_00041_.png").write_bytes(b"old")
-    (places.pictures / "alpha_t2i_00042_.png").write_bytes(b"deleted")
-    Trash(places.trash).store([places.pictures / "alpha_t2i_00042_.png"])
+    places.images.mkdir(parents=True)
+    (places.images / "alpha_t2i_00041_.png").write_bytes(b"old")
+    (places.images / "alpha_t2i_00042_.png").write_bytes(b"deleted")
+    Trash(places.trash).store([places.images / "alpha_t2i_00042_.png"])
     _saved_by_comfyui(places, "run-one", "image", "alpha_t2i_00001_.png")
 
     filed = file_into_library([_listed("run-one", "image", "alpha_t2i_00001_.png")],
@@ -166,29 +166,29 @@ def test_a_run_nobody_finished_has_its_outputs_filed_and_its_folder_cleared(tmp_
 
     assert file_what_comfyui_left(places, in_flight=set()) == 1
 
-    assert (places.pictures / "alpha_t2i_00001_.png").read_bytes() == b"new"
+    assert (places.images / "alpha_t2i_00001_.png").read_bytes() == b"new"
     assert not places.run("run-ten").exists()
 
 
 def test_what_a_run_nobody_finished_left_passes_over_a_number_held_in_trash(tmp_path):
     places = _places(tmp_path)
-    places.pictures.mkdir(parents=True)
-    (places.pictures / "alpha_t2i_00001_.png").write_bytes(b"deleted")
-    Trash(places.trash).store([places.pictures / "alpha_t2i_00001_.png"])
+    places.images.mkdir(parents=True)
+    (places.images / "alpha_t2i_00001_.png").write_bytes(b"deleted")
+    Trash(places.trash).store([places.images / "alpha_t2i_00001_.png"])
     _saved_by_comfyui(places, "run-ten", "image", "alpha_t2i_00001_.png")
 
     file_what_comfyui_left(places, in_flight=set())
 
-    assert (places.pictures / "alpha_t2i_00002_.png").read_bytes() == b"new"
+    assert (places.images / "alpha_t2i_00002_.png").read_bytes() == b"new"
 
 
 def test_the_old_links_and_an_add_ons_scratch_folder_are_left_alone(tmp_path):
     places = _places(tmp_path)
-    kept = places.pictures / "alpha_t2i_00003_.png"
+    kept = places.images / "alpha_t2i_00003_.png"
     kept.parent.mkdir(parents=True)
     kept.write_bytes(b"kept")
     places.comfyui.mkdir()
-    _winapi.CreateJunction(str(places.pictures), str(places.comfyui / "image"))
+    _winapi.CreateJunction(str(places.images), str(places.comfyui / "image"))
     scratch = places.comfyui / "VRGDG_TEMP" / "TextFiles" / "note_00001_.txt"
     scratch.parent.mkdir(parents=True)
     scratch.write_bytes(b"scratch")
@@ -212,7 +212,7 @@ def test_nothing_moves_when_comfyuis_folder_is_where_every_output_is_kept(tmp_pa
 
 def test_a_comfyui_folder_that_holds_the_library_itself_has_only_its_runs_filed(tmp_path):
     library = tmp_path / "library"
-    places = OutputPlaces(comfyui=library, pictures=library / "pictures",
+    places = OutputPlaces(comfyui=library, images=library / "images",
                           videos=library / "videos", scripts=library / "scripts",
                           audio=library / "sounds")
     his = library / "projects" / "notes_00001_.txt"
@@ -223,7 +223,7 @@ def test_a_comfyui_folder_that_holds_the_library_itself_has_only_its_runs_filed(
     assert file_what_comfyui_left(places, in_flight=set()) == 1
 
     assert his.read_bytes() == b"his"
-    assert (places.pictures / "alpha_t2i_00001_.png").is_file()
+    assert (places.images / "alpha_t2i_00001_.png").is_file()
 
 
 def test_a_number_some_other_file_already_wears_is_passed_over(tmp_path):
@@ -250,4 +250,4 @@ def test_a_run_comfyui_reports_with_windows_separators_is_filed_all_the_same(tmp
     filed = file_into_library([reported], places, "run-thirteen")
 
     assert (filed[0]["subfolder"], filed[0]["filename"]) == ("image", "alpha_t2i_00001_.png")
-    assert (places.pictures / "alpha_t2i_00001_.png").is_file()
+    assert (places.images / "alpha_t2i_00001_.png").is_file()

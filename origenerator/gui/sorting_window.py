@@ -1,6 +1,6 @@
-"""The window for saying what each picture shows: one picture, one press, the
-next. The picture fills the left and every action is a button in the grid down
-the right, wearing the drawing :mod:`origenerator.picture_marks` found for it."""
+"""The window for saying what each image shows: one image, one press, the
+next. The image fills the left and every action is a button in the grid down
+the right, wearing the drawing :mod:`origenerator.action_drawings` found for it."""
 from __future__ import annotations
 
 import re
@@ -111,22 +111,22 @@ class SortingWindow(QWidget):
     NOTHING_LEFT = "Nothing left to sort."
     MISSING = "(this one's file is missing)"
 
-    def __init__(self, session, tiles, marks: dict[str, str], parent=None):
+    def __init__(self, session, tiles, drawings: dict[str, str], parent=None):
         super().__init__(parent)
         self._session = session
-        self._marks = dict(marks)
+        self._drawings = dict(drawings)
         self._tiles: dict[str, QToolButton] = {}
         self._faces: dict[str, QToolButton] = {}
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
-        # The picture at its own size, kept so a resize re-scales from the
+        # The image at its own size, kept so a resize re-scales from the
         # original rather than from an already-shrunk copy.
         self._shown = QPixmap()
-        self.setWindowTitle("Origenerator — what does this picture show?")
+        self.setWindowTitle("Origenerator — what does this image show?")
 
-        self._picture = QLabel()
-        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._picture.setMinimumSize(320, 320)
+        self._image = QLabel()
+        self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._image.setMinimumSize(320, 320)
         self._status = QLabel(objectName=STATUS_LINE)
         self._last = QLabel(objectName=LAST_LINE)
         for line in (self._status, self._last):
@@ -135,7 +135,7 @@ class SortingWindow(QWidget):
         stage = QVBoxLayout()
         stage.setContentsMargins(0, 0, 0, 0)
         stage.setSpacing(GAP_MEDIUM)
-        stage.addWidget(self._picture, 1)
+        stage.addWidget(self._image, 1)
         stage.addWidget(self._status)
         stage.addWidget(self._last)
 
@@ -155,8 +155,8 @@ class SortingWindow(QWidget):
         column.setSpacing(GAP_MEDIUM)
         grid = QGridLayout()
         grid.setSpacing(GAP_MEDIUM)
-        drawings = {tile.state: QPixmap(str(self._marks[tile.state]))
-                    for tile in tiles if self._marks.get(tile.state)}
+        drawings = {tile.state: QPixmap(str(self._drawings[tile.state]))
+                    for tile in tiles if self._drawings.get(tile.state)}
         scale = one_scale_for_all(drawings.values(), MARK)
         room = self._room_for_a_name(tiles)
         wide = QFontMetrics(self._name_font).horizontalAdvance
@@ -184,7 +184,7 @@ class SortingWindow(QWidget):
             (SAME_BUTTON, "Same as last",
              "Sort this one the way the last one was sorted", self._on_same),
             (UNDO_BUTTON, "Undo",
-             "Take the last answer back and put its picture up again", self._on_undo),
+             "Take the last answer back and put its image up again", self._on_undo),
         ):
             button = QPushButton(caption, objectName=name)
             button.setToolTip(tip)
@@ -200,7 +200,7 @@ class SortingWindow(QWidget):
         panel.setWidget(inside)
         panel.setWidgetResizable(True)
         panel.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Fixed to what the column asks for, so the picture takes every other
+        # Fixed to what the column asks for, so the image takes every other
         # pixel of the window.
         panel.setFixedWidth(inside.sizeHint().width() + 28)  # room for the scrollbar
         return panel
@@ -320,24 +320,24 @@ class SortingWindow(QWidget):
 
 
     def _show_current(self) -> None:
-        picture = self._session.current
-        if picture is None:
+        image = self._session.current
+        if image is None:
             self._shown = QPixmap()
-            self._picture.clear()
+            self._image.clear()
             self._status.setText(self.NOTHING_LEFT)
             return
-        self._status.setText(f"{self._session.remaining} left · {picture.get('name')}")
-        path = picture.get("picture_path")
+        self._status.setText(f"{self._session.remaining} left · {image.get('name')}")
+        path = image.get("image_path")
         self._shown = QPixmap(str(path)) if path else QPixmap()
-        self._fill_with_the_picture()
+        self._fill_with_the_image()
 
-    def _fill_with_the_picture(self) -> None:
+    def _fill_with_the_image(self) -> None:
         if self._shown.isNull():
-            self._picture.setText(self.MISSING)
+            self._image.setText(self.MISSING)
             return
-        self._picture.setPixmap(_fitted(self._shown, self._picture.width(),
-                                        self._picture.height()))
+        self._image.setPixmap(_fitted(self._shown, self._image.width(),
+                                        self._image.height()))
 
     def resizeEvent(self, event):  # noqa: N802 — Qt override
         super().resizeEvent(event)
-        self._fill_with_the_picture()
+        self._fill_with_the_image()

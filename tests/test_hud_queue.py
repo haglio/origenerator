@@ -64,7 +64,7 @@ def test_a_video_waiting_at_the_head_of_the_line_leads_the_block():
     assert section.idle_note == ""
 
 
-def test_a_video_waiting_out_the_minute_after_a_picture_says_when_it_starts():
+def test_a_video_waiting_out_the_minute_after_an_image_says_when_it_starts():
     # The half-second keeps the count a clear half-second off a rollover.
     section = queue_section([_item("waiting-one", job_kind="Video",
                                    starts_at=time.monotonic() + 42.5)], 0)

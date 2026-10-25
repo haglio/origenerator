@@ -607,7 +607,7 @@ def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtb
 
 
 def _waiting_image(db, prompt_id):
-    """A picture the queue was holding when the app last closed, which the next
+    """An image the queue was holding when the app last closed, which the next
     window takes back into its line."""
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="sdxl_t2i",
@@ -1025,7 +1025,7 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
 
 
 def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
-    # The version list is the widest thing the info pane holds — a picture beside
+    # The version list is the widest thing the info pane holds — an image beside
     # a file row with its copy and Show-in-Explorer buttons, per level. It has to
     # scroll and wrap rather than widen the window, or displaying any enhanced
     # image would knock the whole app out of a tiling slot.
@@ -1239,7 +1239,7 @@ def test_a_tabs_source_comes_back_folded(qtbot, tmp_path):
     assert reopened._gallery_view._info_tabs.currentWidget()._related.is_source_folded()
 
 
-def test_a_tabs_border_under_its_picture_is_where_it_was_left_after_a_restart(qtbot, tmp_path):
+def test_a_tabs_border_under_its_preview_is_where_it_was_left_after_a_restart(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
     first._gallery_view._info_tabs.currentWidget().prefill("sdxl_t2i", {})
@@ -1249,6 +1249,23 @@ def test_a_tabs_border_under_its_picture_is_where_it_was_left_after_a_restart(qt
 
     reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
 
+    assert reopened._gallery_view._info_tabs.currentWidget()._media_split.sizes() == dragged
+
+
+def test_a_tabs_border_saved_under_its_old_name_is_where_it_was_left_after_a_restart(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+    first._gallery_view._info_tabs.currentWidget().prefill("sdxl_t2i", {})
+    dragged = _drag_the_first_open_handle(
+        first._gallery_view._info_tabs.currentWidget()._media_split)
+    first.close()
+    saved = path.read_text(encoding="utf-8")
+    path.write_text(saved.replace('"media_border"', '"picture_border"'), encoding="utf-8")
+
+    reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
+
+    assert '"media_border"' in saved
     assert reopened._gallery_view._info_tabs.currentWidget()._media_split.sizes() == dragged
 
 
@@ -1313,7 +1330,7 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
 
 
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
-    # The end-to-end round trip: pick a picture, drop a video in one lane, move
+    # The end-to-end round trip: pick an image, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane
     # matters as much as the slots — it is which videos the next Generate is
     # answered from, and which lane's dropped video the slot shows.
@@ -1376,7 +1393,7 @@ def _headset_session(tmp_path, main=(10, 20, 200, 100)):
 
 
 def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_path):
-    """Its picture is what the room shows, and a parked window has no picture:
+    """Its frame is what the room shows, and a parked window has no frame:
     Qt draws nothing for one Windows has unmapped."""
     win = _window(qtbot, tmp_path, fun_time=_headset_session(tmp_path))
 
@@ -1434,7 +1451,7 @@ def test_a_window_the_monitors_take_back_is_in_sight_again(
     assert seen == [("in sight", int(win.winId()))]
 
 
-def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
+def test_a_window_hosted_on_the_monitors_hands_no_frame_over(qtbot, tmp_path):
     """There the window itself is what is seen, so a frame written every tick
     would be work for nobody."""
     win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
@@ -1445,7 +1462,7 @@ def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
 def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path):
     """A window hosted on the monitors is kept across a crossing, and the
     headset session that adopts it has no monitor to put it on: it asks for the
-    picture through the session's own channel instead of launching another."""
+    frame through the session's own channel instead of launching another."""
     win = OrigeneratorWindow(
         ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
@@ -1461,7 +1478,7 @@ def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path
 
 def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tmp_path):
     """And the desktop session that adopts it back puts it where it always was:
-    parked until the mode switch restores it, and no picture written for nobody."""
+    parked until the mode switch restores it, and no frame written for nobody."""
     win = OrigeneratorWindow(
         ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
@@ -1476,7 +1493,7 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
     assert win.isMinimized()
 
 
-def _picture_published(frames_file) -> tuple[int, int]:
+def _frame_published(frames_file) -> tuple[int, int]:
     _sequence, _token, width, height = _HEADER.unpack_from(
         frames_file.read_bytes(), 0)
     return width, height
@@ -1498,7 +1515,7 @@ def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
 
     _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{presses}")
     qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
-    qtbot.waitUntil(lambda: _picture_published(tmp_path / "frame.bin") != (0, 0),
+    qtbot.waitUntil(lambda: _frame_published(tmp_path / "frame.bin") != (0, 0),
                     timeout=3000)
     append_command(presses, "hover 10 10")
 
@@ -1518,7 +1535,7 @@ def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_
     qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
 
     assert not win.isMinimized(), "the room was handed a window Windows had unmapped"
-    qtbot.waitUntil(lambda: _picture_published(frames) != (0, 0), timeout=3000)
+    qtbot.waitUntil(lambda: _frame_published(frames) != (0, 0), timeout=3000)
 
 
 def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset(
@@ -1586,7 +1603,7 @@ def test_a_window_hosted_in_the_headset_is_not_put_at_the_sessions_rect(qtbot, t
                                            session.main_rect.height)
 
 
-def test_a_window_hosted_in_the_headset_opens_as_big_as_the_picture_can_carry(
+def test_a_window_hosted_in_the_headset_opens_as_big_as_the_frame_can_carry(
         qtbot, tmp_path):
     """At its size on a monitor the whole layout arrived squeezed small."""
     win = _window(qtbot, tmp_path)
@@ -1712,7 +1729,7 @@ def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
         qtbot, tmp_path, monkeypatch):
     # Hosted, this window is the session's to show: in video mode it sits
     # parked under the players, so taking the foreground for itself would be a
-    # window over the room rather than a way to the picture.
+    # window over the room rather than a way to the item.
     session = replace(_fun_time_session(), dashboard_cmd_file=tmp_path / "dashboard.txt")
     win = OrigeneratorWindow(ComfyUIClient(), Database(tmp_path / "t.db"),
                              AppState(tmp_path / "ui.json"), fun_time=session)

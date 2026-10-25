@@ -7,7 +7,7 @@ be a second HUD.
 
 It says what the strip says: the job being made with its live frame and the
 clock across its bar, then each waiting job as a row -- its shield, the button
-that throws it away, the picture it is made from, and what it costs.  They go as the
+that throws it away, the image it is made from, and what it costs.  They go as the
 panel's own declared buttons (:class:`funestra.hud_button.Button`), so it
 presses and names them exactly as it presses its own.
 """
@@ -66,8 +66,8 @@ CANCEL = "queue_cancel"
 OPEN = "queue_open"
 CLEAR = "queue_clear"
 START_NOW = "queue_start_now"
-# The head's picture goes where its row goes, and says so under its own verb:
-# it is a picture of the job being made, not a row that can be dragged anywhere.
+# The head's thumbnail goes where its row goes, and says so under its own verb:
+# it is a thumbnail of the job being made, not a row that can be dragged anywhere.
 FRAME = "queue_frame"
 
 FRAME_TOOLTIP = "Open the folder this run will land in"
@@ -87,10 +87,10 @@ _ROW_H = CTRL_BTN + BLOCK_GAP
 _BAR_H = CTRL_BTN
 _BAR_PAD = GAP_MEDIUM            # the clock's breathing room at each end of its bar
 _BAND_H = 4             # the pass band along the bar's foot
-_CELL = CTRL_BTN        # one picture cell on a row
+_CELL = CTRL_BTN        # one thumbnail cell on a row
 _CELL_GAP = HAIRLINE
 _BLOCK_W = FOLDER_CELLS * _CELL + (FOLDER_CELLS - 1) * _CELL_GAP
-# The head's picture: a map cell's own height, so the run being made is worth
+# The head's thumbnail: a map cell's own height, so the run being made is worth
 # looking at beside the bar measuring it and the two blocks read at one scale.
 _FRAME = MAP_THUMB_H
 _PLUS_W = 10            # the operator between a start frame and its source video
@@ -103,7 +103,7 @@ _DROP_W = 2             # the mark showing where a dragged row would land
 # not worth half the width of a slideshow.
 _MAX_W = 460
 
-_SLOT_ALPHA = 110       # a cell with nothing in it reads as a slot, not a picture
+_SLOT_ALPHA = 110       # a cell with nothing in it reads as a slot, not a thumbnail
 
 
 @cache
@@ -343,7 +343,7 @@ class QueueSection:
                                      line.discard_tooltip, width=word),
                               pointer, targets)
                 cursor += word + _GAP
-            _paint_pictures(image, draw, cursor, row, line)
+            _paint_thumbnails(image, draw, cursor, row, line)
             cursor += _BLOCK_W + _GAP
             room = max(0, x + width - cursor)
             lead = fit_text(_tiny(), line.lead, room)
@@ -388,8 +388,8 @@ def _fraction(progress) -> float | None:
 
 
 def _slot(draw, x, y, side) -> int:
-    """A cell with nothing in it: a faint square, so a row with no picture reads
-    as a job whose picture has not arrived rather than as one that failed to draw."""
+    """A cell with nothing in it: a faint square, so a row with no thumbnail reads
+    as a job whose thumbnail has not arrived rather than as one that failed to draw."""
     draw.rectangle([x, y, x + side - 1, y + side - 1],
                    fill=(*BORDER_SUBTLE, _SLOT_ALPHA))
     return side
@@ -420,14 +420,14 @@ def _cell(path, side: int, gray: bool = False) -> Image.Image | None:
 
 def _fit(path, side: int, gray: bool) -> Image.Image | None:
     try:
-        picture = Image.open(path).convert("RGBA")
+        opened = Image.open(path).convert("RGBA")
     except (OSError, ValueError):
         return None
     if gray:
-        picture = picture.convert("L").convert("RGBA")
-    picture.thumbnail((side, side))
+        opened = opened.convert("L").convert("RGBA")
+    opened.thumbnail((side, side))
     cell = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    cell.paste(picture, ((side - picture.width) // 2, (side - picture.height) // 2))
+    cell.paste(opened, ((side - opened.width) // 2, (side - opened.height) // 2))
     return cell
 
 
@@ -436,12 +436,12 @@ def _frame_image(frame: bytes | None, side: int) -> Image.Image | None:
     if not frame:
         return None
     try:
-        picture = Image.open(io.BytesIO(frame)).convert("RGBA")
+        opened = Image.open(io.BytesIO(frame)).convert("RGBA")
     except (OSError, ValueError):
         return None
-    picture.thumbnail((side, side))
+    opened.thumbnail((side, side))
     cell = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    cell.paste(picture, ((side - picture.width) // 2, (side - picture.height) // 2))
+    cell.paste(opened, ((side - opened.width) // 2, (side - opened.height) // 2))
     return cell
 
 
@@ -476,8 +476,8 @@ def _paint_source(image, draw, x, y, side, source, prompt_edited: bool) -> int:
     return cursor - x
 
 
-def _paint_pictures(image, draw, x, y, line: JobLine) -> None:
-    """A row's picture, as the strip draws the same one
+def _paint_thumbnails(image, draw, x, y, line: JobLine) -> None:
+    """A row's thumbnail, as the strip draws the same one
     (:mod:`origenerator.gui.queue_thumbs`): what the job is made from, else what
     its folder holds."""
     if _paint_source(image, draw, x, y, _CELL, line.source, line.prompt_edited):
@@ -486,11 +486,11 @@ def _paint_pictures(image, draw, x, y, line: JobLine) -> None:
         return
     for index in range(FOLDER_CELLS):
         cell_x = x + index * (_CELL + _CELL_GAP)
-        picture = _cell(line.folder[index], _CELL) if index < len(line.folder) else None
-        if picture is None:
+        drawn = _cell(line.folder[index], _CELL) if index < len(line.folder) else None
+        if drawn is None:
             _slot(draw, cell_x, y, _CELL)
         else:
-            image.alpha_composite(picture, (cell_x, y))
+            image.alpha_composite(drawn, (cell_x, y))
 
 
 def _line(item) -> JobLine:
@@ -578,7 +578,7 @@ class QueuePointer:
         if verb in (OPEN, FRAME):
             # A row is pressed for two things -- its folder and a place further
             # down the line -- so the press is held until the release says
-            # which.  The head's picture is pressed for the folder alone.
+            # which.  The head's thumbnail is pressed for the folder alone.
             self._press = (key, px, py, verb == OPEN)
         elif verb == SHIELD:
             item = self._item(key)

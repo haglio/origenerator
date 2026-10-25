@@ -78,7 +78,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the two longest module preambles already under it: the fullscreen Funestra's 90
 # lines and the info pane's 71 are 30 and 31, which is what took the tree from
 # 19416 to here. What they keep is what a test cannot say -- where the creep into
-# a picture lives, why a run joins a slideshow on its first frame and not before, why
+# an image lives, why a run joins a slideshow on its first frame and not before, why
 # a slideshow wears one panel where Fun Time wears two, why the tab row carries no
 # "+" of its own, and that an edit is what a person did rather than what a load
 # did. Every rule cut was already a test named for the claim (161 of them across
@@ -132,8 +132,8 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # waiting for its owner to arm a drag: the three notes on that arming went with
 # the method, and what they said is test_a_transient_view_disarms_the_drag and
 # test_dragging_the_armed_preview_carries_its_generation; the director's note
-# that a lone picture keeps its row for its versions is
-# test_a_double_click_on_a_picture_no_folder_lists_still_names_its_generation.
+# that a lone image keeps its row for its versions is
+# test_a_double_click_on_an_item_no_folder_lists_still_names_its_generation.
 #
 # 19261 when a discarded seed's relaunch moved ahead of the folder's redraw: the
 # helper that wrapped the drop and the redraw went, and what its line said is
@@ -154,7 +154,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands,
 # test_a_folders_latest_lists_what_that_folder_made_under_its_path,
 # test_a_folders_collection_scopes_the_search_and_names_its_path and
-# test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_below_it.
+# test_a_folders_favorites_are_its_starred_items_and_the_favorite_folders_below_it.
 #
 # 19161 when a collection row's mark moved under its folder's own mark and a folder of
 # your own lost the star it could not use: the list's note on where it draws a
@@ -182,9 +182,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # drawn with Qt Quick since the slideshow moved onto the Funestras' engine, and the
 # module's note on why it asked went with it.
 #
-# 19121 when a picture the tab puts up itself started going through the very tail
+# 19121 when an image the tab puts up itself started going through the very tail
 # a clicked one takes: the note that it arms the drive like a browsed selection is
-# test_a_picture_the_tab_puts_up_itself_is_announced_like_a_clicked_one.
+# test_an_image_the_tab_puts_up_itself_is_announced_like_a_clicked_one.
 #
 # 19109 when a finished video's script began replacing the one its name already
 # had: completion's note that an existing script is left alone went, ensure_funscript's
@@ -240,13 +240,13 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_cadence_is_resolved_when_the_sweep_runs_too.
 #
 # 18852 when a canceled or failed enhancement began leaving the tab showing its
-# picture as it was before the press, taken down to what the tree measured: the
+# image as it was before the press, taken down to what the tree measured: the
 # note on what the gallery redraws after a job ends unfinished is the name
 # _after_a_job_ended_unfinished and
 # test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press.
 #
-# 18795 when what a slideshow says about the picture on screen moved off the notice
-# across the top and onto the HUD after the picture's name: the fullscreen
+# 18795 when what a slideshow says about the image on screen moved off the notice
+# across the top and onto the HUD after the image's name: the fullscreen
 # Funestra's paragraphs on what that corner said and when are
 # test_the_hud_says_which_version_is_on_screen,
 # test_a_run_of_an_item_this_slideshow_never_asked_about_is_named_all_the_same and
@@ -254,7 +254,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # director's on telling only the slideshow in front is
 # test_how_the_enhancements_are_going_reaches_every_slideshow_that_is_up.
 #
-# 18775 when a session's Funestras took in the pictures still being made: the
+# 18775 when a session's Funestras took in the images still being made: the
 # Funestra slideshow's lines on why it could not are gone, and the fullscreen slideshow's
 # on taking a run in once is
 # test_a_run_culled_from_the_funestra_does_not_come_back_on_its_next_frame.
@@ -268,16 +268,16 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_leading_with_it.
 #
 # 18767 when a slideshow's arrivals began coming up in the order they arrived: what
-# the playlist said about putting each one straight after the picture on
+# the playlist said about putting each one straight after the image on
 # screen is test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it.
 #
-# 18756 when a picture still being made put its frames on the engine: the notes
+# 18756 when an image still being made put its frames on the engine: the notes
 # on refitting a frame drawn on a label went with the label, and what a frame
 # does now is
-# test_an_enhancement_that_starts_on_screen_carries_the_pictures_move_onto_its_frames.
+# test_an_enhancement_that_starts_on_screen_carries_the_images_move_onto_its_frames.
 #
 # 18754 when a picked thing took the family's blue: the line on a picked tile's
-# picture lightening its frame is test_a_picked_tiles_picture_wears_a_white_frame.
+# thumbnail lightening its frame is test_a_picked_tiles_thumbnail_wears_a_white_frame.
 #
 # 18731 when every video a tab plays gained the Funestras' own timeline,
 # taken down to what the tree measured: the notes on how the track is framed,
@@ -365,7 +365,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 17438 when every menu naming an item or a folder came to offer Copy name and
 # a tab's Basic section a Name line, taken down to what the tree measured: the
 # Trash's, a folder of your own's and a pick of folders' menus and the Basic
-# section's builder lost docstrings their tests say, and a picture's menu
+# section's builder lost docstrings their tests say, and an image's menu
 # stopped counting its acts.
 # 17420 when a lock in the room, a slideshow's own lock and a clicked notice came
 # to put their item in front of him through one routine, GalleryView.show_generation,

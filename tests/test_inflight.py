@@ -47,7 +47,7 @@ def test_a_row_says_what_kind_of_work_it_is_when_the_workflow_is_one_we_know():
     assert queue_lead_text(_item(job_kind="")) == "~2 min"
 
 
-def test_the_act_follows_the_kind_so_two_runs_on_one_picture_read_apart():
+def test_the_act_follows_the_kind_so_two_runs_on_one_image_read_apart():
     assert queue_lead_text(_item(job_kind="Video", act="alpha")) == (
         "~2 min · Video · alpha")
 
@@ -154,7 +154,7 @@ def test_a_wait_on_another_app_counts_its_jobs_and_says_job_or_jobs():
     assert queue_wait_text(4) == "Waiting on 4 jobs from another app"
 
 
-def test_a_video_waiting_out_the_minute_after_a_picture_counts_down_to_its_start():
+def test_a_video_waiting_out_the_minute_after_an_image_counts_down_to_its_start():
     # Its bar sweeps as if it were being made, and nothing is.
     assert queue_wait_text(None, starts_at=1042.3, now=lambda: 1000.0) == "Starts in 0:43"
 

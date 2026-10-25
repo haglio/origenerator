@@ -77,10 +77,10 @@ CONTROL_TOOLTIPS = {
     "lock": "Lock this one on screen — favoriting it, and asking for a better version",
     "trash": "Delete this one and move on",
     "fmode": f"{F_MODE_LABEL} — play only the favorites",
-    "enhanced": "Enhanced only — play just the pictures that have been enhanced",
-    "shuffle": f"{SHUFFLE_LABEL} — every picture and video of this shape, shuffled",
-    "latest": f"{LATEST_LABEL} — every picture and video of this shape, newest first",
-    "cycle_version": "Other versions of this one — an enhancement, the picture it was "
+    "enhanced": "Enhanced only — play just the images that have been enhanced",
+    "shuffle": f"{SHUFFLE_LABEL} — every image and video of this shape, shuffled",
+    "latest": f"{LATEST_LABEL} — every image and video of this shape, newest first",
+    "cycle_version": "Other versions of this one — an enhancement, the image it was "
                 "made from, the upscale Evolver made of a video",
 }
 # Reset means what the side goes back TO, which is not the same in both places:

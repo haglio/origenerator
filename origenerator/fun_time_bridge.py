@@ -21,7 +21,7 @@ slideshows the way it reaches the Funestras:
 * The status file says which regions are occupied (and by what) — a readout
   for the hosting session's diagnostics.
 * A click on a slideshow asks the room for OmniPause (:func:`ask_for_omnipause`) on
-  the dashboard channel, where a Funestra's click on its picture asks for it.
+  the dashboard channel, where a Funestra's click on what it shows asks for it.
 """
 
 from __future__ import annotations
@@ -147,8 +147,8 @@ class FunTimeBridge(QObject):
 
     def _deal_the_radio_once(self) -> None:
         """Deal each Funestra the session handed over its own stations, the
-        moment this app is up: they play on out of earshot from then, so a
-        picture tunes in wherever its station has got to."""
+        moment this app is up: they play on out of earshot from then, so an
+        image tunes in wherever its station has got to."""
         if self._radio is not None:
             return
         playlists = {side: channel.playlist for side in SIDES

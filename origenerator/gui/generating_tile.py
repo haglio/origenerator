@@ -4,7 +4,7 @@ folder's ``+`` rather than in its place.
 It shows the run the way every other in-flight surface does: ComfyUI's preview —
 or, until there is one, what the run is made from
 (:func:`~origenerator.gui.combination_view.combination_pixmap`) — under a scrim
-naming the stage, a bar along the picture's foot reading
+naming the stage, a bar along the thumbnail's foot reading
 :func:`origenerator.timing.progress_status_label`, and a button that throws the
 run away (:func:`inflight.discard_run_text`).
 """
@@ -27,7 +27,7 @@ from origenerator.gui.stage_scrim import StageScrim
 _RESTING_FRAME_CSS = grid_card.idle_css("generatingTile")
 _SELECTED_FRAME_CSS = grid_card.selected_css("generatingTile")
 
-_IMAGE_SIZE = grid_card.PICTURE_SIZE
+_IMAGE_SIZE = grid_card.THUMBNAIL_SIZE
 
 
 class GeneratingTile(QFrame):
@@ -69,7 +69,7 @@ class GeneratingTile(QFrame):
         self._cancel.clicked.connect(lambda: self.cancel_requested.emit())
         layout.addWidget(self._cancel)
 
-        # Both ride over the picture rather than taking a row of their own, so the
+        # Both ride over the thumbnail rather than taking a row of their own, so the
         # tile is the same size and shape as every card beside it.
         self._scrim = StageScrim(self)
         self._bar = ProgressCaption(self)
@@ -127,7 +127,7 @@ class GeneratingTile(QFrame):
                                 *self._reading().bars())
 
     def _place_bar(self):
-        """The picture is only positioned once the tile's layout has run, so that
+        """The thumbnail is only positioned once the tile's layout has run, so that
         is forced here — a bar placed before it sits in the tile's top-left
         corner."""
         self.layout().activate()

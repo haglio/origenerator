@@ -35,15 +35,15 @@ def test_show_in_explorer_suppresses_the_console_window(monkeypatch):
 
 def test_a_file_reached_through_a_folder_link_is_shown_where_it_really_is(monkeypatch, tmp_path):
     calls = _capture_run(monkeypatch)
-    pictures = tmp_path / "library" / "images"
-    pictures.mkdir(parents=True)
-    (pictures / "picture_00001_.png").write_bytes(b"")
-    _winapi.CreateJunction(str(pictures), str(tmp_path / "saves"))
+    images = tmp_path / "library" / "images"
+    images.mkdir(parents=True)
+    (images / "image_00001_.png").write_bytes(b"")
+    _winapi.CreateJunction(str(images), str(tmp_path / "saves"))
 
-    reveal.show_in_explorer(tmp_path / "saves" / "picture_00001_.png")
+    reveal.show_in_explorer(tmp_path / "saves" / "image_00001_.png")
 
     (cmd,), _ = calls[0]
-    assert cmd == ["explorer", "/select,", str(pictures / "picture_00001_.png")]
+    assert cmd == ["explorer", "/select,", str(images / "image_00001_.png")]
 
 
 def test_a_folder_is_opened_itself_with_no_console_window(monkeypatch):

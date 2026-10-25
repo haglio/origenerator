@@ -120,9 +120,9 @@ def _act_settings_groups(category: str, video_rows, *, require_scene: bool = Fal
 
 def act_of(row: dict) -> str:
     """The act ``row`` shows, because somebody said so: a video's is the act it was
-    launched as, a picture's the action it was sorted as, and "" means nobody has
+    launched as, an image's the action it was sorted as, and "" means nobody has
     said. Never read off the prompt."""
-    return row.get("act") or row.get("picture_state") or ""
+    return row.get("act") or row.get("image_state") or ""
 
 
 def no_past_video(act: str, lane: str) -> str:

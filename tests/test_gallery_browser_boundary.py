@@ -160,7 +160,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     pane 77 -> 83: every folder of folders has its own five collections, so a collection's
     rows are asked for a folder as well as a side -- a side's placement of its
     rows, a folder's share of a list, the open collection's rows, a folder's own cards
-    in flight, its starred pictures, the counts every folder's collections wear and
+    in flight, its starred images, the counts every folder's collections wear and
     the square each of them shows among the folder's own are seven methods, and
     the lister of Latest's rows they replace went. 267 -> 266: a combination
     draws fresh seeds, so it never repeats a run and the question the gallery
@@ -171,7 +171,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     with the session beside its control state, through the pair every switch the
     session file keeps is read and put back by. And the pane 86 -> 87: a slideshow
     collects what a set holds once for each model the pane takes rather than
-    once for each picture a running generation sends, and the pane's stamp is
+    once for each image a running generation sends, and the pane's stamp is
     what says a new model has come. 270 -> 272: the slideshows -- where the last
     one was left, its filters, where each side's panel sits and the pace -- are
     saved with the session too, through that same pair. 272 -> 273: a Fun Time
@@ -233,7 +233,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     a lock in the room, a lock on one of the app's own slideshows and a clicked
     notice each put their item in front of him through one method, which asks
     a hosting room for this window's place. 279 -> 280: Start now ends the
-    minute a video waits after a picture, from the job queue or a slideshow's,
+    minute a video waits after an image, from the job queue or a slideshow's,
     so it is one method beside Clear's. 280 -> 281: an item dragged over a
     folder of your own in the TOC goes in only where the gallery shows it on
     that folder's side, which the TOC asks of the gallery through one
@@ -244,7 +244,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     too, through one more. And the pane 85 -> 84: every drag the app starts
     reaches every place it could drop by itself, so the pane's relay of its
     tiles' drags to Combine went. 283 -> 281: each step of the path over the
-    pictures opens its folder and a copy button copies the path, so the two
+    images opens its folder and a copy button copies the path, so the two
     methods that opened the path for typing and went where a typed path led went.
     281 -> 280: a collection's path wears its star as the family's mark, which the
     header sets in ahead of the step's name, so the method that typed the star into

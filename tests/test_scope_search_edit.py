@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QToolButton
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 
 # A path wide enough that no field in these tests can hold all of it.
-LONG = "Library / Pictures / Alpha Folder / One Two Three / Four Five Six Seven Eight"
+LONG = "Library / Images / Alpha Folder / One Two Three / Four Five Six Seven Eight"
 
 
 def _field(qtbot, width: int) -> ScopeSearchEdit:

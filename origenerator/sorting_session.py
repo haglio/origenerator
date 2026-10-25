@@ -1,12 +1,12 @@
-"""What each press in the sorting window does to the line of pictures."""
+"""What each press in the sorting window does to the line of images."""
 from __future__ import annotations
 
 from collections import deque
 
 
 class SortingSession:
-    def __init__(self, pictures: list[dict], store):
-        self._line = deque(pictures)
+    def __init__(self, images: list[dict], store):
+        self._line = deque(images)
         self._store = store
         self._sorted: list[tuple[dict, str]] = []
 
@@ -30,9 +30,9 @@ class SortingSession:
     def sort_as(self, state: str) -> None:
         if not self._line:
             return
-        picture = self._line.popleft()
-        self._store.set_picture_state(picture["prompt_id"], state)
-        self._sorted.append((picture, state))
+        image = self._line.popleft()
+        self._store.set_image_state(image["prompt_id"], state)
+        self._sorted.append((image, state))
 
     def same(self) -> None:
         if self.last_state is not None:
@@ -44,6 +44,6 @@ class SortingSession:
     def undo(self) -> None:
         if not self._sorted:
             return
-        picture, _state = self._sorted.pop()
-        self._store.set_picture_state(picture["prompt_id"], None)
-        self._line.appendleft(picture)
+        image, _state = self._sorted.pop()
+        self._store.set_image_state(image["prompt_id"], None)
+        self._line.appendleft(image)

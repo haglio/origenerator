@@ -152,12 +152,12 @@ def job_kind_label(workflow_name: str | None) -> str:
 def _source_image_label(params: dict, image_index: dict,
                         name_of: Callable[[str], str]) -> str:
     """The name of the source-image folder a video's start frame belongs to: the
-    name of the picture it animates, or the frame's bare filename when the frame
+    name of the image it animates, or the frame's bare filename when the frame
     isn't a known generation, and ``"(no start image)"`` when there is none."""
     input_image = params.get("input_image")
     frame = _frame_name(input_image)
     if not frame:
         return "(no start image)"
     entry = (image_index or {}).get(frame)
-    picture = name_of(entry.prompt_id) if entry is not None else ""
-    return picture or _basename(_unannotated(input_image))
+    image = name_of(entry.prompt_id) if entry is not None else ""
+    return image or _basename(_unannotated(input_image))

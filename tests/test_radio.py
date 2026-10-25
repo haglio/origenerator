@@ -211,7 +211,7 @@ def test_a_station_is_one_of_the_funestras_own_opened_once_their_engine_is_found
 
 # --- the Standalone Slideshow ---------------------------------------------
 
-def test_a_radio_a_slideshow_holds_is_heard_while_its_picture_is_up_at_its_level(tmp_path):
+def test_a_radio_a_slideshow_holds_is_heard_while_its_image_is_up_at_its_level(tmp_path):
     radio, stations = _radio(tmp_path)
     radio.start()
     held = radio.held_by_a_slideshow()

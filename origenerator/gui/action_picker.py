@@ -1,5 +1,5 @@
-"""The row on a config tab saying what the item it is showing shows: a picture's,
-into the column :mod:`origenerator.sort_pictures` fills in bulk, or a video's act."""
+"""The row on a config tab saying what the item it is showing shows: an image's,
+into the column :mod:`origenerator.sort_images` fills in bulk, or a video's act."""
 from __future__ import annotations
 
 from funestra.video_families import normalized_text
@@ -12,16 +12,16 @@ from origenerator.gui.eliding import ElidingLabel, open_the_list_in_full
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.media import MediaType
 from origenerator.own_window import show_or_say
-from origenerator.sort_pictures import the_sorting_window
+from origenerator.sort_images import the_sorting_window
 
 UNSAID = "— "
 
 # What this is called here and on Combine's list of acts.
 ACTION_LABEL = "Action"
 
-SORT_BUTTON = "picture.sort"
+SORT_BUTTON = "image.sort"
 
-_PICTURES_TIP = "What this picture already shows — which decides what it can be animated as"
+_IMAGES_TIP = "What this image already shows — which decides what it can be animated as"
 _VIDEOS_TIP = "What this video shows — the act it was made as"
 
 
@@ -44,12 +44,12 @@ class ActionPicker(QWidget):
         row.addWidget(ElidingLabel(ACTION_LABEL))
         self._combo = NoWheelComboBox()
         self._offer(self._states)
-        self._combo.setToolTip(_PICTURES_TIP)
+        self._combo.setToolTip(_IMAGES_TIP)
         self._combo.currentIndexChanged.connect(self._on_picked)
         row.addWidget(self._combo, 1)
         self._sorting = None
         self._sort = QPushButton("Set image actions…", objectName=SORT_BUTTON)
-        self._sort.setToolTip("Set this picture's action, then every picture nobody "
+        self._sort.setToolTip("Set this image's action, then every image nobody "
                               "has answered for, one press apiece")
         self._sort.clicked.connect(self._on_sort)
         row.addWidget(self._sort)
@@ -71,14 +71,14 @@ class ActionPicker(QWidget):
         if kind is None:
             self.clear()
             return
-        picture = kind == MediaType.IMAGE
-        names = self._states if picture else self._acts
-        said = _as_listed(row.get("picture_state" if picture else "act") or "", names)
+        is_image = kind == MediaType.IMAGE
+        names = self._states if is_image else self._acts
+        said = _as_listed(row.get("image_state" if is_image else "act") or "", names)
         self._prompt_id = ""  # nothing is on display while the list is being set
-        self._offer(names if picture or not said or said in names else (*names, said))
+        self._offer(names if is_image or not said or said in names else (*names, said))
         self.pick(said)
-        self._sort.setVisible(picture)
-        self._combo.setToolTip(_PICTURES_TIP if picture else _VIDEOS_TIP)
+        self._sort.setVisible(is_image)
+        self._combo.setToolTip(_IMAGES_TIP if is_image else _VIDEOS_TIP)
         self._prompt_id = row.get("prompt_id") or ""
         self.show()
 
@@ -99,7 +99,7 @@ class ActionPicker(QWidget):
             self._sorting.activateWindow()
             return
         built = the_sorting_window(self._prompt_id)
-        if not show_or_say("Sorting pictures", built, parent=self):
+        if not show_or_say("Sorting images", built, parent=self):
             self._sorting = built
 
     def _on_picked(self) -> None:

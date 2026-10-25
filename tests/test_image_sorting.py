@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 
 from origenerator.gallery.enhance import enhance_file_stem
-from origenerator.picture_sorting import pictures_to_sort
+from origenerator.image_sorting import images_to_sort
 
 
 def _row(prompt_id, filename, *, prompt="scene one", created="2026-01-01 00:00:00",
@@ -14,7 +14,7 @@ def _row(prompt_id, filename, *, prompt="scene one", created="2026-01-01 00:00:0
         "prompt_id": prompt_id, "workflow_name": "sdxl_t2i", "workflow_version": "v001",
         "status": "completed", "positive_prompt": prompt, "params_json": "{}",
         "output_files": json.dumps(files) if files else None,
-        "created_at": created, "picture_state": state, **extra,
+        "created_at": created, "image_state": state, **extra,
     }
 
 
@@ -30,16 +30,16 @@ def test_only_finished_stills_nobody_has_sorted_are_offered():
         _row("no-file", None),
     ]
 
-    assert _ids(pictures_to_sort(rows)) == ["still"]
+    assert _ids(images_to_sort(rows)) == ["still"]
 
 
-def test_an_enhancement_waiting_to_be_folded_is_not_a_second_picture_to_sort():
+def test_an_enhancement_waiting_to_be_folded_is_not_a_second_image_to_sort():
     rows = [
         _row("still", "scene_00001_.png"),
         _row("its-better-version", f"{enhance_file_stem()}_00001_.png"),
     ]
 
-    assert _ids(pictures_to_sort(rows)) == ["still"]
+    assert _ids(images_to_sort(rows)) == ["still"]
 
 
 def test_the_favorites_come_first_and_each_half_runs_newest_backwards():
@@ -50,5 +50,5 @@ def test_the_favorites_come_first_and_each_half_runs_newest_backwards():
         _row("favorite-new", "d_00001_.png", created="2026-01-04 00:00:00", starred=1),
     ]
 
-    assert _ids(pictures_to_sort(rows)) == [
+    assert _ids(images_to_sort(rows)) == [
         "favorite-new", "favorite-old", "plain-new", "plain-old"]

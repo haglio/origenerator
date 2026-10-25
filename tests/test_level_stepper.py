@@ -1,7 +1,7 @@
-"""Stepping the versions of the picture on screen.
+"""Stepping the versions of the image on screen.
 
 Shift+Left/Right moves within one image's enhancement levels rather than along
-the set. Which versions exist, which picture they belong to, and which of them
+the set. Which versions exist, which image they belong to, and which of them
 is showing were three fields on the slideshow, read and written from five of its
 methods; they are one small object now, and this is what it promises.
 """
@@ -13,7 +13,7 @@ import pytest
 
 from origenerator.gui.level_stepper import LevelStepper, Version
 
-# Two pictures. The first has three versions, newest first, as the gallery hands
+# Two images. The first has three versions, newest first, as the gallery hands
 # them over: (path, media_type, label). The second has only itself.
 _LEVELS = {
     "a.png": [("a-v3.png", "image", "Level 3"),
@@ -38,7 +38,7 @@ def test_a_fresh_stepper_has_nothing_to_step():
     assert stepper.index == 0
 
 
-def test_stepping_moves_within_the_one_picture(armed):
+def test_stepping_moves_within_the_one_image(armed):
     assert armed.step(1, base="a.png") == Version("a-v2.png", "image", "Level 2")
     assert armed.step(1, base="a.png") == Version("a.png", "image", "Base")
     assert armed.index == 2
@@ -51,18 +51,18 @@ def test_the_versions_wrap_round_in_both_directions(armed):
     assert armed.index == 0
 
 
-def test_a_picture_with_one_version_does_not_step(armed):
+def test_an_image_with_one_version_does_not_step(armed):
     # And says so by answering nothing, so the caller can leave the set alone
     # rather than stepping it when the shift was the whole point.
     assert armed.step(1, base="b.png") is None
     assert armed.index == 0
 
 
-def test_a_picture_with_no_versions_at_all_does_not_step(armed):
+def test_an_image_with_no_versions_at_all_does_not_step(armed):
     assert armed.step(1, base="never-enhanced.png") is None
 
 
-def test_the_picture_being_stepped_stays_the_key_once_stepping_starts(armed):
+def test_the_image_being_stepped_stays_the_key_once_stepping_starts(armed):
     # The file on screen is no longer the one the set lists the image under the
     # moment a level is showing, so the base is remembered rather than re-asked.
     armed.step(1, base="a.png")
@@ -79,7 +79,7 @@ def test_a_new_slide_starts_again_at_the_top_version(armed):
     assert armed.step(1, base="a.png") == Version("a-v2.png", "image", "Level 2")
 
 
-def test_the_levels_on_offer_are_the_ones_for_the_picture_being_stepped(armed):
+def test_the_levels_on_offer_are_the_ones_for_the_image_being_stepped(armed):
     assert len(armed.levels(base="a.png")) == 3
     assert len(armed.levels(base="b.png")) == 1
     assert armed.levels(base="unknown.png") == []
@@ -132,7 +132,7 @@ def test_versions_gone_a_level_deeper_are_stepped_from_their_new_top_still_stepp
     assert armed.step(1, base="a-v4.png") == Version("a-v3.png", "image", "Level 3")
 
 
-def test_the_slideshow_waits_at_a_pace_of_nought_until_another_picture_comes_up(armed):
+def test_the_slideshow_waits_at_a_pace_of_nought_until_another_image_comes_up(armed):
     paces = [armed.pace(6)]
     armed.step(1, base="a.png")
     paces.append(armed.pace(6))

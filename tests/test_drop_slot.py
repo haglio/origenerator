@@ -27,7 +27,7 @@ def _slot(qtbot, kind="image", lent_by=lambda pid: pid,
     return slot
 
 
-def _pictures_only(pid):
+def _images_only(pid):
     return pid if pid.startswith("img") else None
 
 
@@ -57,7 +57,7 @@ def _write_looping_webp(path, size=(64, 48)):
 
 
 def test_dropping_an_allowed_id_fills_the_slot_and_notifies(qtbot):
-    slot = _slot(qtbot, lent_by=_pictures_only)
+    slot = _slot(qtbot, lent_by=_images_only)
     seen = []
     slot.changed.connect(lambda: seen.append(slot.current_id()))
 
@@ -78,7 +78,7 @@ def test_a_dropped_item_is_held_as_what_it_lends_the_slot(qtbot):
 
 
 def test_dropping_a_disallowed_id_is_ignored(qtbot):
-    slot = _slot(qtbot, lent_by=_pictures_only)
+    slot = _slot(qtbot, lent_by=_images_only)
 
     _drop(slot, "vid9")
 
@@ -86,7 +86,7 @@ def test_dropping_a_disallowed_id_is_ignored(qtbot):
 
 
 def test_drag_enter_accepts_only_allowed_ids(qtbot):
-    slot = _slot(qtbot, lent_by=_pictures_only)
+    slot = _slot(qtbot, lent_by=_images_only)
 
     assert _drag_enter(slot, "img1").isAccepted()
     assert not _drag_enter(slot, "vid1").isAccepted()
@@ -188,10 +188,10 @@ def test_an_ordinary_slot_keeps_its_color(qtbot, tmp_path):
 
 
 def test_a_slot_lights_while_a_drag_it_would_take_is_under_way(qtbot):
-    slot = _slot(qtbot, lent_by=_pictures_only)
-    picture, video = generation_mime("img1"), generation_mime("vid1")
+    slot = _slot(qtbot, lent_by=_images_only)
+    image, video = generation_mime("img1"), generation_mime("vid1")
 
-    under_way.started.emit(picture, None)
+    under_way.started.emit(image, None)
     assert slot._label.property("dragActive") is True
     under_way.ended.emit()
     assert slot._label.property("dragActive") is False
@@ -212,7 +212,7 @@ def test_a_drag_over_the_slot_lights_it_as_where_the_drop_lands(qtbot):
 
 
 def test_a_drag_the_slot_would_turn_away_does_not_light_it(qtbot):
-    slot = _slot(qtbot, lent_by=_pictures_only)
+    slot = _slot(qtbot, lent_by=_images_only)
 
     _drag_enter(slot, "vid1")
 
@@ -274,7 +274,7 @@ def test_the_slot_under_the_drag_sits_one_step_lighter_than_one_only_lit_for_it(
 
 
 def test_accepts_delegates_to_the_predicate(qtbot):
-    slot = _slot(qtbot, lent_by=_pictures_only)
+    slot = _slot(qtbot, lent_by=_images_only)
 
     assert slot.accepts("img1") is True
     assert slot.accepts("vid1") is False
@@ -300,7 +300,7 @@ def _actions(slot) -> dict:
 
 def test_the_menu_pastes_the_item_the_clipboard_names(qtbot):
     QApplication.clipboard().setText("AB12CD34 007")
-    slot = _slot(qtbot, lent_by=_pictures_only, named={"AB12CD34 007": "img7"}.get)
+    slot = _slot(qtbot, lent_by=_images_only, named={"AB12CD34 007": "img7"}.get)
     paste = _actions(slot)["Paste Origenerator name"]
     assert paste.isEnabled()
 
@@ -312,7 +312,7 @@ def test_the_menu_pastes_the_item_the_clipboard_names(qtbot):
 @pytest.mark.parametrize("on_the_clipboard", ["", "a sentence copied elsewhere", "AB12CD34 007"])
 def test_paste_is_grayed_while_the_clipboard_names_nothing_the_slot_takes(qtbot, on_the_clipboard):
     QApplication.clipboard().setText(on_the_clipboard)
-    slot = _slot(qtbot, lent_by=_pictures_only, named={"AB12CD34 007": "vid7"}.get)
+    slot = _slot(qtbot, lent_by=_images_only, named={"AB12CD34 007": "vid7"}.get)
 
     paste = _actions(slot)["Paste Origenerator name"]
 

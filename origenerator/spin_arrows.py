@@ -3,7 +3,7 @@
 Qt's stylesheet engine is not a browser's: the CSS trick of collapsing an element to
 zero size and letting its borders meet as a triangle draws a filled rectangle
 here, which is exactly what appeared over the step buttons. And Qt takes an
-arrow only as an image — no data URIs, no shapes — so the pictures have to
+arrow only as an image — no data URIs, no shapes — so the arrows have to
 exist as files somewhere the stylesheet can name.
 
 They are generated rather than committed because they are two triangles: a few

@@ -47,7 +47,7 @@ from origenerator.orientation import oriented_key, side_of, split_key
 # A search does not narrow this tree: a narrowed list of folder names is a poor
 # answer to "where is the one with the two of them on the couch", because a
 # folder's name is a short code and the thing you would actually recognize is
-# the picture. The search fills the browser pane with matching thumbnails
+# the thumbnail. The search fills the browser pane with matching thumbnails
 # instead (see BrowserPane.show_search_results), and the tree is left alone — so the folder
 # you were standing in is still there when the search clears.
 

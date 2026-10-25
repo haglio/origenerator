@@ -1,6 +1,6 @@
 """The standalone enhance, driven with no gallery around it.
 
-What the button would run on and why a picture is passed over, what a batch
+What the button would run on and why an image is passed over, what a batch
 shares, and where a run in flight shows -- all of it used to be reachable only
 by building the app's central widget. Here the surfaces are recorders.
 
@@ -309,8 +309,8 @@ def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
     assert offer == (False, NO_VIDEO_ENHANCER)
 
 
-def test_a_picture_already_made_at_these_settings_says_so_rather_than_no(enhance,
-                                                                         monkeypatch):
+def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
+                                                                        monkeypatch):
     # Change any setting and the button comes back, which is what makes it read
     # as "you have this one" rather than as "no".
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
@@ -385,8 +385,8 @@ def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
     assert jobs.asks == [("here", 2), ("there", 1)]
 
 
-def test_a_picture_with_no_file_to_enhance_is_skipped_not_launched(enhance,
-                                                                   monkeypatch):
+def test_an_image_with_no_file_to_enhance_is_skipped_not_launched(enhance,
+                                                                  monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: None)
     jobs = FakeReroll()
@@ -598,8 +598,8 @@ def test_every_live_job_is_searched_not_each_folders_leading_one(enhance,
     assert controller.run_of(_image("i2")) is not None
 
 
-def test_a_queued_job_shows_as_queued_rather_than_borrowing_a_picture(enhance,
-                                                                      monkeypatch):
+def test_a_queued_job_shows_as_queued_rather_than_borrowing_a_frame(enhance,
+                                                                    monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     controller, _host = enhance(jobs=FakeReroll([FakeJob("run-a", state="queued")]))
@@ -660,8 +660,8 @@ def test_a_delete_takes_the_runs_being_made_of_what_it_deletes(enhance,
     assert jobs.cancelled == ["run-a"]
 
 
-def test_cancelling_from_a_tile_leaves_the_picture_exactly_as_it_was(enhance,
-                                                                     monkeypatch):
+def test_cancelling_from_a_tile_leaves_the_image_exactly_as_it_was(enhance,
+                                                                   monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     browser = FakeBrowser()
@@ -686,8 +686,8 @@ def test_cancelling_with_nothing_in_flight_redraws_nothing(enhance):
 # --- said out loud -----------------------------------------------------------
 
 
-def test_a_spoken_enhance_refuses_a_picture_that_already_has_one(enhance,
-                                                                 monkeypatch):
+def test_a_spoken_enhance_refuses_an_image_that_already_has_one(enhance,
+                                                                monkeypatch):
     # Re-enhancing stays a deliberate act made in front of the settings it uses.
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: True)
@@ -755,7 +755,7 @@ def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch, p
     assert kind == WARNING
 
 
-def test_a_spoken_enhance_over_a_picture_that_has_one_in_flight_is_refused(enhance,
+def test_a_spoken_enhance_over_an_image_that_has_one_in_flight_is_refused(enhance,
                                                                         monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
@@ -772,7 +772,7 @@ def test_a_spoken_enhance_over_a_picture_that_has_one_in_flight_is_refused(enhan
 
 def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkeypatch):
     # Nothing was refused: the run was wanted and its submit failed, so it reads
-    # red rather than the yellow of a picture with nothing to do.
+    # red rather than the yellow of an image with nothing to do.
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
@@ -792,7 +792,7 @@ def test_a_locked_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):
     assert controller.enhance_from_slideshow("i1") is False
 
 
-def test_a_lock_puts_the_enhancement_of_the_locked_picture_first(enhance, monkeypatch):
+def test_a_lock_puts_the_enhancement_of_the_locked_image_first(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
@@ -809,8 +809,8 @@ def test_a_lock_puts_the_enhancement_of_the_locked_picture_first(enhance, monkey
 
 
 def test_an_enhancement_launched_for_what_a_slideshow_is_locked_on_is_put_first(enhance,
-                                                                         monkeypatch):
-    # The Auto switch enhancing a picture a slideshow stayed locked on while it was
+                                                                                monkeypatch):
+    # The Auto switch enhancing an image a slideshow stayed locked on while it was
     # made, or a batch that takes in the locked one.
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})

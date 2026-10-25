@@ -47,7 +47,7 @@ class GalleryEnvironment:
     """What the app around the actions does for them. Each is optional, and each
     absence costs something: no ``release_files`` and a file the app still holds
     open cannot be moved; no ``cancel_enhancements`` and an enhancement runs on
-    past the image it improves; no ``thumb_dir`` and a row keeps a picture of a
+    past the image it improves; no ``thumb_dir`` and a row keeps a thumbnail of a
     version that is gone."""
 
     release_files: Callable[[list[Path]], None] | None = None
@@ -158,12 +158,12 @@ class GalleryActions:
         return True
 
     def _redraw_thumbnail(self, prompt_id: str) -> None:
-        """Rebuild a row's tile picture from whichever version now leads it.
+        """Rebuild a row's tile thumbnail from whichever version now leads it.
 
         The thumbnail is a separate JPEG keyed by prompt_id, so deleting the
         version it was rendered from leaves it showing a file that is gone —
         the gallery would still be advertising the enhancement you just binned.
-        Rendering is best-effort: a row that can't be redrawn keeps the picture
+        Rendering is best-effort: a row that can't be redrawn keeps the thumbnail
         it has rather than losing its tile.
         """
         thumb_dir = self._environment.thumb_dir
@@ -240,7 +240,7 @@ class GalleryActions:
 
         ``names`` narrows each row to those output files, and leaves the
         thumbnail where it is: a delete of some of a row's versions is not a
-        delete of the row, and its tile still has a picture to show.
+        delete of the row, and its tile still has a thumbnail to show.
         """
         seen: set[str] = set()
         by_row: list[list[Path]] = []

@@ -12,7 +12,7 @@ from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from tests.media_files import write_mp4
-from tests.pictured_rows import square
+from tests.thumbnail_rows import square
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def _row(db, prompt_id, workflow, file, thumb):
                                                    "type": "output"}]))
 
 
-def test_a_dragged_picture_lends_a_picture_zone_its_file_reference(library):
+def test_a_dragged_image_lends_an_image_zone_its_file_reference(library):
     items, _names, _output_dir, _thumb = library
 
     assert items.lends("gen-pic", MediaType.IMAGE) == "image/pic_00001_.png [output]"
@@ -61,7 +61,7 @@ def test_a_dragged_video_lends_a_video_zone_its_own_path(library):
     assert items.lends("gen-run", MediaType.IMAGE) is None
 
 
-def test_a_held_item_is_known_by_its_file_and_shows_its_own_pictures(library):
+def test_a_held_item_is_known_by_its_file_and_shows_its_own_thumbnails(library):
     items, names, output_dir, thumb = library
 
     assert items.item_of("image/pic_00001_.png [output]") == "gen-pic"
@@ -72,11 +72,11 @@ def test_a_held_item_is_known_by_its_file_and_shows_its_own_pictures(library):
 
 def test_a_file_from_outside_is_named_by_its_file_and_shown_as_itself(library, tmp_path):
     items, _names, _output_dir, _thumb = library
-    picture = square(tmp_path, "green")
+    image = square(tmp_path, "green")
 
-    assert items.item_of(picture) is None
-    assert items.name_of(picture) == "made-green.png"
-    assert items.preview(picture) == (picture, None)
+    assert items.item_of(image) is None
+    assert items.name_of(image) == "made-green.png"
+    assert items.preview(image) == (image, None)
 
 
 def test_a_video_from_outside_shows_a_still_made_from_it(library, tmp_path):
@@ -100,10 +100,10 @@ def test_a_pasted_name_means_the_item_wearing_it(library):
 def test_with_no_gallery_a_zone_holds_files_alone(tmp_path):
     items = FilesOnly(places=OutputPlaces.in_one_folder(tmp_path / "output"),
                       input_dir=tmp_path / "input")
-    picture = square(tmp_path, "red")
+    image = square(tmp_path, "red")
 
     assert items.lends("gen-pic", MediaType.IMAGE) is None
     assert items.named("anything") is None
-    assert items.preview(picture) == (picture, None)
-    assert items.name_of(picture) == "made-red.png"
+    assert items.preview(image) == (image, None)
+    assert items.name_of(image) == "made-red.png"
     assert items.preview("nowhere.png") == (None, None)

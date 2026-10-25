@@ -18,24 +18,27 @@ class OutputPlaces:
     videos: Path
     scripts: Path
     audio: Path
+    trash: Path | None = None
 
     @classmethod
-    def in_one_folder(cls, folder: Path) -> OutputPlaces:
+    def in_one_folder(cls, folder: Path, *, trash: Path | None = None) -> OutputPlaces:
         folder = Path(folder)
         return cls(comfyui=folder, pictures=folder / PICTURES, videos=folder,
-                   scripts=folder / SCRIPTS, audio=folder / AUDIO)
+                   scripts=folder / SCRIPTS, audio=folder / AUDIO, trash=trash)
 
     @classmethod
-    def from_settings(cls, settings: dict, *, comfyui_dir: Path) -> OutputPlaces:
+    def from_settings(cls, settings: dict, *, comfyui_dir: Path,
+                      trash: Path | None = None) -> OutputPlaces:
         comfyui = Path(settings.get("comfyui_output_dir") or Path(comfyui_dir) / "output")
         pictures, videos = (settings.get("origenerator_pictures_dir"),
                             settings.get("origenerator_videos_dir"))
         if not (pictures and videos):
-            return cls.in_one_folder(comfyui)
+            return cls.in_one_folder(comfyui, trash=trash)
         videos = Path(videos)
         return cls(comfyui=comfyui, pictures=Path(pictures), videos=videos,
                    scripts=Path(settings.get("origenerator_scripts_dir") or videos / SCRIPTS),
-                   audio=Path(settings.get("origenerator_audio_dir") or videos / AUDIO))
+                   audio=Path(settings.get("origenerator_audio_dir") or videos / AUDIO),
+                   trash=trash)
 
     def folder(self, subfolder: str) -> Path:
         parts = PurePosixPath(subfolder.replace("\\", "/")).parts

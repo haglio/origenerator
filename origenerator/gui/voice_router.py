@@ -326,10 +326,7 @@ class VoiceRouter(QObject):
         to steer. That is not a second switch, just nothing to steer.
         """
         if not self.listening():
-            self.listener.stop()           # both halves, so the listener closes
-            self.listener.stop_commands()
-            self._flash_timer.stop()
-            self._set_caption(None)
+            self.shut_the_mic()
             return
         self.listener.start_commands(self.on_command)
         if self._steering is not None:
@@ -340,6 +337,12 @@ class VoiceRouter(QObject):
         else:
             self.listener.stop()  # no loop to steer; the commands hold the mic open
         self._show("Listening…", transient=False)
+
+    def shut_the_mic(self) -> None:
+        self.listener.stop()           # both halves, so the listener closes
+        self.listener.stop_commands()
+        self._flash_timer.stop()
+        self._set_caption(None)
 
     @property
     def steering(self) -> str | None:

@@ -82,7 +82,11 @@ def source_image_id_in(row: dict, image_index: dict) -> str | None:
     ``image_index`` (see :func:`build_image_config_index`) rather than searched
     for: what a walk of the whole library asks of every video in it. ``None``
     for a row with no input image, or one no indexed generation produced."""
-    entry = image_index.get(_frame_name(parse_params(row.get("params_json")).get("input_image")))
+    return source_image_id_of(parse_params(row.get("params_json")).get("input_image"), image_index)
+
+
+def source_image_id_of(input_image: str | None, image_index: dict) -> str | None:
+    entry = image_index.get(_frame_name(input_image))
     return (entry.prompt_id or None) if entry is not None else None
 
 

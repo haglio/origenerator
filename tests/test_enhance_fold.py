@@ -119,6 +119,24 @@ def test_refold_keeps_the_true_original_and_leads_with_the_newest(tmp_path):
         ["sdxl_t2i_src.png"]
 
 
+def test_an_enhancement_folded_again_after_a_stop_between_its_saves_is_listed_once(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    enhance = _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
+                           "image_enhance_00001_.png")
+    fold_enhancement(db, enhance)
+    db.restore_generation(enhance)
+
+    fold_completed_enhancements(db)
+
+    upgraded = db.get_generation("src")
+    assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
+        ["image_enhance_00001_.png", "sdxl_t2i_src.png"]
+    assert [entry["filename"] for entry in json.loads(upgraded["enhance_history"])] == \
+        ["image_enhance_00001_.png"]
+    assert db.get_generation("e1") is None
+
+
 def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
     # The transient row is deleted here, and with it the only thing that said
     # when this enhancement happened. Its id rides onto the level instead, which

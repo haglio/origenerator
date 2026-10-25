@@ -329,12 +329,6 @@ def _record_workflow_versions(library: Library):
     return stamp_unstamped(library.db)
 
 
-def _repair_records(library: Library):
-    from origenerator.record_repair import repair_records
-
-    return repair_records(library.db, library.places)
-
-
 def _reconcile_bookmarks(library: Library):
     """Heal stars, custom names and hand-composed folders whose folder key
     drifted after a key formula change, and stamp identity onto live ones so the
@@ -396,9 +390,6 @@ MAINTENANCE = (
     BootPass("Recording workflow versions...", _record_workflow_versions,
              counted="Recorded the workflow version of %d generation(s)",
              failure="Recording workflow versions failed: %s"),
-    BootPass("Leaving one record per picture...", _repair_records,
-             counted="Repaired %d generation record(s)",
-             failure="Record repair failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_bookmarks,
              failure="Folder bookmark reconcile failed: %s"),
 )

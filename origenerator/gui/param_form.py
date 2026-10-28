@@ -208,6 +208,7 @@ class ParamForm(QWidget):
         # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
         self._label_columns: dict[str, LabelColumn] = {}
+        self._shut_down: dict[str, str] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         self._defs = {pd.key: pd for pd in self._param_defs}
         # A workflow that tells a story in scenes hands both prompts, the scene
@@ -218,7 +219,7 @@ class ParamForm(QWidget):
         self._scenes_row = scenes_def.key if scenes_def is not None else None
         if scenes_def is not None:
             self._scenes = ScenesEditor(
-                scenes_def, lambda w, pd=scenes_def: grey_out_of_reach(pd, w),
+                scenes_def, lambda w, pd=scenes_def: grey_out_of_reach(pd, w), self._shut_down,
                 lines=any(pd.key == "scene_lines" for pd in self._param_defs))
             self._scenes.changed.connect(self.changed)
         self._build()
@@ -253,15 +254,18 @@ class ParamForm(QWidget):
         for row, (in_use, shut_down_help) in _IN_USE_WHILE.items():
             if row not in self._widgets:
                 continue
-            help_text = None if in_use(values) else shut_down_help(values)
-            if self._widgets[row] is self._scenes:
-                self._scenes.set_text_in_use(row, help_text)
+            if in_use(values):
+                self._shut_down.pop(row, None)
             else:
-                self._set_row_in_use(row, help_text)
+                self._shut_down[row] = shut_down_help(values)
+            if self._widgets[row] is not self._scenes:
+                set_in_use(self._widgets[row], self._labels[row], row not in self._shut_down,
+                           self._tip(row))
+        if self._scenes is not None:
+            self._scenes.reflect_use()
 
-    def _set_row_in_use(self, key: str, shut_down_help: str | None) -> None:
-        set_in_use(self._widgets[key], self._labels[key], shut_down_help is None,
-                   self._help(self._defs[key]) if shut_down_help is None else shut_down_help)
+    def _tip(self, key: str) -> str:
+        return self._shut_down.get(key) or self._help(self._defs[key])
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
         """Show or hide one row, label and field together."""

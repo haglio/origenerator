@@ -522,6 +522,21 @@ def test_asking_whether_anything_can_play_stops_at_the_first_item(slideshows, mo
     assert read == ["g0"]
 
 
+def test_asking_whether_anything_can_play_lists_no_folder_of_upscales(slideshows, monkeypatch):
+    # An upscale changes which file a slide plays, never whether there is one,
+    # and every click on the folder list asks this several times over.
+    director, _host, _made = slideshows(FakeHost(rows=[_row("g0")]))
+    del director.items_of
+    monkeypatch.setattr(module.gallery, "resolve_preview",
+                        lambda row, _places: (f"{row['prompt_id']}.png", "image"))
+    scanned = []
+    monkeypatch.setattr(module.EvolverUpscales, "scan",
+                        lambda *args: scanned.append(args) or module.EvolverUpscales({}))
+
+    assert director.anything_to_play()
+    assert scanned == []
+
+
 def _row(prompt_id, *, workflow_name="sdxl_t2i", favorite=False, params=None,
          files=("one.png",)):
     return {

@@ -173,14 +173,14 @@ class ScenesEditor(QWidget):
     changed = pyqtSignal()
 
     def __init__(self, frames_def: ParamDef,
-                 prepare_length: Callable[[PresetComboBox], None], lines: bool = True,
-                 parent=None):
+                 prepare_length: Callable[[PresetComboBox], None], shut_down: dict[str, str],
+                 lines: bool = True, parent=None):
         super().__init__(parent)
         self._pd = frames_def
         self._prepare_length = prepare_length
         # Whether the workflow speaks: a card of one that cannot has no lines field.
         self._lines = lines
-        self._shut_down: dict[str, str] = {}
+        self._shut_down = shut_down
         self._scenes: list[_Scene] = []
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
@@ -212,11 +212,7 @@ class ScenesEditor(QWidget):
         self._renumber()
         self.changed.emit()
 
-    def set_text_in_use(self, key: str, shut_down_help: str | None) -> None:
-        if shut_down_help is None:
-            self._shut_down.pop(key, None)
-        else:
-            self._shut_down[key] = shut_down_help
+    def reflect_use(self) -> None:
         for scene in self._scenes:
             scene.reflect_use()
 

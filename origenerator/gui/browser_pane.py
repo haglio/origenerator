@@ -2,7 +2,7 @@
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
 settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Favorites /
-Experiments / Requests / Trash collection overviews. Owns the thumbnail multi-selection
+Enhanced / Experiments / Requests / Trash collection overviews. Owns the thumbnail multi-selection
 and the live in-flight cards.
 
 One thing it renders comes from no tree row at all: the gallery search's results,
@@ -38,6 +38,7 @@ from shared_ui.spacing import GAP_DIALOG, GAP_MEDIUM, MARGIN_DIALOG
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
     COLLECTION_LABELS,
+    ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
@@ -222,6 +223,8 @@ def _time_heading(text: str) -> QLabel:
 _NOW_HEADING = "Now"
 _NO_BOOKMARKS = ("No bookmarks yet.\n\nStar an image or video from its right-click menu, "
                  "or favorite a folder from the list, to collect them here.")
+_NO_ENHANCED = ("No enhanced images yet.\n\nEnhance one from its right-click menu or the plus "
+                "in its corner to see it here.")
 
 
 def _open_sections(flow, headings, *, opens_now=False, draw_leading=lambda: None):
@@ -367,6 +370,11 @@ class BrowserPane(QObject):
                     self._favorite_items(self._collection_side, self._collection_folder),
                     self._favorite_folders(self._collection_side, self._collection_folder),
                     show_stars=False, empty=_NO_BOOKMARKS)),
+            ENHANCED_KEY: PaneCollection(
+                rows=lambda side, folder: self._in_folder(self._enhanced_rows, side, folder),
+                render=lambda: self._show_gathered(
+                    self._open_collection_rows(ENHANCED_KEY), (),
+                    show_stars=False, empty=_NO_ENHANCED)),
             EXPERIMENTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._experiment_rows, side, folder),
                 render=self._render_experiments),
@@ -392,6 +400,7 @@ class BrowserPane(QObject):
         self._recents_flow = None           # the open collection's layout, to grow into
         self._recents_drawn = 0             # finished items it has drawn so far
         self._listed = _Listing()
+        self._enhanced_rows = _Listing()    # every enhanced image, newest first
         self._experiment_rows = _Listing()  # unreviewed experiments, newest first
         self._trash_rows = _Listing()       # held deletions, newest first
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
@@ -417,6 +426,7 @@ class BrowserPane(QObject):
         self._models_taken += 1
         self._recent_rows = _Listing(recent_rows)
         self._listed = _Listing(listed_rows)
+        self._enhanced_rows = _Listing(gallery.enhanced_generations(listed_rows))
         self._experiment_rows = _Listing(experiment_rows)
         self._trash_rows = _Listing(trash_rows)
         self._requested_rows = _Listing(item["row"] for item in request_items)
@@ -709,7 +719,7 @@ class BrowserPane(QObject):
         selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
 
-    # --- the collections: Recents / Favorites / Experiments / Requests / Trash ---
+    # --- the collections: Recents / Favorites / Enhanced / Experiments / Requests / Trash ---
 
     def show_collection(self, key: str, side: str | None = None):
         collection = folder_collection(key)
@@ -1149,10 +1159,10 @@ class BrowserPane(QObject):
         outside the collections, where a folder is what's on screen instead.
 
         The slideshow plays these, so they have to match the tiles: Recents is its
-        listed items, Favorites is its
-        favorited items plus everything under each bookmarked folder, since a folder
-        tile there stands for its whole folder, Experiments is its unreviewed
-        queue, Requests is what your spoken requests made, and Trash is what the
+        listed items, Favorites is its favorited items plus everything under each
+        bookmarked folder, since a folder tile there stands for its whole folder,
+        Enhanced is its enhanced images, Experiments is its unreviewed queue,
+        Requests is what your spoken requests made, and Trash is what the
         bin is holding — deleted is not unwatchable, and a collection of items you are
         deciding whether to keep is exactly one you want to sit and look through.
         A favorited item inside a favorited folder is one item, so repeats drop out.
@@ -1168,7 +1178,7 @@ class BrowserPane(QObject):
         placement = self._placement(side)
         tallies = {collection: placement.tally(
                        self._collections[collection].rows(side, gallery.ALL_KEY))
-                   for collection in (EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
+                   for collection in (ENHANCED_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
         tallies[FAVORITES_KEY] = placement.tally_favorites(self._listed.on(side))
         return {FolderCollection(collection, folder).key: count
                 for collection, tally in tallies.items() for folder, count in tally.items()}

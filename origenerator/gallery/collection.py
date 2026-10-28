@@ -1,8 +1,8 @@
-"""The five collections every folder of folders leads with, by key and by label.
+"""The collections every folder of folders leads with, by key and by label.
 
 Names rather than widgets: the tree draws a row for each of these under every
-such folder, and the spoken vocabulary matches an utterance against the same
-five, so neither owns them. They live here, beside the folder keys, because a
+such folder, and the spoken vocabulary matches an utterance against their
+names, so neither owns them. They live here, beside the folder keys, because a
 collection key is an identity a stored expansion and a navigation history are
 written under — it outlives every widget that ever draws it, and a changed
 value would orphan both.
@@ -23,6 +23,8 @@ FAVORITES_KEY = "__starred__"   # synthetic tree node collecting every favorited
 # there IS the favorite mark), so it wears that name.  The key stays
 # "__starred__" so saved expansions and history survive the rename.
 FAVORITES_LABEL = "Favorites"
+ENHANCED_KEY = "__enhanced__"   # synthetic node: every enhanced image under its folder
+ENHANCED_LABEL = "Enhanced"
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
 EXPERIMENTS_LABEL = "Experiments"
 REQUESTS_KEY = "__requests__"  # synthetic node: what spoken requests have queued
@@ -30,10 +32,11 @@ REQUESTS_LABEL = "Requests"
 TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
 TRASH_LABEL = "Trash"
 
-COLLECTIONS = (RECENTS_KEY, FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)
+COLLECTIONS = (RECENTS_KEY, FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, REQUESTS_KEY,
+               TRASH_KEY)
 COLLECTION_LABELS = {RECENTS_KEY: RECENTS_LABEL, FAVORITES_KEY: FAVORITES_LABEL,
-                     EXPERIMENTS_KEY: EXPERIMENTS_LABEL, REQUESTS_KEY: REQUESTS_LABEL,
-                     TRASH_KEY: TRASH_LABEL}
+                     ENHANCED_KEY: ENHANCED_LABEL, EXPERIMENTS_KEY: EXPERIMENTS_LABEL,
+                     REQUESTS_KEY: REQUESTS_LABEL, TRASH_KEY: TRASH_LABEL}
 _IN_FOLDER = "@"
 
 

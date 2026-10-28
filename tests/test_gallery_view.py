@@ -89,6 +89,7 @@ from origenerator.config import (
 from origenerator.db import Database
 from origenerator.gallery import tree as gallery_tree_module
 from origenerator.gallery.collection import (
+    ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
@@ -551,7 +552,8 @@ def _at(item, *path):
     return item
 
 
-_COLLECTION_NAMES = ["Latest", "Favorites", "Experiments", "Requests", "Trash"]
+_COLLECTION_NAMES = ["Latest", "Favorites", "Enhanced", "Experiments", "Requests", "Trash"]
+_COLLECTION_NAMES_OF_VIDEOS = [name for name in _COLLECTION_NAMES if name != "Enhanced"]
 
 
 def _collection_names(item):
@@ -628,7 +630,7 @@ def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
     model, lora, source = (_at(workflow, *[0] * depth) for depth in (1, 2, 3))
 
     for folder in (_alls(view._tree)["Videos"], workflow, model, lora, source):
-        assert _collection_names(folder) == _COLLECTION_NAMES
+        assert _collection_names(folder) == _COLLECTION_NAMES_OF_VIDEOS
     assert _at(source, 0).childCount() == 0
 
 
@@ -1112,7 +1114,7 @@ def test_all_shows_its_collections_then_images_and_videos_as_squares(qtbot):
 
 
 def _both_kinds_in_every_collection():
-    """A picture and a video in each of the five collections: both favorited and
+    """A picture and a video in each collection both kinds have: both favorited and
     asked for, an experiment of each kind, and one of each deleted."""
     picture, video = _image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")
     picture["starred"] = video["starred"] = 1
@@ -1126,7 +1128,7 @@ def _both_kinds_in_every_collection():
     return db
 
 
-@pytest.mark.parametrize("collection", _COLLECTION_NAMES)
+@pytest.mark.parametrize("collection", _COLLECTION_NAMES_OF_VIDEOS)
 def test_each_kinds_collection_lists_that_kind_alone(qtbot, collection):
     view = GalleryView(_both_kinds_in_every_collection())
     qtbot.addWidget(view)
@@ -1148,7 +1150,7 @@ def test_each_kinds_collections_count_that_kind_alone(qtbot):
 
     for kind in ("Images", "Videos"):
         assert [_shown(_collection_row(_alls(view._tree)[kind], name))
-                for name in _COLLECTION_NAMES[1:]] == [
+                for name in _COLLECTION_NAMES_OF_VIDEOS[1:]] == [
             "(1) Favorites", "(1) Experiments", "(1) Requests", "(1) Trash"]
 
 
@@ -1263,6 +1265,17 @@ def test_a_folders_collection_row_counts_what_that_folder_holds(qtbot):
 
     assert _shown(_collection_row(_image_workflow(view._tree), "Trash")) == "(1) Trash"
     assert _shown(_collection_row(_video_workflow(view._tree), "Trash")) == "Trash"
+
+
+def test_an_enhanced_image_counts_on_the_enhanced_of_every_folder_above_it(qtbot):
+    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1),
+                               _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    for folder in (_top_level(view._tree)["All"], _alls(view._tree)["Images"],
+                   _image_workflow(view._tree)):
+        assert _shown(_collection_row(folder, "Enhanced")) == "(1) Enhanced"
 
 
 def test_starring_a_picture_counts_it_on_the_favorites_of_every_folder_above_it(qtbot):
@@ -2956,6 +2969,31 @@ def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
     assert view.visible_prompt_ids() == []
 
 
+def test_enhanced_with_nothing_enhanced_in_it_says_how_to_enhance_one(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_alls(view._tree)["Enhanced"])
+
+    assert view.visible_prompt_ids() == []
+    assert view._scroll.widget().text() == (
+        "No enhanced images yet.\n\nEnhance one from its right-click menu or the plus "
+        "in its corner to see it here.")
+
+
+def test_enhanced_shows_every_enhanced_image_under_its_folder(qtbot):
+    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1),
+                               _image("i2", "a dog", 50, 2),
+                               _enhanced_image("i3", "a bird", 50, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_alls(view._tree)["Enhanced"])
+
+    assert sorted(view.visible_prompt_ids()) == ["i1", "i3"]
+
+
 def test_favorite_collection_gathers_favorite_items_as_thumbnails(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     db = FakeDB(rows)
@@ -4070,6 +4108,18 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
     assert marked_text("star", "Favorites", color=TEXT_PRIMARY,
                        size=path.fontMetrics().height()) in path.text()
     assert view._folder_path.display_text() == f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Favorites"
+
+
+def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
+    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_collection(view, ENHANCED_KEY))
+
+    path = view._folder_path.findChild(FolderPath)
+    assert marked_text("plus", "Enhanced", color=TEXT_PRIMARY,
+                       size=path.fontMetrics().height()) in path.text()
 
 
 def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtbot):
@@ -7875,6 +7925,29 @@ def test_a_slideshow_after_one_of_the_favorites_collection_is_not_held_to_the_fa
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     assert not slideshow.hud_favorites_filter
+    assert sorted(item[2] for item in slideshow._set.playlist._items) == ["i1", "i2"]
+    slideshow.close()
+
+
+def test_a_slideshow_of_enhanced_lights_enhanced_only_and_the_next_slideshow_does_not(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _enhanced_image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_collection(view, ENHANCED_KEY))
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing.shown)
+    assert view._slideshows.showing.hud_enhanced_mode
+    view._slideshows.showing.close()
+
+    _select_first_leaf(view)
+    view._slideshows.start()
+
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    assert not slideshow.hud_enhanced_mode
     assert sorted(item[2] for item in slideshow._set.playlist._items) == ["i1", "i2"]
     slideshow.close()
 

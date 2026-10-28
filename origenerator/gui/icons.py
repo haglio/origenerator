@@ -51,6 +51,7 @@ from shared_ui.type_scale import FONT_UI, SIZE_TINY, in_pixels
 
 from origenerator.gallery.collection import (
     COLLECTION_LABELS,
+    ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
@@ -227,7 +228,8 @@ def flask_icon() -> QIcon:
 def collection_icon(collection: str) -> QIcon:
     return {
         RECENTS_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
-        EXPERIMENTS_KEY: flask_icon, REQUESTS_KEY: mic_icon, TRASH_KEY: trash_icon,
+        ENHANCED_KEY: enhance_icon, EXPERIMENTS_KEY: flask_icon, REQUESTS_KEY: mic_icon,
+        TRASH_KEY: trash_icon,
     }[collection]()
 
 

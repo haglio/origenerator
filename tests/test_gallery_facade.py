@@ -61,7 +61,7 @@ PUBLISHED = {
     "rows_under", "same_enhancement", "section_headings", "selection_group",
     "settings_folder_key", "settings_signature", "source_image_id_for",
     "source_image_id_in", "source_image_of",
-    "favorite_folders", "favorite_generations", "start_frame_index",
+    "enhanced_generations", "favorite_folders", "favorite_generations", "start_frame_index",
     "cycle_shaped",
     "unreviewed_experiments",
     "videos_from_source_image", "was_made_from", "workflow_output_type", "written_params",

@@ -21,6 +21,7 @@ from origenerator.gallery import (
     child_groups,
     config_tab_title,
     enhance_params_for,
+    enhanced_generations,
     favorite_folders,
     favorite_generations,
     find_source_image_id,
@@ -542,6 +543,15 @@ def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
     assert is_enhanced_row(_row(params_json=json.dumps({"steps": 50}))) is False
     assert is_enhanced_row(_row(workflow_name="wan22_t2i",
                                 params_json=json.dumps({"enhance_denoise": 0.15}))) is False
+
+
+def test_a_video_is_never_enhanced_whatever_its_record_carries():
+    video = _row(workflow_name="wan22_i2v",
+                 output_files=json.dumps([{"filename": "wan22_i2v_v1.mp4"}]),
+                 original_files=json.dumps([{"filename": "sdxl_t2i_old.png"}]),
+                 enhance_history=json.dumps([{"filename": "wan22_i2v_v1.mp4"}]))
+
+    assert is_enhanced_row(video) is False
 
 
 def test_rows_awaiting_enhancement_targets_only_plain_uncovered_images():
@@ -1684,6 +1694,20 @@ def test_favorite_generations_excludes_rows_with_no_output():
     # A favorited row that produced nothing (in-flight/failed) has nothing to show.
     favorite_wip = _row(prompt_id="wip", starred=1, output_files=None)
     assert favorite_generations([favorite_wip]) == []
+
+
+def _enhanced_img(prompt_id, seed):
+    return _img(prompt_id, "a cat", 50, seed,
+                original_files=json.dumps([{"filename": f"sdxl_t2i_{prompt_id}_base.png"}]))
+
+
+def test_enhanced_generations_are_the_enhanced_images_with_a_file_in_the_order_given():
+    being_made = _row(prompt_id="wip", status="running",
+                      params_json=json.dumps({"enhance": True}))
+    rows = [_enhanced_img("i3", 3), _img("i2", "a dog", 50, 2), being_made,
+            _enhanced_img("i1", 1)]
+
+    assert [row["prompt_id"] for row in enhanced_generations(rows)] == ["i3", "i1"]
 
 
 def _collection(*ids_and_seeds):

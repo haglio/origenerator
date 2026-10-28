@@ -33,7 +33,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
-from origenerator.gallery.enhance import enhancement_recency
+from origenerator.gallery.enhance import enhancement_recency, is_enhanced_row
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
     AllGroup,
@@ -447,6 +447,10 @@ def favorite_generations(rows: list[dict]) -> list[dict]:
     (the caller lists them by descending id), so the result is too.
     """
     return [row for row in rows if row.get("starred") and produced_output(row)]
+
+
+def enhanced_generations(rows: list[dict]) -> list[dict]:
+    return [row for row in placeable_rows(rows) if produced_output(row) and is_enhanced_row(row)]
 
 
 def requested_generations(records: list[dict], rows: list[dict]) -> list[dict]:

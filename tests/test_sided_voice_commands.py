@@ -20,6 +20,7 @@ from origenerator.gallery.collection import (
     REQUESTS_KEY,
     TRASH_KEY,
 )
+from origenerator.gallery.voice_commands import ENHANCE_COMMAND
 from origenerator.voice.commands import (
     CollectionCommand,
     SlideshowControl,
@@ -65,6 +66,10 @@ def test_the_collection_names_are_the_tree_s_own():
     is what the collection says, where the key still says favorited."""
     assert match_voice_command("favorites") == CollectionCommand(FAVORITES_KEY, None)
     assert match_voice_command("starred") is None
+
+
+def test_saying_enhanced_enhances_the_image_on_screen_rather_than_opening_enhanced():
+    assert match_voice_command("enhanced") == SurfaceCommand(ENHANCE_COMMAND)
 
 
 @pytest.mark.parametrize("text", [

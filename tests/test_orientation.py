@@ -211,8 +211,8 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     # Each half carries the whole table of contents, not a slice of it.
     for side in ("portrait", "landscape"):
         assert _rows(view._tree, side) == ["All"]
-        assert _under_all(view._tree, side)[:5] == [
-            "Latest", "Favorites", "Experiments", "Requests", "Trash",
+        assert _under_all(view._tree, side)[:6] == [
+            "Latest", "Favorites", "Enhanced", "Experiments", "Requests", "Trash",
         ]
 
 

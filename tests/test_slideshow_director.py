@@ -448,7 +448,7 @@ class FakeHost:
     def image_config_index(self):
         return {}
 
-    def visible_prompt_ids(self):
+    def listed_prompt_ids(self):
         return list(self.visible)
 
     def selected_prompt_ids(self):

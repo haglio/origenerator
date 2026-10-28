@@ -2,7 +2,7 @@
 versions -- and what a click with a modifier does to that.
 
 Pure list-and-set logic, lifted out of the pane that draws the tiles. Three of the
-pane's sixteen fields were this -- what is on screen in the order it is shown,
+pane's sixteen fields were this -- what it lists in the order it shows them,
 which of those are picked, and the tile a Shift-click measures its run from -- and
 the rule between them is a file browser's: Ctrl toggles one, Shift extends a
 contiguous run from the anchor, a plain click resets to one.
@@ -30,18 +30,18 @@ class Picking:
     def __init__(self):
         self._picked: set[Hashable] = set()
         self._anchor: Hashable | None = None
-        # Entries on screen, in the order they are shown: what a Shift-click
+        # Every entry listed, in the order shown, drawn yet or not: what a Shift-click
         # measures its run along, and the order the picked ones are reported in.
         self._shown: list[Hashable] = []
 
-    # --- what is on screen ---------------------------------------------------
+    # --- what is listed -------------------------------------------------------
 
     def note_shown(self, entry: Hashable) -> None:
-        """One more entry drawn, at the end of what is on screen."""
+        """One more entry, at the end of what is listed."""
         self._shown.append(entry)
 
     def forget_what_was_shown(self) -> None:
-        """The pane is being redrawn: nothing is on screen until it is drawn again.
+        """The pane is being redrawn: it lists nothing until it is drawn again.
 
         The picked set is dropped separately (see :meth:`clear`), because an empty
         pane and a pane with nothing picked in it are different things: the pane
@@ -52,7 +52,7 @@ class Picking:
 
     @property
     def shown(self) -> list[Hashable]:
-        """What is on screen, in the order it is shown."""
+        """What is listed, in the order it is shown."""
         return list(self._shown)
 
     # --- what is picked ------------------------------------------------------
@@ -64,9 +64,9 @@ class Picking:
         anchor; a plain click resets to just this entry. Mirrors a typical file
         browser.
 
-        A Shift-click whose anchor is no longer on screen -- a pane redrawn under
-        it, a collection paged on -- has no run to measure, so it lands as a plain
-        click rather than as a range from nowhere.
+        A Shift-click whose anchor is no longer listed -- a pane redrawn under
+        it -- has no run to measure, so it lands as a plain click rather than as
+        a range from nowhere.
         """
         if ctrl:
             self._picked ^= {entry}

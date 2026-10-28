@@ -155,7 +155,7 @@ def test_the_pane_stands_alone_on_six_stubs(qtbot):
     pane, scroll = _pane(qtbot)
     pane.show_empty()
     assert scroll.widget() is not None       # the pane filled its own canvas
-    assert pane.visible_prompt_ids() == []
+    assert pane.listed_prompt_ids() == []
 
 
 def test_a_tile_is_captioned_with_the_name_the_gallery_gives_its_item(qtbot):
@@ -232,14 +232,146 @@ def test_clearing_the_thumbnail_selection_announces_it(qtbot):
     assert heard  # the view re-aims its buttons off exactly this
 
 
-def test_recents_draws_a_page_at_a_time(qtbot):
-    rows = [_row(f"g{n}", n) for n in range(1, 61)]
-    pane, _scroll = _pane(qtbot, rows)
+def _sixty():
+    return [_row(f"g{n}", n) for n in range(1, 61)]
+
+
+def _drawn(scroll, kind=ThumbnailWidget):
+    return list(scroll.widget().findChildren(kind))
+
+
+def test_recents_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
+    rows = _sixty()
+    pane, scroll = _pane(qtbot, rows)
     _open_recents(pane, rows)
 
-    # One page of the sixty, newest-first order preserved from the model.
-    assert len(pane.visible_prompt_ids()) == 50
-    assert pane.visible_prompt_ids()[0] == "g1"
+    assert [tile.prompt_id for tile in _drawn(scroll)] == [f"g{n}" for n in range(1, 51)]
+    assert pane.listed_prompt_ids() == [row["prompt_id"] for row in rows]
+
+
+def test_a_settings_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
+    rows = _sixty()
+    pane, scroll = _pane(qtbot, rows)
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert pane.listed_prompt_ids() == [row["prompt_id"] for row in rows]
+
+
+def test_favorites_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
+    rows = [dict(row, starred=1) for row in _sixty()]
+    pane, scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
+
+    pane.show_collection(FAVORITES_KEY, LANDSCAPE)
+
+    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(pane.listed_prompt_ids()) == 60
+
+
+def test_the_trash_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
+    held = _sixty()
+    pane, scroll = _pane(qtbot)
+    pane.set_model([], {}, [], [], held)
+
+    pane.show_collection(TRASH_KEY)
+
+    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(pane.listed_prompt_ids()) == 60
+
+
+def test_the_experiments_draw_a_page_at_a_time_of_everything_they_list(qtbot):
+    rows = _sixty()
+    pane, scroll = _pane(qtbot, rows)
+    pane.set_model([], {}, [], rows, [])
+
+    pane.show_collection(EXPERIMENTS_KEY)
+
+    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(pane.listed_prompt_ids()) == 60
+
+
+def test_the_requests_draw_a_page_at_a_time_of_everything_they_list(qtbot):
+    rows = _sixty()
+    pane, scroll = _pane(qtbot, rows)
+    pane.set_model([], {}, [], [], [], request_items=[{"row": row} for row in rows])
+
+    pane.show_collection(REQUESTS_KEY)
+
+    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(pane.listed_prompt_ids()) == 60
+
+
+def test_a_folder_of_your_own_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
+    rows = _sixty()
+    pane, scroll = _pane(qtbot, rows)
+
+    pane.show_custom_folder(gallery.CustomGroup(key="custom:1", label="mine", children=[],
+                                                rows=rows, folder_id=1))
+
+    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(pane.listed_prompt_ids()) == 60
+
+
+def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot):
+    folders = [gallery.SettingsGroup(key=f"k{n}", label=f"scene {n}", rows=[_row(f"g{n}", n)])
+               for n in range(60)]
+    pane, scroll = _pane(qtbot)
+
+    pane.show_folder_tiles(folders)
+
+    assert len(_drawn(scroll, FolderTile)) == browser_pane._PAGE
+
+
+def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot):
+    rows = [_row(f"g{n}", n) for n in range(300)]
+    pane, scroll = _pane(qtbot, rows)
+    scroll.resize(1900, 2400)
+    scroll.show()
+    qtbot.waitExposed(scroll)
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    drawn_to = scroll.widget().heightForWidth(scroll.viewport().width())
+    assert drawn_to >= scroll.viewport().height() + browser_pane._REACH
+    assert len(_drawn(scroll)) < len(rows)
+
+
+def test_scrolling_to_the_foot_of_a_pane_draws_on_by_a_page_not_to_the_end(qtbot):
+    rows = [_row(f"g{n}", n) for n in range(300)]
+    pane, scroll = _pane(qtbot, rows)
+    scroll.setWidgetResizable(True)
+    scroll.resize(1900, 1000)
+    scroll.show()
+    qtbot.waitExposed(scroll)
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    opened_on = len(_drawn(scroll))
+    qtbot.wait(1)
+
+    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+
+    assert opened_on < len(_drawn(scroll)) < len(rows)
+
+
+def test_revealing_a_folder_past_the_first_page_draws_its_square(qtbot):
+    folders = [gallery.SettingsGroup(key=f"k{n}", label=f"scene {n}", rows=[_row(f"g{n}", n)])
+               for n in range(60)]
+    pane, scroll = _pane(qtbot)
+    pane.show_folder_tiles(folders)
+
+    assert pane.reveal_folder("k59")
+    assert [tile.key for tile in _drawn(scroll, FolderTile) if tile._selected] == ["k59"]
+
+
+def test_revealing_a_picture_past_the_first_page_draws_and_picks_its_tile(qtbot):
+    rows = _sixty()
+    pane, scroll = _pane(qtbot, rows)
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    assert pane.reveal_tile("g60")
+    assert pane.selected_prompt_ids() == ["g60"]
+    assert "g60" in [tile.prompt_id for tile in _drawn(scroll)]
 
 
 def test_latest_heads_each_batch_with_when_it_was_made(qtbot):
@@ -315,7 +447,7 @@ def test_a_later_page_of_latest_heads_only_the_batches_that_begin_on_it(qtbot):
     pane, scroll = _pane(qtbot, rows)
     _open_recents(pane, rows)
 
-    pane._draw_recents_page(50)
+    pane._pages.draw(50)
 
     first, second = [heading for heading in gallery.section_headings(rows) if heading]
     shown = _shown_in_order(scroll)
@@ -529,7 +661,7 @@ def test_a_folders_latest_lists_only_what_that_folder_holds(qtbot):
 
     pane.show_collection(FolderCollection(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
-    assert pane.visible_prompt_ids() == ["a1"]
+    assert pane.listed_prompt_ids() == ["a1"]
 
 
 def test_a_folders_trash_holds_what_was_deleted_from_that_folder(qtbot):
@@ -542,7 +674,7 @@ def test_a_folders_trash_holds_what_was_deleted_from_that_folder(qtbot):
 
     pane.show_collection(trash, LANDSCAPE)
 
-    assert pane.visible_prompt_ids() == ["a2"]
+    assert pane.listed_prompt_ids() == ["a2"]
     assert [row["prompt_id"] for row in pane.rows_for_collection(oriented_key(trash, LANDSCAPE))]         == ["a2"]
 
 
@@ -577,8 +709,8 @@ def test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_b
 
     pane.show_collection(favorites, LANDSCAPE)
 
-    assert pane.visible_prompt_ids() == ["a1"]
-    assert pane._visible_keys == [scene_two.key]
+    assert pane.listed_prompt_ids() == ["a1"]
+    assert pane._listed_folders == [scene_two.key]
     assert sorted(row["prompt_id"] for row in
                   pane.rows_for_collection(oriented_key(favorites, LANDSCAPE))) == ["a1", "a2"]
 
@@ -600,7 +732,7 @@ def test_a_folders_enhanced_lists_the_enhanced_images_under_it(qtbot):
 
     pane.show_collection(enhanced, LANDSCAPE)
 
-    assert pane.visible_prompt_ids() == ["a1"]
+    assert pane.listed_prompt_ids() == ["a1"]
     assert [row["prompt_id"] for row in
             pane.rows_for_collection(oriented_key(enhanced, LANDSCAPE))] == ["a1"]
 
@@ -614,7 +746,7 @@ def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):
 
     pane.show_collection(FolderCollection(EXPERIMENTS_KEY, _models(tree)["beta"].key).key, LANDSCAPE)
 
-    assert pane.visible_prompt_ids() == ["b2"]
+    assert pane.listed_prompt_ids() == ["b2"]
 
 
 def test_a_folders_requests_are_the_ones_that_landed_in_it(qtbot):
@@ -626,7 +758,7 @@ def test_a_folders_requests_are_the_ones_that_landed_in_it(qtbot):
 
     pane.show_collection(FolderCollection(REQUESTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
-    assert pane.visible_prompt_ids() == ["a1"]
+    assert pane.listed_prompt_ids() == ["a1"]
 
 
 def _failed(prompt_id, checkpoint, prompt):

@@ -816,14 +816,14 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     # A branch folder shows its sub-folders as tiles, not loose thumbnails.
     view._tree.setCurrentItem(lora)
-    assert len(view._browser._visible_keys) == 2
-    assert view.visible_prompt_ids() == []
+    assert len(view._browser._listed_folders) == 2
+    assert view.listed_prompt_ids() == []
 
     # A leaf (settings) folder shows the actual item thumbnails.
     cat_leaf = _at(lora, 0)
     view._tree.setCurrentItem(cat_leaf)
-    assert set(view.visible_prompt_ids()) == {"i1", "i2"}
-    assert view._browser._visible_keys == []
+    assert set(view.listed_prompt_ids()) == {"i1", "i2"}
+    assert view._browser._listed_folders == []
 
 
 def _square_names(view):
@@ -863,10 +863,10 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
 
     lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     view._tree.setCurrentItem(lora)
-    a_tile_key = view._browser._visible_keys[0]  # a settings tile under the LoRA folder
+    a_tile_key = view._browser._listed_folders[0]  # a settings tile under the LoRA folder
 
     view._browser._drill_into(a_tile_key)  # same path the tile's clicked signal triggers
-    assert view.visible_prompt_ids()  # now showing that folder's thumbnails
+    assert view.listed_prompt_ids()  # now showing that folder's thumbnails
 
 
 def test_opening_a_folder_lands_on_its_first_item(qtbot):
@@ -880,7 +880,7 @@ def test_opening_a_folder_lands_on_its_first_item(qtbot):
 
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
-    assert view.visible_prompt_ids()[0] == "i1"
+    assert view.listed_prompt_ids()[0] == "i1"
     assert view.selected_generation() == "i1"
     assert view.selected_prompt_ids() == ["i1"]   # the tile itself, highlighted
     panel = view._info_tabs.current_config_panel()
@@ -945,7 +945,7 @@ def test_search_fills_the_browser_pane_with_the_matching_generations(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
     assert view._browser.showing_search()
 
 
@@ -976,14 +976,14 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
     view._tree.setCurrentItem(_children_by_prompt(lora)["a dog"])
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
     _search_for(view, "dog")
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
     view._search.field.setText("")
 
-    assert view.visible_prompt_ids() == ["i2"]   # back in the folder that was open
+    assert view.listed_prompt_ids() == ["i2"]   # back in the folder that was open
     assert not view._browser.showing_search()
 
 
@@ -998,7 +998,7 @@ def test_the_tree_selection_is_what_the_search_covers(qtbot):
     view._tree.setCurrentItem(_video_workflow(view._tree))
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["v1"]
+    assert view.listed_prompt_ids() == ["v1"]
     assert "I2V" in view._folder_path.display_text()  # the header says where it looked
 
 
@@ -1011,13 +1011,13 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_video_workflow(view._tree))
     _search_for(view, "cat")
-    assert view.visible_prompt_ids() == ["v1"]
+    assert view.listed_prompt_ids() == ["v1"]
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
     assert view._search.field.text() == "cat"
     assert view._browser.showing_search()
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
 
 
 def test_the_all_row_searches_the_whole_library(qtbot):
@@ -1032,7 +1032,7 @@ def test_the_all_row_searches_the_whole_library(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "cat")
 
-    assert set(view.visible_prompt_ids()) == {"i1", "v1"}
+    assert set(view.listed_prompt_ids()) == {"i1", "v1"}
 
 
 def test_the_all_row_holds_images_and_videos_and_is_where_the_gallery_lands(qtbot):
@@ -1087,7 +1087,7 @@ def test_standing_on_images_searches_the_images_alone(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
 
 
 def test_a_slideshow_started_on_videos_plays_the_videos_alone(qtbot):
@@ -1138,7 +1138,7 @@ def test_each_kinds_collection_lists_that_kind_alone(qtbot, collection):
     for kind in ("Images", "Videos"):
         view._tree.setCurrentItem(_collection_row(_alls(view._tree)[kind], collection))
         listed[kind] = {gallery.media_type_of_row(view.row_for(prompt_id))
-                        for prompt_id in view.visible_prompt_ids()}
+                        for prompt_id in view.listed_prompt_ids()}
 
     assert listed == {"Images": {"image"}, "Videos": {"video"}}
 
@@ -1229,7 +1229,7 @@ def test_a_collection_scopes_the_search_like_any_other_row(qtbot):
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["i2"]     # the favorited one alone
+    assert view.listed_prompt_ids() == ["i2"]     # the favorited one alone
     assert "Favorites" in view._folder_path.display_text()
 
 
@@ -1246,7 +1246,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
     assert view._search.field.placeholderText() == (
         f"Search {SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest…")
 
@@ -1322,7 +1322,7 @@ def test_the_trash_collection_searches_what_it_is_holding(qtbot):
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["d1"]
+    assert view.listed_prompt_ids() == ["d1"]
 
 
 def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
@@ -1336,7 +1336,7 @@ def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == []
+    assert view.listed_prompt_ids() == []
 
 
 def test_the_field_says_what_it_would_search(qtbot):
@@ -1421,7 +1421,7 @@ def test_search_matches_words_the_prompt_did_not_use(qtbot):
 
     # Both two-subject rows, and neither the lone lady nor the empty street:
     # every word of the query has to be satisfied, so "two" rules i3 out.
-    assert set(view.visible_prompt_ids()) == {"i1", "i2"}
+    assert set(view.listed_prompt_ids()) == {"i1", "i2"}
 
 
 def test_search_stays_applied_across_a_rebuild(qtbot):
@@ -1435,7 +1435,7 @@ def test_search_stays_applied_across_a_rebuild(qtbot):
     view.refresh()                                   # ...triggering a rebuild
 
     # The results are still on screen, and the newcomer joined them.
-    assert set(view.visible_prompt_ids()) == {"i1", "i3"}
+    assert set(view.listed_prompt_ids()) == {"i1", "i3"}
     assert view._browser.showing_search()
 
 
@@ -1464,7 +1464,7 @@ def test_search_matches_a_generation_by_its_seed(qtbot):
 
     _search_for(view, "778899")
 
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
 
 
 def test_a_folder_you_named_is_found_by_that_name(qtbot):
@@ -1481,7 +1481,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "beach trip")
 
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
@@ -1493,7 +1493,7 @@ def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
 
     _search_for(view, code)
 
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_an_item_is_found_by_the_name_it_wears(qtbot):
@@ -1504,7 +1504,7 @@ def test_an_item_is_found_by_the_name_it_wears(qtbot):
 
     _search_for(view, view._item_names.of("i2"))
 
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
@@ -1524,7 +1524,7 @@ def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
 
     _search_for(view, "beetles")
 
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_search_ignores_the_negative_prompt(qtbot):
@@ -1539,7 +1539,7 @@ def test_search_ignores_the_negative_prompt(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
 
 
 def test_search_matches_a_generation_by_its_lora(qtbot):
@@ -1550,7 +1550,7 @@ def test_search_matches_a_generation_by_its_lora(qtbot):
 
     _search_for(view, "styleA")
 
-    assert view.visible_prompt_ids() == ["v1"]
+    assert view.listed_prompt_ids() == ["v1"]
 
 
 def _section_headers(view):
@@ -1642,7 +1642,7 @@ def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
     _search_for(view, "cat aardvark")
     view._search._expander.expanded.emit("cat aardvark", {})
 
-    assert view.visible_prompt_ids() == []
+    assert view.listed_prompt_ids() == []
     assert "aardvark" in view._scroll.widget().text()
 
 
@@ -1666,11 +1666,11 @@ def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    assert view.visible_prompt_ids() == []   # nothing says "cat"
+    assert view.listed_prompt_ids() == []   # nothing says "cat"
 
     view._search._expander.expanded.emit("cat", {"cat": ("kitten",)})
 
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
 
 
 def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
@@ -1685,7 +1685,7 @@ def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
 
     view._search._expander.expanded.emit("cat", {"cat": ("kitten",)})
 
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
@@ -1719,7 +1719,7 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
 
     _search_for(view, "cat")
 
-    assert len(view.visible_prompt_ids()) == 200
+    assert len(view.listed_prompt_ids()) == 200
     assert "205 results" in view._search._count.text()
     assert "add a word" in view._search._count.text()
 
@@ -1736,8 +1736,8 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == []       # no loose thumbnails...
-    assert len(view._browser._visible_keys) == 1  # ...one folder standing for all three
+    assert view.listed_prompt_ids() == []       # no loose thumbnails...
+    assert len(view._browser._listed_folders) == 1  # ...one folder standing for all three
     assert "1 result" in view._search._count.text()
 
 
@@ -1751,8 +1751,8 @@ def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["i1"]
-    assert view._browser._visible_keys == []
+    assert view.listed_prompt_ids() == ["i1"]
+    assert view._browser._listed_folders == []
 
 
 def test_opening_a_result_folder_puts_the_search_away(qtbot):
@@ -1761,13 +1761,13 @@ def test_opening_a_result_folder_puts_the_search_away(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    (key,) = view._browser._visible_keys
+    (key,) = view._browser._listed_folders
 
     view._browser._drill_into(key)   # the path a folder tile's click takes
 
     assert view._search.field.text() == ""
     assert not view._browser.showing_search()
-    assert set(view.visible_prompt_ids()) == {"i1", "i2"}  # standing in the folder
+    assert set(view.listed_prompt_ids()) == {"i1", "i2"}  # standing in the folder
 
 
 def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
@@ -1786,7 +1786,7 @@ def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
     view._search._timer.stop()
     view._search._run_pending()
 
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
 
 
 def test_a_query_under_three_characters_searches_nothing(qtbot):
@@ -2052,11 +2052,11 @@ def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_collection(qtbot)
     view, _cat, dog = _two_leaf_view(qtbot)
     view._toggle_favorite(dog)
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
-    assert view._browser._visible_keys == [dog]
+    assert view._browser._listed_folders == [dog]
 
     view._toggle_favorite(dog)
 
-    assert view._browser._visible_keys == []
+    assert view._browser._listed_folders == []
     assert _shown(_collection(view, FAVORITES_KEY)) == "Favorites"  # and its count with it
 
 
@@ -2237,8 +2237,8 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
     # Selecting it lists a tile for each favorited folder, wherever it lives.
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view._browser._visible_keys == [dog_key]
-    assert view.visible_prompt_ids() == []
+    assert view._browser._listed_folders == [dog_key]
+    assert view.listed_prompt_ids() == []
 
 
 def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot):
@@ -2297,7 +2297,7 @@ def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert view.visible_prompt_ids() == ["e1"]
+    assert view.listed_prompt_ids() == ["e1"]
     tile = view._browser._thumb_widgets["e1"]
     tooltips = [b.toolTip() for b in tile._corner_buttons]
     assert any("Keep" in t for t in tooltips)
@@ -2316,7 +2316,7 @@ def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot
     view._browser._thumb_widgets["e1"].double_clicked.emit("e1")
 
     assert _selected_folder(view) == gallery.settings_folder_key(experiment)
-    assert view.visible_prompt_ids() == ["e1"]  # its own settings folder, not i1's
+    assert view.listed_prompt_ids() == ["e1"]  # its own settings folder, not i1's
     assert view.selected_prompt_ids() == ["e1"]  # landed selected
     assert view._browser._thumb_widgets["e1"]._selected
 
@@ -2334,7 +2334,7 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert view.visible_prompt_ids() == []          # reviewed: out of the collection...
+    assert view.listed_prompt_ids() == []          # reviewed: out of the collection...
     assert "SDXL T2I" in _workflow_rows(view._tree)       # ...and still in its folder
 
 
@@ -2431,7 +2431,7 @@ def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypat
 
     assert _shown(_alls(view._tree)["Experiments"]) == "(2) Experiments"
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert sorted(view.visible_prompt_ids()) == ["e1", "e2"]
+    assert sorted(view.listed_prompt_ids()) == ["e1", "e2"]
     assert "production app" not in view._browser._experiments_empty_hint()
 
 
@@ -2483,7 +2483,7 @@ def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    assert view.visible_prompt_ids() == ["new", "old"]
+    assert view.listed_prompt_ids() == ["new", "old"]
 
 
 def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
@@ -2494,7 +2494,7 @@ def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
     view.follow_link("d1")
 
     assert view._browser.showing_trash()
-    assert view.visible_prompt_ids() == ["d1"]
+    assert view.listed_prompt_ids() == ["d1"]
 
 
 def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, tmp_path):
@@ -2513,7 +2513,7 @@ def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, t
     view._delete_rows([db.get_generation("p1")])
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    assert view.visible_prompt_ids() == ["p1"]
+    assert view.listed_prompt_ids() == ["p1"]
 
 
 def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
@@ -2589,7 +2589,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
     view.restore_from_trash(["p1"])
 
     assert "SDXL T2I" in _workflow_rows(view._tree)      # back in the tree...
-    assert view.visible_prompt_ids() == ["p1"]     # ...and landed on, not left in the collection
+    assert view.listed_prompt_ids() == ["p1"]     # ...and landed on, not left in the collection
     assert view._db.list_deletions() == []
 
 
@@ -2806,7 +2806,7 @@ def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch
     view.purge_from_trash(["p1"])
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    assert view.visible_prompt_ids() == []
+    assert view.listed_prompt_ids() == []
     assert db.list_deletions() == []
 
 
@@ -2834,7 +2834,7 @@ def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypat
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    assert sorted(view.visible_prompt_ids()) == ["live", "mine"]
+    assert sorted(view.listed_prompt_ids()) == ["live", "mine"]
     assert "preview" not in view._browser._trash_empty_hint()
 
     view.restore_from_trash(["mine"])
@@ -2908,7 +2908,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
 
     slideshow = _double_click_slideshow(view, qtbot)
 
-    assert [item[2] for item in slideshow._set.playlist._items] == view.visible_prompt_ids()
+    assert [item[2] for item in slideshow._set.playlist._items] == view.listed_prompt_ids()
     assert slideshow._set.playlist.current()[2] == "d1"  # opened on the shown item
     slideshow.close()
 
@@ -2954,8 +2954,8 @@ def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    view._browser._drill_into(view._browser._visible_keys[0])  # click the favorited tile
-    assert set(view.visible_prompt_ids()) == {"i2"}  # now inside the dog folder
+    view._browser._drill_into(view._browser._listed_folders[0])  # click the favorited tile
+    assert set(view.listed_prompt_ids()) == {"i2"}  # now inside the dog folder
 
 
 def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
@@ -2965,8 +2965,8 @@ def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view._browser._visible_keys == []   # no tiles, just the hint
-    assert view.visible_prompt_ids() == []
+    assert view._browser._listed_folders == []   # no tiles, just the hint
+    assert view.listed_prompt_ids() == []
 
 
 def test_enhanced_with_nothing_enhanced_in_it_says_how_to_enhance_one(qtbot):
@@ -2976,7 +2976,7 @@ def test_enhanced_with_nothing_enhanced_in_it_says_how_to_enhance_one(qtbot):
 
     view._tree.setCurrentItem(_alls(view._tree)["Enhanced"])
 
-    assert view.visible_prompt_ids() == []
+    assert view.listed_prompt_ids() == []
     assert view._scroll.widget().text() == (
         "No enhanced images yet.\n\nEnhance one from its right-click menu or the plus "
         "in its corner to see it here.")
@@ -2991,7 +2991,7 @@ def test_enhanced_shows_every_enhanced_image_under_its_folder(qtbot):
 
     view._tree.setCurrentItem(_alls(view._tree)["Enhanced"])
 
-    assert sorted(view.visible_prompt_ids()) == ["i1", "i3"]
+    assert sorted(view.listed_prompt_ids()) == ["i1", "i3"]
 
 
 def test_favorite_collection_gathers_favorite_items_as_thumbnails(qtbot):
@@ -3004,7 +3004,7 @@ def test_favorite_collection_gathers_favorite_items_as_thumbnails(qtbot):
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view.visible_prompt_ids() == ["i2"]  # the favorited item, in the collection
+    assert view.listed_prompt_ids() == ["i2"]  # the favorited item, in the collection
     assert view._browser._thumb_widgets["i2"]._favorite is True
 
 
@@ -3022,8 +3022,8 @@ def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view.visible_prompt_ids() == ["i1"]      # the item
-    assert view._browser._visible_keys == [dog_key]  # the folder
+    assert view.listed_prompt_ids() == ["i1"]      # the item
+    assert view._browser._listed_folders == [dog_key]  # the folder
 
 
 def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch):
@@ -3036,12 +3036,12 @@ def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch)
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
     _answer_menu(monkeypatch, "Unfavorite 1 item")
     _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]
-    assert view.visible_prompt_ids() == []  # gone from the collection at once
+    assert view.listed_prompt_ids() == []  # gone from the collection at once
 
 
 def test_favorite_collection_stays_selected_across_a_refresh(qtbot):
@@ -3073,7 +3073,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
 
     view._tree.setCurrentItem(workflow.child(0))
 
-    assert view.visible_prompt_ids() == ["i2", "i1"]
+    assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._folder_path.display_text() == (
         f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
 
@@ -3100,8 +3100,8 @@ def test_recents_collection_is_pinned_first_and_lists_recent_items(qtbot):
     assert list(_alls(view._tree))[0] == "Latest"
     # Selecting it lists every recently generated item, newest first — not folders.
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert view.visible_prompt_ids() == ["i2", "i1"]
-    assert view._browser._visible_keys == []
+    assert view.listed_prompt_ids() == ["i2", "i1"]
+    assert view._browser._listed_folders == []
 
 
 def test_recents_collection_lists_imported_files_too(qtbot):
@@ -3115,7 +3115,7 @@ def test_recents_collection_lists_imported_files_too(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert sorted(view.visible_prompt_ids()) == ["gen", "imp"]
+    assert sorted(view.listed_prompt_ids()) == ["gen", "imp"]
 
 
 def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot):
@@ -3130,7 +3130,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     # every recent item is still listed.
     assert view.selected_generation() == "i2"
     assert view._browser.showing_recents()
-    assert set(view.visible_prompt_ids()) == {"i1", "i2"}
+    assert set(view.listed_prompt_ids()) == {"i1", "i2"}
 
 
 def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
@@ -3144,7 +3144,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
     assert view._browser.showing_recents() is False             # out of the collection...
-    assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
+    assert set(view.listed_prompt_ids()) == {"i2"}     # ...into the dog's own folder
     # The item lands selected — its tile picked and highlighted, not merely
     # previewed — as if we'd navigated in and clicked it.
     assert view.selected_prompt_ids() == ["i2"]         # landed selected
@@ -3557,7 +3557,7 @@ def test_recents_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert view.visible_prompt_ids() == []  # nothing to show: just the hint
+    assert view.listed_prompt_ids() == []  # nothing to show: just the hint
 
 
 def test_recents_collection_stays_selected_across_a_refresh(qtbot):
@@ -3590,6 +3590,11 @@ def _scroll_bar(view):
     return view._scroll.verticalScrollBar()
 
 
+def _drawn(view):
+    """The items whose tiles the pane has drawn so far, in the order drawn."""
+    return list(view._browser._thumb_widgets)
+
+
 def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
     # The collection lists every generation ever made, so it draws a page of tiles at a
     # time rather than all 120 at once.
@@ -3598,29 +3603,30 @@ def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert len(view.visible_prompt_ids()) == 50
+    assert len(_drawn(view)) == 50
     # And it's the newest page — the collection still reads newest-first.
-    assert view.visible_prompt_ids()[0] == "i119"
+    assert _drawn(view)[0] == "i119"
+
+
+def _scroll_to_the_end(view):
+    QApplication.processEvents()   # the pane laid out as far as it is drawn
+    bar = _scroll_bar(view)
+    bar.setValue(bar.maximum())
 
 
 def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
     view = GalleryView(FakeDB(_many_recents(120)))
-    qtbot.addWidget(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    opened_on = len(_drawn(view))
+    assert opened_on < 120
 
-    bar = _scroll_bar(view)
-    bar.setRange(0, 5000)          # a laid-out collection with room to scroll
-    assert len(view.visible_prompt_ids()) == 50   # ...and no growth up at the top
+    _scroll_to_the_end(view)
+    assert len(_drawn(view)) > opened_on
+    for _ in range(120 // opened_on):
+        _scroll_to_the_end(view)
 
-    bar.setValue(bar.maximum())    # scroll to the end: the next page follows
-    assert len(view.visible_prompt_ids()) == 100
-    bar.setRange(0, 9000)
-    bar.setValue(bar.maximum())
-    assert view.visible_prompt_ids() == [f"i{n}" for n in reversed(range(120))]
-
-    bar.setValue(bar.maximum())    # the true end of the collection: nothing more to draw
-    assert len(view.visible_prompt_ids()) == 120
+    assert _drawn(view) == [f"i{n}" for n in reversed(range(120))]
 
 
 def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
@@ -3629,19 +3635,29 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
     # down through — the new item just joins the top of what's already drawn.
     db = FakeDB(_many_recents(120))
     view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    bar = _scroll_bar(view)
-    bar.setRange(0, 5000)
-    bar.setValue(bar.maximum())
-    assert len(view.visible_prompt_ids()) == 100
+    _scroll_to_the_end(view)
+    scrolled_into = _drawn(view)
 
     db._rows.insert(0, _image("fresh", "a dog", 50, 999))  # a generation lands
     view.refresh()
 
-    assert len(view.visible_prompt_ids()) == 100      # the two pages stay open...
-    assert view.visible_prompt_ids()[0] == "fresh"    # ...led by the new arrival
+    assert _drawn(view) == ["fresh", *scrolled_into]
+
+
+def test_a_double_click_on_a_picture_in_latest_plays_everything_latest_lists(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB(_many_recents(120)))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+
+    slideshow = view._slideshows.open_on_preview(("i119.png", "image"), "i119")
+    qtbot.addWidget(slideshow.shown)
+
+    assert len(slideshow._set.playlist.in_play_order()) == 120
+    slideshow.close()
 
 
 def test_alls_latest_lists_both_kinds(qtbot):
@@ -3651,7 +3667,7 @@ def test_alls_latest_lists_both_kinds(qtbot):
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    assert set(view.visible_prompt_ids()) == {"i1", "v1"}
+    assert set(view.listed_prompt_ids()) == {"i1", "v1"}
 
 
 def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monkeypatch):
@@ -3683,7 +3699,7 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
 
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "Latest"))
 
-    assert view.visible_prompt_ids() == ["v1"]
+    assert view.listed_prompt_ids() == ["v1"]
     assert built == []
 
 
@@ -3691,18 +3707,15 @@ def test_another_latest_opens_on_its_first_page(qtbot):
     # Another Latest is a new listing, not a redraw of the one on screen, so it
     # starts at its newest item instead of holding the pages already scrolled.
     view = GalleryView(FakeDB(_many_recents(120)))
-    qtbot.addWidget(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    bar = _scroll_bar(view)
-    bar.setRange(0, 5000)
-    bar.setValue(bar.maximum())
-    assert len(view.visible_prompt_ids()) == 100
+    opened_on = _drawn(view)
+    _scroll_to_the_end(view)
+    assert len(_drawn(view)) > len(opened_on)
 
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
 
-    assert len(view.visible_prompt_ids()) == 50
-    assert view.visible_prompt_ids()[0] == "i119"
+    assert _drawn(view) == opened_on
 
 
 def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
@@ -3827,12 +3840,12 @@ def test_a_new_generation_appears_at_the_top_of_recents(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert view.visible_prompt_ids() == ["old"]
+    assert view.listed_prompt_ids() == ["old"]
 
     # A fresh generation lands; a poll reflects it at the top of the running list.
     db.add(_image("new", "a dog", 50, 2))
     view._poll()
-    assert view.visible_prompt_ids() == ["new", "old"]
+    assert view.listed_prompt_ids() == ["new", "old"]
 
 
 def test_new_generations_appear_without_manual_refresh(qtbot):
@@ -3868,7 +3881,7 @@ def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
     db.add(_image("new", "a dog", 50, 2))
     view._poll_timer.timeout.emit()  # the tick, delivered the way the timer does
 
-    assert view.visible_prompt_ids() == ["new", "old"]
+    assert view.listed_prompt_ids() == ["new", "old"]
 
 
 def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
@@ -4057,8 +4070,8 @@ def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    assert view._browser._visible_keys      # its child folders, as tiles
-    assert view.visible_prompt_ids() == []
+    assert view._browser._listed_folders      # its child folders, as tiles
+    assert view.listed_prompt_ids() == []
     assert view._selected is None
 
 
@@ -4135,7 +4148,7 @@ def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtb
 
     assert not view._showing_search()
     assert view._tree.currentItem() is folders["a dog"]
-    assert view.visible_prompt_ids() == ["i2"]
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
@@ -4181,7 +4194,7 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
 
     # Clicking that tile navigates the gallery to the source image.
     _source_tile(view).activated.emit("img1")
-    assert "img1" in view.visible_prompt_ids()
+    assert "img1" in view.listed_prompt_ids()
     assert view._selected["prompt_id"] == "img1"
     # The image itself has no source image, so no tile shows.
     view._on_thumbnail_clicked("img1")
@@ -4229,13 +4242,13 @@ def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)                 # that folder's row is now the current one
-    assert "i1" in view.visible_prompt_ids()
+    assert "i1" in view.listed_prompt_ids()
     view._browser.show_empty()               # the pane goes off it, the row stays current
-    assert "i1" not in view.visible_prompt_ids()
+    assert "i1" not in view.listed_prompt_ids()
 
     view._go_to_generation("i1")
 
-    assert "i1" in view.visible_prompt_ids()          # the folder is drawn again
+    assert "i1" in view.listed_prompt_ids()          # the folder is drawn again
     assert view._selected["prompt_id"] == "i1"        # and the item is picked in it
 
 
@@ -4255,7 +4268,7 @@ def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
     view._go_to_generation("x1")
 
     # Its folder is the one its finished sibling sits in, and that is what opened.
-    assert "i1" in view.visible_prompt_ids()
+    assert "i1" in view.listed_prompt_ids()
     assert view._selected["prompt_id"] == "x1"
 
 
@@ -4570,11 +4583,11 @@ def test_unfavoriting_a_favorite_drops_it_from_the_collection_with_a_real_librar
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
-    assert view.visible_prompt_ids() == ["g0"]
+    assert view.listed_prompt_ids() == ["g0"]
 
     view._browser._thumb_widgets["g0"]._controls.triggered.emit(corner_controls.STAR)
 
-    assert view.visible_prompt_ids() == []
+    assert view.listed_prompt_ids() == []
 
 
 def test_favoriting_the_picked_items_turns_the_favorite_button_to_unfavorite(qtbot):
@@ -4902,7 +4915,7 @@ def test_moving_on_after_a_followed_link_leaves_the_folder_chosen_instead(qtbot)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     qtbot.wait(1)
 
-    assert view.visible_prompt_ids() == ["vid1"]
+    assert view.listed_prompt_ids() == ["vid1"]
     assert _scroll_bar(view).value() == 0
 
 
@@ -5014,7 +5027,7 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
     view._toggle_favorite(dog_key)
 
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
-    view._browser._drill_into(view._browser._visible_keys[0])  # into the dog folder, on i2
+    view._browser._drill_into(view._browser._listed_folders[0])  # into the dog folder, on i2
     view._browser._thumbnail_clicked("i3", _NO_MOD)            # view another item there
     assert view._tree.currentItem() is not _collection(view, FAVORITES_KEY)
 
@@ -5157,7 +5170,7 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
     view.refresh()
 
     _search_for(view, "cat")
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
     view._browser._thumb_widgets["i1"].double_clicked.emit("i1")  # open the hit in its folder
     assert view._browser.showing_search() is False
 
@@ -5165,7 +5178,7 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
 
     assert view._browser.showing_search()
     assert view._search.field.text() == "cat"
-    assert view.visible_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"]
 
 
 def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
@@ -5497,7 +5510,7 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     dog_leaf = _at(_image_workflow(saved._tree), 0, 0, 1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
-    chosen = set(saved.visible_prompt_ids())
+    chosen = set(saved.listed_prompt_ids())
 
     # A brand-new view told to restore that key lands on the same folder.
     restored = GalleryView(db)
@@ -5505,7 +5518,7 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     restored.select_folder(saved_key)
     restored.refresh()
     assert restored.selected_folder() == saved_key
-    assert set(restored.visible_prompt_ids()) == chosen
+    assert set(restored.listed_prompt_ids()) == chosen
 
 
 def test_select_folder_falls_back_to_default_when_key_gone(qtbot):
@@ -5919,7 +5932,7 @@ def test_shift_click_selects_the_contiguous_range(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    order = view.visible_prompt_ids()  # newest-first display order
+    order = view.listed_prompt_ids()  # newest-first display order
 
     view._browser.apply_selection(order[0], _NO_MOD)
     view._browser.apply_selection(order[2], _SHIFT)
@@ -5988,7 +6001,7 @@ def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
     pane.resize(600, 600)
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
-    assert set(view.visible_prompt_ids()) == {"i1", "i2"}
+    assert set(view.listed_prompt_ids()) == {"i1", "i2"}
     assert not any(w._selected for w in view._browser._thumb_widgets.values())
 
 
@@ -7652,7 +7665,7 @@ def test_the_slideshow_begins_on_whichever_item_is_picked_in_the_folder(qtbot, m
     view.refresh()
     _open_leaf(view)
 
-    for picked in view.visible_prompt_ids():
+    for picked in view.listed_prompt_ids():
         view._browser.apply_selection(picked, _NO_MOD)
         view._slideshows.start()
         slideshow = view._slideshows.showing
@@ -7672,7 +7685,7 @@ def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_beg
     minimized = view._slideshows.showing
     qtbot.addWidget(minimized.shown)
     minimized.shown.showMinimized()
-    picked = next(pid for pid in view.visible_prompt_ids()
+    picked = next(pid for pid in view.listed_prompt_ids()
                   if pid != minimized._set.playlist.current().prompt_id)
     view._browser.apply_selection(picked, _NO_MOD)
 
@@ -7694,7 +7707,7 @@ def test_with_two_items_picked_the_slideshow_comes_back_to_where_the_last_one_cl
     qtbot.addWidget(last.shown)
     closed_on = last._set.playlist.current().prompt_id
     last.close()
-    elsewhere = [pid for pid in view.visible_prompt_ids() if pid != closed_on]
+    elsewhere = [pid for pid in view.listed_prompt_ids() if pid != closed_on]
     view._browser.apply_selection(elsewhere[0], _NO_MOD)
     view._browser.apply_selection(elsewhere[1], _CTRL)
 
@@ -7718,7 +7731,7 @@ def test_the_item_picked_comes_first_though_another_in_the_folder_is_being_enhan
     qtbot.addWidget(last.shown)
     last.close()
     (picked,) = view.selected_prompt_ids()   # the slide it closed on
-    enhancing = next(pid for pid in view.visible_prompt_ids() if pid != picked)
+    enhancing = next(pid for pid in view.listed_prompt_ids() if pid != picked)
     view._slideshows.note_enhancing({enhancing: "running"})
 
     view._slideshows.start()
@@ -7965,7 +7978,7 @@ def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
     qtbot.addWidget(last.shown)
     closed_on = last._set.playlist.current().prompt_id
     last.close()
-    picked = next(pid for pid in view.visible_prompt_ids() if pid != closed_on)
+    picked = next(pid for pid in view.listed_prompt_ids() if pid != closed_on)
     view._browser.apply_selection(picked, _NO_MOD)
 
     view._slideshows.start()
@@ -8011,7 +8024,7 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    newest, older = view.visible_prompt_ids()
+    newest, older = view.listed_prompt_ids()
     view._browser.apply_selection(older, _NO_MOD)
 
     view._slideshows.start()
@@ -8289,7 +8302,7 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
     slideshow.close()   # Escape, the spoken "close", a double-click: all this
 
     assert view._slideshows.showing is None
-    assert held in view.visible_prompt_ids()       # its own folder in the pane...
+    assert held in view.listed_prompt_ids()       # its own folder in the pane...
     assert view._browser.selected_ids == {held}    # ...with it picked...
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
 
@@ -8341,7 +8354,7 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
         slideshow.slideshow_step(1)
         slideshow.tick()
     shown = slideshow._set.playlist.current()[2]
-    assert shown not in view.visible_prompt_ids()
+    assert shown not in _drawn(view)
 
     slideshow.close()
     qtbot.wait(1)
@@ -8404,7 +8417,7 @@ def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_cam
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     shown = slideshow._set.playlist.current()[2]
-    assert shown not in view.visible_prompt_ids()
+    assert shown not in _drawn(view)
 
     slideshow.close()
 
@@ -8423,7 +8436,7 @@ def test_the_picture_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view, db = _laid_out_folder(qtbot)
-    far = view.visible_prompt_ids()[-3]
+    far = view.listed_prompt_ids()[-3]
     view._browser._thumbnail_clicked(far, _NO_MOD)
     _scroll_bar(view).setValue(0)
     slideshow = _double_click_slideshow(view, qtbot)
@@ -8442,7 +8455,7 @@ def test_the_picture_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_
 
 def test_a_picked_picture_holds_its_place_as_new_ones_land_above_it(qtbot):
     view, db = _laid_out_folder(qtbot)
-    far = view.visible_prompt_ids()[-3]
+    far = view.listed_prompt_ids()[-3]
     view._browser.reveal_tile(far)
     qtbot.wait(1)
     assert _in_view(view, far)
@@ -8452,13 +8465,13 @@ def test_a_picked_picture_holds_its_place_as_new_ones_land_above_it(qtbot):
     view.refresh()
     qtbot.wait(1)
 
-    assert view.visible_prompt_ids().index(far) > 20
+    assert view.listed_prompt_ids().index(far) > 20
     assert _in_view(view, far)
 
 
 def test_a_folder_read_from_its_top_shows_what_lands_there(qtbot):
     view, db = _laid_out_folder(qtbot)
-    assert view.selected_prompt_ids() == [view.visible_prompt_ids()[0]]
+    assert view.selected_prompt_ids() == [view.listed_prompt_ids()[0]]
 
     for n in range(20):
         db.add(_image(f"n{n}", "a cat", 50, 500 + n))
@@ -8475,11 +8488,11 @@ def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(q
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     qtbot.wait(1)
-    far = view.visible_prompt_ids()[-3]
+    far = view.listed_prompt_ids()[-3]
     view._browser.reveal_tile(far)
     qtbot.wait(1)
 
-    view.set_items_favorite([view.visible_prompt_ids()[0]], False)
+    view.set_items_favorite([view.listed_prompt_ids()[0]], False)
     qtbot.wait(1)
 
     assert view._browser._thumb_widgets[far]._selected
@@ -9391,7 +9404,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == \
-        view.visible_prompt_ids()
+        view.listed_prompt_ids()
     assert slideshow._set.playlist.current().prompt_id == job.prompt_id
     qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
     assert view._enhance.run_of(view.row_for(job.prompt_id)) is not None
@@ -10071,7 +10084,7 @@ def test_recents_shows_an_inflight_card_above_finished_items(qtbot):
     _open_recents(view)
 
     assert "gen1" in view._browser._inflight_cards
-    assert view.visible_prompt_ids() == ["done"]          # cards aren't finished items
+    assert view.listed_prompt_ids() == ["done"]          # cards aren't finished items
 
 
 def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
@@ -10252,8 +10265,8 @@ def test_open_folder_shows_a_running_generation_on_its_generating_tile(qtbot, tm
 
     assert _generating_tile(view) is not None        # the running generation IS the tile
     assert job.prompt_id not in view._browser._inflight_cards  # not a separate in-flight card
-    assert job.prompt_id not in view.visible_prompt_ids()  # nor an output-less static tile
-    assert view.visible_prompt_ids() == ["orig"]     # only the finished item is a thumbnail
+    assert job.prompt_id not in view.listed_prompt_ids()  # nor an output-less static tile
+    assert view.listed_prompt_ids() == ["orig"]     # only the finished item is a thumbnail
 
 
 def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
@@ -10269,7 +10282,7 @@ def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
     assert "run1" in view._browser._inflight_cards           # in_flight, and shown as in_flight
-    assert view.visible_prompt_ids() == ["i1"]      # run1 isn't a static thumbnail
+    assert view.listed_prompt_ids() == ["i1"]      # run1 isn't a static thumbnail
 
 
 def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path):
@@ -12821,12 +12834,12 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    assert view.visible_prompt_ids() == ["g2", "g1", "g0"]  # newest generated first
+    assert view.listed_prompt_ids() == ["g2", "g1", "g0"]  # newest generated first
 
     view.enhance_items(["g0"])
     view.refresh()          # the launch's transient row is in the DB now
 
-    assert view.visible_prompt_ids() == ["g0", "g2", "g1"]
+    assert view.listed_prompt_ids() == ["g0", "g2", "g1"]
     assert view._browser._thumb_widgets["g0"]._enhancing is not None
 
 
@@ -13726,7 +13739,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
     slideshow = _double_click_slideshow(view, qtbot)
 
-    order = view._browser.visible_prompt_ids()
+    order = view._browser.listed_prompt_ids()
     # Each entry carries its generation's id, so the slideshow's Up and Down can name
     # what to trash and what to bookmark, and its stored thumbnail, which is the
     # only still a video has for the neighbor previews.
@@ -13757,7 +13770,7 @@ def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_p
     funestra_of(slideshow.shown)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == \
-        view.visible_prompt_ids()
+        view.listed_prompt_ids()
     assert slideshow._set.playlist.current().prompt_id == landed
     qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
     assert view._enhance.run_of(view.row_for(landed)) is not None
@@ -13773,7 +13786,7 @@ def test_a_double_click_on_a_picture_from_another_folder_opens_that_folder(
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["b1"])
-    folder_b = view.visible_prompt_ids()
+    folder_b = view.listed_prompt_ids()
     view._tree.setCurrentItem(view._leaf_by_id["a1"])
 
     slideshow = view._slideshows.open_on_preview(("b1.png", "image"), "b1")
@@ -14454,7 +14467,7 @@ def test_picking_several_folders_shows_them_together_as_one_folder(qtbot):
 
     _pick(view, cat, dog)
 
-    assert view._browser._visible_keys == [cat, dog]  # both, as tiles
+    assert view._browser._listed_folders == [cat, dog]  # both, as tiles
     assert "2 folders" in view._folder_path.display_text()
     assert not view._bank.group.isHidden()  # offering to save the grouping
 
@@ -14474,7 +14487,7 @@ def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
     view._tree.setCurrentItem(view._tree_item_for(cat))  # a plain click on one row
 
     assert view._selection_group is None
-    assert view.visible_prompt_ids() == ["i1"]  # its own thumbnails, not tiles
+    assert view.listed_prompt_ids() == ["i1"]  # its own thumbnails, not tiles
     assert view._bank.group.isHidden()
 
 
@@ -14505,7 +14518,7 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
     assert record["folders"] == [cat, dog]
     # ...and the view has landed on it, showing what it gathered.
     assert _top_level(view._tree)["Favorites"] is view._tree.currentItem()
-    assert view._browser._visible_keys == [cat, dog]
+    assert view._browser._listed_folders == [cat, dog]
 
 
 def test_grouping_picked_folders_takes_a_custom_folder_among_them(qtbot, monkeypatch):
@@ -14559,7 +14572,7 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     view._tree.setCurrentItem(row)
 
     assert [_key(child) for child in _subs(row)] == [cat]
-    assert view._browser._visible_keys == [cat]
+    assert view._browser._listed_folders == [cat]
     assert {r["prompt_id"] for r in view.rows_to_play()} == {"i1"}
 
 
@@ -14573,8 +14586,8 @@ def test_a_custom_folder_shows_the_items_it_holds_ahead_of_its_folders(qtbot):
 
     assert _shown(_top_level(view._tree)["Mine"]) == "(2) Mine"
     assert _tile_kinds_in_order(view) == [ThumbnailWidget, FolderTile]
-    assert view._browser.visible_prompt_ids() == ["i1"]
-    assert view._browser._visible_keys == [dog]
+    assert view._browser.listed_prompt_ids() == ["i1"]
+    assert view._browser._listed_folders == [dog]
     assert [r["prompt_id"] for r in view.rows_to_play()] == ["i1", "i2"]
 
 
@@ -14601,7 +14614,7 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
 
     (record,) = view._db.list_custom_folders()
     assert record["folders"] == [cat, dog]
-    assert view._browser._visible_keys == [cat, dog]  # landed on it
+    assert view._browser._listed_folders == [cat, dog]  # landed on it
 
 
 def _drop_on(row, mime) -> bool:
@@ -14683,7 +14696,7 @@ def test_an_item_dropped_into_an_open_custom_folder_goes_in(qtbot):
     assert _drop_in_the_middle_pane(view, mime)
 
     assert view._db.list_custom_folders()[0]["items"] == ["i1"]
-    assert view._browser.visible_prompt_ids() == ["i1"]  # drawn again with it
+    assert view._browser.listed_prompt_ids() == ["i1"]  # drawn again with it
 
 
 def _folder_drag(view, key):
@@ -14728,7 +14741,7 @@ def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
     outer = next(r for r in view._db.list_custom_folders() if r["name"] == "Outer")
     assert outer["folders"] == [cat, inner]
     assert _shown(_top_level(view._tree)["Outer"]) == "(2) Outer"
-    assert view._browser._visible_keys == [cat, inner]  # landed on it
+    assert view._browser._listed_folders == [cat, inner]  # landed on it
     assert "Inner" not in _top_level(view._tree)
 
 
@@ -14946,7 +14959,7 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
     view.refresh()
 
     assert view._selection_group is not None
-    assert len(view._browser._visible_keys) == 2
+    assert len(view._browser._listed_folders) == 2
 
 
 # --- the tree's right-click menus: the only route to several of these actions --
@@ -15832,7 +15845,7 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
     # the slideshow happens to have opened on, so the key comes from the same place
     # the slideshow's did — and asking the slideshow for it proves it took them.
     (key, computed), = view._slideshows.versions_of(
-        [view.row_for(pid) for pid in view.visible_prompt_ids()]).items()
+        [view.row_for(pid) for pid in view.listed_prompt_ids()]).items()
     levels = slideshow._levels.levels(base=key)
     assert levels == computed
     assert [version.path.name for version in levels] == \
@@ -15861,7 +15874,7 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
     slideshow = _double_click_slideshow(view, qtbot, media=None)
 
     assert [item[2] for item in slideshow._set.playlist._items] == \
-        view._browser.visible_prompt_ids()
+        view._browser.listed_prompt_ids()
     assert slideshow._set.playlist.index == 0
     slideshow.close()
 
@@ -16287,7 +16300,7 @@ def test_the_requests_collection_lists_what_was_asked_for_as_ordinary_tiles(
 
     view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
 
-    assert view.visible_prompt_ids() == [job.prompt_id]
+    assert view.listed_prompt_ids() == [job.prompt_id]
     assert view._scroll.widget().findChildren(ThumbnailWidget)
 
 

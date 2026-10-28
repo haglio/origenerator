@@ -22,7 +22,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
+from typing import NamedTuple
 
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
@@ -67,6 +69,7 @@ from origenerator.gui.pane_place import (
     PanePlace,
     bring_into_view,
     place_of,
+    show_the_tiles_qt_queued_to_show,
     stand_at,
 )
 from origenerator.gui.picking import Picking
@@ -79,20 +82,19 @@ REROLL_IMAGE = "image"
 
 _TILE_SPACING = GAP_MEDIUM   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
-# The Recents collection lists every generation ever made, so it draws a page of tiles
-# at a time and adds the next once scrolled within _RECENTS_REACH pixels of the
-# end — far enough ahead (three tile rows) that the next page is there before the
-# user arrives at it, rather than after a visible stop.
-_RECENTS_PAGE = 50
+# A pane draws its tiles a page at a time and adds the next once scrolled within
+# _REACH pixels of the end — far enough ahead (three tile rows) that the next page
+# is there before the user arrives at it, rather than after a visible stop.
+_PAGE = 50
 _NEIGHBORS_PAST_A_REVEAL = 12  # three rows at the pane's widest, six at its narrowest
-_RECENTS_REACH = 600
+_REACH = 600
 # Room above a search section's heading, so the headings read as the dividers
 # they are rather than as captions stuck to the row of tiles above them.
 _SECTION_SPACING = GAP_DIALOG
 # The most result tiles a search draws at once. A one-word query over a full
 # library can match most of it, and building thousands of thumbnails in a single
-# pass locks the window for seconds — the Recents collection pages for the same
-# reason. Search doesn't page: it is a narrowing tool, so the useful answer to
+# pass locks the window for seconds — the folders page for the same reason.
+# Search doesn't page: it is a narrowing tool, so the useful answer to
 # "too many to draw" is another word, and the count label says exactly that
 # rather than quietly showing a slice.
 SEARCH_DRAW_LIMIT = 200
@@ -193,8 +195,60 @@ class _KeptTiles:
         if (tile is None or sip.isdeleted(tile) or tile.look != look
                 or self._wiring.get(prompt_id) != wiring):
             return None
-        tile.set_selected(False)
         return tile
+
+
+class _Entry(NamedTuple):
+    draw: Callable[[], None]
+    item: str | None = None
+    folder: str | None = None
+
+
+class _Pages:
+    def __init__(self, listing=None, entries=(), drawn=0):
+        self.listing = listing
+        self._entries = list(entries)
+        self.drawn = drawn
+
+    def items(self) -> list[str]:
+        return [entry.item for entry in self._entries if entry.item is not None]
+
+    def folders(self) -> list[str]:
+        return [entry.folder for entry in self._entries if entry.folder is not None]
+
+    def more(self) -> bool:
+        return self.drawn < len(self._entries)
+
+    def draw(self, count: int) -> None:
+        for entry in self._entries[self.drawn:self.drawn + count]:
+            entry.draw()
+            self.drawn += 1
+
+    def draw_past(self, shows, neighbors: int = 0) -> None:
+        at = self._index(shows)
+        if at is not None:
+            self.draw(at + 1 + neighbors - self.drawn)
+
+    def catch_up(self, earlier: _Pages) -> None:
+        last = earlier._entries[earlier.drawn - 1] if earlier.drawn else None
+        at = self._index(lambda entry: _same_tile(entry, last))
+        self.draw((earlier.drawn if at is None else at + 1) - self.drawn)
+
+    def ended(self) -> _Pages:
+        return _Pages(self.listing, self._entries[:self.drawn], self.drawn)
+
+    def _index(self, shows) -> int | None:
+        return next((n for n, entry in enumerate(self._entries) if shows(entry)), None)
+
+
+def _same_tile(entry: _Entry, other: _Entry | None) -> bool:
+    return (other is not None and (other.item or other.folder) is not None
+            and (entry.item, entry.folder) == (other.item, other.folder))
+
+
+def _drawn_height(drawn: QWidget, width: int) -> int:
+    height = drawn.heightForWidth(width)
+    return height if height >= 0 else drawn.sizeHint().height()
 
 
 _COLLECTION_TILE = "collection"
@@ -237,11 +291,14 @@ def _open_sections(flow, headings, *, opens_now=False, draw_leading=lambda: None
         draw_leading()
 
 
-def _draw_between_headings(flow, rows, headings, draw, *, start=0):
-    for index, row in enumerate(rows, start):
-        if index and headings[index]:
-            flow.add_full_row(_time_heading(headings[index]))
-        draw(row)
+def _between_headings(flow, rows, headings, draw) -> list[_Entry]:
+    def entry(index, row):
+        def draw_it():
+            if index and headings[index]:
+                flow.add_full_row(_time_heading(headings[index]))
+            draw(row)
+        return _Entry(draw_it, item=row["prompt_id"])
+    return [entry(index, row) for index, row in enumerate(rows)]
 
 
 @dataclass(frozen=True)
@@ -386,10 +443,10 @@ class BrowserPane(QObject):
                 render=self._render_trash),
         }
         # Which tiles are picked, the anchor a Shift-click measures its run
-        # from, and what is on screen in the order it is shown
+        # from, and what it lists in the order shown
         # (:mod:`origenerator.gui.picking`).
         self._selection = Picking()
-        self._visible_keys: list[str] = []  # folders on screen (tile overview)
+        self._listed_folders: list[str] = []  # the folders it lists, as tiles
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
         self._wired: dict[str, str] = {}      # how each drawn tile is wired
         self._kept = _KeptTiles()             # the last pane's tiles, while a new one draws
@@ -397,8 +454,7 @@ class BrowserPane(QObject):
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn in the collection
         self._recent_rows = _Listing()      # every generated row, newest first
-        self._recents_flow = None           # the open collection's layout, to grow into
-        self._recents_drawn = 0             # finished items it has drawn so far
+        self._pages = _Pages()              # the open pane's tiles, drawn a page at a time
         self._listed = _Listing()
         self._enhanced_rows = _Listing()    # every enhanced image, newest first
         self._experiment_rows = _Listing()  # unreviewed experiments, newest first
@@ -411,6 +467,8 @@ class BrowserPane(QObject):
         self._placements: dict[str | None, Placement] = {}
         self._image_index: dict = {}
         self._models_taken = 0
+        scroll.verticalScrollBar().valueChanged.connect(self.grow)
+        scroll.verticalScrollBar().rangeChanged.connect(self.grow)
 
     def model_stamp(self) -> int:
         return self._models_taken
@@ -466,13 +524,25 @@ class BrowserPane(QObject):
 
     def show_widget(self, widget: QWidget):
         self._kept = _KeptTiles()  # what the new pane did not take goes with the old
+        self._pages = self._pages.ended()  # nothing more is drawn into what goes
         self._scroll.setWidget(widget)  # replaces & deletes the previous widget
+
+    def _show_paged(self, container: QWidget, entries) -> None:
+        pages = _Pages(self._tree.selected_folder_key(), entries)
+        for item in pages.items():
+            self._selection.note_shown(item)
+        self._listed_folders = pages.folders()
+        pages.draw(_PAGE)
+        if pages.listing == self._pages.listing:
+            pages.catch_up(self._pages)
+        self.show_widget(container)
+        self._pages = pages
+        self.grow()
 
     def show_empty(self):
         """Clear the pane to nothing on screen — no folder selected."""
         self._selection.forget_what_was_shown()
-        self._visible_keys = []
-        self._forget_recents_paging()
+        self._listed_folders = []
         self.show_widget(QWidget())
 
     def _reset_pane_state(self):
@@ -488,10 +558,9 @@ class BrowserPane(QObject):
         self._inflight_cards = {}    # ...as are the live cards, by whichever pane draws them
         self._inflight_by_key = {}
         self._selection.forget_what_was_shown()
-        self._visible_keys = []
+        self._listed_folders = []
         self._search_rows = []
         self._showing_search = False
-        self._forget_recents_paging()
 
     def _new_tile_pane(self):
         """A fresh container whose tiles flow to fill the pane's width."""
@@ -501,16 +570,8 @@ class BrowserPane(QObject):
         self._reset_pane_state()
         return container, flow
 
-    def _forget_recents_paging(self):
-        """Drop the Recents collection's paging state, because the pane it was drawn in
-        is being replaced. :meth:`_render_recents` re-establishes it for the new
-        one; anything else leaves it cleared, so a scroll of some *other* pane
-        can't grow tiles into a layout that is no longer on screen."""
-        self._recents_flow = None
-        self._recents_drawn = 0
-
     def _add_folder_tile(self, flow, group, *, favorite, context=""):
-        """Build one folder tile, wire its click/context signals, and track it."""
+        """Build one folder tile and wire its click/context signals."""
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
             len(gallery.rows_under(group)), favorite=favorite, context=context,
@@ -519,10 +580,11 @@ class BrowserPane(QObject):
         tile.clicked.connect(self._drill_into)
         tile.context_requested.connect(self.folder_menu_requested)
         flow.addWidget(tile)
-        self._visible_keys.append(group.key)
 
     def reveal_folder(self, folder_key: str) -> bool:
         """Mark the drawn square that holds this folder and scroll it into view."""
+        self._pages.draw_past(lambda entry: entry.folder is not None
+                              and key_holds(entry.folder, folder_key))
         drawn = self._scroll.widget()
         if drawn is None:
             return False  # a pane with nothing in it: a slideshow closing as the app does
@@ -548,9 +610,10 @@ class BrowserPane(QObject):
             self._add_collection_tile(flow, key)
         if collections and groups:
             flow.add_full_row(_time_heading(" "))
-        for group in groups:
-            self._add_folder_tile(flow, group, favorite=group.favorite)
-        self.show_widget(container)
+        self._show_paged(container, [
+            _Entry(partial(self._add_folder_tile, flow, group, favorite=group.favorite),
+                   folder=group.key)
+            for group in groups])
 
     def _add_collection_tile(self, flow, key: str):
         rows = self.rows_for_collection(key)
@@ -579,12 +642,19 @@ class BrowserPane(QObject):
         so the bare label the hierarchy relies on isn't enough here.
         """
         container, flow = self._new_tile_pane()
-        for row in rows:
-            self._add_collection_thumbnail(flow, row)
-        for group in groups:
-            self._add_folder_tile(flow, group, favorite=show_stars and group.favorite,
-                                  context=self._tree.folder_context(group.key))
-        self.show_widget(container if (rows or groups) else self._empty_state(empty))
+        if not (rows or groups):
+            self.show_widget(self._empty_state(empty))
+            return
+
+        def folder(group):
+            return lambda: self._add_folder_tile(
+                flow, group, favorite=show_stars and group.favorite,
+                context=self._tree.folder_context(group.key))
+
+        self._show_paged(container, [
+            *(_Entry(partial(self._add_collection_thumbnail, flow, row), item=row["prompt_id"])
+              for row in rows),
+            *(_Entry(folder(group), folder=group.key) for group in groups)])
 
     # --- the search results: whatever the query reached, wherever it lives ---
 
@@ -709,8 +779,10 @@ class BrowserPane(QObject):
         if tile.group is not None:
             self._add_folder_tile(flow, tile.group, favorite=tile.group.favorite,
                                   context=self._tree.folder_context(tile.group.key))
+            self._listed_folders.append(tile.group.key)
         else:
             self._add_collection_thumbnail(flow, tile.row)
+            self._selection.note_shown(tile.row["prompt_id"])
         self._search_rows.extend(tile.rows or [tile.row])
 
     def showing_search(self) -> bool:
@@ -725,8 +797,6 @@ class BrowserPane(QObject):
         collection = folder_collection(key)
         if collection is None:
             return
-        if (side, collection.folder) != (self._collection_side, self._collection_folder):
-            self._forget_recents_paging()
         self._collection_side = side
         self._collection_folder = collection.folder
         self._collections[collection.which].render()
@@ -740,17 +810,9 @@ class BrowserPane(QObject):
         own folder.
 
         In-flight cards first (the newest work, still in flight), then the
-        finished thumbnails a page at a time; a hint when there is neither.
-
-        The collection has no end — it lists every generation ever made — so it opens on
-        one page and grows as it's scrolled into (:meth:`grow_recents`). A redraw of
-        a collection already on screen (a landing generation rebuilds the gallery under
-        it) keeps the pages that were open, so the place its caller puts back
-        (:meth:`return_to`) is still drawn to stand on, rather than snapping the
-        user back up to the newest item.
+        finished thumbnails; a hint when there is neither.
         """
-        drawn = self._recents_drawn
-        container, flow = self._new_tile_pane()  # which forgets that count
+        container, flow = self._new_tile_pane()
         rows = self._open_collection_rows(RECENTS_KEY)
         items = self._latest_inflight_items()
         self._inflight_signature = _inflight_signature(items)
@@ -761,49 +823,38 @@ class BrowserPane(QObject):
             for item in items:
                 self._add_inflight_card(flow, item)
 
-        _open_sections(flow, gallery.section_headings(rows),
+        headings = gallery.section_headings(rows)
+        _open_sections(flow, headings,
                        opens_now=bool(items) and gallery.new_work_opens_a_section(rows),
                        draw_leading=draw_leading)
         # An empty collection teaches how to fill it rather than showing a blank pane.
         if not (items or rows):
             self.show_widget(self._empty_state(self._recents_empty_hint()))
             return
-        self._recents_flow = flow
-        self._draw_recents_page(max(_RECENTS_PAGE, drawn))
-        self.show_widget(container)
+        self._show_paged(container, _between_headings(
+            flow, rows, headings, lambda row: self._add_collection_thumbnail(flow, row)))
 
-    def _draw_recents_page(self, count: int):
-        """Add up to ``count`` more finished items to the open collection, picking up
-        where the last page left off. Short (or empty) at the end of the list."""
-        rows = self._open_collection_rows(RECENTS_KEY)
-        start = self._recents_drawn
-        page = rows[start:start + count]
-        _draw_between_headings(self._recents_flow, page, gallery.section_headings(rows),
-                               lambda row: self._add_collection_thumbnail(self._recents_flow, row),
-                               start=start)
-        self._recents_drawn += len(page)
+    def grow(self, *_):
+        """Draw on a page at a time until the tiles reach _REACH past the foot of
+        what is seen — what makes a pane keep going instead of stopping at a fixed
+        count, and fills a pane taller than a page.
 
-    def grow_recents(self, *_):
-        """Draw the next page once the collection is scrolled near its end — what makes
-        Recents keep going instead of stopping at a fixed count.
-
-        Wired to the browser scroll bar's value *and* its range: the value for the
-        scrolling itself, the range because a pane only gets its real one once the
-        page just drawn has been laid out, which is when a collection redrawn back at
-        the offset it was being read at finds itself already near the end. A range
-        of zero is that not-yet-laid-out pane rather than a collection scrolled to its
-        end, so it waits rather than drawing pages nobody has scrolled to.
+        Measured off the tiles drawn rather than off the scroll bar, whose range
+        trails the drawing until the pane is laid out again. Wired to the bar's
+        value for the scrolling itself, and to its range for a pane that changed
+        size under the reader.
         """
-        if (self._recents_flow is None
-                or self._recents_drawn >= len(self._open_collection_rows(RECENTS_KEY))):
-            return
-        bar = self._scroll_bar()
-        if bar.maximum() and bar.value() >= bar.maximum() - _RECENTS_REACH:
-            self._draw_recents_page(_RECENTS_PAGE)
+        drawn, seen = self._scroll.widget(), self._scroll.viewport()
+        if drawn is None:
+            return  # between one pane and the next
+        while self._pages.more() and (_drawn_height(drawn, seen.width())
+                                      - self._scroll_bar().value() - seen.height() < _REACH):
+            self._pages.draw(_PAGE)
+            show_the_tiles_qt_queued_to_show(drawn)  # or the page measures as nothing
 
     def _scroll_bar(self):
-        """The browser pane's vertical scroll bar: what the collection grows off, and
-        what a redraw puts back where the user was reading."""
+        """The browser pane's vertical scroll bar: what a pane grows off, and what a
+        redraw puts back where the user was reading."""
         return self._scroll.verticalScrollBar()
 
     def _add_collection_thumbnail(self, flow, row, corner_actions=None):
@@ -849,7 +900,7 @@ class BrowserPane(QObject):
             tile.set_enhance(appearance.get("enhance"))
             tile.set_enhancing(appearance.get("enhancing"))
         flow.addWidget(tile)
-        self._selection.note_shown(prompt_id)
+        tile.set_selected(self._selection.holds(prompt_id))
         self._thumb_widgets[prompt_id] = tile
         self._wired[prompt_id] = wiring
         return tile
@@ -988,15 +1039,16 @@ class BrowserPane(QObject):
                          "Reject — trash it and steer future experiments away"),
         ]
         rows = self._open_collection_rows(EXPERIMENTS_KEY)
+        if not rows:
+            self.show_widget(self._empty_state(self._experiments_empty_hint()))
+            return
 
         def draw(row):
             self._add_collection_thumbnail(flow, row, corner_actions=list(actions))
 
         headings = gallery.section_headings(rows)
         _open_sections(flow, headings)
-        _draw_between_headings(flow, rows, headings, draw)
-        self.show_widget(container if rows
-                         else self._empty_state(self._experiments_empty_hint()))
+        self._show_paged(container, _between_headings(flow, rows, headings, draw))
 
 
     def _experiments_empty_hint(self) -> str:
@@ -1025,6 +1077,9 @@ class BrowserPane(QObject):
         container, flow = self._new_tile_pane()
         in_flight = {item.key: item for item in self.inflight_items()}
         rows = self._open_collection_rows(REQUESTS_KEY)
+        if not rows:
+            self.show_widget(self._empty_state(self._requests_empty_hint()))
+            return
         drawn = [row for row in rows
                  if row["prompt_id"] in in_flight or gallery.produced_output(row)]
 
@@ -1037,9 +1092,9 @@ class BrowserPane(QObject):
 
         headings = gallery.section_headings(drawn)
         _open_sections(flow, headings)
-        _draw_between_headings(flow, drawn, headings, draw)
-        self.show_widget(container if rows
-                         else self._empty_state(self._requests_empty_hint()))
+        self._show_paged(container, [
+            entry._replace(item=None) if entry.item in in_flight else entry
+            for entry in _between_headings(flow, drawn, headings, draw)])
 
 
     @staticmethod
@@ -1069,10 +1124,13 @@ class BrowserPane(QObject):
                          "Delete permanently — remove it and its files for good"),
         ]
         rows = self._open_collection_rows(TRASH_KEY)
-        for row in rows:
-            self._add_trash_thumbnail(flow, row, list(actions))
-        self.show_widget(container if rows
-                         else self._empty_state(self._trash_empty_hint()))
+        if not rows:
+            self.show_widget(self._empty_state(self._trash_empty_hint()))
+            return
+        self._show_paged(container, [
+            _Entry(partial(self._add_trash_thumbnail, flow, row, list(actions)),
+                   item=row["prompt_id"])
+            for row in rows])
 
     def _add_trash_thumbnail(self, flow, row, corner_actions):
         """One deleted item's tile — a collection tile like any other, wired to
@@ -1268,8 +1326,7 @@ class BrowserPane(QObject):
                 flow.addWidget(lead.generating)
 
         _open_sections(flow, headings, opens_now=opens_now, draw_leading=draw_leading)
-        _draw_between_headings(flow, finished, headings, draw)
-        self.show_widget(container)
+        self._show_paged(container, _between_headings(flow, finished, headings, draw))
 
     def _folder_inflight_items(self, group) -> list[InFlightItem]:
         """Every other run of this folder still in flight, for a card each.
@@ -1315,7 +1372,7 @@ class BrowserPane(QObject):
         row (:meth:`GalleryView._go_to_folder`)."""
         self.folder_open_requested.emit(key)
 
-    def visible_prompt_ids(self) -> list[str]:
+    def listed_prompt_ids(self) -> list[str]:
         return self._selection.shown
 
     # --- multi-selection ---------------------------------------------------
@@ -1354,7 +1411,7 @@ class BrowserPane(QObject):
         its newest items with the one you asked for highlighted off-screen.
 
         False where this pane has no picture of its own for it."""
-        self._draw_open_collection_past(prompt_id)
+        self._pages.draw_past(lambda entry: entry.item == prompt_id, _NEIGHBORS_PAST_A_REVEAL)
         widget = self._thumb_widgets.get(prompt_id)
         if widget is None:
             return False  # nothing drawn for it here: an in-flight row, or a folder
@@ -1365,17 +1422,6 @@ class BrowserPane(QObject):
         # this turn's layout has run (as :meth:`return_to` does).
         defer(self._scroll, lambda: self._reapply_reveal(prompt_id, widget))
         return True
-
-    def _draw_open_collection_past(self, prompt_id: str) -> None:
-        if self._recents_flow is None:
-            return
-        listed = [row["prompt_id"] for row in self._open_collection_rows(RECENTS_KEY)]
-        if prompt_id not in listed:
-            return
-        beyond = (listed.index(prompt_id) + 1 + _NEIGHBORS_PAST_A_REVEAL
-                  - self._recents_drawn)
-        if beyond > 0:
-            self._draw_recents_page(beyond)
 
     def _reapply_reveal(self, prompt_id: str, widget):
         """Scroll to a revealed tile again after layout — unless the pane has since

@@ -174,9 +174,9 @@ class NavigationController:
                 self._host.clear_selection()
 
     def _reveal_in_pane(self, prompt_id: str) -> None:
-        """Land on an item the pane is already showing. Silent if the pane has no
-        tile for it — a Recents page not drawn yet, a row since deleted — which
-        leaves the view itself restored rather than jumping somewhere else."""
+        """Land on an item the pane lists. Silent if it does not — a row since
+        deleted — which leaves the view itself restored rather than jumping
+        somewhere else."""
         if self._host.pane_holds(prompt_id):
             self._host.reveal(prompt_id)
 

@@ -821,10 +821,6 @@ class GalleryView(QWidget):
         # been picked.
         self._scroll.background_clicked.connect(
             self._browser.clear_thumbnail_selection)
-        # The Recents collection has no end: reaching the end of what it has drawn
-        # draws the next page. Range as well as value — see BrowserPane.grow_recents.
-        self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
-        self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
         browser_column.addWidget(self._scroll, 1)
         # The foot of the center (browser) pane, under a handle of its own: what
         # an enhancement runs at — the Enhance All button, a single image's
@@ -1750,7 +1746,7 @@ class GalleryView(QWidget):
         :meth:`InfoPaneTabs.reconcile_previews`). Painting the selection
         into whichever tab was in front is how a tab came to show a picture that
         was not its own."""
-        if not prompt_id or prompt_id not in self._browser.visible_prompt_ids():
+        if not prompt_id or prompt_id not in self._browser.listed_prompt_ids():
             return
         row = self.row_for(prompt_id)
         if row:
@@ -1822,7 +1818,7 @@ class GalleryView(QWidget):
         return self._selected["prompt_id"] if self._selected else None
 
     def pane_holds(self, prompt_id: str) -> bool:
-        return prompt_id in self._browser.visible_prompt_ids()
+        return prompt_id in self._browser.listed_prompt_ids()
 
     def show_folder(self, key: str) -> bool:
         """Draw the folder or collection ``key`` names, saying whether the tree had a
@@ -1976,7 +1972,7 @@ class GalleryView(QWidget):
         """
         if self._navigation.suppressed:
             return None
-        first = next(iter(self._browser.visible_prompt_ids()), None)
+        first = next(iter(self._browser.listed_prompt_ids()), None)
         if first is None or not self._show_generation(first):
             return None
         # Picked rather than revealed: the first tile leads a pane just drawn, so
@@ -3416,8 +3412,8 @@ class GalleryView(QWidget):
         if isinstance(group, gallery.SettingsGroup):
             self._browser.show_thumbnails(group)
 
-    def visible_prompt_ids(self) -> list[str]:
-        return self._browser.visible_prompt_ids()
+    def listed_prompt_ids(self) -> list[str]:
+        return self._browser.listed_prompt_ids()
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
@@ -4179,11 +4175,10 @@ class GalleryView(QWidget):
                 if not drawn_by_the_signal:
                     self._on_folder_selected(item, None)
         self._on_thumbnail_clicked(prompt_id)   # the arrival: its tab, and its stop
-        self._browser.reveal_tile(prompt_id)    # once the folder's tiles are drawn
-        logger.info("Went to %s: folder %s, %d tiles drawn, tile shown %s",
+        revealed = self._browser.reveal_tile(prompt_id)
+        logger.info("Went to %s: folder %s, %d items listed, tile shown %s",
                     prompt_id, self.selected_folder_key(),
-                    len(self._browser.visible_prompt_ids()),
-                    prompt_id in self._browser.visible_prompt_ids())
+                    len(self._browser.listed_prompt_ids()), revealed)
 
     def _folder_row_for(self, prompt_id: str):
         """The tree row of the folder a generation lives in: its settings row, or

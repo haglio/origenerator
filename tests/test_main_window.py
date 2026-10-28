@@ -1297,7 +1297,7 @@ def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot
     reopened._gallery_view.refresh()
 
     assert reopened._gallery_view.selected_folder_key() == latest
-    assert reopened._gallery_view.visible_prompt_ids() == ["vid"]
+    assert reopened._gallery_view.listed_prompt_ids() == ["vid"]
 
 
 def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):

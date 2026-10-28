@@ -251,6 +251,12 @@ def _drawn_height(drawn: QWidget, width: int) -> int:
     return height if height >= 0 else drawn.sizeHint().height()
 
 
+def _play_only_what_is_in_sight(drawn: QWidget, tiles, top: int, foot: int) -> None:
+    for tile in tiles:
+        at = tile.mapTo(drawn, QPoint(0, 0)).y()
+        tile.set_in_sight(at < foot and at + tile.height() > top)
+
+
 _COLLECTION_TILE = "collection"
 _REVIEW_TILE = "collection with a verdict"
 _FOLDER_TILE = "folder"
@@ -467,8 +473,8 @@ class BrowserPane(QObject):
         self._placements: dict[str | None, Placement] = {}
         self._image_index: dict = {}
         self._models_taken = 0
-        scroll.verticalScrollBar().valueChanged.connect(self.grow)
-        scroll.verticalScrollBar().rangeChanged.connect(self.grow)
+        scroll.verticalScrollBar().valueChanged.connect(self.follow_the_scroll)
+        scroll.verticalScrollBar().rangeChanged.connect(self.follow_the_scroll)
 
     def model_stamp(self) -> int:
         return self._models_taken
@@ -537,12 +543,12 @@ class BrowserPane(QObject):
             pages.catch_up(self._pages)
         self.show_widget(container)
         self._pages = pages
-        self.grow()
+        self.follow_the_scroll()
+        defer(self._scroll, self.follow_the_scroll)  # again, the pages it drew laid out
 
     def show_empty(self):
         """Clear the pane to nothing on screen — no folder selected."""
-        self._selection.forget_what_was_shown()
-        self._listed_folders = []
+        self._reset_pane_state()
         self.show_widget(QWidget())
 
     def _reset_pane_state(self):
@@ -834,10 +840,11 @@ class BrowserPane(QObject):
         self._show_paged(container, _between_headings(
             flow, rows, headings, lambda row: self._add_collection_thumbnail(flow, row)))
 
-    def grow(self, *_):
+    def follow_the_scroll(self, *_):
         """Draw on a page at a time until the tiles reach _REACH past the foot of
         what is seen — what makes a pane keep going instead of stopping at a fixed
-        count, and fills a pane taller than a page.
+        count, and fills a pane taller than a page — and play only the looping
+        clips within _REACH of it.
 
         Measured off the tiles drawn rather than off the scroll bar, whose range
         trails the drawing until the pane is laid out again. Wired to the bar's
@@ -847,10 +854,13 @@ class BrowserPane(QObject):
         drawn, seen = self._scroll.widget(), self._scroll.viewport()
         if drawn is None:
             return  # between one pane and the next
+        top = self._scroll_bar().value()
         while self._pages.more() and (_drawn_height(drawn, seen.width())
-                                      - self._scroll_bar().value() - seen.height() < _REACH):
+                                      - top - seen.height() < _REACH):
             self._pages.draw(_PAGE)
             show_the_tiles_qt_queued_to_show(drawn)  # or the page measures as nothing
+        _play_only_what_is_in_sight(drawn, self._thumb_widgets.values(),
+                                    top - _REACH, top + seen.height() + _REACH)
 
     def _scroll_bar(self):
         """The browser pane's vertical scroll bar: what a pane grows off, and what a

@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import pytest
 from PyQt6 import sip
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QMovie
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery
@@ -43,6 +44,7 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.orientation import oriented_key
+from tests.pictured_rows import looping_clip
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
@@ -109,7 +111,7 @@ class _StubAuto:
 
 
 def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, jobs=None,
-          selected=None):
+          selected=None, animated_preview=lambda row: None):
     if scroll is None:
         scroll = BrowserScrollArea()
         qtbot.addWidget(scroll)
@@ -122,7 +124,7 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, job
         ),
         PaneHost(
             image_rows=list,
-            animated_preview=lambda row: None,
+            animated_preview=animated_preview,
             enhancing_run=lambda row: None,
             enhance_settings=lambda: gallery.EnhanceSettings(),
             experiments_enabled=lambda: False,
@@ -352,6 +354,29 @@ def test_scrolling_to_the_foot_of_a_pane_draws_on_by_a_page_not_to_the_end(qtbot
     scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
 
     assert opened_on < len(_drawn(scroll)) < len(rows)
+
+
+def _tile_at(scroll, y):
+    return next(tile for tile in _drawn(scroll) if tile.geometry().contains(10, y))
+
+
+def test_only_the_videos_in_sight_play_their_looping_clips(qtbot, tmp_path):
+    clip = looping_clip(tmp_path)
+    rows = [_row(f"g{n}", n) for n in range(200)]
+    pane, scroll = _pane(qtbot, rows, animated_preview=lambda row: clip)
+    scroll.setWidgetResizable(True)
+    scroll.resize(800, 600)
+    scroll.show()
+    qtbot.waitExposed(scroll)
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    qtbot.wait(1)
+    bar = scroll.verticalScrollBar()
+    bar.setValue(bar.maximum())
+    qtbot.wait(1)
+
+    in_sight = _tile_at(scroll, bar.value() + scroll.viewport().height() // 2)
+    assert in_sight._image_label.movie().state() == QMovie.MovieState.Running
+    assert pane._thumb_widgets["g0"]._image_label.movie().state() == QMovie.MovieState.Paused
 
 
 def test_revealing_a_folder_past_the_first_page_draws_its_square(qtbot):

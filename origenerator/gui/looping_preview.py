@@ -13,7 +13,7 @@ strip nobody remembered kept playing through a stopped room.
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QObject, QSize, Qt
 from PyQt6.QtGui import QImageReader, QMovie
 
 from origenerator.gui import omnipause
@@ -58,6 +58,27 @@ def play_in(label, path: str, size: QSize) -> QMovie:
     return _running(movie)
 
 
+def set_in_sight(label, in_sight: bool) -> None:
+    movie = label.movie()
+    gate = movie.findChild(_Gate) if movie is not None else None
+    if gate is not None:
+        gate.set_in_sight(in_sight)
+
+
+class _Gate(QObject):
+    def __init__(self, movie: QMovie):
+        super().__init__(movie)
+        self._movie, self._frozen, self._in_sight = movie, False, True
+
+    def set_frozen(self, frozen: bool) -> None:
+        self._frozen = frozen
+        self._movie.setPaused(frozen or not self._in_sight)
+
+    def set_in_sight(self, in_sight: bool) -> None:
+        self._in_sight = in_sight
+        self._movie.setPaused(self._frozen or not in_sight)
+
+
 def stop_what_plays_in(label) -> None:
     playing = label.movie()
     label.setMovie(None)
@@ -79,6 +100,6 @@ def _fitted(path: str, size: QSize, parent) -> QMovie:
 
 def _running(movie: QMovie) -> QMovie:
     movie.start()
-    omnipause.holds(movie)  # stopped at once if the room already is
+    omnipause.holds(_Gate(movie))  # stopped at once if the room already is
     return movie
 

@@ -10,7 +10,8 @@ from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QMovie
 from PyQt6.QtWidgets import QLabel
 
-from origenerator.gui.looping_preview import play_in
+from origenerator.gui import omnipause
+from origenerator.gui.looping_preview import play_in, set_in_sight
 
 
 def _loop(path, color="gray"):
@@ -54,3 +55,33 @@ def test_the_clip_is_fit_into_the_space_it_is_given(label, tmp_path):
     movie = play_in(label, _loop(tmp_path / "one.webp"), QSize(20, 20))
 
     assert movie.scaledSize() == QSize(20, 15)
+
+
+def test_a_clip_out_of_sight_holds_still_until_it_is_back_in_sight(label, tmp_path):
+    movie = play_in(label, _loop(tmp_path / "one.webp"), QSize(40, 30))
+
+    set_in_sight(label, False)
+    assert movie.state() == QMovie.MovieState.Paused
+
+    set_in_sight(label, True)
+    assert movie.state() == QMovie.MovieState.Running
+
+
+def test_a_clip_out_of_sight_stays_still_when_the_room_lets_go(label, tmp_path):
+    movie = play_in(label, _loop(tmp_path / "one.webp"), QSize(40, 30))
+    set_in_sight(label, False)
+
+    omnipause.freeze(True)
+    omnipause.freeze(False)
+
+    assert movie.state() == QMovie.MovieState.Paused
+
+
+def test_a_clip_back_in_sight_stays_still_while_the_room_is_stopped(label, tmp_path):
+    movie = play_in(label, _loop(tmp_path / "one.webp"), QSize(40, 30))
+    set_in_sight(label, False)
+    omnipause.freeze(True)
+
+    set_in_sight(label, True)
+
+    assert movie.state() == QMovie.MovieState.Paused

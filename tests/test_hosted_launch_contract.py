@@ -16,10 +16,10 @@ import re
 from pathlib import Path
 
 import pytest
+from app_support import origenerator_handoff as handoff
 from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
-from origenerator.win32 import this_process_creation_time
 from origenerator.workflows import detail_parts
 from tests.children import run_python
 from tests.test_main_window import _fun_time_session, _window
@@ -138,37 +138,34 @@ def _handoff() -> dict:
 
 def test_the_document_names_each_file_this_app_and_a_session_hand_each_other():
     assert {side: entry["file"] for side, entry in _handoff().items()} == {
-        "offer": contract.OFFER_NAME, "showing": contract.SHOWING_NAME,
-        "session": contract.SESSION_NAME, "takeover": contract.TAKEOVER_NAME}
+        "offer": handoff.OFFER, "showing": handoff.SHOWING,
+        "session": handoff.SESSION, "takeover": handoff.TAKEOVER}
 
 
 def test_a_claim_on_the_device_is_read_exactly_when_the_document_says_it_is(tmp_path):
     pattern = _handoff()["session"]["reads"]["pattern"]
-    live = f"{os.getpid()} {this_process_creation_time()}"
+    live = str(handoff.this_process())
 
     for claim, read in ((live, True), (f"{live} more", False), (live.replace(" ", ", "), False)):
-        (tmp_path / contract.SESSION_NAME).write_text(claim, encoding="utf-8")
+        (tmp_path / handoff.SESSION).write_text(claim, encoding="utf-8")
         assert (bool(re.fullmatch(pattern, claim)),
-                contract.a_session_holds_the_device(tmp_path)) == (read, read), claim
+                handoff.a_session_claims_the_osr2(tmp_path)) == (read, read), claim
 
 
 def test_a_takeover_carrying_what_the_document_says_this_app_reads_is_taken(tmp_path):
-    asked = {contract.TAKEOVER_PID: os.getpid(), contract.TAKEOVER_ARGS: [contract.MODE_FLAG]}
-    (tmp_path / contract.TAKEOVER_NAME).write_text(json.dumps(asked), encoding="utf-8")
+    handoff.hand_over(tmp_path, pid=os.getpid(), args=[contract.MODE_FLAG])
+    asked = json.loads((tmp_path / handoff.TAKEOVER).read_text(encoding="utf-8"))
 
     assert sorted(asked) == _handoff()["takeover"]["reads"]["keys"]
     assert contract.take_the_takeover(tmp_path, pid=os.getpid()) is not None
 
 
 def test_every_offer_and_slideshow_mark_the_document_says_this_app_writes_is_one_it_writes():
-    pid, created_at = 4321, 8765
+    window = handoff.Process(4242, 4343)
 
-    assert {side: entry["writes"] for side, entry in contract.handoff(pid, created_at).items()
-            if "writes" in entry} == {
-        "offer": [contract.offer_of(pid, created_at),
-                  contract.offer_of(pid, created_at, starting=True)],
-        "showing": [contract.slideshow_mark(pid, created_at, shape)
-                    for shape in ("portrait", "landscape", "both")]}
+    assert {side: entry["writes"] for side, entry in _handoff().items() if "writes" in entry} == {
+        "offer": [handoff.offer_of(window), handoff.offer_of(window, starting=True)],
+        "showing": [handoff.slideshow_mark_of(window, shape) for shape in handoff.SHAPES]}
 
 
 def test_the_document_names_every_fix_a_session_should_hear_for_the_built_in_parts():

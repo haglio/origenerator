@@ -25,12 +25,12 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import origenerator_handoff as handoff
 from app_support.file_channel import read_key_values
 from funestra.file_channel import append_command
 from funestra.playlist import write_playlist
@@ -40,7 +40,6 @@ from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
 from origenerator.slideshow import Slide
 from origenerator.slideshow_buttons import PANEL_PLACES, PRESSES, PRESSES_ABOUT_A_FILE
-from origenerator.win32 import process_creation_time, this_process_creation_time
 from origenerator.workflows.detail_parts import published_fix_phrases
 
 logger = logging.getLogger(__name__)
@@ -223,7 +222,7 @@ def declaration() -> dict:
         "command_patterns": list(command_patterns()),
         "request_lines": [spelled_for(side, line) for side in SIDES
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
-        "handoff": handoff(*_A_WINDOW),
+        "handoff": _the_handoff(),
         "fix_phrases": list(published_fix_phrases()),
     }
 
@@ -491,78 +490,20 @@ def parse_app_args(argv: list[str]) -> AppArgs:
     return AppArgs(fun_time=_session_of(args), check_launch=args.check_launch)
 
 
-OFFER_NAME = "fun_time_offer.txt"
-SHOWING_NAME = "fun_time_showing.txt"
-TAKEOVER_NAME = "fun_time_takeover.json"
-SESSION_NAME = "fun_time_session.txt"
-OFFER_STILL_STARTING = "starting"
-SESSION_CLAIM = re.compile(r"(\d+) (\d+)")
-TAKEOVER_PID = "pid"
-TAKEOVER_ARGS = "args"
-_A_WINDOW = (4242, 4343)
+_A_WINDOW = handoff.Process(4242, 4343)
 
 
-def handoff(pid: int, created_at: int) -> dict:
+def _the_handoff() -> dict:
+    # Fun Time's main holds this app to it until it reads these files through
+    # app_support.origenerator_handoff as this app does.
     return {
-        "offer": {"file": OFFER_NAME, "writes": [offer_of(pid, created_at),
-                                                 offer_of(pid, created_at, starting=True)]},
-        "showing": {"file": SHOWING_NAME,
-                    "writes": [slideshow_mark(pid, created_at, shape)
-                               for shape in ("portrait", "landscape", "both")]},
-        "session": {"file": SESSION_NAME, "reads": {"pattern": SESSION_CLAIM.pattern}},
-        "takeover": {"file": TAKEOVER_NAME,
-                     "reads": {"keys": sorted((TAKEOVER_PID, TAKEOVER_ARGS))}},
+        "offer": {"file": handoff.OFFER,
+                  "writes": [handoff.offer_of(_A_WINDOW), handoff.offer_of(_A_WINDOW, starting=True)]},
+        "showing": {"file": handoff.SHOWING,
+                    "writes": [handoff.slideshow_mark_of(_A_WINDOW, shape) for shape in handoff.SHAPES]},
+        "session": {"file": handoff.SESSION, "reads": {"pattern": r"(\d+) (\d+)"}},
+        "takeover": {"file": handoff.TAKEOVER, "reads": {"keys": ["args", "pid"]}},
     }
-
-
-def offer_of(pid: int, created_at: int, *, starting: bool = False) -> str:
-    offer = f"{pid} {created_at}"
-    return f"{offer} {OFFER_STILL_STARTING}" if starting else offer
-
-
-def slideshow_mark(pid: int, created_at: int, shape: str) -> str:
-    return f"{offer_of(pid, created_at)} {shape}"
-
-
-def offer_of_this_process(*, starting: bool = False) -> str:
-    return offer_of(os.getpid(), this_process_creation_time(), starting=starting)
-
-
-def slideshow_mark_of_this_process(shape: str) -> str:
-    return slideshow_mark(os.getpid(), this_process_creation_time(), shape)
-
-
-def offer_the_window_while_it_is_built(*state_dirs: Path) -> None:
-    for state_dir in dict.fromkeys(state_dirs):
-        state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / OFFER_NAME).write_text(offer_of_this_process(starting=True), encoding="utf-8")
-
-
-def withdraw_the_offer(*state_dirs: Path) -> None:
-    for state_dir in state_dirs:
-        (state_dir / OFFER_NAME).unlink(missing_ok=True)
-        (state_dir / SHOWING_NAME).unlink(missing_ok=True)
-
-
-def a_session_holds_the_device(state_dir: Path) -> bool:
-    """Whether a live Fun Time session has claimed the OSR2.
-
-    A session leaves its own pid and creation time here for as long as it runs,
-    the way a standalone window leaves its own in the offer.  Read that way
-    rather than as a heartbeat because a session that died without clearing it
-    names a pid that is gone, so the claim expires with the session.
-
-    The claim stands whether or not the session took this window over: a
-    takeover can miss -- an app still booting when the room opened, an offer
-    another instance overwrote -- and a window the session never reached must
-    still keep off the one device it is driving.
-    """
-    try:
-        claim = SESSION_CLAIM.fullmatch(
-            (state_dir / SESSION_NAME).read_text(encoding="utf-8").strip())
-    except OSError:
-        return False
-    return claim is not None and process_creation_time(int(claim[1])) == int(claim[2])
 
 
 def _stayed_standalone(why: str) -> None:
@@ -571,20 +512,16 @@ def _stayed_standalone(why: str) -> None:
 
 
 def take_the_takeover(state_dir: Path, *, pid: int) -> FunTimeSession | None:
-    takeover = state_dir / TAKEOVER_NAME
-    if not takeover.exists():
-        return None
     try:
-        asked = json.loads(takeover.read_text(encoding="utf-8"))
-        whose = asked[TAKEOVER_PID]
-        args, unknown = build_parser().parse_known_args(asked[TAKEOVER_ARGS])
-    except (OSError, ValueError, TypeError, KeyError) as not_one:
+        asked = handoff.take_the_takeover(state_dir)
+        if asked is None:
+            return None
+        args, unknown = build_parser().parse_known_args(asked.args)
+    except (OSError, ValueError, TypeError) as not_one:
         _stayed_standalone(f"it did not read as a session ({not_one!r})")
         return None
-    finally:
-        takeover.unlink(missing_ok=True)
-    if whose != pid:
-        _stayed_standalone(f"it asked for another window, pid {whose}")
+    if asked.pid != pid:
+        _stayed_standalone(f"it asked for another window, pid {asked.pid}")
         return None
     if unknown:
         _stayed_standalone(f"it named {unknown}, a flag this app does not know")

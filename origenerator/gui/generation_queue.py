@@ -417,10 +417,9 @@ class QueueRow(OpensAFolder, QWidget):
     THUMB = HEIGHT - 6
     INSET = GAP_SMALL
 
-    def __init__(self, item, *, movable=True, parent=None):
+    def __init__(self, item, parent=None):
         super().__init__(parent)
         self.key = item.key
-        self.movable = movable
         self._press_at = None
         self._drag_out = DragOut()
         self.setObjectName("queueRow")
@@ -474,6 +473,7 @@ class QueueRow(OpensAFolder, QWidget):
         """Re-render this row in place — a queued→running flip, a fresh estimate,
         or an Auto toggle that changed what the button gets you."""
         self._item = item
+        self.movable = not item.sent
         self._lead.setText(queue_lead_text(item))
         # The name the row no longer spends its width on, plus what the shorthand
         # in front of it means. The settings are worth an answer, just not the row.
@@ -678,10 +678,9 @@ class GenerationQueue(QWidget):
     def set_items(self, items: list, foreign_queued: int = 0):
         """Show ``items`` — every in-flight generation, the one being made first.
 
-        The first drives the live half. Rows already listed are refreshed in
-        place; only a change to the *set* of jobs (or their order) rebuilds the
-        list, so a poll landing mid-drag doesn't yank the row out from under the
-        gesture.
+        The first drives the live half. A row already standing for a job is
+        refreshed and moved into place, never built again, so a press on it
+        survives a poll that changes the line around it.
 
         ``foreign_queued`` is how much of ComfyUI's queue belongs to another app.
         It puts Clear up whenever there is any, and with nothing of ours in
@@ -703,20 +702,24 @@ class GenerationQueue(QWidget):
         # be centered in the sliver beside it rather than in the strip itself.
         self._hint.setVisible(not items)
         self._running.setVisible(bool(items) or bool(free_half))
-        if self.keys() != [item.key for item in items]:
-            self._rebuild(items)
-            return
-        self._items = list(items)
-        for row, item in zip(self.rows(), items):
-            row.update_item(item)
+        self._line_up(items)
 
-    def _rebuild(self, items: list):
+    def _line_up(self, items: list):
         self._items = list(items)
-        for row in self.rows():
-            self._rows_column.removeWidget(row)
-            row.deleteLater()
+        standing = {row.key: row for row in self.rows()}
+        for key in standing.keys() - {item.key for item in items}:
+            gone = standing.pop(key)
+            self._rows_column.removeWidget(gone)
+            gone.deleteLater()
         for index, item in enumerate(items):
-            self._rows_column.insertWidget(index, QueueRow(item, movable=not item.sent))
+            row = standing.get(item.key)
+            if row is None:
+                row = QueueRow(item)
+            else:
+                row.update_item(item)
+            if self._rows_column.indexOf(row) != index:
+                self._rows_column.removeWidget(row)
+                self._rows_column.insertWidget(index, row)
         # The scroll area would otherwise squeeze the whole line into its own
         # height, stacking the rows on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
@@ -773,7 +776,7 @@ class GenerationQueue(QWidget):
         moved.insert(target, moved.pop(source))
         if [item.key for item in moved] == order:
             return
-        self._rebuild(moved)
+        self._line_up(moved)
         self.reorder_requested.emit(self.keys())
 
     # --- accepting a dragged row --------------------------------------------

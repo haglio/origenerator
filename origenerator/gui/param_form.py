@@ -264,9 +264,6 @@ class ParamForm(QWidget):
         if self._scenes is not None:
             self._scenes.reflect_use()
 
-    def _tip(self, key: str) -> str:
-        return self._shut_down.get(key) or self._help(self._defs[key])
-
     def _set_row_visible(self, key: str, visible: bool) -> None:
         """Show or hide one row, label and field together."""
         title = param_sections.section_title(key)
@@ -349,13 +346,16 @@ class ParamForm(QWidget):
         self._explain(key)
 
     def _explain(self, key: str) -> None:
-        pd = self._defs.get(key)
-        explained = self._help(pd) if pd is not None else param_help(key)
+        explained = self._tip(key)
         label = self._labels[key]
         label.setToolTip(explained or label.text())
         widget = self._widgets.get(key)
         if widget is not None and explained and not isinstance(widget, DropSlot):
             widget.setToolTip(explained)  # a zone's tooltip names what it holds
+
+    def _tip(self, key: str) -> str:
+        pd = self._defs.get(key)
+        return self._shut_down.get(key) or (self._help(pd) if pd is not None else param_help(key))
 
     def _help(self, pd: ParamDef) -> str:
         warned_here = [other for other in self._param_defs

@@ -41,7 +41,7 @@ from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.param_form import ParamForm
+from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_names import ItemNames
@@ -3457,6 +3457,17 @@ def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recomm
     tips = {key: blank_panel._param_form._widgets[key].toolTip() for key in ("steps", "cfg")}
     assert tips["steps"].endswith(" Other Model's page recommends 30–40 steps.")
     assert tips["cfg"].endswith(" Other Model's page recommends 3–7.")
+
+
+def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    form = blank_panel._param_form
+
+    form._widgets["cfg"].setValue(1.0)
+
+    field, label = form._widgets["negative_prompt"], form._labels["negative_prompt"]
+    assert field.property("inert") is True
+    assert field.toolTip() == label.toolTip() == STRENGTH_ONE_HELP
 
 
 def _on_screen(qtbot, panel):

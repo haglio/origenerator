@@ -13,7 +13,10 @@ import ast
 import re
 from pathlib import Path
 
+import pytest
 from shared_ui import palette
+
+pytestmark = pytest.mark.repo_check
 
 _ROOT = Path(__file__).resolve().parent.parent
 _TESTS = _ROOT / "tests"

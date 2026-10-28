@@ -680,7 +680,8 @@ class GalleryView(QWidget):
         # edge is this column's splitter handle, so a long queue can be dragged
         # open at the cost of the folder listing above it.
         self._queue = GenerationQueue()
-        self._queue.reorder_requested.connect(self._jobs.reorder)
+        self._queue.move_requested.connect(self._jobs.move)
+        self._jobs.reordered.connect(self.queue_changed)
         self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
         self._queue.start_now_requested.connect(self.start_now)
         self._arrangement = PaneArrangement(

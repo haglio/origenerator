@@ -183,11 +183,32 @@ def _video_from(image, name=""):
                            run_media_type="video", start_image=image, enhances="")
 
 
-def test_videos_waiting_for_one_enhancement_follow_it_in_the_order_they_had():
+# --- a job moved by hand ---------------------------------------------------------
+
+def test_a_job_moved_lands_just_ahead_of_the_one_it_is_let_go_over():
+    first, second, third = _video("first"), _video("second"), _video("third")
+
+    assert queue_line.moved([first, second, third], third, second) == [first, third, second]
+
+
+def test_a_job_let_go_past_the_last_one_ends_the_line():
+    first, second, third = _video("first"), _video("second"), _video("third")
+
+    assert queue_line.moved([first, second, third], first, None) == [second, third, first]
+
+
+def test_a_video_moved_ahead_of_its_images_enhancement_takes_the_enhancement_along():
+    # It is made from that enhancement, so the enhancement still comes first.
+    other, enhance = _video("other"), _enhance("p.png", "enhance")
+    video = _video_from("p.png", "video")
+
+    assert queue_line.moved([other, enhance, video], video, other) == [enhance, video, other]
+
+
+def test_an_enhancement_moved_behind_the_videos_waiting_for_it_takes_them_along():
+    # In the order they had, right behind it.
+    enhance, other = _enhance("p.png", "enhance"), _video("other")
     first, second = _video_from("p.png", "first"), _video_from("p.png", "second")
-    enhance = _enhance("p.png", "enhance")
-    line = [first, second, enhance]
 
-    queue_line.behind_the_enhancements_they_wait_for(line)
-
-    assert line == [enhance, first, second]
+    assert queue_line.moved([enhance, first, second, other], enhance, None) == [
+        other, enhance, first, second]

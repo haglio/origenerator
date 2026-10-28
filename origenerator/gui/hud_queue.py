@@ -50,6 +50,7 @@ from origenerator.gui.inflight import (
     discard_run_tooltip,
     first_movable,
     foreign_queue_text,
+    movable,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
@@ -504,7 +505,7 @@ def _line(item) -> JobLine:
         discard_tooltip=discard_run_tooltip(item.auto_generating),
         shieldable=item.shield is not None,
         shielded=item.shielded,
-        movable=not item.sent,
+        movable=movable(item),
         source=(str(frame) if frame is not None else None, item.source_video_thumbnail),
         prompt_edited=item.prompt_edited,
         folder=tuple(str(path) for path in item.folder_thumbnails[:FOLDER_CELLS]),
@@ -596,7 +597,7 @@ class QueuePointer:
 
     def drag(self, px: int, py: int) -> None:
         """A press on a row that travels is a drag, and the block marks where it
-        would land.  A row ComfyUI already holds stays where it is, and nothing
+        would land.  A row that holds its place stays where it is, and nothing
         can be moved in front of it."""
         if self._press is None:
             return
@@ -605,7 +606,7 @@ class QueuePointer:
             if not draggable or abs(px - start_x) + abs(py - start_y) < _DRAG_START:
                 return
             item = self._item(key)
-            if item is None or item.sent:
+            if item is None or not movable(item):
                 self._press = None
                 return
             self._drag = key
@@ -646,31 +647,26 @@ class QueuePointer:
 
     def _drop_index(self, py: int) -> int:
         """Which slot in the line a drop at ``py`` lands in: above the row whose
-        upper half it fell on, else at the end of what is drawn."""
+        upper half it fell on, else at the end of what is drawn, and never in
+        front of a row that holds its place."""
         rows = self._rows()
-        for index, (rect, _key) in enumerate(rows):
-            if py < rect[1] + rect[3] / 2:
-                return self.first + index
-        return self.first + len(rows)
+        slot = next((index for index, (rect, _key) in enumerate(rows)
+                     if py < rect[1] + rect[3] / 2), len(rows))
+        return max(first_movable(self._host.hud_queue[0]), self.first + slot)
 
     def _drag_to(self, key: str, target: int) -> None:
-        """Re-line the queue with *key*'s row let go at *target*.
+        """Ask for *key*'s row to go where it was let go, at *target*.
 
-        Nothing may be moved in front of what ComfyUI already holds, and a row
+        Nothing may be moved in front of a row that holds its place, and a row
         let go where it already was asks for nothing.
         """
         items = self._host.hud_queue[0]
         keys = [item.key for item in items]
         if key not in keys:
             return
-        source = keys.index(key)
         # The slot was read with the dragged row still in place, so a drop below
         # it names one further along than it will end up in.
-        target = min(target - 1 if target > source else target, len(keys) - 1)
-        first = first_movable(items)
-        if not first <= source or not first <= target:
-            return
-        moved = list(keys)
-        moved.insert(target, moved.pop(source))
-        if moved != keys:
-            self._host.requeue(moved)
+        rest = [other for other in keys if other != key]
+        landing = target - 1 if target > keys.index(key) else target
+        if rest[:landing] + [key] + rest[landing:] != keys:
+            self._host.move(key, rest[landing] if landing < len(rest) else None)

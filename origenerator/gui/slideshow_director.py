@@ -574,7 +574,7 @@ class SlideshowDirector:
             # The queue's own three: a row dragged down the block the panel
             # hangs at its foot re-lines the line, its Clear drops another app's
             # work off ComfyUI, and its Start now ends a video's minute's wait.
-            requeue=self._jobs.reorder,
+            move=self._jobs.move,
             clear_queue=self._host.clear_foreign_queue,
             start_now=self._host.start_now,
             # Space reaches the one OSR2 switch, like every other surface's,

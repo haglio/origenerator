@@ -74,9 +74,10 @@ class SlideshowActions:
     reorder: Callable[[object, bool], bool] | None = None
     browse_all: Callable[[object], bool] | None = None
     # The generation queue's own three, for the block the panel hangs at its foot:
-    # ``requeue`` takes the ids in the order the rows were dropped into, ``clear_queue``
-    # drops another app's work off ComfyUI, ``start_now`` ends a video's wait.
-    requeue: Callable[[list], None] | None = None
+    # ``move`` lets a row go just ahead of another (past the last for None),
+    # ``clear_queue`` drops another app's work off ComfyUI, ``start_now`` ends a
+    # video's wait.
+    move: Callable[[str, str | None], None] | None = None
     clear_queue: Callable[[], None] | None = None
     start_now: Callable[[], None] | None = None
     drive_toggle: Callable[[], None] | None = None

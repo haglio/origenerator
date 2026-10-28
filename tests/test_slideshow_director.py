@@ -349,10 +349,10 @@ class FakeSession:
 
 class FakeJobQueue:
     def __init__(self):
-        self.reordered = []
+        self.moved = []
 
-    def reorder(self, keys=None):
-        self.reordered.append(keys)
+    def move(self, key, before):
+        self.moved.append((key, before))
 
 
 class FakePace:
@@ -1817,9 +1817,9 @@ def test_a_row_dragged_down_the_block_re_lines_the_queue(slideshows):
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
-    made[0].actions.requeue(["g2", "g1"])
+    made[0].actions.move("g2", "g1")
 
-    assert director._jobs.reordered == [["g2", "g1"]]
+    assert director._jobs.moved == [("g2", "g1")]
 
 
 def test_the_spoken_filter_narrows_the_slideshow_and_says_what_is_left(slideshows):

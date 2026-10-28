@@ -93,8 +93,11 @@ class InFlightItem:
     # — has not finished. It has no row, no id on the server, and nothing to
     # cancel; it exists so the press has a visible answer.
     starting: bool = False
-    # Sent to ComfyUI, made yet or not: the line can only move what it has not sent.
-    sent: bool = False
+    # One place up or down the line, where the queue lets it go that way: never
+    # past a shielded run being made or what a slideshow is locked on, and never
+    # for a run this window holds no job for.
+    move_up: Callable[[], None] | None = None
+    move_down: Callable[[], None] | None = None
 
 
 def queue_lead_text(item: InFlightItem) -> str:
@@ -210,9 +213,13 @@ class RunReading:
 
 
 def first_movable(items) -> int:
-    """Where in a line of runs a move may begin or end: past every run ComfyUI
-    already holds, which nothing can be put in front of."""
-    return next((index for index, item in enumerate(items) if not item.sent), len(items))
+    """Where in a line of runs a move may begin or end: past every run that
+    holds its place at the front, which nothing can be put in front of."""
+    return next((index for index, item in enumerate(items) if movable(item)), len(items))
+
+
+def movable(item) -> bool:
+    return item.move_up is not None or item.move_down is not None
 
 
 ALREADY_MAKING_ONE_TIP = "This folder is already making one"

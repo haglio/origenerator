@@ -23,8 +23,9 @@ from funestra.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.modes import Osr2State
 from funestra.robot_hand import POSITION_MAX
-from PyQt6.QtCore import QEvent, QObject, QPointF, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, pyqtSignal
 from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
 from origenerator import motion_engine
@@ -41,23 +42,15 @@ def _panel(qtbot, motion=None, control=None):
 
 
 def _press(panel, action):
-    """Press whatever button posts *action*, at its own middle.
-
-    The painter takes window coordinates and its rects are panel ones, so the
-    margin goes back on — the same conversion the widget does with the pointer.
-    """
-    rect = next(r for r, b in panel._painter.buttons if b.command == action)
-    x, y, w, h = rect
-    margin = MotionPanel.MARGIN
-    panel._post(panel._painter.press_at(x + w // 2 + margin, y + h // 2 + margin))
+    """Press whatever button posts *action*, at its own middle."""
+    x, y, w, h = next(r for r, b in panel._painter.buttons if b.command == action)
+    QTest.mousePress(panel, Qt.MouseButton.LeftButton, pos=QPoint(x + w // 2, y + h // 2))
 
 
 def _slide(panel, along: float) -> None:
     max_intensity = next(t for t in panel._painter.tracks if t.axis == drive_layout.MAX_INTENSITY)
     x, y, w, h = max_intensity.rect
-    margin = MotionPanel.MARGIN
-    panel._post(panel._painter.press_at(x + round(along * (w - 1)) + margin,
-                                        y + h // 2 + margin))
+    QTest.mousePress(panel, Qt.MouseButton.LeftButton, pos=QPoint(x + round(along * (w - 1)), y + h // 2))
 
 
 def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
@@ -65,7 +58,7 @@ def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
     # HUD this panel sits under, and a second pair here would be two switches
     # for one thing — so the console offers neither, the way Genau's own does.
     panel, _motion = _panel(qtbot)
-    panel.render_console()
+    panel.picture()
     for action in ("main_fmode", "genau_filter_enhanced"):
         assert action not in [b.command for _r, b in panel._painter.buttons]
 
@@ -89,14 +82,14 @@ def test_the_picture_is_the_console_funestra_paints(qtbot):
     # Not a repaint of the design, and not a third of it: the same painter, the
     # same rows, the same bitmap.
     panel, motion = _panel(qtbot)
-    raw, size = panel.render_console()
+    raw, size = panel.picture()
     expected, expected_size = ConsolePainter(device_only=True).rgba(console_hud(motion))
     assert (raw, size) == (expected, expected_size)
 
 
 def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
     panel, _motion = _panel(qtbot)
-    panel.render_console()
+    panel.picture()
     actions = [b.command for _rect, b in panel._painter.buttons]
 
     assert not any(a.endswith("_minimize") for a in actions)
@@ -150,7 +143,7 @@ def test_every_button_the_console_declares_does_something_here(qtbot):
     control = FakeControl()
     panel, motion = _panel(qtbot, control=control)
     motion.active = True
-    panel.render_console()
+    panel.picture()
     console = console_hud(motion, control=control.state()).console
     declared = [b.command for row in (*console.rows, *console.osr2_rows) for b in row if b.command]
 
@@ -165,7 +158,7 @@ def test_the_motion_buttons_reach_the_driver(qtbot):
     motion.active = True  # a parked device's marks are dimmed, and dim is unpressable
     # A full-travel motion has its center pinned, and a pinned mark is dim too.
     motion.state.state.amplitude = 40
-    panel.render_console()
+    panel.picture()
     for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
                    "robot_hand_toggle_learned", "robot_hand_cycle_shape"):
         _press(panel, action)
@@ -177,7 +170,7 @@ def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):
     panel, _motion = _panel(qtbot)
     faces = []
     for _waveform in motion_engine.WaveformShape:
-        panel.render_console()
+        panel.picture()
         faces.append(next(b.glyph for _r, b in panel._painter.buttons
                           if b.command == "robot_hand_cycle_shape"))
         _press(panel, "robot_hand_cycle_shape")
@@ -244,7 +237,7 @@ def test_the_speed_plus_dims_where_the_max_intensity_stops_the_speed(qtbot):
     motion.active = True
     motion.set_max_intensity(40)
     motion_engine.set_speed(motion.state.state, motion_engine.MAX_SPEED)
-    panel.render_console()
+    panel.picture()
 
     plus, minus = (next(b for _r, b in panel._painter.buttons if b.command == command)
                    for command in ("robot_hand_speed_up", "robot_hand_speed_down"))
@@ -254,7 +247,7 @@ def test_the_speed_plus_dims_where_the_max_intensity_stops_the_speed(qtbot):
 def test_the_max_intensity_slider_asks_the_apps_one_switch_for_the_level(qtbot):
     control = FakeControl()
     panel, motion = _panel(qtbot, control=control)
-    panel.render_console()
+    panel.picture()
 
     _slide(panel, 1.0)
 
@@ -263,7 +256,7 @@ def test_the_max_intensity_slider_asks_the_apps_one_switch_for_the_level(qtbot):
 
 def test_a_panel_with_no_switch_hands_the_max_intensity_to_the_motion(qtbot):
     panel, motion = _panel(qtbot)
-    panel.render_console()
+    panel.picture()
 
     _slide(panel, 0.0)
 
@@ -276,9 +269,9 @@ def test_the_console_switch_is_the_apps_one_switch(qtbot):
     control = FakeControl()
     panel, _motion = _panel(qtbot, control=control)
 
-    panel.render_console()
+    panel.picture()
     _press(panel, OSR2_CONTROL_BUTTONS[OSR2_PARKED])
-    panel.render_console()
+    panel.picture()
     _press(panel, OSR2_CONTROL_BUTTONS[OSR2_DRIVING])
 
     assert control.asked == [OSR2_PARKED, OSR2_DRIVING]
@@ -293,14 +286,14 @@ def test_the_group_lights_the_state_the_switch_is_in(qtbot):
     hud = console_hud(motion, control=control.state())
 
     assert hud.console.osr2_control == OSR2_PARKED
-    assert panel.render_console()[0]  # and it paints in that state
+    assert panel.picture()[0]  # and it paints in that state
 
 
 def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
     """A console outside a gallery -- a test's, and any future host that hands
     over no switch -- can still release what it does have."""
     panel, motion = _panel(qtbot)
-    panel.render_console()
+    panel.picture()
 
     _press(panel, OSR2_CONTROL_BUTTONS[OSR2_DRIVING])
 
@@ -384,7 +377,7 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
     # while nothing is reaching the device, exactly as it is in Fun Time while a
     # funscript has it.
     panel, _motion = _panel(qtbot, control=FakeControl(state=OSR2_PARKED))
-    panel.render_console()
+    panel.picture()
     marks = [b for _r, b in panel._painter.buttons
              if b.command.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
     assert marks and all(b.dim for b in marks)
@@ -393,11 +386,10 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
 def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
     panel, motion = _panel(qtbot)
     motion.active = True
-    panel.render_console()
+    panel.picture()
     speed = next(t for t in panel._painter.tracks if t.axis == "speed")
     x, y, w, _h = speed.rect
-    margin = MotionPanel.MARGIN
-    panel._post(panel._painter.press_at(x + w - 1 + margin, y + margin))
+    QTest.mousePress(panel, Qt.MouseButton.LeftButton, pos=QPoint(x + w - 1, y))
     assert motion.calls == [("set_speed", 100)]
 
 
@@ -447,7 +439,7 @@ def test_the_panel_redraws_once_the_device_switches_under_what_it_drew(qtbot):
                         device=lambda: Osr2Mode.CONTROLLED if device["on"] else Osr2Mode.OFF,
                         control=FakeControl(state=OSR2_PARKED))
     qtbot.addWidget(panel)
-    panel.render_console()
+    panel.picture()
 
     assert panel._redraw_if_the_device_switched() is False
     device["on"] = True
@@ -459,7 +451,7 @@ def test_the_panel_redraws_once_the_broker_says_why_it_cannot_hear_the_osr2(qtbo
     panel = MotionPanel(FakeMotion(), device=lambda: Osr2Mode.OFF,
                         trouble=lambda: trouble["now"], control=FakeControl(state=OSR2_PARKED))
     qtbot.addWidget(panel)
-    panel.render_console()
+    panel.picture()
 
     assert panel._redraw_if_the_device_switched() is False
     trouble["now"] = Osr2Trouble.NOT_FOUND
@@ -485,9 +477,9 @@ def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
     panel = MotionPanel(motion, device=lambda: answers.pop(0))
     qtbot.addWidget(panel)
 
-    panel.render_console()
+    panel.picture()
     assert answers == [Osr2Mode.CONTROLLED]  # it asked
-    panel.render_console()
+    panel.picture()
     assert answers == []      # and asked again rather than reusing the answer
 
 
@@ -632,7 +624,7 @@ def test_the_panel_redraws_once_the_osr2_goes_into_its_own_auto_mode(qtbot):
     panel = MotionPanel(FakeMotion(), device=lambda: device["mode"],
                         control=FakeControl(state=OSR2_DRIVING))
     qtbot.addWidget(panel)
-    panel.render_console()
+    panel.picture()
 
     device["mode"] = Osr2Mode.AUTO
 

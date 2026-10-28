@@ -43,6 +43,9 @@ from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
 from origenerator.fun_time_mode import majority_shape, region_for_items
 from origenerator.gallery.collection import (
+    ENHANCED_KEY as _ENHANCED_KEY,
+)
+from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import (
@@ -92,6 +95,7 @@ from origenerator.workflows.detail_parts import parts_framed_together
 logger = logging.getLogger(__name__)
 
 _REGION_CAPTIONS = {"portrait": "Origenerator Portrait", "landscape": "Origenerator Landscape"}
+_SWITCH_HELD_BY = {_FAVORITES_KEY: "favorites", _ENHANCED_KEY: "enhanced"}
 
 
 class SlideshowHost(Protocol):
@@ -367,11 +371,11 @@ class SlideshowDirector:
         base, located_on = _split_collection_key(location)
         collection = folder_collection(base)
         side = side or located_on
-        # Favorites is not a set of its own: it is its folder with the
-        # favorites switch held down, so the switch can be let go to widen and
-        # the order pair means the folder rather than the bookmarks.
-        favorites = collection is not None and collection.which == _FAVORITES_KEY
-        if favorites:
+        # Favorites and Enhanced are not sets of their own: each is its folder
+        # with its switch held down, so the switch can be let go to widen and
+        # the order pair means the folder rather than what the collection lists.
+        switch = _SWITCH_HELD_BY.get(collection.which) if collection is not None else None
+        if switch is not None:
             side = side or self._host.side_in_view()
             location = oriented_key(collection.folder, side)
             rows = self.rows_at(location)
@@ -395,7 +399,7 @@ class SlideshowDirector:
                             and resume.current != one_picked)
         self.open(items, rows=rows, location=location, side=side, start=start,
                   resume=None if picked_elsewhere else resume,
-                  filters=replace(self._filters, favorites=True) if favorites else None,
+                  filters=replace(self._filters, **{switch: True}) if switch else None,
                   **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),

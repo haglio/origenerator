@@ -123,8 +123,8 @@ def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(q
 
 
 def test_a_collection_mark_is_drawn_once():
-    """One redraw of the folder list asked for these 1,280 times -- five collections
-    for every folder of folders, on every side -- and drew each one afresh."""
+    """One redraw of the folder list asked for these 1,280 times -- every collection
+    of every folder of folders, on every side -- and drew each one afresh."""
     assert icons.collection_icon(RECENTS_KEY) is icons.collection_icon(RECENTS_KEY)
 
 

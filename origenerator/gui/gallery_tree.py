@@ -31,6 +31,7 @@ from origenerator import gallery
 from origenerator.gallery.collection import (
     COLLECTION_LABELS,
     COLLECTIONS,
+    ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
@@ -42,7 +43,8 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
-from origenerator.orientation import oriented_key, side_of, split_key
+from origenerator.media import MediaType
+from origenerator.orientation import key_holds, oriented_key, side_of, split_key
 
 # A search does not narrow this tree: a narrowed list of folder names is a poor
 # answer to "where is the one with the two of them on the couch", because a
@@ -56,6 +58,7 @@ GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represent
 _COLLECTION_TIPS = {
     RECENTS_KEY: "Recently generated",
     FAVORITES_KEY: "Your favorite folders and items — drop a folder here to add it",
+    ENHANCED_KEY: "Your enhanced images",
     EXPERIMENTS_KEY: "Background experiments awaiting your review",
     REQUESTS_KEY: "What you asked for out loud — “Request … over”",
     TRASH_KEY: "Deleted items — restorable here until you delete them for good",
@@ -93,10 +96,15 @@ def _inside(group, inside: tuple) -> tuple:
     return (*inside, group.key) if inside else ()
 
 
-def _shown_collections(side) -> list[str]:
-    return [collection for collection in COLLECTIONS
-            if (collection != RECENTS_KEY or side.show_recents)
-            and (collection != FAVORITES_KEY or side.tree_model)]
+def _shown_collections(side, folder_key: str) -> list[str]:
+    left_off = set()
+    if not side.show_recents:
+        left_off.add(RECENTS_KEY)
+    if not side.tree_model:
+        left_off |= {FAVORITES_KEY, ENHANCED_KEY}
+    if key_holds(MediaType.VIDEO, folder_key):
+        left_off.add(ENHANCED_KEY)
+    return [collection for collection in COLLECTIONS if collection not in left_off]
 
 
 @dataclass
@@ -176,7 +184,7 @@ class GalleryTree:
             self._add_children(custom, row, side, (custom.key,))
 
     def _add_collections(self, folder_item, side, folder_key: str, inside=()) -> None:
-        for collection in _shown_collections(side):
+        for collection in _shown_collections(side, folder_key):
             key = FolderCollection(collection, folder_key).key
             item = QTreeWidgetItem([COLLECTION_LABELS[collection]])
             item.setData(0, COUNT_ROLE, side.collection_counts.get(key, 0))

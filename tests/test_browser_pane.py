@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery
 from origenerator.gallery.collection import (
+    ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
@@ -580,6 +581,28 @@ def test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_b
     assert pane._visible_keys == [scene_two.key]
     assert sorted(row["prompt_id"] for row in
                   pane.rows_for_collection(oriented_key(favorites, LANDSCAPE))) == ["a1", "a2"]
+
+
+def _enhanced_made_with(prompt_id, checkpoint):
+    row = _made_with(prompt_id, checkpoint)
+    row["original_files"] = json.dumps([{"filename": f"sdxl_t2i_{prompt_id}_base.png"}])
+    return row
+
+
+def test_a_folders_enhanced_lists_the_enhanced_images_under_it(qtbot):
+    rows = [_enhanced_made_with("a1", "alpha.safetensors"),
+            _made_with("a2", "alpha.safetensors", prompt="scene two"),
+            _enhanced_made_with("b1", "beta.safetensors")]
+    tree = gallery.build_gallery_tree(rows)
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    enhanced = FolderCollection(ENHANCED_KEY, _models(tree)["alpha"].key).key
+
+    pane.show_collection(enhanced, LANDSCAPE)
+
+    assert pane.visible_prompt_ids() == ["a1"]
+    assert [row["prompt_id"] for row in
+            pane.rows_for_collection(oriented_key(enhanced, LANDSCAPE))] == ["a1"]
 
 
 def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):

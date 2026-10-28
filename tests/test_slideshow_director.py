@@ -23,7 +23,12 @@ from PIL import Image
 from PyQt6.QtCore import QRect, Qt
 
 from origenerator import gallery
-from origenerator.gallery.collection import FAVORITES_KEY, RECENTS_KEY, FolderCollection
+from origenerator.gallery.collection import (
+    ENHANCED_KEY,
+    FAVORITES_KEY,
+    RECENTS_KEY,
+    FolderCollection,
+)
 from origenerator.gallery.sides import BOTH
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
@@ -2141,6 +2146,20 @@ def test_a_slideshow_of_a_folders_favorites_plays_that_folder_with_the_filter_on
 
     assert _played(made[0]) == ["g1", "g2"]
     assert made[0].hud_favorites_filter is True
+    assert director._live_slideshows == [(made[0], folder)]
+
+
+def test_a_slideshow_of_a_folders_enhanced_plays_that_folder_with_enhanced_only_on(slideshows):
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
+    folder = oriented_key("workflow/a", PORTRAIT)
+    enhanced = oriented_key(FolderCollection(ENHANCED_KEY, "workflow/a").key, PORTRAIT)
+    director, _host, made = slideshows(FakeHost(location=enhanced, rows=[rows[0]],
+                                                groups={folder: _folder_of(rows)}))
+
+    director.start()
+
+    assert _played(made[0]) == ["g1", "g2"]
+    assert made[0].taken_up == (SlideshowFilters(enhanced=True), False)
     assert director._live_slideshows == [(made[0], folder)]
 
 

@@ -10,6 +10,7 @@ from shared_ui.icons import glyph_pixmap
 
 from origenerator import gallery
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, SIDE_LABELS
+from origenerator.gui import icons
 from origenerator.gui.folder_tree import DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.gui.gallery_tree import (
     GROUP_ROLE,
@@ -146,31 +147,59 @@ def _children(item):
     return [item.child(i) for i in range(item.childCount())]
 
 
-_COLLECTIONS = ["Latest", "Favorites", "Experiments", "Requests", "Trash"]
+_COLLECTIONS = ["Latest", "Favorites", "Enhanced", "Experiments", "Requests", "Trash"]
+_COLLECTIONS_OF_VIDEOS = [name for name in _COLLECTIONS if name != "Enhanced"]
 
 
-def _leads_with_the_collections(folder) -> bool:
-    *collections, _first_folder = _children(folder)[:6]
-    return ([row.text(0) for row in collections] == _COLLECTIONS
-            and all(row.data(0, GROUP_ROLE) is None for row in collections))
+def _leads_with(folder, collections) -> bool:
+    *rows, _first_folder = _children(folder)[:len(collections) + 1]
+    return ([row.text(0) for row in rows] == collections
+            and all(row.data(0, GROUP_ROLE) is None for row in rows))
 
 
-def test_all_leads_with_its_five_collections_then_images_then_videos(qtbot):
+def test_all_leads_with_its_six_collections_then_images_then_videos(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
 
     assert [row.text(0) for row in _children(all_row)] == [*_COLLECTIONS, "Images", "Videos"]
-    assert _leads_with_the_collections(all_row)
+    assert _leads_with(all_row, _COLLECTIONS)
 
 
-def test_images_and_videos_each_lead_with_five_collections_then_their_workflows(qtbot):
+def test_images_lead_with_the_six_and_videos_with_all_but_enhanced_then_their_workflows(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
+    images, videos = _children(all_row)[len(_COLLECTIONS):]
 
-    for kind in _children(all_row)[5:]:
-        assert _leads_with_the_collections(kind)
+    for kind, collections in ((images, _COLLECTIONS), (videos, _COLLECTIONS_OF_VIDEOS)):
+        assert _leads_with(kind, collections)
         assert [isinstance(row.data(0, GROUP_ROLE), gallery.WorkflowGroup)
-                for row in _children(kind)[5:]] == [True]
+                for row in _children(kind)[len(collections):]] == [True]
+
+
+def test_enhanced_wears_the_plus_an_enhanced_image_wears_and_says_what_it_holds(qtbot):
+    half = _table_of_contents(qtbot, [_image("i1", "a cat")])
+    (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
+    (enhanced,) = [row for row in _children(all_row) if row.text(0) == "Enhanced"]
+    size = QSize(48, 48)
+
+    assert enhanced.icon(0).pixmap(size).toImage() == icons.enhance_icon().pixmap(size).toImage()
+    assert enhanced.toolTip(0) == "Your enhanced images"
+
+
+def test_every_folder_of_images_leads_with_an_enhanced_and_no_folder_of_videos_does(qtbot):
+    half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
+    folders = [item for _depth, item in _rows_by_depth(half)
+               if item.data(0, GROUP_ROLE) is not None
+               and not isinstance(item.data(0, GROUP_ROLE), gallery.SettingsGroup)]
+    kinds_seen = set()
+
+    for folder in folders:
+        collections = [row.text(0) for row in _children(folder)
+                       if row.data(0, GROUP_ROLE) is None]
+        inside_videos = base_of(folder.data(0, TREE_KEY_ROLE)).startswith("video")
+        assert ("Enhanced" in collections) is not inside_videos, folder.text(0)
+        kinds_seen.add(inside_videos)
+    assert kinds_seen == {True, False}
 
 
 def test_images_wear_the_photo_and_videos_the_play_mark_and_say_which_they_are(qtbot):

@@ -41,6 +41,9 @@ from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
 from origenerator.gallery.collection import (
+    ENHANCED_KEY as _ENHANCED_KEY,
+)
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
 from origenerator.gallery.collection import (
@@ -175,6 +178,7 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 1500
 _TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
+_PATH_MARK_OF = {_FAVORITES_KEY: "star", _ENHANCED_KEY: "plus"}
 # How long the search waits after the last keystroke before asking the local LLM
 # to widen the query. Long enough to be a real pause rather than a gap between
 # two characters — the table-widened results are already on screen throughout, so
@@ -1985,7 +1989,7 @@ class GalleryView(QWidget):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
         self._folder_path.show_folder(self._tree_view.path_steps(item),
-                                      mark="star" if collection.which == _FAVORITES_KEY else "")
+                                      mark=_PATH_MARK_OF.get(collection.which, ""))
         self._avg_label.setText("")
         self._clear_metadata()
         self._browser.show_collection(collection.key, side)

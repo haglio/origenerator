@@ -203,6 +203,8 @@ def is_enhanced_row(row: dict) -> bool:
     row whose original has since been deleted; an explicit ``enhance`` param is
     authoritative for the rest of the inline runs; an SDXL row from the era the
     tail ran unconditionally (tail params stored, no flag yet) counts too."""
+    if media_type_of_row(row) != MediaType.IMAGE:
+        return False
     if original_files_of(row):
         return True
     if parse_file_list(row.get("enhance_history")):

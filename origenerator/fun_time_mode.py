@@ -222,7 +222,6 @@ def declaration() -> dict:
         "command_patterns": list(command_patterns()),
         "request_lines": [spelled_for(side, line) for side in SIDES
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
-        "handoff": _the_handoff(),
         "fix_phrases": list(published_fix_phrases()),
     }
 
@@ -488,22 +487,6 @@ def parse_app_args(argv: list[str]) -> AppArgs:
         parser.error(f"{MODE_FLAG} without {', '.join(missing)}; the launch "
                      f"contract is {CONTRACT_FILE}")
     return AppArgs(fun_time=_session_of(args), check_launch=args.check_launch)
-
-
-_A_WINDOW = handoff.Process(4242, 4343)
-
-
-def _the_handoff() -> dict:
-    # Fun Time's main holds this app to it until it reads these files through
-    # app_support.origenerator_handoff as this app does.
-    return {
-        "offer": {"file": handoff.OFFER,
-                  "writes": [handoff.offer_of(_A_WINDOW), handoff.offer_of(_A_WINDOW, starting=True)]},
-        "showing": {"file": handoff.SHOWING,
-                    "writes": [handoff.slideshow_mark_of(_A_WINDOW, shape) for shape in handoff.SHAPES]},
-        "session": {"file": handoff.SESSION, "reads": {"pattern": r"(\d+) (\d+)"}},
-        "takeover": {"file": handoff.TAKEOVER, "reads": {"keys": ["args", "pid"]}},
-    }
 
 
 def _stayed_standalone(why: str) -> None:

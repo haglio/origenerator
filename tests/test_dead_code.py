@@ -407,7 +407,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # tests that state it.
 # 16379 when the files a standalone copy and a Fun Time session hand each other
 # came to be written and read in app_support, and the notes on them went there.
-MAX_PROSE_LINES = 16379
+# 16377 when Fun Time stopped reading this app's account of those files, and the
+# note keeping it published for Fun Time went with it.
+MAX_PROSE_LINES = 16377
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -222,38 +222,6 @@
     "landscape_request_open",
     "landscape_request_closed"
   ],
-  "handoff": {
-    "offer": {
-      "file": "fun_time_offer.txt",
-      "writes": [
-        "4242 4343",
-        "4242 4343 starting"
-      ]
-    },
-    "showing": {
-      "file": "fun_time_showing.txt",
-      "writes": [
-        "4242 4343 portrait",
-        "4242 4343 landscape",
-        "4242 4343 both"
-      ]
-    },
-    "session": {
-      "file": "fun_time_session.txt",
-      "reads": {
-        "pattern": "(\\d+) (\\d+)"
-      }
-    },
-    "takeover": {
-      "file": "fun_time_takeover.json",
-      "reads": {
-        "keys": [
-          "args",
-          "pid"
-        ]
-      }
-    }
-  },
   "fix_phrases": [
     "fix face",
     "fix faces",

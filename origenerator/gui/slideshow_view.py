@@ -300,14 +300,9 @@ class SlideshowView(QWidget):
                              drop_at=self._queue_pointer.drop,
                              pointer=self._queue_pointer)
 
-    def requeue(self, keys) -> None:
-        """Re-line the queue in this order — a row dragged somewhere else on the
-        panel, re-listed at once rather than a poll later, since a row that
-        springs back to where it was reads as a failure."""
-        by_key = {item.key: item for item in self._queue_items}
-        self._queue_items = [by_key[key] for key in keys if key in by_key]
-        if self._actions.requeue is not None:
-            self._actions.requeue(list(keys))
+    def move(self, key: str, before: str | None) -> None:
+        if self._actions.move is not None:
+            self._actions.move(key, before)
 
     def clear_foreign_queue(self) -> None:
         if self._actions.clear_queue is not None:

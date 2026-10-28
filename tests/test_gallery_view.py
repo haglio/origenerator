@@ -8,7 +8,7 @@ from functools import partial
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from funestra.console import (
@@ -129,7 +129,6 @@ from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight_card import InFlightCard
-from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import NOTICE, WARNING
@@ -10459,7 +10458,7 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
 def _queued_job(prompt_id, state="idle"):
     """A stand-in for a job in the queue's line, as the display reads it."""
     return SimpleNamespace(prompt_id=prompt_id, media_type="image", source="generated",
-                           state=state)
+                           state=state, shielded=False)
 
 
 def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
@@ -10545,9 +10544,11 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
     slideshow.close()
 
 
-def test_a_row_dragged_in_the_slideshows_queue_re_lines_the_real_queue(qtbot, monkeypatch):
+def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at_once(
+        qtbot, monkeypatch):
     # The block on the slideshow's panel lists the same line as the lower strip and
-    # asks for the same things, so it reaches the same handler.
+    # asks for the same things, so it reaches the same queue, and both are drawn
+    # again from its line the moment it moves.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("gen1", prompt="a dog"))
@@ -10555,19 +10556,20 @@ def test_a_row_dragged_in_the_slideshows_queue_re_lines_the_real_queue(qtbot, mo
                 status="pending", output_files="[]"))
     db.add(_row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
                 status="pending", output_files="[]"))
-    with patch.object(JobQueue, "reorder") as reorder:
-        view = GalleryView(db)
-        qtbot.addWidget(view)
-        view.refresh()
-        _select_first_leaf(view)
-        view._slideshows.start()
-        qtbot.addWidget(view._slideshows.showing.shown)
-        slideshow = view._slideshows.showing
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._jobs._on_server = [_queued_job("gen1", state="running")]
+    view._jobs._waiting = [_queued_job("w1"), _queued_job("w2")]
+    view.refresh()
+    _select_first_leaf(view)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing.shown)
+    slideshow = view._slideshows.showing
 
-        before = [item.key for item in slideshow.shown.hud_queue[0]]
-        slideshow.shown.requeue([before[0], before[2], before[1]])  # the last waiting job, up one
+    slideshow.shown.move("w2", "w1")  # the last waiting job, up one
 
-        reorder.assert_called_once_with([before[0], before[2], before[1]])
+    assert [item.key for item in slideshow.shown.hud_queue[0]] == ["gen1", "w2", "w1"]
+    assert view._queue.keys() == ["gen1", "w2", "w1"]
     view._slideshows.showing.close()
 
 
@@ -10584,7 +10586,8 @@ def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
     assert view._queue.keys() == ["running-one", "waiting-one"]
 
 
-def test_dragging_a_queue_row_asks_the_queue_for_that_order(qtbot):
+def test_a_queue_row_let_go_elsewhere_is_moved_there_and_redrawn_at_once(qtbot):
+    # Not a poll later: a row that sits still after the drop reads as one missed.
     db = FakeDB([
         _running_row("running-one", prompt="a dog"),
         _row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
@@ -10592,16 +10595,16 @@ def test_dragging_a_queue_row_asks_the_queue_for_that_order(qtbot):
         _row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
              status="pending", output_files="[]"),
     ])
-    with patch.object(JobQueue, "reorder") as reorder:
-        view = GalleryView(db)
-        qtbot.addWidget(view)
-        view._jobs._on_server = [_queued_job("running-one", state="running")]
-        view._jobs._waiting = [_queued_job("w1"), _queued_job("w2")]
-        view.refresh()
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._jobs._on_server = [_queued_job("running-one", state="running")]
+    view._jobs._waiting = [_queued_job("w1"), _queued_job("w2")]
+    view.refresh()
 
-        view._queue.move_row(2, 1)
+    view._queue.move_requested.emit("w2", "w1")
 
-    reorder.assert_called_once_with(["running-one", "w2", "w1"])
+    assert view._jobs.queue_order == ["running-one", "w2", "w1"]
+    assert view._queue.keys() == ["running-one", "w2", "w1"]
 
 
 def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):

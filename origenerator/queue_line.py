@@ -105,13 +105,15 @@ def waits_for_any(video, jobs) -> bool:
     return any(waits_for(video, job) for job in jobs)
 
 
-def behind_the_enhancements_they_wait_for(line: list) -> None:
-    for video in reversed([job for job in line if is_video(job)]):
-        last = max((index for index, job in enumerate(line) if waits_for(video, job)),
-                   default=-1)
-        if last > line.index(video):
-            line.remove(video)
-            line.insert(last, video)
+def moved(line: list, job, before) -> list:
+    order = [other for other in line if other is not job]
+    order.insert(order.index(before) if before in order else len(order), job)
+    at = order.index(job)
+    ahead = [other for other in order[at + 1:] if waits_for(job, other)]
+    behind = [other for other in order[:at] if waits_for(other, job)]
+    rest = [other for other in order if other not in ahead and other not in behind]
+    at = rest.index(job)
+    return rest[:at] + ahead + [job] + behind + rest[at + 1:]
 
 
 def rejoin_index(line: list, job, newcomer) -> int:

@@ -136,6 +136,10 @@ def _the_users_own(source: str) -> bool:
     return source == GenerationSource.GENERATED
 
 
+def _named(line: list, prompt_id: str | None):
+    return next((job for job in line if job.prompt_id == prompt_id), None)
+
+
 def _parse_progress_state(raw):
     """The persisted progress snapshot for a row, or ``None`` when absent/corrupt."""
     if not raw:
@@ -160,7 +164,8 @@ class JobQueue(QObject):
     user's image work owns it outright: whatever is being rendered when an image is
     asked for is set aside -- stopped, and put back in the line to start over once
     the images are done (:meth:`_set_aside_for`) -- unless a slideshow is locked
-    on it (:meth:`put_first`) or it is shielded (:meth:`shield`)."""
+    on it (:meth:`put_first`) or it is shielded (:meth:`shield`). A job the user
+    moves ahead of it by hand takes the machine the same way (:meth:`move`)."""
 
     changed = pyqtSignal()            # the set of live jobs changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
@@ -180,6 +185,7 @@ class JobQueue(QObject):
     # which is all anyone reporting it outside the window has to go on — by then
     # there is no tile left to write the news on.
     run_ended = pyqtSignal(object)
+    reordered = pyqtSignal()  # a job was moved by hand, and the line is in its new order
 
     def __init__(self, db, client, parent=None, *, clock=time.monotonic, bring_up_comfyui=None):
         super().__init__(parent)
@@ -858,8 +864,76 @@ class JobQueue(QObject):
         rows were made — the rules that put an image in front of a video leave no
         mark on anything the database records.
         """
+        return [job.prompt_id for job in self._line()]
+
+    def _line(self) -> list[GenerationJob]:
         making_first = sorted(self._on_server, key=lambda job: job.state != JobState.RUNNING)
-        return [job.prompt_id for job in making_first + self._waiting]
+        return making_first + self._waiting
+
+    def move(self, prompt_id: str, before: str | None) -> None:
+        line = self._line()
+        job = _named(line, prompt_id)
+        if job is not None:
+            self._take_up(self._moved(line, job, _named(line, before)))
+
+    def move_up(self, prompt_id: str) -> None:
+        self._take_up(self._one_step(prompt_id, up=True))
+
+    def move_down(self, prompt_id: str) -> None:
+        self._take_up(self._one_step(prompt_id, up=False))
+
+    def can_move_up(self, prompt_id: str) -> bool:
+        return self._one_step(prompt_id, up=True) is not None
+
+    def can_move_down(self, prompt_id: str) -> bool:
+        return self._one_step(prompt_id, up=False) is not None
+
+    def _one_step(self, prompt_id: str, *, up: bool) -> list[GenerationJob] | None:
+        line = self._line()
+        job = _named(line, prompt_id)
+        if job is None:
+            return None
+        at = line.index(job)
+        if up:
+            ahead = [other for other in reversed(line[:at])
+                     if not queue_line.waits_for(job, other)]
+            return self._moved(line, job, ahead[0]) if ahead else None
+        behind = [other for other in line[at + 1:] if not queue_line.waits_for(other, job)]
+        if not behind:
+            return None
+        after = line.index(behind[0]) + 1
+        return self._moved(line, job, line[after] if after < len(line) else None)
+
+    def _moved(self, line: list[GenerationJob], job: GenerationJob,
+               before: GenerationJob | None) -> list[GenerationJob] | None:
+        if self._holds_its_place(job):
+            return None
+        order = sorted(queue_line.moved(line, job, before),
+                       key=lambda other: not self._holds_its_place(other))
+        return None if order == line else order
+
+    def _holds_its_place(self, job: GenerationJob) -> bool:
+        return job.prompt_id in self._first or (job in self._on_server and job.shielded)
+
+    def _take_up(self, order: list[GenerationJob] | None) -> None:
+        if order is None:
+            return
+        first_waiting = next((at for at, job in enumerate(order) if job not in self._on_server),
+                             len(order))
+        set_aside = False
+        for job in order[first_waiting:]:
+            if job in self._on_server and job.defer():
+                self._back_in_the_line(job, 0)
+                set_aside = True
+                logger.info("Set aside %s for a job moved ahead of it; it starts over after",
+                            job.prompt_id)
+        place = {job.prompt_id: at for at, job in enumerate(order)}
+        self._waiting.sort(key=lambda job: place[job.prompt_id])
+        if set_aside:
+            self.start_now()
+        else:
+            self._pump()
+        self.reordered.emit()
 
     def shield(self, prompt_id: str, shielded: bool) -> None:
         job = self.job_for_prompt(prompt_id)
@@ -879,21 +953,6 @@ class JobQueue(QObject):
         if self._waiting and self._waiting[0].prompt_id in self._first:
             self._set_aside_for(self._waiting[0])
         self._pump()
-
-    def reorder(self, prompt_ids: list[str]):
-        """Rearrange the waiting line into ``prompt_ids`` order, after what is
-        put first.
-
-        A drag in the queue strip, and it costs nothing: a waiting job has never
-        been sent, so its place is ours to change. Ids this app holds no waiting
-        job for are ignored — another app's prompts, a finished one, and the job
-        already on the server, which has no place in front of it to be moved to.
-        Any waiting job the list doesn't name keeps its place at the back.
-        """
-        place = {pid: index for index, pid in enumerate(prompt_ids)}
-        self._waiting.sort(key=lambda job: place.get(job.prompt_id, len(place)))
-        queue_line.put_first(self._waiting, self._first)
-        queue_line.behind_the_enhancements_they_wait_for(self._waiting)
 
     def cancel(self, key: str):
         """Stop and forget the job leading a folder's queue, dropping its row.

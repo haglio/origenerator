@@ -50,9 +50,10 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
           act="", source_video_thumbnail=None, prompt_edited=False,
-          starting=False, sent=None, shield=None, shielded=False):
-    return InFlightItem(key=key, caption=caption,
-                        sent=status == "running" if sent is None else sent,
+          starting=False, movable=None, shield=None, shielded=False):
+    # The job being made holds its place unless a test says it can be moved.
+    move = (lambda: None) if (status != "running" if movable is None else movable) else None
+    return InFlightItem(key=key, caption=caption, move_up=move, move_down=move,
                         reading=RunReading(status=status, frame=frame, progress=progress,
                                            started_at=started_at,
                                            typical_seconds=typical_seconds),
@@ -899,32 +900,30 @@ def test_a_row_the_line_redraws_away_mid_drag_lets_the_drag_finish(queue, monkey
     assert drag_alive == [True]
 
 
-def test_the_job_being_made_cannot_be_picked_up(queue, monkeypatch):
-    # Nothing goes in front of what ComfyUI is already rendering, so the head of
-    # the line does not move.
+def test_a_job_that_holds_its_place_cannot_be_picked_up(queue, monkeypatch):
+    # A shielded run being made, or one this window holds no job for: the
+    # queue gives its row no move, and the row then has nowhere to go.
     _four(queue)
     assert queue.rows()[0].movable is False
     assert _press_and_drag(queue.rows()[0], monkeypatch) == []
 
 
-def test_a_run_comfyui_holds_cannot_be_picked_up_though_it_has_not_started(queue, monkeypatch):
-    # The line can only move what it has not sent yet: ComfyUI has no way to
-    # change the order of what it holds.
-    queue.set_items([_item(key="a", status="queued", sent=True),
-                     _item(key="b", status="queued")])
-
-    assert queue.rows()[0].movable is False
-    assert _press_and_drag(queue.rows()[0], monkeypatch) == []
-
-
-def test_the_head_of_a_queue_with_nothing_running_can_be_moved(queue, monkeypatch):
-    # It is only what ComfyUI holds that is fixed. With nothing sent yet, the
-    # user may still put the line in the order they want it run in.
-    queue.set_items([_item(key="a", status="queued"),
-                     _item(key="b", status="queued")])
+def test_the_job_being_made_can_be_picked_up_where_it_can_move(queue, monkeypatch):
+    # Moving it down hands the machine to the job let go ahead of it.
+    queue.set_items([_item(key="a", movable=True), _item(key="b", status="queued")])
 
     assert queue.rows()[0].movable is True
     assert _press_and_drag(queue.rows()[0], monkeypatch) == ["a"]
+
+
+def test_a_row_takes_up_its_jobs_moves_as_they_change(queue, monkeypatch):
+    # A run can come to hold its place, a shield put on it say, without the line
+    # changing around it.
+    queue.set_items([_item(key="a", movable=True), _item(key="b", status="queued")])
+
+    queue.set_items([_item(key="a"), _item(key="b", status="queued")])
+
+    assert _press_and_drag(queue.rows()[0], monkeypatch) == []
 
 
 def test_a_press_that_stays_put_is_a_click_not_a_drag(queue, monkeypatch):
@@ -978,33 +977,61 @@ def _drop(queue, key, at_row, *, on_top_half=True):
     queue.dropEvent(_drag_event(queue, QDropEvent, key, at_row, on_top_half=on_top_half))
 
 
-def test_dropping_a_row_above_another_moves_it_there(queue):
+def _asked_to_move(queue) -> list:
     asked = []
-    queue.reorder_requested.connect(asked.append)
+    queue.move_requested.connect(lambda key, before: asked.append((key, before)))
+    return asked
+
+
+def test_dropping_a_row_above_another_asks_to_move_it_there(queue):
+    # The queue moves it and the strip is drawn again from the queue's line: a
+    # job that cannot go exactly there lands where the queue's rules put it.
+    asked = _asked_to_move(queue)
     _four(queue)
 
     _drop(queue, "d", at_row=1)  # let the last one go over the first waiting row
 
-    assert queue.keys() == ["a", "d", "b", "c"]
-    assert asked == [["a", "d", "b", "c"]]
+    assert asked == [("d", "b")]
 
 
 def test_dropping_a_row_onto_the_lower_half_puts_it_after(queue):
     # The half of a row a drop lands on is what says above-or-below, so the same
     # gesture a few pixels lower means something different.
+    asked = _asked_to_move(queue)
     _four(queue)
 
     _drop(queue, "b", at_row=2, on_top_half=False)
 
-    assert queue.keys() == ["a", "c", "b", "d"]
+    assert asked == [("b", "d")]
 
 
-def test_nothing_can_be_dropped_in_front_of_the_job_being_made(queue):
+def test_a_row_let_go_past_the_last_one_asks_for_the_end_of_the_line(queue):
+    asked = _asked_to_move(queue)
+    _four(queue)
+
+    _drop(queue, "b", at_row=3, on_top_half=False)
+
+    assert asked == [("b", None)]
+
+
+def test_a_row_let_go_above_the_job_being_made_asks_for_the_top(queue):
+    # The job being made is deposed for it, where the queue lets it be.
+    asked = _asked_to_move(queue)
+    queue.set_items([_item(key="a", movable=True), _item(key="b", status="queued"),
+                     _item(key="c", status="queued")])
+
+    _drop(queue, "c", at_row=0)
+
+    assert asked == [("c", "a")]
+
+
+def test_nothing_can_be_dropped_in_front_of_a_job_that_holds_its_place(queue):
+    asked = _asked_to_move(queue)
     _four(queue)
 
     _drop(queue, "d", at_row=0)  # aimed above the head of the line
 
-    assert queue.keys() == ["a", "d", "b", "c"]  # it lands just after it instead
+    assert asked == [("d", "b")]  # it lands just after it instead
 
 
 def test_a_drag_over_the_strip_marks_where_it_would_land(queue):
@@ -1051,12 +1078,12 @@ def test_the_mark_clears_when_the_drag_leaves(queue):
     assert queue._drop_at is None
 
 
-def test_a_move_that_changes_nothing_asks_for_nothing(queue):
-    asked = []
-    queue.reorder_requested.connect(asked.append)
+def test_a_row_let_go_where_it_already_was_asks_for_nothing(queue):
+    asked = _asked_to_move(queue)
     _four(queue)
 
-    queue.move_row(2, 2)
+    _drop(queue, "c", at_row=2)
+    _drop(queue, "c", at_row=3)
 
     assert asked == []
 
@@ -1065,8 +1092,7 @@ def test_a_drop_carrying_something_else_is_ignored(queue):
     # Gallery thumbnails are dragged around this app too; one let go over the
     # strip must not be read as a reorder.
 
-    asked = []
-    queue.reorder_requested.connect(asked.append)
+    asked = _asked_to_move(queue)
     _four(queue)
     mime = QMimeData()
     mime.setData("application/x-origenerator-generation", b"b")

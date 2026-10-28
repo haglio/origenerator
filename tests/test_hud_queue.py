@@ -24,7 +24,10 @@ def _item(key="j1", caption="Alpha Workflow › a paper kite", status="queued", 
     reading = {name: kw.pop(name) for name in list(kw)
                if name in ("frame", "progress", "pass_progress", "stage",
                            "started_at", "typical_seconds")}
-    kw.setdefault("sent", status == "running")
+    # The job being made holds its place unless a test says it can be moved.
+    move = (lambda: None) if kw.pop("movable", status != "running") else None
+    kw.setdefault("move_up", move)
+    kw.setdefault("move_down", move)
     return InFlightItem(key=key, caption=caption,
                         reading=RunReading(status=status, **reading),
                         reveal=kw.pop("reveal", lambda: None), **kw)
@@ -164,12 +167,12 @@ class _Host:
 
     def __init__(self, items, foreign=0):
         self.hud_queue = (items, foreign)
-        self.relined = []
+        self.moved = []
         self.cleared = 0
         self.started_now = 0
 
-    def requeue(self, keys):
-        self.relined.append(list(keys))
+    def move(self, key, before):
+        self.moved.append((key, before))
 
     def clear_foreign_queue(self):
         self.cleared += 1
@@ -268,8 +271,21 @@ class TestThePointerOnTheBlock:
         assert pointer.drop == 3
         pointer.release(*_lower_half_of(pointer, f"{OPEN}|j3"))
 
-        assert host.relined == [["j1", "j3", "j2"]]
+        assert host.moved == [("j2", None)]
         assert pointer.drop is None
+
+    def test_a_row_let_go_above_the_job_being_made_asks_for_the_top(self):
+        pointer, host = _pointer_over([_item("j1", status="running", movable=True,
+                                             typical_seconds=30),
+                                       _item("j2", typical_seconds=30),
+                                       _item("j3", typical_seconds=30)])
+
+        pointer.press(*_middle_of(pointer, f"{OPEN}|j3"))
+        x, y, _width, _height = pointer.where(f"{OPEN}|j1")
+        pointer.drag(x + 5, y + 2)
+        pointer.release(x + 5, y + 2)
+
+        assert host.moved == [("j3", "j1")]
 
     def test_a_row_that_was_dragged_does_not_also_open_its_folder(self):
         opened = []
@@ -284,9 +300,9 @@ class TestThePointerOnTheBlock:
 
         assert opened == []
 
-    def test_the_job_being_made_cannot_be_picked_up(self):
-        """Nothing can be moved in front of what ComfyUI is already rendering,
-        itself included."""
+    def test_a_job_that_holds_its_place_cannot_be_picked_up(self):
+        """A shielded run being made, or one this window holds no job for, has
+        no move, so its row has nowhere to go."""
         pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),
                                        _item("j2", typical_seconds=30)])
         x, y = _middle_of(pointer, f"{OPEN}|j1")
@@ -295,19 +311,19 @@ class TestThePointerOnTheBlock:
         pointer.drag(x, y + 40)
         pointer.release(x, y + 40)
 
-        assert host.relined == []
+        assert host.moved == []
 
-    def test_a_run_comfyui_holds_cannot_be_picked_up_though_it_has_not_started(self):
-        """The line can only move what it has not sent yet."""
-        pointer, host = _pointer_over([_item("j1", sent=True, typical_seconds=30),
-                                       _item("j2", typical_seconds=30)])
-        x, y = _middle_of(pointer, f"{OPEN}|j1")
+    def test_nothing_can_be_let_go_in_front_of_a_job_that_holds_its_place(self):
+        pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),
+                                       _item("j2", typical_seconds=30),
+                                       _item("j3", typical_seconds=30)])
 
-        pointer.press(x, y)
-        pointer.drag(x, y + 40)
-        pointer.release(x, y + 40)
+        pointer.press(*_middle_of(pointer, f"{OPEN}|j3"))
+        x, y, _width, _height = pointer.where(f"{OPEN}|j1")
+        pointer.drag(x + 5, y + 2)
+        pointer.release(x + 5, y + 2)
 
-        assert host.relined == []
+        assert host.moved == [("j3", "j2")]
 
     def test_the_wheel_scrolls_a_line_longer_than_the_rows_drawn(self):
         pointer, host = _pointer_over([_item(f"j{index}", typical_seconds=30)

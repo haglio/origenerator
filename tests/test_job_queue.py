@@ -1009,9 +1009,9 @@ def test_a_held_row_whose_workflow_is_gone_is_dropped(qtbot, tmp_path):
     assert queue.queue_order == []
 
 
-# --- reordering the line by hand ---------------------------------------------
+# --- moving a job by hand -----------------------------------------------------
 
-def test_reorder_rearranges_the_waiting_jobs(qtbot, tmp_path):
+def test_a_job_moved_in_the_waiting_line_costs_nothing(qtbot, tmp_path):
     # A waiting job has never been sent, so its place is ours to change: no
     # dequeue, no re-submit, nothing the server has to agree to.
     client = _client()
@@ -1021,40 +1021,229 @@ def test_reorder_rearranges_the_waiting_jobs(qtbot, tmp_path):
     third = _launch_video(queue, "k2", seed=2)
     client.submit_job.reset_mock()
 
-    queue.reorder([head.prompt_id, third.prompt_id, second.prompt_id])
+    queue.move(third.prompt_id, before=second.prompt_id)
 
     assert queue.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id]
     client.submit_job.assert_not_called()
     client.cancel_prompt.assert_not_called()
 
 
-def test_reorder_cannot_move_the_job_already_on_the_server(qtbot, tmp_path):
-    # There is no place in front of what is executing, and dropping it would throw
-    # the work away rather than reorder it.
-    queue = JobQueue(Database(tmp_path / "test.db"), _client())
-    head = _launch_video(queue, "k0", seed=0)
+def test_a_job_moved_to_the_top_takes_the_machine_from_the_one_being_made(qtbot, tmp_path):
+    # The user's own words for a move to the top: it deposes the job being
+    # rendered, which goes back in the line right behind it and starts over.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    rendering = _launch_video(queue, "k0", seed=0)
+    _rendering(client, rendering)
     waiting = _launch_video(queue, "k1", seed=1)
 
-    queue.reorder([waiting.prompt_id, head.prompt_id])
+    queue.move(waiting.prompt_id, before=rendering.prompt_id)
 
-    assert queue.queue_order == [head.prompt_id, waiting.prompt_id]
+    client.interrupt.assert_called_once_with(rendering.prompt_id)
+    assert client.submit_job.call_args_list[-1].args[1] == waiting.prompt_id
+    assert queue.queue_order == [waiting.prompt_id, rendering.prompt_id]
+    assert db.get_generation(rendering.prompt_id)["status"] == "pending"
 
 
-def test_reorder_ignores_ids_this_app_holds_no_waiting_job_for(qtbot, tmp_path):
-    # Another app's prompts share the server; nothing here can move them.
+def test_a_job_moved_to_the_top_waits_behind_a_shielded_one_being_made(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "k0", seed=0)
+    _rendering(client, rendering)
+    queue.shield(rendering.prompt_id, True)
+    second = _launch_video(queue, "k1", seed=1)
+    third = _launch_video(queue, "k2", seed=2)
+
+    queue.move(third.prompt_id, before=rendering.prompt_id)
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [rendering.prompt_id, third.prompt_id, second.prompt_id]
+
+
+def test_a_shielded_job_being_made_cannot_be_moved_down(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "k0", seed=0)
+    _rendering(client, rendering)
+    queue.shield(rendering.prompt_id, True)
+    waiting = _launch_video(queue, "k1", seed=1)
+
+    queue.move(rendering.prompt_id, before=None)
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id]
+
+
+def test_a_video_moved_to_the_top_starts_at_once_however_lately_an_image_was_asked_for(
+        qtbot, tmp_path):
+    # Its minute's wait is for a video nobody moved: one moved to the top took the
+    # machine to be made now, and waiting would leave the machine idle.
+    client = _client()
+    now = [1000.0]
+    queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
+    image = _launch_image(queue, "i", seed=1)
+    _rendering(client, image)
+    video = _launch_video(queue, "v", seed=2)
+
+    queue.move(video.prompt_id, before=image.prompt_id)
+
+    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
+
+
+def test_a_move_cannot_put_anything_ahead_of_a_job_put_first(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    waiting = _launch_image(queue, "i1", seed=1)
+    rendering = _launch_image(queue, "i2", seed=2)
+    queue.put_first({waiting.prompt_id, rendering.prompt_id})
+    newer = _launch_image(queue, "i3", seed=3)
+
+    queue.move(newer.prompt_id, before=rendering.prompt_id)
+
+    assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id, newer.prompt_id]
+
+
+def test_a_job_let_go_over_one_the_line_does_not_hold_goes_to_its_end(qtbot, tmp_path):
+    # Another app's prompts share the server, and a row can outlive its job by a
+    # poll; neither is a place in this line.
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     head = _launch_video(queue, "k0", seed=0)
     second = _launch_video(queue, "k1", seed=1)
     third = _launch_video(queue, "k2", seed=2)
 
-    queue.reorder(["some-other-apps-prompt", third.prompt_id, second.prompt_id])
+    queue.move(second.prompt_id, before="some-other-apps-prompt")
 
     assert queue.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id]
 
 
-def test_reorder_without_a_client_is_harmless(qtbot, tmp_path):
+def test_moving_a_job_the_line_does_not_hold_changes_nothing(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    head = _launch_video(queue, "k0", seed=0)
+    second = _launch_video(queue, "k1", seed=1)
+
+    queue.move("some-other-apps-prompt", before=head.prompt_id)
+
+    assert queue.queue_order == [head.prompt_id, second.prompt_id]
+
+
+def test_a_move_without_a_client_is_harmless(qtbot, tmp_path):
     queue = JobQueue(Database(tmp_path / "test.db"), None)
-    queue.reorder(["anything"])  # nothing to reorder, nothing to raise
+    queue.move("anything", before=None)  # nothing to move, nothing to raise
+
+
+def test_a_move_says_the_line_was_reordered_and_one_that_changes_nothing_says_nothing(
+        qtbot, tmp_path):
+    # The Job Queue redraws on that word, rather than a poll later: a row that
+    # sits still after its button was pressed reads as a press that missed.
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    head = _launch_video(queue, "k0", seed=0)
+    second = _launch_video(queue, "k1", seed=1)
+    said = []
+    queue.reordered.connect(lambda: said.append(queue.queue_order))
+
+    queue.move_up(head.prompt_id)
+    queue.move_down(head.prompt_id)
+
+    assert said == [[second.prompt_id, head.prompt_id]]
+
+
+def test_up_moves_a_job_ahead_of_the_one_above_it(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    head = _launch_video(queue, "k0", seed=0)
+    second = _launch_video(queue, "k1", seed=1)
+    third = _launch_video(queue, "k2", seed=2)
+
+    queue.move_up(third.prompt_id)
+
+    assert queue.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id]
+
+
+def test_up_on_a_video_just_behind_its_images_enhancement_takes_both_up(qtbot, tmp_path):
+    # It cannot pass the enhancement it is made from, so the press is spent on
+    # the job above that, and the enhancement goes up with it.
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "r", seed=1)
+    _rendering(client, rendering)
+    queue.shield(rendering.prompt_id, True)
+    enhance = _launch_enhance(queue, "e")
+    other = _launch_video(queue, "o", seed=2)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
+    queue.move(other.prompt_id, before=enhance.prompt_id)
+
+    queue.move_up(video.prompt_id)
+
+    assert queue.queue_order == [rendering.prompt_id, enhance.prompt_id, video.prompt_id,
+                                 other.prompt_id]
+
+
+def test_down_moves_a_job_behind_the_one_below_it(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    head = _launch_video(queue, "k0", seed=0)
+    second = _launch_video(queue, "k1", seed=1)
+    third = _launch_video(queue, "k2", seed=2)
+
+    queue.move_down(second.prompt_id)
+
+    assert queue.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id]
+
+
+def test_down_on_an_enhancement_just_ahead_of_its_video_takes_both_down(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "r", seed=1)
+    _rendering(client, rendering)
+    queue.shield(rendering.prompt_id, True)
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_IMAGE)
+    other = _launch_video(queue, "o", seed=2)
+
+    queue.move_down(enhance.prompt_id)
+
+    assert queue.queue_order == [rendering.prompt_id, other.prompt_id, enhance.prompt_id,
+                                 video.prompt_id]
+
+
+def test_down_on_the_job_being_made_hands_the_machine_to_the_one_behind_it(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "k0", seed=0)
+    _rendering(client, rendering)
+    second = _launch_video(queue, "k1", seed=1)
+    third = _launch_video(queue, "k2", seed=2)
+
+    queue.move_down(rendering.prompt_id)
+
+    client.interrupt.assert_called_once_with(rendering.prompt_id)
+    assert client.submit_job.call_args_list[-1].args[1] == second.prompt_id
+    assert queue.queue_order == [second.prompt_id, rendering.prompt_id, third.prompt_id]
+
+
+def test_the_top_of_the_line_cannot_go_up_nor_its_end_down(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "k0", seed=0)
+    _rendering(client, rendering)
+    middle = _launch_video(queue, "k1", seed=1)
+    last = _launch_video(queue, "k2", seed=2)
+
+    assert [(queue.can_move_up(job.prompt_id), queue.can_move_down(job.prompt_id))
+            for job in (rendering, middle, last)] == [(False, True), (True, True), (True, False)]
+
+
+def test_a_shielded_job_being_made_neither_moves_nor_lets_anything_up_past_it(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "k0", seed=0)
+    _rendering(client, rendering)
+    queue.shield(rendering.prompt_id, True)
+    behind = _launch_video(queue, "k1", seed=1)
+    last = _launch_video(queue, "k2", seed=2)
+
+    assert [(queue.can_move_up(job.prompt_id), queue.can_move_down(job.prompt_id))
+            for job in (rendering, behind, last)] == [(False, False), (False, True),
+                                                      (True, False)]
 
 
 def test_parse_progress_state_tolerates_absent_or_corrupt():
@@ -1693,18 +1882,6 @@ def test_the_image_set_aside_for_a_job_put_first_goes_back_behind_all_of_them(
     assert queue.queue_order == [middle.prompt_id, oldest.prompt_id, newest.prompt_id]
 
 
-def test_a_drag_cannot_put_anything_ahead_of_a_job_put_first(qtbot, tmp_path):
-    queue = JobQueue(Database(tmp_path / "test.db"), _client())
-    waiting = _launch_image(queue, "i1", seed=1)
-    rendering = _launch_image(queue, "i2", seed=2)
-    queue.put_first({waiting.prompt_id, rendering.prompt_id})
-    newer = _launch_image(queue, "i3", seed=3)
-
-    queue.reorder([newer.prompt_id, waiting.prompt_id])
-
-    assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id, newer.prompt_id]
-
-
 def test_a_job_put_first_while_a_hand_over_is_out_takes_the_machine_when_it_lands(
         qtbot, tmp_path):
     client, gate = _gated_client()
@@ -1919,7 +2096,8 @@ def test_the_video_waiting_on_an_enhancement_is_sent_after_the_enhancement_is_an
     assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
 
 
-def test_a_video_dragged_ahead_of_its_images_enhancement_stays_behind_it(qtbot, tmp_path):
+def test_a_video_moved_ahead_of_its_images_enhancement_still_comes_after_it(
+        qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     locked = _launch_image(queue, "i", seed=1)
@@ -1927,9 +2105,29 @@ def test_a_video_dragged_ahead_of_its_images_enhancement_stays_behind_it(qtbot, 
     enhance = _launch_enhance(queue, "e")
     video = _launch_video(queue, "v", input_image=_IMAGE)
 
-    queue.reorder([video.prompt_id, enhance.prompt_id])
+    queue.move(video.prompt_id, before=enhance.prompt_id)
 
     assert queue.queue_order == [locked.prompt_id, enhance.prompt_id, video.prompt_id]
+
+
+def test_a_video_moved_to_the_top_takes_its_images_enhancement_along(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "r", seed=1)
+    _rendering(client, rendering)
+    queue.shield(rendering.prompt_id, True)
+    enhance = _launch_enhance(queue, "e")
+    other = _launch_video(queue, "o", seed=2)
+    video = _launch_video(queue, "v", input_image=_IMAGE)
+    queue.move(other.prompt_id, before=enhance.prompt_id)
+    queue.shield(rendering.prompt_id, False)
+
+    queue.move(video.prompt_id, before=rendering.prompt_id)
+
+    assert queue.queue_order == [enhance.prompt_id, video.prompt_id, rendering.prompt_id,
+                                 other.prompt_id]
+    client.interrupt.assert_called_once_with(rendering.prompt_id)
+    assert client.submit_job.call_args_list[-1].args[1] == enhance.prompt_id
 
 
 def test_closing_keeps_back_a_video_waiting_for_its_images_enhancement(qtbot, tmp_path):

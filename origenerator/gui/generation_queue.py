@@ -24,8 +24,8 @@ folder being re-rolled. Beside that, a thumbnail — the frame an I2V
 animates, the gray clip a dropped-video combine takes its settings from, or a
 four-up of the folder the run will land in — because the one thumbnail a queued
 job cannot show is its own.
-Only what ComfyUI already holds is fixed: nothing can be moved in front of it.
-With nothing queued at all, the strip says so in dim letters across the middle of
+Only a run that holds its place is fixed, a shielded one being made say: nothing
+can be moved in front of it. With nothing queued at all, the strip says so in dim letters across the middle of
 the whole of itself, rather than sitting blank: the left half has no frame, no
 bar and (barring another app's backlog to report) nothing to say, so it stands
 down and the line takes the strip's whole width to be centered in.
@@ -40,8 +40,8 @@ It's fed the in-flight view-models the Recents collection uses
 (:class:`origenerator.gui.inflight.InFlightItem`), leading job first, refreshed on
 every poll so the frame and progress stay live; a refresh updates rows in place,
 so a drag is never yanked out from under the user. Reordering is asked for, not
-done here: :attr:`reorder_requested` carries the order the rows were dropped into,
-and whoever owns the jobs re-lines the queue.
+done here: :attr:`move_requested` names the row let go and the one it was let go
+ahead of, and whoever owns the jobs re-lines the queue.
 """
 from __future__ import annotations
 
@@ -79,6 +79,7 @@ from origenerator.gui.inflight import (
     discard_run_tooltip,
     first_movable,
     foreign_queue_text,
+    movable,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
@@ -406,8 +407,7 @@ class QueueRow(OpensAFolder, QWidget):
 
     A press-and-release opens the job's folder, and so does a double-click
     (:class:`OpensAFolder`); a press that travels starts a drag instead, which
-    the strip turns into a reorder. The row being made is the head of the line
-    and does not move.
+    the strip turns into a reorder, wherever the queue gives the job a move.
     """
 
     HEIGHT = 34  # about two of these fit beside the progress bar
@@ -473,7 +473,7 @@ class QueueRow(OpensAFolder, QWidget):
         """Re-render this row in place — a queued→running flip, a fresh estimate,
         or an Auto toggle that changed what the button gets you."""
         self._item = item
-        self.movable = not item.sent
+        self.movable = movable(item)
         self._lead.setText(queue_lead_text(item))
         # The name the row no longer spends its width on, plus what the shorthand
         # in front of it means. The settings are worth an answer, just not the row.
@@ -583,7 +583,7 @@ class _Rules(QWidget):
 class GenerationQueue(QWidget):
     """The live preview and its bar on the left, the whole line on the right."""
 
-    reorder_requested = pyqtSignal(list)  # prompt ids, in the order they were dropped into
+    move_requested = pyqtSignal(str, object)  # a row let go just ahead of another, or past the last
     clear_queue_requested = pyqtSignal()  # wipe another app's work off ComfyUI
     start_now_requested = pyqtSignal()  # end the minute a video waits after an image
 
@@ -757,28 +757,6 @@ class GenerationQueue(QWidget):
         super().resizeEvent(event)
         self._rules.resize(event.size())
 
-    # --- moving a job up or down the line -----------------------------------
-
-    def move_row(self, source: int, target: int):
-        """Lift the row at ``source`` out and drop it back in at ``target``.
-
-        Re-lists them there and then — the queue's agreement only shows up on a
-        later poll, and a row that springs back reads as a failure — then asks for
-        that order through :attr:`reorder_requested`. Neither end may be a job
-        already being rendered: those keep the front of the line. A move that
-        changes nothing asks for nothing.
-        """
-        order = [item.key for item in self._items]
-        first = first_movable(self._items)
-        if not first <= source < len(order) or not first <= target < len(order):
-            return
-        moved = list(self._items)
-        moved.insert(target, moved.pop(source))
-        if [item.key for item in moved] == order:
-            return
-        self._line_up(moved)
-        self.reorder_requested.emit(self.keys())
-
     # --- accepting a dragged row --------------------------------------------
 
     def _carried_key(self, event) -> str | None:
@@ -803,16 +781,19 @@ class GenerationQueue(QWidget):
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
-        """Land a dragged row wherever in the line it was let go."""
+        """Ask for a dragged row to go wherever in the line it was let go."""
         key = self._carried_key(event)
         self._show_drop_mark(None)
         if key is None:
             return
-        source = [item.key for item in self._items].index(key)
-        target = self._drop_index(event.position().toPoint())
-        # The insertion point was read with the dragged row still in place, so a
-        # drop below it names a slot one further along than it will end up in.
-        self.move_row(source, target - 1 if target > source else target)
+        keys = [item.key for item in self._items]
+        slot = self._drop_index(event.position().toPoint())
+        # The slot was read with the dragged row still in place, so a drop below
+        # it names a slot one further along than it will end up in.
+        rest = [other for other in keys if other != key]
+        landing = slot - 1 if slot > keys.index(key) else slot
+        if rest[:landing] + [key] + rest[landing:] != keys:
+            self.move_requested.emit(key, rest[landing] if landing < len(rest) else None)
         event.acceptProposedAction()
 
     def _show_drop_mark(self, index: int | None):
@@ -823,7 +804,7 @@ class GenerationQueue(QWidget):
     def _drop_index(self, point) -> int:
         """Which slot a drop at ``point`` (in this widget's coordinates) lands in:
         above the row whose top half it fell on, else at the end of the line. Never
-        in front of a row already being rendered."""
+        in front of a row that holds its place."""
         for index, row in enumerate(self.rows()):
             middle = row.mapTo(self, row.rect().center())
             if point.y() < middle.y():

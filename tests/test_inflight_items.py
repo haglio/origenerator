@@ -63,10 +63,24 @@ class FakeJob:
 
 
 class FakeJobQueue:
-    def __init__(self, jobs_by_folder=None, order=(), training=None):
+    def __init__(self, jobs_by_folder=None, order=(), training=None, stuck=()):
         self.jobs_by_folder = jobs_by_folder or {}
         self.queue_order = list(order)
         self.training = training
+        self.stuck = set(stuck)  # (prompt id, "up" or "down") the line cannot do
+        self.moved = []
+
+    def can_move_up(self, prompt_id):
+        return (prompt_id, "up") not in self.stuck
+
+    def can_move_down(self, prompt_id):
+        return (prompt_id, "down") not in self.stuck
+
+    def move_up(self, prompt_id):
+        self.moved.append((prompt_id, "up"))
+
+    def move_down(self, prompt_id):
+        self.moved.append((prompt_id, "down"))
 
     def starts_at(self, prompt_id):
         return next((job.queue_says_it_starts_at for jobs in self.jobs_by_folder.values()
@@ -113,10 +127,10 @@ class FakeTree:
 def build():
     def make(rows=(), *, requests=(), jobs_by_folder=None, order=(),
              auto_generating=(), image_rows=(), groups=None, cancelled=None, revealed=None,
-             went_to=None, shielded=None, training=None):
+             went_to=None, shielded=None, training=None, jobs=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
-            jobs=FakeJobQueue(jobs_by_folder, order, training),
+            jobs=jobs or FakeJobQueue(jobs_by_folder, order, training),
             auto=FakeAuto(auto_generating),
             tree=FakeTree(groups),
             image_rows=lambda: list(image_rows),
@@ -188,11 +202,22 @@ def test_a_run_comfyui_holds_but_has_not_started_says_queued(build):
     assert items[0].reading.status == "queued"
 
 
-def test_a_run_counts_as_sent_once_its_row_says_running(build):
-    items = build([_row("g1", status="running"), _row("g2", status="pending")],
-                  order=["g1", "g2"])
+def test_a_card_moves_its_job_up_and_down_the_queues_own_line(build):
+    jobs = FakeJobQueue({"image/sdxl_t2i/aaa": [FakeJob("g1"), FakeJob("g2", state="queued")]},
+                        order=["g1", "g2"], stuck={("g1", "up"), ("g2", "down")})
+    head, behind = build([_row("g1", status="running"), _row("g2")], jobs=jobs)
 
-    assert [item.sent for item in items] == [True, False]
+    behind.move_up()
+    head.move_down()
+
+    assert jobs.moved == [("g2", "up"), ("g1", "down")]
+    assert (head.move_up, behind.move_down) == (None, None)
+
+
+def test_a_run_no_live_job_holds_cannot_be_moved(build):
+    item, = build([_row("g1", status="running")])
+
+    assert (item.move_up, item.move_down) == (None, None)
 
 
 def test_the_queues_own_line_orders_the_cards(build):
@@ -218,7 +243,8 @@ def test_a_training_holding_the_line_waits_after_what_comfyui_holds_and_before_t
 
     assert [item.key for item in items] == ["g1", TRAINING_KEY, "g2"]
     item = items[1]
-    assert (item.job_kind, item.sent, item.reading) == (JobKind.TRAINING, True, training.read)
+    assert (item.job_kind, item.move_up, item.move_down, item.reading) == (
+        JobKind.TRAINING, None, None, training.read)
     assert "Hands" in item.caption
     item.cancel()
     item.reveal()

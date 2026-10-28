@@ -20,7 +20,7 @@ from functools import partial
 from origenerator import gallery, timing
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.generation_job import display_status
-from origenerator.gui.inflight import InFlightItem, RunReading, first_movable
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -97,6 +97,7 @@ class InFlightItems:
         # is an ordinary finished row somewhere in it.
         row_by_id = {r.get("prompt_id"): r for r in rows}
         items = []
+        sent = set()  # the runs ComfyUI holds, which a fix's training waits behind
         for row in rows:
             if not gallery.is_in_progress(row):
                 continue
@@ -115,6 +116,10 @@ class InFlightItems:
                 shielded = job.shielded
                 stop_auto = partial(self._auto.stop, folder_key)
                 state = job.state
+                move_up = (partial(self._jobs.move_up, pid)
+                           if self._jobs.can_move_up(pid) else None)
+                move_down = (partial(self._jobs.move_down, pid)
+                             if self._jobs.can_move_down(pid) else None)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._image_rows())
@@ -123,6 +128,7 @@ class InFlightItems:
                 starts_at = None
                 pass_progress, stage, stop_auto, state = None, "", None, row.get("status")
                 shield, shielded = None, bool(row.get("shielded"))
+                move_up = move_down = None
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
@@ -185,17 +191,22 @@ class InFlightItems:
                     source_video and workflow
                     and gallery.prompts_differ_from(params, source_video, workflow)),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
-                sent=row.get("status") == GenerationStatus.RUNNING,
+                move_up=move_up,
+                move_down=move_down,
             ))
+            if row.get("status") == GenerationStatus.RUNNING:
+                sent.add(pid)
         place = {pid: i for i, pid in enumerate(self._jobs.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    not it.reading.rendering))
         training = self._jobs.training
         if training is not None:
-            items.insert(first_movable(items), InFlightItem(
+            behind_what_comfyui_holds = next(
+                (at for at, item in enumerate(items) if item.key not in sent), len(items))
+            items.insert(behind_what_comfyui_holds, InFlightItem(
                 key=TRAINING_KEY, caption=f"{training.name.capitalize()} fix LoRA",
                 reading=training.reading(), reveal=training.reveal, cancel=training.cancel,
-                job_kind=gallery.JobKind.TRAINING, sent=True))
+                job_kind=gallery.JobKind.TRAINING))
         return items
 
     def _go_to_the_image_of(self, enhancement: dict) -> None:

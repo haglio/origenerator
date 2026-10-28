@@ -1154,17 +1154,15 @@ def test_the_view_holds_what_is_in_flight_for_its_panel(qtbot):
     assert foreign == 3
 
 
-def test_a_row_dragged_down_the_line_is_re_listed_before_the_queue_agrees(qtbot):
-    # The queue's own answer is a poll away, and a row that springs back to
-    # where it was reads as a failure.
+def test_a_row_let_go_elsewhere_on_the_panel_goes_to_the_gallery_to_be_moved(qtbot):
     asked = []
-    view = _view(qtbot, actions=SlideshowActions(requeue=asked.append))
+    view = _view(qtbot, actions=SlideshowActions(
+        move=lambda key, before: asked.append((key, before))))
     view.set_queue([_inflight(), _inflight(key="j2"), _inflight(key="j3")])
 
-    view.requeue(["j1", "j3", "j2"])
+    view.move("j3", "j2")
 
-    assert [item.key for item in view.hud_queue[0]] == ["j1", "j3", "j2"]
-    assert asked == [["j1", "j3", "j2"]]
+    assert asked == [("j3", "j2")]
 
 
 def test_clearing_another_apps_work_goes_back_to_the_gallery(qtbot):

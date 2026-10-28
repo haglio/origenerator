@@ -7,6 +7,7 @@ from PIL import Image
 from PyQt6 import sip
 from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 
@@ -856,13 +857,36 @@ def test_the_dragged_row_lights_up_while_it_is_being_dragged(queue, monkeypatch)
     assert row.property("dragging") is False  # and it settles back afterwards
 
 
+def test_a_press_on_a_row_outlives_a_poll_that_changes_the_line(queue, monkeypatch):
+    # A job finishing ahead of it between the press and the drag used to take
+    # every row down with it, the pressed one included, so the drag never began.
+    carried = []
+    monkeypatch.setattr(QDrag, "exec", lambda self, *a: carried.append(
+        bytes(self.mimeData().data(QUEUE_ROW_MIME)).decode()))
+    queue.resize(800, 200)
+    _four(queue)
+    QApplication.processEvents()
+    pressed_at = queue.rows()[2].rect().center()
+    QTest.mousePress(queue.rows()[2], Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, pressed_at)
+
+    queue.set_items([_item(key="b"), _item(key="c", status="queued"),
+                     _item(key="d", status="queued")])
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
+    QTest.mouseMove(queue.rows()[1], pressed_at + QPoint(0, 30))
+    QTest.mouseRelease(queue, Qt.MouseButton.LeftButton)
+
+    assert carried == ["c"]
+
+
 def test_a_row_the_line_redraws_away_mid_drag_lets_the_drag_finish(queue, monkeypatch):
     _four(queue)
     row = queue.rows()[2]
     drag_alive = []
 
     def drag_loop_through_a_redraw(drag, *_):
-        queue.set_items([_item(key="a"), _item(key="c", status="queued"),
+        queue.set_items([_item(key="a"), _item(key="b", status="queued"),
                          _item(key="d", status="queued")])
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         drag_alive.append(not sip.isdeleted(drag))

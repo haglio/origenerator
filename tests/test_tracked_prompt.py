@@ -179,16 +179,16 @@ def test_the_caret_stays_where_it_was_typed_when_the_strike_arrives(pair, qtbot)
 def test_typing_on_takes_the_strike_back_out_and_keeps_the_prompt_right(pair, qtbot):
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
-    _type_over(pair.edit, "cat", "dog")
+    _type_over(pair.edit, "cat", "fr")
     _settle(qtbot, pair.edit)
 
-    pair.edit.insertPlainText("gy")  # carry on typing: "dog" -> "doggy"
+    pair.edit.insertPlainText("og")
 
-    assert pair.edit.toPlainText() == "a doggy on a couch"  # no strike in the way
-    assert diff_text.live_text(pair.edit) == "a doggy on a couch"
+    assert pair.edit.toPlainText() == "a frog on a couch"
+    assert diff_text.live_text(pair.edit) == "a frog on a couch"
     _settle(qtbot, pair.edit)
     assert _marked(pair.edit, "struck") == "cat"
-    assert diff_text.live_text(pair.edit) == "a doggy on a couch"
+    assert diff_text.live_text(pair.edit) == "a frog on a couch"
 
 
 def test_a_word_typed_and_taken_back_out_stops_being_marked(pair, qtbot):

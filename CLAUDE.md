@@ -251,12 +251,12 @@ first), a switch on the shared HUD in `gui/slideshow_panel.py` (which posts a ve
 captions once and publishes them in the same document for the session to
 read, and `tests/test_hosted_launch_contract.py` holds the parser and the
 windows to what it says), and the offer, slideshow, takeover and session-claim
-files a standalone window meets a session through (`fun_time_mode.py` here,
-`standalone_origenerator.py` there; each app's document says under `handoff`
-what it writes and reads in them, and `tests/test_fun_time_expectations.py`
-holds this app to Fun Time's) — renamed on one side only, every session
-quietly launches a second copy beside the one already open, and the copy it
-missed goes on driving the OSR2 the session is driving too. The claim is also
+files a standalone window meets a session through, which both apps write and
+read through `app_support.origenerator_handoff` and nothing else, so a change
+to them is one change there and a pin both apps move -- written by one app on
+its own, every session quietly launches a second copy beside the one already
+open, and the copy it missed goes on driving the OSR2 the session is driving
+too. The claim is also
 a matter of where: a preview keeps a `state/` of its own, so it reads the
 claim in the production copy's `state/` as well, which is where every session
 writes one; a preview that read only its own went on driving beside Fun Time
@@ -496,8 +496,8 @@ Origenerator is already running." and stops before its splash
 most likely met a copy already running, which that message names. A standalone
 copy offers itself to Fun Time the moment it has the library, marked as still
 starting until its window is up, so a session opened during its splash takes it
-over and waits for it rather than starting a second (`fun_time_offer.txt`, read
-by fun_time's `standalone_origenerator.py`). A copy Fun Time opens itself never
+over and waits for it rather than starting a second (the offer in
+`app_support.origenerator_handoff`). A copy Fun Time opens itself never
 refuses, since refusing would leave the session's room with no Origenerator at
 all; it is only ever opened when no copy has offered itself.
 

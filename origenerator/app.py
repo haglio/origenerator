@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import origenerator_handoff
 from app_support.process_identity import ProcessNamer
 from shared_ui.preview import Preview, taskbar_identity, window_title
 
@@ -775,8 +776,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     if claim is not None:
         claim.closes_with(app)
     if fun_time is None:
-        from origenerator.fun_time_mode import offer_the_window_while_it_is_built
-        offer_the_window_while_it_is_built(STATE_DIR, LIBRARY_STATE_DIR)
+        origenerator_handoff.offer_this_process(STATE_DIR, LIBRARY_STATE_DIR, starting=True)
 
     crash_log = _arm_the_crash_log(STATE_DIR, logger)
 
@@ -836,8 +836,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         if window is not None:
             _put_away_unseen(window, app, crash_log)
         _disconnect(client)
-        from origenerator.fun_time_mode import withdraw_the_offer
-        withdraw_the_offer(STATE_DIR, LIBRARY_STATE_DIR)
+        origenerator_handoff.withdraw_the_offer(STATE_DIR, LIBRARY_STATE_DIR)
         if claim is not None:
             claim.let_go()
         loading.done()

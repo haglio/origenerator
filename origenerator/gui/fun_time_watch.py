@@ -9,22 +9,13 @@ reached this window is driving it anyway.
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Callable
 from pathlib import Path
 
+from app_support import origenerator_handoff as handoff
 from PyQt6.QtCore import QObject, QTimer
 
-from origenerator.fun_time_mode import (
-    OFFER_NAME,
-    SHOWING_NAME,
-    FunTimeSession,
-    a_session_holds_the_device,
-    offer_of_this_process,
-    slideshow_mark_of_this_process,
-    take_the_takeover,
-    withdraw_the_offer,
-)
+from origenerator.fun_time_mode import FunTimeSession, take_the_takeover
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +29,7 @@ class FunTimeWatch(QObject):
                  library_state_dir: Path | None = None,
                  parent: QObject | None = None):
         super().__init__(parent)
+        self._me = handoff.this_process()
         self._state_dirs = tuple(dict.fromkeys((state_dir, library_state_dir or state_dir)))
         self._take_over = take_over
         self._device_claimed = device_claimed or (lambda held: None)
@@ -58,15 +50,15 @@ class FunTimeWatch(QObject):
 
     def _stand_the_offer(self) -> None:
         for state_dir in self._state_dirs:
-            self._stand_the_offer_in(state_dir / OFFER_NAME)
+            self._stand_the_offer_in(state_dir / handoff.OFFER)
 
     def _stand_the_offer_in(self, offer: Path) -> None:
-        mine = offer_of_this_process()
+        mine = handoff.offer_of(self._me)
         try:
             standing = offer.read_text(encoding="utf-8")
             if standing == mine:
                 return
-            if standing != offer_of_this_process(starting=True):
+            if standing != handoff.offer_of(self._me, starting=True):
                 logger.info("The offer to Fun Time named someone else; standing ours again")
         except FileNotFoundError:
             pass
@@ -76,15 +68,15 @@ class FunTimeWatch(QObject):
 
     def _mark_the_slideshow(self) -> None:
         shape = self._showing_on()
-        mark = None if shape is None else slideshow_mark_of_this_process(shape)
+        mark = None if shape is None else handoff.slideshow_mark_of(self._me, shape)
         for state_dir in self._state_dirs:
-            _stand(state_dir / SHOWING_NAME, mark)
+            _stand(state_dir / handoff.SHOWING, mark)
 
     def _answer_the_session(self) -> None:
         self._stand_the_offer()
         self._mark_the_slideshow()
-        self._device_claimed(any(map(a_session_holds_the_device, self._state_dirs)))
-        session = next(filter(None, (take_the_takeover(state_dir, pid=os.getpid())
+        self._device_claimed(any(map(handoff.a_session_claims_the_osr2, self._state_dirs)))
+        session = next(filter(None, (take_the_takeover(state_dir, pid=self._me.pid)
                                      for state_dir in self._state_dirs)), None)
         if session is None:
             return
@@ -94,7 +86,7 @@ class FunTimeWatch(QObject):
 
     def withdraw(self) -> None:
         self._timer.stop()
-        withdraw_the_offer(*self._state_dirs)
+        handoff.withdraw_the_offer(*self._state_dirs)
 
 
 def _stand(path: Path, mark: str | None) -> None:

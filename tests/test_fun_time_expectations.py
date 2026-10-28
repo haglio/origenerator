@@ -65,36 +65,3 @@ def test_this_app_declares_every_line_a_room_writes(relied_on):
 
     assert [line for line in relied_on["command_lines"]
             if not any(re.fullmatch(pattern, line) for pattern in patterns)] == []
-
-
-def _is_read_by(written: str, reads: dict) -> bool:
-    if "pattern" in reads:
-        return re.fullmatch(reads["pattern"], written) is not None
-    return sorted(json.loads(written)) == reads["keys"]
-
-
-def test_fun_time_names_each_file_the_two_apps_hand_each_other_as_this_app_does(relied_on):
-    assert {side: entry["file"] for side, entry in relied_on["handoff"].items()} == {
-        side: entry["file"] for side, entry in contract.declaration()["handoff"].items()}
-
-
-def test_what_either_app_writes_in_a_handoff_file_is_what_the_other_reads(relied_on):
-    declared = contract.declaration()
-    unread = [(side, written)
-              for writer, reader in ((relied_on, declared), (declared, relied_on))
-              for side, entry in writer["handoff"].items()
-              for written in entry.get("writes", ())
-              if not _is_read_by(written, reader["handoff"][side]["reads"])]
-
-    assert unread == []
-
-
-def test_every_takeover_fun_time_writes_is_taken_and_gone_once_read(relied_on, tmp_path):
-    for written in relied_on["handoff"]["takeover"]["writes"]:
-        takeover = tmp_path / contract.TAKEOVER_NAME
-        takeover.write_text(written, encoding="utf-8")
-
-        session = contract.take_the_takeover(
-            tmp_path, pid=json.loads(written)[contract.TAKEOVER_PID])
-
-        assert (session is not None, takeover.exists()) == (True, False), written

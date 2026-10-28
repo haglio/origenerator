@@ -1,31 +1,28 @@
 from __future__ import annotations
 
-import json
 import os
 
-from origenerator.fun_time_mode import Rect, offer_the_window_while_it_is_built
+from app_support import origenerator_handoff as handoff
+
+from origenerator.fun_time_mode import Rect
 from origenerator.gui.fun_time_watch import FunTimeWatch
-from origenerator.win32 import this_process_creation_time
 
 
 def _takeover(state_dir, *, pid):
-    (state_dir / "fun_time_takeover.json").write_text(json.dumps({
-        "pid": pid,
-        "args": ["--fun-time", "--x", "0", "--y", "206", "--width", "853", "--height", "1234"],
-    }), encoding="utf-8")
+    handoff.hand_over(state_dir, pid=pid, args=[
+        "--fun-time", "--x", "0", "--y", "206", "--width", "853", "--height", "1234"])
 
 
 def _claim(state_dir, *, pid, created_at=None):
-    created = this_process_creation_time() if created_at is None else created_at
-    (state_dir / "fun_time_session.txt").write_text(
-        f"{pid} {created}", encoding="utf-8")
+    created = handoff.this_process().created_at if created_at is None else created_at
+    (state_dir / handoff.SESSION).write_text(f"{pid} {created}", encoding="utf-8")
 
 
 def test_an_open_app_offers_itself_to_a_session_by_its_process(tmp_path):
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
 
-    assert (tmp_path / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
-        str(os.getpid()), str(this_process_creation_time())]
+    assert (tmp_path / handoff.OFFER).read_text(encoding="utf-8").split() == [
+        str(os.getpid()), str(handoff.this_process().created_at)]
     watch.withdraw()
 
 
@@ -37,11 +34,11 @@ def test_a_takeover_for_this_app_hands_it_the_session_and_withdraws_the_offer(qt
     qtbot.waitUntil(lambda: bool(taken))
 
     assert [session.main_rect for session in taken] == [Rect(0, 206, 853, 1234)]
-    assert not (tmp_path / "fun_time_offer.txt").exists()
+    assert not (tmp_path / handoff.OFFER).exists()
     _takeover(tmp_path, pid=os.getpid())
     qtbot.wait(600)
     assert len(taken) == 1
-    assert (tmp_path / "fun_time_takeover.json").exists()
+    assert (tmp_path / handoff.TAKEOVER).exists()
     del watch
 
 
@@ -63,7 +60,7 @@ def test_an_app_handed_back_offers_itself_to_the_next_session(qtbot, tmp_path):
 
     watch.renew()
 
-    assert (tmp_path / "fun_time_offer.txt").exists()
+    assert (tmp_path / handoff.OFFER).exists()
     _takeover(tmp_path, pid=os.getpid())
     qtbot.waitUntil(lambda: len(taken) == 2)
     del watch
@@ -88,7 +85,7 @@ def test_a_session_starting_beside_an_open_window_takes_the_device_from_it(qtbot
     _claim(tmp_path, pid=os.getpid())
     qtbot.waitUntil(lambda: said[-1] is True)
 
-    (tmp_path / "fun_time_session.txt").unlink()
+    (tmp_path / handoff.SESSION).unlink()
     qtbot.waitUntil(lambda: said[-1] is False)
     watch.withdraw()
 
@@ -119,8 +116,8 @@ def test_a_preview_offers_itself_in_the_production_copy_s_state_where_every_sess
 
     watch = FunTimeWatch(preview, take_over=lambda session: None, library_state_dir=production)
 
-    assert (production / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
-        str(os.getpid()), str(this_process_creation_time())]
+    assert (production / handoff.OFFER).read_text(encoding="utf-8").split() == [
+        str(os.getpid()), str(handoff.this_process().created_at)]
     watch.withdraw()
 
 
@@ -134,14 +131,14 @@ def test_a_session_that_found_the_offer_in_the_production_copy_s_state_takes_the
     qtbot.waitUntil(lambda: bool(taken))
 
     assert [session.main_rect for session in taken] == [Rect(0, 206, 853, 1234)]
-    assert not (preview / "fun_time_offer.txt").exists()
-    assert not (production / "fun_time_offer.txt").exists()
+    assert not (preview / handoff.OFFER).exists()
+    assert not (production / handoff.OFFER).exists()
     del watch
 
 
 def test_a_claim_left_by_a_session_that_died_holds_nothing(qtbot, tmp_path):
     said = []
-    _claim(tmp_path, pid=os.getpid(), created_at=this_process_creation_time() - 1)
+    _claim(tmp_path, pid=os.getpid(), created_at=handoff.this_process().created_at - 1)
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None,
                          device_claimed=said.append)
 
@@ -151,19 +148,19 @@ def test_a_claim_left_by_a_session_that_died_holds_nothing(qtbot, tmp_path):
 
 def test_an_offer_deleted_under_an_open_window_is_put_back(qtbot, tmp_path):
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
-    offer = tmp_path / "fun_time_offer.txt"
+    offer = tmp_path / handoff.OFFER
 
     offer.unlink()
     qtbot.waitUntil(offer.exists)
 
     assert offer.read_text(encoding="utf-8").split() == [
-        str(os.getpid()), str(this_process_creation_time())]
+        str(os.getpid()), str(handoff.this_process().created_at)]
     watch.withdraw()
 
 
 def test_an_offer_another_instance_overwrote_is_taken_back(qtbot, tmp_path):
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
-    offer = tmp_path / "fun_time_offer.txt"
+    offer = tmp_path / handoff.OFFER
 
     offer.write_text("999999 12345", encoding="utf-8")
     qtbot.waitUntil(lambda: offer.read_text(encoding="utf-8").startswith(f"{os.getpid()} "))
@@ -179,14 +176,14 @@ def test_a_window_taken_over_stops_standing_its_offer(qtbot, tmp_path):
 
     qtbot.wait(600)
 
-    assert not (tmp_path / "fun_time_offer.txt").exists()
+    assert not (tmp_path / handoff.OFFER).exists()
     del watch
 
 
 def test_an_offer_another_instance_overwrote_is_recorded_when_it_is_taken_back(
         qtbot, tmp_path, caplog):
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
-    offer = tmp_path / "fun_time_offer.txt"
+    offer = tmp_path / handoff.OFFER
 
     with caplog.at_level("INFO", logger="origenerator.gui.fun_time_watch"):
         caplog.clear()
@@ -203,7 +200,7 @@ def test_an_offer_simply_missing_is_put_back_without_a_word(qtbot, tmp_path, cap
     # Withdrawn and renewed is the ordinary course of a session; only another
     # writer is worth a line.
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
-    offer = tmp_path / "fun_time_offer.txt"
+    offer = tmp_path / handoff.OFFER
 
     with caplog.at_level("INFO", logger="origenerator.gui.fun_time_watch"):
         caplog.clear()
@@ -215,13 +212,13 @@ def test_an_offer_simply_missing_is_put_back_without_a_word(qtbot, tmp_path, cap
 
 
 def test_the_offer_made_while_starting_becomes_the_plain_one_without_a_word(tmp_path, caplog):
-    offer_the_window_while_it_is_built(tmp_path)
+    handoff.offer_this_process(tmp_path, starting=True)
 
     with caplog.at_level("INFO", logger="origenerator.gui.fun_time_watch"):
         watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
 
-    assert (tmp_path / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
-        str(os.getpid()), str(this_process_creation_time())]
+    assert (tmp_path / handoff.OFFER).read_text(encoding="utf-8").split() == [
+        str(os.getpid()), str(handoff.this_process().created_at)]
     assert caplog.records == []
     watch.withdraw()
 
@@ -240,7 +237,7 @@ def test_a_takeover_arriving_is_recorded(qtbot, tmp_path, caplog):
 
 
 def _marked(state_dir):
-    mark = state_dir / "fun_time_showing.txt"
+    mark = state_dir / handoff.SHOWING
     return mark.read_text(encoding="utf-8").split() if mark.exists() else None
 
 
@@ -248,7 +245,7 @@ def test_an_open_app_says_beside_its_offer_which_side_its_slideshow_is_showing_o
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None,
                          showing_on=lambda: "portrait")
 
-    assert _marked(tmp_path) == [str(os.getpid()), str(this_process_creation_time()), "portrait"]
+    assert _marked(tmp_path) == [str(os.getpid()), str(handoff.this_process().created_at), "portrait"]
     watch.withdraw()
 
 
@@ -284,5 +281,5 @@ def test_a_preview_marks_its_slideshow_in_the_everyday_copy_s_state_too(tmp_path
                          showing_on=lambda: "landscape", library_state_dir=everyday)
 
     assert _marked(everyday) == _marked(preview) == [
-        str(os.getpid()), str(this_process_creation_time()), "landscape"]
+        str(os.getpid()), str(handoff.this_process().created_at), "landscape"]
     watch.withdraw()

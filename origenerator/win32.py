@@ -27,7 +27,6 @@ _SWP_NOSIZE = 0x0001
 _SWP_NOMOVE = 0x0002
 _SWP_NOZORDER = 0x0004
 _SWP_NOACTIVATE = 0x0010
-_kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
 
 # What this app calls itself to Windows. It is not decoration: the taskbar
 # groups by it, and it is the name Windows prints over a notification this app
@@ -222,41 +221,3 @@ def raise_window_without_activating(hwnd: int) -> bool:
         return False
     return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None, 0, 0, 0, 0,
                                      _SWP_NOSIZE | _SWP_NOMOVE | _SWP_NOACTIVATE))
-
-
-_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-_kernel32.OpenProcess.argtypes = [
-    ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.wintypes.DWORD,
-]
-_kernel32.OpenProcess.restype = ctypes.wintypes.HANDLE
-_kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
-_kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
-_kernel32.GetCurrentProcess.restype = ctypes.wintypes.HANDLE
-_kernel32.GetProcessTimes.argtypes = [
-    ctypes.wintypes.HANDLE, *[ctypes.POINTER(ctypes.wintypes.FILETIME)] * 4,
-]
-_kernel32.GetProcessTimes.restype = ctypes.wintypes.BOOL
-
-
-def this_process_creation_time() -> int:
-    times = [ctypes.wintypes.FILETIME() for _ in range(4)]
-    _kernel32.GetProcessTimes(_kernel32.GetCurrentProcess(), *map(ctypes.byref, times))
-    return (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
-
-
-def process_creation_time(pid: int) -> int | None:
-    """The creation time of whatever holds *pid* now, or None where nothing does.
-
-    Windows hands a freed pid out again within seconds, so a pid alone names no
-    process; with the creation time beside it, a recycled one is recognized.
-    """
-    handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-    if not handle:
-        return None
-    try:
-        times = [ctypes.wintypes.FILETIME() for _ in range(4)]
-        if not _kernel32.GetProcessTimes(handle, *map(ctypes.byref, times)):
-            return None
-        return (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
-    finally:
-        _kernel32.CloseHandle(handle)

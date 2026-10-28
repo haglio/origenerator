@@ -1,24 +1,20 @@
 """The Fun Time mode contract: the flags Fun Time launches this app with."""
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
 
 import pytest
+from app_support import origenerator_handoff as handoff
 from PIL import Image
 
 from origenerator.fun_time_mode import (
     Rect,
-    a_session_holds_the_device,
-    offer_the_window_while_it_is_built,
     parse_app_args,
     region_for_items,
     region_for_size,
     take_the_takeover,
 )
 from origenerator.slideshow import Slide
-from origenerator.win32 import this_process_creation_time
 from tests.hosted_launch import hosted_launch
 from tests.media_files import write_mp4
 
@@ -117,9 +113,8 @@ _SESSION_ARGS = ["--fun-time", "--x", "0", "--y", "206", "--width", "853",
 
 
 def _takeover(state_dir: Path, *, pid: int, args=_SESSION_ARGS) -> Path:
-    path = state_dir / "fun_time_takeover.json"
-    path.write_text(json.dumps({"pid": pid, "args": args}), encoding="utf-8")
-    return path
+    handoff.hand_over(state_dir, pid=pid, args=args)
+    return state_dir / handoff.TAKEOVER
 
 
 def test_a_takeover_for_this_process_is_the_session_it_names(tmp_path):
@@ -154,7 +149,7 @@ def test_a_takeover_meant_for_another_process_is_spent_unanswered(tmp_path):
     '{"pid": 4321, "args": ["--x", "5"]}',
 ])
 def test_a_takeover_that_does_not_read_as_a_session_is_spent_unanswered(tmp_path, written):
-    takeover = tmp_path / "fun_time_takeover.json"
+    takeover = tmp_path / handoff.TAKEOVER
     takeover.write_text(written, encoding="utf-8")
 
     assert take_the_takeover(tmp_path, pid=4321) is None
@@ -173,7 +168,7 @@ def test_a_takeover_this_window_cannot_take_says_why(tmp_path, caplog, written, 
     reported hosting this app while this app went on standalone -- which is a
     room whose Origenerator mode button stays dim -- could be read from neither
     app's log."""
-    (tmp_path / "fun_time_takeover.json").write_text(written, encoding="utf-8")
+    (tmp_path / handoff.TAKEOVER).write_text(written, encoding="utf-8")
 
     assert take_the_takeover(tmp_path, pid=4321) is None
 
@@ -185,23 +180,6 @@ def test_a_poll_that_finds_no_takeover_says_nothing(tmp_path, caplog):
     assert take_the_takeover(tmp_path, pid=4321) is None
 
     assert caplog.text == ""
-
-
-def test_a_window_still_being_built_offers_itself_as_starting(tmp_path):
-    offer_the_window_while_it_is_built(tmp_path)
-
-    assert (tmp_path / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
-        str(os.getpid()), str(this_process_creation_time()), "starting"]
-
-
-def test_a_preview_still_being_built_offers_itself_in_the_production_copy_s_state_too(tmp_path):
-    preview, production = tmp_path / "preview", tmp_path / "production"
-
-    offer_the_window_while_it_is_built(preview, production)
-
-    for state_dir in (preview, production):
-        assert (state_dir / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
-            str(os.getpid()), str(this_process_creation_time()), "starting"]
 
 
 def test_region_for_size_splits_on_aspect():
@@ -266,17 +244,3 @@ def test_the_probe_only_runs_when_nothing_else_measured(tmp_path):
         (str(tmp_path / "also-gone.mp4"), "video", "b", None),
     ]
     assert region_for_items(items) == "landscape"
-
-
-def test_a_live_sessions_claim_on_the_device_is_read_off_its_process(tmp_path):
-    assert not a_session_holds_the_device(tmp_path)
-
-    claim = tmp_path / "fun_time_session.txt"
-    claim.write_text(f"{os.getpid()} {this_process_creation_time()}", encoding="utf-8")
-    assert a_session_holds_the_device(tmp_path)
-
-    claim.write_text(f"{os.getpid()} {this_process_creation_time() - 1}", encoding="utf-8")
-    assert not a_session_holds_the_device(tmp_path)
-
-    claim.write_text("not a claim", encoding="utf-8")
-    assert not a_session_holds_the_device(tmp_path)

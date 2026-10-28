@@ -17,6 +17,7 @@ from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
 from app_support import loading_screen as launchers_screen
+from app_support import origenerator_handoff as handoff
 from app_support.win32 import TaskbarApp
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QWidget
@@ -50,7 +51,6 @@ from origenerator.config import STATE_DIR
 from origenerator.db import Database
 from origenerator.evolver_export import EvolverInbox
 from origenerator.export_lane import GENAU
-from origenerator.fun_time_mode import OFFER_NAME
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
@@ -536,8 +536,8 @@ def test_a_canceled_launch_takes_back_its_offer_to_fun_time(qapp, monkeypatch, t
                        **_real_loading_screens(screens)):
         assert main([]) == 0
 
-    assert not (own / OFFER_NAME).exists()
-    assert not (everyday / OFFER_NAME).exists()
+    assert not (own / handoff.OFFER).exists()
+    assert not (everyday / handoff.OFFER).exists()
 
 
 def test_a_launch_canceled_once_connected_to_comfyui_disconnects(qapp):
@@ -978,21 +978,22 @@ def test_a_standalone_boot_offers_its_window_to_fun_time_before_building_it(
     events = []
 
     with _a_faked_boot([], **{
-        "origenerator.fun_time_mode.offer_the_window_while_it_is_built":
-            MagicMock(side_effect=lambda *state_dirs: events.append(("offered", state_dirs))),
+        "app_support.origenerator_handoff.offer_this_process":
+            MagicMock(side_effect=lambda *state_dirs, starting: events.append(
+                ("offered", state_dirs, starting))),
         "origenerator.gui.main_window.OrigeneratorWindow":
             MagicMock(side_effect=lambda *a, **k: events.append("built") or MagicMock()),
     }):
         assert main([]) == 0
 
-    assert events == [("offered", (STATE_DIR, production)), "built"]
+    assert events == [("offered", (STATE_DIR, production), True), "built"]
 
 
 def test_a_boot_fun_time_launched_offers_its_window_to_nobody(qapp):
     offered = MagicMock()
 
     with _a_faked_boot([], **{
-            "origenerator.fun_time_mode.offer_the_window_while_it_is_built": offered}):
+            "app_support.origenerator_handoff.offer_this_process": offered}):
         assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
 
     offered.assert_not_called()

@@ -23,13 +23,13 @@ from funestra.hud_marks import shared_mark
 from funestra.hud_panel import (
     SYMBOL_FONT,
     draw_button,
-    fit_text,
     load_font,
     text_width,
 )
 from funestra.satellite_hud import BLOCK_GAP, CTRL_BTN, MAP_THUMB_H
 from PIL import Image, ImageDraw
 from shared_ui.icons_pil import paste_glyph
+from shared_ui.lettering import fit_text
 from shared_ui.palette import (
     BLUE,
     BLUE_LIGHT,

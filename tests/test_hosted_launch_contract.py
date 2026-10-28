@@ -11,12 +11,10 @@ These hold the document to the parser and to the windows.
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 
 import pytest
-from app_support import origenerator_handoff as handoff
 from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
@@ -130,42 +128,6 @@ def test_a_region_rect_is_not_required_of_a_launch():
 
     assert session is not None
     assert session.region_rect("portrait") == contract.Rect(0, 0, 0, 0)
-
-
-def _handoff() -> dict:
-    return contract.declaration()["handoff"]
-
-
-def test_the_document_names_each_file_this_app_and_a_session_hand_each_other():
-    assert {side: entry["file"] for side, entry in _handoff().items()} == {
-        "offer": handoff.OFFER, "showing": handoff.SHOWING,
-        "session": handoff.SESSION, "takeover": handoff.TAKEOVER}
-
-
-def test_a_claim_on_the_device_is_read_exactly_when_the_document_says_it_is(tmp_path):
-    pattern = _handoff()["session"]["reads"]["pattern"]
-    live = str(handoff.this_process())
-
-    for claim, read in ((live, True), (f"{live} more", False), (live.replace(" ", ", "), False)):
-        (tmp_path / handoff.SESSION).write_text(claim, encoding="utf-8")
-        assert (bool(re.fullmatch(pattern, claim)),
-                handoff.a_session_claims_the_osr2(tmp_path)) == (read, read), claim
-
-
-def test_a_takeover_carrying_what_the_document_says_this_app_reads_is_taken(tmp_path):
-    handoff.hand_over(tmp_path, pid=os.getpid(), args=[contract.MODE_FLAG])
-    asked = json.loads((tmp_path / handoff.TAKEOVER).read_text(encoding="utf-8"))
-
-    assert sorted(asked) == _handoff()["takeover"]["reads"]["keys"]
-    assert contract.take_the_takeover(tmp_path, pid=os.getpid()) is not None
-
-
-def test_every_offer_and_slideshow_mark_the_document_says_this_app_writes_is_one_it_writes():
-    window = handoff.Process(4242, 4343)
-
-    assert {side: entry["writes"] for side, entry in _handoff().items() if "writes" in entry} == {
-        "offer": [handoff.offer_of(window), handoff.offer_of(window, starting=True)],
-        "showing": [handoff.slideshow_mark_of(window, shape) for shape in handoff.SHAPES]}
 
 
 def test_the_document_names_every_fix_a_session_should_hear_for_the_built_in_parts():

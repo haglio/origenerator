@@ -354,7 +354,7 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
 
     Nothing is capped here: the collection keeps going as far back as the user has ever
     generated, and the pane draws a page of tiles at a time as it's scrolled into
-    (:meth:`~origenerator.gui.browser_pane.BrowserPane.grow_recents`).
+    (:meth:`~origenerator.gui.browser_pane.BrowserPane.grow`).
     """
     listed = [
         row for row in rows

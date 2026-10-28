@@ -60,12 +60,12 @@ def bring_into_view(scroll, tile) -> None:
 
 def _lay_out_now(scroll) -> None:
     content = scroll.widget()
-    _show_the_tiles_qt_queued_to_show(content)
+    show_the_tiles_qt_queued_to_show(content)
     if content.layout() is not None:
         content.layout().activate()
     QCoreApplication.sendEvent(scroll, QEvent(QEvent.Type.LayoutRequest))
 
 
-def _show_the_tiles_qt_queued_to_show(content) -> None:
+def show_the_tiles_qt_queued_to_show(content) -> None:
     for tile in content.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
         QCoreApplication.sendPostedEvents(tile, QEvent.Type.MetaCall)

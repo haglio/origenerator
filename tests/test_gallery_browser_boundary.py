@@ -255,8 +255,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     pair that kept its message for then went. 274 -> 271: what the microphone hears
     no longer edits the prompt Auto-Generate runs on, so the two methods voice read
     and wrote that prompt through went, and so did the one that found the folder an
-    edited prompt belonged in.)"""
+    edited prompt belonged in. And the pane 84 -> 82: Latest's pages are drawn by
+    the one pager any listing can take, so the three steps that drew, forgot and
+    revealed Latest's own pages are the one that hands a listing to it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 271
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 84
+               for x in _class_def(PANE, "BrowserPane").body) == 82

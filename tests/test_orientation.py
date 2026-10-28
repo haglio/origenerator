@@ -653,7 +653,7 @@ def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
 
     view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, "portrait")])
 
-    assert view._browser.visible_prompt_ids() == ["t1"]
+    assert view._browser.listed_prompt_ids() == ["t1"]
     # The slideshow plays exactly the listing — a homogeneous set, so the
     # hosting session routes the whole slideshow to the portrait region.
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
@@ -673,7 +673,7 @@ def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
 
     view._tree.setCurrentItem(view._item_by_key[oriented_key(FAVORITES_KEY, "landscape")])
 
-    assert view._browser.visible_prompt_ids() == ["w1"]
+    assert view._browser.listed_prompt_ids() == ["w1"]
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["w1"]
 
 

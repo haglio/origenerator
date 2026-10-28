@@ -20,10 +20,10 @@ each.
 from __future__ import annotations
 
 from funestra.console import OSR2_CONTROL_UNANSWERED
-from funestra.console_hud import ConsolePainter, hud_xy
+from funestra.console_hud import ConsolePainter
+from funestra.device_panel import DevicePanel
 from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QImage, QPainter
-from PyQt6.QtWidgets import QWidget
+from shared_ui.pressable_picture import PressablePicture
 
 from origenerator import osr2
 from origenerator.gui.console import (
@@ -36,7 +36,7 @@ from origenerator.gui.console import (
 DEVICE_WATCH_MS = 1000
 
 
-class MotionPanel(QWidget):
+class MotionPanel(PressablePicture):
     """The console, floated over whichever surface hosts it.
 
     It is always here, motion or no motion. With nothing driving, its readout
@@ -44,12 +44,10 @@ class MotionPanel(QWidget):
     riding.
     """
 
-    # Fun Time insets its HUD from the window's top-left corner by this much, and
-    # a reader glancing between the two apps looks for one panel in one place.
-    MARGIN = hud_xy()[0]
-
     def __init__(self, motion, parent=None, device=None, control=None, trouble=None):
-        super().__init__(parent)
+        painter = ConsolePainter(device_only=True)
+        super().__init__(DevicePanel(post=self._post, painter=painter), parent)
+        self._painter = painter
         self._motion = motion
         # The app's one OSR2 switch: the control-state group's four buttons
         # read which state it is in and ask it for another.  None where nobody
@@ -66,8 +64,6 @@ class MotionPanel(QWidget):
         self._ask_device = device
         self._ask_trouble = trouble
         self._drawn_device = None
-        self._painter = ConsolePainter(device_only=True)
-        self.setMouseTracking(True)
         self.setFixedSize(*panel_room(motion))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
@@ -128,35 +124,6 @@ class MotionPanel(QWidget):
         self._repaint.stop()
         self._device_watch.stop()
 
-    # --- presses: the console says what they post, this routes them ---------
-
-    def mousePressEvent(self, event):
-        self._post(self._painter.press_at(*self._window(event)))
-
-    def mouseMoveEvent(self, event):
-        self._painter.motion(*self._window(event))
-        if self._painter.holding:
-            self._post(self._painter.drag_to(*self._window(event)))
-        else:
-            self.update()
-
-    def mouseReleaseEvent(self, event):
-        self._painter.release()
-
-    def leaveEvent(self, event):
-        self._painter.leave()
-        self.update()
-        super().leaveEvent(event)
-
-    def _window(self, event) -> tuple[int, int]:
-        """This widget's coordinates as the window ones the painter expects.
-
-        It sits at the same inset from its parent that Fun Time's does from its
-        window, so putting the margin back is the whole conversion.
-        """
-        return (int(event.position().x()) + self.MARGIN,
-                int(event.position().y()) + self.MARGIN)
-
     def _post(self, action: str) -> None:
         """Do here what Fun Time would route to whichever Funestra owns it —
         through the one router both of this app's consoles press into."""
@@ -176,7 +143,7 @@ class MotionPanel(QWidget):
         return (OSR2_CONTROL_UNANSWERED if self._control is None
                 else self._control.state())
 
-    def render_console(self) -> tuple[bytes, tuple[int, int]]:
+    def picture(self) -> tuple[bytes, tuple[int, int]]:
         """The console drawn — the picture, before it is a widget. Returned
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
@@ -201,11 +168,3 @@ class MotionPanel(QWidget):
         ask_why = self._ask_trouble if self._ask_trouble is not None else osr2.device_trouble
         return ask(), ask_why()
 
-    def paintEvent(self, event):
-        raw, (width, height) = self.render_console()
-        if width > self.width() or height > self.height():
-            self.setFixedSize(max(width, self.width()), max(height, self.height()))
-        painter = QPainter(self)
-        painter.drawImage(0, 0, QImage(raw, width, height,
-                                       QImage.Format.Format_RGBA8888))
-        painter.end()

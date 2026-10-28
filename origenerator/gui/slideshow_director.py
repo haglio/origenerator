@@ -185,6 +185,13 @@ def _still_up(slideshow):
     return slideshow if slideshow is not None and slideshow.is_showing() else None
 
 
+def _with_files(rows):
+    for row in rows:
+        resolved = gallery.resolve_preview(row, OUTPUT_PLACES)
+        if resolved is not None:
+            yield row, resolved
+
+
 def _place_of(prompt_id: str, items) -> int | None:
     return next((index for index, item in enumerate(items) if item[2] == prompt_id), None)
 
@@ -358,7 +365,7 @@ class SlideshowDirector:
 
     def anything_to_play(self) -> bool:
         """Whether the view on screen holds media a slideshow could play at all."""
-        return next(self._playable(self._host.rows_to_play()), None) is not None
+        return next(_with_files(self._host.rows_to_play()), None) is not None
 
     # --- opening one --------------------------------------------------------
 
@@ -696,19 +703,10 @@ class SlideshowDirector:
         being made: a slide with nothing to look at is a gap between pictures,
         and one still in flight joins the running slideshow the moment it lands (see
         :meth:`note_finished`)."""
-        return list(self._playable(rows))
-
-    def _playable(self, rows):
-        """:meth:`items_of`'s slides as they are worked out, so a caller that
-        only needs to know there is one stops at the first."""
         upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
-        for row in rows:
-            resolved = gallery.resolve_preview(row, OUTPUT_PLACES)
-            if resolved is None:
-                continue  # nothing to look at yet, or ever
-            path, media_type = resolved
-            yield (upscales.upscale_of(path) or path, media_type, row["prompt_id"],
-                   row.get("thumbnail_path"))
+        return [(upscales.upscale_of(path) or path, media_type, row["prompt_id"],
+                 row.get("thumbnail_path"))
+                for row, (path, media_type) in _with_files(rows)]
 
     def versions_of(self, rows) -> dict:
         """Each of ``rows``' versions, newest first, keyed by the file its slide

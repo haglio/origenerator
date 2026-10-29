@@ -137,6 +137,14 @@ def shield_icon() -> QIcon:
     return glyph_icon("shield", size=_SIZE)
 
 
+def move_up_icon() -> QIcon:
+    return glyph_icon("chevron_up", size=_SIZE)
+
+
+def move_down_icon() -> QIcon:
+    return glyph_icon("chevron_down", size=_SIZE)
+
+
 def slideshow_icon() -> QIcon:
     """A play triangle in a frame — play this folder as a fullscreen slideshow."""
     return glyph_icon("slideshow", size=_SIZE)

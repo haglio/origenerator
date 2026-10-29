@@ -45,15 +45,21 @@ def dressed(qtbot):
     return q
 
 
+_EITHER_WAY = object()  # an arrow left to follow ``movable``
+
+
 def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
           progress=None, reveal=None, cancel=None, foreign_ahead=None, starts_at=None,
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
           act="", source_video_thumbnail=None, prompt_edited=False,
-          starting=False, movable=None, shield=None, shielded=False):
+          starting=False, movable=None, shield=None, shielded=False,
+          move_up=_EITHER_WAY, move_down=_EITHER_WAY):
     # The job being made holds its place unless a test says it can be moved.
     move = (lambda: None) if (status != "running" if movable is None else movable) else None
-    return InFlightItem(key=key, caption=caption, move_up=move, move_down=move,
+    return InFlightItem(key=key, caption=caption,
+                        move_up=move if move_up is _EITHER_WAY else move_up,
+                        move_down=move if move_down is _EITHER_WAY else move_down,
                         reading=RunReading(status=status, frame=frame, progress=progress,
                                            started_at=started_at,
                                            typical_seconds=typical_seconds),
@@ -378,17 +384,17 @@ def test_a_rule_runs_up_beside_the_live_half_and_along_the_foot_of_its_row(queue
     assert (corner.y(), along.y(), along.x()) == (foot.y(), foot.y(), foot.x())
 
 
-def test_the_rule_stands_midway_between_the_bar_and_the_cancels_leading_the_rows(queue):
+def test_the_rule_stands_midway_between_the_bar_and_the_arrows_leading_the_rows(queue):
     # Give or take the one pixel a gap of even width cannot split.
     queue.set_items([_item(key="a", cancel=lambda: None),
                      _item(key="b", status="queued", cancel=lambda: None)])
     QApplication.processEvents()
     rule = queue.head_rule()[0].x()
     bar_ends = queue._running.geometry().right()
-    cancel = queue.rows()[1]._cancel
-    cancel_starts = cancel.mapTo(queue, cancel.rect().topLeft()).x()
+    up = queue.rows()[1]._up
+    up_starts = up.mapTo(queue, up.rect().topLeft()).x()
 
-    assert abs((rule - bar_ends) - (cancel_starts - rule)) <= 1
+    assert abs((rule - bar_ends) - (up_starts - rule)) <= 1
 
 
 def test_no_rule_stands_beside_another_apps_backlog_with_nothing_of_ours_in_it(queue):
@@ -510,9 +516,89 @@ def test_a_rows_cancel_hover_follows_its_folders_auto_generate_in_place(queue):
     assert row._cancel.toolTip() == "Cancel this generation"
 
 
+# --- the arrows, which move a job one place up or down the line ---------------
+
+def test_every_row_leads_with_an_up_and_a_down_arrow_ahead_of_its_shield(queue):
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None),
+                     _item(key="b", status="queued", cancel=lambda: None,
+                           shield=lambda _on: None)])
+    QApplication.processEvents()
+
+    rows = queue.rows()
+    for row in rows:
+        up, down, shield = row._up.geometry(), row._down.geometry(), row._shield.geometry()
+        assert up.right() < down.left() and down.right() < shield.left()
+    assert len({row._up.geometry().x() for row in rows}) == 1
+
+
+def test_pressing_an_arrow_moves_its_job_that_way(queue, qtbot):
+    asked = []
+    queue.set_items([_item(key="a", status="queued", move_up=lambda: asked.append("up"),
+                           move_down=lambda: asked.append("down"))])
+    row = queue.rows()[0]
+
+    qtbot.mouseClick(row._up, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(row._down, Qt.MouseButton.LeftButton)
+
+    assert asked == ["up", "down"]
+
+
+def test_an_arrow_its_job_cannot_go_is_grayed_out(queue):
+    # The top row's up arrow, say: the arrows stay in their column either way.
+    queue.set_items([_item(key="a", status="queued", move_up=None, move_down=lambda: None)])
+    QApplication.processEvents()
+    row = queue.rows()[0]
+
+    assert (row._up.isVisible(), row._up.isEnabled()) == (True, False)
+    assert row._up.cursor().shape() == Qt.CursorShape.ArrowCursor  # no hand: nothing to press
+    assert row._down.isEnabled()
+    assert row._down.cursor().shape() == Qt.CursorShape.PointingHandCursor
+
+
+def test_a_press_on_a_grayed_arrow_does_nothing_at_all(queue):
+    # Not even the folder the rest of the row opens, nor a drag of the row.
+    revealed = []
+    queue.set_items([_item(key="a", status="queued", reveal=lambda: revealed.append(True),
+                           move_up=None, move_down=lambda: None)])
+    QApplication.processEvents()
+    up = queue.rows()[0]._up
+    on_it = up.mapTo(queue.window(), up.rect().center())
+
+    QTest.mouseClick(queue.window().windowHandle(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, on_it)
+    QTest.mouseDClick(queue.window().windowHandle(), Qt.MouseButton.LeftButton,
+                      Qt.KeyboardModifier.NoModifier, on_it)
+
+    assert revealed == []
+    assert queue.rows()[0]._press_at is None
+
+
+def test_a_rows_arrows_follow_where_its_job_can_go_in_place(queue):
+    queue.set_items([_item(key="a", status="queued", move_up=None, move_down=lambda: None)])
+    row = queue.rows()[0]
+
+    queue.set_items([_item(key="a", status="queued", move_up=lambda: None, move_down=None)])
+
+    assert queue.rows() == [row]
+    assert (row._up.isEnabled(), row._down.isEnabled()) == (True, False)
+
+
+def test_a_rows_text_elides_rather_than_widen_the_row_past_a_narrow_strip(queue):
+    queue.resize(900, 60)
+    queue.set_items([_item(key="a", status="queued", job_kind="Video",
+                           act="an act with a name long enough to run past the strip",
+                           cancel=lambda: None, shield=lambda _on: None)])
+    QApplication.processEvents()
+    row = queue.rows()[0]
+
+    assert row.width() <= queue._scroll.viewport().width()
+    assert row._lead.display_text(row._lead.width()).endswith("…")
+    assert row._lead.text().endswith("past the strip")
+
+
 # --- the shield, which keeps a run going for the images asked for after it ----
 
-def test_every_row_leads_with_its_shield_just_left_of_its_cancel(queue):
+def test_every_rows_shield_sits_just_left_of_its_cancel(queue):
     queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None),
                      _item(key="b", status="queued", cancel=lambda: None,
                            shield=lambda _on: None, auto_generating=True)])

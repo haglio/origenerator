@@ -387,13 +387,11 @@ def _first_output_path(row: dict, places: OutputPlaces) -> Path:
 
 def _get_existing_filenames(db: Database) -> set[str]:
     result = set()
-    for row in db.list_generations():
-        files_json = row.get("output_files")
-        if files_json:
-            try:
-                result.update(_record_key(f) for f in json.loads(files_json))
-            except (json.JSONDecodeError, KeyError):
-                pass
+    for files_json in db.output_files_of_every_row():
+        try:
+            result.update(_record_key(f) for f in json.loads(files_json))
+        except (json.JSONDecodeError, KeyError):
+            pass
     return result
 
 

@@ -162,6 +162,9 @@ class Database:
     def library_paths(self) -> set[str]:
         return self.generations.library_paths()
 
+    def output_files_of_every_row(self) -> list[str]:
+        return self.generations.output_files_of_every_row()
+
     def get_generation(self, prompt_id: str) -> dict | None:
         return self.generations.get_generation(prompt_id)
 

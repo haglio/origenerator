@@ -1892,6 +1892,18 @@ def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, mon
     assert (kept["lora"], kept["strength"]) == ("my_hands.safetensors", 0.7)
 
 
+def test_a_fixs_prompts_offer_only_the_loras_the_enhance_model_can_run(qtbot, installed_models):
+    installed_models.add("loras", "an_xl_fix.safetensors", arch="sdxl", lora=True)
+    installed_models.add("loras", "a_15_fix.safetensors", arch="sd15", lora=True)
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    lora = panel._fix_prompt_windows["hands"].lora
+
+    offered = {lora.itemData(row) for row in range(lora.count())}
+    assert {"an_xl_fix.safetensors", "a_15_fix.safetensors"} & offered == {
+        "an_xl_fix.safetensors"}
+
+
 _STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
                "Click to add it.")
 

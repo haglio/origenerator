@@ -32,7 +32,7 @@ class FakeEngine:
         self.showing_image = False
         self.showing_video = True
         self.image_time: tuple[float, float] | None = None
-        self.picture_seeks: list[float] = []
+        self.image_seeks: list[float] = []
         self.source_dims = (0, 0)
         self.ab_loop: tuple[float, float] | None = None
         self.pushes = 0
@@ -94,7 +94,7 @@ class FakeEngine:
         self.held_for = seconds or None
 
     def seek_image(self, ms: float) -> None:
-        self.picture_seeks.append(ms)
+        self.image_seeks.append(ms)
 
     def push_still(self) -> None:
         self.pushes += 1

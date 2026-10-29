@@ -15,16 +15,23 @@ from origenerator.workflows.model_arch import (
     SDXL,
     WAN,
     WAN_ANIMATE,
+    WAN_FUN_CONTROL,
     WAN_S2V,
+    WAN_T2V,
 )
 
 
-def _write(path, tensor_names):
+def _write_shaped(path, shapes):
     header = json.dumps(
-        {name: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for name in tensor_names}
+        {name: {"dtype": "F16", "shape": shape, "data_offsets": [0, 2]}
+         for name, shape in shapes.items()}
     ).encode()
     path.write_bytes(struct.pack("<Q", len(header)) + header + b"\x00\x00")
     return path
+
+
+def _write(path, tensor_names):
+    return _write_shaped(path, {name: [1] for name in tensor_names})
 
 
 # The tensor-name shapes the installed models actually have, one case per
@@ -98,13 +105,31 @@ def test_reads_the_architecture_off_the_tensor_names(tmp_path, expected, tensor_
     assert model_arch.describe(_write(tmp_path / "m.safetensors", tensor_names)).arch == expected
 
 
+def _wan_model(path, patch_channels, *extra):
+    return _write_shaped(path, {
+        "blocks.0.self_attn.q.weight": [5120, 5120],
+        "model.diffusion_model.patch_embedding.weight": [5120, patch_channels, 1, 2, 2],
+        **{name: [5120, 16, 1, 2, 2] for name in extra}})
+
+
+def test_a_wan_model_whose_patches_take_sixteen_channels_makes_video_from_text_alone(tmp_path):
+    assert model_arch.describe(_wan_model(tmp_path / "t.safetensors", 16)).arch == WAN_T2V
+    assert model_arch.describe(_wan_model(tmp_path / "i.safetensors", 36)).arch == WAN
+
+
+def test_a_wan_model_with_a_reference_conv_is_steered_by_a_control_video(tmp_path):
+    path = _wan_model(tmp_path / "c.safetensors", 52, "ref_conv.weight")
+
+    assert model_arch.describe(path).arch == WAN_FUN_CONTROL
+
+
 def test_a_model_file_is_read_once_while_it_stays_the_same(tmp_path, monkeypatch):
     """Twenty tabs restored at launch listed the model folders 111 times and
     read 1,099 file headers doing it."""
     path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
     reads = []
-    read = model_arch._tensor_names
-    monkeypatch.setattr(model_arch, "_tensor_names", lambda p: reads.append(p) or read(p))
+    read = model_arch._tensor_shapes
+    monkeypatch.setattr(model_arch, "_tensor_shapes", lambda p: reads.append(p) or read(p))
 
     model_arch.describe(path)
     model_arch.describe(path)
@@ -121,7 +146,7 @@ def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeyp
     path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
     assert model_arch.describe(path).arch == SDXL
     reads = []
-    monkeypatch.setattr(model_arch, "_tensor_names", lambda p: reads.append(p))
+    monkeypatch.setattr(model_arch, "_tensor_shapes", lambda p: reads.append(p))
     monkeypatch.setattr(model_arch, "_described", None)  # the next launch
 
     assert model_arch.describe(path).arch == SDXL

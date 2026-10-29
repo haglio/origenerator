@@ -1011,7 +1011,8 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         assert denoise.default == 0.15
 
 
-_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_animate", "ltx", "krea2")
+_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_t2v", "wan_fun_control",
+             "wan_animate", "ltx", "krea2")
 # The categories that hold more than one architecture. upscale_models is left
 # out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
 # over them is meant to list everything.
@@ -1043,6 +1044,20 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
             checked += 1
             assert offered < planted, f"{name}.{pd.key} offers every architecture"
     assert checked, "no model pickers were exercised — the fixture stopped matching"
+
+
+def test_an_image_to_video_form_offers_no_model_that_makes_video_from_text_or_a_control_video(
+        installed_models):
+    families = ("wan", "wan_t2v", "wan_fun_control")
+    for family in families:
+        installed_models.add("diffusion_models", f"fam_{family}.safetensors", arch=family)
+    kinds = {f"fam_{family}.safetensors" for family in families}
+
+    for workflow in ("wan22_i2v", "wan22_flf2v_loop"):
+        for pd in WORKFLOW_REGISTRY[workflow].param_definitions():
+            if pd.key in ("unet_high", "unet_low"):
+                assert kinds.intersection(pd.options) == {"fam_wan.safetensors"}, (
+                    f"{workflow}.{pd.key}")
 
 
 def test_every_wan_expert_slot_rejects_the_other_half(installed_models):

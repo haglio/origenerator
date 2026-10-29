@@ -811,9 +811,10 @@ def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, t
 class _Training(QObject):
     ended = pyqtSignal(object)
 
-    def __init__(self, running=True):
+    def __init__(self, running=True, holds_the_line=True):
         super().__init__()
         self.running = running
+        self.holds_the_line = holds_the_line
 
 
 def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_ends(qtbot, tmp_path):
@@ -821,7 +822,7 @@ def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_ends(qtbot, 
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     training = _Training()
-    queue.hold_for_training(training)
+    queue.watch_training(training)
 
     held = _launch_video(queue, "v1", seed=1)
     assert client.submit_job.call_count == 0
@@ -834,10 +835,25 @@ def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_ends(qtbot, 
     assert queue.training is None
 
 
+def test_a_queue_watching_a_training_that_yields_the_card_hands_comfyui_its_jobs_as_ever(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    training = _Training(holds_the_line=False)
+    queue.watch_training(training)
+
+    sent = _launch_video(queue, "v1", seed=1)
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [sent.prompt_id]
+    assert queue.training is training
+    assert not queue.training_holds_the_machine()
+    assert queue.flush_to_server() == 0
+
+
 def test_a_training_that_ends_says_what_it_came_to_the_way_a_run_does(qtbot, tmp_path):
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     training = _Training()
-    queue.hold_for_training(training)
+    queue.watch_training(training)
     outcome = RunOutcome(kind="Training", display_name="Hands fix", seconds=2952.0, ok=True,
                          source="", generation="")
 
@@ -850,7 +866,7 @@ def test_a_training_that_ends_says_what_it_came_to_the_way_a_run_does(qtbot, tmp
 def test_a_canceled_training_says_nothing_of_what_it_came_to(qtbot, tmp_path):
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     training = _Training()
-    queue.hold_for_training(training)
+    queue.watch_training(training)
 
     with qtbot.assertNotEmitted(queue.run_ended):
         training.ended.emit(None)
@@ -879,7 +895,7 @@ def test_closing_while_a_training_runs_leaves_the_line_for_the_next_launch(qtbot
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    queue.hold_for_training(_Training(running=True))
+    queue.watch_training(_Training(running=True))
     waiting = _launch_video(queue, "v1", seed=1)
 
     assert queue.flush_to_server() == 0
@@ -890,7 +906,7 @@ def test_closing_while_a_training_runs_leaves_the_line_for_the_next_launch(qtbot
 def test_closing_while_a_training_waits_its_turn_hands_the_line_over_as_ever(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
-    queue.hold_for_training(_Training(running=False))
+    queue.watch_training(_Training(running=False))
     waiting = _launch_video(queue, "v1", seed=1)
 
     assert queue.flush_to_server() == 1
@@ -1530,7 +1546,7 @@ def test_start_now_starts_the_video_waiting_out_the_minute_at_once(qtbot, tmp_pa
 def test_a_video_held_for_a_training_says_no_start(qtbot, tmp_path):
     _client_, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
-    queue.hold_for_training(_Training())
+    queue.watch_training(_Training())
 
     assert queue.starts_at(video.prompt_id) is None
 

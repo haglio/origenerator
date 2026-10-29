@@ -4,28 +4,20 @@ says back."""
 
 from __future__ import annotations
 
-import json
-import subprocess
-import time
-from dataclasses import asdict, dataclass
-from enum import Enum
 from pathlib import Path, PureWindowsPath
 
-from app_support.win32 import process_started
-
-from origenerator import comfyui_launcher, config, gallery, timing
-from origenerator.gallery import JobKind
+from origenerator import comfyui_launcher, config, gallery, lora_training
 from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
+from origenerator.lora_training import TrainingState
 from origenerator.lora_versions import next_version
 from origenerator.model_titles import FIX_LORA_FOLDER
-from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part, part_table
 
-TRAINER = Path(__file__).resolve().parents[1] / "tools" / "fix_lora_trainer.py"
+TRAINER = lora_training.TRAINERS / "fix_lora_trainer.py"
+HOLDS_THE_LINE = True
+FIRST_STATE = "cropping"
 _PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
-_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-_IN_THE_BACKGROUND = _NO_WINDOW | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
 
 
 def photos_folder(part) -> Path:
@@ -51,17 +43,7 @@ def training_photos(part) -> list[Path]:
 
 
 def photo_stamps(part) -> dict[str, list[int]]:
-    stamps = {}
-    for photo in training_photos(part):
-        found = photo.stat()
-        stamps[f"{photo.parent.name}/{photo.name}"] = [found.st_size, found.st_mtime_ns]
-    return stamps
-
-
-class TrainingState(Enum):
-    UNTRAINED = "untrained"
-    CURRENT = "current"
-    OUT_OF_DATE = "out of date"
+    return lora_training.picture_stamps(training_photos(part))
 
 
 def _work_folder(part) -> Path:
@@ -69,13 +51,7 @@ def _work_folder(part) -> Path:
 
 
 def training_state(part) -> TrainingState:
-    try:
-        trained = json.loads((_work_folder(part) / "trained.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return TrainingState.UNTRAINED
-    if trained.get("photo_stamps") == photo_stamps(part):
-        return TrainingState.CURRENT
-    return TrainingState.OUT_OF_DATE
+    return lora_training.training_state(_work_folder(part) / "trained.json", photo_stamps(part))
 
 
 def fix_to_train():
@@ -97,8 +73,8 @@ def fix_title_base(part_name: str) -> str:
 
 def training_job(part, checkpoint: str, *, automatic: bool = False) -> dict:
     models = config.COMFYUI_DIR / "models"
-    work = _work_folder(part)
     version = next_version(fix_title_base(part.name))
+    output_name = f"{part.name} {version}"
     return {
         "part": part.name,
         "photos": [str(path) for path in training_photos(part)],
@@ -109,14 +85,10 @@ def training_job(part, checkpoint: str, *, automatic: bool = False) -> dict:
         "base_model": str(models / "checkpoints" / checkpoint),
         "sd_scripts": str(config.LORA_TRAINING_SCRIPTS),
         "output_dir": str(models / "loras" / FIX_LORA_FOLDER),
-        "output_name": f"{part.name} {version}",
+        "output_name": output_name,
+        "lora": str(PureWindowsPath(FIX_LORA_FOLDER) / f"{output_name}.safetensors"),
         "display_name": f"{fix_title_base(part.name)} {version}",
-        "work": str(work),
-        "status": str(work / "status.json"),
-        "log": str(work / "training.log"),
-        "job_file": str(work / "job.json"),
-        "process": str(work / "process.json"),
-        "trained": str(work / "trained.json"),
+        **lora_training.work_files(_work_folder(part)),
         "automatic": automatic,
     }
 
@@ -125,118 +97,22 @@ def comfyui_python() -> Path:
     return comfyui_launcher.load(config.COMFYUI_DIR).comfyui_python()
 
 
-@dataclass(frozen=True)
-class Trainer:
-    pid: int
-    started: int | None
-    began: float
-
-    def running(self) -> bool:
-        return self.started is not None and process_started(self.pid) == self.started
-
-    def stop(self) -> None:
-        if self.running():
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.pid)],
-                           capture_output=True, creationflags=_NO_WINDOW)
-
-
-def start(job: dict) -> Trainer:
-    Path(job["work"]).mkdir(parents=True, exist_ok=True)
-    Path(job["status"]).unlink(missing_ok=True)
-    Path(job["log"]).unlink(missing_ok=True)
-    Path(job["job_file"]).write_text(json.dumps(dict(job, comfyui_python=str(comfyui_python()))),
-                                     encoding="utf-8")
-    with open(job["log"], "ab") as log:
-        process = subprocess.Popen([str(config.LORA_TRAINING_PYTHON), str(TRAINER), "run",
-                                    job["job_file"]],
-                                   stdout=log, stderr=subprocess.STDOUT,
-                                   creationflags=_IN_THE_BACKGROUND)
-    trainer = Trainer(process.pid, process_started(process.pid), time.time())
-    Path(job["process"]).write_text(json.dumps(asdict(trainer)), encoding="utf-8")
-    return trainer
-
-
-def trainer_of(job: dict) -> Trainer | None:
-    try:
-        return Trainer(**json.loads(Path(job["process"]).read_text(encoding="utf-8")))
-    except (KeyError, OSError, ValueError, TypeError):
-        return None
-
-
-def _durations_file() -> Path:
-    return config.FIX_TRAINING_DIR / "durations.json"
-
-
-def _durations() -> list[float]:
-    try:
-        return json.loads(_durations_file().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-
-
-def time_taken(job: dict, trainer: Trainer) -> float:
-    try:
-        ended = Path(job["status"]).stat().st_mtime
-    except OSError:
-        ended = time.time()
-    return ended - trainer.began
-
-
-def note_duration(seconds: float) -> None:
-    _durations_file().parent.mkdir(parents=True, exist_ok=True)
-    _durations_file().write_text(json.dumps((_durations() + [seconds])[-10:]), encoding="utf-8")
-
-
-def typical_seconds() -> float | None:
-    return timing.estimate_seconds(_durations())
+def start(job: dict) -> lora_training.Trainer:
+    return lora_training.start(job, config.LORA_TRAINING_PYTHON, TRAINER,
+                               comfyui_python=str(comfyui_python()))
 
 
 def trainings() -> list[dict]:
-    jobs = []
-    for job_file in sorted(config.FIX_TRAINING_DIR.glob("*/job.json")):
-        try:
-            jobs.append(json.loads(job_file.read_text(encoding="utf-8")))
-        except (OSError, ValueError):
-            continue
-    return jobs
+    return lora_training.trainings(config.FIX_TRAINING_DIR)
 
 
 def running_trainings() -> list[dict]:
-    return [job for job in trainings()
-            if (trainer := trainer_of(job)) is not None and trainer.running()]
+    return lora_training.running_trainings(config.FIX_TRAINING_DIR)
 
 
-def outcome_of(job: dict, *, ok: bool, seconds: float | None) -> RunOutcome:
-    return RunOutcome(kind=JobKind.TRAINING, display_name=f"{job['part'].capitalize()} fix",
-                      seconds=seconds, ok=ok, source="", generation="")
+def note_duration(seconds: float) -> None:
+    lora_training.note_duration(config.FIX_TRAINING_DIR, seconds)
 
 
-def lora_of(status: dict) -> str:
-    return str(PureWindowsPath(FIX_LORA_FOLDER) / status["lora"])
-
-
-def untaken_lora(job: dict) -> str | None:
-    status = read_status(job) or {}
-    if status.get("state") != "done" or status.get("taken"):
-        return None
-    return lora_of(status)
-
-
-def mark_taken(job: dict) -> None:
-    _mark(job, taken=True)
-
-
-def mark_announced(job: dict) -> None:
-    _mark(job, announced=True)
-
-
-def _mark(job: dict, **marks) -> None:
-    Path(job["status"]).write_text(json.dumps(dict(read_status(job) or {}, **marks)),
-                                   encoding="utf-8")
-
-
-def read_status(job: dict) -> dict | None:
-    try:
-        return json.loads(Path(job["status"]).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
+def typical_seconds() -> float | None:
+    return lora_training.typical_seconds(config.FIX_TRAINING_DIR)

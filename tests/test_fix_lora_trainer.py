@@ -183,7 +183,8 @@ def _cropped_job(tmp_path, sd_script: str) -> dict:
     crops.mkdir(parents=True)
     (crops / "0000.jpg").write_bytes(_image())
     return dict(job, sd_scripts=str(scripts), base_model="base.safetensors",
-                output_dir=str(tmp_path / "loras"), output_name="hands 2026-10-21 1500")
+                output_dir=str(tmp_path / "loras"), output_name="hands 1.1",
+                lora=r"fixes\hands 1.1.safetensors")
 
 
 @pytest.mark.parametrize("said", ["torch.OutOfMemoryError: CUDA out of memory.",
@@ -223,7 +224,7 @@ def test_a_finished_training_names_its_lora_and_passes_on_what_it_printed(tmp_pa
 
     fix_lora_trainer.train(job)
 
-    assert _status(job) == {"state": "done", "lora": "hands 2026-10-21 1500.safetensors"}
+    assert _status(job) == {"state": "done", "lora": r"fixes\hands 1.1.safetensors"}
     assert "5/10" in capfd.readouterr().out
 
 
@@ -235,7 +236,7 @@ def test_a_finished_training_keeps_a_record_of_the_photos_it_trained_on(tmp_path
     fix_lora_trainer.train(job)
 
     assert json.loads(Path(job["trained"]).read_text(encoding="utf-8")) == {
-        "photo_stamps": stamps, "lora": "hands 2026-10-21 1500.safetensors"}
+        "photo_stamps": stamps, "lora": r"fixes\hands 1.1.safetensors"}
 
 
 def test_a_part_is_cropped_to_a_square_twice_its_size_around_it():

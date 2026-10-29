@@ -72,6 +72,7 @@ from origenerator import (
     evolver_export,
     fix_training,
     gallery,
+    lora_training,
     motion_engine,
     osr2_driver,
     outside_videos,
@@ -9102,10 +9103,10 @@ def test_a_training_left_running_is_taken_up_before_the_line_it_held_is_sent(
     _insert_running_reroll(db, "waiting")
     db.update_generation("waiting", status="pending")
     trainer = SimpleNamespace(running=lambda: True, began=0.0)
-    job = {"part": "hands", "status": str(tmp_path / "status.json"),
-           "log": str(tmp_path / "training.log")}
+    job = {"part": "hands", "display_name": "Hands fix 1.0",
+           "status": str(tmp_path / "status.json"), "log": str(tmp_path / "training.log")}
     monkeypatch.setattr(fix_training, "trainings", lambda: [job])
-    monkeypatch.setattr(fix_training, "trainer_of", lambda kept: trainer)
+    monkeypatch.setattr(lora_training, "trainer_of", lambda kept: trainer)
     client = _reroll_client()
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)

@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import json
 import time
+import types
 from pathlib import Path
 
 import pytest
 
 from origenerator import config, fix_training
-from origenerator.gui import fix_training_run
-from origenerator.gui.fix_training_run import FixTrainingRun
+from origenerator.gui import training_run
 from origenerator.gui.generation_job import JobState
+from origenerator.gui.training_run import TrainingRun
 
 
 class _Queue:
@@ -19,7 +20,7 @@ class _Queue:
         self.ended: list = []
         self.freed = 0
 
-    def hold_for_training(self, training) -> None:
+    def watch_training(self, training) -> None:
         self.held.append(training)
         training.ended.connect(self.ended.append)
 
@@ -45,7 +46,7 @@ class _Trainer:
 
 
 def _run(qtbot, monkeypatch, tmp_path, *, busy=False):
-    monkeypatch.setattr(fix_training_run, "POLL_MS", 5)
+    monkeypatch.setattr(training_run, "POLL_MS", 5)
     monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
     started: list[_Trainer] = []
 
@@ -55,9 +56,9 @@ def _run(qtbot, monkeypatch, tmp_path, *, busy=False):
 
     monkeypatch.setattr(fix_training, "start", start)
     queue = _Queue(busy)
-    job = {"part": "hands", "status": str(tmp_path / "status.json"),
-           "log": str(tmp_path / "training.log")}
-    run = FixTrainingRun(job, queue, reveal=lambda: None)
+    job = {"part": "hands", "display_name": "Hands fix 1.0",
+           "status": str(tmp_path / "status.json"), "log": str(tmp_path / "training.log")}
+    run = TrainingRun(job, queue, fix_training, reveal=lambda: None)
     return run, queue, started
 
 
@@ -128,7 +129,7 @@ def test_a_finished_trainings_time_is_noted_where_its_lora_is_taken_not_by_the_r
     qtbot.waitUntil(lambda: bool(started))
 
     with qtbot.waitSignal(run.finished):
-        _say(tmp_path, state="done", lora="hands 2026-10-21 1500.safetensors")
+        _say(tmp_path, state="done", lora=r"fixes\hands 2026-10-21 1500.safetensors")
         started[0].alive = False
 
     assert noted == []
@@ -141,12 +142,12 @@ def test_a_finished_training_lets_the_queue_go_and_names_the_lora_it_made(
     qtbot.waitUntil(lambda: bool(started))
 
     with qtbot.waitSignal(run.finished) as made:
-        _say(tmp_path, state="done", lora="hands 2026-10-19 0130.safetensors")
+        _say(tmp_path, state="done", lora=r"fixes\hands 2026-10-19 0130.safetensors")
         started[0].alive = False
 
-    assert made.args == [fix_training.lora_of({"lora": "hands 2026-10-19 0130.safetensors"})]
+    assert made.args == [r"fixes\hands 2026-10-19 0130.safetensors"]
     (outcome,) = queue.ended
-    assert (outcome.kind, outcome.display_name, outcome.ok) == ("Training", "Hands fix", True)
+    assert (outcome.kind, outcome.display_name, outcome.ok) == ("Training", "Hands fix 1.0", True)
     assert outcome.seconds == pytest.approx(30, abs=10)
     assert not run.running
 
@@ -236,5 +237,43 @@ def test_a_training_left_running_by_an_earlier_launch_holds_the_line_at_once(
     assert started == []
     assert queue.freed == 0
     with qtbot.waitSignal(run.finished):
-        _say(tmp_path, state="done", lora="hands 2026-10-21 1500.safetensors")
+        _say(tmp_path, state="done", lora=r"fixes\hands 2026-10-21 1500.safetensors")
         trainer.alive = False
+
+
+def _yielding_kind(started: list):
+    def start(job):
+        started.append(_Trainer())
+        return started[-1]
+
+    return types.SimpleNamespace(HOLDS_THE_LINE=False, FIRST_STATE="preparing", start=start,
+                                 typical_seconds=lambda: None)
+
+
+def test_a_training_that_yields_the_card_itself_starts_at_once_whatever_comfyui_is_making(
+        qtbot, monkeypatch, tmp_path):
+    monkeypatch.setattr(training_run, "POLL_MS", 5)
+    queue = _Queue(busy=True)
+    started: list[_Trainer] = []
+    job = {"display_name": "Example Look 1.1", "status": str(tmp_path / "status.json"),
+           "log": str(tmp_path / "training.log")}
+    run = TrainingRun(job, queue, _yielding_kind(started), reveal=lambda: None)
+    words = []
+    run.progress.connect(words.append)
+
+    run.begin()
+
+    assert queue.held == [run]
+    assert not run.holds_the_line
+    assert len(started) == 1
+    assert queue.freed == 0
+    assert run.reading().stage == "Copying pictures"
+    assert run.caption == "Example Look 1.1 LoRA"
+    _say(tmp_path, state="describing", done=3, total=12)
+    qtbot.waitUntil(lambda: run.reading().stage == "Describing pictures")
+    assert run.reading().pass_progress == (3, 12)
+    _say(tmp_path, state="waiting")
+    qtbot.waitUntil(lambda: run.reading().stage == "Waiting for the graphics card")
+    _say(tmp_path, state="training", done=150, total=1500)
+    qtbot.waitUntil(lambda: run.reading().progress == (150, 1500))
+    assert words[-1] == "Training 10%"

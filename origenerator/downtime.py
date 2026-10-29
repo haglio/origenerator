@@ -10,7 +10,7 @@ from pathlib import Path
 from app_support.logging_utils import configure_logging, install_exception_logging
 from shared_ui.preview import taskbar_identity
 
-from origenerator import config, fix_training, gallery, places_backfill
+from origenerator import config, fix_training, gallery, lora_training, places_backfill
 from origenerator.app_state import AppState
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
@@ -87,12 +87,12 @@ def queue_the_work_left(jobs, rows: list[dict], *, experiments_on: bool, policy)
 
 def announce_trainings_that_ended(announce) -> None:
     for job in fix_training.trainings():
-        status = fix_training.read_status(job) or {}
+        status = lora_training.read_status(job) or {}
         if (job.get("automatic") and status.get("state") in ("done", "failed")
                 and not status.get("taken") and not status.get("announced")):
             if (notice := training_notice(job)) is not None:
                 announce(notice)
-            fix_training.mark_announced(job)
+            lora_training.mark_announced(job)
 
 
 def _comfyui_busy(client) -> bool:

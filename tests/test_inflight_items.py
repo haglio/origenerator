@@ -88,7 +88,7 @@ class FakeJobQueue:
 
 
 class FakeTraining:
-    name = "hands"
+    caption = "Hands fix 1.0 LoRA"
 
     def __init__(self):
         self.canceled = self.revealed = 0

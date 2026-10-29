@@ -217,7 +217,7 @@ class JobQueue(QObject):
     def close(self) -> None:
         self._closed = True
 
-    def hold_for_training(self, training) -> None:
+    def watch_training(self, training) -> None:
         self._training = training
         training.ended.connect(self._let_go_of_training)
 
@@ -231,8 +231,11 @@ class JobQueue(QObject):
     def training(self):
         return self._training
 
+    def _training_holds_the_line(self) -> bool:
+        return self._training is not None and self._training.holds_the_line
+
     def training_holds_the_machine(self) -> bool:
-        return self._training is not None and self._training.running
+        return self._training_holds_the_line() and self._training.running
 
     def making_something(self) -> bool:
         return bool(self._on_server) or self._in_flight is not None
@@ -523,8 +526,8 @@ class JobQueue(QObject):
         return self._clock() + wait if wait > 0 else None
 
     def _free_for_the_next_job(self) -> bool:
-        return not (self._on_server or self._in_flight is not None or self._training is not None
-                    or self._awaiting_comfyui)
+        return not (self._on_server or self._in_flight is not None
+                    or self._training_holds_the_line() or self._awaiting_comfyui)
 
     def _wait_at_the_front(self) -> float:
         since = (None if self._image_asked_at is None

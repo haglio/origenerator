@@ -70,7 +70,7 @@ def training_job(base: str) -> dict:
         "display_name": output_name,
         "lora_folder": str(lora_folder() / folder),
         "lora": str(folder / f"{output_name}.safetensors"),
-        "trigger_words": list(trigger_words_by_lora().get(model_stem(newest[1]), [])) if newest else [],
+        "trigger_words": _words_to_train_on(settings, newest),
         "base_model": str(models / "diffusion_models" / settings["base_model"]),
         "text_encoder": str(models / "text_encoders" / settings["text_encoder"]),
         "vae": str(models / "vae" / settings["vae"]),
@@ -80,6 +80,12 @@ def training_job(base: str) -> dict:
         "comfyui": f"http://{config.COMFYUI_HOST}:{config.COMFYUI_PORT}",
         **lora_training.work_files(work_folder(base)),
     }
+
+
+def _words_to_train_on(settings: dict, newest) -> list[str]:
+    if "trigger_words" in settings:
+        return list(settings["trigger_words"])
+    return list(trigger_words_by_lora().get(model_stem(newest[1]), [])) if newest else []
 
 
 def start(job: dict) -> lora_training.Trainer:

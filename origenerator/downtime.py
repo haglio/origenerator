@@ -165,7 +165,7 @@ def main() -> int:
     from origenerator.db import Database  # noqa: PLC0415
 
     db = Database(config.LIBRARY_STATE_DIR / "origenerator.db")
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=config.COMFYUI_FOLDERS)
     copies = Copies(config.LIBRARY_STATE_DIR)
     ui = AppState(config.UI_STATE_PATH)
 

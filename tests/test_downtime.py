@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import types
+from unittest.mock import MagicMock, patch
 
 from origenerator import downtime, gallery
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 _HANDS = types.SimpleNamespace(name="hands")
@@ -128,6 +131,44 @@ def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_card
 
     assert json.loads(capsys.readouterr().out) == {
         "did": "nothing: Origenerator is open", "holds_the_graphics_card": False}
+
+
+def _answered(request, timeout):
+    response = MagicMock()
+    response.read.return_value = json.dumps({"prompt_id": "our-id"}).encode()
+    response.__enter__ = lambda answer: answer
+    response.__exit__ = MagicMock(return_value=False)
+    return response
+
+
+def test_the_command_evolver_runs_hands_comfyui_each_file_a_run_reads_as_a_copy_it_can_open(
+        monkeypatch, tmp_path):
+    folders = ComfyFolders(input=tmp_path / "input", temp=tmp_path / "temp",
+                           places=OutputPlaces.in_one_folder(tmp_path / "output"))
+    for name, value in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
+                        ("UI_STATE_PATH", tmp_path / "ui_state.json"),
+                        ("FIX_TRAINING_DIR", tmp_path / "fix training"),
+                        ("COMFYUI_FOLDERS", folders)):
+        monkeypatch.setattr(downtime.config, name, value)
+    monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
+    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
+        one_holds_the_library=lambda: False, one_is_closing=lambda: False))
+    handed = []
+    monkeypatch.setattr(downtime, "hand_comfyui_the_work_left",
+                        lambda db, client, ui: handed.append(client))
+    downtime.leave_work_for_while_closed()
+    image = tmp_path / "elsewhere" / "jane_doe.png"
+    image.parent.mkdir()
+    image.write_bytes(b"fabricated image bytes")
+
+    downtime.main()
+    (client,) = handed
+    with patch("urllib.request.urlopen", side_effect=_answered) as urlopen:
+        client.submit_job({"1": {"class_type": "LoadImage", "inputs": {"image": str(image)}}},
+                          "our-id")
+
+    posted = json.loads(urlopen.call_args.args[0].data)["prompt"]
+    assert posted["1"]["inputs"]["image"].endswith("/jane_doe.png [temp]")
 
 
 def _kept(tmp_path, part, *, automatic, **status) -> None:

@@ -40,14 +40,21 @@ def _lightness_across_the_middle(picture):
             for x in range(0, image.width(), 4)]
 
 
-def test_the_window_behind_goes_dark_and_out_of_focus(qtbot):
+def _lightness_across_the_faded_window(qtbot):
     window = _checkerboard_window(qtbot)
-
     with hard_to_miss(window):
-        levels = _lightness_across_the_middle(_faded_backgrounds(window)[0].grab())
+        return _lightness_across_the_middle(_faded_backgrounds(window)[0].grab())
+
+
+def test_the_window_behind_goes_dark_and_out_of_focus(qtbot):
+    levels = _lightness_across_the_faded_window(qtbot)
 
     assert max(levels) < _BLACK_AND_WHITE_AVERAGE
     assert max(levels) - min(levels) < 255 // 8
+
+
+def test_the_window_behind_still_shows_through_the_dark(qtbot):
+    assert min(_lightness_across_the_faded_window(qtbot)) > 0
 
 
 def test_the_window_fades_rather_than_going_dark_at_once(qtbot):

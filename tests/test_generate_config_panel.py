@@ -11,7 +11,14 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
 from PyQt6.QtGui import QColor, QDropEvent, QPixmap, QTextDocumentFragment
-from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
+from PyQt6.QtWidgets import (
+    QApplication,
+    QFormLayout,
+    QLabel,
+    QPushButton,
+    QSplitter,
+    QSplitterHandle,
+)
 from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.icons import inline_mark
 
@@ -38,9 +45,11 @@ from origenerator.gui import corner_controls, icons
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.animated_strip import _VideoTile
+from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
@@ -196,8 +205,8 @@ def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(panel):
 
 def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):
     """The settings scroll never grows a horizontal bar: squeezed, the form gives
-    up width — the pickers elide, the labels wrap, a row drops its field onto its
-    own line — rather than push the whole column out of view sideways.
+    up width — the pickers and the labels shorten — rather than push the whole
+    column out of view sideways.
 
     The failure this exists for: a model picker asked for its longest file name,
     a section header for its whole title and the workflow picker for its
@@ -248,6 +257,76 @@ def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel)
 
         walk(host)
         assert not over, f"at {width}px: {over[:3]}"
+
+
+def _names_its_setting(label: ElidingLabel) -> bool:
+    shown = label.display_text(label.contentsRect().width()).removesuffix("…")
+    return bool(shown) and label.text().startswith(shown)
+
+
+@pytest.mark.parametrize("workflow", [None, "sdxl_t2i", "wan22_i2v", "flux_t2i_upscaled"])
+def test_a_narrow_pane_shortens_its_labels_rather_than_dropping_them(
+        app_chrome, blank_panel, workflow):
+    """Squeezed, every setting still names itself: its label ends in an ellipsis,
+    and the whole of it is in the label's tooltip.
+
+    The failure this exists for: QFormLayout gives its labels the widest one's
+    width when a row fits beside its field and no width at all when none does, so
+    a narrow Generate tab showed whole sections of fields with nothing beside them
+    to say what they were (2026-10-28).
+    """
+    panel = blank_panel
+    if workflow is not None:
+        panel._workflow_combo.setCurrentIndex(_combo_index(panel, workflow))
+        for section in panel._param_form._sections.values():
+            section.set_collapsed(False)
+    panel.show()
+    QApplication.processEvents()
+
+    for width in (600, 420, 330, panel.minimumSizeHint().width()):
+        panel.resize(width, 800)
+        QApplication.processEvents()
+        labels = [cell.findChild(ElidingLabel) for cell in panel.findChildren(LabelCell)
+                  if cell.isVisible()]
+        assert labels
+        unnamed = [label.text() for label in labels if not _names_its_setting(label)]
+        assert not unnamed, f"at {width}px: {unnamed}"
+
+
+@pytest.mark.parametrize("workflow", ["sdxl_t2i", "wan22_i2v", "wan22_animate"])
+def test_a_narrow_pane_shortens_a_label_before_it_squeezes_a_field(
+        app_chrome, blank_panel, workflow):
+    """The labels are what give way: no field beside one is laid out narrower than
+    it asks to be, at any width down to the pane's floor.
+
+    The failure this exists for: QFormLayout kept a section's labels whole while
+    any one of its fields still fit beside them, and squeezed the rest, so the
+    Random tick beside a sound's seed was drawn at under half the width its word
+    needs (2026-10-28).
+    """
+    panel = blank_panel
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, workflow))
+    sections = panel._param_form._sections.values()
+    for section in sections:
+        section.set_collapsed(False)
+    panel.show()
+    QApplication.processEvents()
+
+    for width in (600, 500, 420, 380, 330, panel.minimumSizeHint().width()):
+        panel.resize(width, 800)
+        QApplication.processEvents()
+        squeezed = []
+        for section in sections:
+            form = section.content_form()
+            for row in range(form.rowCount()):
+                label = form.itemAt(row, QFormLayout.ItemRole.LabelRole)
+                field = form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+                if (section.isVisible() and form.isRowVisible(row)
+                        and label is not None and field is not None
+                        and field.geometry().width() < field.minimumSize().width()):
+                    squeezed.append((label.widget().findChild(ElidingLabel).text(),
+                                     field.geometry().width(), field.minimumSize().width()))
+        assert not squeezed, f"at {width}px: {squeezed}"
 
 
 def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, blank_panel):

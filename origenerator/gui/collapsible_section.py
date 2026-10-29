@@ -10,7 +10,6 @@ from __future__ import annotations
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QFormLayout,
     QStyle,
     QStyleOptionButton,
     QStylePainter,
@@ -21,6 +20,7 @@ from shared_ui.icons import draw_glyph
 from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL, MARGIN_DIALOG
 
 from origenerator.gui.eliding import ElidingButton
+from origenerator.gui.label_cells import LabelForm
 from origenerator.gui.warning_mark import WarningMark
 
 # Drawn before the header title so the fold state reads at a glance.
@@ -148,16 +148,11 @@ class CollapsibleSection(QWidget):
         outer.addWidget(self._header)
 
         self._content = QWidget()
-        self._form = QFormLayout(self._content)
-        # Indent the rows under the header, and let the label column size to its
-        # widest label with the inputs taking the rest — matching the form's look.
+        self._form = LabelForm(self._content)
         self._form.setContentsMargins(MARGIN_DIALOG, GAP_SMALL, 0, GAP_SMALL)
         self._form.setSpacing(GAP_MEDIUM)
         self._form.setLabelAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
-        )
-        self._form.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
         outer.addWidget(self._content)
 
@@ -193,6 +188,6 @@ class CollapsibleSection(QWidget):
         (e.g. the swap button) that should fold away with the section."""
         return self._content
 
-    def content_form(self) -> QFormLayout:
+    def content_form(self) -> LabelForm:
         """The layout callers add ``label: field`` rows to."""
         return self._form

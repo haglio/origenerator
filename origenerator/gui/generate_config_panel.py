@@ -8,7 +8,6 @@ from pathlib import Path
 from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -76,7 +75,7 @@ from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
 )
-from origenerator.gui.label_cells import LabelCell, LabelColumn
+from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.metadata_block import MetadataBlock, wrappable
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.no_wheel import NoWheelComboBox
@@ -444,18 +443,11 @@ class GenerateConfigPanel(QWidget):
         """The editable half: the workflow picker, its typical-time estimate, and
         the host the param form is swapped into whenever the workflow changes."""
         self._form_workflow_key = None  # which workflow the installed form belongs to
-        # A form row rather than a plain side-by-side pair, so that squeezed past
-        # what the word and the picker can share, the picker drops onto its own
-        # line — the same wrap the sections below it do — instead of holding the
-        # pane open and putting a horizontal scroll bar under the whole form.
-        header = QFormLayout()
+        header = LabelForm()
         header.setContentsMargins(0, 0, 0, 0)
         header.setHorizontalSpacing(GAP_MEDIUM)
         header.setLabelAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        header.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
         self._workflow_combo = NoWheelComboBox()
         self._workflow_combo.setPlaceholderText("Select a workflow…")
@@ -469,7 +461,8 @@ class GenerateConfigPanel(QWidget):
         # It shrinks to a short floor when the pane is narrow rather than holding
         # the width of the longest workflow name — see NoWheelComboBox, which every
         # picker in the app inherits that from. It still expands to fill the row.
-        header.addRow(LabelCell(self._workflow_warning, ElidingLabel("Workflow"), LabelColumn()),
+        header.addRow(LabelCell(self._workflow_warning, ElidingLabel("Workflow"),
+                                header.label_column),
                       self._workflow_combo)
         body.addLayout(header)
         self._cannot_remake_note = QLabel()

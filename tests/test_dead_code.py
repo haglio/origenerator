@@ -412,7 +412,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # came to be written and read in app_support, and the notes on them went there.
 # 16377 when Fun Time stopped reading this app's account of those files, and the
 # note keeping it published for Fun Time went with it.
-MAX_PROSE_LINES = 16377
+# 16371 when a squeezed form's labels came to shorten rather than vanish, and the
+# notes on a label column sized to its widest label and on the workflow row
+# wrapping, which no form has done since August, went with it.
+MAX_PROSE_LINES = 16371
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

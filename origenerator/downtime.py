@@ -5,7 +5,6 @@ import logging
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 from app_support.logging_utils import configure_logging, install_exception_logging
@@ -149,8 +148,7 @@ def _train(client, part, ui: AppState) -> None:
         logger.info("ComfyUI could not be asked to let go of its models: %s", e)
     settings = gallery.EnhanceSettings.parse(ui.get("enhance_settings"))
     fix_training.start(fix_training.training_job(
-        part, fix_training.model_to_train_for(settings.params), datetime.now().astimezone(),
-        automatic=True))
+        part, fix_training.model_to_train_for(settings.params), automatic=True))
     logger.info("Started training the %s fix while Origenerator is closed", part.name)
 
 

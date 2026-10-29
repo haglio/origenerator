@@ -8,7 +8,6 @@ import json
 import subprocess
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime
 from enum import Enum
 from pathlib import Path, PureWindowsPath
 
@@ -17,7 +16,8 @@ from app_support.win32 import process_started
 from origenerator import comfyui_launcher, config, gallery, timing
 from origenerator.gallery import JobKind
 from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
-from origenerator.model_titles import FIX_LORA_FOLDER, fix_lora_name
+from origenerator.lora_versions import next_version
+from origenerator.model_titles import FIX_LORA_FOLDER
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part, part_table
@@ -91,9 +91,14 @@ def model_to_train_for(enhance_params: dict) -> str:
     return chosen
 
 
-def training_job(part, checkpoint: str, now: datetime, *, automatic: bool = False) -> dict:
+def fix_title_base(part_name: str) -> str:
+    return f"{part_name.capitalize()} fix"
+
+
+def training_job(part, checkpoint: str, *, automatic: bool = False) -> dict:
     models = config.COMFYUI_DIR / "models"
     work = _work_folder(part)
+    version = next_version(fix_title_base(part.name))
     return {
         "part": part.name,
         "photos": [str(path) for path in training_photos(part)],
@@ -104,7 +109,8 @@ def training_job(part, checkpoint: str, now: datetime, *, automatic: bool = Fals
         "base_model": str(models / "checkpoints" / checkpoint),
         "sd_scripts": str(config.LORA_TRAINING_SCRIPTS),
         "output_dir": str(models / "loras" / FIX_LORA_FOLDER),
-        "output_name": fix_lora_name(part.name, now),
+        "output_name": f"{part.name} {version}",
+        "display_name": f"{fix_title_base(part.name)} {version}",
         "work": str(work),
         "status": str(work / "status.json"),
         "log": str(work / "training.log"),

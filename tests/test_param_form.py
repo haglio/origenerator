@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QColor, QDropEvent, QImage
@@ -2450,3 +2452,23 @@ def test_clicking_a_held_item_leads_back_to_it(qtbot):
     qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
 
     assert led_to == ["image1"]
+
+
+def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
+        qtbot, installed_models, titled_models):
+    titled_models({"example_look": "Example Look 1.0"})
+    for name in ("example_look", "example_style"):
+        installed_models.add("loras", f"{name}.safetensors", arch="krea2", lora=True,
+                             metadata={"ss_training_finished_at": "1792851468.891"})
+    form = ParamForm([ParamDef("lora", "LoRA", "combo", NO_LORA, options=[
+        NO_LORA, "example_look.safetensors", "example_style.safetensors"])], lora_keys=("lora",))
+    qtbot.addWidget(form)
+    combo = form._widgets["lora"]
+    trained = f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}."
+    assert combo.toolTip() == param_help("lora")
+
+    combo.setCurrentIndex(combo.findData("example_look.safetensors"))
+    assert combo.toolTip() == f"{param_help('lora')} {trained}"
+
+    form.set_values({"lora": "example_style.safetensors"})
+    assert combo.toolTip() == param_help("lora")

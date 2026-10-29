@@ -4,6 +4,7 @@ import json
 import os
 import re
 from dataclasses import FrozenInstanceError
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -3827,3 +3828,16 @@ def test_a_second_lora_picked_on_a_tab_lowers_each_picked_strengths_good_range(
     assert mark.toolTip() == "Good range while another LoRA is picked: 0.6–0.8. Click to use 0.8."
     assert form._widgets["lora_strength_2"].toolTip().endswith(
         " Good range while another LoRA is picked: 0.6–0.8.")
+
+
+def test_a_tabs_lora_dropdown_says_when_its_picked_lora_was_trained(
+        blank_panel, installed_models, titled_models):
+    titled_models({"example_look": "Example Look 1.0"})
+    installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True,
+                         metadata={"ss_training_finished_at": "1792851468.891"})
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+
+    blank_panel._param_form.set_values({"lora": "example_look.safetensors"})
+
+    assert blank_panel._param_form._widgets["lora"].toolTip().endswith(
+        f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}.")

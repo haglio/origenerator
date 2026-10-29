@@ -79,7 +79,7 @@ from origenerator.gui.no_wheel import (
 )
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
-from origenerator.gui.param_help import definition_help, param_help
+from origenerator.gui.param_help import definition_help, param_help, with_training_date
 from origenerator.reveal import open_in_explorer
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
@@ -768,6 +768,8 @@ class FixPromptsDialog(QDialog):
         self.lora = NoWheelComboBox()
         offer_options(self.lora, loras)
         choose_option(self.lora, current["lora"] or NO_LORA)
+        self.lora.currentIndexChanged.connect(self._explain_lora)
+        self._explain_lora()
         strength = lora_strength("lora_strength", current["strength"])
         self.strength = NoWheelDoubleSpinBox()
         self.strength.setRange(strength.min_val, strength.max_val)
@@ -820,6 +822,9 @@ class FixPromptsDialog(QDialog):
 
     def choose_lora(self, lora: str) -> None:
         choose_option(self.lora, lora)
+
+    def _explain_lora(self) -> None:
+        self.lora.setToolTip(with_training_date("", self.lora.currentData()))
 
     def prompts(self) -> dict:
         return fix_prompts_of(self._part, {

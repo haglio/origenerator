@@ -32,7 +32,13 @@ from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import NOT_KNOWN, field_kind, grey_out_of_reach
-from origenerator.gui.param_help import advice_help, definition_help, option_help, param_help
+from origenerator.gui.param_help import (
+    advice_help,
+    definition_help,
+    option_help,
+    param_help,
+    with_training_date,
+)
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import set_in_use
 from origenerator.gui.scenes_editor import ScenesEditor
@@ -147,8 +153,10 @@ class ParamForm(QWidget):
         heights=None,
         seed_history: SeedHistory | None = None,
         items=None,
+        lora_keys: tuple[str, ...] = (),
     ):
         super().__init__(parent)
+        self._lora_keys = tuple(lora_keys)
         # Where a dragged prompt height is filed: the window's own set, handed
         # down rather than reached for, so a form can be built at chosen sizes.
         self._heights = heights
@@ -225,6 +233,7 @@ class ParamForm(QWidget):
             self._draw(pd)
         self.changed.connect(self._describe_seed_fields)
         self._describe_seed_fields()
+        self.changed.connect(self._explain_lora_picks)
         self.changed.connect(self._show_the_shape)
         self._show_the_shape()
 
@@ -350,7 +359,14 @@ class ParamForm(QWidget):
         label.setToolTip(explained or label.text())
         widget = self._widgets.get(key)
         if widget is not None and explained and not isinstance(widget, DropSlot):
+            if key in self._lora_keys:
+                explained = with_training_date(explained, self._read_field(self._defs[key]))
             widget.setToolTip(explained)  # a zone's tooltip names what it holds
+
+    def _explain_lora_picks(self) -> None:
+        for key in self._lora_keys:
+            if key in self._labels:
+                self._explain(key)
 
     def _tip(self, key: str) -> str:
         pd = self._defs.get(key)

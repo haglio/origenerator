@@ -715,7 +715,7 @@ class GenerateConfigPanel(DropZone):
                                          heights=self._heights,
                                          seed_history=SeedHistory(
                                              self._seed_uses, self._looping_preview),
-                                         items=self._zone_items()))
+                                         items=self._zone_items(), lora_keys=wf.lora_keys))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {

@@ -47,7 +47,8 @@ def _read(path: Path) -> dict | None:
     return read if isinstance(read, dict) else {}
 
 
-def take(holder: str, pid: int, path: Path = CLAIM) -> bool:
+def take(holder: str, pid: int, path: Path | None = None) -> bool:
+    path = path or CLAIM
     path.parent.mkdir(parents=True, exist_ok=True)
     while True:
         try:
@@ -67,12 +68,13 @@ def take(holder: str, pid: int, path: Path = CLAIM) -> bool:
         return True
 
 
-def held_by_another(pid: int, path: Path = CLAIM) -> bool:
-    existing = _read(path)
+def held_by_another(pid: int, path: Path | None = None) -> bool:
+    existing = _read(path or CLAIM)
     return existing is not None and existing.get("pid") != pid and alive(existing.get("pid"))
 
 
-def release(pid: int, path: Path = CLAIM) -> None:
+def release(pid: int, path: Path | None = None) -> None:
+    path = path or CLAIM
     existing = _read(path)
     if existing is not None and existing.get("pid") == pid:
         path.unlink(missing_ok=True)

@@ -1967,6 +1967,26 @@ def test_no_model_warning_while_the_fix_is_off_or_the_model_is_the_one_it_was_tr
     assert hands_trained_on({"hands": 0.45}, "trained_on.safetensors")[0]._model_warning.isHidden()
 
 
+def test_matching_the_source_warns_not_while_the_images_in_front_were_made_by_the_fixs_model(
+        hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_source_models({"trained_on.safetensors"})
+
+    assert panel._model_warning.isHidden()
+
+
+@pytest.mark.parametrize("in_front", [{"trained_on.safetensors", "picked.safetensors"}, set()])
+def test_matching_the_source_warns_while_an_image_in_front_or_none_is_made_by_another_model(
+        hands_trained_on, in_front):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_source_models(in_front)
+
+    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+        False, _TRAINED_ON_SAID)
+
+
 def test_the_models_warning_sits_between_its_caption_and_the_model_leaving_the_caption_be(
         hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45})

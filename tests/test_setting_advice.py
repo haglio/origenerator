@@ -447,7 +447,7 @@ def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so_and_a_cli
         titled_models):
     titled_models({"trained_on": "Trained On v1"})
 
-    found = fix_lora_model_advice("picked.safetensors", {"hands": "trained_on.safetensors"},
+    found = fix_lora_model_advice({"picked.safetensors"}, {"hands": "trained_on.safetensors"},
                                   ["picked.safetensors", "trained_on.safetensors"])
 
     assert found["checkpoint"].said == (
@@ -456,7 +456,7 @@ def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so_and_a_cli
 
 
 def test_no_model_advice_while_a_fixs_lora_has_its_model_or_that_model_is_not_installed():
-    assert fix_lora_model_advice("trained_on.safetensors", {"hands": "trained_on.safetensors"},
+    assert fix_lora_model_advice({"trained_on.safetensors"}, {"hands": "trained_on.safetensors"},
                                  ["trained_on.safetensors"]) == {}
-    assert fix_lora_model_advice("picked.safetensors", {"hands": "gone.safetensors"},
+    assert fix_lora_model_advice({"picked.safetensors"}, {"hands": "gone.safetensors"},
                                  ["picked.safetensors"]) == {}

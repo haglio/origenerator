@@ -39,6 +39,7 @@ from origenerator.gallery.enhance import (
     enhance_level_params,
     enhance_target_id,
     is_enhance_product_row,
+    moves_its_image,
 )
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, level_settings
 from origenerator.gallery.output import (
@@ -68,7 +69,8 @@ def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list
     settings = level_settings(params)
     return [
         {"filename": f.get("filename"), "params": settings,
-         "run_id": enhance_row.get("id"), "finished_at": enhance_row.get("completed_at")}
+         "run_id": enhance_row.get("id") if moves_its_image(enhance_row) else None,
+         "finished_at": enhance_row.get("completed_at")}
         for f in files if f.get("filename")
     ]
 

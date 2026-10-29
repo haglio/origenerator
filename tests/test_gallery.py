@@ -64,6 +64,7 @@ from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.gallery.tree import folder_chain
 from origenerator.generation_config import prepared_params
+from origenerator.generation_state import GenerationSource
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import NO_LORA
@@ -1732,6 +1733,12 @@ def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
     running = _enhance_run("e1", "sdxl_t2i_i1.png", 4)
     rows = [running] + _collection(("i3", 3), ("i2", 2), ("i1", 1))
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
+
+
+def test_recent_generations_leaves_an_image_the_backfill_is_enhancing_where_it_sat():
+    running = {**_enhance_run("e1", "sdxl_t2i_i1.png", 4), "source": GenerationSource.BACKFILL}
+    rows = [running] + _collection(("i3", 3), ("i2", 2), ("i1", 1))
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"]
 
 
 def test_recent_generations_keeps_a_folded_enhancement_where_its_run_landed():

@@ -19,6 +19,7 @@ from origenerator.gallery import (
     is_enhanced_row,
 )
 from origenerator.generation_metadata import basic_section, file_item
+from origenerator.generation_state import GenerationSource
 from origenerator.output_places import OutputPlaces
 
 
@@ -80,6 +81,22 @@ def test_fold_upgrades_the_source_row_in_place(tmp_path):
     assert gallery.settings_folder_key(upgraded) == key_before
     # The transient job row is gone.
     assert db.get_generation("e1") is None
+
+
+def _latest(db):
+    return [row["prompt_id"] for row in gallery.recent_generations(db.list_generations())]
+
+
+def test_an_enhancement_the_backfill_made_leaves_its_image_where_it_sat_in_latest(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    _add_source(db, prompt_id="made later", filename="sdxl_t2i_later.png")
+    _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]", "image_enhance_00001_.png")
+    db.set_source("e1", GenerationSource.BACKFILL)
+
+    fold_enhancement(db, db.get_generation("e1"))
+
+    assert _latest(db) == ["made later", "src"]
 
 
 def test_the_places_an_enhancements_fixes_found_stay_with_its_file_once_folded(tmp_path):

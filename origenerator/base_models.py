@@ -6,6 +6,7 @@ from origenerator import config
 from origenerator.model_titles import kept_by_stem, model_stem
 
 _TEXT_TO_VIDEO = re.compile(r"\bt2v\b", re.IGNORECASE)
+_KIND_OF = {"Krea 2 Raw": "Krea 2", "Krea 2 Turbo": "Krea 2"}
 
 
 def base_model_of(value) -> str:
@@ -27,7 +28,11 @@ def filed_apart(lora, model) -> bool:
 
 def _apart(filed: dict, lora, model) -> bool:
     made_for, picked = _filed_under(filed, lora), _filed_under(filed, model)
-    return bool(made_for and picked) and made_for != picked
+    return bool(made_for and picked) and not _go_together(made_for, picked)
+
+
+def _go_together(made_for: str, picked: str) -> bool:
+    return made_for in (picked, _KIND_OF.get(picked)) or picked == _KIND_OF.get(made_for)
 
 
 def _filed_under(filed: dict, value) -> str:

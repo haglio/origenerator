@@ -351,10 +351,10 @@ class FakeFollowingLoraWorkflow(FakeWorkflow):
         ]
 
 
-def test_an_experiment_never_pairs_a_lora_with_a_model_civitai_files_it_apart_from(
+def test_an_experiment_never_pairs_a_lora_with_a_model_it_is_filed_apart_from(
         recorded_base_models):
     recorded_base_models({"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo",
-                          "speed_up": "Krea 2"})
+                          "speed_up": "Krea 2 Raw"})
     workflow = FakeFollowingLoraWorkflow()
     bases = [make_row("on-raw", workflow_name=workflow.name,
                       params={"unet": "raw_model.safetensors", "lora": "speed_up.safetensors"}),

@@ -11,10 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from origenerator import config
 from origenerator.model_titles import kept_by_stem, model_stem, write_kept
-from origenerator.workflows.model_files import ANY, is_no_lora, list_lora_files
+from origenerator.workflows.model_files import ANY, is_no_lora, list_lora_files, list_model_files
 
 CIVITAI_BY_HASH = "https://civitai.com/api/v1/model-versions/by-hash"
 CIVITAI_HASHES_AT_A_TIME = 100
+MODEL_FOLDERS = ("checkpoints", "diffusion_models")
 
 
 def ask_civitai(hashes: list[str]) -> list[dict]:
@@ -30,16 +31,18 @@ def _sha256(path: Path) -> str:
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
-def _records() -> dict:
-    return {config.TRIGGER_WORDS_PATH: lambda version: list(version.get("trainedWords") or []),
-            config.BASE_MODELS_PATH: lambda version: str(version.get("baseModel") or "")}
+def _trigger_words(version: dict) -> list[str]:
+    return list(version.get("trainedWords") or [])
 
 
-def _loras_not_written_down() -> list[Path]:
-    loras = config.COMFYUI_DIR / "models" / "loras"
-    written = [kept_by_stem(path) for path in _records()]
-    return [loras / name for name in list_lora_files([], accepts=ANY)
-            if not is_no_lora(name) and not all(model_stem(name) in kept for kept in written)]
+def _base_model(version: dict) -> str:
+    return str(version.get("baseModel") or "")
+
+
+def _missing_from(records, folder: str, names) -> list[Path]:
+    written = [kept_by_stem(path) for path in records]
+    return [config.COMFYUI_DIR / "models" / folder / name for name in names
+            if not all(model_stem(name) in kept for kept in written)]
 
 
 def _versions_on_civitai(paths: list[Path], ask) -> dict[str, dict | None]:
@@ -59,19 +62,33 @@ def _versions_on_civitai(paths: list[Path], ask) -> dict[str, dict | None]:
             for path in copies}
 
 
+def _write_down(path, versions: dict, kept_from) -> None:
+    written = kept_by_stem(path)
+    write_kept(path, {stem: kept_from(version or {}) for stem, version in versions.items()
+                        if stem not in written})
+
+
 def main(argv=None, ask=ask_civitai) -> int:
     argparse.ArgumentParser(
         description="Ask Civitai for the trigger words and the base model of each installed "
-                    "LoRA.").parse_args(argv)
-    found = _versions_on_civitai(_loras_not_written_down(), ask)
-    for path, kept_from in _records().items():
-        written = kept_by_stem(path)
-        write_kept(path, {stem: kept_from(version or {}) for stem, version in found.items()
-                            if stem not in written})
-    known = [version for version in found.values() if version is not None]
+                    "LoRA, and the base model of each installed model.").parse_args(argv)
+    loras = _missing_from((config.TRIGGER_WORDS_PATH, config.BASE_MODELS_PATH), "loras",
+                          [name for name in list_lora_files([], accepts=ANY)
+                           if not is_no_lora(name)])
+    models = [path for folder in MODEL_FOLDERS
+              for path in _missing_from((config.BASE_MODELS_PATH,), folder,
+                                        list_model_files(folder, [], accepts=ANY))]
+    found = _versions_on_civitai(loras + models, ask)
+    of_loras = {model_stem(path): found[model_stem(path)] for path in loras}
+    of_models = {model_stem(path): found[model_stem(path)] for path in models}
+    _write_down(config.TRIGGER_WORDS_PATH, of_loras, _trigger_words)
+    _write_down(config.BASE_MODELS_PATH, found, _base_model)
+    known = [version for version in of_loras.values() if version is not None]
     worded = sum(1 for version in known if version.get("trainedWords"))
-    print(f"Asked Civitai about {len(found)} LoRAs: {worded} with trigger words, "
-          f"{len(known) - worded} with none, {len(found) - len(known)} it does not know.")
+    print(f"Asked Civitai about {len(of_loras)} LoRAs ({worded} with trigger words, "
+          f"{len(known) - worded} with none, {len(of_loras) - len(known)} it does not know) "
+          f"and {len(of_models)} models "
+          f"({sum(1 for version in of_models.values() if version is not None)} it knows).")
     return 0
 
 

@@ -57,9 +57,9 @@ from origenerator.gui.deferred import defer
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.inflight import (
+    CANCEL_TEXT,
     InFlightItem,
-    discard_run_text,
-    discard_run_tooltip,
+    cancel_tooltip,
     stop_auto_generate_text,
     stop_auto_generate_tooltip,
 )
@@ -988,10 +988,9 @@ class BrowserPane(QObject):
         The one act a queued or running card has, and until now the one act it
         offered nowhere: a finished tile answers a right-click with its own menu,
         and a card answered with nothing, so stopping a run meant finding it again
-        among the lower strip's rows. The wording is the strip's
-        (:func:`inflight.discard_run_text`) — "Next seed" while the folder is
-        auto-generating, where the press starts another rather than stopping
-        anything.
+        among the lower strip's rows. The wording is the strip's Cancel, which
+        while the folder is auto-generating starts another seed rather than
+        stopping anything.
 
         Which is exactly why an auto-generating folder's card gets a second entry
         (:func:`inflight.stop_auto_generate_text`): a menu, unlike the one button those
@@ -1009,8 +1008,8 @@ class BrowserPane(QObject):
         if item is None or item.cancel is None:
             return
         menu = QMenu(self._scroll)
-        discard = menu.addAction(discard_run_text(item.auto_generating))
-        discard.setToolTip(discard_run_tooltip(item.auto_generating))
+        discard = menu.addAction(CANCEL_TEXT)
+        discard.setToolTip(cancel_tooltip(item.auto_generating))
         stop = None
         if item.auto_generating and item.stop_auto is not None:
             stop = menu.addAction(stop_auto_generate_text())

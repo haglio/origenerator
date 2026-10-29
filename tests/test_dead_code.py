@@ -421,7 +421,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 16158 when a job in the Job Queue came to be moved by naming where
 # it goes: the account of re-lining the queue in a dropped order went with the
 # code that did it.
-MAX_PROSE_LINES = 16158
+# 16149 when the button that throws a run away came to say Cancel
+# everywhere, and the account of why it once said "Next seed" went.
+MAX_PROSE_LINES = 16149
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

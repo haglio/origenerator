@@ -5,8 +5,8 @@ It shows the run the way every other in-flight surface does: ComfyUI's preview â
 or, until there is one, what the run is made from
 (:func:`~origenerator.gui.combination_view.combination_pixmap`) â€” under a scrim
 naming the stage, a bar along the thumbnail's foot reading
-:func:`origenerator.timing.progress_status_label`, and a button that throws the
-run away (:func:`inflight.discard_run_text`).
+:func:`origenerator.timing.progress_status_label`, and a Cancel that throws the
+run away.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from origenerator.gui import grid_card, palette
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.generation_job import display_status
-from origenerator.gui.inflight import TICK_MS, RunReading, discard_run_text, discard_run_tooltip
+from origenerator.gui.inflight import CANCEL_TEXT, TICK_MS, RunReading, cancel_tooltip
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
@@ -64,8 +64,8 @@ class GeneratingTile(QFrame):
         )
         layout.addWidget(self._image)
 
-        self._cancel = QPushButton(discard_run_text(auto_generating))
-        self._cancel.setToolTip(discard_run_tooltip(auto_generating))
+        self._cancel = QPushButton(CANCEL_TEXT)
+        self._cancel.setToolTip(cancel_tooltip(auto_generating))
         self._cancel.clicked.connect(lambda: self.cancel_requested.emit())
         layout.addWidget(self._cancel)
 

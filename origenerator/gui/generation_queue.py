@@ -69,14 +69,14 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.inflight import (
+    CANCEL_TEXT,
     CLEAR_TEXT,
     SHIELD_TIP,
     START_NOW_TEXT,
     START_NOW_TOOLTIP,
     TICK_MS,
+    cancel_tooltip,
     clear_queue_tooltip,
-    discard_run_text,
-    discard_run_tooltip,
     first_movable,
     foreign_queue_text,
     movable,
@@ -401,10 +401,6 @@ class QueueRow(OpensAFolder, QWidget):
     The thumbnail block is one width whether it holds one thumbnail or four, so the
     line of text beside it starts at the same place on every row.
 
-    The second button reads "Cancel", or "Next seed" for a job whose folder is
-    auto-generating — where the press discards the seed and Auto-Generate starts
-    another (:func:`inflight.discard_run_text`).
-
     A press-and-release opens the job's folder, and so does a double-click
     (:class:`OpensAFolder`); a press that travels starts a drag instead, which
     the strip turns into a reorder, wherever the queue gives the job a move.
@@ -441,7 +437,7 @@ class QueueRow(OpensAFolder, QWidget):
         self._shield.setCursor(Qt.CursorShape.PointingHandCursor)
         self._shield.clicked.connect(self._on_shield)
         layout.addWidget(self._shield)
-        self._cancel = QPushButton()
+        self._cancel = QPushButton(CANCEL_TEXT)
         self._cancel.setObjectName("queueCancelBtn")
         self._cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self._cancel.setFixedHeight(self.HEIGHT - 12)
@@ -485,8 +481,7 @@ class QueueRow(OpensAFolder, QWidget):
         # half says that one, under the bar that wait is holding up.
         self._note_text = starting_row_text(item.starting) or ""
         self._render_note()
-        self._cancel.setText(discard_run_text(item.auto_generating))
-        self._cancel.setToolTip(discard_run_tooltip(item.auto_generating))
+        self._cancel.setToolTip(cancel_tooltip(item.auto_generating))
         self._cancel.setVisible(item.cancel is not None)
         self._shield.setVisible(item.shield is not None)
         self._shield.setChecked(item.shielded)

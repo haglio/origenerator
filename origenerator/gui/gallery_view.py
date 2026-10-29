@@ -117,9 +117,9 @@ from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.gui.inflight import (
+    CANCEL_TEXT,
+    cancel_tooltip,
     clear_queue_tooltip,
-    discard_run_text,
-    discard_run_tooltip,
     queue_wait_text,
     stop_auto_generate_text,
     stop_auto_generate_tooltip,
@@ -1256,9 +1256,10 @@ class GalleryView(QWidget):
         self._combine.reconcile_generating()
 
     def _auto_generating(self, job) -> bool:
-        """Whether ``job``'s own folder is auto-generating — so the button that throws
-        the run away reads "Next seed" instead of "Cancel". Its folder, not the
-        front tab's: the label has to match what pressing it actually does."""
+        """Whether ``job``'s own folder is auto-generating — so the hover on the
+        Cancel that throws the run away says Auto-Generate starts the next seed.
+        Its folder, not the front tab's: the hover has to match what pressing it
+        actually does."""
         key = self._job_folder_key(job)
         return key is not None and self._auto.is_active(key)
 
@@ -1296,7 +1297,7 @@ class GalleryView(QWidget):
             self._reconcile_generating()  # the launch's own reconcile ran before this
 
     def _cancel_panel_reroll(self, panel):
-        """Discard the run this tab's bar is showing — its Cancel/Next seed button.
+        """Discard the run this tab's bar is showing — its Cancel button.
 
         The oldest of the tab's own still alive, so the press acts on the thing on
         screen rather than something queued after it.
@@ -2356,19 +2357,18 @@ class GalleryView(QWidget):
         The same act as the button on its face, on the gesture the rest of the
         grid answers — a right-click that worked on every other card and died on
         this one read as a tile that wasn't listening. The wording is the
-        button's (:func:`inflight.discard_run_text`), so both say the same thing
-        about the same press.
+        button's, so both say the same thing about the same press.
 
         With one more entry the button has no room for: while the folder is
-        auto-generating, that press is "Next seed" and nothing on the tile stops
-        anything, so the menu carries the real stop too
+        auto-generating, that Cancel only starts the next seed and nothing on the
+        tile stops anything, so the menu carries the real stop too
         (:func:`inflight.stop_auto_generate_text`). Auto-Generate is ended first — a
         discard while it is still on is the cue for the next seed.
         """
         menu = QMenu(self)
         auto = self._auto.is_active(key)
-        discard = menu.addAction(discard_run_text(auto))
-        discard.setToolTip(discard_run_tooltip(auto))
+        discard = menu.addAction(CANCEL_TEXT)
+        discard.setToolTip(cancel_tooltip(auto))
         stop = None
         if auto:
             stop = menu.addAction(stop_auto_generate_text())
@@ -2624,7 +2624,7 @@ class GalleryView(QWidget):
         elif group is not None:
             self._begin_auto(group.key)
         self._re_aim()  # reflect the real state — a start may not take
-        self._sync_discard_buttons()  # Cancel ⇄ Next seed, on all three surfaces
+        self._sync_cancel_buttons()
 
     def _begin_auto(self, key: str):
         """Read the workflow and settings the folder's Auto-Generate will run on,
@@ -2655,16 +2655,17 @@ class GalleryView(QWidget):
             # one to wait for now.
             self._clear_reroll_selection()
         self._re_aim()
-        self._sync_discard_buttons()  # the in-flight run's button is a Cancel again
+        self._sync_cancel_buttons()
 
-    def _sync_discard_buttons(self):
-        """Re-label every button that throws a run away — the folder's live tile, the
-        lower strip's rows, each config tab's — after Auto-Generate started or ended.
+    def _sync_cancel_buttons(self):
+        """Re-word the hover of every Cancel that throws a run away — the
+        folder's live tile, the lower strip's rows, each config tab's — after
+        Auto-Generate started or ended.
 
         Nothing else repaints them at that moment: switching Auto on over a folder
         that is already generating launches nothing, so there is no re-roll change
-        to ride, and the label would keep promising a stop that the press no longer
-        performs (or offering a next seed after Auto-Generate is off).
+        to ride, and the hover would keep promising a stop that the press no
+        longer performs (or a next seed after Auto-Generate is off).
         """
         self._rerender_current_leaf()
         self._update_queue()

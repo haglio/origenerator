@@ -600,14 +600,15 @@ def test_set_generating_offers_cancel_and_leaves_generate_to_the_folder(panel):
     assert panel._generate_btn.isEnabled() is True
 
 
-def test_the_discard_button_says_next_seed_while_the_folder_auto_generates(panel):
-    # Same button, honest label: with the folder auto-generating, the press discards
-    # this seed and Auto-Generate starts another — nothing stops.
+def test_the_cancel_hover_says_next_seed_while_the_folder_auto_generates(panel):
+    # With the folder auto-generating, the press discards this seed and
+    # Auto-Generate starts another — nothing stops.
     panel.set_generating(True, auto_generating=True)
-    assert panel._cancel_btn.text() == "Next seed"
+    assert panel._cancel_btn.text() == "Cancel"
+    assert panel._cancel_btn.toolTip() == "Throw away this seed and start the next"
 
     panel.set_generating(True)  # Auto switched off mid-run: a plain cancel
-    assert panel._cancel_btn.text() == "Cancel"
+    assert panel._cancel_btn.toolTip() == "Cancel this generation"
 
 
 def test_set_generating_false_keeps_generate_disabled_without_a_client(qtbot, tmp_path):

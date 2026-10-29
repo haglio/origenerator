@@ -41,13 +41,13 @@ from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_RADIUS_HUD, GAP_MEDIUM,
 from shared_ui.type_scale import SIZE_TINY
 
 from origenerator.gui.inflight import (
+    CANCEL_TEXT,
     CLEAR_TEXT,
     SHIELD_TIP,
     START_NOW_TEXT,
     START_NOW_TOOLTIP,
+    cancel_tooltip,
     clear_queue_tooltip,
-    discard_run_text,
-    discard_run_tooltip,
     first_movable,
     foreign_queue_text,
     movable,
@@ -140,8 +140,8 @@ class JobLine:
     lead: str
     note: str
     tooltip: str
-    discard: str
-    discard_tooltip: str
+    cancelable: bool
+    cancel_tooltip: str
     shieldable: bool
     shielded: bool
     movable: bool
@@ -227,8 +227,8 @@ class QueueSection:
         width = _BLOCK_W + _GAP + text_width(_tiny(), line.lead)
         if line.shieldable:
             width += CTRL_BTN + _GAP
-        if line.discard:
-            width += _word_width(line.discard) + _GAP
+        if line.cancelable:
+            width += _word_width(CANCEL_TEXT) + _GAP
         if line.note:
             width += _GAP + text_width(_tiny(), line.note)
         return width
@@ -337,11 +337,11 @@ class QueueSection:
                                      SHIELD_TIP, width=CTRL_BTN, lit=line.shielded),
                               pointer, targets)
                 cursor += CTRL_BTN + _GAP
-            if line.discard:
-                word = _word_width(line.discard)
+            if line.cancelable:
+                word = _word_width(CANCEL_TEXT)
                 _paint_button(image, draw, (cursor, row, word, CTRL_BTN),
-                              Button(f"{CANCEL}|{line.key}", line.discard,
-                                     line.discard_tooltip, width=word),
+                              Button(f"{CANCEL}|{line.key}", CANCEL_TEXT,
+                                     line.cancel_tooltip, width=word),
                               pointer, targets)
                 cursor += word + _GAP
             _paint_thumbnails(image, draw, cursor, row, line)
@@ -501,8 +501,8 @@ def _line(item) -> JobLine:
         lead=queue_lead_text(item),
         note=starting_row_text(item.starting) or "",
         tooltip=f"{item.caption}\n\n{queue_lead_tooltip(item)}",
-        discard=discard_run_text(item.auto_generating) if item.cancel is not None else "",
-        discard_tooltip=discard_run_tooltip(item.auto_generating),
+        cancelable=item.cancel is not None,
+        cancel_tooltip=cancel_tooltip(item.auto_generating),
         shieldable=item.shield is not None,
         shielded=item.shielded,
         movable=movable(item),

@@ -15,7 +15,7 @@ a click of its own already.
 
 :func:`queue_wait_text` is here for the same reason: how a wait reads is one
 wording, shared by every surface that has to say it — as is
-:func:`discard_run_text`, the label on the button that throws the run in flight
+:data:`CANCEL_TEXT`, the label on the button that throws the run in flight
 away, which three panes each draw, and :func:`stop_auto_generate_text`, the menu entry
 beside it that ends Auto-Generate as well as the run.
 """
@@ -43,7 +43,7 @@ class InFlightItem:
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     shield: Callable[[bool], None] | None = None  # put its shield on or off, where cancel can stop it
     shielded: bool = False
-    auto_generating: bool = False  # its folder auto-generates, so :attr:`cancel` means "next seed"
+    auto_generating: bool = False  # its folder auto-generates, so a :attr:`cancel` starts its next seed
     # End Auto-Generate in its folder. What a menu's real stop calls before
     # :attr:`cancel`, since discarding the run while Auto-Generate is on only starts the
     # next one. ``None`` alongside a ``None`` cancel — a run this session holds no
@@ -227,21 +227,13 @@ SHIELD_TIP = ("Shield this generation: images you ask for while it is being made
               "wait for it instead of stopping it")
 
 
-def discard_run_text(auto_generating: bool) -> str:
-    """The label on the button that throws away the run being made — one wording
-    for the folder's live tile, the lower strip's rows, and the config pane.
-
-    While the folder is auto-generating, that press ends nothing: Auto-Generate takes
-    it as a discarded seed and launches another at once (see
-    :meth:`AutoGenerateController.note_canceled`). "Cancel" would be a promise of
-    a stop that doesn't come — only the Auto toggle stops — so there it reads
-    "Next seed", which is what the press actually gets you.
-    """
-    return "Next seed" if auto_generating else "Cancel"
+CANCEL_TEXT = "Cancel"
 
 
-def discard_run_tooltip(auto_generating: bool) -> str:
-    """The hover line for :func:`discard_run_text`'s button."""
+def cancel_tooltip(auto_generating: bool) -> str:
+    """While the folder is auto-generating, a Cancel ends nothing: Auto-Generate
+    takes it as a discarded seed and launches another at once
+    (:meth:`AutoGenerateController.note_canceled`), and the hover says so."""
     return ("Throw away this seed and start the next" if auto_generating
             else "Cancel this generation")
 
@@ -259,11 +251,11 @@ def clear_queue_tooltip(foreign: int) -> str:
 def stop_auto_generate_text() -> str:
     """The menu entry that ends Auto-Generate and the run inside it.
 
-    A button carries one act, so while Auto-Generate is on it carries the one the
-    press performs — "Next seed" — and there is nowhere left on that surface to
-    ask for a stop: the only one was the Auto switch, which is in the header
-    rather than on the card you are looking at. A menu has room for both, and
-    this is the other one.
+    A button carries one act, so while Auto-Generate is on its Cancel only
+    throws the seed away, and there is nowhere left on that surface to ask for
+    a stop: the only one was the Auto switch, which is in the header rather
+    than on the card you are looking at. A menu has room for both, and this is
+    the other one.
 
     It says Auto-Generate goes off rather than reading "Cancel", because switching a
     standing instruction off is a bigger act than throwing one seed away, and it

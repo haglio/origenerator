@@ -489,23 +489,25 @@ def test_cancel_is_hidden_on_a_job_that_cannot_be_stopped_from_here(queue):
     assert not queue.rows()[0]._cancel.isVisible()
 
 
-def test_a_row_from_an_auto_generating_folder_says_next_seed(queue):
-    # The press discards that seed and Auto-Generate in its folder starts another,
-    # so the row says what it gets you — one folder auto-generating doesn't
-    # re-label the others.
+def test_a_row_from_an_auto_generating_folder_says_cancel_too(queue):
+    # His call (2026-10-28): every row's button says Cancel. Auto-Generate in
+    # that folder still starts its next seed, as the hover says.
     queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True),
                      _item(key="b", status="queued", cancel=lambda: None)])
-    assert [row._cancel.text() for row in queue.rows()] == ["Next seed", "Cancel"]
+    assert [row._cancel.text() for row in queue.rows()] == ["Cancel", "Cancel"]
+    assert queue.rows()[0]._cancel.toolTip() == "Throw away this seed and start the next"
 
 
-def test_a_row_relabels_in_place_when_its_folders_auto_generate_is_switched_off(queue):
+def test_a_rows_cancel_hover_follows_its_folders_auto_generate_in_place(queue):
     # Auto off with the run still in flight: the same row's press is a plain cancel
     # again, and rows are updated in place rather than rebuilt.
     queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True)])
+    row = queue.rows()[0]
 
     queue.set_items([_item(key="a", cancel=lambda: None)])
 
-    assert queue.rows()[0]._cancel.text() == "Cancel"
+    assert queue.rows() == [row]
+    assert row._cancel.toolTip() == "Cancel this generation"
 
 
 # --- the shield, which keeps a run going for the images asked for after it ----

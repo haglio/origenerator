@@ -1,13 +1,3 @@
-"""One LoRA being trained, from the Train button to the LoRA it made.
-
-A fix's trainer needs the graphics card to itself, so nothing new is handed to
-ComfyUI while it runs: it waits for what ComfyUI is making, has ComfyUI let go
-of its models, and lets the queue go again when it ends either way. A look
-LoRA's trainer yields the card itself whenever ComfyUI has work, so the queue
-only watches it. Either training is a program of its own that outlives the
-app, so a launch finds one an earlier launch left running and takes it up
-(:meth:`adopt`)."""
-
 from __future__ import annotations
 
 import logging

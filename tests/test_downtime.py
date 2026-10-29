@@ -240,3 +240,18 @@ def test_a_training_evolver_started_is_announced_once_when_it_ends_unless_alread
 
     assert [(notice.title, notice.body.split(" · ")[0]) for notice in announced] == [
         ("LoRA ready", "Hands fix 1.0")]
+
+
+def test_the_command_evolver_runs_holds_the_card_while_a_look_lora_trains(monkeypatch, tmp_path, capsys):
+    for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
+                       ("UI_STATE_PATH", tmp_path / "ui_state.json"),
+                       ("FIX_TRAINING_DIR", tmp_path / "fix training")):
+        monkeypatch.setattr(downtime.config, name, path)
+    monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
+    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
+        one_holds_the_library=lambda: True, one_is_closing=lambda: False))
+    monkeypatch.setattr(downtime, "running_trainings", lambda: [{"base": "Example Look"}])
+
+    assert downtime.main() == 0
+
+    assert json.loads(capsys.readouterr().out)["holds_the_graphics_card"] is True

@@ -8,6 +8,7 @@ from origenerator.model_titles import (
     trained_sentence,
     trained_when,
     versioned,
+    write_title,
 )
 
 
@@ -81,3 +82,12 @@ def test_a_versioned_loras_training_date_reads_as_a_sentence_of_its_own(
         f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}.")
     assert trained_sentence("example_style.safetensors") == ""
     assert trained_sentence(r"fixes\hands 1.1.safetensors") == ""
+
+
+def test_a_title_written_for_a_new_file_keeps_every_other_title(titled_models):
+    titled_models({"example_model": "Example Model"})
+
+    write_title("example_look_1_1", "Example Look 1.1")
+
+    assert model_title("example_look_1_1.safetensors") == "Example Look 1.1"
+    assert model_title("example_model.safetensors") == "Example Model"

@@ -26,7 +26,7 @@ from shared_ui.icons import inline_mark
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
-from origenerator import evolver_export, gallery, osr2_driver, prompt_edit
+from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
 from origenerator import export_lane as export_lane_module
 from origenerator.act_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
@@ -64,6 +64,7 @@ from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
+from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.thumbnail_rows import looping_clip, painted_row, where_the_thumbnail_is
@@ -4145,3 +4146,39 @@ def test_a_tabs_lora_dropdown_says_when_its_picked_lora_was_trained(
 
     assert blank_panel._param_form._widgets["lora"].toolTip().endswith(
         f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}.")
+
+
+def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picked(
+        blank_panel, monkeypatch, tmp_path, installed_models, titled_models):
+    folder = tmp_path / "pictures"
+    folder.mkdir()
+    (folder / "one.jpg").write_bytes(b"")
+    monkeypatch.setattr(look_training, "load_content", lambda: {"trainable_loras": {"Example Look": {
+        "pictures": str(folder), "base_model": "example_raw.safetensors",
+        "text_encoder": "example_te.safetensors", "vae": "example_vae.safetensors"}}})
+    monkeypatch.setattr(config, "LOOK_TRAINING_DIR", tmp_path / "lora training")
+    titled_models({"example_look": "Example Look 1.0"})
+    installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True)
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    controls = blank_panel._param_form._training_controls["lora"]
+    assert controls.isHidden()
+    asked = []
+    blank_panel.train_requested.connect(asked.append)
+
+    blank_panel._param_form.set_values({"lora": "example_look.safetensors"})
+
+    assert not controls.isHidden()
+    assert (controls.train.text(), controls.pictures.text()) == ("Retrain", "1 picture")
+    controls.train.click()
+    assert asked == ["lora"]
+    blank_panel.show_training("Example Look", "Training 10%")
+    assert (controls.train.text(), controls.train.isEnabled()) == ("Training 10%", False)
+    blank_panel.show_training("Example Look", None)
+    assert (controls.train.text(), controls.train.isEnabled()) == ("Retrain", True)
+    assert blank_panel.lora_value("lora") == "example_look.safetensors"
+
+    blank_panel._param_form.set_values({"lora": NO_LORA})
+    assert controls.isHidden()
+    assert blank_panel.pick_lora("lora", "example_look.safetensors") is True
+    assert not controls.isHidden()
+    assert blank_panel.pick_lora("seed", "example_look.safetensors") is False

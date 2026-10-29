@@ -45,8 +45,10 @@ from origenerator.gui.request_field import RequestField
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
+from origenerator.gui.training_controls import TrainingControls
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
+from origenerator.lora_training import TrainingOffer
 from origenerator.seed_history import SeedHistory
 from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE
@@ -139,6 +141,7 @@ class ParamForm(QWidget):
     """
 
     changed = pyqtSignal()          # any field's value changed
+    train_requested = pyqtSignal(str)  # a LoRA row's Train was pressed (its key)
     seed_drawn = pyqtSignal(str, object)
     item_activated = pyqtSignal(str)  # a zone's held gallery item was clicked (prompt_id)
 
@@ -158,6 +161,7 @@ class ParamForm(QWidget):
     ):
         super().__init__(parent)
         self._lora_keys = tuple(lora_keys)
+        self._training_controls: dict[str, TrainingControls] = {}
         # Where a dragged prompt height is filed: the window's own set, handed
         # down rather than reached for, so a form can be built at chosen sizes.
         self._heights = heights
@@ -468,7 +472,15 @@ class ParamForm(QWidget):
             )
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
+        if pd.key in self._lora_keys:
+            controls = TrainingControls()
+            controls.train_requested.connect(lambda key=pd.key: self.train_requested.emit(key))
+            self._training_controls[pd.key] = controls
+            extras.append(controls)
         return extras
+
+    def offer_training(self, key: str, offer: TrainingOffer | None, running: str | None = None) -> None:
+        self._training_controls[key].show_offer(offer, running)
 
     def _label_cell(self, key: str, label: QWidget, column: LabelColumn) -> LabelCell:
         mark = WarningMark()

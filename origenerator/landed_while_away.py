@@ -16,7 +16,7 @@ from pathlib import Path
 
 from app_support.logging_utils import configure_logging, install_exception_logging
 
-from origenerator import app_link, fix_training, lora_training
+from origenerator import app_link, fix_training, look_training, lora_training
 from origenerator.comfyui_api import ComfyUIApi
 from origenerator.config import (
     COMFYUI_FOLDERS,
@@ -68,6 +68,10 @@ def training_notice(job: dict) -> Notice | None:
         seconds=None if trainer is None else lora_training.time_taken(job, trainer)))
 
 
+def running_trainings() -> list[dict]:
+    return fix_training.running_trainings() + look_training.running_trainings()
+
+
 def _training_ended(job: dict, announce) -> bool:
     trainer = lora_training.trainer_of(job)
     if trainer is not None and trainer.running():
@@ -82,7 +86,7 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
           poll_seconds: float = POLL_SECONDS,
           patience_seconds: float = PATIENCE_SECONDS, trainings=None) -> None:
     """Wait out every run the app left in flight, announcing each as it lands."""
-    training = list(fix_training.running_trainings() if trainings is None else trainings)
+    training = list(running_trainings() if trainings is None else trainings)
     giving_up_at = now() + patience_seconds
     while not app_is_running():
         training = [job for job in training if not _training_ended(job, announce)]
@@ -114,7 +118,7 @@ def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
 
     *identity* is the name Windows draws over this copy's notifications.
     """
-    if not runs_left_in_flight(db) and not fix_training.running_trainings():
+    if not runs_left_in_flight(db) and not running_trainings():
         return False
     (spawn or _start_a_watcher)(identity)
     return True

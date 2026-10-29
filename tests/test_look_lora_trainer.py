@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 import types
@@ -10,7 +11,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from tools import look_lora_trainer
+from tools import card_claim, look_lora_trainer
+
+
+@pytest.fixture(autouse=True)
+def _a_claim_of_the_tests_own(tmp_path, monkeypatch):
+    monkeypatch.setattr(card_claim, "CLAIM", tmp_path / "graphics_card_claim.json")
 
 
 def _picture(size=(1024, 768), color=(200, 30, 30), kind="PNG") -> bytes:
@@ -218,11 +224,23 @@ def test_a_cache_program_that_fails_stops_the_training_and_names_the_log(tmp_pat
 # --- waiting for the card ---------------------------------------------------------
 
 class _Machine:
-    def __init__(self, waiting=(), memory=()):
+    def __init__(self, waiting=(), memory=(), held=(False,), claims=(True,)):
         self.waiting = list(waiting)
         self.memory = list(memory)
-        self.unloaded = 0
+        self.held = list(held)
+        self.claims = list(claims)
+        self.unloaded = self.claimed = self.released = 0
         self.slept: list[float] = []
+
+    def card_held_by_another(self):
+        return self.held.pop(0) if len(self.held) > 1 else self.held[0]
+
+    def claim_card(self):
+        self.claimed += 1
+        return self.claims.pop(0) if len(self.claims) > 1 else self.claims[0]
+
+    def release_card(self):
+        self.released += 1
 
     def jobs_waiting(self):
         return self.waiting.pop(0) if len(self.waiting) > 1 else self.waiting[0]
@@ -247,7 +265,30 @@ def test_the_card_is_idle_once_comfyuis_line_has_been_empty_two_minutes_and_its_
 
     assert machine.slept.count(20) == 7
     assert machine.unloaded == 1
+    assert machine.claimed == 1
     assert _status(job)["state"] == "waiting"
+
+
+def test_the_card_is_not_idle_while_another_trainer_holds_it(tmp_path):
+    job = _job(tmp_path)
+    Path(job["work"]).mkdir()
+    machine = _Machine(waiting=[0], memory=[100], held=[True, True, False])
+
+    look_lora_trainer.wait_for_idle(job, machine)
+
+    assert machine.slept.count(20) == 8
+    assert machine.claimed == 1
+
+
+def test_a_card_another_trainer_took_first_is_waited_for_again(tmp_path):
+    job = _job(tmp_path)
+    Path(job["work"]).mkdir()
+    machine = _Machine(waiting=[0], memory=[100], claims=[False, True])
+
+    look_lora_trainer.wait_for_idle(job, machine)
+
+    assert machine.slept.count(20) == 12
+    assert machine.claimed == 2
 
 
 # --- training ---------------------------------------------------------------------
@@ -310,6 +351,7 @@ open(os.path.join(out, 'Example Look 1.1.safetensors'), 'wb').write(b'lora')
     look_lora_trainer.train(job, machine, popen=_popen_the_fake(job), kill=kill)
 
     assert len(killed) == 1
+    assert (machine.claimed, machine.released) == (2, 1)
     assert Path(job["work"], "steps_done.txt").read_text() == "50"
 
 
@@ -404,6 +446,29 @@ def test_a_whole_run_takes_the_steps_in_order_and_describes_in_a_program_of_its_
     look_lora_trainer.run(job)
 
     assert done == ["prepare", ("describe", ["describe", job["job_file"]]), "dataset", "cache", "train", "install"]
+
+
+def test_a_run_lets_go_of_the_card_however_it_ends(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    Path(job["work"]).mkdir()
+    monkeypatch.setattr(look_lora_trainer, "prepare",
+                        lambda job: (_ for _ in ()).throw(look_lora_trainer.Stopped("No pictures.")))
+    assert card_claim.take("Example Look 1.1 training", os.getpid())
+
+    with pytest.raises(look_lora_trainer.Stopped):
+        look_lora_trainer.run(job)
+
+    assert not card_claim.CLAIM.exists()
+
+
+def test_a_step_run_on_its_own_lets_go_of_the_card_too(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    Path(job["work"]).mkdir()
+    Path(job["job_file"]).write_text(json.dumps(job), encoding="utf-8")
+    monkeypatch.setitem(look_lora_trainer.STEPS, "describe", lambda job: card_claim.take("Example Look 1.1 training", os.getpid()))
+
+    assert look_lora_trainer.main(["describe", job["job_file"]]) == 0
+    assert not card_claim.CLAIM.exists()
 
 
 def test_a_step_that_stops_leaves_its_reason_where_the_app_reads_it(tmp_path, monkeypatch):

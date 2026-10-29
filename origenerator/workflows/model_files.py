@@ -23,7 +23,7 @@ from pathlib import Path
 
 from origenerator import config
 from origenerator.base_models import made_for_text_to_video
-from origenerator.model_titles import model_title
+from origenerator.model_titles import fix_of, is_a_fixs_lora, model_title
 from origenerator.workflows import model_arch
 
 # The suffixes ComfyUI loads as models — LoRAs and checkpoints alike live under
@@ -132,7 +132,7 @@ def list_model_files(
 
 
 def list_lora_files(
-    fallback: list[str], *, accepts, expert: str | None = None,
+    fallback: list[str], *, accepts, expert: str | None = None, fix: str = "",
 ) -> list[str]:
     """The LoRA picker's options: the "None" sentinel first, then the installed
     LoRAs this picker can run. "None" bypasses the LoRA (see :data:`NO_LORA`), so
@@ -143,7 +143,8 @@ def list_lora_files(
     checkpoint that ends up filed under ``loras``, which no LoraLoader can take.
     """
     listing = _listing("loras", fallback, accepts, expert, want_lora=True)
-    return [NO_LORA, *(name for name in listing if not is_no_lora(name))]
+    return [NO_LORA, *(name for name in listing if not is_no_lora(name)
+                       and (not is_a_fixs_lora(name) or fix_of(name) == fix))]
 
 
 def list_detector_files() -> list[str]:

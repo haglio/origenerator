@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from origenerator import config
-from origenerator.model_titles import is_a_fixs_lora, kept_by_stem, model_stem, write_kept
+from origenerator.model_titles import kept_by_stem, model_stem, write_kept
 from origenerator.workflows.model_files import ANY, is_no_lora, list_lora_files
 
 CIVITAI_BY_HASH = "https://civitai.com/api/v1/model-versions/by-hash"
@@ -39,8 +39,7 @@ def _loras_not_written_down() -> list[Path]:
     loras = config.COMFYUI_DIR / "models" / "loras"
     written = [kept_by_stem(path) for path in _records()]
     return [loras / name for name in list_lora_files([], accepts=ANY)
-            if not (is_no_lora(name) or is_a_fixs_lora(name))
-            and not all(model_stem(name) in kept for kept in written)]
+            if not is_no_lora(name) and not all(model_stem(name) in kept for kept in written)]
 
 
 def _versions_on_civitai(paths: list[Path], ask) -> dict[str, dict | None]:

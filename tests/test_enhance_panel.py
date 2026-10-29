@@ -7,6 +7,7 @@ already received.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 
 import pytest
@@ -1876,7 +1877,7 @@ def test_each_fixs_edit_button_checkbox_name_and_value_sit_inside_one_thin_gray_
 def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, monkeypatch,
                                                                     titled_models):
     monkeypatch.setattr(enhance_panel_module, "list_lora_files",
-                        lambda fallback, accepts: ["None", "my_hands.safetensors"])
+                        lambda fallback, **terms: ["None", "my_hands.safetensors"])
     titled_models({"my_hands": "My Hands v1"})
     panel, edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
@@ -1904,6 +1905,19 @@ def test_a_fixs_prompts_offer_only_the_loras_the_enhance_model_can_run(qtbot, in
         "an_xl_fix.safetensors"}
 
 
+def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, installed_models):
+    hands = os.path.join("fixes", "hands 2026-10-19 1444.safetensors")
+    for name in ("an_xl_look.safetensors", hands,
+                 os.path.join("fixes", "faces 2026-10-20 0910.safetensors")):
+        installed_models.add("loras", name, arch="sdxl", lora=True)
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    lora = panel._fix_prompt_windows["hands"].lora
+
+    assert {lora.itemData(row) for row in range(lora.count())} == {
+        "None", "an_xl_look.safetensors", hands}
+
+
 _STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
                "Click to add it.")
 
@@ -1911,7 +1925,7 @@ _STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Posit
 @pytest.fixture
 def worded_fix(qtbot, monkeypatch, worded_loras, titled_models):
     monkeypatch.setattr(enhance_panel_module, "list_lora_files",
-                        lambda fallback, accepts: ["None", "example_style.safetensors"])
+                        lambda fallback, **terms: ["None", "example_style.safetensors"])
     worded_loras({"example_style": ["exmplstyle"]})
     titled_models({"example_style": "Example Style 1.0"})
     panel, _edits = _panel(qtbot)

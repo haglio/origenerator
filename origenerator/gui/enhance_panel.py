@@ -499,7 +499,7 @@ class EnhancePanel(QWidget):
             open_already.activateWindow()
             return
         current = fix_prompts_of(part, self._fix_prompts.get(part.name))
-        loras = list_lora_files([NO_LORA], accepts=ENHANCE_MODEL_FAMILIES)
+        loras = list_lora_files([NO_LORA], accepts=ENHANCE_MODEL_FAMILIES, fix=part.name)
         window = FixPromptsDialog(self, part, current, loras)
         window.accepted.connect(lambda: self._keep_fix_prompts(part.name, window.prompts()))
         window.finished.connect(lambda _result: self._fix_prompt_windows.pop(part.name, None))

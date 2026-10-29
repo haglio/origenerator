@@ -426,15 +426,23 @@ is the two hooks that call the guard, below.
   trainings; `describe` writes a description beside each new copy with
   Florence-2, in a program of its own so the model leaves the card before the
   training; `dataset` puts the recorded trigger words in front of every
-  description; `cache` and `train` run musubi's own programs, the training
-  only while ComfyUI's line has been empty two minutes and the card's memory
-  is back, stopped the moment ComfyUI has a job and resumed from its newest
-  saved state, since his own generations come first (his rule); `install`
-  copies the result beside the newest version as `<base> <version>` and never
-  over a file. It works in `state/lora training/<base>`, outside the library,
-  because pCloud turns a state rewritten every 25 steps into conflicted copies.
-  It prints counts, never a description or a picture's name. The queue only
-  watches this training (`TrainingRun.holds_the_line`), where a fix's holds it.
+  description, the words the entry's `trigger_words` names (a version's own
+  recorded words only when the entry names none); `cache` and `train` run
+  musubi's own programs, the training only while ComfyUI's line has been
+  empty two minutes and the card's memory is back, stopped the moment ComfyUI
+  has a job and resumed from its newest saved state, since his own
+  generations come first (his rule); `install` copies the result beside the
+  newest version as `<base> <version>` and never over a file. It works in
+  `state/lora training/<base>`, outside the library, because pCloud turns a
+  state rewritten every 25 steps into conflicted copies. It prints counts,
+  never a description or a picture's name. The queue only watches this
+  training (`TrainingRun.holds_the_line`), where a fix's holds it.
+- `tools/card_claim.py` — the one claim on the graphics card, the file
+  `~/.haglio/graphics_card_claim.json` naming who holds it and its Windows
+  pid. Both trainers take it before they use the card and let go when they
+  stop, his hand training scripts beside the library take and honor the same
+  file, and a claim whose pid has died is stale: two trainings each yielding
+  only to ComfyUI's line took the card together on 2026-10-29 and both crawled.
 - `tools/open_from_notification.py` — what Windows runs when a notification of
   this app's is clicked, registered as the command for the `origenerator:` link
   every notice carries. It hands the generation to the copy that has the

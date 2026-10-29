@@ -1,6 +1,11 @@
 """A prompt field showing what is being typed into it as a change to what it said."""
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QTextCursor
@@ -343,5 +348,37 @@ def test_untracking_leaves_an_ordinary_field_holding_its_prompt(pair, qtbot):
     assert pair.edit.findChildren(QTimer) == []
     pair.edit.setPlainText("a dog on a rug")
     assert _marks(pair.edit) == [("a dog on a rug", "plain")]
+
+
+_FORMS_FREED_WHILE_A_REDRAW_WAITS = """
+import gc, sys
+from PyQt6.QtWidgets import QApplication, QPlainTextEdit, QWidget
+from origenerator.gui import tracked_prompt
+
+app = QApplication(sys.argv)
+for _ in range(5):
+    form = QWidget()
+    form.only_the_collector_frees_it = form
+    field = QPlainTextEdit(form)
+    field.setPlainText("a cat")
+    tracked_prompt.track(field, "a cat")
+    field.setPlainText("a dog")
+    form.deleteLater()
+    del form, field
+    gc.collect()
+    app.processEvents()
+print("still running")
+"""
+
+
+def test_a_form_freed_while_its_prompt_waits_to_be_redrawn_leaves_the_app_running():
+    # In a fresh interpreter, since what breaks here is the process itself.
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
+               PYTHONPATH=str(Path(__file__).resolve().parent.parent))
+    ran = subprocess.run([sys.executable, "-c", _FORMS_FREED_WHILE_A_REDRAW_WAITS],
+                         env=env, capture_output=True, text=True, timeout=120,
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    assert (ran.returncode, ran.stdout.strip()) == (0, "still running"), ran.stderr
 
 

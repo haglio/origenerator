@@ -107,7 +107,7 @@ class _Tracker(QObject):
         self._prompt_caret = 0
         self._redraw = QTimer(self)
         self._redraw.setSingleShot(True)
-        self._redraw.timeout.connect(lambda: self._show_prompt_only(self._prompt_caret))
+        self._redraw.timeout.connect(self._show_prompt_only)
         edit.setUndoRedoEnabled(False)  # see the module docstring
         edit.installEventFilter(self)
         edit.document().contentsChange.connect(self._on_contents_change)
@@ -219,7 +219,7 @@ class _Tracker(QObject):
         else:
             self._light(spans)  # nothing left: the document already reads right
 
-    def _show_prompt_only(self, caret: int) -> None:
+    def _show_prompt_only(self) -> None:
         """The field as the prompt alone, arriving words still lit — what it is
         while being typed in."""
         spans = [span for span in diff_spans(self._baseline, self._value)
@@ -227,7 +227,7 @@ class _Tracker(QObject):
         if self._edit.toPlainText() == self._value:
             self._light(spans)  # already the prompt: mark it, don't rewrite it
         else:
-            self._paint(spans, caret)
+            self._paint(spans, self._prompt_caret)
 
     # --- what the typist does -----------------------------------------------
 

@@ -87,8 +87,9 @@ def test_workflows_declare_the_params_that_identify_their_lora():
     # The gallery nests a workflow's runs by LoRA under model, so each workflow
     # names the param(s) that pick its LoRAs. A workflow with no LoRA (WAN t2i)
     # declares none, and so grows no LoRA folder level.
-    assert Wan22I2vWorkflow().lora_keys == ("lora_high", "lora_low")
-    assert Wan22Flf2vLoopWorkflow().lora_keys == ("lora_high", "lora_low")
+    assert Wan22I2vWorkflow().lora_keys == ("lora_high", "lora_high_2", "lora_high_3",
+                                            "lora_low", "lora_low_2", "lora_low_3")
+    assert Wan22Flf2vLoopWorkflow().lora_keys == Wan22I2vWorkflow().lora_keys
     assert FluxT2iUpscaledWorkflow().lora_keys == ("lora", "lora_2", "lora_3")
     assert SdxlT2iWorkflow().lora_keys == ("lora", "lora_2", "lora_3")
     assert Wan22T2iWorkflow().lora_keys == ()
@@ -182,20 +183,17 @@ def test_wan_video_workflows_expose_model_pickers(monkeypatch):
 
 def test_wan_video_workflows_group_all_models_then_all_loras():
     # Model and LoRA settings are grouped by kind, not by noise level: both UNET
-    # pickers sit together, then both LoRA pickers (each directly above its own
+    # pickers sit together, then every LoRA picker (each directly above its own
     # strength). So the Generate form and the gallery info pane read as "all the
     # models, then all the LoRAs" rather than "everything high, then everything
     # low". This order is the single source both surfaces draw from.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         keys = [d.key for d in wf.param_definitions()]
         model_block = [keys.index(k) for k in ("unet_high", "unet_low")]
-        lora_block = [
-            keys.index(k) for k in
-            ("lora_high", "lora_strength_high", "lora_low", "lora_strength_low")
-        ]
+        lora_block = [index for index, key in enumerate(keys) if key.startswith("lora")]
         # Each kind is one contiguous run, in the listed order...
         assert model_block == list(range(model_block[0], model_block[0] + 2))
-        assert lora_block == list(range(lora_block[0], lora_block[0] + 4))
+        assert lora_block == list(range(lora_block[0], lora_block[0] + len(lora_block)))
         # ...with every model picker above every LoRA picker.
         assert model_block[-1] < lora_block[0]
 
@@ -2520,10 +2518,10 @@ _NAMES_EVERYONE_USES = {
     "negative_prompt": "Negative Prompt",
     "audio_prompt": "Positive Prompt",
     "audio_negative_prompt": "Negative Prompt",
-    "lora_high": "LoRA (First Pass)",
-    "lora_strength_high": "LoRA Strength (First Pass)",
-    "lora_low": "LoRA (Second Pass)",
-    "lora_strength_low": "LoRA Strength (Second Pass)",
+    "lora_high": "LoRA 1 (First Pass)",
+    "lora_strength_high": "LoRA Strength 1 (First Pass)",
+    "lora_low": "LoRA 1 (Second Pass)",
+    "lora_strength_low": "LoRA Strength 1 (Second Pass)",
     "sampler_name": "Sampler",
 }
 

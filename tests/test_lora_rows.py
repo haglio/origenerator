@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from origenerator.gallery.labels import lora_label
 from origenerator.gallery.tree import folder_chain
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import NO_LORA
@@ -120,6 +121,42 @@ def test_a_form_offers_three_loras_each_on_none_above_its_own_strength(name):
     ]
 
 
+_TWO_PASS_WORKFLOWS = ("wan22_i2v", "wan22_flf2v_loop")
+
+
+@pytest.mark.parametrize("name", _TWO_PASS_WORKFLOWS)
+@pytest.mark.parametrize("key", ["lora_high_2", "lora_high_3", "lora_low_2", "lora_low_3"])
+def test_a_lora_picked_on_any_row_of_a_pass_is_filed_under_a_lora_folder_naming_it(name, key):
+    stored = _stored_run(name, _A_PAIR)
+    picked = stored | {key: "example_extra.safetensors"}
+
+    assert _folders(name, picked)[1] != _folders(name, stored)[1]
+    assert "example_extra" in lora_label(name, picked).split(" / ")
+
+
+@pytest.mark.parametrize("name", _TWO_PASS_WORKFLOWS)
+def test_a_two_pass_form_offers_three_loras_for_each_pass_the_first_pass_first(name):
+    workflow = WORKFLOW_REGISTRY[name]
+    defaults = workflow.default_params()
+    rows = [(pd.key, pd.label, pd.default)
+            for pd in workflow.param_definitions() if pd.key.startswith("lora")]
+
+    assert rows == [
+        ("lora_high", "LoRA 1 (First Pass)", defaults["lora_high"]),
+        ("lora_strength_high", "LoRA Strength 1 (First Pass)", 1.0),
+        ("lora_high_2", "LoRA 2 (First Pass)", "None"),
+        ("lora_strength_high_2", "LoRA Strength 2 (First Pass)", 1.0),
+        ("lora_high_3", "LoRA 3 (First Pass)", "None"),
+        ("lora_strength_high_3", "LoRA Strength 3 (First Pass)", 1.0),
+        ("lora_low", "LoRA 1 (Second Pass)", defaults["lora_low"]),
+        ("lora_strength_low", "LoRA Strength 1 (Second Pass)", 1.0),
+        ("lora_low_2", "LoRA 2 (Second Pass)", "None"),
+        ("lora_strength_low_2", "LoRA Strength 2 (Second Pass)", 1.0),
+        ("lora_low_3", "LoRA 3 (Second Pass)", "None"),
+        ("lora_strength_low_3", "LoRA Strength 3 (Second Pass)", 1.0),
+    ]
+
+
 @pytest.mark.parametrize("name", _THREE_LORA_WORKFLOWS)
 def test_a_forms_loras_come_right_after_its_model(name):
     workflow = WORKFLOW_REGISTRY[name]
@@ -208,6 +245,34 @@ def test_two_loras_picked_together_both_reach_the_prompts_one_after_the_other(na
                if node["class_type"] == "CLIPTextEncode"]
     assert readers and all(_loras_behind(payload, clip, "clip") == [
         ("first_look.safetensors", 0.7), ("second_look.safetensors", 0.6)] for clip in readers)
+
+
+def _each_pass_loras(payload: dict) -> dict[str, list[list[tuple[str, float]]]]:
+    passes: dict[str, list[list[tuple[str, float]]]] = {"enable": [], "disable": []}
+    for node in payload.values():
+        if node["class_type"] == "KSamplerAdvanced":
+            passes[node["inputs"]["add_noise"]].append(
+                _loras_behind(payload, node["inputs"]["model"], "model"))
+    return passes
+
+
+@pytest.mark.parametrize("name", _TWO_PASS_WORKFLOWS)
+def test_loras_picked_together_on_a_pass_all_reach_its_sampler_one_after_the_other(name):
+    workflow = WORKFLOW_REGISTRY[name]
+    payload = workflow.build_api_payload(workflow.default_params() | {
+        "lora_high": "first_motion.safetensors", "lora_strength_high": 0.9,
+        "lora_high_3": "second_motion.safetensors", "lora_strength_high_3": 0.6,
+        "lora_low": NO_LORA,
+        "lora_low_2": "first_detail.safetensors", "lora_strength_low_2": 0.7,
+        "lora_low_3": "second_detail.safetensors", "lora_strength_low_3": 0.5})
+
+    passes = _each_pass_loras(payload)
+    assert passes["enable"] and all(loras == [("first_motion.safetensors", 0.9),
+                                              ("second_motion.safetensors", 0.6)]
+                                    for loras in passes["enable"])
+    assert passes["disable"] and all(loras == [("first_detail.safetensors", 0.7),
+                                               ("second_detail.safetensors", 0.5)]
+                                     for loras in passes["disable"])
 
 
 @pytest.mark.parametrize("name", _THREE_LORA_WORKFLOWS)

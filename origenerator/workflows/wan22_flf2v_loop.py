@@ -14,6 +14,11 @@ from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import picked_loras
 from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import (
+    FIRST_PASS_LORA_KEYS,
+    LORA_KEYS_OF_BOTH_PASSES,
+    LORAS_KEYED_ONLY_WHEN_NAMED,
+    SECOND_PASS_LORA_KEYS,
+    wan_expert_lora_defaults,
     wan_expert_lora_params,
     wan_expert_model_params,
     wan_expert_shift_param,
@@ -42,7 +47,8 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     looping = True
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")
-    lora_keys = ("lora_high", "lora_low")
+    lora_keys = LORA_KEYS_OF_BOTH_PASSES
+    loras_keyed_only_when_named = LORAS_KEYED_ONLY_WHEN_NAMED
     output_node_id = "16"
 
     def default_params(self) -> dict:
@@ -71,6 +77,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "unet_low": "wan22EnhancedNSFWSVICamera_nolightningSVICfFp8L.safetensors",
             "lora_high": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
             "lora_low": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+            **wan_expert_lora_defaults(),
             "audio_prompt": "",
             "audio_negative_prompt": "noisy, harsh",
             "audio_seed": 0,
@@ -105,8 +112,8 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        loras_high = self.lora_chain("5", ["3", 0], picked_loras(params, ("lora_high",)))
-        loras_low = self.lora_chain("6", ["4", 0], picked_loras(params, ("lora_low",)))
+        loras_high = self.lora_chain("5", ["3", 0], picked_loras(params, FIRST_PASS_LORA_KEYS))
+        loras_low = self.lora_chain("6", ["4", 0], picked_loras(params, SECOND_PASS_LORA_KEYS))
         # Size the loop off the input image: derived in-graph by default, or scaled
         # to the user's explicit WxH when the derived size was unlocked. Both
         # endpoints read the same scaled image.

@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from origenerator.workflows.lora_rows import LORA_KEYS, keys_with_strengths
+from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS_LORA_KEYS
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,8 @@ SECTIONS: tuple[Section, ...] = (
     Section("Models & LoRAs", (
         "checkpoint", "unet", *keys_with_strengths(LORA_KEYS), "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",
-        "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
+        *keys_with_strengths(FIRST_PASS_LORA_KEYS),
+        *keys_with_strengths(SECOND_PASS_LORA_KEYS),
         "upscale_model", "model", "style",
     ), collapsed=True),
     Section("Calibration", (

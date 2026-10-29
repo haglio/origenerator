@@ -38,8 +38,8 @@ class Turn:
 
 def take_a_turn(*, app_open: Callable[[], bool], training_running: Callable[[], bool],
                 comfyui_busy: Callable[[], bool], batches_due: Callable[[], bool],
-                queue_batches: Callable[[], None], fix_to_train: Callable[[], object],
-                train: Callable[[object], None]) -> Turn:
+                queue_batches: Callable[[], None], queue_more_backfill: Callable[[], int],
+                fix_to_train: Callable[[], object], train: Callable[[object], None]) -> Turn:
     if app_open():
         return Turn("nothing: Origenerator is open", training_running())
     if training_running():
@@ -49,6 +49,8 @@ def take_a_turn(*, app_open: Callable[[], bool], training_running: Callable[[], 
     if batches_due():
         queue_batches()
         return Turn("handed ComfyUI the work Origenerator left as it closed", training_running())
+    if queue_more_backfill():
+        return Turn("handed ComfyUI the next videos the backfill remakes", training_running())
     if (fix := fix_to_train()) is not None:
         train(fix)
         return Turn(f"started training the {fix.name} fix", True)
@@ -112,34 +114,55 @@ def queue_the_backfill(jobs, db, rows: list[dict], *, enhance_settings) -> int:
             db.set_backfill_of(prompt_id, video["prompt_id"])
         return prompt_id
 
-    def enhance(images: list[dict]) -> None:
+    def enhance(images: list[dict]) -> int:
         asks = [(image, params) for image in images
                 if (params := gallery.enhance_params_for(image, enhance_settings)) is not None]
         index = gallery.build_image_config_index(
             [row for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE])
-        launch_enhancements(jobs, db, asks, index, source=GenerationSource.BACKFILL)
+        return sum(1 for *_launch, prompt_id in launch_enhancements(
+            jobs, db, asks, index, source=GenerationSource.BACKFILL) if prompt_id)
 
     return queue_backfill(rows, launch, enhance=enhance)
 
 
-def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
+def _handed_over(db, client, queue: Callable[[object], int]) -> int:
     from PyQt6.QtCore import QCoreApplication  # noqa: PLC0415
 
     from origenerator.gui.job_queue import JobQueue  # noqa: PLC0415
 
     _app = QCoreApplication.instance() or QCoreApplication([])
     jobs = JobQueue(db, client)
-    queued = queue_the_backfill(
+    queued = queue(jobs)
+    jobs.flush_to_server()
+    return queued
+
+
+def _queue_the_backfill_into(jobs, db, ui: AppState) -> int:
+    return queue_the_backfill(
         jobs, db, db.list_generations(),
         enhance_settings=gallery.EnhanceSettings.parse(ui.get("enhance_settings")))
-    queued += queue_the_work_left(jobs, db.list_generations(),
-                                  experiments_on=ui.get("experiments_enabled") is True,
-                                  policy=ExperimentPolicy(registry=WORKFLOW_REGISTRY,
-                                                          rng=random.Random()))
-    queued += places_backfill.queue_finding_for_the_absence(db, client)
-    jobs.flush_to_server()
+
+
+def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
+    def everything(jobs) -> int:
+        return (_queue_the_backfill_into(jobs, db, ui)
+                + queue_the_work_left(jobs, db.list_generations(),
+                                      experiments_on=ui.get("experiments_enabled") is True,
+                                      policy=ExperimentPolicy(registry=WORKFLOW_REGISTRY,
+                                                              rng=random.Random()))
+                + places_backfill.queue_finding_for_the_absence(db, client))
+
+    queued = _handed_over(db, client, everything)
     forget_work_left()
     logger.info("Handed ComfyUI %d run(s) Origenerator left for while it is closed", queued)
+
+
+def hand_comfyui_more_of_the_backfill(db, client, ui: AppState) -> int:
+    queued = _handed_over(db, client, lambda jobs: _queue_the_backfill_into(jobs, db, ui))
+    if queued:
+        logger.info("Handed ComfyUI %d more run(s) of the backfill while Origenerator stays "
+                    "closed", queued)
+    return queued
 
 
 def _train(client, part, ui: AppState) -> None:
@@ -180,6 +203,7 @@ def main() -> int:
         training_running=lambda: bool(fix_training.running_trainings()),
         comfyui_busy=lambda: _comfyui_busy(client), batches_due=work_left,
         queue_batches=lambda: hand_comfyui_the_work_left(db, client, ui),
+        queue_more_backfill=lambda: hand_comfyui_more_of_the_backfill(db, client, ui),
         fix_to_train=fix_training.fix_to_train, train=lambda part: _train(client, part, ui))
     print(json.dumps({"did": turn.did, "holds_the_graphics_card": turn.holds_the_graphics_card}))
     return 0

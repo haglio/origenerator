@@ -46,7 +46,7 @@ def queue_backfill(rows: list[dict], launch, *, enhance,
     found = videos_to_backfill(rows)
     plain = {image["prompt_id"]: image for _video, image in found
              if not gallery.is_enhanced_row(image)}
-    enhance(gallery.rows_awaiting_enhancement(list(plain.values()), rows))
+    enhanced = enhance(gallery.rows_awaiting_enhancement(list(plain.values()), rows))
     starts = {video["prompt_id"]: image for video, image in found
               if gallery.is_enhanced_row(image)}
 
@@ -60,7 +60,7 @@ def queue_backfill(rows: list[dict], launch, *, enhance,
     if queued:
         logger.info("Queued %d video(s) of the enhanced-start backfill (~%d min) to run "
                     "while the app is closed", queued, round(spent / 60))
-    return queued
+    return enhanced + queued
 
 
 @dataclass

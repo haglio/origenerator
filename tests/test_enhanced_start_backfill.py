@@ -205,6 +205,7 @@ class _Absence:
 
     def enhance(self, images):
         self.enhanced.extend(image["prompt_id"] for image in images)
+        return len(images)
 
     def queue(self, db, **budget):
         return queue_backfill(db.list_generations(), self.launch, enhance=self.enhance, **budget)
@@ -216,7 +217,7 @@ def test_an_image_never_enhanced_is_enhanced_first_and_its_video_waits(tmp_path)
     _video(db, "video", made_from="image", starred=True)
     absence = _Absence()
 
-    assert absence.queue(db) == 0
+    assert absence.queue(db) == 1
 
     assert (absence.enhanced, absence.launched) == (["image"], [])
 
@@ -270,7 +271,7 @@ def test_the_work_left_for_while_closed_backfills_videos_and_enhances_their_imag
     jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
 
     assert downtime.queue_the_backfill(jobs, db, db.list_generations(),
-                                      enhance_settings=gallery.EnhanceSettings.parse(None)) == 1
+                                      enhance_settings=gallery.EnhanceSettings.parse(None)) == 2
 
     queued = [row for row in db.list_generations() if row["source"] == GenerationSource.BACKFILL]
     assert sorted((row["workflow_name"], row["backfill_of"] or row["enhance_of"])

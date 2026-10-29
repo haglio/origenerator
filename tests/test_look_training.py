@@ -43,6 +43,20 @@ def test_a_picked_lora_is_trainable_when_its_titles_base_is_one_the_overlay_name
     assert look_training.trainable_base_of(NO_LORA) is None
 
 
+def test_a_lora_of_another_family_than_the_entrys_base_model_is_no_version_of_it(
+        monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
+    _trainable(monkeypatch, tmp_path)
+    installed_models.add("diffusion_models", "example_raw.safetensors", arch="krea2")
+    titled_models({"example_look": "Example Look 1.0", "example_look_sdxl": "Example Look 1.1"})
+    worded_loras({})
+    installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True)
+    installed_models.add("loras", "example_look_sdxl.safetensors", arch="sdxl", lora=True)
+
+    assert look_training.trainable_base_of("example_look.safetensors") == "Example Look"
+    assert look_training.trainable_base_of("example_look_sdxl.safetensors") is None
+    assert look_training.training_job("Example Look")["output_name"] == "Example Look 1.1"
+
+
 def test_only_pictures_in_the_folder_are_trained_on_whatever_their_kind(tmp_path):
     for name in ("b.jpg", "a.PNG", "c.webp", "d.avif", "e.gif", "notes.txt", "f.mp4"):
         (tmp_path / name).write_bytes(b"")

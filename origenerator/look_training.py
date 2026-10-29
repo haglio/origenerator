@@ -8,6 +8,7 @@ from origenerator.lora_training import TrainingOffer, TrainingState
 from origenerator.lora_versions import newest_version, next_version
 from origenerator.model_titles import lora_folder, model_stem, model_title, versioned, write_title
 from origenerator.trigger_words import trigger_words_by_lora, write_trigger_words
+from origenerator.workflows.model_arch import describe
 from origenerator.workflows.model_files import is_no_lora
 
 TRAINER = lora_training.TRAINERS / "look_lora_trainer.py"
@@ -28,7 +29,16 @@ def trainable_base_of(lora) -> str | None:
     parsed = versioned(model_title(lora))
     if parsed is None or parsed[0] not in trainable_loras():
         return None
-    return parsed[0]
+    family, own = model_family(parsed[0]), describe(lora_folder() / str(lora)).arch
+    return parsed[0] if family is None or own in (None, family) else None
+
+
+def model_family(base: str) -> str | None:
+    return describe(_model_file("diffusion_models", trainable_loras()[base]["base_model"])).arch
+
+
+def _model_file(category: str, name: str) -> Path:
+    return config.COMFYUI_DIR / "models" / category / name
 
 
 def pictures_folder(base: str) -> Path:
@@ -50,7 +60,7 @@ def work_folder(base: str) -> Path:
 
 
 def training_state(base: str) -> TrainingState:
-    if newest_version(base) is None:
+    if newest_version(base, model_family(base)) is None:
         return TrainingState.UNTRAINED
     state = lora_training.training_state(work_folder(base) / "trained.json", picture_stamps(base))
     return TrainingState.OUT_OF_DATE if state is TrainingState.UNTRAINED else state
@@ -58,10 +68,10 @@ def training_state(base: str) -> TrainingState:
 
 def training_job(base: str) -> dict:
     settings = trainable_loras()[base]
-    newest = newest_version(base)
+    family = model_family(base)
+    newest = newest_version(base, family)
     folder = PureWindowsPath(newest[1]).parent if newest else PureWindowsPath()
-    output_name = f"{base} {next_version(base)}"
-    models = config.COMFYUI_DIR / "models"
+    output_name = f"{base} {next_version(base, family)}"
     return {
         "base": base,
         "pictures_folder": str(pictures_folder(base)),
@@ -71,9 +81,9 @@ def training_job(base: str) -> dict:
         "lora_folder": str(lora_folder() / folder),
         "lora": str(folder / f"{output_name}.safetensors"),
         "trigger_words": _words_to_train_on(settings, newest),
-        "base_model": str(models / "diffusion_models" / settings["base_model"]),
-        "text_encoder": str(models / "text_encoders" / settings["text_encoder"]),
-        "vae": str(models / "vae" / settings["vae"]),
+        "base_model": str(_model_file("diffusion_models", settings["base_model"])),
+        "text_encoder": str(_model_file("text_encoders", settings["text_encoder"])),
+        "vae": str(_model_file("vae", settings["vae"])),
         "scripts": str(config.KREA2_TRAINING_SCRIPTS),
         "steps": STEPS,
         "save_every": SAVE_EVERY,

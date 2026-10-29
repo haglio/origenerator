@@ -4,10 +4,12 @@ from origenerator.workflows.frame_rate import playback_rate
 
 CRF = 13
 
+VIDEO_WRITER = "VHS_VideoCombine"
+
 
 def video_writer(frames_ref, audio_ref, params: dict) -> dict:
     return {
-        "class_type": "VHS_VideoCombine",
+        "class_type": VIDEO_WRITER,
         "inputs": {
             "images": frames_ref,
             "audio": audio_ref,

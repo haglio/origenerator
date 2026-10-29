@@ -4,8 +4,11 @@ import os
 from pathlib import Path
 
 from origenerator.file_numbers import NUMBERED, next_number, numbered
+from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces, files_under, folders_in
 from origenerator.trash import Trash
+from origenerator.workflows.base import soundless_copies_of
+from origenerator.workflows.video_writer import VIDEO_WRITER
 
 ADD_ON_SCRATCH = frozenset({"VRGDG_TEMP"})
 
@@ -20,6 +23,32 @@ def _saving_under(node: dict, run: str) -> dict:
     if not isinstance(prefix, str):
         return node
     return {**node, "inputs": {**node["inputs"], "filename_prefix": f"{run}/{prefix}"}}
+
+
+def saved_in_its_run_folder(payload: dict, places: OutputPlaces, prompt_id: str) -> dict:
+    run = _run_subfolder(places, prompt_id)
+    return {"outputs": {node_id: {"images": saved} for node_id, node in payload.items()
+                        if (saved := _saved_by(node, run, places))}}
+
+
+def _saved_by(node: dict, run: str, places: OutputPlaces) -> list[dict]:
+    prefix = node.get("inputs", {}).get("filename_prefix")
+    if not isinstance(prefix, str) or not prefix.startswith(f"{run}/"):
+        return []
+    subfolder, stem = prefix.rsplit("/", 1)
+    folder = places.comfyui / subfolder
+    names = sorted(name for name in (os.listdir(folder) if folder.is_dir() else [])
+                   if (match := NUMBERED.match(name)) and match["stem"] == stem)
+    if node.get("class_type") == VIDEO_WRITER:
+        names = _videos_comfyui_reports(names)
+    return [{"filename": name, "subfolder": subfolder, "type": "output"} for name in names]
+
+
+def _videos_comfyui_reports(names: list[str]) -> list[str]:
+    videos = [{"filename": name} for name in names
+              if media_type_from_filename(name) == MediaType.VIDEO]
+    silent = {copy["filename"] for copy in soundless_copies_of(videos)}
+    return [video["filename"] for video in videos if video["filename"] not in silent]
 
 
 def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -> list[dict]:
@@ -37,29 +66,22 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
     return [_as_filed(record, filed) for record in files]
 
 
-def file_what_comfyui_left(places: OutputPlaces, *, in_flight: set[str]) -> int:
-    held = _held_in_trash(places)
-    filed = 0
-    for run in folders_in(places.working):
-        if run.name not in in_flight:
-            filed += _file_everything_under(run, run, places, held)
+def file_what_comfyui_left(places: OutputPlaces) -> int:
     if places.keeps_outputs_in_comfyuis_folder():
-        return filed
-    for top in folders_in(places.comfyui):
-        if top != places.working and top.name not in ADD_ON_SCRATCH:
-            filed += _file_everything_under(top, places.comfyui, places, held)
-    return filed
+        return 0
+    held = _held_in_trash(places)
+    return sum(_file_everything_under(top, places, held) for top in folders_in(places.comfyui)
+               if top != places.working and top.name not in ADD_ON_SCRATCH)
 
 
 def _held_in_trash(places: OutputPlaces) -> set[str]:
     return Trash(places.trash).held_names() if places.trash is not None else set()
 
 
-def _file_everything_under(top: Path, kinds_from: Path, places: OutputPlaces,
-                           held: set[str]) -> int:
+def _file_everything_under(top: Path, places: OutputPlaces, held: set[str]) -> int:
     filed = 0
     for folder, names in files_under(top):
-        home = places.folder(folder.relative_to(kinds_from).as_posix())
+        home = places.folder(folder.relative_to(places.comfyui).as_posix())
         for name in names:
             if (folder / name).is_file():
                 filed += len(_file_into_its_home(folder, name, home, held))

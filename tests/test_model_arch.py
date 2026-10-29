@@ -231,6 +231,8 @@ def test_reads_the_wan_expert_off_the_filename(tmp_path):
     # camelCase, where the marker has a letter immediately before it
     assert expert("exampleRemixT2VI2V_t2vHighV20.safetensors") == "high"
     assert expert("sampleMixWan2214BI2V_t2vLowV30.safetensors") == "low"
+    assert expert("exampleMixWan22Camera_nolightningCfFp8H.safetensors") == "high"
+    assert expert("exampleMixWan22Camera_nolightningCfFp8L.safetensors") == "low"
 
 
 def test_a_word_merely_containing_high_or_low_is_not_a_marker(tmp_path):

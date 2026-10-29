@@ -2606,6 +2606,25 @@ def _lora_form(qtbot, **options):
     return form
 
 
+_FILED_ON_CIVITAI = {"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo", "speed_up": "Krea 2"}
+
+
+def _offered(combo) -> list:
+    return [combo.itemData(row) for row in range(combo.count())]
+
+
+def _model_and_its_lora(qtbot, recorded_base_models, model):
+    recorded_base_models(_FILED_ON_CIVITAI)
+    form = ParamForm([
+        ParamDef("unet", "Model", "combo", model,
+                 options=["raw_model.safetensors", "turbo_model.safetensors"]),
+        ParamDef("lora", "LoRA", "combo", "None", beside_model="unet",
+                 options=["None", "speed_up.safetensors", "a_look.safetensors"]),
+    ])
+    qtbot.addWidget(form)
+    return form
+
+
 def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot, tmp_path, monkeypatch):
     form = _lora_form(qtbot, lora_keys=("lora",))
     controls = form._training_controls["lora"]
@@ -2641,3 +2660,31 @@ def test_a_form_told_no_lora_keys_offers_no_training(qtbot):
     form = _lora_form(qtbot)
 
     assert form._training_controls == {}
+
+
+def test_a_lora_civitai_files_under_another_base_model_than_the_models_is_not_offered(
+        qtbot, recorded_base_models):
+    form = _model_and_its_lora(qtbot, recorded_base_models, "turbo_model.safetensors")
+
+    assert _offered(form._widgets["lora"]) == ["None", "a_look.safetensors"]
+
+
+def test_picking_another_model_offers_the_loras_made_for_it(qtbot, recorded_base_models):
+    form = _model_and_its_lora(qtbot, recorded_base_models, "turbo_model.safetensors")
+    unet = form._widgets["unet"]
+
+    unet.setCurrentIndex(unet.findData("raw_model.safetensors"))
+
+    assert _offered(form._widgets["lora"]) == [
+        "None", "speed_up.safetensors", "a_look.safetensors"]
+
+
+def test_a_lora_picked_beside_one_model_stays_picked_when_another_model_is(
+        qtbot, recorded_base_models):
+    form = _model_and_its_lora(qtbot, recorded_base_models, "raw_model.safetensors")
+    form.set_values({"lora": "speed_up.safetensors"})
+
+    form.set_values({"unet": "turbo_model.safetensors"})
+
+    assert form.get_values()["lora"] == "speed_up.safetensors"
+

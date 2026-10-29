@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSignalBlocker, Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 
@@ -242,7 +242,7 @@ class _Presets(FieldKind):
 class _Choice(FieldKind):
     def make(self, pd):
         widget = NoWheelComboBox()
-        offer_options(widget, pd.options or [], lambda option: option_help(pd.key, option))
+        _offer_choices(pd, widget, pd.options or [])
         choose_option(widget, str(pd.default))
         return widget
 
@@ -288,6 +288,21 @@ def offer_options(combo: QComboBox, options, tip=lambda _option: None) -> None:
     for option in options:
         combo.addItem(option_title(option), option)
         combo.setItemData(combo.count() - 1, tip(option) or None, Qt.ItemDataRole.ToolTipRole)
+
+
+def offer_only(pd: ParamDef, combo: QComboBox, options: list) -> None:
+    held = combo.currentData()
+    shown = options if held in options else [*options, held]
+    if [combo.itemData(row) for row in range(combo.count())] == shown:
+        return
+    with QSignalBlocker(combo):
+        combo.clear()
+        _offer_choices(pd, combo, options)
+        choose_option(combo, str(held))
+
+
+def _offer_choices(pd: ParamDef, combo: QComboBox, options: list) -> None:
+    offer_options(combo, options, lambda option: option_help(pd.key, option))
 
 
 def choose_option(combo: QComboBox, value: str):

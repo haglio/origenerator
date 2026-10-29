@@ -212,6 +212,7 @@ class ParamDef:
     also_sets: tuple[str, ...] = ()
     good: tuple[float, float] | None = None
     beside_model: str = ""
+    folder: str = ""
 
     def __post_init__(self):
         self.type = ParamType(self.type)

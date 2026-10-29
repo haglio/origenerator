@@ -4,7 +4,7 @@ from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import FLUX
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_pickers import model_picker
 
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
@@ -71,10 +71,10 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         # GGUF Flux models live under diffusion_models, alongside the WAN UNETs
         # and a few bare SDXL and Qwen ones — hence the filter.
         defaults = self.default_params()
-        unets = list_model_files("diffusion_models", [defaults["unet"]], accepts=(FLUX,))
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
+            model_picker("unet", "Model", defaults["unet"], "diffusion_models",
+                         accepts=(FLUX,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(FLUX,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=16),

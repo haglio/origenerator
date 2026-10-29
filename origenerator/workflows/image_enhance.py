@@ -5,7 +5,8 @@ from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.detail_parts import FIX_MAX
 from origenerator.workflows.model_arch import SDXL
-from origenerator.workflows.model_files import ANY, list_model_files
+from origenerator.workflows.model_files import ANY
+from origenerator.workflows.model_pickers import model_picker
 
 ENHANCE_MODEL_FAMILIES = (SDXL,)
 
@@ -74,21 +75,15 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        checkpoints = list_model_files(
-            "checkpoints", [defaults["checkpoint"]], accepts=ENHANCE_MODEL_FAMILIES,
-        )
-        upscalers = list_model_files(
-            "upscale_models", [defaults["upscale_model"]], accepts=ANY,
-        )
         return [
             ParamDef("input_image", "Image", ParamType.IMAGE, defaults["input_image"]),
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
-                     options=checkpoints),
+            model_picker("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
+                         accepts=ENHANCE_MODEL_FAMILIES),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
-            ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
-                     options=upscalers),
+            model_picker("upscale_model", "Upscaler", defaults["upscale_model"],
+                         "upscale_models", accepts=ANY),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),

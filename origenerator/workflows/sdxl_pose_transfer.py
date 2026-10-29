@@ -11,7 +11,8 @@ from origenerator.workflows.base import (
 from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import SDXL
-from origenerator.workflows.model_files import ANY, list_model_files
+from origenerator.workflows.model_files import ANY
+from origenerator.workflows.model_pickers import model_picker
 
 # The pixel budget the output is scaled to. SDXL is trained at ~1 megapixel, so
 # the pose image's aspect ratio is kept at that budget — unlike the video
@@ -104,27 +105,18 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        checkpoints = list_model_files(
-            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL,),
-        )
-        controlnets = list_model_files(
-            "controlnet", [defaults["controlnet"]], accepts=(SDXL,),
-        )
-        upscalers = list_model_files(
-            "upscale_models", [defaults["upscale_model"]], accepts=ANY,
-        )
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Structure Image", ParamType.IMAGE, defaults["input_image"],
                      browse_dir=CUSTOM_POSES_DIR),
-            ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
-                     options=checkpoints),
+            model_picker("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
+                         accepts=(SDXL,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(SDXL,)),
             ParamDef("control_mode", "Structure From", ParamType.COMBO, defaults["control_mode"],
                      options=["depth", "pose"]),
-            ParamDef("controlnet", "Structure Model", ParamType.COMBO, defaults["controlnet"],
-                     options=controlnets),
+            model_picker("controlnet", "Structure Model", defaults["controlnet"], "controlnet",
+                         accepts=(SDXL,)),
             ParamDef("controlnet_strength", "Structure Strength", ParamType.FLOAT, defaults["controlnet_strength"],
                      min_val=0.0, max_val=2.0, step=0.05, good=(0.5, 0.9)),
             ParamDef("controlnet_end", "Structure Hold", ParamType.FLOAT, defaults["controlnet_end"],
@@ -134,8 +126,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5, good=(3, 8)),
             *sampler_params(defaults),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
-            ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
-                     options=upscalers),
+            model_picker("upscale_model", "Upscaler", defaults["upscale_model"],
+                         "upscale_models", accepts=ANY),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),

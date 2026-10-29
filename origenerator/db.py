@@ -117,8 +117,8 @@ class Database:
     def set_source(self, prompt_id: str, source: str):
         return self.generations.set_source(prompt_id, source)
 
-    def owe_a_fun_time_favorite(self, prompt_id: str):
-        return self.generations.owe_a_fun_time_favorite(prompt_id)
+    def take_the_place_of(self, prompt_id: str, old: dict):
+        return self.generations.take_the_place_of(prompt_id, old)
 
     def pay_a_fun_time_favorite(self, prompt_id: str):
         return self.generations.pay_a_fun_time_favorite(prompt_id)

@@ -264,8 +264,14 @@ class GenerationStore(Store):
     def set_source(self, prompt_id: str, source: str):
         self._set(prompt_id, "source", source)
 
-    def owe_a_fun_time_favorite(self, prompt_id: str):
-        self._set(prompt_id, "fun_time_favorite_owed", 1)
+    def take_the_place_of(self, prompt_id: str, old: dict):
+        self._set(prompt_id, "created_at", old["created_at"])
+        self._set(prompt_id, "completed_at", old["completed_at"])
+        self._set(prompt_id, "evolver_exported_at", old["evolver_exported_at"])
+        self._set(prompt_id, "evolver_unsent_at", old["evolver_unsent_at"])
+        self._set(prompt_id, "genau_exported_at", old["genau_exported_at"])
+        self._set(prompt_id, "genau_unsent_at", old["genau_unsent_at"])
+        self._set(prompt_id, "genau_requested_at", old["genau_requested_at"])
 
     def pay_a_fun_time_favorite(self, prompt_id: str):
         self._set(prompt_id, "fun_time_favorite_owed", 0)

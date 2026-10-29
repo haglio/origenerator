@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -10,16 +9,15 @@ from pathlib import Path
 from origenerator import gallery
 from origenerator.base_backfill import BATCH_MINUTES, queue_within_budget
 from origenerator.db_generations import was_kept, was_sent
-from origenerator.evolver_export import EvolverInbox
 from origenerator.evolver_upscales import EvolverUpscales
-from origenerator.export_lane import EXPORT_LANES, EXPORT_LANES_BY_KEY, KINO
+from origenerator.export_lane import KINO
 from origenerator.generation_config import filled_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.inflight import drop_in_flight
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces
-from origenerator.outside_videos import mark_a_favorite, record_of
-from origenerator.record_fold import fold_record_into, lanes_owed
+from origenerator.outside_videos import mark_a_favorite
+from origenerator.record_fold import fold_record_into
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -67,7 +65,6 @@ def queue_backfill(rows: list[dict], launch, *, enhance,
 
 @dataclass
 class Evolver:
-    inbox: EvolverInbox
     places: OutputPlaces
     upscaled_dir: Path
     records_folder: Path | None
@@ -76,30 +73,18 @@ class Evolver:
     def _kino_copies(self) -> EvolverUpscales:
         return EvolverUpscales.scan(self.upscaled_dir, KINO.source)
 
-    def _video_of(self, row: dict) -> Path | None:
+    def video_of(self, row: dict) -> Path | None:
         shown = gallery.resolve_preview(row, self.places)
         return shown[0] if shown is not None and shown[1] == MediaType.VIDEO else None
 
     def kino_copy_of(self, row: dict) -> Path | None:
-        video = self._video_of(row)
+        video = self.video_of(row)
         return self._kino_copies.upscale_of(video) if video is not None else None
 
-    def is_a_fun_time_favorite(self, row: dict) -> bool:
-        return self._on_the_kino_copy(row, lambda copy, folder: record_of(copy, folder).favorite)
-
     def mark_a_fun_time_favorite(self, row: dict) -> bool:
-        return self._on_the_kino_copy(row, mark_a_favorite)
-
-    def _on_the_kino_copy(self, row: dict, answer: Callable[[Path, Path], bool]) -> bool:
         copy = self.kino_copy_of(row)
-        return copy is not None and self.records_folder is not None and answer(
+        return copy is not None and self.records_folder is not None and mark_a_favorite(
             copy, self.records_folder)
-
-    def still_holds(self, old: dict, backfilled: dict | None) -> bool:
-        video = self._video_of(backfilled) if backfilled is not None else None
-        waiting = video is not None and any(self.inbox.holds(video, lane.source)
-                                            for lane in EXPORT_LANES if old.get(lane.unsent_flag))
-        return waiting or self.kino_copy_of(old) is not None
 
 
 def fold_completed_backfill(db, evolver: Evolver, *, trash) -> int:
@@ -130,44 +115,32 @@ def cancel_backfill(db, client) -> int:
     return drop_in_flight(db, client, GenerationSource.BACKFILL, "backfill run")
 
 
-def trash_what_the_backfill_replaced(db, evolver: Evolver, *, trash) -> int:
-    backfilled = {row["backfill_of"]: row for row in db.list_generations()
-                  if row.get("backfill_of")}
+def trash_what_the_backfill_replaced(db, *, trash) -> int:
     let_go = [{**old, "source": GenerationSource.GENERATED} for old in db.replaced_generations()
-              if not evolver.still_holds(old, backfilled.get(old["prompt_id"]))]
+              if not was_sent(old)]
     trash(let_go)
     return len(let_go)
 
 
 def _put_in_place(db, backfilled: dict, old: dict, evolver: Evolver) -> bool:
-    try:
-        for lane in lanes_owed(old, backfilled):
-            EXPORT_LANES_BY_KEY[lane].send_video_of(backfilled, db=db, inbox=evolver.inbox,
-                                                    places=evolver.places)
-    except Exception:
-        logger.warning("Could not send %s where %s had gone; both wait for the next launch",
-                       backfilled["prompt_id"], old["prompt_id"], exc_info=True)
+    if evolver.video_of(backfilled) is None:
+        logger.warning("%s has no video on disk to take the place of %s; both wait for the "
+                       "next launch", backfilled["prompt_id"], old["prompt_id"])
         return False
-    _carry_over(db, old, backfilled, evolver)
+    _carry_over(db, old, backfilled)
     _take_back(db, old)
     db.set_source(backfilled["prompt_id"], GenerationSource.GENERATED)
     return True
 
 
-def _carry_over(db, old: dict, backfilled: dict, evolver: Evolver) -> None:
+def _carry_over(db, old: dict, backfilled: dict) -> None:
     fold_record_into(db, db.list_generations(), old, backfilled)
+    db.take_the_place_of(backfilled["prompt_id"], old)
     db.set_settings_source(backfilled["prompt_id"], category=old.get("act"),
                            video_prompt_id=old.get("source_video"))
-    if old.get("genau_requested_at"):
-        db.mark_genau_requested(backfilled["prompt_id"])
-    if evolver.is_a_fun_time_favorite(old):
-        db.owe_a_fun_time_favorite(backfilled["prompt_id"])
 
 
 def _take_back(db, old: dict) -> None:
-    for lane in EXPORT_LANES:
-        if old.get(lane.flag):
-            lane.unmark(db, old["prompt_id"])
     db.set_generation_favorite(old["prompt_id"], False)
     db.set_source(old["prompt_id"], GenerationSource.REPLACED)
 

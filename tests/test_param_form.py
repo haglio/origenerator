@@ -2216,7 +2216,7 @@ def test_the_whole_forms_warnings_read_and_resolve_in_the_order_of_its_sections(
     form.set_warnings({**_STEPS_ADVICE, **_STRENGTH_ADVICE})
 
     assert form.every_warning() == (
-        "LoRA Strength (First Pass): 1.5. Example LoRA's page recommends a strength of "
+        "LoRA Strength 1 (First Pass): 1.5. Example LoRA's page recommends a strength of "
         "0.8–1.2. Click to use 1.2.\n"
         "Steps: 50. Example Model's page recommends 20–40 steps. Click to use 40.")
     form.resolve_every_warning()

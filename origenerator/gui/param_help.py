@@ -18,6 +18,7 @@ from __future__ import annotations
 from origenerator.setting_advice import good_range_text
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
+from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS_LORA_KEYS
 
 # Keyed by param name: what the setting does.
 _COMPOSITION_FOCUS = (
@@ -32,6 +33,24 @@ _LORA = (
 _LORA_STRENGTH = (
     "How hard the LoRA pulls. 1.0 is its intended strength; much weaker and "
     "it barely shows, much stronger and it tends to take over the result."
+)
+_FIRST_PASS_LORA = (
+    "A LoRA trained for a specific look or subject, applied to the first "
+    "pass (high noise). \"None\" leaves the model unmodified."
+)
+_SECOND_PASS_LORA = (
+    "A LoRA trained for a specific look or subject, applied to the second "
+    "pass (low noise). \"None\" leaves the model unmodified."
+)
+_FIRST_PASS_LORA_STRENGTH = (
+    "How hard the first pass's LoRA (high noise) pulls. 1.0 is its intended "
+    "strength; much weaker and it barely shows, much stronger and it tends to "
+    "take over the result."
+)
+_SECOND_PASS_LORA_STRENGTH = (
+    "How hard the second pass's LoRA (low noise) pulls. 1.0 is its intended "
+    "strength; much weaker and it barely shows, much stronger and it tends to "
+    "take over the result."
 )
 
 PARAM_HELP: dict[str, str] = {
@@ -128,26 +147,12 @@ PARAM_HELP: dict[str, str] = {
     ),
 
     # --- LoRAs ---
-    **{key: _LORA for key in LORA_KEYS},
+    **dict.fromkeys(LORA_KEYS, _LORA),
     **{strength_key_of(key): _LORA_STRENGTH for key in LORA_KEYS},
-    "lora_high": (
-        "A LoRA trained for a specific look or subject, applied to the first "
-        "pass (high noise). \"None\" leaves the model unmodified."
-    ),
-    "lora_low": (
-        "A LoRA trained for a specific look or subject, applied to the second "
-        "pass (low noise). \"None\" leaves the model unmodified."
-    ),
-    "lora_strength_high": (
-        "How hard the first pass's LoRA (high noise) pulls. 1.0 is its intended "
-        "strength; much weaker and it barely shows, much stronger and it tends to "
-        "take over the result."
-    ),
-    "lora_strength_low": (
-        "How hard the second pass's LoRA (low noise) pulls. 1.0 is its intended "
-        "strength; much weaker and it barely shows, much stronger and it tends to "
-        "take over the result."
-    ),
+    **dict.fromkeys(FIRST_PASS_LORA_KEYS, _FIRST_PASS_LORA),
+    **{strength_key_of(key): _FIRST_PASS_LORA_STRENGTH for key in FIRST_PASS_LORA_KEYS},
+    **dict.fromkeys(SECOND_PASS_LORA_KEYS, _SECOND_PASS_LORA),
+    **{strength_key_of(key): _SECOND_PASS_LORA_STRENGTH for key in SECOND_PASS_LORA_KEYS},
 
     # --- calibration ---
     "steps": (

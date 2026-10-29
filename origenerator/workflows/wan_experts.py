@@ -16,9 +16,18 @@ picker to slot in between them.
 from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef, ParamType
-from origenerator.workflows.lora_rows import lora_rows
+from origenerator.workflows.lora_rows import lora_defaults, lora_rows, numbered_lora_keys
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_model_files
+
+FIRST_PASS_LORA_KEYS = numbered_lora_keys("_high")
+SECOND_PASS_LORA_KEYS = numbered_lora_keys("_low")
+LORA_KEYS_OF_BOTH_PASSES = (*FIRST_PASS_LORA_KEYS, *SECOND_PASS_LORA_KEYS)
+LORAS_KEYED_ONLY_WHEN_NAMED = (*FIRST_PASS_LORA_KEYS[1:], *SECOND_PASS_LORA_KEYS[1:])
+
+
+def wan_expert_lora_defaults() -> dict:
+    return lora_defaults(LORAS_KEYED_ONLY_WHEN_NAMED)
 
 
 def wan_expert_model_params(defaults: dict) -> list[ParamDef]:
@@ -43,11 +52,11 @@ def wan_expert_shift_param(defaults: dict) -> ParamDef:
 
 
 def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
-    """The high/low LoRA pickers, each directly above its own strength — the
+    """Each pass's LoRA pickers, each directly above its own strength — the
     same expert filter as the models, over the LoRA folder."""
     return [
-        *lora_rows(defaults, ("lora_high",), accepts=(WAN,), expert="high",
+        *lora_rows(defaults, FIRST_PASS_LORA_KEYS, accepts=(WAN,), expert="high",
                    qualifier=" (First Pass)"),
-        *lora_rows(defaults, ("lora_low",), accepts=(WAN,), expert="low",
+        *lora_rows(defaults, SECOND_PASS_LORA_KEYS, accepts=(WAN,), expert="low",
                    qualifier=" (Second Pass)"),
     ]

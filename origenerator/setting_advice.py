@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import NamedTuple
 
+from origenerator.base_models import filed_apart, loras_offered_beside
 from origenerator.content import load_content
 from origenerator.model_titles import model_title
 from origenerator.trigger_words import lacks_trigger_word, trigger_words, with_trigger_word
 from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef
 from origenerator.workflows.duration import seconds_for_frames
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
-from origenerator.workflows.model_files import is_no_lora
+from origenerator.workflows.model_files import is_installed, is_no_lora
 from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS_LORA_KEYS
 
 GOOD_STEP_SPACING = {
@@ -179,21 +180,53 @@ def recommendations(params: dict) -> dict[str, str]:
 
 
 def not_installed(params: dict, definitions, keys) -> dict[str, str]:
-    return {pd.key: params[pd.key] for pd in definitions
-            if pd.key in keys and pd.options and params.get(pd.key)
-            and not is_no_lora(params[pd.key]) and params[pd.key] not in pd.options}
+    return {pd.key: params[pd.key] for pd in _files_left_unoffered(params, definitions, keys)
+            if not is_installed(pd.folder, params[pd.key])}
 
 
 def not_installed_advice(missing: dict[str, str], definitions, defaults: dict) -> dict[str, Advice]:
     offered = {pd.key: pd.options for pd in definitions}
-    return {key: _installed_in_place_of(chosen, offered[key], defaults.get(key))
+    return {key: _in_place_of("Not installed anymore, so nothing can be made with it.", chosen,
+                              offered[key], defaults.get(key))
             for key, chosen in missing.items()}
 
 
-def _installed_in_place_of(chosen: str, options: list, default) -> Advice:
+def not_offered_advice(params: dict, definitions, keys, defaults: dict,
+                       workflow: str) -> dict[str, Advice]:
+    not_for_the_workflow = {
+        pd.key: _in_place_of(_not_made_for(params[pd.key], workflow), params[pd.key],
+                             pd.options, defaults.get(pd.key))
+        for pd in _files_left_unoffered(params, definitions, keys)
+        if is_installed(pd.folder, params[pd.key])}
+    return {**_not_offered_beside_their_models(params, definitions, keys, defaults),
+            **not_for_the_workflow}
+
+
+def _not_offered_beside_their_models(params: dict, definitions, keys,
+                                     defaults: dict) -> dict[str, Advice]:
+    found = {}
+    for pd in definitions:
+        chosen, model = params.get(pd.key), params.get(pd.beside_model)
+        if pd.key in keys and pd.beside_model and filed_apart(chosen, model):
+            found[pd.key] = _in_place_of(_not_made_for(chosen, model_title(model)), chosen,
+                                         loras_offered_beside(model, pd.options),
+                                         defaults.get(pd.key))
+    return found
+
+
+def _files_left_unoffered(params: dict, definitions, keys) -> list[ParamDef]:
+    return [pd for pd in definitions
+            if pd.key in keys and pd.options and params.get(pd.key)
+            and not is_no_lora(params[pd.key]) and params[pd.key] not in pd.options]
+
+
+def _not_made_for(chosen, made_for: str) -> str:
+    return f"{model_title(chosen)} isn't made for {made_for}, so it isn't offered here."
+
+
+def _in_place_of(text: str, chosen: str, options: list, default) -> Advice:
     fix = default if default in options else options[0]
-    return Advice("Not installed anymore, so nothing can be made with it.", chosen, fix,
-                  model_title)
+    return Advice(text, chosen, fix, model_title)
 
 
 def _good_ranges(params: dict, definitions) -> dict[str, _Range]:

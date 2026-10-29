@@ -167,6 +167,10 @@ def list_outline_detector_files() -> list[str]:
     return list_model_files(_OUTLINE_DETECTOR_CATEGORY, [], accepts=ANY)
 
 
+def is_installed(folder: str, value) -> bool:
+    return bool(folder) and (config.COMFYUI_DIR / "models" / folder / str(value)).is_file()
+
+
 def is_no_lora(value) -> bool:
     """True when a LoRA param names no LoRA: the "None" sentinel, or an empty or
     absent value (an older row, or an import whose graph carried no LoRA node).

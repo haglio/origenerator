@@ -2585,6 +2585,41 @@ def test_the_missing_models_field_wears_a_warning_that_puts_an_installed_one_in_
     assert panel._generate_pair.isEnabled()
 
 
+def test_a_model_installed_but_not_made_for_the_workflow_says_so_rather_than_not_installed(
+        installed_models, saved_panel):
+    installed_models.add("checkpoints", "an_old_look.safetensors", arch="sd15")
+    panel, db = saved_panel
+    image = _image_made_with(db, "an_old_look.safetensors")
+
+    panel.show_saved_generation(image, [image])
+
+    mark = panel._param_form._warning_marks["checkpoint"]
+    assert (mark.isHidden(), mark.toolTip()) == (
+        False, "an_old_look isn't made for SDXL T2I, so it isn't offered here. "
+               "Click to use reapony_v80.")
+    assert _note(panel) == ""
+    assert panel._generate_pair.isEnabled()
+
+
+def test_a_lora_not_made_for_the_model_beside_it_says_so_on_its_row(
+        installed_models, recorded_base_models, saved_panel):
+    for model in ("raw_model", "turbo_model"):
+        installed_models.add("diffusion_models", f"{model}.safetensors", arch="krea2")
+    installed_models.add("loras", "speed_up.safetensors", arch="krea2", lora=True)
+    recorded_base_models({"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo",
+                          "speed_up": "Krea 2 Raw"})
+    panel, _db = saved_panel
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "krea2_t2i"))
+
+    panel._param_form.set_values({"unet": "turbo_model.safetensors",
+                                  "lora": "speed_up.safetensors"})
+
+    mark = panel._param_form._warning_marks["lora"]
+    assert (mark.isHidden(), mark.toolTip()) == (
+        False, "speed_up isn't made for turbo_model, so it isn't offered here. "
+               "Click to use None.")
+
+
 def test_generate_is_grayed_out_while_the_form_names_a_model_that_is_not_installed(
         installed_models, saved_panel):
     panel, db = saved_panel

@@ -173,7 +173,10 @@ every workflow, present and future, so nothing here needs a name added to a list
 
 The families are read from each file's own header, never its name — installed
 here is a checkpoint whose name says Flux and whose tensors say SDXL, and the
-tensors are right. **Unrecognized is not unwanted:**
+tensors are right. A WAN model's patch embedding says its kind too (16 channels
+text-to-video, `ref_conv` Fun Control), so the image-to-video forms take neither,
+and the SDXL graphs, which decode with the SDXL VAE, take no SD 1.5 checkpoint.
+**Unrecognized is not unwanted:**
 `describe()` returns `arch=None` for a file it cannot read or match, and every
 filter keeps those. Be wrong in that direction. A listed option that errors on
 submit costs one run and says why; a working model missing from the dropdown has

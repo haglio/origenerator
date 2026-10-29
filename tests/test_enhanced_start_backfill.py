@@ -27,6 +27,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.output_places import OutputPlaces
+from tests.comfyui_folders import SUITE_FOLDERS
 
 
 def _file(name, subfolder):
@@ -262,7 +263,7 @@ def test_the_work_left_for_while_closed_backfills_videos_and_enhances_their_imag
     _image(db, "enhanced image", enhanced=True)
     _video(db, "from enhanced", made_from="enhanced image", starred=True,
            start=_plain("enhanced image"))
-    jobs = JobQueue(db, ComfyUIClient())
+    jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
 
     assert downtime.queue_the_backfill(jobs, db, db.list_generations(),
                                       enhance_settings=gallery.EnhanceSettings.parse(None)) == 1

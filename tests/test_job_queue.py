@@ -22,13 +22,14 @@ from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.comfyui_folders import SUITE_FOLDERS
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 _IMAGE_WF = "flux_t2i_upscaled"
 
 
 def _client():
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = MagicMock(return_value="comfy-X")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()

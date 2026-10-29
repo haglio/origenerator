@@ -14,6 +14,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import http.client
+import inspect
 import io
 import json
 import socket
@@ -26,6 +27,7 @@ from origenerator.comfyui_api import ComfyUIApi, comfyui_responding, format_prom
 from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.output_places import OutputPlaces
+from tests.comfyui_folders import SUITE_FOLDERS
 
 
 def _mock_response(status: int, body: bytes):
@@ -39,7 +41,7 @@ def _mock_response(status: int, body: bytes):
 def test_a_submitted_job_keeps_the_prompt_id_this_app_chose_for_it():
     # Origenerator supplies its own prompt_id so ComfyUI keys this job's signals
     # and history on the same id the DB row uses (the basis for reconnecting).
-    client = ComfyUIApi(client_id="test-client")
+    client = ComfyUIApi(client_id="test-client", folders=SUITE_FOLDERS)
 
     mock_response = MagicMock()
     mock_response.read.return_value = json.dumps(
@@ -63,7 +65,7 @@ def test_submit_job_surfaces_comfyui_node_validation_detail_on_400():
     # node and why (here: LoadImage's image doesn't resolve). urlopen raises
     # HTTPError, and str(HTTPError) is only "HTTP Error 400: Bad Request" — the
     # useful detail lives in its body. The client must read and surface it.
-    client = ComfyUIApi(client_id="test-client")
+    client = ComfyUIApi(client_id="test-client", folders=SUITE_FOLDERS)
     body = json.dumps({
         "error": {"message": "Prompt outputs failed validation"},
         "node_errors": {
@@ -108,7 +110,7 @@ def test_format_prompt_error_falls_back_when_body_is_not_the_expected_json():
     ) == "Prompt has no outputs"
 
 def test_the_queue_names_what_is_running_and_what_is_still_waiting():
-    client = ComfyUIApi()
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
     body = json.dumps({
         "queue_running": [[0, "run-1", {}, {}, []]],
         "queue_pending": [[1, "pend-1", {}, {}, []], [2, "pend-2", {}, {}, []]],
@@ -121,7 +123,7 @@ def test_the_queue_names_what_is_running_and_what_is_still_waiting():
 
 def _queue_client(body: dict, client_id="ours-client"):
     """A bare client, with its own id, whose one /queue call answers with ``body``."""
-    client = ComfyUIApi(client_id=client_id)
+    client = ComfyUIApi(client_id=client_id, folders=SUITE_FOLDERS)
     return client, patch("urllib.request.urlopen",
                          return_value=_mock_response(200, json.dumps(body).encode()))
 
@@ -225,7 +227,7 @@ def test_clear_foreign_queue_drops_their_pending_and_stops_their_run_by_name():
     # holding the GPU, so what's executing is stopped too -- by name, so that if
     # it has finished and a job of ours has taken the GPU meanwhile, the server
     # skips the interrupt rather than cutting ours off.
-    client = ComfyUIApi(client_id="ours-client")
+    client = ComfyUIApi(client_id="ours-client", folders=SUITE_FOLDERS)
     queue = {
         "queue_running": [_entry(0, "theirs-running", "some-other-app")],
         "queue_pending": [_entry(1, "theirs-a", "some-other-app"),
@@ -262,7 +264,7 @@ def test_clear_foreign_queue_touches_nothing_when_the_queue_is_all_ours():
 def test_cancel_prompts_deletes_a_whole_backlog_in_one_call():
     # One round trip, not one per job — the caller is the GUI thread and the
     # backlog can be another app's whole batch.
-    client = ComfyUIApi()
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"{}")) as m:
         client.cancel_prompts(["a", "b", "c"])
 
@@ -291,7 +293,7 @@ def test_queue_reads_on_the_poll_path_use_the_short_timeout():
         assert m.call_args.kwargs.get("timeout") == _POLL_TIMEOUT_S
 
 def test_interrupt_posts_to_interrupt_endpoint():
-    client = ComfyUIApi()
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as m:
         client.interrupt()
     req = m.call_args[0][0]
@@ -303,7 +305,7 @@ def test_interrupt_can_name_the_one_prompt_to_stop():
     # it. Named, the server stops that prompt if it is the one running and
     # nothing otherwise -- so a job can be stopped without first asking whether
     # it is still the one on the GPU.
-    client = ComfyUIApi()
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as m:
         client.interrupt("comfy-X")
     req = m.call_args[0][0]
@@ -313,7 +315,7 @@ def test_interrupt_can_name_the_one_prompt_to_stop():
 def test_forget_history_drops_the_servers_record_of_a_prompt():
     # A prompt sent a second time under the same id would otherwise be read
     # against the record its first, stopped run left.
-    client = ComfyUIApi()
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as m:
         client.forget_history("comfy-X")
     req = m.call_args[0][0]
@@ -321,7 +323,7 @@ def test_forget_history_drops_the_servers_record_of_a_prompt():
     assert json.loads(req.data) == {"delete": ["comfy-X"]}
 
 def test_cancel_prompt_deletes_from_queue():
-    client = ComfyUIApi()
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"{}")) as m:
         client.cancel_prompt("comfy-X")
     req = m.call_args[0][0]
@@ -333,7 +335,7 @@ def test_every_http_call_carries_a_timeout():
     # thread forever: the GUI thread on a submit/cancel (the app freezes), or the
     # websocket thread on a history fetch (no job ever completes again). Every
     # HTTP helper must therefore pass one.
-    client = ComfyUIApi(client_id="test-client")
+    client = ComfyUIApi(client_id="test-client", folders=SUITE_FOLDERS)
     body = json.dumps({"pid": {}, "queue_running": [], "queue_pending": []}).encode()
     calls = [
         lambda: client.submit_job({"1": {"class_type": "T", "inputs": {}}}, "pid"),
@@ -389,7 +391,7 @@ def test_no_test_can_reach_the_comfyui_running_on_this_machine(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", dial)
 
     with pytest.raises(urllib.error.URLError):
-        ComfyUIApi().submit_job({}, "a-prompt-id")
+        ComfyUIApi(folders=SUITE_FOLDERS).submit_job({}, "a-prompt-id")
 
     assert dialed == []
 
@@ -439,7 +441,7 @@ class _Clock:
 
 
 def _client_on(clock: _Clock) -> ComfyUIApi:
-    return ComfyUIApi(client_id="ours-client", clock=clock, sleep=clock.sleep)
+    return ComfyUIApi(client_id="ours-client", clock=clock, sleep=clock.sleep, folders=SUITE_FOLDERS)
 
 
 def test_a_submit_answered_too_late_stands_once_comfyui_lists_the_prompt():
@@ -501,7 +503,7 @@ def test_a_submit_refused_outright_is_not_waited_on():
 def test_free_memory_asks_comfyui_to_unload_its_models():
     # The voice that speaks a story's lines needs the GPU before the video is
     # submitted, and ComfyUI keeps the last run's models resident until asked.
-    client = ComfyUIApi(client_id="test-client")
+    client = ComfyUIApi(client_id="test-client", folders=SUITE_FOLDERS)
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as mock_urlopen:
         client.free_memory()
     req = mock_urlopen.call_args[0][0]
@@ -541,13 +543,10 @@ def test_submit_job_hands_comfyui_a_run_it_can_open(tmp_path):
     assert payload["1"]["inputs"]["image"] == str(picture), "the run keeps the name it was given"
 
 
-def test_a_client_told_no_folders_posts_a_run_as_it_was_given(tmp_path):
-    picture = _picture_elsewhere(tmp_path)
-    client = ComfyUIApi(client_id="test-client")
-    payload = {"1": {"class_type": "LoadImage", "inputs": {"image": str(picture)}}}
+def test_no_client_is_made_without_the_folders_comfyui_opens_files_from():
+    folders = inspect.signature(ComfyUIApi).parameters["folders"]
+    assert folders.kind is inspect.Parameter.KEYWORD_ONLY
+    assert folders.default is inspect.Parameter.empty
 
-    with patch("urllib.request.urlopen",
-               return_value=_mock_response(200, b'{"prompt_id": "our-id"}')) as mock_urlopen:
-        client.submit_job(payload, "our-id")
-
-    assert _posted_prompt(mock_urlopen) == payload
+    with pytest.raises(TypeError):
+        ComfyUIApi(client_id="test-client")

@@ -19,6 +19,7 @@ from app_support.logging_utils import configure_logging, install_exception_loggi
 from origenerator import app_link, fix_training
 from origenerator.comfyui_api import ComfyUIApi
 from origenerator.config import (
+    COMFYUI_FOLDERS,
     COMFYUI_HOST,
     COMFYUI_PORT,
     LIBRARY_STATE_DIR,
@@ -146,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     _log_into_the_apps_file()
     db = Database(LIBRARY_STATE_DIR / "origenerator.db")
-    watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT),
+    watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT, folders=COMFYUI_FOLDERS),
           announce=lambda notice: raise_notice(identity, notice),
           app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library)
     return 0

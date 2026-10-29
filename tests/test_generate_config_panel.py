@@ -62,6 +62,7 @@ from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from tests import drops
+from tests.comfyui_folders import SUITE_FOLDERS
 from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
 
 
@@ -69,7 +70,7 @@ from tests.pictured_rows import looping_clip, painted_row, where_the_picture_is
 def blank_panel(qtbot, tmp_path):
     """A panel as it opens: the picker on its placeholder, nothing chosen yet."""
     db = Database(tmp_path / "test.db")
-    p = GenerateConfigPanel(ComfyUIClient(), db)
+    p = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(p)
     return p
 
@@ -643,7 +644,7 @@ def test_a_tabs_seed_drops_down_every_seed_the_library_used_newest_first(panel):
 def test_a_tabs_seed_dropdown_lists_only_the_seeds_of_the_kind_it_makes(panel, qtbot):
     _image_row(panel._db)
     _video_row(panel._db, noise_seed=30)
-    video_tab = GenerateConfigPanel(ComfyUIClient(), panel._db)
+    video_tab = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), panel._db)
     qtbot.addWidget(video_tab)
     video_tab._workflow_combo.setCurrentIndex(_combo_index(video_tab, "wan22_i2v"))
 
@@ -852,7 +853,7 @@ def test_generate_sends_the_random_seed_on_show_and_then_shows_the_next_one(pane
 
 
 def test_a_tab_with_no_picture_to_start_from_grays_generate_and_says_why(qtbot, tmp_path):
-    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
 
     panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
@@ -863,7 +864,7 @@ def test_a_tab_with_no_picture_to_start_from_grays_generate_and_says_why(qtbot, 
 
 
 def test_picking_the_picture_to_start_from_lights_generate(qtbot, tmp_path):
-    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
     panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
 
@@ -1018,7 +1019,7 @@ def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
     # The standalone image enhancer is launched by the gallery's enhance
     # buttons, not picked by hand: it stays out of the dropdown. Reusing one of
     # its rows still lands on its form — the entry is added on demand.
-    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
     combo = panel._workflow_combo
     keys = {combo.itemData(i) for i in range(combo.count())}
@@ -1102,7 +1103,7 @@ def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
                                     positive_prompt="a dragon")),
         workflow_json="{}",
     )
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel.prefill("sdxl_t2i", _wiz_params())
     assert panel._recent_matching_row()["prompt_id"] == "wiz"  # the dragon isn't in this folder
@@ -1115,7 +1116,7 @@ def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypa
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     )
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     shown = []
     monkeypatch.setattr(panel._preview, "show_media",
@@ -1128,7 +1129,7 @@ def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypa
 
 def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
     # Nothing generated with these settings yet → the placeholder, no crash.
-    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
     panel.show_recent_preview()
     assert panel._preview._media is None  # a placeholder, not a resolved file
@@ -1142,7 +1143,7 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     )
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel.prefill("sdxl_t2i", _wiz_params())  # autoshows the folder's newest result
 
@@ -1157,7 +1158,7 @@ def test_a_picture_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     )
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     announced = []
     panel.displayed_changed.connect(lambda: announced.append(panel.displayed_row()))
@@ -1440,7 +1441,7 @@ class SpyDB:
 
 
 def _spy_panel(qtbot, db):
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     return panel
@@ -1479,7 +1480,7 @@ def test_a_config_that_has_generated_has_a_folder_to_go_to(qtbot, tmp_path):
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(params), workflow_json="{}",
     )
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel.prefill("sdxl_t2i", params)
 
@@ -1535,7 +1536,7 @@ def _video_row(db, prompt_id="vid1", input_image=None, *, workflow_name="wan22_i
 def saved_panel(qtbot, tmp_path, installed_models):
     """A panel over a DB with an image and the video animated from it."""
     db = Database(tmp_path / "t.db")
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     panel._preview.show_media = MagicMock()  # don't start real WMF playback
@@ -1553,7 +1554,7 @@ def test_a_tab_showing_an_item_puts_its_name_on_the_name_line(qtbot, tmp_path):
     image = _image_row(db)
     names = ItemNames(db)
     names.take([image], [], {})
-    panel = GenerateConfigPanel(ComfyUIClient(), db, names=names)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db, names=names)
     qtbot.addWidget(panel)
     panel._preview.show_media = MagicMock()
 
@@ -1994,7 +1995,7 @@ def _wizard_panel(qtbot, tmp_path, monkeypatch):
                          params_json=json.dumps(_wiz_params()), workflow_json="{}")
     db.update_generation("g1", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_g1.png", "subfolder": "image"}]))
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel._preview.show_media = MagicMock()
     return panel, db
@@ -3290,7 +3291,7 @@ def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
     reaching into the module. It is an object now, given at construction."""
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "somebody elses inbox"
-    panel = GenerateConfigPanel(ComfyUIClient(), db,
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db,
                                 inbox=evolver_export.EvolverInbox(inbox))
     qtbot.addWidget(panel)
     panel._preview.show_media = MagicMock()
@@ -3315,7 +3316,7 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "0_inbox"
-    panel = GenerateConfigPanel(ComfyUIClient(), db,
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db,
                                 inbox=evolver_export.EvolverInbox(inbox))
     qtbot.addWidget(panel)
     panel._preview.show_media = MagicMock()
@@ -3789,7 +3790,7 @@ def test_the_picture_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_p
     monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     db = Database(tmp_path / "t.db")
     _image_row(db, "img1", filename="sdxl_img1.png")
-    panel = GenerateConfigPanel(ComfyUIClient(), db, names=ItemNames.from_library(db))
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db, names=ItemNames.from_library(db))
     qtbot.addWidget(panel)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     zone = panel._param_form._widgets["input_image"]

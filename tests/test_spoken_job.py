@@ -14,6 +14,7 @@ from origenerator.gui import generation_job
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.speech import scene_speech
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.comfyui_folders import SUITE_FOLDERS
 
 I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 
@@ -29,7 +30,7 @@ class _Speaker:
 
 
 def _client():
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = MagicMock(return_value="comfy-A")
     client.free_memory = MagicMock()
     # Every send asks after an earlier run of its id first; answered here,

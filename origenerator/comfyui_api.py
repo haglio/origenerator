@@ -198,7 +198,7 @@ class ComfyUIApi:
     """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
-                 client_id: str | None = None, folders: ComfyFolders | None = None, *,
+                 client_id: str | None = None, *, folders: ComfyFolders,
                  clock: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep):
         self.host = host
@@ -224,8 +224,7 @@ class ComfyUIApi:
         A POST the server answers too late is followed up rather than failed:
         see :meth:`_await_acceptance`.
         """
-        if self.folders is not None:
-            workflow_payload = within_reach(workflow_payload, self.folders)
+        workflow_payload = within_reach(workflow_payload, self.folders)
         try:
             self._post_prompt(workflow_payload, prompt_id)
         except Exception as e:

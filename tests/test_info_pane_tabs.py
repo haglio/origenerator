@@ -18,11 +18,12 @@ from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs, parse_tabs_state
 from origenerator.item_names import ItemNames
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.comfyui_folders import SUITE_FOLDERS
 
 
 @pytest.fixture
 def tabs(qtbot, tmp_path):
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     db = Database(tmp_path / "test.db")
     t = InfoPaneTabs(client, db)  # starts with one editable config tab
     qtbot.addWidget(t)
@@ -236,7 +237,7 @@ def test_copy_name_on_a_tab_copies_the_name_of_the_item_it_shows(qtbot, tmp_path
                         "sdxl_g1.png")
     names = ItemNames(db)
     names.take([row], [], {})
-    tabs = InfoPaneTabs(ComfyUIClient(), db, names=names)
+    tabs = InfoPaneTabs(ComfyUIClient(folders=SUITE_FOLDERS), db, names=names)
     qtbot.addWidget(tabs)
     tabs.currentWidget()._preview.show_media = MagicMock()
     tabs.load_selection(row, [row])
@@ -253,7 +254,7 @@ def test_a_name_given_to_an_item_after_its_tab_showed_it_reaches_the_tab_and_nam
     row = _complete_gen(db, "g1", _sdxl_full(positive_prompt="a wizard", seed=1),
                         "sdxl_g1.png")
     names = ItemNames(db)
-    tabs = InfoPaneTabs(ComfyUIClient(), db, names=names)
+    tabs = InfoPaneTabs(ComfyUIClient(folders=SUITE_FOLDERS), db, names=names)
     qtbot.addWidget(tabs)
     tabs.currentWidget()._preview.show_media = MagicMock()
     tabs.load_selection(row, [row])

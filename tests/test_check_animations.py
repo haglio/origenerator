@@ -11,6 +11,7 @@ from origenerator import check_animations, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.comfyui_folders import SUITE_FOLDERS
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 _PICTURE = "image/picture_00001_.png [output]"
@@ -18,7 +19,7 @@ _ENHANCED = {"filename": "image_enhance_00001_.png", "subfolder": "image", "type
 
 
 def _client():
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = MagicMock(return_value="comfy-X")
     client.fetch_history = MagicMock(return_value={})
     client.forget_history = MagicMock()

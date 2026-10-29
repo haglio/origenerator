@@ -1,14 +1,10 @@
-"""Training a fix's LoRA from photos of its part, the app's side of it: where
-the photos are, the job ``tools/fix_lora_trainer.py`` is handed, and what it
-says back."""
-
 from __future__ import annotations
 
 from pathlib import Path, PureWindowsPath
 
 from origenerator import comfyui_launcher, config, gallery, lora_training
 from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
-from origenerator.lora_training import TrainingState
+from origenerator.lora_training import TrainingOffer, TrainingState
 from origenerator.lora_versions import next_version
 from origenerator.model_titles import FIX_LORA_FOLDER
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -52,6 +48,20 @@ def _work_folder(part) -> Path:
 
 def training_state(part) -> TrainingState:
     return lora_training.training_state(_work_folder(part) / "trained.json", photo_stamps(part))
+
+
+def train_tooltip(part) -> str:
+    folders = (f"{part.name.lower()}, and in fixes\\shared," if part.shared_photos
+               else f"{part.name.lower()},")
+    return ("Trains this fix a LoRA from the photos in the library's "
+            f"app_data\\origenerator\\fixes\\{folders} each cropped down to the part by the "
+            "fix's own detector. Nothing generates while it trains.")
+
+
+def training_offer(part) -> TrainingOffer:
+    folder = photos_folder(part)
+    return lora_training.offer(training_state(part), tooltip=train_tooltip(part),
+                               pictures=len(photo_files(folder)), folder=folder, counted="photo")
 
 
 def fix_to_train():

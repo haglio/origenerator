@@ -187,9 +187,24 @@ two files would otherwise read alike. Titles live in `model_titles.json` beside
 the library's records (`config.MODEL_TITLES_PATH`), keyed by the file's name
 without its extension, and outside the repo, since many of them name what the
 library holds. A file with no title is shown by its name, and a fix's LoRA by
-its fix and when it was trained. So an agent installing a model writes its title
+its fix and its version. So an agent installing a model writes its title
 there in the same piece of work: the user asked for titles in place of
 filenames (2026-10-24), and a model added without one is the filename again.
+
+A title that ends in a number pair, "Example Look 1.0", is a base and a
+version (`model_titles.versioned`), and every LoRA trained here is named
+after the version that follows the highest its base already has
+(`lora_versions.next_version`: 1.0, then 1.1, and so on), in the folder of
+the version it follows, so no file is ever written over (his rule, 2026-10-25:
+gallery records name the file). The fix LoRAs from before versions, named by
+the minute they finished, keep their names and read as 1.0, 1.1 and so on in
+the order they were trained. When a picked LoRA's title carries a version, its
+dropdown's tooltip ends with the date its own header says it finished
+training (`model_titles.trained_sentence`; kohya and musubi-tuner both write
+it), on the settings form's LoRA rows and in a fix's prompts window alike,
+which is where he chose to see it (2026-10-29). A trained look LoRA's title
+and trigger words are written when the app takes the finished version
+(`look_training.take`).
 Installing a LoRA also writes down the trigger words it answers to, beside the
 titles in `trigger_words.json`, by running `tools/record_trigger_words.py`; a
 LoRA trained here gets its word written there by hand, from its training.
@@ -412,6 +427,25 @@ is the two hooks that call the guard, below.
   held, the two fought over the graphics card and the training ran out of
   memory), the next launch holds the line for it again, and the watcher left at
   closing announces its end.
+- `tools/look_lora_trainer.py` — trains the next version of a look LoRA on
+  Krea 2 with musubi-tuner, under the `krea2_training_python` the overlay
+  names (musubi's pins are not this app's either), from the Train button beside
+  a LoRA row whose pick is one of the overlay's `trainable_loras`
+  (`origenerator/look_training.py`). Its steps, each a subcommand on the same
+  job file: `prepare` copies the folder's pictures in as JPEGs named by their
+  contents, so an unchanged picture keeps its copy and its description across
+  trainings; `describe` writes a description beside each new copy with
+  Florence-2, in a program of its own so the model leaves the card before the
+  training; `dataset` puts the recorded trigger words in front of every
+  description; `cache` and `train` run musubi's own programs, the training
+  only while ComfyUI's line has been empty two minutes and the card's memory
+  is back, stopped the moment ComfyUI has a job and resumed from its newest
+  saved state, since his own generations come first (his rule); `install`
+  copies the result beside the newest version as `<base> <version>` and never
+  over a file. It works in `state/lora training/<base>`, outside the library,
+  because pCloud turns a state rewritten every 25 steps into conflicted copies.
+  It prints counts, never a description or a picture's name. The queue only
+  watches this training (`TrainingRun.holds_the_line`), where a fix's holds it.
 - `tools/open_from_notification.py` — what Windows runs when a notification of
   this app's is clicked, registered as the command for the `origenerator:` link
   every notice carries. It hands the generation to the copy that has the

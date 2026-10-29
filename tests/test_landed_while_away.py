@@ -288,3 +288,16 @@ def test_quitting_while_a_training_runs_hands_it_to_a_process_of_its_own(tmp_pat
     assert landed_while_away.hand_over_what_is_in_flight(
         Database(tmp_path / "t.db"), "Origenerator", spawn=started.append) is True
     assert started == ["Origenerator"]
+
+
+def test_a_look_loras_training_is_waited_out_and_handed_over_like_a_fixs(tmp_path, monkeypatch):
+    monkeypatch.setattr(landed_while_away.fix_training, "running_trainings", lambda: [{"part": "hands"}])
+    monkeypatch.setattr(landed_while_away.look_training, "running_trainings",
+                        lambda: [{"base": "Example Look"}])
+
+    assert landed_while_away.running_trainings() == [{"part": "hands"}, {"base": "Example Look"}]
+
+    monkeypatch.setattr(landed_while_away.fix_training, "running_trainings", list)
+    started = []
+    assert landed_while_away.hand_over_what_is_in_flight(
+        Database(tmp_path / "t.db"), "Origenerator", spawn=started.append) is True

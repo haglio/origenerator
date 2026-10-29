@@ -19,7 +19,7 @@ from origenerator.enhanced_start_backfill import queue_backfill
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.generation_state import GenerationSource
-from origenerator.landed_while_away import training_notice
+from origenerator.landed_while_away import running_trainings, training_notice
 from origenerator.media import MediaType
 from origenerator.notice_toast import raise_notice
 from origenerator.single_instance import Copies
@@ -198,7 +198,7 @@ def main() -> int:
         announce_trainings_that_ended(lambda notice: raise_notice(identity, notice))
     turn = take_a_turn(
         app_open=app_open,
-        training_running=lambda: bool(fix_training.running_trainings()),
+        training_running=lambda: bool(running_trainings()),
         comfyui_busy=lambda: _comfyui_busy(client), batches_due=work_left,
         queue_batches=lambda: hand_comfyui_the_work_left(db, client, ui),
         queue_more_backfill=lambda: hand_comfyui_more_of_the_backfill(db, client, ui),

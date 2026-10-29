@@ -34,6 +34,22 @@ def training_state(trained: Path, picture_stamps: dict) -> TrainingState:
     return TrainingState.OUT_OF_DATE
 
 
+@dataclass(frozen=True)
+class TrainingOffer:
+    label: str
+    enabled: bool
+    tooltip: str
+    pictures: int
+    folder: Path
+    counted: str = "picture"
+
+
+def offer(state: TrainingState, *, tooltip: str, pictures: int, folder: Path,
+          counted: str = "picture") -> TrainingOffer:
+    return TrainingOffer("Train" if state is TrainingState.UNTRAINED else "Retrain",
+                         state is not TrainingState.CURRENT, tooltip, pictures, folder, counted)
+
+
 def picture_stamps(pictures: list[Path]) -> dict[str, list[int]]:
     stamps = {}
     for picture in pictures:

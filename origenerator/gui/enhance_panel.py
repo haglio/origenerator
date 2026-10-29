@@ -71,7 +71,6 @@ from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.metadata_block import reveal_button
 from origenerator.gui.no_wheel import (
     NoWheelComboBox,
     NoWheelDoubleSpinBox,
@@ -80,8 +79,7 @@ from origenerator.gui.no_wheel import (
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help, with_training_date
-from origenerator.lora_training import TrainingState
-from origenerator.reveal import open_in_explorer
+from origenerator.gui.training_controls import TrainingControls
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -103,12 +101,6 @@ _AUTO_TOOLTIP = (
 )
 
 
-def _train_tooltip(part) -> str:
-    folders = (f"{part.name.lower()}, and in fixes\\shared," if part.shared_photos
-               else f"{part.name.lower()},")
-    return ("Trains this fix a LoRA from the photos in the library's "
-            f"app_data\\origenerator\\fixes\\{folders} each cropped down to the part by the "
-            "fix's own detector. Nothing generates while it trains.")
 _NO_DETECTOR_TOOLTIP = (
     "Unavailable: ComfyUI hasn't got a model that finds {}. Install the Impact "
     "Subpack node pack, put one whose name says \"{}\" in its "
@@ -510,7 +502,8 @@ class EnhancePanel(QWidget):
         window.accepted.connect(lambda: self._keep_fix_prompts(part.name, window.prompts()))
         window.finished.connect(lambda _result: self._fix_prompt_windows.pop(part.name, None))
         window.finished.connect(window.deleteLater)
-        window.train.clicked.connect(lambda: self.fix_training_requested.emit(part.name))
+        window.training.train_requested.connect(
+            lambda: self.fix_training_requested.emit(part.name))
         window.show_training(self._fix_training.get(part.name))
         self._fix_prompt_windows[part.name] = window
         window.show_over_parent()
@@ -777,48 +770,26 @@ class FixPromptsDialog(QDialog):
         self.strength.setSingleStep(strength.step)
         self.strength.setValue(strength.default)
         self.strength.setToolTip(definition_help(strength))
-        self.train = QPushButton()
-        self.train.setToolTip(_train_tooltip(part))
-        self._training: str | None = None
-        self._photos_folder = fix_training.photos_folder(part)
-        self.photo_count = QLabel()
-        self.photo_count.setToolTip(str(self._photos_folder))
-        self.show_photos = reveal_button()
-        self.show_photos.setToolTip(f"Open {self._photos_folder} in Explorer")
-        self.show_photos.clicked.connect(self._show_photos)
-        self._count_photos()
+        self.training = TrainingControls()
+        self._running: str | None = None
+        self._offer_training()
         foot = FlowLayout(spacing=GAP_SMALL)
-        for together in ((QLabel("LoRA"), self.lora), (QLabel("LoRA Strength"), self.strength),
-                         (self.train, self.photo_count, self.show_photos)):
+        for together in ((QLabel("LoRA"), self.lora), (QLabel("LoRA Strength"), self.strength)):
             foot.addWidget(_side_by_side(*together))
+        foot.addWidget(self.training)
         foot.add_trailing(buttons)
         layout.addLayout(foot)
 
     def show_training(self, text: str | None) -> None:
-        self._training = text
-        self._show_train()
+        self._running = text
+        self._offer_training()
 
-    def _show_train(self) -> None:
-        if self._training is not None:
-            self.train.setText(self._training)
-            self.train.setEnabled(False)
-            return
-        state = fix_training.training_state(self._part)
-        self.train.setText("Train" if state is TrainingState.UNTRAINED else "Retrain")
-        self.train.setEnabled(state is not TrainingState.CURRENT)
-
-    def _count_photos(self) -> None:
-        count = len(fix_training.photo_files(self._photos_folder))
-        self.photo_count.setText(f"{count} photo{'' if count == 1 else 's'}")
-
-    def _show_photos(self) -> None:
-        self._photos_folder.mkdir(parents=True, exist_ok=True)
-        open_in_explorer(self._photos_folder)
+    def _offer_training(self) -> None:
+        self.training.show_offer(fix_training.training_offer(self._part), self._running)
 
     def event(self, event) -> bool:
         if event.type() == QEvent.Type.WindowActivate:
-            self._count_photos()
-            self._show_train()
+            self._offer_training()
         return super().event(event)
 
     def choose_lora(self, lora: str) -> None:

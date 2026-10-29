@@ -14,10 +14,10 @@ shared *server* is this half's to say — a row on the right is about one job of
 ours and nothing else. With nothing of ours in flight the same half says what
 that server is busy with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
-as a row of its own — the one being made at the top — each led by a shield and a
-Cancel, each opening its folder on a click or a double-click, and each draggable
-to a new place in the line. A row says what the job will cost and what kind of
-thing it is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a
+as a row of its own — the one being made at the top — each led by its arrows, a
+shield and a Cancel, each opening its folder on a click or a double-click, and
+each draggable to a new place in the line. A row says what the job will cost and
+what kind of thing it is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a
 line of waiting work is read to find out how long the wait is, and the
 workflow-and-prompt name that used to be here is the same on every row of a
 folder being re-rolled. Beside that, a thumbnail — the frame an I2V
@@ -68,9 +68,12 @@ from origenerator.gui import icons
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
+from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.inflight import (
     CANCEL_TEXT,
     CLEAR_TEXT,
+    MOVE_DOWN_TIP,
+    MOVE_UP_TIP,
     SHIELD_TIP,
     START_NOW_TEXT,
     START_NOW_TOOLTIP,
@@ -112,6 +115,11 @@ def _made_from(item) -> Combination:
     frame = resolve_input_image_path(item.source_image)
     return Combination(str(frame) if frame is not None else None, item.source_video_thumbnail,
                        item.prompt_edited)
+
+
+def _offer(button: QPushButton, can_act: bool) -> None:
+    button.setEnabled(can_act)
+    button.setCursor(Qt.CursorShape.PointingHandCursor if can_act else Qt.CursorShape.ArrowCursor)
 
 
 class OpensAFolder:
@@ -377,7 +385,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
 class QueueRow(OpensAFolder, QWidget):
     """One job in the line: what it costs, what it is, what it is made from, and
-    the buttons that shield it and throw it away.
+    the buttons that move it, shield it and throw it away.
 
     Read left to right: the buttons, then the job's thumbnail, then what it is —
     ``"~2 min · Video · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
@@ -429,6 +437,10 @@ class QueueRow(OpensAFolder, QWidget):
         layout.setSpacing(GAP_MEDIUM)
         # They lead the row: a button anywhere after a line that can elide was
         # pushed out of sight at the right-hand end.
+        self._up = self._arrow(icons.move_up_icon(), MOVE_UP_TIP, self._on_up)
+        layout.addWidget(self._up)
+        self._down = self._arrow(icons.move_down_icon(), MOVE_DOWN_TIP, self._on_down)
+        layout.addWidget(self._down)
         self._shield = fill_square_with_mark(QPushButton(), size=self.HEIGHT - 12)
         self._shield.setProperty(CHOSEN, True)
         self._shield.setCheckable(True)
@@ -447,9 +459,9 @@ class QueueRow(OpensAFolder, QWidget):
         # near edge of the line rather than out at the far end of the text.
         self._thumbs = QueueThumbs(self.THUMB)
         layout.addWidget(self._thumbs)
-        # What the row says about the job, in the type the rows always used —
-        # this is the row's text now, not an annotation on some other text.
-        self._lead = QLabel()
+        # What the row says about the job, in the type the rows always used,
+        # elided rather than widen the row past a narrow strip.
+        self._lead = ElidingLabel()
         self._lead.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._lead)
         # Only a wait needs explaining, so most rows leave this empty. It asks
@@ -465,11 +477,20 @@ class QueueRow(OpensAFolder, QWidget):
 
         self.update_item(item)
 
+    def _arrow(self, icon, tooltip: str, pressed) -> QPushButton:
+        arrow = fill_square_with_mark(QPushButton(), size=self.HEIGHT - 12)
+        arrow.setIcon(icon)
+        arrow.setToolTip(tooltip)
+        arrow.clicked.connect(pressed)
+        return arrow
+
     def update_item(self, item):
         """Re-render this row in place — a queued→running flip, a fresh estimate,
         or an Auto toggle that changed what the button gets you."""
         self._item = item
         self.movable = movable(item)
+        for arrow, move in ((self._up, item.move_up), (self._down, item.move_down)):
+            _offer(arrow, move is not None)
         self._lead.setText(queue_lead_text(item))
         # The name the row no longer spends its width on, plus what the shorthand
         # in front of it means. The settings are worth an answer, just not the row.
@@ -526,6 +547,14 @@ class QueueRow(OpensAFolder, QWidget):
         self.setProperty("dragging", dragging)
         self.style().unpolish(self)
         self.style().polish(self)
+
+    def _on_up(self):
+        if self._item.move_up is not None:
+            self._item.move_up()
+
+    def _on_down(self):
+        if self._item.move_down is not None:
+            self._item.move_down()
 
     def _on_cancel(self):
         if self._item.cancel is not None:

@@ -10,10 +10,12 @@ from shared_ui.palette import RED
 from origenerator.gui.hud_queue import (
     CANCEL,
     CLEAR,
+    DOWN,
     FRAME,
     OPEN,
     SHIELD,
     START_NOW,
+    UP,
     QueuePointer,
     queue_section,
 )
@@ -122,7 +124,22 @@ def test_a_row_carries_the_button_that_throws_its_job_away():
         ("Cancel", "Throw away this seed and start the next")]
 
 
-def test_a_row_leads_with_a_shield_just_left_of_its_cancel_lit_while_shielded():
+def test_a_row_leads_with_an_up_and_a_down_arrow_ahead_of_its_shield():
+    # Each grayed where its job cannot go that way: here, up.
+    section = queue_section([_item("j1", cancel=lambda: None, shield=lambda _on: None,
+                                   move_up=None, move_down=lambda: None)], 0)
+
+    _image, targets = _painted(section)
+
+    drawn = {button.command: (rect, button) for rect, button in targets}
+    (up_x, _y, up_width, _h), up = drawn[f"{UP}|j1"]
+    (down_x, _y, down_width, _h), down = drawn[f"{DOWN}|j1"]
+    (shield_x, *_rest), _shield = drawn[f"{SHIELD}|j1"]
+    assert up_x + up_width <= down_x and down_x + down_width <= shield_x
+    assert (up.dim, down.dim) == (True, False)
+
+
+def test_a_rows_shield_sits_just_left_of_its_cancel_lit_while_shielded():
     section = queue_section([_item("j1", cancel=lambda: None, shield=lambda _on: None,
                                    shielded=True),
                              _item("j2", cancel=lambda: None, shield=lambda _on: None)], 0)
@@ -213,6 +230,28 @@ class TestThePointerOnTheBlock:
         pointer.press(*_middle_of(pointer, f"{CANCEL}|j1"))
 
         assert stopped == ["j1"]
+
+    def test_a_press_on_a_rows_arrows_moves_its_job_that_way(self):
+        asked = []
+        pointer, _host = _pointer_over([_item("j1", move_up=lambda: asked.append("up"),
+                                              move_down=lambda: asked.append("down"))])
+
+        pointer.press(*_middle_of(pointer, f"{UP}|j1"))
+        pointer.press(*_middle_of(pointer, f"{DOWN}|j1"))
+
+        assert asked == ["up", "down"]
+
+    def test_a_press_on_a_grayed_arrow_does_nothing_at_all(self):
+        # Not even the folder the rest of the row opens.
+        opened = []
+        pointer, _host = _pointer_over([_item("j1", reveal=lambda: opened.append("j1"),
+                                              move_up=None, move_down=lambda: None)])
+        at = _middle_of(pointer, f"{UP}|j1")
+
+        pointer.press(*at)
+        pointer.release(*at)
+
+        assert opened == []
 
     def test_a_press_on_a_rows_shield_puts_it_on_and_lights_it_at_once(self):
         asked = []

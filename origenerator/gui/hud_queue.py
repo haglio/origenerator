@@ -6,8 +6,8 @@ the panel the slideshow already wears rather than on a plate of its own, which w
 be a second HUD.
 
 It says what the strip says: the job being made with its live frame and the
-clock across its bar, then each waiting job as a row -- its shield, the button
-that throws it away, the image it is made from, and what it costs.  They go as the
+clock across its bar, then each waiting job as a row -- its arrows, its shield,
+its Cancel, the image it is made from, and what it costs.  They go as the
 panel's own declared buttons (:class:`funestra.hud_button.Button`), so it
 presses and names them exactly as it presses its own.
 """
@@ -43,6 +43,8 @@ from shared_ui.type_scale import SIZE_TINY
 from origenerator.gui.inflight import (
     CANCEL_TEXT,
     CLEAR_TEXT,
+    MOVE_DOWN_TIP,
+    MOVE_UP_TIP,
     SHIELD_TIP,
     START_NOW_TEXT,
     START_NOW_TOOLTIP,
@@ -60,8 +62,10 @@ from origenerator.gui.inflight import (
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-# What a press on this block posts, and what the slideshow does with each: shield the
-# job or throw it away, go to its folder, drop another app's work, start a video now.
+# What a press on this block posts: move, shield or cancel a job, go to its
+# folder, drop another app's work, start a video now.
+UP = "queue_up"
+DOWN = "queue_down"
 SHIELD = "queue_shield"
 CANCEL = "queue_cancel"
 OPEN = "queue_open"
@@ -144,7 +148,8 @@ class JobLine:
     cancel_tooltip: str
     shieldable: bool
     shielded: bool
-    movable: bool
+    can_move_up: bool
+    can_move_down: bool
     source: tuple[str | None, str | None]
     prompt_edited: bool
     folder: tuple[str, ...]
@@ -224,7 +229,7 @@ class QueueSection:
         return _FRAME + _GAP + column, _FRAME
 
     def _row_width(self, line: JobLine) -> int:
-        width = _BLOCK_W + _GAP + text_width(_tiny(), line.lead)
+        width = 2 * (CTRL_BTN + _GAP) + _BLOCK_W + _GAP + text_width(_tiny(), line.lead)
         if line.shieldable:
             width += CTRL_BTN + _GAP
         if line.cancelable:
@@ -331,6 +336,14 @@ class QueueSection:
         for index, line in enumerate(self.drawn):
             row = y + index * _ROW_H
             cursor = x
+            for verb, mark, tooltip, can_go in (
+                    (UP, "chevron_up", MOVE_UP_TIP, line.can_move_up),
+                    (DOWN, "chevron_down", MOVE_DOWN_TIP, line.can_move_down)):
+                _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
+                              Button(f"{verb}|{line.key}", shared_mark(mark), tooltip,
+                                     width=CTRL_BTN, dim=not can_go),
+                              pointer, targets)
+                cursor += CTRL_BTN + _GAP
             if line.shieldable:
                 _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
                               Button(f"{SHIELD}|{line.key}", shared_mark("shield"),
@@ -505,7 +518,8 @@ def _line(item) -> JobLine:
         cancel_tooltip=cancel_tooltip(item.auto_generating),
         shieldable=item.shield is not None,
         shielded=item.shielded,
-        movable=movable(item),
+        can_move_up=item.move_up is not None,
+        can_move_down=item.move_down is not None,
         source=(str(frame) if frame is not None else None, item.source_video_thumbnail),
         prompt_edited=item.prompt_edited,
         folder=tuple(str(path) for path in item.folder_thumbnails[:FOLDER_CELLS]),
@@ -549,10 +563,10 @@ class QueuePointer:
 
     The panel hands it a press, a drag, the button coming up and the wheel,
     and it places each against the rows and buttons as they were last painted:
-    a press on a row's shield or Cancel shields or drops its job, one on the row goes
-    to the folder its job will land in once the button comes up where it went
-    down, and a press that travels picks the row up and drops it further down
-    the line.  Which row the window opens on and where a drag would land are
+    a press on a row's arrows, shield or Cancel moves, shields or drops its
+    job, one on the row goes to the folder its job will land in once the button
+    comes up where it went down, and a press that travels picks the row up and
+    drops it further down the line.  Which row the window opens on and where a drag would land are
     the block's own state rather than the line's, kept here because the block
     is painted afresh each beat.
     """
@@ -581,6 +595,11 @@ class QueuePointer:
             # down the line -- so the press is held until the release says
             # which.  The head's thumbnail is pressed for the folder alone.
             self._press = (key, px, py, verb == OPEN)
+        elif verb in (UP, DOWN):
+            item = self._item(key)
+            move = None if item is None else item.move_up if verb == UP else item.move_down
+            if move is not None:
+                move()
         elif verb == SHIELD:
             item = self._item(key)
             if item is not None and item.shield is not None:

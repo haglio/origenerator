@@ -225,6 +225,8 @@ def movable(item) -> bool:
 ALREADY_MAKING_ONE_TIP = "This folder is already making one"
 SHIELD_TIP = ("Shield this generation: images you ask for while it is being made "
               "wait for it instead of stopping it")
+MOVE_UP_TIP = "Move this job up the Job Queue"
+MOVE_DOWN_TIP = "Move this job down the Job Queue"
 
 
 CANCEL_TEXT = "Cancel"

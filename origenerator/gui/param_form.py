@@ -331,7 +331,7 @@ class ParamForm(QWidget):
         The label elides. A phrase like "Enhance Redraw Amount" asks for three
         hundred pixels on one line, and a plain label hands that on as a floor under
         the whole form — which is how a narrow pane ended up scrolling sideways
-        instead of squeezing its fields. Its whole text stays in the tooltip."""
+        instead of squeezing its fields."""
         title = param_sections.section_title(key)
         keys = self._present_keys[title]
         index = self._insert_index(keys, key)

@@ -207,7 +207,6 @@ class ParamForm(QWidget):
         self._sections: dict[str, CollapsibleSection] = {}
         # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
-        self._label_columns: dict[str, LabelColumn] = {}
         self._shut_down: dict[str, str] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         self._defs = {pd.key: pd for pd in self._param_defs}
@@ -285,7 +284,6 @@ class ParamForm(QWidget):
                 lambda title=title: self._resolve_warnings(self._present_keys[title]))
             self._sections[title] = section
             self._present_keys[title] = []
-            self._label_columns[title] = LabelColumn()
             outer.addWidget(section)
         outer.addStretch(1)  # collect any slack at the foot, not between sections
 
@@ -339,7 +337,7 @@ class ParamForm(QWidget):
         index = self._insert_index(keys, key)
         form = self._sections[title].content_form()
         label_widget = ElidingLabel(label)
-        form.insertRow(index, self._label_cell(key, label_widget, self._label_columns[title]),
+        form.insertRow(index, self._label_cell(key, label_widget, form.label_column),
                        self._field_cell(field, extras))
         keys.insert(index, key)
         self._labels[key] = label_widget

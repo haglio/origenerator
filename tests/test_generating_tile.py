@@ -73,12 +73,12 @@ def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
     assert tile._cancel.text() == "Cancel"
 
 
-def test_an_auto_generating_folders_tile_says_next_seed(qtbot):
-    # Pressing it there discards the seed and Auto-Generate starts another, so "Cancel"
-    # would promise a stop that never comes.
+def test_an_auto_generating_folders_tile_says_cancel_and_hovers_the_next_seed(qtbot):
+    # Pressing it there discards the seed and Auto-Generate starts another, which
+    # the hover says.
     tile = GeneratingTile(FakeJob(state="running"), auto_generating=True)
     qtbot.addWidget(tile)
-    assert tile._cancel.text() == "Next seed"
+    assert tile._cancel.text() == "Cancel"
     assert "seed" in tile._cancel.toolTip()
 
 

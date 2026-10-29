@@ -117,8 +117,9 @@ def test_a_row_carries_the_button_that_throws_its_job_away():
     _image, targets = _painted(section)
 
     assert "queue_cancel|j1" in _posted(targets)
-    assert [button.glyph for _rect, button in targets
-            if button.command == "queue_cancel|j2"] == ["Next seed"]
+    assert [(button.glyph, button.tooltip) for _rect, button in targets
+            if button.command == "queue_cancel|j2"] == [
+        ("Cancel", "Throw away this seed and start the next")]
 
 
 def test_a_row_leads_with_a_shield_just_left_of_its_cancel_lit_while_shielded():

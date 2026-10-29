@@ -14,9 +14,8 @@ from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import (
     InFlightItem,
     RunReading,
+    cancel_tooltip,
     clear_queue_tooltip,
-    discard_run_text,
-    discard_run_tooltip,
     foreign_queue_text,
     queue_lead_text,
     queue_lead_tooltip,
@@ -126,14 +125,9 @@ def test_the_line_over_the_bar_names_what_the_app_is_doing():
 
 # --- the button that throws the run away -------------------------------------
 
-def test_the_discard_button_promises_a_stop_only_when_a_stop_is_what_it_gets():
-    assert discard_run_text(auto_generating=False) == "Cancel"
-    assert discard_run_text(auto_generating=True) == "Next seed"
-
-
-def test_the_discard_hover_says_which_of_the_two_the_press_will_do():
-    assert discard_run_tooltip(auto_generating=False) == "Cancel this generation"
-    assert discard_run_tooltip(auto_generating=True) == (
+def test_the_cancel_hover_says_which_of_the_two_the_press_will_do():
+    assert cancel_tooltip(auto_generating=False) == "Cancel this generation"
+    assert cancel_tooltip(auto_generating=True) == (
         "Throw away this seed and start the next")
 
 

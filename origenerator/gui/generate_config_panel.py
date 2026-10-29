@@ -71,11 +71,7 @@ from origenerator.gui.generate_button import (
     GenerateButton,
 )
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyPicker
-from origenerator.gui.inflight import (
-    ALREADY_MAKING_ONE_TIP,
-    discard_run_text,
-    discard_run_tooltip,
-)
+from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
 from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.metadata_block import MetadataBlock, wrappable
 from origenerator.gui.moving_previews import MovingPreviews
@@ -543,7 +539,7 @@ class GenerateConfigPanel(DropZone):
         btn_row.addWidget(self._sent_row)
         self._offered_lane = None
         self._update_lane_button(None)
-        self._cancel_btn = QPushButton(discard_run_text(False))
+        self._cancel_btn = QPushButton(CANCEL_TEXT)
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
         self._cancel_btn.hide()
@@ -979,14 +975,13 @@ class GenerateConfigPanel(DropZone):
     def set_generating(self, generating: bool, *, auto_generating: bool = False):
         """Reflect whether a run of this config's folder is in flight.
 
-        All it moves is the discard button. ``auto_generating`` says the run's
-        folder is auto-generating, which reads that button as "Next seed" rather than
-        "Cancel" (see :func:`inflight.discard_run_text`) — re-labeled ahead of the
-        idempotence guard below, because the Auto toggle flips mid-run without the
-        generating state ever changing.
+        All it moves is the Cancel button. ``auto_generating`` says the run's
+        folder is auto-generating, which changes what that button's hover says
+        (:func:`inflight.cancel_tooltip`) — set ahead of the idempotence guard
+        below, because the Auto toggle flips mid-run without the generating state
+        ever changing.
         """
-        self._cancel_btn.setText(discard_run_text(auto_generating))
-        self._cancel_btn.setToolTip(discard_run_tooltip(auto_generating))
+        self._cancel_btn.setToolTip(cancel_tooltip(auto_generating))
         if generating == self._generating:
             return
         self._generating = generating

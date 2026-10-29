@@ -156,9 +156,9 @@ class InFlightItems:
                 cancel=cancel,
                 shield=shield,
                 shielded=shielded,
-                # Its folder auto-generating makes that button "Next seed": the press
-                # discards this run and Auto-Generate launches another. A menu can
-                # offer the real stop beside it, which is what stop_auto is for.
+                # Its folder auto-generating makes a Cancel discard this run and
+                # Auto-Generate launch another. A menu can offer the real stop
+                # beside it, which is what stop_auto is for.
                 auto_generating=self._auto.is_active(folder_key),
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,

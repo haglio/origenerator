@@ -7213,11 +7213,11 @@ def _folder_tab(view, db):
     return view._info_tabs.current_config_panel()
 
 
-def test_auto_relabels_the_discard_button_in_all_three_panes(qtbot, tmp_path):
+def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     # Center (the folder's live tile), foot (the queue row) and right (the config
-    # tab) each draw a button for the run in flight. While the folder
+    # tab) each draw a Cancel for the run in flight. While the folder
     # auto-generates, the press throws away a seed and Auto-Generate starts
-    # another, so all three say so.
+    # another, so all three hovers say so.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -7227,14 +7227,18 @@ def test_auto_relabels_the_discard_button_in_all_three_panes(qtbot, tmp_path):
 
     view._toggle_auto(True)
 
-    assert _generating_tile(view)._cancel.text() == "Next seed"
-    assert [row._cancel.text() for row in view._queue.rows()] == ["Next seed"]
-    assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Next seed"
+    next_seed = "Throw away this seed and start the next"
+    assert _generating_tile(view)._cancel.text() == "Cancel"
+    assert _generating_tile(view)._cancel.toolTip() == next_seed
+    assert [row._cancel.text() for row in view._queue.rows()] == ["Cancel"]
+    assert [row._cancel.toolTip() for row in view._queue.rows()] == [next_seed]
+    assert view._info_tabs.current_config_panel()._cancel_btn.toolTip() == next_seed
 
 
-def test_turning_auto_off_says_cancel_again_with_the_run_still_in_flight(qtbot, tmp_path):
+def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flight(
+        qtbot, tmp_path):
     # Auto off leaves the variation in flight (it still lands), and from then on
-    # that button really does stop it — so it must stop claiming to be a next seed.
+    # that button really does stop it — so its hover must stop promising a next seed.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -7246,9 +7250,10 @@ def test_turning_auto_off_says_cancel_again_with_the_run_still_in_flight(qtbot, 
     view._toggle_auto(False)
 
     assert key in view._live_jobs  # the in-flight variation was left alone
-    assert _generating_tile(view)._cancel.text() == "Cancel"
-    assert [row._cancel.text() for row in view._queue.rows()] == ["Cancel"]
-    assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Cancel"
+    plain = "Cancel this generation"
+    assert _generating_tile(view)._cancel.toolTip() == plain
+    assert [row._cancel.toolTip() for row in view._queue.rows()] == [plain]
+    assert view._info_tabs.current_config_panel()._cancel_btn.toolTip() == plain
 
 
 def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
@@ -10234,13 +10239,13 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
     assert view._jobs.all_jobs == []      # the run really stopped
 
 
-def test_an_auto_generating_folders_card_offers_the_next_seed_and_a_real_stop(
+def test_an_auto_generating_folders_card_offers_a_cancel_and_a_real_stop(
         qtbot, tmp_path, monkeypatch):
-    # A discard ends nothing while Auto-Generate is on — it throws this seed away
-    # and Auto-Generate launches another — so the menu says what that press actually gets
-    # you, in the same words the tile's button and the strip's row use. Unlike
-    # those, it has room to offer the stop as well, which is the thing you cannot
-    # otherwise ask for without going to the header for the Auto switch.
+    # A Cancel ends nothing while Auto-Generate is on — it throws this seed away
+    # and Auto-Generate launches another — and the menu says it in the same words
+    # the tile's button and the strip's row use. Unlike those, it has room to
+    # offer the stop as well, which is the thing you cannot otherwise ask for
+    # without going to the header for the Auto switch.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -10253,7 +10258,7 @@ def test_an_auto_generating_folders_card_offers_the_next_seed_and_a_real_stop(
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert labels == [["Next seed", "Cancel and stop auto-generating"]]
+    assert labels == [["Cancel", "Cancel and stop auto-generating"]]
 
 
 def test_canceling_from_an_auto_generating_folders_card_ends_auto_generate_too(
@@ -10270,7 +10275,7 @@ def test_canceling_from_an_auto_generating_folders_card_ends_auto_generate_too(
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_recents(view)
-    _menu_offering(monkeypatch, "browser_pane", pick="Cancel")
+    _menu_offering(monkeypatch, "browser_pane", pick="Cancel and stop")
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
@@ -10314,18 +10319,18 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
 
 def test_an_auto_generating_folders_live_tile_offers_the_stop_its_button_cannot(
         qtbot, tmp_path, monkeypatch):
-    # The tile's button reads "Next seed" while Auto-Generate is on and there is no
-    # room on it for a second act. The menu has the room, so it carries the stop.
+    # The tile's Cancel only starts the next seed while Auto-Generate is on, and
+    # there is no room on it for a second act. The menu has the room, so it carries the stop.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel and stop")
 
     view._generating_tile_menu(key, QPoint(0, 0))
 
-    assert labels == [["Next seed", "Cancel and stop auto-generating"]]
+    assert labels == [["Cancel", "Cancel and stop auto-generating"]]
     assert not view._auto.is_active(key)
     assert view._jobs.all_jobs == []
 

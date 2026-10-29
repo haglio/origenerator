@@ -4,6 +4,7 @@ from pathlib import Path
 from origenerator.library_filing import (
     file_into_library,
     file_what_comfyui_left,
+    saved_in_its_run_folder,
     saving_into_its_run_folder,
 )
 from origenerator.output_places import OutputPlaces
@@ -38,6 +39,39 @@ def _saved_by_comfyui(places: OutputPlaces, prompt_id: str, subfolder: str, name
 def _listed(prompt_id: str, subfolder: str, name: str, **extra) -> dict:
     return {"filename": name, "subfolder": f"origenerator/{prompt_id}/{subfolder}",
             "type": "output", **extra}
+
+
+def test_a_video_runs_folder_answers_for_it_the_way_comfyui_reports_a_video_with_sound(
+        tmp_path):
+    places = _places(tmp_path)
+    payload = {"19": {"class_type": "VHS_VideoCombine",
+                      "inputs": {"filename_prefix": "origenerator/run-five/video/beta_i2v"}}}
+    for name in ("beta_i2v_00001.png", "beta_i2v_00001.mp4", "beta_i2v_00001-audio.mp4"):
+        _saved_by_comfyui(places, "run-five", "video", name)
+
+    assert saved_in_its_run_folder(payload, places, "run-five") == {"outputs": {"19": {
+        "images": [_listed("run-five", "video", "beta_i2v_00001-audio.mp4")]}}}
+
+
+def test_a_silent_video_runs_folder_answers_for_it_with_the_video_alone(tmp_path):
+    places = _places(tmp_path)
+    payload = {"19": {"class_type": "VHS_VideoCombine",
+                      "inputs": {"filename_prefix": "origenerator/run-six/video/beta_i2v"}}}
+    for name in ("beta_i2v_00001.png", "beta_i2v_00001.mp4"):
+        _saved_by_comfyui(places, "run-six", "video", name)
+
+    assert saved_in_its_run_folder(payload, places, "run-six") == {"outputs": {"19": {
+        "images": [_listed("run-six", "video", "beta_i2v_00001.mp4")]}}}
+
+
+def test_a_save_into_a_folder_that_is_not_the_runs_own_answers_for_nothing(tmp_path):
+    places = _places(tmp_path)
+    payload = {"7": {"class_type": "SaveImage", "inputs": {"filename_prefix": "image/alpha_t2i"}}}
+    elsewhere = places.comfyui / "image" / "alpha_t2i_00001_.png"
+    elsewhere.parent.mkdir(parents=True)
+    elsewhere.write_bytes(b"not this run's")
+
+    assert saved_in_its_run_folder(payload, places, "run-seven") == {"outputs": {}}
 
 
 def test_a_finished_picture_is_filed_in_the_pictures_folder_after_the_highest_number_there(
@@ -117,7 +151,7 @@ def test_what_another_program_saved_in_a_folder_of_comfyuis_is_filed_where_that_
     left.parent.mkdir(parents=True)
     left.write_bytes(b"theirs")
 
-    assert file_what_comfyui_left(places, in_flight=set()) == 1
+    assert file_what_comfyui_left(places) == 1
 
     assert (places.folder("video") / "gamma_anim_00001.mp4").read_bytes() == b"theirs"
     assert not (places.comfyui / "video").exists()
@@ -129,7 +163,7 @@ def test_a_file_saved_there_without_comfyuis_number_is_filed_under_its_own_name(
     left.parent.mkdir(parents=True)
     left.write_bytes(b"theirs")
 
-    assert file_what_comfyui_left(places, in_flight=set()) == 1
+    assert file_what_comfyui_left(places) == 1
 
     assert (places.folder("sketches") / "delta.png").read_bytes() == b"theirs"
     assert not (places.comfyui / "sketches").exists()
@@ -145,41 +179,33 @@ def test_a_file_without_comfyuis_number_stays_put_when_its_name_is_taken_in_the_
     left.parent.mkdir(parents=True)
     left.write_bytes(b"theirs")
 
-    assert file_what_comfyui_left(places, in_flight=set()) == 0
+    assert file_what_comfyui_left(places) == 0
 
     assert taken.read_bytes() == b"already there"
     assert left.read_bytes() == b"theirs"
 
 
-def test_a_run_still_in_flight_is_left_waiting_in_comfyuis_folder(tmp_path):
+def test_what_a_run_saved_in_its_own_folder_is_left_there_for_its_item(tmp_path):
     places = _places(tmp_path)
     waiting = _saved_by_comfyui(places, "run-nine", "image", "alpha_t2i_00001_.png")
 
-    assert file_what_comfyui_left(places, in_flight={"run-nine"}) == 0
+    assert file_what_comfyui_left(places) == 0
 
     assert waiting.is_file()
 
 
-def test_a_run_nobody_finished_has_its_outputs_filed_and_its_folder_cleared(tmp_path):
-    places = _places(tmp_path)
-    _saved_by_comfyui(places, "run-ten", "image", "alpha_t2i_00001_.png")
-
-    assert file_what_comfyui_left(places, in_flight=set()) == 1
-
-    assert (places.pictures / "alpha_t2i_00001_.png").read_bytes() == b"new"
-    assert not places.run("run-ten").exists()
-
-
-def test_what_a_run_nobody_finished_left_passes_over_a_number_held_in_trash(tmp_path):
+def test_what_another_program_left_passes_over_a_number_held_in_trash(tmp_path):
     places = _places(tmp_path)
     places.pictures.mkdir(parents=True)
     (places.pictures / "alpha_t2i_00001_.png").write_bytes(b"deleted")
     Trash(places.trash).store([places.pictures / "alpha_t2i_00001_.png"])
-    _saved_by_comfyui(places, "run-ten", "image", "alpha_t2i_00001_.png")
+    left = places.comfyui / "image" / "alpha_t2i_00001_.png"
+    left.parent.mkdir(parents=True)
+    left.write_bytes(b"theirs")
 
-    file_what_comfyui_left(places, in_flight=set())
+    file_what_comfyui_left(places)
 
-    assert (places.pictures / "alpha_t2i_00002_.png").read_bytes() == b"new"
+    assert (places.pictures / "alpha_t2i_00002_.png").read_bytes() == b"theirs"
 
 
 def test_the_old_links_and_an_add_ons_scratch_folder_are_left_alone(tmp_path):
@@ -193,7 +219,7 @@ def test_the_old_links_and_an_add_ons_scratch_folder_are_left_alone(tmp_path):
     scratch.parent.mkdir(parents=True)
     scratch.write_bytes(b"scratch")
 
-    assert file_what_comfyui_left(places, in_flight=set()) == 0
+    assert file_what_comfyui_left(places) == 0
 
     assert kept.read_bytes() == b"kept"
     assert scratch.read_bytes() == b"scratch"
@@ -205,12 +231,12 @@ def test_nothing_moves_when_comfyuis_folder_is_where_every_output_is_kept(tmp_pa
     kept.parent.mkdir(parents=True)
     kept.write_bytes(b"kept")
 
-    assert file_what_comfyui_left(places, in_flight=set()) == 0
+    assert file_what_comfyui_left(places) == 0
 
     assert kept.read_bytes() == b"kept"
 
 
-def test_a_comfyui_folder_that_holds_the_library_itself_has_only_its_runs_filed(tmp_path):
+def test_nothing_moves_when_comfyuis_folder_holds_the_library_itself(tmp_path):
     library = tmp_path / "library"
     places = OutputPlaces(comfyui=library, pictures=library / "pictures",
                           videos=library / "videos", scripts=library / "scripts",
@@ -218,12 +244,10 @@ def test_a_comfyui_folder_that_holds_the_library_itself_has_only_its_runs_filed(
     his = library / "projects" / "notes_00001_.txt"
     his.parent.mkdir(parents=True)
     his.write_bytes(b"his")
-    _saved_by_comfyui(places, "run-eleven", "image", "alpha_t2i_00001_.png")
 
-    assert file_what_comfyui_left(places, in_flight=set()) == 1
+    assert file_what_comfyui_left(places) == 0
 
     assert his.read_bytes() == b"his"
-    assert (places.pictures / "alpha_t2i_00001_.png").is_file()
 
 
 def test_a_number_some_other_file_already_wears_is_passed_over(tmp_path):

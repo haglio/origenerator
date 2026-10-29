@@ -8,12 +8,11 @@ was submitted to — matched by the shared prompt_id — and:
     thumbnail and duration), so it shows as a real result instead of a job stuck
     forever at "generating";
   - **still queued or executing** → left as-is, for the UI to reconnect to live;
-  - **gone** (ComfyUI restarted, or the job was dropped) → the stale row is
-    deleted; any file it managed to write is picked up by the normal disk import.
+  - **gone** (ComfyUI forgets every run when it restarts) → finalized from what
+    it saved in its own folder, or deleted when it saved nothing there.
 
-Runs before the importer so a finalized row's output is already recorded and is
-not imported a second time. Never raises: if ComfyUI can't be read, in-flight
-rows are left untouched for a later launch to resolve.
+Never raises: if ComfyUI can't be read, in-flight rows are left untouched for a
+later launch to resolve.
 
 The only startup reconcile that needs to reach ComfyUI at all; the bookmark
 reconciles are :mod:`origenerator.bookmark_reconcile`, and share nothing with
@@ -30,6 +29,7 @@ from origenerator.completion import extract_completion, mark_generation_complete
 from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationStatus
+from origenerator.library_filing import saved_in_its_run_folder
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -97,11 +97,22 @@ def reconcile_in_flight(db, client, places: OutputPlaces, thumb_dir: Path) -> di
 
 
 def take_in_what_landed(db, client, row, places: OutputPlaces, thumb_dir: Path) -> bool:
-    prompt_id = row["prompt_id"]
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-    history = _safe_history(client, prompt_id) if workflow is not None else {}
-    if not history:
+    history = _safe_history(client, row["prompt_id"]) if workflow is not None else {}
+    return _record(db, row, workflow, history, places, thumb_dir)
+
+
+def take_in_what_its_folder_holds(db, row, places: OutputPlaces, thumb_dir: Path) -> bool:
+    workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+    saved = saved_in_its_run_folder(parse_params(row.get("workflow_json")), places,
+                                    row["prompt_id"])
+    return _record(db, row, workflow, saved, places, thumb_dir)
+
+
+def _record(db, row, workflow, history: dict, places: OutputPlaces, thumb_dir: Path) -> bool:
+    if workflow is None or not history:
         return False
+    prompt_id = row["prompt_id"]
     files, thumb, duration = extract_completion(
         workflow, history, places, thumb_dir, prompt_id,
         params=parse_params(row.get("params_json")))
@@ -116,6 +127,8 @@ def _reconcile_row(db, client, row, queued, places: OutputPlaces, thumb_dir: Pat
         return "finalized"
     if row["prompt_id"] in queued:
         return "running"  # still in flight; leave it for the UI to reconnect to
+    if take_in_what_its_folder_holds(db, row, places, thumb_dir):
+        return "finalized"
     db.delete_generation(row["prompt_id"])  # gone from the server with no output recorded
     return "cleared"
 

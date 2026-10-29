@@ -415,7 +415,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 16371 when a squeezed form's labels came to shorten rather than vanish, and the
 # notes on a label column sized to its widest label and on the workflow row
 # wrapping, which no form has done since August, went with it.
-MAX_PROSE_LINES = 16371
+# 16174 when a run's own folder came to answer for a run ComfyUI forgot, and the
+# notes on the import picking up what a cleared run wrote went; taken down to
+# what the tree measures.
+MAX_PROSE_LINES = 16174
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

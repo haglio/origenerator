@@ -204,8 +204,17 @@ never given out while that picture can come back, and a skipped number is
 fine. A file put back from Trash whose name a newer file has anyway comes back
 under the next free number, and its item lists that name, so no two items ever
 list one file. A record keeps naming its file by kind (`image`, `video`, ...), so
-every row made before this resolves unchanged. At launch,
-`file_what_comfyui_left` files what a run nobody finished, or another program,
+every row made before this resolves unchanged.
+
+A run's folder names its run, so what is saved there reaches the library only
+on that run's own row: a run ComfyUI finished and then forgot (it forgets every
+run when it restarts) is written down at launch from what its folder holds
+(`inflight.reconcile_in_flight`), and nothing else ever moves a run's files.
+What a run left with no row to take it -- one canceled that ComfyUI finished
+anyway -- stays where ComfyUI saved it, because the import writing a run of
+this app's down as an item of its own is how four videos lost their start
+images in October 2026: the item it made names ComfyUI's temporary copy of the
+start image. At launch `file_what_comfyui_left` files only what another program
 left in ComfyUI's folder.
 
 That folder still holds four links from the old scheme (`image`, `video`,

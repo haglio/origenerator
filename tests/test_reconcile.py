@@ -15,7 +15,9 @@ from origenerator.bookmark_reconcile import (
 from origenerator.db import Database
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.inflight import reconcile_in_flight
+from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.output_places import OutputPlaces
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 # sdxl_t2i saves under output node "7".
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -92,8 +94,28 @@ def test_gone_row_is_cleared(tmp_path):
 
     summary = reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
-    assert db.get_generation("p1") is None  # any file it wrote is caught by the importer
+    assert db.get_generation("p1") is None
     assert summary["cleared"] == 1
+
+
+def test_a_run_comfyui_is_still_making_keeps_what_its_folder_holds_so_far(tmp_path):
+    db = Database(tmp_path / "t.db")
+    places = OutputPlaces.in_one_folder(tmp_path / "saves")
+    workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    payload = saving_into_its_run_folder(workflow.build_api_payload(workflow.default_params()),
+                                         places, "p1")
+    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i", workflow_version="v",
+                         params_json="{}", workflow_json=json.dumps(payload))
+    db.update_generation("p1", status="running")
+    so_far = places.run("p1") / "image" / "sdxl_t2i_00001_.png"
+    so_far.parent.mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(so_far)
+
+    summary = reconcile_in_flight(db, FakeComfy(queue={"p1"}), places, tmp_path / "thumbs")
+
+    assert db.get_generation("p1")["status"] == "running"
+    assert so_far.is_file()
+    assert summary["running"] == 1
 
 
 def test_completed_rows_are_untouched(tmp_path):

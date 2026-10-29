@@ -178,19 +178,16 @@ def _copy_the_records_for_backup(library: Library):
 
 def _reconnect_to_running_generations(library: Library):
     """Resolve any generation left mid-run by a previous session against ComfyUI
-    (finished-while-away, still-running, or gone). Runs before the import below
-    so a finalized job's output is already recorded and isn't imported twice."""
+    (finished-while-away, still-running, or gone)."""
     from origenerator.inflight import reconcile_in_flight
 
     reconcile_in_flight(library.db, library.client, library.places, library.thumb_dir)
 
 
 def _file_what_comfyui_left(library: Library):
-    from origenerator.gallery import is_in_progress
     from origenerator.library_filing import file_what_comfyui_left
 
-    in_flight = {row["prompt_id"] for row in library.db.list_generations() if is_in_progress(row)}
-    return file_what_comfyui_left(library.places, in_flight=in_flight)
+    return file_what_comfyui_left(library.places)
 
 
 def _follow_moved_files(library: Library):

@@ -19,6 +19,7 @@ import pytest
 from app_support import loading_screen as launchers_screen
 from app_support import origenerator_handoff as handoff
 from app_support.win32 import TaskbarApp
+from PIL import Image
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
@@ -32,10 +33,12 @@ from origenerator.app import (
     _configure_logging,
     _file_what_comfyui_left,
     _fold_enhancements,
+    _import_new_files,
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
     _open_the_loading,
     _put_the_backfill_in_place,
+    _reconnect_to_running_generations,
     _say_where_the_window_comes_up,
     _taskbar_identity,
     _the_preview_on_the_taskbar,
@@ -54,7 +57,9 @@ from origenerator.export_lane import GENAU
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
+from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.output_places import OutputPlaces
+from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.children import run_python
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.hosted_launch import hosted_launch
@@ -682,32 +687,6 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
         assert main([]) == 0
 
     assert events == ["window.show", "loading.accept", "front:window"]
-
-
-def test_main_reconciles_in_flight_before_importing(qapp):
-    """In-flight generations are resolved against ComfyUI before the disk import,
-    so a job finalized from history isn't then re-imported as a duplicate."""
-    calls = []
-    with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity", return_value=None), \
-         patch("origenerator.gui.loading_screen.loading_screen"), \
-         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
-         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
-         patch("origenerator.app_state.AppState"), \
-         patch("origenerator.db.Database"), \
-         patch("origenerator.trash.Trash"), \
-         patch("origenerator.inflight.reconcile_in_flight",
-               side_effect=lambda *a, **k: calls.append("reconcile")), \
-         patch("origenerator.importer.import_comfyui_output",
-               side_effect=lambda *a, **k: calls.append("import") or 0), \
-         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
-         patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
-         patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        assert main([]) == 0
-
-    assert calls[:2] == ["reconcile", "import"]
 
 
 def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
@@ -1480,7 +1459,7 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
     assert exit_.value.code == 3
 
 
-def test_the_launch_files_what_a_finished_run_left_and_leaves_a_run_still_going(tmp_path):
+def test_what_a_run_left_in_its_folder_never_becomes_an_item_of_its_own(tmp_path):
     library_root = tmp_path / "library"
     places = OutputPlaces(comfyui=tmp_path / "saves", pictures=library_root / "pictures",
                           videos=library_root / "videos", scripts=library_root / "scripts",
@@ -1496,10 +1475,48 @@ def test_the_launch_files_what_a_finished_run_left_and_leaves_a_run_still_going(
     library = Library(db=db, client=None, places=places, thumb_dir=tmp_path / "thumbs",
                       log_dir=tmp_path / "logs", inbox=None)
 
-    assert _file_what_comfyui_left(library) == 1
+    _file_what_comfyui_left(library)
+    _import_new_files(library)
 
-    assert (places.pictures / "gone_t2i_00001_.png").is_file()
+    assert [row["prompt_id"] for row in db.list_generations()] == ["going"]
+    assert (places.run("gone") / "image" / "gone_t2i_00001_.png").is_file()
     assert (places.run("going") / "image" / "going_t2i_00001_.png").is_file()
+
+
+class _ComfyUIThatRestarted:
+    def fetch_queue(self):
+        return set()
+
+    def fetch_history(self, prompt_id):
+        return {}
+
+
+def test_a_run_comfyui_finished_and_then_forgot_is_written_down_on_its_own_row(tmp_path):
+    places = OutputPlaces(comfyui=tmp_path / "saves", pictures=tmp_path / "library" / "pictures",
+                          videos=tmp_path / "library" / "videos",
+                          scripts=tmp_path / "library" / "scripts",
+                          audio=tmp_path / "library" / "sounds")
+    workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    payload = saving_into_its_run_folder(workflow.build_api_payload(workflow.default_params()),
+                                         places, "run-one")
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="run-one", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json="{}", workflow_json=json.dumps(payload))
+    db.update_generation("run-one", status="running")
+    saved = places.run("run-one") / "image" / "sdxl_t2i_00001_.png"
+    saved.parent.mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(saved)
+    library = Library(db=db, client=_ComfyUIThatRestarted(), places=places,
+                      thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs", inbox=None)
+
+    _reconnect_to_running_generations(library)
+    _file_what_comfyui_left(library)
+    _import_new_files(library)
+
+    [row] = db.list_generations()
+    assert (row["prompt_id"], row["status"]) == ("run-one", "completed")
+    assert json.loads(row["output_files"]) == [
+        {"filename": "sdxl_t2i_00001_.png", "subfolder": "image", "type": "output"}]
 
 
 # Every line the splash shows while the library is maintained, in order. The

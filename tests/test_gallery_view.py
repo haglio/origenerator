@@ -593,9 +593,9 @@ def _video_workflow(tree):
 def _on_screen(qtbot, view, width, height):
     qtbot.addWidget(view)
     view.resize(width, height)
-    view.show()
-    view.activateWindow()
-    qtbot.waitActive(view)
+    with qtbot.waitActive(view):
+        view.show()
+        view.activateWindow()
     view.refresh()
 
 
@@ -3941,15 +3941,15 @@ def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
     the screen is up — and must resume the moment it is back."""
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
 
     view.hide()
 
     assert not view._poll_timer.isActive()
 
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
 
     assert view._poll_timer.isActive()
 
@@ -4936,7 +4936,7 @@ def _linked_view(qtbot, source="i7", count=12):
                   "input_image": f"sdxl_t2i_{source}.png"},
                  "wan22_i2v_00001_.mp4")
     view = GalleryView(FakeDB([video] + images))
-    _on_screen(qtbot, view, 1100, 800)
+    _on_screen(qtbot, view, 1100, 1200)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     _click_tile(view, "vid1")               # viewing the video
     return view
@@ -7885,7 +7885,9 @@ def test_a_standalone_huds_transport_lands_on_the_slideshow_itself(qtbot, monkey
 def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_screen(
         qtbot, monkeypatch):
     view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch)
-    _on_screen(qtbot, view, 1200, 800)
+    view.resize(1200, 800)
+    with qtbot.waitExposed(view):
+        view.show()
     slideshow.shown.showMinimized()   # from the taskbar, which still minimizes any window
     assert slideshow.shown.isMinimized()
 
@@ -9961,8 +9963,8 @@ def _shown_view_with_one_image(qtbot, tmp_path):
     actions = GalleryActions(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     view.refresh()
     return view, db, file_path
 
@@ -10001,8 +10003,8 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     win = QMainWindow()
     win.setCentralWidget(view)
     qtbot.addWidget(win)
-    win.show()
-    qtbot.waitExposed(win)
+    with qtbot.waitExposed(win):
+        win.show()
     view.refresh()
     view._tree.setCurrentItem(_at(_image_workflow(view._tree), 0, 0, 0))
     view._browser.apply_selection("i1", _NO_MOD)
@@ -10018,8 +10020,8 @@ def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_pat
     # and buttons aren't text fields, so without this it would wipe a thumbnail.
     view, db, _file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    view.activateWindow()
-    qtbot.waitActive(view)
+    with qtbot.waitActive(view):
+        view.activateWindow()
     thumb = view._browser._thumb_widgets["i1"]
     gestures.click(thumb, thumb.rect().center())
     form = view._info_tabs.current_config_panel()._param_form
@@ -10501,8 +10503,8 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
     db.add(_running_row("gen1", prompt="a dog"))
     view = GalleryView(db)
     qtbot.addWidget(view)
-    view.show()
-    qtbot.waitExposed(view)   # showEvent -> refresh -> feeds the strip
+    with qtbot.waitExposed(view):   # showEvent -> refresh -> feeds the strip
+        view.show()
 
     assert view._queue.isVisible()
     assert view._queue.keys() == ["gen1"]
@@ -14775,8 +14777,8 @@ def _drop_on(row, mime) -> bool:
 def test_an_item_dropped_on_a_custom_folders_row_goes_in_and_the_folder_opens(qtbot):
     view, _cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Mine", [dog])
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     mime = generation_mime("i1")
 
     assert _drop_on(_top_level(view._tree)["Mine"], mime)
@@ -14790,8 +14792,8 @@ def test_a_folder_of_your_own_refuses_an_item_of_the_other_shape(qtbot):
     # The same rule a folder dragged out of the other half meets.
     view, _cat, _dog = _two_leaf_view(qtbot, extra=[_tall("t1", "a fish")])
     _make_folder(view, "Mine", [])
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     mime = generation_mime("t1")
 
     assert not _drop_on(_top_level(view._tree)["Mine"], mime)
@@ -14802,8 +14804,8 @@ def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
     # One in the Trash, or still being made: it would land and never be seen.
     view, _cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Mine", [])
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     mime = generation_mime("not-in-any-folder")
 
     assert not _drop_on(_top_level(view._tree)["Mine"], mime)
@@ -14873,8 +14875,8 @@ def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     inner = gallery.custom_folder_key(_make_folder(view, "Inner", [dog]))
     _make_folder(view, "Outer", [cat])
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     mime = _folder_drag(view, inner)
 
     assert _drop_on(_top_level(view._tree)["Outer"], mime)
@@ -14890,8 +14892,8 @@ def test_a_custom_folder_cannot_go_inside_one_it_holds(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
     outer = gallery.custom_folder_key(_make_folder(view, "Outer", [inner]))
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     mime = _folder_drag(view, outer)
     outer_row = _top_level(view._tree)["Outer"]
     outer_row.setExpanded(True)
@@ -14907,8 +14909,8 @@ def test_a_custom_folder_dragged_onto_favorites_is_refused(qtbot):
     # Favorites stars what lands on it, and a custom folder takes no star.
     view, cat, _dog = _two_leaf_view(qtbot)
     mine = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     mime = _folder_drag(view, mine)
 
     assert not _drop_on(_alls(view._tree)["Favorites"], mime)
@@ -14925,8 +14927,9 @@ def test_open_favorites_takes_no_drop_though_its_row_does(qtbot):
 def _middle_pane_style(view, qtbot):
     """The drop style the middle pane wears, read where nothing in it is drawn."""
     view.setStyleSheet(build_stylesheet())
-    view.show()
-    qtbot.waitExposed(view)
+    view.resize(1100, 1200)
+    with qtbot.waitExposed(view):
+        view.show()
     pane = view._scroll.rect()
     return worn(view._scroll.grab().toImage(), pane,
                 QPoint(pane.right() - 3, pane.bottom() - 3))
@@ -15210,8 +15213,8 @@ def test_an_item_dropped_on_a_folder_of_your_own_inside_another_opens_it_there(q
     view, cat, _dog = _two_leaf_view(qtbot)
     inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
     _make_folder(view, "Outer", [inner])
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     outer_row = _top_level(view._tree)["Outer"]
     outer_row.setExpanded(True)
     (inner_row,) = _subs(outer_row)

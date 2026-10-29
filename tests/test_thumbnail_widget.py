@@ -406,8 +406,8 @@ def _picked_tile_drawn(qtbot):
         qtbot.addWidget(tw)
         tw.resize(180, 200)
         tw.set_selected(True)
-        tw.show()
-        qtbot.waitExposed(tw)
+        with qtbot.waitExposed(tw):
+            tw.show()
         return tw, tw.grab().toImage()
     finally:
         app.setStyleSheet(prior)

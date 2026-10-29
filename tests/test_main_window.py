@@ -154,8 +154,8 @@ def test_the_close_question_sounds_the_alert(qtbot, tmp_path, monkeypatch, alert
 
 def test_the_window_behind_the_close_question_fades_out(qtbot, tmp_path, monkeypatch):
     win = _window(qtbot, tmp_path)
-    win.show()
-    qtbot.waitExposed(win)
+    with qtbot.waitExposed(win):
+        win.show()
     faded_while_asked = []
     monkeypatch.setattr(QMessageBox, "question", staticmethod(
         lambda *_args: faded_while_asked.extend(_faded_backgrounds(win))
@@ -190,8 +190,8 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
     win._gallery_view._slideshows.start()
     slideshow = win._gallery_view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    slideshow.shown.activateWindow()
-    qtbot.waitActive(slideshow.shown)
+    with qtbot.waitActive(slideshow.shown):
+        slideshow.shown.activateWindow()
 
     gestures.press_key(slideshow.shown, Qt.Key.Key_Q, _CTRL_ALT)
 
@@ -390,8 +390,8 @@ def _drag_the_first_open_handle(splitter: PaneSplitter, by: int = 20) -> list[in
 
 def _shown_at_the_same_size(qtbot, win):
     win.setGeometry(40, 50, 1600, 1600)
-    win.show()
-    qtbot.waitExposed(win)
+    with qtbot.waitExposed(win):
+        win.show()
     return win
 
 
@@ -1934,8 +1934,8 @@ def test_a_window_a_session_takes_keeps_the_borders_it_was_dragged_to(qtbot, tmp
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
     win.setGeometry(QApplication.primaryScreen().availableGeometry())
-    win.show()
-    qtbot.waitExposed(win)
+    with qtbot.waitExposed(win):
+        win.show()
     dragged = _drag_the_first_open_handle(win._gallery_view.findChild(PaneSplitter, "panes"))
     win.become_hosted(_fun_time_session())
 
@@ -1947,8 +1947,8 @@ def test_a_window_a_session_takes_keeps_the_borders_it_was_dragged_to(qtbot, tmp
 def test_a_window_handed_back_from_a_session_puts_its_dragged_borders_back(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     win.setGeometry(QApplication.primaryScreen().availableGeometry())
-    win.show()
-    qtbot.waitExposed(win)
+    with qtbot.waitExposed(win):
+        win.show()
     panes = win._gallery_view.findChild(PaneSplitter, "panes")
     dragged = _drag_the_first_open_handle(panes, by=100)
     win.become_hosted(_fun_time_session())

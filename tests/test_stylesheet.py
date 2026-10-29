@@ -242,8 +242,8 @@ def test_the_step_down_buttons_outer_corner_is_rounded_off(qtbot):
 
 def test_a_step_button_sits_one_step_lighter_under_the_pointer(qtbot, pointer):
     spinner = _styled_spinner(qtbot)
-    spinner.show()
-    qtbot.waitExposed(spinner)
+    with qtbot.waitExposed(spinner):
+        spinner.show()
     down = _spin_down_rect(spinner)
     ground = down.bottomRight() - QPoint(5, 5)
     pointer.off(spinner)
@@ -285,8 +285,8 @@ def test_a_picked_row_in_the_table_of_contents_wears_the_familys_blue(qtbot):
         for name in ("folder one", "folder two"):
             tree.addTopLevelItem(QTreeWidgetItem([name]))
         tree.resize(300, 120)
-        tree.show()
-        qtbot.waitExposed(tree)
+        with qtbot.waitExposed(tree):
+            tree.show()
         tree.setCurrentItem(tree.topLevelItem(0))
 
         image = tree.viewport().grab().toImage()

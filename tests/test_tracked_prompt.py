@@ -31,8 +31,8 @@ class _Pair(QWidget):
 def pair(qtbot):
     widget = _Pair("a cat on a couch")
     qtbot.addWidget(widget)
-    widget.show()
-    qtbot.waitExposed(widget)
+    with qtbot.waitExposed(widget):
+        widget.show()
     return widget
 
 
@@ -220,8 +220,8 @@ def test_a_rewrite_across_lines_keeps_the_prompt_whole(qtbot):
     # that read its own marks back would gain or lose newlines here.
     widget = _Pair("a cat\non a couch")
     qtbot.addWidget(widget)
-    widget.show()
-    qtbot.waitExposed(widget)
+    with qtbot.waitExposed(widget):
+        widget.show()
     tracked_prompt.track(widget.edit, "a cat\non a couch")
     widget.edit.setFocus()
 
@@ -235,8 +235,8 @@ def test_a_rewrite_across_lines_keeps_the_prompt_whole(qtbot):
 def test_deleting_a_whole_line_keeps_the_prompt_whole(qtbot):
     widget = _Pair("a cat\non a couch")
     qtbot.addWidget(widget)
-    widget.show()
-    qtbot.waitExposed(widget)
+    with qtbot.waitExposed(widget):
+        widget.show()
     tracked_prompt.track(widget.edit, "a cat\non a couch")
     widget.edit.setFocus()
 

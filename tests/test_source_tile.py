@@ -33,9 +33,9 @@ def test_show_source_reveals_the_heading_and_the_items_whole_name(tile):
 
 
 def test_a_heading_wider_than_the_thumbnail_is_centered_over_it(tile, qtbot):
-    tile.show_source("vid1", None, "77B2E1A0 012",
-                     heading="From a source far wider than any thumbnail is drawn")
-    qtbot.waitExposed(tile)
+    with qtbot.waitExposed(tile):
+        tile.show_source("vid1", None, "77B2E1A0 012",
+                         heading="From a source far wider than any thumbnail is drawn")
 
     heading, thumb, name = (w.geometry() for w in (tile._heading, tile._thumb, tile._name))
     assert heading.width() > thumb.width()
@@ -45,8 +45,8 @@ def test_a_heading_wider_than_the_thumbnail_is_centered_over_it(tile, qtbot):
 
 def test_clicking_the_tile_emits_activated_with_the_source_id(tile, qtbot):
     tile.show_source("img1", None, "sdxl_img1.png")
-    tile.show()
-    qtbot.waitExposed(tile)
+    with qtbot.waitExposed(tile):
+        tile.show()
     got = []
     tile.activated.connect(got.append)
 

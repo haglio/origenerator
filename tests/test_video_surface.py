@@ -29,8 +29,8 @@ def test_a_burst_of_frames_costs_one_conversion_and_shows_the_newest(qtbot, monk
     surface = VideoSurface()
     qtbot.addWidget(surface)
     surface.resize(64, 36)
-    surface.show()
-    qtbot.waitExposed(surface)
+    with qtbot.waitExposed(surface):
+        surface.show()
     converted = _count_conversions(monkeypatch)
 
     for color in ("red", "green", "blue", "yellow", "white"):

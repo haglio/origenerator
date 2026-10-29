@@ -67,8 +67,8 @@ def _tree_with_leaf(qtbot, *, favorite=False):
     tree.addTopLevelItem(media)
     tree.expandAll()
     tree.resize(320, 200)
-    tree.show()
-    qtbot.waitExposed(tree)
+    with qtbot.waitExposed(tree):
+        tree.show()
     return tree, leaf
 
 
@@ -223,8 +223,8 @@ def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False,
     for item in (collection, a, b):
         tree.addTopLevelItem(item)
     tree.resize(320, 200)
-    tree.show()
-    qtbot.waitExposed(tree)
+    with qtbot.waitExposed(tree):
+        tree.show()
     return tree, collection, a, b
 
 
@@ -624,8 +624,8 @@ def _too_long_for_its_height(qtbot):
     for n in range(100):
         tree.addTopLevelItem(_folder_row(f"Folder {n}", f"k/{n}"))
     tree.resize(200, 150)
-    tree.show()
-    qtbot.waitExposed(tree)
+    with qtbot.waitExposed(tree):
+        tree.show()
     return tree, tree.verticalScrollBar()
 
 
@@ -776,8 +776,8 @@ def _tree_with_a_collection(qtbot, which=RECENTS_KEY):
     top.addChild(folder)
     tree.addTopLevelItem(top)
     tree.expandAll()
-    tree.show()
-    qtbot.waitExposed(tree)
+    with qtbot.waitExposed(tree):
+        tree.show()
     return tree, collection
 
 

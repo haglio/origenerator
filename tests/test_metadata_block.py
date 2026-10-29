@@ -48,8 +48,8 @@ def _texts(block):
 def test_a_folded_block_stays_folded_for_the_next_item_shown(qtbot, block):
     block.show_row(_row())
     block.resize(400, 300)
-    block.show()
-    qtbot.waitExposed(block)
+    with qtbot.waitExposed(block):
+        block.show()
     header = block.findChild(CollapsibleSection)._header
     gestures.click(header, header.rect().center())
 

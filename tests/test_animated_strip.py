@@ -19,8 +19,8 @@ def test_strip_shows_one_tile_per_video_and_navigates_on_click(qtbot):
     strip.video_activated.connect(activated.append)
 
     strip.show_videos([("v1", None, None), ("v2", None, None)])
-    strip.show()
-    qtbot.waitExposed(strip)
+    with qtbot.waitExposed(strip):
+        strip.show()
 
     tiles = strip.findChildren(_VideoTile)
     assert len(tiles) == 2

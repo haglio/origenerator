@@ -30,8 +30,8 @@ def _field(qtbot, key="positive_prompt"):
     field = PromptField(key)
     qtbot.addWidget(field)
     field.resize(300, field.height())
-    field.show()
-    qtbot.waitExposed(field)
+    with qtbot.waitExposed(field):
+        field.show()
     return field
 
 

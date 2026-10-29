@@ -27,8 +27,8 @@ def styled_button(qtbot):
     layout.addWidget(b)
     qtbot.addWidget(host)
     host.resize(320, 60)
-    host.show()
-    qtbot.waitExposed(host)
+    with qtbot.waitExposed(host):
+        host.show()
     yield b  # yield, so the host stays referenced: collected, it takes the button
 
 

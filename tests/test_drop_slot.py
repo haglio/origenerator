@@ -282,8 +282,8 @@ def test_letting_go_over_the_slot_puts_it_out(qtbot):
 
 def _shown_in_the_app(qtbot, slot):
     slot.setStyleSheet(build_stylesheet())
-    slot.show()
-    qtbot.waitExposed(slot)
+    with qtbot.waitExposed(slot):
+        slot.show()
     return slot
 
 

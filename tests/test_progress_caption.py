@@ -30,8 +30,8 @@ def styled_bar(qtbot):
     layout.addWidget(b)
     qtbot.addWidget(host)
     host.resize(240, 60)
-    host.show()
-    qtbot.waitExposed(host)
+    with qtbot.waitExposed(host):
+        host.show()
     yield b  # yield, so the host stays referenced: collected, it takes the bar
 
 

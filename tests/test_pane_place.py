@@ -37,8 +37,8 @@ def pane(qtbot):
     scroll.setVerticalScrollBarPolicy(scroll.verticalScrollBarPolicy())
     qtbot.addWidget(scroll)
     scroll.resize(230, _VIEWPORT)
-    scroll.show()
-    qtbot.waitExposed(scroll)
+    with qtbot.waitExposed(scroll):
+        scroll.show()
     return scroll, tiles
 
 

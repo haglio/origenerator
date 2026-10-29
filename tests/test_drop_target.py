@@ -28,8 +28,8 @@ def _pane(qtbot, landing=lambda _mime, _source: ("taken",)):
     qtbot.addWidget(pane, before_close_func=lambda held: QApplication.sendEvent(
         held.viewport(), QDragLeaveEvent()))
     pane.resize(300, 200)
-    pane.show()
-    qtbot.waitExposed(pane)
+    with qtbot.waitExposed(pane):
+        pane.show()
     return pane
 
 

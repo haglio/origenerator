@@ -21,7 +21,7 @@ from shared_ui.icons import glyph_icon, marked_text
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
-from origenerator import act_settings, evolver_export, outside_videos
+from origenerator import act_settings, evolver_export, look_training, outside_videos
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
@@ -101,6 +101,7 @@ from origenerator.setting_advice import (
 )
 from origenerator.timing import estimate_label
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES, offered_workflows, workflow_named
+from origenerator.workflows.model_files import NO_LORA
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +223,7 @@ class GenerateConfigPanel(DropZone):
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
     levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
+    train_requested = pyqtSignal(str)        # a LoRA row's Train was pressed (the row's key)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
                  *, fun_time=None, heights=None,
@@ -280,6 +282,8 @@ class GenerateConfigPanel(DropZone):
         # asked for. Nothing else on the form remembers any of them.
         self._settings_source: tuple[str, str | None, str] = ("", None, "")
         self._source_video_row: dict | None = None
+        self._trainings_running: dict[str, str] = {}
+        self._offered_loras: dict[str, object] = {}
         # Re-reads (shortly) whether Generate would reproduce a past run — see
         # refresh_generate_caption for why the answer isn't taken on the spot.
         self._caption_timer = QTimer(self)
@@ -710,6 +714,7 @@ class GenerateConfigPanel(DropZone):
                 self._rebase_on_the_model(None, checkpoint, keep=edited)
                 self._fresh_form = True
             self._form_checkpoint = checkpoint
+            self._offer_trainings()
         else:
             self._clear_form()  # no workflow picked: nothing below is known yet
         self._show_advice()
@@ -810,10 +815,44 @@ class GenerateConfigPanel(DropZone):
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
         self._param_form.item_activated.connect(self.source_activated)
+        self._param_form.train_requested.connect(self.train_requested)
+        self._param_form.changed.connect(self._offer_trainings)
+        self._offered_loras = {}
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
         self.form_replaced.emit()
+
+    def _offer_trainings(self, every_row: bool = False) -> None:
+        wf = workflow_named(self._form_workflow_key)
+        if self._param_form is None or wf is None:
+            return
+        values = self._param_form.get_values()
+        for key in wf.lora_keys:
+            if not every_row and self._offered_loras.get(key, NO_LORA) == values.get(key):
+                continue
+            self._offered_loras[key] = values.get(key)
+            base = look_training.trainable_base_of(values.get(key))
+            self._param_form.offer_training(
+                key, look_training.training_offer(base) if base else None,
+                self._trainings_running.get(base))
+
+    def show_training(self, base: str, text: str | None) -> None:
+        if text is None:
+            self._trainings_running.pop(base, None)
+        else:
+            self._trainings_running[base] = text
+        self._offer_trainings(every_row=True)
+
+    def lora_value(self, key: str):
+        return self._param_form.get_values().get(key) if self._param_form is not None else None
+
+    def pick_lora(self, key: str, lora: str) -> bool:
+        wf = workflow_named(self._form_workflow_key)
+        if self._param_form is None or wf is None or key not in wf.lora_keys:
+            return False
+        self._param_form.set_values({key: lora})
+        return True
 
     def prompt_fields(self) -> list:
         """This tab's prompt inputs, for a find over the words it would generate

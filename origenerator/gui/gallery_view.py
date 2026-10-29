@@ -129,6 +129,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.job_queue import JobQueue
+from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.moving_previews import MovingPreviews
@@ -553,6 +554,9 @@ class GalleryView(QWidget):
             slideshows=self._slideshows, info_tabs_of=lambda: self._info_tabs)
         self._jobs.enhance_images_with(
             lambda image: self._enhance.enhance_items([image["prompt_id"]]))
+        self._look_training = LookTrainingController(
+            self._jobs, panels=lambda: self._info_tabs.config_panels(),
+            show_panel=lambda panel: self._info_tabs.setCurrentWidget(panel), parent=self)
         # Everything spoken: the microphone, the caption that says what it heard,
         # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
         # caption is placed by _build_ui, and the bank it presses is bound to it
@@ -992,6 +996,7 @@ class GalleryView(QWidget):
         # Every keystroke in a tab's form moves the text an open find is marking
         # up — re-run rather than leave highlights on words that shifted.
         panel.form_edited.connect(self._find_bar.refresh)
+        self._look_training.wire(panel)
 
     # --- Drive OSR2: one switch, the app picking funscript or motion ----------
 
@@ -3260,6 +3265,7 @@ class GalleryView(QWidget):
         startup; a tab's Generate is itself a re-roll, so every still-running row is
         the re-roll controller's to reconnect."""
         self._enhance.take_up_trainings()
+        self._look_training.take_up_trainings()
         self._jobs.reconnect_running()
 
     def _cancel_reroll(self, key: str):

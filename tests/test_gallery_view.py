@@ -72,6 +72,7 @@ from origenerator import (
     evolver_export,
     fix_training,
     gallery,
+    look_training,
     lora_training,
     motion_engine,
     osr2_driver,
@@ -9052,6 +9053,27 @@ def test_a_training_left_running_is_taken_up_before_the_line_it_held_is_sent(
 
     assert view._jobs.training is not None
     client.submit_job.assert_not_called()
+
+
+def test_a_look_loras_training_left_running_is_taken_up_without_holding_the_line(
+        qtbot, tmp_path, monkeypatch):
+    db = _seeded_db(tmp_path, seed=7)
+    _insert_running_reroll(db, "waiting")
+    db.update_generation("waiting", status="pending")
+    trainer = SimpleNamespace(running=lambda: True, began=0.0)
+    job = {"base": "Example Look", "display_name": "Example Look 1.1",
+           "status": str(tmp_path / "status.json"), "log": str(tmp_path / "training.log")}
+    monkeypatch.setattr(look_training, "trainings", lambda: [job])
+    monkeypatch.setattr(lora_training, "trainer_of", lambda kept: trainer)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+
+    view.reconnect_running_jobs()
+
+    assert view._jobs.training is not None
+    assert not view._jobs.training_holds_the_machine()
+    client.submit_job.assert_called_once()
 
 
 def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):

@@ -84,6 +84,8 @@ SPEECH_PYTHON = speech_python()
 # and the Python of the environment it lives in: its pins are not this app's either.
 LORA_TRAINING_PYTHON = _overlay_path("lora_training_python")
 LORA_TRAINING_SCRIPTS = _overlay_path("lora_training_scripts")
+KREA2_TRAINING_PYTHON = _overlay_path("krea2_training_python")
+KREA2_TRAINING_SCRIPTS = _overlay_path("krea2_training_scripts")
 # How many stations Origenerator Radio deals: Standalone hears them all at
 # once, and inside a session each Satellite Funestra is dealt this many of its own.
 RADIO_STATIONS = 3
@@ -117,6 +119,7 @@ STARTING_FRAMES_DIR = _LIBRARY_FILES_DIR / "starting frames"
 TRASH_DIR = _LIBRARY_FILES_DIR / "trash"
 FIX_PHOTOS_DIR = _LIBRARY_FILES_DIR / "fixes"
 FIX_TRAINING_DIR = _LIBRARY_FILES_DIR / "fix training"
+LOOK_TRAINING_DIR = LIBRARY_STATE_DIR / "lora training"
 MODEL_TITLES_PATH = _LIBRARY_FILES_DIR / "model_titles.json"
 TRIGGER_WORDS_PATH = _LIBRARY_FILES_DIR / "trigger_words.json"
 LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"

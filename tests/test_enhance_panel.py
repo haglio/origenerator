@@ -38,6 +38,7 @@ from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.gui.enhance_panel as enhance_panel_module
+import origenerator.gui.training_controls as training_controls_module
 import origenerator.workflows.detail_parts as parts
 from origenerator import config, fix_training
 from origenerator.enhance_presets import Preset
@@ -1906,7 +1907,7 @@ def _fix_window_laid_out_at(window, width: int) -> dict:
     buttons = window.findChild(QDialogButtonBox)
     return {"ok": buttons.button(QDialogButtonBox.StandardButton.Ok),
             "cancel": buttons.button(QDialogButtonBox.StandardButton.Cancel),
-            "train": window.train, "prompt_height": window.positive.height()}
+            "train": window.training.train, "prompt_height": window.positive.height()}
 
 
 def _rows_of(window, widget) -> set[int]:
@@ -1936,7 +1937,7 @@ def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):
     window = panel._fix_prompt_windows["hands"]
 
     with qtbot.waitSignal(panel.fix_training_requested) as asked:
-        window.train.click()
+        window.training.train.click()
 
     assert asked.args == ["hands"]
 
@@ -1959,8 +1960,8 @@ def test_beside_train_a_fixs_prompts_say_how_many_photos_its_folder_holds(
     panel._fix_prompt_buttons["hands"].click()
 
     window = panel._fix_prompt_windows["hands"]
-    assert window.photo_count.text() == "2 photos"
-    assert window.photo_count.toolTip() == str(folder)
+    assert window.training.pictures.text() == "2 photos"
+    assert window.training.pictures.toolTip() == str(folder)
 
 
 def test_a_fixs_photos_are_counted_again_each_time_its_prompts_come_to_the_front(
@@ -1969,25 +1970,25 @@ def test_a_fixs_photos_are_counted_again_each_time_its_prompts_come_to_the_front
     panel, _edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
-    assert window.photo_count.text() == "1 photo"
+    assert window.training.pictures.text() == "1 photo"
 
     (folder / "two.jpg").write_bytes(b"")
     QApplication.sendEvent(window, QEvent(QEvent.Type.WindowActivate))
 
-    assert window.photo_count.text() == "2 photos"
+    assert window.training.pictures.text() == "2 photos"
 
 
 def test_show_in_explorer_opens_a_fixs_photos_folder_making_it_first_if_need_be(
         qtbot, monkeypatch, tmp_path):
     folder = _fix_photos(monkeypatch, tmp_path)
     opened = []
-    monkeypatch.setattr(enhance_panel_module, "open_in_explorer", opened.append)
+    monkeypatch.setattr(training_controls_module, "open_in_explorer", opened.append)
     panel, _edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
-    assert window.photo_count.text() == "0 photos"
+    assert window.training.pictures.text() == "0 photos"
 
-    window.show_photos.click()
+    window.training.folder.click()
 
     assert opened == [folder]
     assert folder.is_dir()
@@ -1998,11 +1999,11 @@ def test_a_fixs_train_button_says_how_its_training_is_going_until_it_ends(qtbot)
     panel.show_fix_training("hands", "Training 40%")
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
-    assert (window.train.text(), window.train.isEnabled()) == ("Training 40%", False)
+    assert (window.training.train.text(), window.training.train.isEnabled()) == ("Training 40%", False)
 
     panel.show_fix_training("hands", None)
 
-    assert (window.train.text(), window.train.isEnabled()) == ("Train", True)
+    assert (window.training.train.text(), window.training.train.isEnabled()) == ("Train", True)
 
 
 def test_a_trained_fixs_button_says_retrain_grayed_until_its_photos_change(
@@ -2015,12 +2016,12 @@ def test_a_trained_fixs_button_says_retrain_grayed_until_its_photos_change(
     panel, _edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
-    assert (window.train.text(), window.train.isEnabled()) == ("Retrain", False)
+    assert (window.training.train.text(), window.training.train.isEnabled()) == ("Retrain", False)
 
     (folder / "two.jpg").write_bytes(b"")
     QApplication.sendEvent(window, QEvent(QEvent.Type.WindowActivate))
 
-    assert (window.train.text(), window.train.isEnabled()) == ("Retrain", True)
+    assert (window.training.train.text(), window.training.train.isEnabled()) == ("Retrain", True)
 
 
 def test_train_says_it_draws_on_the_shared_folder_only_for_a_fix_that_does(qtbot, monkeypatch):
@@ -2030,8 +2031,8 @@ def test_train_says_it_draws_on_the_shared_folder_only_for_a_fix_that_does(qtbot
     for name in ("hands", "alpha"):
         panel.open_fix_prompts(name)
 
-    assert "fixes\\shared" in panel._fix_prompt_windows["hands"].train.toolTip()
-    assert "shared" not in panel._fix_prompt_windows["alpha"].train.toolTip()
+    assert "fixes\\shared" in panel._fix_prompt_windows["hands"].training.train.toolTip()
+    assert "shared" not in panel._fix_prompt_windows["alpha"].training.train.toolTip()
 
 
 def test_a_trained_lora_is_put_on_its_fix(qtbot):

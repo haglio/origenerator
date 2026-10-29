@@ -22,7 +22,13 @@ from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
-from origenerator.gui import file_pick, icons, param_sections, thumbnail_dropdown
+from origenerator.gui import (
+    file_pick,
+    icons,
+    param_sections,
+    thumbnail_dropdown,
+    training_controls,
+)
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.eliding import ElidingLabel
@@ -39,6 +45,7 @@ from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
+from origenerator.lora_training import TrainingOffer
 from origenerator.seed_history import SeedHistory, SeedUse
 from origenerator.setting_advice import Advice, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
@@ -2472,3 +2479,47 @@ def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
 
     form.set_values({"lora": "example_style.safetensors"})
     assert combo.toolTip() == param_help("lora")
+
+
+def _lora_form(qtbot, **options):
+    form = ParamForm([ParamDef("lora", "LoRA", "combo", NO_LORA,
+                               options=[NO_LORA, "example_look.safetensors"])], **options)
+    qtbot.addWidget(form)
+    return form
+
+
+def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot, tmp_path, monkeypatch):
+    form = _lora_form(qtbot, lora_keys=("lora",))
+    controls = form._training_controls["lora"]
+    assert controls.isHidden()
+    opened = []
+    monkeypatch.setattr(training_controls, "open_in_explorer", opened.append)
+    asked = []
+    form.train_requested.connect(asked.append)
+
+    form.offer_training("lora", TrainingOffer(label="Retrain", enabled=True, tooltip="Trains it.",
+                                              pictures=87, folder=tmp_path))
+
+    assert not controls.isHidden()
+    assert (controls.train.text(), controls.train.isEnabled(), controls.train.toolTip()) == (
+        "Retrain", True, "Trains it.")
+    assert controls.pictures.text() == "87 pictures"
+    assert controls.pictures.toolTip() == str(tmp_path)
+    controls.train.click()
+    assert asked == ["lora"]
+    controls.folder.click()
+    assert opened == [tmp_path]
+
+    form.offer_training("lora", TrainingOffer(label="Retrain", enabled=True, tooltip="Trains it.",
+                                              pictures=1, folder=tmp_path), running="Training 10%")
+    assert (controls.train.text(), controls.train.isEnabled()) == ("Training 10%", False)
+    assert controls.pictures.text() == "1 picture"
+
+    form.offer_training("lora", None)
+    assert controls.isHidden()
+
+
+def test_a_form_told_no_lora_keys_offers_no_training(qtbot):
+    form = _lora_form(qtbot)
+
+    assert form._training_controls == {}

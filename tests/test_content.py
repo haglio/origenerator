@@ -207,6 +207,7 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
 
     assert documented == {
         "speech_python", "lora_training_python", "lora_training_scripts",
+        "krea2_training_python", "krea2_training_scripts", "trainable_loras",
         "acts", "pinned_kino_settings", "search_synonyms",
         "pinned_genau_settings", "detail_fix_parts", "genau_flick_prompts",
         "model_recommendations", "lora_recommendations",

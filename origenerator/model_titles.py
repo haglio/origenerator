@@ -98,6 +98,10 @@ def write_kept(path, entries: dict) -> None:
     path.write_text(json.dumps(every, sort_keys=True, indent=1), encoding="utf-8")
 
 
+def write_title(stem: str, title: str) -> None:
+    write_kept(config.MODEL_TITLES_PATH, {stem: title})
+
+
 def trained_when(path) -> datetime | None:
     metadata = safetensors_metadata(path)
     for key in _TRAINED_AT:

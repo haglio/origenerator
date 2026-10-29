@@ -196,17 +196,19 @@ def _narrowest(widget: QWidget) -> int:
 
 
 class _FieldGrid(QGridLayout):
-    """Fields beside one column of captions: a picker to a line, and the numbers
-    sharing a line while each keeps its width, a line each when they cannot.
+    """Fields beside one column of captions, its warning marks in a column left of
+    it: a picker to a line, and the numbers sharing a line while each keeps its
+    width, a line each when they cannot.
 
     A layout rather than a widget, because Qt asks a widget's layout for its
     height at a width and never the widget itself."""
 
     def __init__(self, pickers: list[tuple[QLabel, QWidget]],
-                 numbers: list[tuple[QLabel, QWidget]]):
+                 numbers: list[tuple[QLabel, QWidget]], marks: dict[QLabel, WarningMark]):
         super().__init__()
         self._pickers = pickers
         self._numbers = numbers
+        self._marks = marks
         self.setContentsMargins(0, 0, 0, 0)
         self.setSpacing(GAP_SMALL)
         self._stacked: bool | None = None
@@ -231,7 +233,8 @@ class _FieldGrid(QGridLayout):
 
     def minimumSize(self) -> QSize:
         pairs = self._pickers + self._numbers
-        narrowest = (max(label.sizeHint().width() for label, _field in pairs)
+        narrowest = (self._mark_column()
+                     + max(label.sizeHint().width() for label, _field in pairs)
                      + self.horizontalSpacing()
                      + max(_narrowest(field) for _label, field in pairs))
         return QSize(narrowest, self.heightForWidth(self._one_line_width()))
@@ -240,10 +243,14 @@ class _FieldGrid(QGridLayout):
         self._arrange(stacked=rect.width() < self._one_line_width())
         super().setGeometry(rect)
 
+    def _mark_column(self) -> int:
+        return (max(mark.sizeHint().width() for mark in self._marks.values())
+                + self.horizontalSpacing())
+
     def _one_line_width(self) -> int:
         captions = max(label.sizeHint().width()
                        for label, _field in self._pickers + self._numbers[:1])
-        return (captions
+        return (self._mark_column() + captions
                 + sum(label.sizeHint().width() for label, _field in self._numbers[1:])
                 + sum(_narrowest(field) for _label, field in self._numbers)
                 + self.horizontalSpacing() * (2 * len(self._numbers) - 1))
@@ -255,11 +262,13 @@ class _FieldGrid(QGridLayout):
             self.setColumnStretch(column, 0)
         span = 1 if stacked else 2 * len(self._numbers) - 1
         for row, (label, field) in enumerate(self._pickers):
-            self.addWidget(label, row, 0)
-            self.addWidget(field, row, 1, 1, span)
+            if label in self._marks:
+                self.addWidget(self._marks[label], row, 0)
+            self.addWidget(label, row, 1)
+            self.addWidget(field, row, 2, 1, span)
         below = len(self._pickers)
         for index, (label, field) in enumerate(self._numbers):
-            row, column = (below + index, 0) if stacked else (below, 2 * index)
+            row, column = (below + index, 1) if stacked else (below, 1 + 2 * index)
             self.addWidget(label, row, column)
             self.addWidget(field, row, column + 1)
             self.setColumnStretch(column + 1, 1)
@@ -374,13 +383,14 @@ class EnhancePanel(QWidget):
         self._scale = self._number("enhance_scale", NoWheelDoubleSpinBox())
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
+        model_caption = self._labeled("Model", self._model)
         settings_column.addLayout(_FieldGrid(
-            pickers=[(_warned_beside(self._labeled("Model", self._model), self._model_warning),
-                      self._model),
+            pickers=[(model_caption, self._model),
                      (self._labeled("Upscaler", self._upscaler), self._upscaler)],
             numbers=[(self._labeled(label, widget), widget)
                      for label, widget in (("Scale", self._scale), ("Steps", self._steps),
                                            ("Redraw Amount", self._denoise))],
+            marks={model_caption: self._model_warning},
         ))
 
         # The detail pass: a tick and a number per part it can be aimed at, the
@@ -754,17 +764,6 @@ class EnhancePanel(QWidget):
     def _take_settings(self, params: dict) -> None:
         self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=full_settings(params)))
         self._emit()
-
-
-def _warned_beside(caption: QLabel, mark: WarningMark) -> QWidget:
-    host = QWidget()
-    row = QHBoxLayout(host)
-    row.setContentsMargins(0, 0, 0, 0)
-    row.setSpacing(GAP_SMALL)
-    row.addWidget(caption)
-    row.addStretch(1)
-    row.addWidget(mark)
-    return host
 
 
 def _side_by_side(*widgets) -> QWidget:

@@ -1987,20 +1987,45 @@ def test_matching_the_source_warns_while_an_image_in_front_or_none_is_made_by_an
         False, _TRAINED_ON_SAID)
 
 
-def test_the_models_warning_sits_between_its_caption_and_the_model_leaving_the_caption_be(
+_CAPTIONS = ("Model", "Upscaler", "Scale", "Steps", "Redraw Amount")
+
+
+def _caption_lefts(panel) -> dict[str, int]:
+    return {label.text(): label.mapTo(panel, QPoint()).x()
+            for label in panel.findChildren(QLabel) if label.text() in _CAPTIONS}
+
+
+def test_the_models_warning_sits_left_of_its_caption_with_the_captions_in_line(
         hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45})
-    _laid_out_at(panel, 500)
+    _laid_out_at(panel, 2000)
 
-    captions = {label.text(): label.mapTo(panel, QPoint()).x()
-                for label in panel.findChildren(QLabel) if label.text() in ("Model", "Upscaler")}
+    lefts = _caption_lefts(panel)
     caption = next(label for label in panel.findChildren(QLabel) if label.text() == "Model")
     mark = panel._model_warning
-    assert captions["Model"] == captions["Upscaler"]
-    assert (caption.mapTo(panel, QPoint()).x() + caption.width()
-            <= mark.mapTo(panel, QPoint()).x())
-    assert mark.mapTo(panel, QPoint()).x() + mark.width() <= panel._model.mapTo(panel, QPoint()).x()
-    assert _rows_of(panel, mark) & _rows_of(panel, panel._model)
+    assert mark.mapTo(panel, QPoint()).x() + mark.width() <= lefts["Model"]
+    assert _rows_of(panel, mark) & _rows_of(panel, caption)
+    assert lefts["Model"] == lefts["Upscaler"] == lefts["Scale"]
+
+
+def test_the_captions_stay_where_they_are_while_the_models_warning_is_hidden(hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+    _laid_out_at(panel, 2000)
+    warned = _caption_lefts(panel)
+
+    hands_trained_on({})
+    _laid_out_at(panel, 2000)
+
+    assert panel._model_warning.isHidden()
+    assert _caption_lefts(panel) == warned
+
+
+def test_a_caption_moved_onto_a_line_of_its_own_keeps_in_line_with_the_others(hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+
+    _laid_out_at(panel, panel.minimumSizeHint().width())
+
+    assert len(set(_caption_lefts(panel).values())) == 1
 
 
 _STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "

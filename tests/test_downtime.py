@@ -12,6 +12,7 @@ from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.comfyui_folders import SUITE_FOLDERS
 
 _HANDS = types.SimpleNamespace(name="hands")
 
@@ -103,7 +104,7 @@ def test_the_work_left_tries_experiments_from_the_policy_handed_in_only_while_th
         qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
     db = Database(tmp_path / "t.db")
-    jobs = JobQueue(db, ComfyUIClient())
+    jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
     workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
     proposal = types.SimpleNamespace(workflow=workflow, params=workflow.default_params(),
                                      base_prompt_id="p0", mutated_keys=["steps"])

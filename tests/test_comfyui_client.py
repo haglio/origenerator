@@ -14,6 +14,7 @@ import struct
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.output_places import OutputPlaces
+from tests.comfyui_folders import SUITE_FOLDERS
 
 
 def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
@@ -26,7 +27,7 @@ def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
     owns the taskbar identity. stop() must cancel the sleep so the thread ends
     at once.
     """
-    client = ComfyUIClient(host="127.0.0.1", port=59999)  # nothing listening
+    client = ComfyUIClient(host="127.0.0.1", port=59999, folders=SUITE_FOLDERS)  # nothing listening
     # Wait for the refused connect to drop the loop into its 3s reconnect sleep.
     # The refusal fires ``disconnected`` almost at once; the generous timeout is a
     # safety net for a cold QThread + asyncio + websockets spin-up under heavy load
@@ -77,7 +78,7 @@ def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
     # prompt; the client adopts it as the executing prompt, so the live preview
     # frames that follow (which carry no id of their own) attribute to that job
     # instead of being dropped. Without this, a reconnected run shows no live frame.
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client._executing_prompt_id = ""  # the empty tag the reconnect replay left over
 
     client._handle_ws_message(json.dumps({
@@ -92,7 +93,7 @@ def test_progress_carries_the_node_that_took_the_step(qtbot):
     # apart in the bar (see origenerator.progress). The node is read off the
     # progress event itself rather than off the "executing" frame before it,
     # because a reconnect mid-pass never sees that frame.
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     seen = []
     client.progress.connect(lambda *args: seen.append(args))
 
@@ -109,7 +110,7 @@ def test_progress_carries_the_node_that_took_the_step(qtbot):
     assert seen == [("job1", "24", 3, 50), ("job1", "", 4, 50)]
 
 def test_a_failed_run_arrives_saying_what_threw_and_nothing_its_node_was_given(qtbot):
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     seen = []
     client.job_error.connect(lambda pid, message: seen.append((pid, json.loads(message))))
 
@@ -132,18 +133,18 @@ def test_reuses_a_supplied_client_id(qtbot):
     # job still running in ComfyUI, which targets that job's live websocket messages
     # at the id that submitted it. The id also rides the /ws query so ComfyUI routes
     # the running prompt's messages to this reconnecting socket.
-    client = ComfyUIClient(client_id="stable-id")
+    client = ComfyUIClient(client_id="stable-id", folders=SUITE_FOLDERS)
 
     assert client.client_id == "stable-id"
     assert "clientId=stable-id" in client.ws_url
 
 def test_mints_a_distinct_client_id_when_none_supplied(qtbot):
     # A read-only gallery or a test needs no persisted id; each gets its own.
-    assert ComfyUIClient().client_id
-    assert ComfyUIClient().client_id != ComfyUIClient().client_id
+    assert ComfyUIClient(folders=SUITE_FOLDERS).client_id
+    assert ComfyUIClient(folders=SUITE_FOLDERS).client_id != ComfyUIClient(folders=SUITE_FOLDERS).client_id
 
 def test_binary_preview_emits_image_tagged_with_current_prompt(qtbot):
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client._executing_prompt_id = "p1"
     received = []
     client.preview_image.connect(lambda pid, data: received.append((pid, data)))
@@ -155,7 +156,7 @@ def test_binary_preview_emits_image_tagged_with_current_prompt(qtbot):
     assert received == [("p1", b"PNG-BYTES")]
 
 def test_binary_non_preview_event_is_ignored(qtbot):
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client._executing_prompt_id = "p1"
     received = []
     client.preview_image.connect(lambda pid, data: received.append((pid, data)))

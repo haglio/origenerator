@@ -19,13 +19,14 @@ from origenerator.gui.generation_job import (
 from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.comfyui_folders import SUITE_FOLDERS
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
 
 
 def _client():
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = MagicMock(return_value="comfy-A")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()

@@ -43,6 +43,7 @@ from origenerator.orientation import oriented_key
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
+from tests.comfyui_folders import SUITE_FOLDERS
 from tests.test_combine_panel import _listed_under_recent
 from tests.test_gallery_view import _collection, _select_first_leaf, _selected_folder
 from tests.test_hard_to_miss import _faded_backgrounds
@@ -53,7 +54,7 @@ _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifie
 def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, taskbar=None,
             next_launch=None):
     win = OrigeneratorWindow(
-        ComfyUIClient(),
+        ComfyUIClient(folders=SUITE_FOLDERS),
         Database(tmp_path / "t.db"),
         app_state or AppState(tmp_path / "ui.json"),
         fun_time=fun_time,
@@ -533,7 +534,7 @@ class _QueueSpyClient(ComfyUIClient):
     """A real client whose queue operations are recorded instead of sent."""
 
     def __init__(self):
-        super().__init__()
+        super().__init__(folders=SUITE_FOLDERS)
         self.canceled = []
         self.submitted = []
         self.submitted_on = []
@@ -740,7 +741,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
         "exp-1", status="completed",
         output_files=json.dumps([{"filename": "exp.png", "subfolder": ""}]),
     )
-    win = OrigeneratorWindow(ComfyUIClient(), db, state)
+    win = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, state)
     qtbot.addWidget(win)
 
     view = win._gallery_view
@@ -1451,7 +1452,7 @@ def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path
     headset session that adopts it has no monitor to put it on: it asks for the
     picture through the session's own channel instead of launching another."""
     win = OrigeneratorWindow(
-        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
     )
     qtbot.addWidget(win)
@@ -1467,7 +1468,7 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
     """And the desktop session that adopts it back puts it where it always was:
     parked until the mode switch restores it, and no picture written for nobody."""
     win = OrigeneratorWindow(
-        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
     )
     qtbot.addWidget(win)
@@ -1739,7 +1740,7 @@ def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
     # parked under the players, so taking the foreground for itself would be a
     # window over the room rather than a way to the picture.
     session = replace(_fun_time_session(), dashboard_cmd_file=tmp_path / "dashboard.txt")
-    win = OrigeneratorWindow(ComfyUIClient(), Database(tmp_path / "t.db"),
+    win = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
                              AppState(tmp_path / "ui.json"), fun_time=session)
     qtbot.addWidget(win)
     fronted, went = [], []
@@ -1757,7 +1758,7 @@ def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
 def test_a_session_that_named_no_channel_still_opens_the_item(qtbot, tmp_path, monkeypatch):
     # An older session hands this app no way to ask the room for anything; the
     # item is still opened, so it is there when the user switches over.
-    win = OrigeneratorWindow(ComfyUIClient(), Database(tmp_path / "t.db"),
+    win = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
                              AppState(tmp_path / "ui.json"), fun_time=_fun_time_session())
     qtbot.addWidget(win)
     went = []

@@ -22,6 +22,7 @@ from origenerator.media import MediaType
 from origenerator.outside_videos import Made, OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, workflow_named
 from origenerator.workflows.outside import VideoKind, outside_workflow
+from tests.comfyui_folders import SUITE_FOLDERS
 
 _VIDEO = {"positive_prompt": "a slow walk on the shore", "seed": "11", "model": "Video Model",
           "style": "Video Style", "resolution": "720p", "aspect_ratio": "9:16",
@@ -48,7 +49,7 @@ def library(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     picture, video = _brought_in(db, tmp_path, "c1_topaz.mp4", Record(
         video=Made(_VIDEO), picture=Made(_PICTURE), act="Wave"))
-    panel =GenerateConfigPanel(ComfyUIClient(), db)
+    panel =GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel._preview.show_media = MagicMock()
     return panel, db, video, picture
@@ -77,7 +78,7 @@ def test_an_ai_video_from_a_site_of_both_kinds_shows_its_settings_under_its_site
     picture, video = _brought_in(db, tmp_path, "c1_topaz.mp4", Record(
         video=Made(_VIDEO), picture=Made(_PICTURE), act="Wave"),
         kind=VideoKind.IMAGE_TO_VIDEO)
-    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
     panel._preview.show_media = MagicMock()
 

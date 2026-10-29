@@ -156,6 +156,7 @@ from origenerator.voice.listener import CommandAndRequestListener
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts, offered_workflows
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import drops, gestures
+from tests.comfyui_folders import SUITE_FOLDERS
 from tests.conftest import FakeHearing
 from tests.drop_style_seen import worn
 from tests.lit_switches import lit_in
@@ -2391,7 +2392,7 @@ def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
     # The whole point of the switch's new meaning: turning it on mid-session
     # must not put anything on the GPU while the user is sitting right there.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db, client=ComfyUIClient())
+    view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2407,7 +2408,7 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
     # Generate waits on jobs "from another app" that were his own preview's.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db, client=ComfyUIClient())
+    view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -4233,7 +4234,7 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for panel in view._info_tabs.config_panels():
@@ -4255,7 +4256,7 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
 
 def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
     older, newer = _image("g1", "a cat", 50, 1), _image("g2", "a cat", 50, 2)
-    view = GalleryView(FakeDB([newer, older]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([newer, older]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for panel in view._info_tabs.config_panels():
@@ -4270,7 +4271,7 @@ def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
 
 def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then(qtbot):
     row = _image("g1", "a cat", 50, 1)
-    view = GalleryView(FakeDB([row]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([row]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     for panel in view._info_tabs.config_panels():
         panel._preview.show_media = MagicMock()
@@ -4290,7 +4291,7 @@ def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current
     trusting the signal, which is how a click came to fill the info pane while
     the middle pane under it stood still.
     """
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)                 # that folder's row is now the current one
@@ -4312,7 +4313,7 @@ def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
     done = _image("i1", "a cat", 50, 1)
     failed = dict(done, prompt_id="x1", status="error", output_files="[]",
                   thumbnail_path=None)
-    view = GalleryView(FakeDB([done, failed]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([done, failed]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     assert "x1" not in view._leaf_by_id       # no settings row of its own
@@ -4332,7 +4333,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for panel in view._info_tabs.config_panels():
@@ -5310,7 +5311,7 @@ def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_vid1.mp4")
-    view = GalleryView(FakeDB([image, video]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([image, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -5328,7 +5329,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
     lonely = _image("img2", "a dog", 50, 2)  # never animated
     video = _row("vid1", "wan22_i2v",
                  {"input_image": "sdxl_t2i_img1.png"}, "wan22_i2v_vid1.mp4")
-    view = GalleryView(FakeDB([image, lonely, video]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([image, lonely, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for panel in view._info_tabs.config_panels():
@@ -5432,7 +5433,7 @@ def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
 
 def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
     # Picking an item loads it into a config tab, brought to the front.
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -5448,7 +5449,7 @@ def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
     # user off a config tab they're editing, fork a new one, or paint the
     # selection into the tab in front — the selection is the gallery's, and a
     # tab shows only what it is for.
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])  # its folder on screen
@@ -5479,7 +5480,7 @@ def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
         positive_prompt="a wizard", seed=123,
         params_json=json.dumps(params), workflow_json="{}",
     )
-    view = GalleryView(db, client=ComfyUIClient())
+    view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -5499,7 +5500,7 @@ def test_a_rebuilds_reselection_does_not_reload_the_form(qtbot, tmp_path):
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a wizard", params_json=json.dumps(params), workflow_json="{}",
     )
-    view = GalleryView(db, client=ComfyUIClient())
+    view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["g1"])  # its folder on screen
@@ -5522,7 +5523,7 @@ def test_selecting_an_unregistered_thumbnail_leaves_no_settings_from_before(qtbo
         prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
         params_json=json.dumps({"steps": 20}), workflow_json="{}",
     )
-    view = GalleryView(db, client=ComfyUIClient())
+    view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("reg")
@@ -5823,7 +5824,7 @@ def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
         _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
         _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
     ]
-    view = GalleryView(FakeDB(rows), client=ComfyUIClient())
+    view = GalleryView(FakeDB(rows), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for panel in view._info_tabs.config_panels():
@@ -6571,7 +6572,7 @@ def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
 
 
 def _reroll_client():
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = MagicMock(return_value="comfy-X")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()
@@ -10893,7 +10894,7 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     # Real wiring, as the app builds it: a tab's Generate launches a re-roll, whose
     # in-flight card must stay on Recents across navigating to a folder and back, and
     # across poll ticks.
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = lambda payload, prompt_id: prompt_id
     client.fetch_history = lambda prompt_id: {}   # reconcile finds nothing done
     db = _finished_row_db(tmp_path)
@@ -10919,7 +10920,7 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
 
 
 def test_reroll_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_path):
-    client = ComfyUIClient()
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = lambda payload, prompt_id: prompt_id
     client.fetch_history = lambda prompt_id: {}   # reconcile finds nothing done
     db = _finished_row_db(tmp_path)
@@ -10981,7 +10982,7 @@ def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
                          workflow_version="v", positive_prompt="a wolf", seed=5,
                          params_json=json.dumps(p), workflow_json="{}")
     db.update_generation("rr_running", status="running")
-    gv = GalleryView(db, client=ComfyUIClient())
+    gv = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(gv)
     gv.refresh()
     gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
@@ -13556,7 +13557,7 @@ def _aim_slideshow(view, slideshow, target):
 def _osr2_view(qtbot):
     """A gallery with both drive sources stubbed: the funscript driver, and the
     motion the one switch falls back to when there is no script to follow."""
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(),
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS),
                        osr2_motion=_SignalMotion())
     qtbot.addWidget(view)
     driver = _FakeDriver()
@@ -14064,7 +14065,7 @@ class _SignalMotion(QObject):
 def _auto_generating_view(qtbot, monkeypatch, rows):
     """A gallery on a settings leaf whose Auto-Generate reports active, built on a stubbed
     motion so no device backend spins up."""
-    view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(),
+    view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(folders=SUITE_FOLDERS),
                        osr2_motion=_SignalMotion())
     qtbot.addWidget(view)
     view.refresh()
@@ -14114,7 +14115,7 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
 def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
-                       client=ComfyUIClient(), **gallery)
+                       client=ComfyUIClient(folders=SUITE_FOLDERS), **gallery)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -14163,7 +14164,7 @@ def test_a_standing_slideshows_volume_comes_back_after_a_restart(qtbot, monkeypa
     saved = first.remembered_slideshows()
 
     second = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
-                         client=ComfyUIClient(), radio=_FakeRadio())
+                         client=ComfyUIClient(folders=SUITE_FOLDERS), radio=_FakeRadio())
     qtbot.addWidget(second)
     second.remember_slideshows(saved)
     second.refresh()
@@ -15735,7 +15736,7 @@ class _QueueClient(ComfyUIClient):
     """A client whose ComfyUI queue holds ``foreign`` jobs of another app's."""
 
     def __init__(self, foreign=ForeignQueue(running=[], pending=[]), fail=None):
-        super().__init__()
+        super().__init__(folders=SUITE_FOLDERS)
         self._foreign = foreign
         self._fail = fail
         self.cleared = 0

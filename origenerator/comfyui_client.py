@@ -52,8 +52,7 @@ class ComfyUIClient(QThread):
     preview_image = pyqtSignal(str, bytes)  # executing prompt_id, image bytes
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
-                 client_id: str | None = None, parent=None, *,
-                 folders: ComfyFolders | None = None):
+                 client_id: str | None = None, parent=None, *, folders: ComfyFolders):
         super().__init__(parent)
         # A stable client id is what lets a relaunch reconnect to a job still
         # running in ComfyUI: ComfyUI routes that job's progress, preview and
@@ -61,7 +60,7 @@ class ComfyUIClient(QThread):
         # reusing the persisted id — rather than minting a fresh one each launch —
         # keeps those live updates flowing to the reconnected session. A fresh uuid
         # is minted when none is supplied (a read-only gallery, or a test).
-        self.api = ComfyUIApi(host, port, client_id, folders)
+        self.api = ComfyUIApi(host, port, client_id, folders=folders)
         self._running = False
         self._loop = None  # the thread's asyncio loop, for cross-thread wakeups
         self._task = None  # the running _ws_loop task, so stop() can cancel it

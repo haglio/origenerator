@@ -56,6 +56,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
 from origenerator.output_places import OutputPlaces
 from tests.children import run_python
+from tests.comfyui_folders import SUITE_FOLDERS
 from tests.hosted_launch import hosted_launch
 from tests.loading_screens import opened_here
 from tests.media_files import write_mp4_with_a_comment_tag
@@ -271,8 +272,8 @@ def test_client_id_is_stable_across_launches(tmp_path, qtbot):
     # give ComfyUIClients the same id, so ComfyUI keeps routing a running job's live
     # progress/preview/completion messages to the reconnecting session.
     path = tmp_path / "ui.json"
-    first = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)))
-    second = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)))
+    first = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)), folders=SUITE_FOLDERS)
+    second = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)), folders=SUITE_FOLDERS)
 
     assert first.client_id == second.client_id
 

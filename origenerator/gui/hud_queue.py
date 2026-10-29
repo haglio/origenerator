@@ -22,7 +22,9 @@ from funestra.hud_button import Button
 from funestra.hud_marks import shared_mark
 from funestra.hud_panel import (
     SYMBOL_FONT,
+    button_ground,
     draw_button,
+    draw_mark,
     load_font,
     text_width,
 )
@@ -31,20 +33,31 @@ from PIL import Image, ImageDraw
 from shared_ui.icons_pil import paste_glyph
 from shared_ui.lettering import fit_text
 from shared_ui.palette import (
+    BG_BUTTON,
     BLUE,
     BLUE_LIGHT,
     BORDER_SUBTLE,
     TEXT_MUTED,
     TEXT_PRIMARY,
 )
-from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_RADIUS_HUD, GAP_MEDIUM, HAIRLINE
+from shared_ui.spacing import (
+    BUTTON_MARK_INSET,
+    BUTTON_PAD_H_TIGHT,
+    BUTTON_RADIUS_HUD,
+    GAP_MEDIUM,
+    HAIRLINE,
+)
 from shared_ui.type_scale import SIZE_TINY
 
 from origenerator.gui.inflight import (
+    CANCEL_ALL_TEXT,
+    CANCEL_ALL_TIP,
     CANCEL_TEXT,
     CLEAR_TEXT,
     MOVE_DOWN_TIP,
     MOVE_UP_TIP,
+    SHIELD_ALL_TEXT,
+    SHIELD_ALL_TIP,
     SHIELD_TIP,
     START_NOW_TEXT,
     START_NOW_TOOLTIP,
@@ -52,22 +65,27 @@ from origenerator.gui.inflight import (
     clear_queue_tooltip,
     first_movable,
     foreign_queue_text,
+    jobs_to_cancel,
+    jobs_to_shield,
     movable,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
     seconds_until_start,
+    shield_every_job,
     starting_row_text,
 )
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-# What a press on this block posts: move, shield or cancel a job, go to its
-# folder, drop another app's work, start a video now.
+# What a press on this block posts: move, shield or cancel one job, or every job,
+# go to its folder, drop another app's work, start a video now.
 UP = "queue_up"
 DOWN = "queue_down"
 SHIELD = "queue_shield"
 CANCEL = "queue_cancel"
+SHIELD_ALL = "queue_shield_all"
+CANCEL_ALL = "queue_cancel_all"
 OPEN = "queue_open"
 CLEAR = "queue_clear"
 START_NOW = "queue_start_now"
@@ -103,6 +121,8 @@ _PAREN_W = 5            # the marks around a source video whose prompt was edite
 _MARK_H = 8             # the slot the "…" takes when the line runs on past the rows
 _MARK_SIDE = 12         # the frame the family's three dots are drawn in, as on the satellite's map
 _DROP_W = 2             # the mark showing where a dragged row would land
+_SHIELD_MARK = CTRL_BTN - 2 * BUTTON_MARK_INSET  # a row's shield's own size
+_MARK_TO_WORD = 3       # between Shield All's shield and its word
 # The widest the block asks the panel to be. Past this the texts elide instead:
 # the panel is anchored in a corner of the screen, and a line of queued work is
 # not worth half the width of a slideshow.
@@ -178,6 +198,8 @@ class QueueSection:
     lines: tuple[JobLine, ...] = ()
     leader: Leader | None = None
     foreign: int = 0
+    any_to_shield: bool = False
+    any_to_cancel: bool = False
     # Which row the drawn window opens on, and where a dragged row would land —
     # both the panel's own doing rather than the queue's, and both redrawn
     # through here because the block is painted, not laid out in widgets.
@@ -208,6 +230,7 @@ class QueueSection:
         width = max([head_width] + [self._row_width(line) for line in rows])
         height = head_height
         if rows:
+            width += _GAP + _for_all_width()
             height += BLOCK_GAP + len(rows) * _ROW_H
             if self.windowed:
                 height += 2 * _MARK_H
@@ -244,6 +267,9 @@ class QueueSection:
         draw = ImageDraw.Draw(image)
         targets: list[tuple[tuple, Button]] = []
         top = y
+        if self.drawn:
+            width = max(0, width - _GAP - _for_all_width())
+            self._paint_for_all(image, draw, x + width + _GAP, y, pointer, targets)
         head = self._head_size()[1]
         if head:
             self._paint_head(image, draw, x, top, width, pointer, targets)
@@ -259,6 +285,16 @@ class QueueSection:
         if self.pointer is not None:
             self.pointer.painted(targets, (x, y))
         return targets
+
+    def _paint_for_all(self, image, draw, x, y, pointer, targets) -> None:
+        column = _for_all_width()
+        top = y + (self.size()[1] - 2 * CTRL_BTN - BLOCK_GAP) // 2
+        _paint_shield_all(image, draw, (x, top, column, CTRL_BTN), pointer, targets,
+                          dim=not self.any_to_shield)
+        _paint_button(image, draw, (x, top + CTRL_BTN + BLOCK_GAP, column, CTRL_BTN),
+                      Button(CANCEL_ALL, CANCEL_ALL_TEXT, CANCEL_ALL_TIP, width=column,
+                             dim=not self.any_to_cancel),
+                      pointer, targets)
 
     def _paint_head(self, image, draw, x, y, width, pointer, targets) -> None:
         column, room = x, width
@@ -387,6 +423,26 @@ class QueueSection:
         middle_x, middle_y = x + width / 2, y + _MARK_H / 2
         paste_glyph(image, "more", (round(middle_x - _MARK_SIDE / 2), round(middle_y - _MARK_SIDE / 2),
                                     _MARK_SIDE, _MARK_SIDE), TEXT_PRIMARY)
+
+
+def _for_all_width() -> int:
+    return max(_shield_all_width(), _word_width(CANCEL_ALL_TEXT))
+
+
+def _shield_all_width() -> int:
+    return _SHIELD_MARK + _MARK_TO_WORD + _word_width(SHIELD_ALL_TEXT)
+
+
+def _paint_shield_all(image, draw, rect, pointer, targets, *, dim: bool) -> None:
+    """The shield followed by its word: no declared face draws both."""
+    x, y, width, height = rect
+    ink = button_ground(draw, rect, BG_BUTTON, hovered=_on(rect, pointer), dim=dim)
+    left = x + (width - _shield_all_width()) // 2 + _WORD_PAD
+    draw_mark(image, "shield", (left - BUTTON_MARK_INSET, y, height, height), ink)
+    draw.text((left + _SHIELD_MARK + _MARK_TO_WORD, y + height / 2), SHIELD_ALL_TEXT,
+              font=_tiny(), anchor="lm", fill=ink)
+    targets.append((rect, Button(SHIELD_ALL, SHIELD_ALL_TEXT, SHIELD_ALL_TIP, width=width,
+                                 dim=dim)))
 
 
 def _paint_button(image, draw, rect, button, pointer, targets) -> None:
@@ -554,6 +610,8 @@ def queue_section(items, foreign: int = 0, *, first: int = 0,
     return QueueSection(lines=lines,
                         leader=_leader(items[0]) if items else None,
                         foreign=foreign,
+                        any_to_shield=bool(jobs_to_shield(items)),
+                        any_to_cancel=bool(jobs_to_cancel(items)),
                         first=max(0, min(first, max(0, len(lines) - ROWS))),
                         drop_at=drop_at, pointer=pointer)
 
@@ -609,6 +667,10 @@ class QueuePointer:
             item = self._item(key)
             if item is not None and item.cancel is not None:
                 item.cancel()
+        elif verb == SHIELD_ALL:
+            shield_every_job(self._host.hud_queue[0])
+        elif verb == CANCEL_ALL:
+            self._host.cancel_all()
         elif verb == CLEAR:
             self._host.clear_foreign_queue()
         elif verb == START_NOW:

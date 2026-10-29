@@ -312,6 +312,10 @@ class SlideshowView(QWidget):
         if self._actions.start_now is not None:
             self._actions.start_now()
 
+    def cancel_all(self) -> None:
+        if self._actions.cancel_all is not None:
+            self._actions.cancel_all()
+
     # --- the OSR2, which this app drives standalone --------------------------
 
     @property

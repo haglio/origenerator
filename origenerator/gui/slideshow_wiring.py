@@ -73,13 +73,13 @@ class SlideshowActions:
     reset: Callable[[object], None] | None = None
     reorder: Callable[[object, bool], bool] | None = None
     browse_all: Callable[[object], bool] | None = None
-    # The generation queue's own three, for the block the panel hangs at its foot:
-    # ``move`` lets a row go just ahead of another (past the last for None),
-    # ``clear_queue`` drops another app's work off ComfyUI, ``start_now`` ends a
-    # video's wait.
+    # The block at the panel's foot: ``move`` lets a row go just ahead of another
+    # (past the last for None), ``clear_queue`` drops another app's work off
+    # ComfyUI, ``start_now`` ends a video's wait, ``cancel_all`` asks, then cancels.
     move: Callable[[str, str | None], None] | None = None
     clear_queue: Callable[[], None] | None = None
     start_now: Callable[[], None] | None = None
+    cancel_all: Callable[[], None] | None = None
     drive_toggle: Callable[[], None] | None = None
     osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None

@@ -138,6 +138,8 @@ class SlideshowHost(Protocol):
 
     def start_now(self) -> None: ...
 
+    def cancel_all(self) -> None: ...
+
     def follow_link(self, prompt_id: str) -> None:
         """Land on this generation: its folder, its tile, its config tab."""
 
@@ -571,12 +573,13 @@ class SlideshowDirector:
             reset=(self.reset_region if self._fun_time is not None else None),
             reorder=self.reorder_slideshow,
             browse_all=self.browse_it_all,
-            # The queue's own three: a row dragged down the block the panel
-            # hangs at its foot re-lines the line, its Clear drops another app's
-            # work off ComfyUI, and its Start now ends a video's minute's wait.
+            # The queue's own four: the block at the panel's foot re-lines the
+            # line, its Clear drops another app's work, its Start now ends a
+            # video's wait and its Cancel All asks before it cancels every job.
             move=self._jobs.move,
             clear_queue=self._host.clear_foreign_queue,
             start_now=self._host.start_now,
+            cancel_all=self._host.cancel_all,
             # Space reaches the one OSR2 switch, like every other surface's,
             # and the console's control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,

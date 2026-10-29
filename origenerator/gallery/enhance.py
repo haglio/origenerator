@@ -402,14 +402,13 @@ def most_used_enhancements(rows, count: int) -> list[dict]:
 
 def _settings_as_offered(row: dict, params: dict) -> dict:
     held_on_the_panel = full_settings(params)
-    if held_on_the_panel["checkpoint"] == _model_matching_the_source(
-            parse_params(row.get("params_json"))):
+    if held_on_the_panel["checkpoint"] == model_matching_the_source(row):
         held_on_the_panel["checkpoint"] = MATCH_SOURCE_MODEL
     return full_settings(held_on_the_panel)
 
 
-def _model_matching_the_source(source_params: dict) -> str:
-    checkpoint = source_params.get("checkpoint")
+def model_matching_the_source(row: dict) -> str:
+    checkpoint = parse_params(row.get("params_json")).get("checkpoint")
     if isinstance(checkpoint, str) and checkpoint:
         return checkpoint
     return WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()["checkpoint"]
@@ -534,7 +533,7 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     params["input_image"] = input_ref
     params["positive_prompt"] = src.get("positive_prompt") or row.get("positive_prompt") or ""
     params["negative_prompt"] = src.get("negative_prompt") or row.get("negative_prompt") or ""
-    params["checkpoint"] = _model_matching_the_source(src)
+    params["checkpoint"] = model_matching_the_source(row)
     for key, value in (settings.params if settings else {}).items():
         if key not in ENHANCE_SETTING_KEYS:
             continue

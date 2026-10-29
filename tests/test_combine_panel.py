@@ -270,8 +270,8 @@ def test_generate_comes_back_once_that_one_is_made(qtbot):
 def test_generate_is_blue_while_it_can_run_and_gray_while_it_cannot(qtbot):
     panel = _panel(qtbot)
     panel.setStyleSheet(build_stylesheet())
-    panel.show()
-    qtbot.waitExposed(panel)
+    with qtbot.waitExposed(panel):
+        panel.show()
     cannot_run = ground(panel._generate_btn)
 
     panel.image_slot.set_item("img1")
@@ -287,8 +287,8 @@ def test_a_ready_button_sits_one_step_lighter_under_the_pointer(qtbot, pointer, 
     panel.image_slot.set_item("img1")
     panel.video_slot.set_item("vid1")
     panel.setStyleSheet(build_stylesheet())
-    panel.show()
-    qtbot.waitExposed(panel)
+    with qtbot.waitExposed(panel):
+        panel.show()
     button = getattr(panel, name)
     pointer.off(button)
     at_rest = ground(button)
@@ -425,8 +425,8 @@ def test_with_an_act_picked_the_room_between_reaches_only_the_image_slot(qtbot):
 def test_the_room_between_the_slots_is_the_whole_gap_that_parts_them(qtbot):
     panel = _panel(qtbot)
     panel.setStyleSheet(build_stylesheet())
-    panel.show()
-    qtbot.waitExposed(panel)
+    with qtbot.waitExposed(panel):
+        panel.show()
 
     between = panel._between.geometry()
     assert between.top() == panel.image_slot.geometry().bottom() + 1

@@ -1310,8 +1310,8 @@ def test_stepping_off_a_locked_slide_releases_it(qtbot):
 
 def _on_screen_wearing_its_panel(qtbot, view):
     view.resize(900, 700)
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     view.wear_the_hud("portrait")
     view._pane.tick()
     _settle(view)

@@ -127,8 +127,8 @@ def _picked_tile_drawn(qtbot):
         tile = GeneratingTile(FakeJob(state="running"), holder)
         tile.set_selected(True)
         holder.resize(tile.size())
-        holder.show()
-        qtbot.waitExposed(holder)
+        with qtbot.waitExposed(holder):
+            holder.show()
         return tile, holder.grab().toImage()
     finally:
         app.setStyleSheet(prior)

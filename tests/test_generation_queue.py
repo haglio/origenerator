@@ -39,8 +39,8 @@ def dressed(qtbot):
     q.setStyleSheet(build_stylesheet())
     qtbot.addWidget(q)
     q.resize(800, 60)
-    q.show()
-    qtbot.waitExposed(q)
+    with qtbot.waitExposed(q):
+        q.show()
     return q
 
 

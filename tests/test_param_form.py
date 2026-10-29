@@ -62,8 +62,8 @@ def test_field_labels_fit_the_heading_font(qtbot):
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
     form._sections["Models & LoRAs"].set_collapsed(False)  # its section starts folded
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
 
     label = next(w for w in form.findChildren(QLabel) if w.text() == label_text)
     assert label.width() >= label.fontMetrics().horizontalAdvance(label_text)
@@ -81,8 +81,8 @@ def test_browse_button_fits_its_caption(qtbot):
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
     form.resize(800, 200)  # a roomy panel, as the form has in the real window
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
 
     # The width "Browse..." needs at this font + stylesheet. The sheet lives on
     # an ancestor (as it does on the real window), which Qt's sizing accounts
@@ -92,8 +92,8 @@ def test_browse_button_fits_its_caption(qtbot):
     gauge.setFont(make_font(FONT_UI, SIZE_HEADING))
     reference = QPushButton("Browse...", gauge)
     qtbot.addWidget(gauge)
-    gauge.show()
-    qtbot.waitExposed(gauge)
+    with qtbot.waitExposed(gauge):
+        gauge.show()
 
     btn = form._browse_buttons["voice_sample"]
     assert btn.width() >= reference.sizeHint().width()
@@ -797,8 +797,8 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     qtbot.addWidget(form)
     form._sections["Size"].set_collapsed(False)  # unfold so its rows lay out
     form.resize(400, 320)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
 
     btn = form._swap_dimensions_btn.geometry()
     width = form._widgets["width"].geometry()
@@ -898,8 +898,8 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     form._sections["Size"].set_collapsed(False)
     form.resize(420, 380)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
 
     btn = form._unlock_btn.geometry()
     top = form._dim_stacks["width"].geometry()
@@ -1338,8 +1338,8 @@ def test_fields_are_grouped_into_collapsible_sections(qtbot):
 def test_empty_sections_are_hidden(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
     assert form._sections["Seed"].isHidden() is False       # has the one field
     assert form._sections["Prompts"].isHidden() is True     # no prompt → no header
     assert form._sections["Video"].isHidden() is True
@@ -1460,8 +1460,8 @@ def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
 def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["wan22_t2i"].param_definitions())
     qtbot.addWidget(form)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
 
     form.set_values({"unet_high": "example_high.safetensors",
                      "unet_low": "example_low.safetensors"})
@@ -1497,8 +1497,8 @@ def test_a_numeric_param_with_presets_is_an_editable_dropdown_that_emits_the_num
 def test_a_typed_number_past_the_range_is_clamped_and_shown_clamped_once_the_edit_ends(qtbot):
     form = ParamForm([_rate_def()])
     qtbot.addWidget(form)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
     combo = form._widgets["frame_rate"]
     combo.lineEdit().setFocus()
     combo.setCurrentText("500")
@@ -1589,8 +1589,8 @@ def test_a_loaded_frame_count_is_shown_as_the_seconds_it_really_runs(qtbot):
 def test_a_duration_the_model_cannot_render_settles_to_what_it_can_once_the_edit_ends(qtbot):
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
     duration = form._widgets["frame_count"]
 
     duration.lineEdit().setFocus()
@@ -1606,8 +1606,8 @@ def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbo
     # landing on the rate the clip will really be written at.
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
     rate = form._widgets["frame_rate"]
 
     rate.lineEdit().setFocus()
@@ -2163,8 +2163,8 @@ def _laid_out(qtbot, form):
     for section in form._sections.values():
         section.set_collapsed(False)
     form.resize(640, 2400)
-    form.show()
-    qtbot.waitExposed(form)
+    with qtbot.waitExposed(form):
+        form.show()
     return form
 
 

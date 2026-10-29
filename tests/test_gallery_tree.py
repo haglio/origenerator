@@ -79,8 +79,8 @@ def _table_of_contents(qtbot, rows, folders_of_your_own=(), folder_meta=None):
     """The Landscape half, built from ``rows`` and opened all the way down."""
     pane, _tree = _gallery_tree(qtbot, rows, folders_of_your_own, folder_meta)
     pane.resize(500, 1600)
-    pane.show()
-    qtbot.waitExposed(pane)
+    with qtbot.waitExposed(pane):
+        pane.show()
     half = pane._trees[LANDSCAPE]
     half.expandAll()
     return half

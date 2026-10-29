@@ -31,8 +31,8 @@ def test_letters_cannot_be_typed_and_an_empty_field_has_no_value(qtbot):
 def test_edited_fires_when_typing_ends_and_when_a_preset_is_picked(qtbot):
     combo = PresetComboBox([16, 24], unit="fps")
     qtbot.addWidget(combo)
-    combo.show()
-    qtbot.waitExposed(combo)
+    with qtbot.waitExposed(combo):
+        combo.show()
     edits = []
     combo.edited.connect(lambda: edits.append(combo.value()))
 
@@ -69,8 +69,8 @@ def test_the_longest_preset_fits_the_field_it_is_shown_in(qtbot):
     QHBoxLayout(host).addWidget(combo)
     qtbot.addWidget(host)
     host.resize(host.sizeHint())
-    host.show()
-    qtbot.waitExposed(host)
+    with qtbot.waitExposed(host):
+        host.show()
 
     combo.set_value(10)
     field = combo.lineEdit()

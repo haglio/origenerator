@@ -120,8 +120,8 @@ def _shown_section(qtbot, title: str, width: int) -> CollapsibleSection:
     section.setStyleSheet(build_stylesheet())
     qtbot.addWidget(section)
     section.resize(width, section.sizeHint().height())
-    section.show()
-    qtbot.waitExposed(section)
+    with qtbot.waitExposed(section):
+        section.show()
     return section
 
 

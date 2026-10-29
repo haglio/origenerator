@@ -330,8 +330,8 @@ def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot
     rows = [_row(f"g{n}", n) for n in range(300)]
     pane, scroll = _pane(qtbot, rows)
     scroll.resize(1900, 2400)
-    scroll.show()
-    qtbot.waitExposed(scroll)
+    with qtbot.waitExposed(scroll):
+        scroll.show()
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -345,8 +345,8 @@ def test_scrolling_to_the_foot_of_a_pane_draws_on_by_a_page_not_to_the_end(qtbot
     pane, scroll = _pane(qtbot, rows)
     scroll.setWidgetResizable(True)
     scroll.resize(1900, 1000)
-    scroll.show()
-    qtbot.waitExposed(scroll)
+    with qtbot.waitExposed(scroll):
+        scroll.show()
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
     opened_on = len(_drawn(scroll))
     qtbot.wait(1)
@@ -366,8 +366,8 @@ def test_only_the_videos_in_sight_play_their_looping_clips(qtbot, tmp_path):
     pane, scroll = _pane(qtbot, rows, animated_preview=lambda row: clip)
     scroll.setWidgetResizable(True)
     scroll.resize(800, 600)
-    scroll.show()
-    qtbot.waitExposed(scroll)
+    with qtbot.waitExposed(scroll):
+        scroll.show()
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
     qtbot.wait(1)
     bar = scroll.verticalScrollBar()

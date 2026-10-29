@@ -3669,8 +3669,8 @@ def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
 
 def _on_screen(qtbot, panel):
     panel.resize(700, 1400)
-    panel.show()
-    qtbot.waitExposed(panel)
+    with qtbot.waitExposed(panel):
+        panel.show()
     return panel
 
 

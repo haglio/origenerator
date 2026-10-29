@@ -286,8 +286,8 @@ def test_clearing_takes_the_source_section_down(make_related):
 def test_the_source_video_sits_beside_the_source_image(make_related, qtbot):
     related = make_related(_video_row("vid0"))
     related.show_row(_combined_row(), [_image_row()])
-    related.show()
-    qtbot.waitExposed(related)
+    with qtbot.waitExposed(related):
+        related.show()
 
     image, video = related._source_tile.geometry(), related._source_video_tile.geometry()
     assert video.top() == image.top()

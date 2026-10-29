@@ -620,8 +620,8 @@ class TestASlideshowOverASessionsRegion:
     def _slideshow_over_a_region(qtbot, tmp_path, items, **kw):
         window = _window(qtbot, items, **kw)
         window.resize(900, 700)
-        window.show()
-        qtbot.waitExposed(window)
+        with qtbot.waitExposed(window):
+            window.show()
         window.wear_the_hud("portrait", dashboard_cmd_file=tmp_path / "dashboard_cmd.txt")
         window._pane.tick()
         return window

@@ -35,8 +35,8 @@ def test_revealing_a_prompt_scrolls_the_form_to_its_field(qtbot):
     scroll.setWidget(host)
     scroll.resize(300, 200)
     qtbot.addWidget(scroll)
-    scroll.show()
-    qtbot.waitExposed(scroll)
+    with qtbot.waitExposed(scroll):
+        scroll.show()
 
     reveal_prompt(target)
 

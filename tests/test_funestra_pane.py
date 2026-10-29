@@ -238,8 +238,8 @@ def test_the_wheel_is_counted_in_notches(qtbot, tmp_path, monkeypatch):
 def test_a_double_click_is_two_presses_and_the_second_says_it_came_again(qtbot, tmp_path):
     pane, _engine, running = _pane(qtbot)
     pane.resize(600, 400)
-    pane.show()
-    qtbot.waitExposed(pane)
+    with qtbot.waitExposed(pane):
+        pane.show()
     _hand_over(pane, _items(tmp_path, "one"))
     pane.tick()
     again = []

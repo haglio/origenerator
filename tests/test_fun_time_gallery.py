@@ -154,8 +154,8 @@ def test_fun_time_gallery_gives_the_lower_corner_to_the_queue(qtbot):
     height, so the corner under it is the queue — where standalone has it."""
     view = _fun_time_view(qtbot)
     view.resize(600, 900)
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
     toc = view._arrangement.panes.widget(0)
     corner = view._queue.mapTo(view, view._queue.rect().bottomLeft())
     tree_foot = toc.mapTo(view, toc.rect().bottomLeft())
@@ -177,8 +177,8 @@ def test_fun_time_gallery_has_no_collapse_toggle_on_its_left_pane(qtbot):
 
 def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_list(qtbot):
     view = _fun_time_view(qtbot)
-    view.show()
-    qtbot.waitExposed(view)
+    with qtbot.waitExposed(view):
+        view.show()
 
     assert not view._tree.separate_button.isVisible()
     assert not view._tree.together_button.isVisible()

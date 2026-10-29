@@ -25,8 +25,8 @@ def _checkerboard_window(qtbot):
     window.setCentralWidget(_Checkerboard())
     window.setGeometry(100, 120, 320, 200)
     qtbot.addWidget(window)
-    window.show()
-    qtbot.waitExposed(window)
+    with qtbot.waitExposed(window):
+        window.show()
     return window
 
 

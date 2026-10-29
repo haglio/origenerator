@@ -587,8 +587,8 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
     panel, _ = _panel(qtbot)
     panel.show_settings(EnhanceSettings(auto=True, params={}))
     panel.resize(360, 150)
-    panel.show()
-    qtbot.waitExposed(panel)
+    with qtbot.waitExposed(panel):
+        panel.show()
     live = _mean_ink(panel)
 
     panel.set_applicable(False, "no video enhancer")
@@ -1008,8 +1008,8 @@ def test_a_picked_level_is_filled_with_the_familys_blue(qtbot):
         versions = EnhanceVersions()
         qtbot.addWidget(versions)
         versions.show_levels(_items(_levels(1)))
-        versions.show()
-        qtbot.waitExposed(versions)
+        with qtbot.waitExposed(versions):
+            versions.show()
         row = _rows(versions)[0]
         _click(qtbot, row)
 
@@ -1245,8 +1245,8 @@ def test_pressing_a_versions_trash_can_deletes_that_version(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)))
-    versions.show()
-    qtbot.waitExposed(versions)
+    with qtbot.waitExposed(versions):
+        versions.show()
     asked = []
     versions.delete_requested.connect(asked.append)
 
@@ -1274,8 +1274,8 @@ def test_a_versions_trash_can_sits_beside_its_copy_button(qtbot):
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)))
     versions.resize(600, 400)
-    versions.show()
-    qtbot.waitExposed(versions)
+    with qtbot.waitExposed(versions):
+        versions.show()
     row = _rows(versions)[0]
     copy, reveal = (row.findChild(QPushButton, name).geometry()
                     for name in ("copyButton", "revealButton"))
@@ -1304,8 +1304,8 @@ def test_a_version_without_a_trash_can_keeps_the_gap_after_its_copy_button(qtbot
         qtbot.addWidget(versions)
         versions.show_levels(_items(levels))
         versions.resize(600, 400)
-        versions.show()
-        qtbot.waitExposed(versions)
+        with qtbot.waitExposed(versions):
+            versions.show()
         row = _rows(versions)[0]
         copy = row.findChild(QPushButton, "copyButton").geometry()
         following = _trash(row) or row.findChild(QPushButton, "revealButton")
@@ -1676,8 +1676,8 @@ def _in_the_app(qtbot, panel):
     host.setStyleSheet(build_stylesheet())
     qtbot.addWidget(host)
     host.resize(420, 700)
-    host.show()
-    qtbot.waitExposed(host)
+    with qtbot.waitExposed(host):
+        host.show()
     return panel
 
 

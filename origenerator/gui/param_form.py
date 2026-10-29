@@ -50,7 +50,7 @@ from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.lora_training import TrainingOffer
 from origenerator.seed_history import SeedHistory
-from origenerator.setting_advice import Advice
+from origenerator.setting_advice import Advice, MissingTriggerWord
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
@@ -202,7 +202,7 @@ class ParamForm(QWidget):
         # into this editable form.
         self._copy_buttons: dict[str, CopyButton] = {}
         self._warning_marks: dict[str, WarningMark] = {}
-        self._advice: dict[str, Advice] = {}
+        self._advice: dict[str, Advice | MissingTriggerWord] = {}
         self._labels: dict[str, ElidingLabel] = {}
         self._recommendations: dict[str, str] = {}
         # A single swap-width-and-height button, built only when the workflow has
@@ -487,15 +487,18 @@ class ParamForm(QWidget):
         self._warning_marks[key] = mark
         return LabelCell(mark, label, column)
 
-    def _resolve_warnings(self, keys: list[str]) -> None:
-        for key in keys:
-            found = self._advice.get(key)
-            if found is None:
-                continue
-            if key == self._scenes_row:
-                self._scenes.set_total_frames(found.fix)
-            else:
-                self._write_field(self._defs[key], found.fix)
+    def _resolve_warnings(self, rows: list[str]) -> None:
+        for row in rows:
+            for key, found in self._advised_at([row]):
+                self._take_advice(key, found)
+
+    def _take_advice(self, key: str, found: Advice | MissingTriggerWord) -> None:
+        written = found.writes or key
+        fixed = found.fixed(self._read_field(self._defs[written]))
+        if written == "frame_count" and self._scenes is not None:
+            self._scenes.set_total_frames(fixed)
+        else:
+            self._write_field(self._defs[written], fixed)
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
         for key, good in choices.items():
@@ -511,15 +514,24 @@ class ParamForm(QWidget):
                                          if recommended else help_text or None,
                                          Qt.ItemDataRole.ToolTipRole)
 
-    def set_warnings(self, advice: dict[str, Advice]) -> None:
-        self._advice = {self._row_of(key): found for key, found in advice.items()}
-        for key, mark in self._warning_marks.items():
-            mark.warn(self._warning(key))
+    def set_warnings(self, advice: dict[str, Advice | MissingTriggerWord]) -> None:
+        self._advice = {key: found for key, found in advice.items()
+                        if self._row_of(key) in self._labels}
+        for row, mark in self._warning_marks.items():
+            mark.warn(self._warning(row))
         for title, section in self._sections.items():
             section.warning.warn(self._warnings_about(self._present_keys[title]))
 
     def _row_of(self, key: str) -> str:
         return self._scenes_row if self._scenes is not None and key in _SCENE_KEYS else key
+
+    def _advised_at(self, rows) -> list[tuple[str, Advice | MissingTriggerWord]]:
+        advised = {key: found for row in rows for key, found in self._advice.items()
+                   if row in self._rows_warning(key, found)}
+        return list(advised.items())
+
+    def _rows_warning(self, key: str, found: Advice | MissingTriggerWord) -> set[str]:
+        return {self._row_of(shown) for shown in (key, found.writes) if shown}
 
     def every_warning(self) -> str:
         return self._warnings_about(self._keys_in_order())
@@ -530,14 +542,12 @@ class ParamForm(QWidget):
     def _keys_in_order(self) -> list[str]:
         return [key for keys in self._present_keys.values() for key in keys]
 
-    def _warning(self, key: str) -> str:
-        found = self._advice.get(key)
-        return f"{found.text} Click to use {found.fix_shown}." if found else ""
+    def _warning(self, row: str) -> str:
+        return "\n".join(found.said for _key, found in self._advised_at([row]))
 
-    def _warnings_about(self, keys: list[str]) -> str:
-        return "\n".join(f"{self._labels[key].text()}: {self._advice[key].value_shown}. "
-                         f"{self._warning(key)}"
-                         for key in keys if key in self._advice)
+    def _warnings_about(self, rows: list[str]) -> str:
+        return "\n".join(f"{self._labels[self._row_of(key)].text()}: {found.value_shown}. "
+                         f"{found.said}" for key, found in self._advised_at(rows))
 
     def track_prompt_rewrites(self, made_with: dict | None = None) -> None:
         """Mark every prompt on the form as a rewrite of ``made_with``'s text for

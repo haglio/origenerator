@@ -64,6 +64,7 @@ from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
+from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -4045,6 +4046,52 @@ def test_a_story_too_long_for_its_good_range_is_among_the_workflows_warnings(qtb
     qtbot.mouseClick(blank_panel._workflow_warning, Qt.MouseButton.LeftButton)
 
     assert form.get_values()["frame_count"] == 161
+
+
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+               "Click to add it.")
+
+
+@pytest.fixture
+def worded_style(installed_models, worded_loras, titled_models):
+    installed_models.add("loras", "example_style.safetensors", arch=KREA2, lora=True)
+    worded_loras({"example_style": ["exmplstyle"]})
+    titled_models({"example_style": "Example Style 1.0"})
+
+
+def test_picking_a_lora_whose_trigger_word_the_prompt_lacks_warns_and_a_click_adds_it(
+        qtbot, worded_style, blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form._widgets["positive_prompt"].setPlainText("a portrait")
+    lora = form._widgets["lora"]
+
+    lora.setCurrentIndex(lora.findData("example_style.safetensors"))
+
+    assert form._warning_marks["lora"].toolTip() == _STYLE_SAID
+    assert f"LoRA 1: Example Style 1.0. {_STYLE_SAID}" in (
+        blank_panel._workflow_warning.toolTip().split("\n"))
+    qtbot.mouseClick(form._warning_marks["positive_prompt"], Qt.MouseButton.LeftButton)
+    assert form.get_values()["positive_prompt"] == "exmplstyle, a portrait"
+    assert form._warning_marks["lora"].isHidden()
+
+
+def test_a_shown_image_whose_prompt_left_off_its_loras_trigger_word_wears_the_warning(
+        worded_style, saved_panel):
+    panel, db = saved_panel
+    params = dict(WORKFLOW_REGISTRY["krea2_t2i"].default_params(), positive_prompt="a cat",
+                  lora="example_style.safetensors", seed=1)
+    db.insert_generation(prompt_id="img1", workflow_name="krea2_t2i", workflow_version="v001",
+                         positive_prompt="a cat", seed=1, params_json=json.dumps(params),
+                         workflow_json="{}")
+    db.update_generation("img1", status="completed",
+                         output_files=json.dumps([{"filename": "krea_img1.png",
+                                                   "subfolder": "image"}]))
+    image = db.get_generation("img1")
+
+    panel.show_saved_generation(image, [image])
+
+    assert panel._param_form._warning_marks["positive_prompt"].toolTip() == _STYLE_SAID
 
 
 def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtbot, blank_panel):

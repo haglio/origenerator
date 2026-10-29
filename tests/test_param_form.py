@@ -48,7 +48,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.lora_training import TrainingOffer
 from origenerator.seed_history import SeedHistory, SeedUse
-from origenerator.setting_advice import Advice, setting_advice
+from origenerator.setting_advice import Advice, MissingTriggerWord, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
@@ -2314,6 +2314,87 @@ def test_resolving_a_warning_leaves_the_rest_of_the_form_as_it_was(qtbot):
     values = form.get_values()
     assert (values["steps"], values.get("example_extra"), values.get("width"),
             values.get("height")) == (40, "kept", 640, 960)
+
+
+_TRIGGER_WORD = {"lora": MissingTriggerWord("example_style.safetensors", "exmplstyle")}
+_TRIGGER_WORD_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive "
+                      "Prompt. Click to add it.")
+
+
+def _krea_form(qtbot):
+    return _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["krea2_t2i"].param_definitions()))
+
+
+def test_a_missing_trigger_word_warns_beside_the_prompt_and_beside_its_lora(qtbot, titled_models):
+    titled_models({"example_style": "Example Style 1.0"})
+    form = _krea_form(qtbot)
+
+    form.set_warnings(_TRIGGER_WORD)
+
+    marks = [form._warning_marks[key] for key in ("positive_prompt", "lora")]
+    assert [(mark.isHidden(), mark.toolTip()) for mark in marks] == [
+        (False, _TRIGGER_WORD_SAID)] * 2
+
+
+@pytest.mark.parametrize("beside", ["positive_prompt", "lora"])
+def test_clicking_a_trigger_words_warning_puts_the_word_at_the_start_of_the_prompt(qtbot, beside):
+    form = _krea_form(qtbot)
+    form.set_values({"positive_prompt": "a portrait, soft light"})
+    form.set_warnings(_TRIGGER_WORD)
+
+    qtbot.mouseClick(form._warning_marks[beside], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == "exmplstyle, a portrait, soft light"
+
+
+def test_a_trigger_word_warning_beside_two_fields_is_one_line_of_each_warning_it_is_among(
+        qtbot, titled_models):
+    titled_models({"example_style": "Example Style 1.0"})
+    form = _krea_form(qtbot)
+
+    form.set_warnings(_TRIGGER_WORD)
+
+    line = f"LoRA 1: Example Style 1.0. {_TRIGGER_WORD_SAID}"
+    assert form.every_warning() == line
+    assert [form._sections[title].warning.toolTip()
+            for title in ("Prompts", "Models & LoRAs")] == [line, line]
+
+
+def test_one_click_adds_once_a_word_two_loras_both_lack(qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "a portrait"})
+    form.set_warnings({
+        "lora_high": MissingTriggerWord("example_style_high.safetensors", "exmplstyle"),
+        "lora_low": MissingTriggerWord("example_style_low.safetensors", "exmplstyle")})
+
+    form.resolve_every_warning()
+
+    assert form.get_values()["positive_prompt"] == "exmplstyle, a portrait"
+
+
+def test_a_story_wears_its_trigger_word_warning_beside_its_scenes_and_each_scene_gets_the_word(
+        qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "scene one\n---\nexmplstyle, scene two",
+                     "scene_frames": [81, 81]})
+    form.set_warnings({"lora_high": _TRIGGER_WORD["lora"]})
+
+    qtbot.mouseClick(form._warning_marks["scene_frames"], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == (
+        "exmplstyle, scene one\n---\nexmplstyle, scene two")
+
+
+def test_the_scenes_warn_about_their_length_and_a_missing_trigger_word_on_two_lines(
+        qtbot, titled_models):
+    titled_models({"example_style": "Example Style 1.0"})
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "a\n---\nb", "scene_frames": [81, 161]})
+
+    form.set_warnings({**_duration_advice(form), "lora_high": _TRIGGER_WORD["lora"]})
+
+    assert form._warning_marks["scene_frames"].toolTip() == (
+        f"Good range: 5–10 s. Click to use 10 s.\n{_TRIGGER_WORD_SAID}")
 
 
 def test_a_warning_mark_sits_left_of_its_label(qtbot):

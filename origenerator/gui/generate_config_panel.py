@@ -100,6 +100,7 @@ from origenerator.setting_advice import (
     recommended_choices,
     setting_advice,
     spoken_list,
+    trigger_word_advice,
 )
 from origenerator.timing import estimate_label
 from origenerator.voice.dictation import words_of
@@ -782,10 +783,12 @@ class GenerateConfigPanel(DropZone):
         if form is not None:
             values = form.get_values()
             definitions = form.definitions()
+            workflow = workflow_named(self._form_workflow_key)
             missing = self._models_not_installed()
-            defaults = (workflow_named(self._form_workflow_key).default_params()
-                        if missing else {})
-            form.set_warnings({**setting_advice(values, definitions),
+            defaults = workflow.default_params() if missing else {}
+            lora_keys = workflow.lora_keys if workflow is not None else ()
+            form.set_warnings({**trigger_word_advice(values, lora_keys),
+                               **setting_advice(values, definitions),
                                **not_installed_advice(missing, definitions, defaults)})
             form.mark_recommended(recommended_choices(values))
             form.explain(recommendations(values))

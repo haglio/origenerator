@@ -128,7 +128,7 @@ def test_every_control_in_the_window_comes_back_after_a_restart_or_is_no_setting
 def test_every_control_on_the_console_comes_back_after_a_restart_or_is_no_setting(
         qtbot, tmp_path):
     console = _window(qtbot, tmp_path)._gallery_view._motion_panel
-    console.picture()
+    console.drawing()
     offered = ({button.command for _rect, button in console._painter.buttons}
                | {track.axis for track in console._painter.tracks})
 

@@ -216,7 +216,7 @@ def test_a_radio_a_slideshow_holds_is_heard_while_its_image_is_up_at_its_level(t
     radio.start()
     held = radio.held_by_a_slideshow()
 
-    held.tick(picture=True, level=40, paused=False)
+    held.tick(image=True, level=40, paused=False)
 
     assert [station.heard_at for station in stations] == [40, 40, 40]
 
@@ -225,7 +225,7 @@ def test_a_radio_a_slideshow_lets_go_is_heard_at_full_level_again(tmp_path):
     radio, stations = _radio(tmp_path)
     radio.start()
     held = radio.held_by_a_slideshow()
-    held.tick(picture=False, level=40, paused=False)
+    held.tick(image=False, level=40, paused=False)
 
     held.close()
 
@@ -238,7 +238,7 @@ def test_a_radio_a_slideshow_holds_still_holds_still_with_the_room(tmp_path):
     held = radio.held_by_a_slideshow()
 
     radio.set_frozen(True)
-    held.tick(picture=True, level=40, paused=False)
+    held.tick(image=True, level=40, paused=False)
 
     assert [station.paused for station in stations] == [True, True, True]
 

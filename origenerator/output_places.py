@@ -30,7 +30,7 @@ class OutputPlaces:
     def from_settings(cls, settings: dict, *, comfyui_dir: Path,
                       trash: Path | None = None) -> OutputPlaces:
         comfyui = Path(settings.get("comfyui_output_dir") or Path(comfyui_dir) / "output")
-        images, videos = (settings.get("origenerator_pictures_dir"),
+        images, videos = (settings.get("origenerator_images_dir"),
                             settings.get("origenerator_videos_dir"))
         if not (images and videos):
             return cls.in_one_folder(comfyui, trash=trash)

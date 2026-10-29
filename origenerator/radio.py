@@ -115,10 +115,10 @@ class OrigeneratorRadio:
         self._held_by = _HeldByASlideshow(self)
         return self._held_by
 
-    def _heard_through(self, holder: _HeldByASlideshow, *, picture: bool | None,
+    def _heard_through(self, holder: _HeldByASlideshow, *, image: bool | None,
                        level: int | None, paused: bool) -> None:
         if holder is self._held_by:
-            self._stations.tick(picture=picture, level=level, paused=paused or self._frozen)
+            self._stations.tick(image=image, level=level, paused=paused or self._frozen)
 
     def _let_go_by(self, holder: _HeldByASlideshow) -> None:
         if holder is self._held_by:
@@ -127,15 +127,15 @@ class OrigeneratorRadio:
 
     def _tune(self) -> None:
         if self._held_by is None:
-            self._stations.tick(picture=True, level=FULL_LEVEL, paused=self._frozen)
+            self._stations.tick(image=True, level=FULL_LEVEL, paused=self._frozen)
 
 
 class _HeldByASlideshow:
     def __init__(self, radio: OrigeneratorRadio) -> None:
         self._radio = radio
 
-    def tick(self, *, picture: bool | None, level: int | None, paused: bool) -> None:
-        self._radio._heard_through(self, picture=picture, level=level, paused=paused)
+    def tick(self, *, image: bool | None, level: int | None, paused: bool) -> None:
+        self._radio._heard_through(self, image=image, level=level, paused=paused)
 
     def close(self) -> None:
         self._radio._let_go_by(self)

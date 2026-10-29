@@ -53,7 +53,7 @@ class _Running:
     def set_showing(self, showing: bool) -> None:
         pass
 
-    def picture(self):
+    def own_frame(self):
         return None
 
     def close(self) -> None:
@@ -318,8 +318,8 @@ class _HeldRadio:
         self.ticked: tuple | None = None
         self.closed = False
 
-    def tick(self, *, picture, level, paused) -> None:
-        self.ticked = (picture, level, paused)
+    def tick(self, *, image, level, paused) -> None:
+        self.ticked = (image, level, paused)
 
     def close(self) -> None:
         self.closed = True
@@ -337,7 +337,7 @@ def test_the_funestra_plays_the_radio_its_slideshow_holds_at_its_own_volume(qtbo
     radio = _ARadio()
     pane, engine, _running = _pane(qtbot, radio=radio)
     _hand_over(pane, _items(tmp_path, "one"))
-    engine.showing_picture = True
+    engine.showing_image = True
 
     pane.tick()
 

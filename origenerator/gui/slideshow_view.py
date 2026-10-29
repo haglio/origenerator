@@ -510,7 +510,7 @@ class _TheWindowsPresses:
     def set_showing(self, showing: bool) -> None:
         pass
 
-    def picture(self) -> None:
+    def own_frame(self) -> None:
         return None
 
     def close(self) -> None:

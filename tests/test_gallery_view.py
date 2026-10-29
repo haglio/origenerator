@@ -14132,7 +14132,7 @@ def test_a_slideshow_standing_on_its_own_plays_the_radio_while_its_image_is_up(
         qtbot, monkeypatch):
     radio = _FakeRadio()
     _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio)
-    engine_of(slideshow.shown).showing_picture = True
+    engine_of(slideshow.shown).showing_image = True
 
     slideshow.shown._pane.tick()
 

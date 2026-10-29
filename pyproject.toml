@@ -115,6 +115,7 @@ venv = "primary"
 log = 'state\origenerator_launcher.log'
 environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
 loading-screen = ["Updating Origenerator..."]
+preview = true
 
 [tool.haglio.launchers."sort_pictures.vbs"]
 app = "Origenerator (sorting pictures)"

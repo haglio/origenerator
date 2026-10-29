@@ -479,6 +479,8 @@ is the two hooks that call the guard, below.
   shows only what an open copy does with the item it is handed.
 - `tools/record_from_civitai.py` — asks Civitai, by each file's SHA-256, for
   the trigger words and the base model of every installed LoRA missing either,
+  and the base model of every model in `checkpoints` and `diffusion_models`
+  missing one (what a LoRA row following its Model compares a LoRA's against),
   and writes each one only where it is missing, in `config.TRIGGER_WORDS_PATH`
   and `config.BASE_MODELS_PATH` beside the titles: `[]` and `""` for one
   Civitai does not know, so a later run skips it, and a fix's own LoRAs are

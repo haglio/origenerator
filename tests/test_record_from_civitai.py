@@ -180,12 +180,39 @@ def test_it_prints_counts_and_never_a_name_or_a_word(installed_models, capsys):
     worded = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
     wordless = installed_models.add("loras", "example_light.safetensors", arch="flux", lora=True)
     installed_models.add("loras", "example_unlisted.safetensors", arch="sd15", lora=True)
+    known = installed_models.add("checkpoints", "example_model.safetensors", arch="sdxl")
+    installed_models.add("diffusion_models", "example_unlisted_model.safetensors", arch="krea2")
 
     record_from_civitai.main([], ask=lambda hashes: [_version(worded, ["exmplstyle"]),
-                                                      _version(wordless, [])])
+                                                      _version(wordless, []),
+                                                      _version(known, [], "Example Base")])
 
     assert capsys.readouterr().out == (
-        "Asked Civitai about 3 LoRAs: 1 with trigger words, 1 with none, 1 it does not know.\n")
+        "Asked Civitai about 3 LoRAs (1 with trigger words, 1 with none, 1 it does not know) "
+        "and 2 models (1 it knows).\n")
+
+
+def test_a_model_has_its_base_model_written_down_and_no_trigger_words(installed_models):
+    for category in ("checkpoints", "diffusion_models"):
+        model = installed_models.add(category, f"{category}_model.safetensors", arch="krea2")
+
+        record_from_civitai.main([], ask=lambda hashes, model=model: [
+            _version(model, ["exmplword"], "Example Base 1.0")])
+
+    assert _bases() == {"checkpoints_model": "Example Base 1.0",
+                        "diffusion_models_model": "Example Base 1.0"}
+    assert _recorded() == {}
+
+
+def test_a_model_whose_base_model_is_written_down_is_not_asked_about(
+        installed_models, recorded_base_models):
+    recorded_base_models({"example_model": "Example Base 1.0"})
+    installed_models.add("diffusion_models", "example_model.safetensors", arch="krea2")
+    asked = []
+
+    record_from_civitai.main([], ask=lambda hashes: asked.append(hashes) or [])
+
+    assert asked == []
 
 
 def test_civitai_is_sent_the_hashes_as_a_json_list_and_its_answer_read_back(monkeypatch):

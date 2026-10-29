@@ -1,21 +1,8 @@
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
-
-import pytest
 
 from tools import card_claim
-
-
-@pytest.fixture
-def another_program():
-    program = subprocess.Popen([sys._base_executable, "-c", "import time; time.sleep(120)"],
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    yield program
-    program.kill()
-    program.wait()
 
 
 def test_a_free_card_is_taken_with_who_holds_it_and_since_when(tmp_path):

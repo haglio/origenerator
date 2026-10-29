@@ -267,8 +267,8 @@ def _names_its_setting(label: ElidingLabel) -> bool:
 @pytest.mark.parametrize("workflow", [None, "sdxl_t2i", "wan22_i2v", "flux_t2i_upscaled"])
 def test_a_narrow_pane_shortens_its_labels_rather_than_dropping_them(
         app_chrome, blank_panel, workflow):
-    """Squeezed, every setting still names itself: its label ends in an ellipsis,
-    and the whole of it is in the label's tooltip.
+    """Squeezed, every setting still names itself: its label ends in an ellipsis
+    rather than drawing nothing.
 
     The failure this exists for: QFormLayout gives its labels the widest one's
     width when a row fits beside its field and no width at all when none does, so

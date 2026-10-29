@@ -100,8 +100,8 @@ class ElidingButton(QPushButton):
 class ElidingLabel(QLabel):
     """A label that elides rather than set the width of the column it sits in.
 
-    Its text stays whole — ``text()`` answers with all of it, and so does the
-    tooltip a form puts on it — only what is *drawn* is shortened.
+    Its text stays whole — ``text()`` answers with all of it — and only what is
+    *drawn* is shortened.
     """
 
     def __init__(self, text: str = "", parent=None, *, preferred_width: int = 0):

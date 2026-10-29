@@ -1000,9 +1000,8 @@ class BrowserPane(QObject):
         the cue for the next seed, so canceling first would start one.
 
         No menu at all for a running row this session holds no job for — one a
-        restart hasn't re-adopted — for the reason its strip row hides the same
-        button: there is nothing here to cancel it with, and a menu saying so
-        would be a menu that cannot act.
+        restart hasn't re-adopted: there is nothing here to cancel it with, and
+        a menu saying so would be a menu that cannot act.
         """
         item = self._inflight_by_key.get(key)
         if item is None or item.cancel is None:

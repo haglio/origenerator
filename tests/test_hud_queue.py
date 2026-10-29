@@ -156,6 +156,18 @@ def test_a_rows_shield_sits_just_left_of_its_cancel_lit_while_shielded():
     assert not drawn[f"{SHIELD}|j2"][1].lit
 
 
+def test_a_rows_shield_and_cancel_are_grayed_where_its_job_cannot_take_them():
+    # His answer for the Job Queue (2026-10-29), and so here too.
+    section = queue_section([_item("j1"), _item("j2", cancel=lambda: None,
+                                                shield=lambda _on: None)], 0)
+
+    _image, targets = _painted(section)
+
+    dim = {button.command: button.dim for _rect, button in targets}
+    assert (dim[f"{SHIELD}|j1"], dim[f"{CANCEL}|j1"]) == (True, True)
+    assert (dim[f"{SHIELD}|j2"], dim[f"{CANCEL}|j2"]) == (False, False)
+
+
 def test_the_block_stacks_shield_all_over_cancel_all_at_its_right_end():
     # Where the user put them in the Job Queue (2026-10-28), and so here too.
     section = queue_section([_item("j1", status="running", cancel=lambda: None,

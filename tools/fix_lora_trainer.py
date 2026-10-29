@@ -14,8 +14,14 @@ imported inside the step that needs it, so this file loads anywhere.
 from __future__ import annotations
 
 import math
+import os
 import subprocess
 import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools import card_claim  # noqa: E402
 
 # How many times the training sees a photo in all, spread over however many
 # photos there are, so a small set is not under-trained.
@@ -74,7 +80,6 @@ _IN_THE_BACKGROUND = (getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 def _status(job: dict, **fields) -> None:
     import json  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
 
     Path(job["status"]).write_text(json.dumps(fields), encoding="utf-8")
 
@@ -84,7 +89,6 @@ class Stopped(Exception):
 
 
 def _finder(job: dict):
-    from pathlib import Path  # noqa: PLC0415
 
     from ultralytics import YOLO  # noqa: PLC0415
 
@@ -107,7 +111,6 @@ def _finder(job: dict):
 
 def crop(job: dict, find=None) -> int:
     import shutil  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
 
     from PIL import Image  # noqa: PLC0415
 
@@ -176,7 +179,6 @@ def _why_the_training_stopped(tail: bytes, log: str) -> str:
 
 def train(job: dict) -> None:
     import json  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
 
     work = Path(job["work"])
     crops = work / "crops"
@@ -194,7 +196,6 @@ def train(job: dict) -> None:
 
 def _said_why(job: dict) -> bool:
     import json  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
 
     try:
         return json.loads(Path(job["status"]).read_text(encoding="utf-8"))["state"] == "failed"
@@ -202,17 +203,25 @@ def _said_why(job: dict) -> bool:
         return False
 
 
-def run(job: dict) -> None:
-    from pathlib import Path  # noqa: PLC0415
+def _take_the_card(job: dict) -> None:
+    while not card_claim.take(f"{job['part'].capitalize()} fix training", os.getpid()):
+        _status(job, state="waiting")
+        time.sleep(20)
 
-    cropping = subprocess.run([job["comfyui_python"], str(Path(__file__).resolve()), "crop",
-                               job["job_file"]], creationflags=_IN_THE_BACKGROUND)
-    if cropping.returncode != 0:
-        if _said_why(job):
-            raise Stopped()
-        raise Stopped("The photo cropping quit without saying why. An agent can read what "
-                      f"it printed in {job['log']}.")
-    train(job)
+
+def run(job: dict) -> None:
+    try:
+        _take_the_card(job)
+        cropping = subprocess.run([job["comfyui_python"], str(Path(__file__).resolve()), "crop",
+                                   job["job_file"]], creationflags=_IN_THE_BACKGROUND)
+        if cropping.returncode != 0:
+            if _said_why(job):
+                raise Stopped()
+            raise Stopped("The photo cropping quit without saying why. An agent can read what "
+                          f"it printed in {job['log']}.")
+        train(job)
+    finally:
+        card_claim.release(os.getpid())
 
 
 STEPS = {"run": run, "crop": crop}
@@ -222,7 +231,6 @@ _DOING = {"run": "training", "crop": "cropping the photos"}
 def main(argv: list[str]) -> int:
     import json  # noqa: PLC0415
     import traceback  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
 
     step, job_path = argv
     job = json.loads(Path(job_path).read_text(encoding="utf-8"))

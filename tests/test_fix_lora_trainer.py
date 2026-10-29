@@ -9,7 +9,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from tools import fix_lora_trainer
+from tools import card_claim, fix_lora_trainer
+
+
+@pytest.fixture(autouse=True)
+def _a_claim_of_the_tests_own(tmp_path, monkeypatch):
+    monkeypatch.setattr(card_claim, "CLAIM", tmp_path / "graphics_card_claim.json")
 
 
 def _image(size=(64, 48)) -> bytes:
@@ -112,6 +117,25 @@ def _whole_run(tmp_path, monkeypatch, *, crop_code: int, crop_says=None):
     monkeypatch.setattr(fix_lora_trainer.subprocess, "run", cropping)
     monkeypatch.setattr(fix_lora_trainer, "train", lambda job: done.append("trained"))
     return job, done
+
+
+def test_a_fix_training_waits_for_the_card_while_another_trainer_holds_it_then_takes_it(
+        tmp_path, monkeypatch, another_program):
+    job, done = _whole_run(tmp_path, monkeypatch, crop_code=0)
+    assert card_claim.take("hand training", another_program.pid)
+    waited = []
+
+    def let_go(seconds):
+        waited.append(_status(job)["state"])
+        card_claim.release(another_program.pid)
+
+    monkeypatch.setattr(fix_lora_trainer.time, "sleep", let_go)
+
+    fix_lora_trainer.run(job)
+
+    assert waited == ["waiting"]
+    assert [step for step in done if step == "trained"] == ["trained"]
+    assert not card_claim.CLAIM.exists()
 
 
 def test_a_whole_training_crops_under_comfyuis_python_and_then_trains(tmp_path, monkeypatch):

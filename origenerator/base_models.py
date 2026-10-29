@@ -18,8 +18,16 @@ def made_for_text_to_video(value) -> bool:
 
 def loras_offered_beside(model, loras) -> list:
     filed = kept_by_stem(config.BASE_MODELS_PATH)
-    picked = _filed_under(filed, model)
-    return [lora for lora in loras if not picked or _filed_under(filed, lora) in ("", picked)]
+    return [lora for lora in loras if not _apart(filed, lora, model)]
+
+
+def filed_apart(lora, model) -> bool:
+    return _apart(kept_by_stem(config.BASE_MODELS_PATH), lora, model)
+
+
+def _apart(filed: dict, lora, model) -> bool:
+    made_for, picked = _filed_under(filed, lora), _filed_under(filed, model)
+    return bool(made_for and picked) and made_for != picked
 
 
 def _filed_under(filed: dict, value) -> str:

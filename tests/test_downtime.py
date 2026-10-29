@@ -19,24 +19,34 @@ _HANDS = types.SimpleNamespace(name="hands")
 
 class _Machine:
     def __init__(self, *, app_open=False, training=False, comfyui_busy=False, batches_due=False,
-                 fix=None):
+                 fix=None, backfill_batches=0):
         self.app_open = app_open
         self.training = training
         self.comfyui_busy = comfyui_busy
         self.batches_due = batches_due
         self.fix = fix
+        self.backfill_batches = backfill_batches
         self.queued = 0
+        self.backfilled = 0
         self.trained = []
 
     def turn(self) -> downtime.Turn:
         return downtime.take_a_turn(
             app_open=lambda: self.app_open, training_running=lambda: self.training,
             comfyui_busy=lambda: self.comfyui_busy, batches_due=lambda: self.batches_due,
-            queue_batches=self._queue, fix_to_train=lambda: self.fix, train=self._train)
+            queue_batches=self._queue, queue_more_backfill=self._backfill,
+            fix_to_train=lambda: self.fix, train=self._train)
 
     def _queue(self) -> None:
         self.queued += 1
         self.batches_due = False
+
+    def _backfill(self) -> int:
+        if not self.backfill_batches:
+            return 0
+        self.backfill_batches -= 1
+        self.backfilled += 1
+        return 6
 
     def _train(self, part) -> None:
         self.trained.append(part)
@@ -58,6 +68,16 @@ def test_the_work_origenerator_left_as_it_closed_is_handed_to_comfyui_first():
     machine.turn()
 
     assert (machine.queued, machine.trained) == (1, [])
+
+
+def test_while_origenerator_stays_closed_comfyui_gets_the_backfills_next_batch_once_it_is_idle():
+    machine = _Machine(backfill_batches=2, fix=_HANDS)
+
+    turns = [machine.turn().did for _ in range(3)]
+
+    assert machine.backfilled == 2
+    assert turns[:2] == ["handed ComfyUI the next videos the backfill remakes"] * 2
+    assert machine.trained == [_HANDS]
 
 
 def test_once_comfyui_has_nothing_left_a_fix_whose_photos_changed_is_trained():
@@ -132,6 +152,29 @@ def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_card
 
     assert json.loads(capsys.readouterr().out) == {
         "did": "nothing: Origenerator is open", "holds_the_graphics_card": False}
+
+
+def test_the_command_evolver_runs_hands_comfyui_more_of_the_backfill_while_closed_and_idle(
+        monkeypatch, tmp_path, capsys):
+    for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
+                       ("UI_STATE_PATH", tmp_path / "ui_state.json"),
+                       ("FIX_TRAINING_DIR", tmp_path / "fix training")):
+        monkeypatch.setattr(downtime.config, name, path)
+    monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
+    monkeypatch.setattr(downtime, "announce_trainings_that_ended", lambda announce: None)
+    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
+        one_holds_the_library=lambda: False, one_is_closing=lambda: False))
+    monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
+    handed = []
+    monkeypatch.setattr(downtime, "hand_comfyui_more_of_the_backfill",
+                        lambda db, client, ui: handed.append((db.path, client.folders)) or 6)
+
+    assert downtime.main() == 0
+
+    assert handed == [(tmp_path / "origenerator.db", downtime.config.COMFYUI_FOLDERS)]
+    assert json.loads(capsys.readouterr().out) == {
+        "did": "handed ComfyUI the next videos the backfill remakes",
+        "holds_the_graphics_card": False}
 
 
 def _answered(request, timeout):

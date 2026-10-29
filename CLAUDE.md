@@ -181,7 +181,14 @@ the base model Civitai files it under decides (`base_models.json`, written by
 `tools/record_from_civitai.py`), and one filed under text-to-video is left out
 of the image-to-video forms too. A fix's own LoRA, in `loras\fixes`, is offered
 in no LoRA dropdown but its own fix's prompts window, his decision (2026-10-29):
-each fix's LoRA is trained for that fix alone. **Unrecognized is not unwanted:**
+each fix's LoRA is trained for that fix alone. Krea 2 T2I's LoRA rows follow
+the Model picked beside them (`ParamDef.beside_model`): a LoRA leaves them while
+its base model and the Model's are both written down and neither is the other
+or a kind of it (`base_models._KIND_OF`: Raw and Turbo are kinds of Krea 2, and
+two kinds of it are apart). So the LoRA that turns Raw into Turbo, written down
+by hand as made for Krea 2 Raw, is offered beside Raw alone (his decision,
+2026-10-29).
+**Unrecognized is not unwanted:**
 `describe()` returns `arch=None` for a file it cannot read or match, and every
 filter keeps those. Be wrong in that direction. A listed option that errors on
 submit costs one run and says why; a working model missing from the dropdown has
@@ -220,7 +227,9 @@ and trigger words are written when the app takes the finished version
 Installing a LoRA also writes down the trigger words it answers to and the base
 model Civitai files it under, beside the titles in `trigger_words.json` and
 `base_models.json`, by running `tools/record_from_civitai.py`; a LoRA trained
-here gets its word written there by hand, from its training.
+here gets its word written there by hand, from its training, and a base model
+Civitai lacks or files too broadly is written there by hand too, which the tool
+then leaves as it is.
 
 ## What a generation shows is said by hand, never read off its prompt
 

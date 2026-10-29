@@ -2689,3 +2689,19 @@ def test_a_lora_picked_beside_one_model_stays_picked_when_another_model_is(
 
     assert form.get_values()["lora"] == "speed_up.safetensors"
 
+
+def test_every_krea_2_t2i_lora_row_follows_the_model_picked_beside_it(
+        qtbot, installed_models, recorded_base_models):
+    for model in ("raw_model", "turbo_model"):
+        installed_models.add("diffusion_models", f"{model}.safetensors", arch="krea2")
+    for lora in ("speed_up", "a_look"):
+        installed_models.add("loras", f"{lora}.safetensors", arch="krea2", lora=True)
+    recorded_base_models(_FILED)
+    form = ParamForm(WORKFLOW_REGISTRY["krea2_t2i"].param_definitions())
+    qtbot.addWidget(form)
+
+    form.set_values({"unet": "turbo_model.safetensors"})
+
+    assert [_offered(form._widgets[key]) for key in ("lora", "lora_2", "lora_3")] == [
+        ["None", "a_look.safetensors"]] * 3
+

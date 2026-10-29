@@ -49,7 +49,8 @@ def _words_on_civitai(paths: list[Path], ask) -> dict[str, list[str] | None]:
     for version in versions:
         for file in version.get("files") or []:
             sha = str((file.get("hashes") or {}).get("SHA256") or "").lower()
-            words.setdefault(sha, list(version.get("trainedWords") or []))
+            if sha not in words or file.get("primary"):
+                words[sha] = list(version.get("trainedWords") or [])
     return {model_stem(path): words.get(sha) for sha, copies in by_hash.items()
             for path in copies}
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -78,3 +79,19 @@ def release(pid: int, path: Path | None = None) -> None:
     existing = _read(path)
     if existing is not None and existing.get("pid") == pid:
         path.unlink(missing_ok=True)
+
+
+def main(argv: list[str]) -> int:
+    verb, *words = argv
+    if verb == "take":
+        holder, pid, *path = words
+        return 0 if take(holder, int(pid), *map(Path, path)) else 1
+    pid, *path = words
+    if verb == "held-by-another":
+        return 0 if held_by_another(int(pid), *map(Path, path)) else 1
+    release(int(pid), *map(Path, path))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1918,6 +1918,71 @@ def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, instal
         "None", "an_xl_look.safetensors", hands}
 
 
+_HANDS_LORA = os.path.join("fixes", "hands 2026-10-19 1444.safetensors")
+_TRAINED_ON_SAID = "The Hands fix's LoRA was trained on trained_on. Click to use trained_on."
+
+
+@pytest.fixture
+def hands_trained_on(qtbot, monkeypatch, tmp_path, installed_models):
+    for model in ("picked.safetensors", "trained_on.safetensors"):
+        installed_models.add("checkpoints", model, arch="sdxl")
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
+    work = tmp_path / "fix training" / "hands"
+    work.mkdir(parents=True)
+    (work / "job.json").write_text(json.dumps({
+        "part": "hands", "output_name": "hands 2026-10-19 1444",
+        "base_model": str(installed_models.root / "models" / "checkpoints"
+                          / "trained_on.safetensors")}), encoding="utf-8")
+    panel, edits = _panel(qtbot)
+
+    def shown(fixes, model="picked.safetensors"):
+        panel.show_settings(EnhanceSettings(auto=False, params={
+            "checkpoint": model, "enhance_detail_fixes": fixes,
+            "enhance_fix_prompts": {"hands": {"lora": _HANDS_LORA}}}))
+        return panel, edits
+
+    return shown
+
+
+def test_a_ticked_fixs_lora_trained_on_another_model_warns_beside_the_model(hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+
+    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+        False, _TRAINED_ON_SAID)
+
+
+def test_clicking_the_models_warning_picks_the_model_the_fixs_lora_was_trained_on(
+        qtbot, hands_trained_on):
+    panel, edits = hands_trained_on({"hands": 0.45})
+
+    qtbot.mouseClick(panel._model_warning, Qt.MouseButton.LeftButton)
+
+    assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
+    assert panel._model_warning.isHidden()
+
+
+def test_no_model_warning_while_the_fix_is_off_or_the_model_is_the_one_it_was_trained_on(
+        hands_trained_on):
+    assert hands_trained_on({})[0]._model_warning.isHidden()
+    assert hands_trained_on({"hands": 0.45}, "trained_on.safetensors")[0]._model_warning.isHidden()
+
+
+def test_the_models_warning_sits_between_its_caption_and_the_model_leaving_the_caption_be(
+        hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+    _laid_out_at(panel, 500)
+
+    captions = {label.text(): label.mapTo(panel, QPoint()).x()
+                for label in panel.findChildren(QLabel) if label.text() in ("Model", "Upscaler")}
+    caption = next(label for label in panel.findChildren(QLabel) if label.text() == "Model")
+    mark = panel._model_warning
+    assert captions["Model"] == captions["Upscaler"]
+    assert (caption.mapTo(panel, QPoint()).x() + caption.width()
+            <= mark.mapTo(panel, QPoint()).x())
+    assert mark.mapTo(panel, QPoint()).x() + mark.width() <= panel._model.mapTo(panel, QPoint()).x()
+    assert _rows_of(panel, mark) & _rows_of(panel, panel._model)
+
+
 _STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
                "Click to add it.")
 

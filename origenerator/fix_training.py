@@ -6,7 +6,7 @@ from origenerator import comfyui_launcher, config, gallery, lora_training
 from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
 from origenerator.lora_training import TrainingOffer, TrainingState
 from origenerator.lora_versions import next_version
-from origenerator.model_titles import FIX_LORA_FOLDER
+from origenerator.model_titles import FIX_LORA_FOLDER, model_stem
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part, part_table
 
@@ -114,6 +114,16 @@ def start(job: dict) -> lora_training.Trainer:
 
 def trainings() -> list[dict]:
     return lora_training.trainings(config.FIX_TRAINING_DIR)
+
+
+def trained_on(lora) -> str | None:
+    checkpoints = config.COMFYUI_DIR / "models" / "checkpoints"
+    for job in trainings():
+        if job.get("output_name") == model_stem(lora) and job.get("base_model"):
+            base = Path(job["base_model"])
+            return str(base.relative_to(checkpoints)) if base.is_relative_to(checkpoints) else (
+                base.name)
+    return None
 
 
 def running_trainings() -> list[dict]:

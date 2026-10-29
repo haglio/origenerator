@@ -184,3 +184,27 @@ def test_every_fix_training_ever_started_is_found_among_the_fix_trainings(monkey
 
     assert fix_training.trainings() == [job]
     assert fix_training.running_trainings() == []
+
+
+def _training_of(monkeypatch, tmp_path, **job) -> None:
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path)
+    work = tmp_path / "hands"
+    work.mkdir()
+    files = lora_training.work_files(work)
+    Path(files["job_file"]).write_text(json.dumps({"part": "hands", **files, **job}),
+                                       encoding="utf-8")
+
+
+def test_a_fixs_lora_was_trained_on_the_model_its_training_names(monkeypatch, tmp_path):
+    checkpoints = config.COMFYUI_DIR / "models" / "checkpoints"
+    _training_of(monkeypatch, tmp_path, output_name="hands 1.1",
+                 base_model=str(checkpoints / "styles" / "base.safetensors"))
+
+    assert fix_training.trained_on(str(Path("fixes") / "hands 1.1.safetensors")) == (
+        str(Path("styles") / "base.safetensors"))
+
+
+def test_a_lora_no_training_names_was_trained_on_no_model_anyone_knows(monkeypatch, tmp_path):
+    _training_of(monkeypatch, tmp_path)
+
+    assert fix_training.trained_on(str(Path("fixes") / "hands 1.2.safetensors")) is None

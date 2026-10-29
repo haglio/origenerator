@@ -81,13 +81,14 @@ from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help, with_training_date
 from origenerator.gui.training_controls import TrainingControls
 from origenerator.gui.warning_mark import WarningMark
-from origenerator.setting_advice import trigger_word_advice
+from origenerator.setting_advice import fix_lora_model_advice, trigger_word_advice
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
     detail_fixes_of,
     detector_folder,
     detector_for_part,
+    fix_prompts,
     fix_prompts_of,
     part_named,
     part_table,
@@ -360,6 +361,8 @@ class EnhancePanel(QWidget):
             "it, so it stays in its own style; pick one to pin it instead."
         )
         self._widgets["checkpoint"] = self._model
+        self._model_warning = WarningMark()
+        self._model_warning.pressed.connect(self._use_the_model_a_fixs_lora_was_trained_on)
 
         self._upscaler = NoWheelComboBox()
         offer_options(self._upscaler, self._options("upscale_model"))
@@ -371,9 +374,9 @@ class EnhancePanel(QWidget):
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
         settings_column.addLayout(_FieldGrid(
-            pickers=[(self._labeled(label, widget), widget)
-                     for label, widget in (("Model", self._model),
-                                           ("Upscaler", self._upscaler))],
+            pickers=[(_warned_beside(self._labeled("Model", self._model), self._model_warning),
+                      self._model),
+                     (self._labeled("Upscaler", self._upscaler), self._upscaler)],
             numbers=[(self._labeled(label, widget), widget)
                      for label, widget in (("Scale", self._scale), ("Steps", self._steps),
                                            ("Redraw Amount", self._denoise))],
@@ -696,6 +699,24 @@ class EnhancePanel(QWidget):
         finally:
             self._loading = False
         self._show_the_preset_held()
+        self._warn_of_a_fixs_lora_trained_on_another_model()
+
+    def _model_advice(self):
+        params = self.settings().params
+        trained = {name: fix_training.trained_on(own["lora"])
+                   for name, own in fix_prompts(params).items() if own["lora"]}
+        return fix_lora_model_advice(params.get("checkpoint"),
+                                     {name: model for name, model in trained.items() if model},
+                                     self._options("checkpoint")).get("checkpoint")
+
+    def _warn_of_a_fixs_lora_trained_on_another_model(self) -> None:
+        found = self._model_advice()
+        self._model_warning.warn(found.said if found is not None else "")
+
+    def _use_the_model_a_fixs_lora_was_trained_on(self) -> None:
+        found = self._model_advice()
+        if found is not None:
+            _fill(self._model, found.fixed(self._model.currentData()))
 
     def settings(self) -> EnhanceSettings:
         """What the panel currently reads as."""
@@ -717,11 +738,23 @@ class EnhancePanel(QWidget):
     def _emit(self, *_args):
         if not self._loading:
             self._show_the_preset_held()
+            self._warn_of_a_fixs_lora_trained_on_another_model()
             self._on_change(self.settings())
 
     def _take_settings(self, params: dict) -> None:
         self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=full_settings(params)))
         self._emit()
+
+
+def _warned_beside(caption: QLabel, mark: WarningMark) -> QWidget:
+    host = QWidget()
+    row = QHBoxLayout(host)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(GAP_SMALL)
+    row.addWidget(caption)
+    row.addStretch(1)
+    row.addWidget(mark)
+    return host
 
 
 def _side_by_side(*widgets) -> QWidget:

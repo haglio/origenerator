@@ -96,6 +96,7 @@ from origenerator.setting_advice import (
     fresh_settings,
     not_installed,
     not_installed_advice,
+    not_offered_advice,
     recommendations,
     recommended_choices,
     setting_advice,
@@ -783,15 +784,22 @@ class GenerateConfigPanel(DropZone):
             values = form.get_values()
             definitions = form.definitions()
             workflow = workflow_named(self._form_workflow_key)
-            missing = self._models_not_installed()
-            defaults = workflow.default_params() if missing else {}
             lora_keys = workflow.lora_keys if workflow is not None else ()
             form.set_warnings({**trigger_word_advice(values, lora_keys),
                                **setting_advice(values, definitions),
-                               **not_installed_advice(missing, definitions, defaults)})
+                               **self._file_advice(values, definitions, workflow)})
             form.mark_recommended(recommended_choices(values))
             form.explain(recommendations(values))
         self._workflow_warning.warn(form.every_warning() if form is not None else "")
+
+    def _file_advice(self, values: dict, definitions, workflow) -> dict:
+        if workflow is None:
+            return {}
+        defaults = workflow.default_params()
+        return {**not_offered_advice(values, definitions,
+                                     (*workflow.model_keys, *workflow.lora_keys), defaults,
+                                     workflow.display_name),
+                **not_installed_advice(self._models_not_installed(), definitions, defaults)}
 
     def _resolve_every_warning(self):
         self._param_form.resolve_every_warning()

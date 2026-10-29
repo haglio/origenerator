@@ -9,6 +9,7 @@ from origenerator.setting_advice import (
     fresh_settings,
     not_installed,
     not_installed_advice,
+    not_offered_advice,
     recommendations,
     recommended_choices,
     setting_advice,
@@ -297,6 +298,55 @@ def test_a_missing_model_whose_default_is_gone_too_is_answered_with_the_first_in
                                  {"checkpoint": "also_gone.safetensors"})
 
     assert found["checkpoint"].fix == "installed_a.safetensors"
+
+
+_LISTED_FROM_A_FOLDER = [
+    ParamDef("checkpoint", "Model", ParamType.COMBO, "installed_a.safetensors",
+             options=["installed_a.safetensors", "installed_b.safetensors"],
+             folder="checkpoints"),
+]
+
+
+def test_a_model_installed_but_not_offered_is_never_called_not_installed(installed_models):
+    installed_models.add("checkpoints", "not_offered.safetensors", arch="sd15")
+
+    assert not_installed({"checkpoint": "not_offered.safetensors"}, _LISTED_FROM_A_FOLDER,
+                         ("checkpoint",)) == {}
+
+
+def test_a_model_installed_but_not_made_for_the_workflow_says_so_and_a_click_uses_its_default(
+        installed_models, titled_models):
+    installed_models.add("checkpoints", "not_offered.safetensors", arch="sd15")
+    titled_models({"not_offered": "Not Offered 1.5", "installed_b": "Installed B"})
+
+    found = not_offered_advice({"checkpoint": "not_offered.safetensors"}, _LISTED_FROM_A_FOLDER,
+                               ("checkpoint",), {"checkpoint": "installed_b.safetensors"},
+                               "Example T2I")
+
+    assert found["checkpoint"].said == ("Not Offered 1.5 isn't made for Example T2I, so it isn't "
+                                        "offered here. Click to use Installed B.")
+    assert found["checkpoint"].fixed("not_offered.safetensors") == "installed_b.safetensors"
+
+
+_A_MODEL_AND_ITS_LORA = [
+    ParamDef("unet", "Model", ParamType.COMBO, "raw_model.safetensors",
+             options=["raw_model.safetensors", "turbo_model.safetensors"]),
+    ParamDef("lora", "LoRA", ParamType.COMBO, "None", beside_model="unet",
+             options=["None", "speed_up.safetensors", "a_look.safetensors"]),
+]
+
+
+def test_a_lora_offered_by_the_workflow_but_not_beside_the_model_names_the_model(
+        recorded_base_models, titled_models):
+    recorded_base_models({"turbo_model": "Krea 2 Turbo", "speed_up": "Krea 2 Raw"})
+    titled_models({"turbo_model": "Turbo Model", "speed_up": "Speed Up"})
+
+    found = not_offered_advice({"unet": "turbo_model.safetensors", "lora": "speed_up.safetensors"},
+                               _A_MODEL_AND_ITS_LORA, ("unet", "lora"), {"lora": "None"},
+                               "Example T2I")
+
+    assert found["lora"].said == ("Speed Up isn't made for Turbo Model, so it isn't offered "
+                                  "here. Click to use None.")
 
 
 _STRENGTHS_ON_AN_IMAGE = [lora_strength(key, 1.0)

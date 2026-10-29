@@ -122,6 +122,7 @@ FIX_TRAINING_DIR = _LIBRARY_FILES_DIR / "fix training"
 LOOK_TRAINING_DIR = LIBRARY_STATE_DIR / "lora training"
 MODEL_TITLES_PATH = _LIBRARY_FILES_DIR / "model_titles.json"
 TRIGGER_WORDS_PATH = _LIBRARY_FILES_DIR / "trigger_words.json"
+BASE_MODELS_PATH = _LIBRARY_FILES_DIR / "base_models.json"
 LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 
 

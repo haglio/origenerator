@@ -10,8 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from origenerator import config
-from origenerator.model_titles import is_a_fixs_lora, model_stem
-from origenerator.trigger_words import trigger_words_by_lora, write_trigger_words
+from origenerator.model_titles import is_a_fixs_lora, kept_by_stem, model_stem, write_kept
 from origenerator.workflows.model_files import ANY, is_no_lora, list_lora_files
 
 CIVITAI_BY_HASH = "https://civitai.com/api/v1/model-versions/by-hash"
@@ -31,39 +30,49 @@ def _sha256(path: Path) -> str:
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
-def _loras_with_nothing_written_down() -> list[Path]:
+def _records() -> dict:
+    return {config.TRIGGER_WORDS_PATH: lambda version: list(version.get("trainedWords") or []),
+            config.BASE_MODELS_PATH: lambda version: str(version.get("baseModel") or "")}
+
+
+def _loras_not_written_down() -> list[Path]:
     loras = config.COMFYUI_DIR / "models" / "loras"
-    written = trigger_words_by_lora()
+    written = [kept_by_stem(path) for path in _records()]
     return [loras / name for name in list_lora_files([], accepts=ANY)
-            if not (is_no_lora(name) or is_a_fixs_lora(name) or model_stem(name) in written)]
+            if not (is_no_lora(name) or is_a_fixs_lora(name))
+            and not all(model_stem(name) in kept for kept in written)]
 
 
-def _words_on_civitai(paths: list[Path], ask) -> dict[str, list[str] | None]:
+def _versions_on_civitai(paths: list[Path], ask) -> dict[str, dict | None]:
     by_hash: dict[str, list[Path]] = {}
     for path in paths:
         by_hash.setdefault(_sha256(path), []).append(path)
     hashes = list(by_hash)
     versions = [version for start in range(0, len(hashes), CIVITAI_HASHES_AT_A_TIME)
                 for version in ask(hashes[start:start + CIVITAI_HASHES_AT_A_TIME])]
-    words: dict[str, list[str]] = {}
+    own: dict[str, dict] = {}
     for version in versions:
         for file in version.get("files") or []:
             sha = str((file.get("hashes") or {}).get("SHA256") or "").lower()
-            if sha not in words or file.get("primary"):
-                words[sha] = list(version.get("trainedWords") or [])
-    return {model_stem(path): words.get(sha) for sha, copies in by_hash.items()
+            if sha not in own or file.get("primary"):
+                own[sha] = version
+    return {model_stem(path): own.get(sha) for sha, copies in by_hash.items()
             for path in copies}
 
 
 def main(argv=None, ask=ask_civitai) -> int:
     argparse.ArgumentParser(
-        description="Ask Civitai for the trigger words of each installed LoRA.").parse_args(argv)
-    found = _words_on_civitai(_loras_with_nothing_written_down(), ask)
-    write_trigger_words({stem: words or [] for stem, words in found.items()})
-    answers = list(found.values())
-    print(f"Asked Civitai about {len(answers)} LoRAs: "
-          f"{sum(1 for words in answers if words)} with trigger words, "
-          f"{answers.count([])} with none, {answers.count(None)} it does not know.")
+        description="Ask Civitai for the trigger words and the base model of each installed "
+                    "LoRA.").parse_args(argv)
+    found = _versions_on_civitai(_loras_not_written_down(), ask)
+    for path, kept_from in _records().items():
+        written = kept_by_stem(path)
+        write_kept(path, {stem: kept_from(version or {}) for stem, version in found.items()
+                            if stem not in written})
+    known = [version for version in found.values() if version is not None]
+    worded = sum(1 for version in known if version.get("trainedWords"))
+    print(f"Asked Civitai about {len(found)} LoRAs: {worded} with trigger words, "
+          f"{len(known) - worded} with none, {len(found) - len(known)} it does not know.")
     return 0
 
 

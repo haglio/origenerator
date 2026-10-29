@@ -5,25 +5,61 @@ import io
 import json
 import struct
 
+import pytest
+
 from origenerator import config
 from tools import record_trigger_words
+
+
+@pytest.fixture(autouse=True)
+def _nothing_recorded_yet(worded_loras, recorded_base_models):
+    worded_loras({})
+    recorded_base_models({})
 
 
 def _sha256(path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _version(path, words) -> dict:
-    return {"trainedWords": words, "files": [{"hashes": {"SHA256": _sha256(path).upper()}}]}
+def _version(path, words, base="") -> dict:
+    return {"trainedWords": words, "baseModel": base,
+            "files": [{"hashes": {"SHA256": _sha256(path).upper()}}]}
 
 
 def _recorded() -> dict:
     return json.loads(config.TRIGGER_WORDS_PATH.read_text(encoding="utf-8"))
 
 
-def test_a_lora_civitai_knows_is_recorded_with_the_words_it_was_trained_on(
+def _bases() -> dict:
+    return json.loads(config.BASE_MODELS_PATH.read_text(encoding="utf-8"))
+
+
+def test_a_lora_civitai_knows_has_its_base_model_written_down_beside_its_words(installed_models):
+    style = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
+
+    record_trigger_words.main([], ask=lambda hashes: [_version(style, [], "Example Base 1.0")])
+
+    assert _bases() == {"example_style": "Example Base 1.0"}
+
+
+def test_a_lora_whose_words_are_written_down_but_not_its_base_model_is_asked_and_keeps_its_words(
         installed_models, worded_loras):
-    worded_loras({})
+    worded_loras({"home_trained": ["hmtrnd"]})
+    trained = installed_models.add("loras", "home_trained.safetensors", arch="sdxl", lora=True)
+    asked = []
+
+    def civitai(hashes):
+        asked.append(hashes)
+        return []
+
+    record_trigger_words.main([], ask=civitai)
+
+    assert asked == [[_sha256(trained)]]
+    assert (_recorded(), _bases()) == ({"home_trained": ["hmtrnd"]}, {"home_trained": ""})
+
+
+def test_a_lora_civitai_knows_is_recorded_with_the_words_it_was_trained_on(
+        installed_models):
     style = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
     asked = []
 
@@ -37,9 +73,10 @@ def test_a_lora_civitai_knows_is_recorded_with_the_words_it_was_trained_on(
     assert _recorded() == {"example_style": ["exmplstyle"]}
 
 
-def test_a_lora_whose_words_are_written_down_already_is_neither_asked_about_nor_changed(
-        installed_models, worded_loras):
+def test_a_lora_whose_words_and_base_model_are_written_down_is_neither_asked_about_nor_changed(
+        installed_models, worded_loras, recorded_base_models):
     worded_loras({"home_trained": ["hmtrnd"]})
+    recorded_base_models({"home_trained": ""})
     installed_models.add("loras", "home_trained.safetensors", arch="sdxl", lora=True)
     style = installed_models.add("loras", "example_style.safetensors", arch="flux", lora=True)
     asked = []
@@ -55,8 +92,7 @@ def test_a_lora_whose_words_are_written_down_already_is_neither_asked_about_nor_
 
 
 def test_a_lora_civitai_does_not_know_is_written_down_with_no_words_and_not_asked_about_again(
-        installed_models, worded_loras):
-    worded_loras({})
+        installed_models):
     installed_models.add("loras", "unlisted_style.safetensors", arch="sdxl", lora=True)
     asked = []
 
@@ -68,11 +104,10 @@ def test_a_lora_civitai_does_not_know_is_written_down_with_no_words_and_not_aske
     record_trigger_words.main([], ask=civitai)
 
     assert len(asked) == 1
-    assert _recorded() == {"unlisted_style": []}
+    assert (_recorded(), _bases()) == ({"unlisted_style": []}, {"unlisted_style": ""})
 
 
-def test_a_fixs_own_lora_is_left_out(installed_models, worded_loras):
-    worded_loras({})
+def test_a_fixs_own_lora_is_left_out(installed_models):
     installed_models.add("loras", r"fixes\mouth 2026-10-19 1444.safetensors", arch="sdxl",
                          lora=True)
     asked = []
@@ -88,8 +123,7 @@ def test_a_fixs_own_lora_is_left_out(installed_models, worded_loras):
 
 
 def test_two_copies_of_one_lora_under_different_names_are_both_written_down(
-        installed_models, worded_loras):
-    worded_loras({})
+        installed_models):
     style = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
     installed_models.add("loras", r"copies\example_style_copy.safetensors", arch="sdxl",
                          lora=True)
@@ -107,8 +141,7 @@ def test_two_copies_of_one_lora_under_different_names_are_both_written_down(
 
 
 def test_a_lora_civitai_also_lists_beside_another_models_own_file_takes_its_own_versions_words(
-        installed_models, worded_loras):
-    worded_loras({})
+        installed_models):
     style = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
     listed = {"hashes": {"SHA256": _sha256(style).upper()}}
     bundled_with = {"trainedWords": ["othrword"],
@@ -128,8 +161,7 @@ def _distinct_lora(installed_models, n: int):
                                 body=struct.pack("<Q", len(header)) + header + b"\x00\x00")
 
 
-def test_civitai_is_asked_about_at_most_a_hundred_loras_at_a_time(installed_models, worded_loras):
-    worded_loras({})
+def test_civitai_is_asked_about_at_most_a_hundred_loras_at_a_time(installed_models):
     for n in range(101):
         _distinct_lora(installed_models, n)
     asked = []
@@ -144,8 +176,7 @@ def test_civitai_is_asked_about_at_most_a_hundred_loras_at_a_time(installed_mode
     assert len(_recorded()) == 101
 
 
-def test_it_prints_counts_and_never_a_name_or_a_word(installed_models, worded_loras, capsys):
-    worded_loras({})
+def test_it_prints_counts_and_never_a_name_or_a_word(installed_models, capsys):
     worded = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
     wordless = installed_models.add("loras", "example_light.safetensors", arch="flux", lora=True)
     installed_models.add("loras", "example_unlisted.safetensors", arch="sd15", lora=True)

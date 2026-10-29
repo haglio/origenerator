@@ -105,11 +105,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
         checkpoints = list_model_files(
-            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL, SD15),
+            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL,),
         )
-        # SDXL only, unlike the checkpoint above: a ControlNet is built against
-        # one UNet's block shapes, and the SD1.5 ones installed here fail on an
-        # SDXL model rather than merely drifting the way a mismatched VAE does.
         controlnets = list_model_files(
             "controlnet", [defaults["controlnet"]], accepts=(SDXL,),
         )

@@ -69,12 +69,9 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        # SD1.5 alongside SDXL: it carries its own CLIP and runs here, just
-        # against the SDXL VAE this graph pairs it with. The video models filed
-        # under checkpoints carry no text encoder for node 2/3 to read at all.
         defaults = self.default_params()
         checkpoints = list_model_files(
-            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL, SD15),
+            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL,),
         )
         upscalers = list_model_files(
             "upscale_models", [defaults["upscale_model"]], accepts=ANY,

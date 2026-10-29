@@ -4,8 +4,10 @@ from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.detail_parts import FIX_MAX
-from origenerator.workflows.model_arch import SD15, SDXL
+from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
+
+ENHANCE_MODEL_FAMILIES = (SDXL,)
 
 
 class ImageEnhanceWorkflow(WorkflowTemplate):
@@ -73,7 +75,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
         checkpoints = list_model_files(
-            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL, SD15),
+            "checkpoints", [defaults["checkpoint"]], accepts=ENHANCE_MODEL_FAMILIES,
         )
         upscalers = list_model_files(
             "upscale_models", [defaults["upscale_model"]], accepts=ANY,

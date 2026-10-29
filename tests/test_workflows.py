@@ -1060,6 +1060,17 @@ def test_an_image_to_video_form_offers_no_model_that_makes_video_from_text_or_a_
                     f"{workflow}.{pd.key}")
 
 
+def test_a_form_that_decodes_with_the_sdxl_vae_offers_no_sd15_checkpoint(installed_models):
+    installed_models.add("checkpoints", "an_xl_model.safetensors", arch="sdxl")
+    installed_models.add("checkpoints", "a_15_model.safetensors", arch="sd15")
+
+    for workflow in ("sdxl_t2i", "sdxl_pose_transfer", "image_enhance"):
+        checkpoint = next(pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
+                          if pd.key == "checkpoint")
+        assert {"an_xl_model.safetensors", "a_15_model.safetensors"}.intersection(
+            checkpoint.options) == {"an_xl_model.safetensors"}, workflow
+
+
 def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
     # The pair that started this: a slot labelled High must not offer a file
     # whose name says low, and vice versa. Both halves are installed, so a slot

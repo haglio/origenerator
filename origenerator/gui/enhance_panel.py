@@ -92,8 +92,8 @@ from origenerator.workflows.detail_parts import (
     part_named,
     part_table,
 )
+from origenerator.workflows.image_enhance import ENHANCE_MODEL_FAMILIES
 from origenerator.workflows.lora_rows import lora_strength
-from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import NO_LORA, list_lora_files
 
 _AUTO_TOOLTIP = (
@@ -499,7 +499,7 @@ class EnhancePanel(QWidget):
             open_already.activateWindow()
             return
         current = fix_prompts_of(part, self._fix_prompts.get(part.name))
-        loras = list_lora_files([NO_LORA], accepts=(SDXL, SD15))
+        loras = list_lora_files([NO_LORA], accepts=ENHANCE_MODEL_FAMILIES)
         window = FixPromptsDialog(self, part, current, loras)
         window.accepted.connect(lambda: self._keep_fix_prompts(part.name, window.prompts()))
         window.finished.connect(lambda _result: self._fix_prompt_windows.pop(part.name, None))

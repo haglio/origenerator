@@ -71,14 +71,14 @@ class ComfyUIClient(QThread):
     # --- what the api answers for ------------------------------------------
     #
     # Forwarded rather than reached through, because every consumer of a client
-    # already spells these and there are seventeen call sites of them outside
-    # this module. A consumer that wants only these should take a
+    # already spells these. A consumer that wants only these should take a
     # :class:`~origenerator.comfyui_api.ComfyUIApi` instead of a client.
 
     host = property(lambda self: self.api.host)
     port = property(lambda self: self.api.port)
     client_id = property(lambda self: self.api.client_id)
     base_url = property(lambda self: self.api.base_url)
+    folders = property(lambda self: self.api.folders)
 
     def submit_job(self, workflow_payload: dict, prompt_id: str) -> str:
         return self.api.submit_job(workflow_payload, prompt_id)

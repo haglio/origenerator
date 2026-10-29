@@ -8,6 +8,7 @@ from pathlib import Path
 
 from origenerator import gallery, points_of_interest
 from origenerator.branch_session import is_branch_session
+from origenerator.comfyui_inputs import file_named_by
 from origenerator.config import LIBRARY_STATE_DIR
 from origenerator.media import MediaType
 from origenerator.workflows.detail_parts import detail_fix_passes
@@ -29,9 +30,10 @@ def queue_finding_for_the_absence(db, client) -> int:
 def queue_finding(rows: list[dict], client, record: Path, limit: int = RUNS_PER_ABSENCE) -> int:
     waiting = _read(record)
     asked = {(one["row"], one["file"]) for one in waiting.values()}
-    unasked = ((row, level) for row, level in images_to_look_over(rows)
-               if (row["prompt_id"], level.file["filename"]) not in asked)
-    batch = {str(uuid.uuid4()): image for image in islice(unasked, limit)}
+    to_ask = ((row, level) for row, level in images_to_look_over(rows)
+              if (row["prompt_id"], level.file["filename"]) not in asked
+              and file_named_by(_reference_to(level), client.folders) is not None)
+    batch = {str(uuid.uuid4()): image for image in islice(to_ask, limit)}
     _write(record, waiting | {prompt_id: _noted(*image) for prompt_id, image in batch.items()})
     queued = 0
     for prompt_id, (row, level) in batch.items():
@@ -99,11 +101,14 @@ def _write(record: Path, waiting: dict) -> None:
 
 
 def finding_graph(level: gallery.EnhanceLevel) -> dict:
-    graph = {_IMAGE: {"class_type": "LoadImage",
-                      "inputs": {"image": gallery.output_file_reference([level.file])}}}
+    graph = {_IMAGE: {"class_type": "LoadImage", "inputs": {"image": _reference_to(level)}}}
     for index, fix in enumerate(detail_fix_passes(level.params)):
         graph.update(finding_nodes(index, fix, [_IMAGE, 0], [_IMAGE, 0])[0])
     return graph
+
+
+def _reference_to(level: gallery.EnhanceLevel) -> str | None:
+    return gallery.output_file_reference([level.file])
 
 
 def images_to_look_over(rows: list[dict]) -> list[tuple[dict, gallery.EnhanceLevel]]:

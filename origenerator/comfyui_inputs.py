@@ -42,14 +42,14 @@ def _with_its_file_in_reach(node: dict, folders: ComfyFolders) -> dict:
 
 
 def reachable(ref: str, folders: ComfyFolders) -> str:
-    file = _file_named_by(ref, folders)
+    file = file_named_by(ref, folders)
     if file is None or _inside(file, _folder_named_by(ref, folders)):
         return ref
     copy = _copied_in(file, folders.temp / HANDED_OVER)
     return f"{copy.relative_to(folders.temp).as_posix()} {TEMP_TAG}"
 
 
-def _file_named_by(ref: str, folders: ComfyFolders) -> Path | None:
+def file_named_by(ref: str | None, folders: ComfyFolders) -> Path | None:
     place = reference_place(ref, places=folders.places, input_dir=folders.input, temp_dir=folders.temp)
     if place is None or place.is_file():
         return place

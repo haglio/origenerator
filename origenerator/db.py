@@ -120,6 +120,9 @@ class Database:
     def owe_a_fun_time_favorite(self, prompt_id: str):
         return self.generations.owe_a_fun_time_favorite(prompt_id)
 
+    def pay_a_fun_time_favorite(self, prompt_id: str):
+        return self.generations.pay_a_fun_time_favorite(prompt_id)
+
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)
 

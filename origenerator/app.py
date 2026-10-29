@@ -216,6 +216,7 @@ def _put_the_backfill_in_place(library: Library):
     enhanced_start_backfill.cancel_backfill(library.db, library.client)
     folded = enhanced_start_backfill.fold_completed_backfill(library.db, evolver, trash=trash)
     enhanced_start_backfill.trash_what_the_backfill_replaced(library.db, evolver, trash=trash)
+    enhanced_start_backfill.pay_the_owed_favorites(library.db, evolver)
     return folded
 
 

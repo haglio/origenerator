@@ -267,6 +267,9 @@ class GenerationStore(Store):
     def owe_a_fun_time_favorite(self, prompt_id: str):
         self._set(prompt_id, "fun_time_favorite_owed", 1)
 
+    def pay_a_fun_time_favorite(self, prompt_id: str):
+        self._set(prompt_id, "fun_time_favorite_owed", 0)
+
     def mark_evolver_exported(self, prompt_id: str):
         """Record that this generation's video was sent to Evolver's inbox.
 

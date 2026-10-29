@@ -65,6 +65,8 @@ _SHARD = re.compile(r"-\d+-of-\d+\.[^.]+$")
 # so an unanchored search would file each of those under low-noise.
 _EXPERT_CAMEL = re.compile(r"(?<=[a-z0-9])(High|Low)")
 _EXPERT_BOUNDED = re.compile(r"(?:^|[^A-Za-z])(high|low)", re.IGNORECASE)
+_EXPERT_AFTER_PRECISION = re.compile(r"(?:fp|bf)\d+([HL])\.[^.]+$", re.IGNORECASE)
+_EXPERT_INITIALS = {"h": "high", "l": "low"}
 
 # What a Krea 2 block holds and a WAN block never does -- wq/wk/wv/wo and a gated
 # MLP -- dotted, or flattened as lycoris spells it (`lycoris_blocks_0_attn_wq`).
@@ -178,6 +180,8 @@ def _expert_from_name(name: str) -> str | None:
         for match in (*_EXPERT_BOUNDED.finditer(name), *_EXPERT_CAMEL.finditer(name))
     }
     found = {word for word in found if word in ("high", "low")}
+    found |= {_EXPERT_INITIALS[match.group(1).lower()]
+              for match in _EXPERT_AFTER_PRECISION.finditer(name)}
     return found.pop() if len(found) == 1 else None
 
 

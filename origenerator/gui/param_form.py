@@ -50,7 +50,7 @@ from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.lora_training import TrainingOffer
 from origenerator.seed_history import SeedHistory
-from origenerator.setting_advice import Advice, MissingTriggerWord
+from origenerator.setting_advice import Advice, MissingTriggerWords
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
@@ -202,7 +202,7 @@ class ParamForm(QWidget):
         # into this editable form.
         self._copy_buttons: dict[str, CopyButton] = {}
         self._warning_marks: dict[str, WarningMark] = {}
-        self._advice: dict[str, Advice | MissingTriggerWord] = {}
+        self._advice: dict[str, Advice | MissingTriggerWords] = {}
         self._labels: dict[str, ElidingLabel] = {}
         self._recommendations: dict[str, str] = {}
         # A single swap-width-and-height button, built only when the workflow has
@@ -492,7 +492,7 @@ class ParamForm(QWidget):
             for key, found in self._advised_at([row]):
                 self._take_advice(key, found)
 
-    def _take_advice(self, key: str, found: Advice | MissingTriggerWord) -> None:
+    def _take_advice(self, key: str, found: Advice | MissingTriggerWords) -> None:
         written = found.writes or key
         fixed = found.fixed(self._read_field(self._defs[written]))
         if written == "frame_count" and self._scenes is not None:
@@ -514,7 +514,7 @@ class ParamForm(QWidget):
                                          if recommended else help_text or None,
                                          Qt.ItemDataRole.ToolTipRole)
 
-    def set_warnings(self, advice: dict[str, Advice | MissingTriggerWord]) -> None:
+    def set_warnings(self, advice: dict[str, Advice | MissingTriggerWords]) -> None:
         self._advice = {key: found for key, found in advice.items()
                         if self._row_of(key) in self._labels}
         for row, mark in self._warning_marks.items():
@@ -525,12 +525,12 @@ class ParamForm(QWidget):
     def _row_of(self, key: str) -> str:
         return self._scenes_row if self._scenes is not None and key in _SCENE_KEYS else key
 
-    def _advised_at(self, rows) -> list[tuple[str, Advice | MissingTriggerWord]]:
+    def _advised_at(self, rows) -> list[tuple[str, Advice | MissingTriggerWords]]:
         advised = {key: found for row in rows for key, found in self._advice.items()
                    if row in self._rows_warning(key, found)}
         return list(advised.items())
 
-    def _rows_warning(self, key: str, found: Advice | MissingTriggerWord) -> set[str]:
+    def _rows_warning(self, key: str, found: Advice | MissingTriggerWords) -> set[str]:
         return {self._row_of(shown) for shown in (key, found.writes) if shown}
 
     def every_warning(self) -> str:

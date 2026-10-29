@@ -5,7 +5,7 @@ from typing import NamedTuple
 
 from origenerator.content import load_content
 from origenerator.model_titles import model_title
-from origenerator.trigger_words import missing_words, trigger_words, with_words
+from origenerator.trigger_words import lacks_trigger_word, trigger_words, with_trigger_word
 from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef
 from origenerator.workflows.duration import seconds_for_frames
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
@@ -68,9 +68,9 @@ class Advice(NamedTuple):
         return self.fix
 
 
-class MissingTriggerWord(NamedTuple):
+class MissingTriggerWords(NamedTuple):
     lora: str
-    word: str
+    words: tuple[str, ...]
 
     writes = "positive_prompt"
 
@@ -80,25 +80,26 @@ class MissingTriggerWord(NamedTuple):
 
     @property
     def said(self) -> str:
-        return (f"{self.value_shown}'s trigger word, {self.word}, isn't in the Positive Prompt. "
-                "Click to add it.")
+        if len(self.words) == 1:
+            return (f"{self.value_shown}'s trigger word, {self.words[0]}, isn't in the "
+                    "Positive Prompt. Click to add it.")
+        return (f"{self.value_shown}'s trigger words, {spoken_list(self.words, 'and')}, aren't in "
+                f"the Positive Prompt. Click to add {self.words[0]}.")
 
     def fixed(self, prompt: str) -> str:
-        return with_words(prompt, [self.word])
+        return with_trigger_word(prompt, self.words)
 
 
-def trigger_word_advice(params: dict, lora_keys) -> dict[str, MissingTriggerWord]:
-    words = {key: _the_one_trigger_word(params[key]) for key in lora_keys
+def trigger_word_advice(params: dict, lora_keys) -> dict[str, MissingTriggerWords]:
+    words = {key: _warned_trigger_words(params[key]) for key in lora_keys
              if not is_no_lora(params.get(key))}
-    return {key: MissingTriggerWord(params[key], word) for key, word in words.items()
-            if word is not None and missing_words(params["positive_prompt"], [word])}
+    return {key: MissingTriggerWords(params[key], found) for key, found in words.items()
+            if found and lacks_trigger_word(params["positive_prompt"], found)}
 
 
-def _the_one_trigger_word(lora: str) -> str | None:
-    words = trigger_words(lora)
-    if len(words) != 1 or len(words[0].split()) > _LONGEST_TRIGGER_WORD_IN_WORDS:
-        return None
-    return words[0]
+def _warned_trigger_words(lora: str) -> tuple[str, ...]:
+    return tuple(word for word in trigger_words(lora)
+                 if len(word.split()) <= _LONGEST_TRIGGER_WORD_IN_WORDS)
 
 
 def model_recommendations() -> dict:

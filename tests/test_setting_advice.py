@@ -391,13 +391,41 @@ def test_only_the_lora_rows_asked_about_are_checked(worded_style):
     assert set(trigger_word_advice(params, ("lora_low",))) == {"lora_low"}
 
 
-def test_a_lora_with_several_trigger_words_or_a_passage_for_one_gets_no_warning(worded_loras):
-    worded_loras({"example_acts": ["alpha", "beta"],
-                  "example_scene": ["one two three four five six"]})
-    params = {"positive_prompt": "a portrait", "lora": "example_acts.safetensors",
-              "lora_low": "example_scene.safetensors"}
+@pytest.fixture
+def worded_acts(worded_loras, titled_models):
+    worded_loras({"example_acts": ["alpha", "beta", "gamma", "delta"]})
+    titled_models({"example_acts": "Example Acts 1.0"})
 
-    assert trigger_word_advice(params, ("lora", "lora_low")) == {}
+
+def test_a_lora_with_several_trigger_words_names_them_all_and_its_click_adds_the_first(
+        worded_acts):
+    found = trigger_word_advice({"positive_prompt": "a portrait",
+                                 "lora": "example_acts.safetensors"}, ("lora",))["lora"]
+
+    assert found.said == ("Example Acts 1.0's trigger words, alpha, beta, gamma and delta, "
+                          "aren't in the Positive Prompt. Click to add alpha.")
+    assert found.fixed("a portrait") == "alpha, a portrait"
+
+
+def test_a_lora_with_several_trigger_words_warns_only_while_none_of_them_is_in_the_prompt(
+        worded_acts):
+    params = {"positive_prompt": "a portrait, gamma", "lora": "example_acts.safetensors"}
+
+    assert trigger_word_advice(params, ("lora",)) == {}
+
+
+def test_an_entry_longer_than_five_words_is_never_warned_about(worded_loras, titled_models):
+    worded_loras({"example_scene": ["one two three four five six"],
+                  "example_mixed": ["alpha", "one two three four five six"]})
+    titled_models({"example_mixed": "Example Mixed 1.0"})
+    params = {"positive_prompt": "a portrait", "lora": "example_scene.safetensors",
+              "lora_low": "example_mixed.safetensors"}
+
+    found = trigger_word_advice(params, ("lora", "lora_low"))
+
+    assert list(found) == ["lora_low"]
+    assert found["lora_low"].said == ("Example Mixed 1.0's trigger word, alpha, isn't in the "
+                                      "Positive Prompt. Click to add it.")
 
 
 def test_a_trigger_word_of_five_words_is_still_one_to_warn_about(worded_loras):

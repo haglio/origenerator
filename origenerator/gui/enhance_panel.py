@@ -80,6 +80,7 @@ from origenerator.gui.no_wheel import (
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help, with_training_date
+from origenerator.lora_training import TrainingState
 from origenerator.reveal import open_in_explorer
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
@@ -803,8 +804,8 @@ class FixPromptsDialog(QDialog):
             self.train.setEnabled(False)
             return
         state = fix_training.training_state(self._part)
-        self.train.setText("Train" if state is fix_training.TrainingState.UNTRAINED else "Retrain")
-        self.train.setEnabled(state is not fix_training.TrainingState.CURRENT)
+        self.train.setText("Train" if state is TrainingState.UNTRAINED else "Retrain")
+        self.train.setEnabled(state is not TrainingState.CURRENT)
 
     def _count_photos(self) -> None:
         count = len(fix_training.photo_files(self._photos_folder))

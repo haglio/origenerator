@@ -25,16 +25,16 @@ from typing import NamedTuple, Protocol
 
 from PyQt6.QtWidgets import QMessageBox
 
-from origenerator import config, enhance_presets, fix_training, gallery
+from origenerator import config, enhance_presets, fix_training, gallery, lora_training
 from origenerator.file_refs import frame_name
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
-from origenerator.gui.fix_training_run import FixTrainingRun
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.training_run import TrainingRun
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detector_folder, name_parts, part_named
@@ -164,7 +164,7 @@ class EnhanceController:
             enhance_presets.save(name, self._settings.params)))
         self.panel.preset_renamed.connect(lambda index, name: self.panel.show_presets(
             enhance_presets.rename(index, name)))
-        self._training: FixTrainingRun | None = None
+        self._training: TrainingRun | None = None
 
     # --- training a fix's LoRA --------------------------------------------------
 
@@ -188,22 +188,16 @@ class EnhanceController:
         self._watch(job).begin()
 
     def take_up_trainings(self) -> None:
-        for job in fix_training.trainings():
-            trainer = fix_training.trainer_of(job)
-            if trainer is None:
-                continue
-            if trainer.running() and job.get("automatic"):
-                trainer.stop()
-            elif trainer.running():
-                if self._training is None:
-                    self._watch(job).adopt(trainer)
-            elif (lora := fix_training.untaken_lora(job)) is not None:
-                self._take(job, lora)
+        lora_training.take_up(fix_training, adopt=self._adopt, take=self._take)
 
-    def _watch(self, job: dict) -> FixTrainingRun:
+    def _adopt(self, job: dict, trainer) -> None:
+        if self._training is None:
+            self._watch(job).adopt(trainer)
+
+    def _watch(self, job: dict) -> TrainingRun:
         name = job["part"]
-        self._training = FixTrainingRun(job, self._jobs,
-                                        reveal=lambda: self.panel.open_fix_prompts(name))
+        self._training = TrainingRun(job, self._jobs, fix_training,
+                                     reveal=lambda: self.panel.open_fix_prompts(name))
         self._training.progress.connect(lambda text: self.panel.show_fix_training(name, text))
         self._training.finished.connect(lambda lora: self._training_ended(job, lora))
         self._training.failed.connect(lambda why: self._training_ended(job, None, why))
@@ -220,10 +214,10 @@ class EnhanceController:
 
     def _take(self, job: dict, lora: str) -> None:
         self.panel.use_fix_lora(job["part"], lora)
-        trainer = fix_training.trainer_of(job)
+        trainer = lora_training.trainer_of(job)
         if trainer is not None:
-            fix_training.note_duration(fix_training.time_taken(job, trainer))
-        fix_training.mark_taken(job)
+            fix_training.note_duration(lora_training.time_taken(job, trainer))
+        lora_training.mark_taken(job)
 
     # --- what it runs at ------------------------------------------------------
 

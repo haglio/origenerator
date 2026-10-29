@@ -204,7 +204,7 @@ class InFlightItems:
             behind_what_comfyui_holds = next(
                 (at for at, item in enumerate(items) if item.key not in sent), len(items))
             items.insert(behind_what_comfyui_holds, InFlightItem(
-                key=TRAINING_KEY, caption=f"{training.name.capitalize()} fix LoRA",
+                key=TRAINING_KEY, caption=training.caption,
                 reading=training.reading(), reveal=training.reveal, cancel=training.cancel,
                 job_kind=gallery.JobKind.TRAINING))
         return items

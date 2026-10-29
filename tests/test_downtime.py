@@ -175,7 +175,8 @@ def test_the_command_evolver_runs_hands_comfyui_each_file_a_run_reads_as_a_copy_
 def _kept(tmp_path, part, *, automatic, **status) -> None:
     work = tmp_path / "fix training" / part
     work.mkdir(parents=True)
-    job = {"part": part, "work": str(work), "status": str(work / "status.json"),
+    job = {"part": part, "display_name": f"{part.capitalize()} fix 1.0", "work": str(work),
+           "status": str(work / "status.json"),
            "process": str(work / "process.json"), "automatic": automatic}
     (work / "job.json").write_text(json.dumps(job), encoding="utf-8")
     (work / "status.json").write_text(json.dumps(status), encoding="utf-8")
@@ -195,4 +196,4 @@ def test_a_training_evolver_started_is_announced_once_when_it_ends_unless_alread
     downtime.announce_trainings_that_ended(announced.append)
 
     assert [(notice.title, notice.body.split(" · ")[0]) for notice in announced] == [
-        ("LoRA ready", "Hands fix")]
+        ("LoRA ready", "Hands fix 1.0")]

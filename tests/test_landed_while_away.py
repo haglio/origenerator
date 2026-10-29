@@ -230,10 +230,11 @@ def test_the_watcher_asks_whether_a_copy_holds_the_library_it_waits_for(tmp_path
 
 
 def _training(tmp_path, monkeypatch, *, ends_with: dict, after_naps: int = 0):
-    job = {"part": "hands", "status": str(tmp_path / "status.json")}
+    job = {"part": "hands", "display_name": "Hands fix 1.0",
+           "status": str(tmp_path / "status.json")}
     trainer = SimpleNamespace(alive=after_naps > 0, began=1_000_000.0)
     trainer.running = lambda: trainer.alive
-    monkeypatch.setattr(landed_while_away.fix_training, "trainer_of", lambda kept: trainer)
+    monkeypatch.setattr(landed_while_away.lora_training, "trainer_of", lambda kept: trainer)
     naps = []
 
     def end():
@@ -257,7 +258,7 @@ def test_a_training_that_ends_while_the_app_is_closed_is_announced(tmp_path, mon
 
     said = _watch(Database(tmp_path / "t.db"), _Api({}), tmp_path, sleep=nap, trainings=[job])
 
-    assert [(notice.title, notice.body) for notice in said] == [("LoRA ready", "Hands fix · 49:12")]
+    assert [(notice.title, notice.body) for notice in said] == [("LoRA ready", "Hands fix 1.0 · 49:12")]
 
 
 def test_a_training_still_going_is_waited_out_and_its_failure_announced(tmp_path, monkeypatch):

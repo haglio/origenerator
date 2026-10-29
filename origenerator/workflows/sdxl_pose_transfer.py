@@ -10,7 +10,7 @@ from origenerator.workflows.base import (
 )
 from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
-from origenerator.workflows.model_arch import SD15, SDXL
+from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
 # The pixel budget the output is scaled to. SDXL is trained at ~1 megapixel, so
@@ -120,7 +120,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                      browse_dir=CUSTOM_POSES_DIR),
             ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
                      options=checkpoints),
-            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL, SD15)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL,)),
             ParamDef("control_mode", "Structure From", ParamType.COMBO, defaults["control_mode"],
                      options=["depth", "pose"]),
             ParamDef("controlnet", "Structure Model", ParamType.COMBO, defaults["controlnet"],

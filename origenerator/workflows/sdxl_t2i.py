@@ -8,7 +8,7 @@ from origenerator.workflows.base import (
     sampler_params,
 )
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
-from origenerator.workflows.model_arch import SD15, SDXL
+from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
 
@@ -81,7 +81,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
                      options=checkpoints),
-            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL, SD15)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=64),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=64),

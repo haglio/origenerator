@@ -187,10 +187,9 @@ def train(job: dict) -> None:
     code, tail = _train(job, str(images))
     if code != 0:
         raise Stopped(_why_the_training_stopped(tail, job["log"]))
-    lora = f"{job['output_name']}.safetensors"
-    Path(job["trained"]).write_text(json.dumps({"photo_stamps": job["photo_stamps"], "lora": lora}),
-                                    encoding="utf-8")
-    _status(job, state="done", lora=lora)
+    Path(job["trained"]).write_text(
+        json.dumps({"photo_stamps": job["photo_stamps"], "lora": job["lora"]}), encoding="utf-8")
+    _status(job, state="done", lora=job["lora"])
 
 
 def _said_why(job: dict) -> bool:

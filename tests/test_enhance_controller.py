@@ -868,8 +868,8 @@ _training_runs: list = []
 
 
 class FakeTrainingRun:
-    def __init__(self, job, queue, *, reveal, parent=None):
-        self.job, self.queue, self.reveal = job, queue, reveal
+    def __init__(self, job, queue, kind, *, reveal, parent=None):
+        self.job, self.queue, self.kind, self.reveal = job, queue, kind, reveal
         self.progress, self.finished, self.failed = FakeSignal(), FakeSignal(), FakeSignal()
         self.canceled = FakeSignal()
         self.began = False
@@ -890,7 +890,7 @@ def photos(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "LORA_TRAINING_PYTHON", tmp_path / "python.exe")
     monkeypatch.setattr(config, "LORA_TRAINING_SCRIPTS", tmp_path / "sd-scripts")
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
-    monkeypatch.setattr(module, "FixTrainingRun", FakeTrainingRun)
+    monkeypatch.setattr(module, "TrainingRun", FakeTrainingRun)
     _training_runs.clear()
     return tmp_path
 
@@ -945,12 +945,12 @@ def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
     assert controller.panel.training["hands"] == "Training 40%"
     Path(run.job["work"]).mkdir(parents=True)
     Path(run.job["status"]).write_text(json.dumps(
-        {"state": "done", "lora": "hands 2026-10-19 0130.safetensors"}), encoding="utf-8")
+        {"state": "done", "lora": "fixes\\hands 2026-10-19 0130.safetensors"}), encoding="utf-8")
     run.finished.emit("fixes\\hands 2026-10-19 0130.safetensors")
 
     assert controller.panel.used == [("hands", "fixes\\hands 2026-10-19 0130.safetensors")]
     assert controller.panel.training["hands"] is None
-    assert module.fix_training.untaken_lora(run.job) is None
+    assert module.lora_training.untaken_lora(run.job) is None
 
 
 def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start(
@@ -998,9 +998,9 @@ class _KeptTrainer:
 def _kept_training(photos, part="hands", automatic=False, **status) -> dict:
     work = photos / "fix training" / part
     work.mkdir(parents=True)
-    job = {"part": part, "work": str(work), "status": str(work / "status.json"),
-           "job_file": str(work / "job.json"), "process": str(work / "process.json"),
-           "automatic": automatic}
+    job = {"part": part, "display_name": f"{part.capitalize()} fix 1.0", "work": str(work),
+           "status": str(work / "status.json"), "job_file": str(work / "job.json"),
+           "process": str(work / "process.json"), "automatic": automatic}
     Path(job["job_file"]).write_text(json.dumps(job), encoding="utf-8")
     if status:
         Path(job["status"]).write_text(json.dumps(status), encoding="utf-8")
@@ -1011,7 +1011,7 @@ def test_a_training_an_earlier_launch_left_running_is_taken_up_and_holds_the_lin
         enhance, photos, monkeypatch):
     _kept_training(photos)
     trainer = _KeptTrainer(alive=True)
-    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: trainer)
+    monkeypatch.setattr(module.lora_training, "trainer_of", lambda job: trainer)
     controller, _host = enhance()
 
     controller.take_up_trainings()
@@ -1025,7 +1025,7 @@ def test_a_training_evolver_started_while_the_app_was_closed_stops_as_it_opens(
         enhance, photos, monkeypatch):
     _kept_training(photos, automatic=True)
     trainer = _KeptTrainer(alive=True)
-    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: trainer)
+    monkeypatch.setattr(module.lora_training, "trainer_of", lambda job: trainer)
     controller, _host = enhance()
 
     controller.take_up_trainings()
@@ -1036,8 +1036,8 @@ def test_a_training_evolver_started_while_the_app_was_closed_stops_as_it_opens(
 
 def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(
         enhance, photos, monkeypatch):
-    _kept_training(photos, state="done", lora="hands 2026-10-21 1500.safetensors")
-    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: _KeptTrainer(alive=False))
+    _kept_training(photos, state="done", lora="fixes\\hands 2026-10-21 1500.safetensors")
+    monkeypatch.setattr(module.lora_training, "trainer_of", lambda job: _KeptTrainer(alive=False))
     controller, _host = enhance()
 
     controller.take_up_trainings()
@@ -1049,9 +1049,9 @@ def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(
 
 def test_a_training_that_ended_while_the_app_was_closed_still_counts_toward_the_next_countdown(
         enhance, photos, monkeypatch):
-    job = _kept_training(photos, state="done", lora="hands 2026-10-21 1500.safetensors")
+    job = _kept_training(photos, state="done", lora="fixes\\hands 2026-10-21 1500.safetensors")
     ended = Path(job["status"]).stat().st_mtime
-    monkeypatch.setattr(module.fix_training, "trainer_of",
+    monkeypatch.setattr(module.lora_training, "trainer_of",
                         lambda kept: SimpleNamespace(running=lambda: False, began=ended - 2580.0))
     controller, _host = enhance()
 
@@ -1062,8 +1062,8 @@ def test_a_training_that_ended_while_the_app_was_closed_still_counts_toward_the_
 
 def test_a_lora_from_a_training_before_its_program_was_recorded_is_left_where_it_was_put(
         enhance, photos, monkeypatch):
-    _kept_training(photos, state="done", lora="hands 2026-10-19 1444.safetensors")
-    monkeypatch.setattr(module.fix_training, "trainer_of", lambda job: None)
+    _kept_training(photos, state="done", lora="fixes\\hands 2026-10-19 1444.safetensors")
+    monkeypatch.setattr(module.lora_training, "trainer_of", lambda job: None)
     controller, _host = enhance()
 
     controller.take_up_trainings()

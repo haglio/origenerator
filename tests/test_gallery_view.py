@@ -13789,8 +13789,8 @@ class _HeldRadio:
         self.ticked = None
         self.closed = False
 
-    def tick(self, *, picture, level, paused):
-        self.ticked = (picture, level, paused)
+    def tick(self, *, image, level, paused):
+        self.ticked = (image, level, paused)
 
     def close(self):
         self.closed = True

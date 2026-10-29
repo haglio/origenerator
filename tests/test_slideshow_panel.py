@@ -561,7 +561,7 @@ class TestTheRowOnTheOnePanel:
 
         self._press_the_middle_of_the_track(window)
 
-        assert engine.picture_seeks == [pytest.approx(4_000, abs=100)]
+        assert engine.image_seeks == [pytest.approx(4_000, abs=100)]
 
     def test_the_panel_follows_the_video_along_the_track(self, qtbot):
         window = self._window(qtbot, [("scene one.mp4", "video")])

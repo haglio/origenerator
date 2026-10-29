@@ -13,6 +13,7 @@ from origenerator.setting_advice import (
     setting_advice,
 )
 from origenerator.workflows.base import ParamDef, ParamType
+from origenerator.workflows.lora_rows import lora_strength
 
 MODELS = {
     "example_model.safetensors": {
@@ -294,3 +295,52 @@ def test_a_missing_model_whose_default_is_gone_too_is_answered_with_the_first_in
                                  {"checkpoint": "also_gone.safetensors"})
 
     assert found["checkpoint"].fix == "installed_a.safetensors"
+
+
+_STRENGTHS_ON_AN_IMAGE = [lora_strength(key, 1.0)
+                           for key in ("lora_strength", "lora_strength_2", "lora_strength_3")]
+
+
+def test_a_strength_takes_a_lower_good_range_while_another_lora_is_picked():
+    image = {"lora": "first_look.safetensors", "lora_strength": 1.0,
+               "lora_2": "second_look.safetensors", "lora_strength_2": 0.7,
+               "lora_3": "None", "lora_strength_3": 1.0}
+
+    advice = setting_advice(image, _STRENGTHS_ON_AN_IMAGE)
+
+    assert {key: (found.text, found.fix) for key, found in advice.items()} == {
+        "lora_strength": ("Good range while another LoRA is picked: 0.6–0.8.", 0.8)}
+
+
+def test_the_tooltip_of_every_picked_strength_gives_the_range_while_loras_share_an_image():
+    image = {"lora": "first_look.safetensors", "lora_strength": 1.0,
+               "lora_2": "None", "lora_strength_2": 1.0,
+               "lora_3": "second_look.safetensors", "lora_strength_3": 0.7}
+
+    assert recommendations(image) == {
+        "lora_strength": "Good range while another LoRA is picked: 0.6–0.8.",
+        "lora_strength_3": "Good range while another LoRA is picked: 0.6–0.8."}
+    assert recommendations(image | {"lora_3": "None"}) == {}
+
+
+def test_loras_share_a_video_pass_by_pass():
+    video = {"lora_high": "a_look_high.safetensors", "lora_strength_high": 1.0,
+             "lora_high_2": "another_look_high.safetensors", "lora_strength_high_2": 1.0,
+             "lora_low": "a_look_low.safetensors", "lora_strength_low": 1.0}
+
+    assert recommendations(video) == {
+        "lora_strength_high": "Good range while another LoRA is picked for this pass: 0.6–0.8.",
+        "lora_strength_high_2": "Good range while another LoRA is picked for this pass: 0.6–0.8."}
+
+
+def test_a_loras_page_holds_its_strength_in_any_row_even_while_loras_share_its_pass():
+    video = {"lora_high": "a_look_high.safetensors", "lora_strength_high": 1.0,
+             "lora_low": "a_look_low.safetensors", "lora_strength_low": 1.0,
+             "lora_low_2": "example_speed_low.safetensors", "lora_strength_low_2": 0.8}
+
+    advice = setting_advice(video)
+
+    assert (advice["lora_strength_low_2"].text, advice["lora_strength_low_2"].fix) == (
+        "Example Speed's page recommends a strength of 1.", 1)
+    assert advice["lora_strength_low"].text == (
+        "Good range while another LoRA is picked for this pass: 0.6–0.8.")

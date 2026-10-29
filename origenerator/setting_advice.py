@@ -7,7 +7,9 @@ from origenerator.content import load_content
 from origenerator.model_titles import model_title
 from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef
 from origenerator.workflows.duration import seconds_for_frames
+from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
 from origenerator.workflows.model_files import is_no_lora
+from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS_LORA_KEYS
 
 GOOD_STEP_SPACING = {
     "dpmpp_2m": ("karras", "exponential"),
@@ -26,6 +28,12 @@ GOOD_STEP_SPACING = {
 }
 _PASSES = ("high", "low")
 _STRENGTHS = ("cfg", "cfg_high", "cfg_low")
+_SHARED_GOOD_RANGE = (0.6, 0.8)
+_LORA_GROUPS = {
+    LORA_KEYS: "Good range while another LoRA is picked",
+    FIRST_PASS_LORA_KEYS: "Good range while another LoRA is picked for this pass",
+    SECOND_PASS_LORA_KEYS: "Good range while another LoRA is picked for this pass",
+}
 STRENGTH_BELOW_ONE = ("Below 1 the Negative Prompt works backwards: what you get is pulled toward "
                       "what it names, and at 0 the Positive Prompt is ignored altogether.")
 
@@ -96,7 +104,8 @@ class _Choices(NamedTuple):
 
 
 def setting_advice(params: dict, definitions=()) -> dict[str, Advice]:
-    rules = {**_good_ranges(params, definitions), **_recommended(params)}
+    rules = {**_good_ranges(params, definitions), **_shared_strength_ranges(params),
+             **_recommended(params)}
     found = {key: rule.advice(params.get(key)) for key, rule in rules.items()}
     for key in _STRENGTHS:
         if params.get(key) is not None and float(params[key]) < 1.0:
@@ -111,7 +120,8 @@ def _backwards(strength, usual: Advice | None) -> Advice:
 
 
 def recommendations(params: dict) -> dict[str, str]:
-    return {key: rule.said for key, rule in _recommended(params).items()}
+    rules = {**_shared_strength_ranges(params), **_recommended(params)}
+    return {key: rule.said for key, rule in rules.items()}
 
 
 def not_installed(params: dict, definitions, keys) -> dict[str, str]:
@@ -135,6 +145,16 @@ def _installed_in_place_of(chosen: str, options: list, default) -> Advice:
 def _good_ranges(params: dict, definitions) -> dict[str, _Range]:
     return {pd.key: _Range(good_range_text(pd), pd.good, _shown_for(pd))
             for pd in definitions if pd.good and pd.key in params}
+
+
+def _shared_strength_ranges(params: dict) -> dict[str, _Range]:
+    rules: dict[str, _Range] = {}
+    for keys, said in _LORA_GROUPS.items():
+        picked = [key for key in keys if not is_no_lora(params.get(key))]
+        if len(picked) > 1:
+            shared = _Range(f"{said}: {_span(_SHARED_GOOD_RANGE)}.", _SHARED_GOOD_RANGE)
+            rules.update(dict.fromkeys(map(strength_key_of, picked), shared))
+    return rules
 
 
 def _shown_for(pd: ParamDef) -> Callable[[object], str]:
@@ -175,13 +195,16 @@ def _loras_recommend(params: dict) -> dict:
     pages = {side: loras.get(params.get(f"lora_{side}") or "") for side in _PASSES
              if f"lora_{side}" in params}
     rules: dict = {}
+    for keys in _LORA_GROUPS:
+        for key in keys:
+            page = loras.get(params.get(key) or "")
+            if page is not None and page.get("strength"):
+                rules[strength_key_of(key)] = _Range(
+                    f"{page['name']}'s page recommends a strength of {_span(page['strength'])}.",
+                    page["strength"])
     for side, page in pages.items():
         if page is None:
             continue
-        if page.get("strength"):
-            rules[f"lora_strength_{side}"] = _Range(
-                f"{page['name']}'s page recommends a strength of {_span(page['strength'])}.",
-                page["strength"])
         if page.get("cfg"):
             rules.setdefault(f"cfg_{side}" if f"cfg_{side}" in params else "cfg",
                              _Range(_with(page, "cfg"), page["cfg"]))

@@ -3806,3 +3806,24 @@ def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_pat
     assert panel._param_form.get_values()["input_image"] == "image/sdxl_img1.png [output]"
     assert zone.toolTip() == panel._names.of("img1")
     assert led_to == ["img1"]
+
+
+def test_a_second_lora_picked_on_a_tab_lowers_each_picked_strengths_good_range(
+        qtbot, tmp_path, installed_models):
+    for name in ("first_look.safetensors", "second_look.safetensors"):
+        installed_models.add("loras", name, arch="krea2", lora=True)
+    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS),
+                                Database(tmp_path / "test.db"))
+    qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "krea2_t2i"))
+    form = panel._param_form
+    mark = form._warning_marks["lora_strength"]
+
+    form.set_values({"lora": "first_look.safetensors"})
+    assert mark.isHidden()
+
+    form.set_values({"lora_2": "second_look.safetensors"})
+    assert not mark.isHidden()
+    assert mark.toolTip() == "Good range while another LoRA is picked: 0.6–0.8. Click to use 0.8."
+    assert form._widgets["lora_strength_2"].toolTip().endswith(
+        " Good range while another LoRA is picked: 0.6–0.8.")

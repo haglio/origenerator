@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -17,7 +18,7 @@ from origenerator.generation_state import GenerationSource, source_of
 from origenerator.inflight import drop_in_flight
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces
-from origenerator.outside_videos import record_of
+from origenerator.outside_videos import mark_a_favorite, record_of
 from origenerator.record_fold import fold_record_into, lanes_owed
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -84,9 +85,15 @@ class Evolver:
         return self._kino_copies.upscale_of(video) if video is not None else None
 
     def is_a_fun_time_favorite(self, row: dict) -> bool:
+        return self._on_the_kino_copy(row, lambda copy, folder: record_of(copy, folder).favorite)
+
+    def mark_a_fun_time_favorite(self, row: dict) -> bool:
+        return self._on_the_kino_copy(row, mark_a_favorite)
+
+    def _on_the_kino_copy(self, row: dict, answer: Callable[[Path, Path], bool]) -> bool:
         copy = self.kino_copy_of(row)
-        return (copy is not None and self.records_folder is not None
-                and record_of(copy, self.records_folder).favorite)
+        return copy is not None and self.records_folder is not None and answer(
+            copy, self.records_folder)
 
     def still_holds(self, old: dict, backfilled: dict | None) -> bool:
         video = self._video_of(backfilled) if backfilled is not None else None
@@ -109,6 +116,14 @@ def fold_completed_backfill(db, evolver: Evolver, *, trash) -> int:
         elif _put_in_place(db, run, old, evolver):
             folded += 1
     return folded
+
+
+def pay_the_owed_favorites(db, evolver: Evolver) -> int:
+    paid = [row["prompt_id"] for row in db.list_generations()
+            if row.get("fun_time_favorite_owed") and evolver.mark_a_fun_time_favorite(row)]
+    for prompt_id in paid:
+        db.pay_a_fun_time_favorite(prompt_id)
+    return len(paid)
 
 
 def cancel_backfill(db, client) -> int:

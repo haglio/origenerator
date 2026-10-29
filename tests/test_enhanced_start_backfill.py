@@ -17,6 +17,7 @@ from origenerator.enhanced_start_backfill import (
     backfill_params_for,
     cancel_backfill,
     fold_completed_backfill,
+    pay_the_owed_favorites,
     queue_backfill,
     trash_what_the_backfill_replaced,
     videos_to_backfill,
@@ -27,6 +28,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.output_places import OutputPlaces
+from origenerator.outside_videos import record_of
 from tests.comfyui_folders import SUITE_FOLDERS
 
 
@@ -383,6 +385,22 @@ def test_a_fun_time_favorite_on_the_old_videos_copy_is_owed_to_the_new_one(tmp_p
     _fold(db, tmp_path)
 
     assert db.get_generation("again")["fun_time_favorite_owed"]
+
+
+def test_an_owed_favorite_is_marked_on_the_new_videos_copy_once_evolver_has_filed_it(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _video(db, "again", made_from="image")
+    _made_on_disk(tmp_path, "again")
+    db.owe_a_fun_time_favorite("again")
+
+    assert pay_the_owed_favorites(db, _evolver(tmp_path)) == 0
+    assert db.get_generation("again")["fun_time_favorite_owed"]
+
+    copy = _kino_copy(tmp_path, "again")
+    assert pay_the_owed_favorites(db, _evolver(tmp_path)) == 1
+
+    assert record_of(copy, tmp_path / "library" / "metadata").favorite
+    assert not db.get_generation("again")["fun_time_favorite_owed"]
 
 
 def test_a_backfill_run_that_failed_is_cleared_so_the_next_absence_tries_again(tmp_path):

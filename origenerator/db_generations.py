@@ -434,6 +434,11 @@ class GenerationStore(Store):
                                  " WHERE output_files LIKE '%library_path%'").fetchall()
         return {path for files in lists for path in library_paths_in(files[0])}
 
+    def output_files_of_every_row(self) -> list[str]:
+        with self._connect() as conn:
+            return [files for (files,) in conn.execute(
+                "SELECT output_files FROM generations WHERE output_files IS NOT NULL")]
+
     def seed_history_rows(self) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(

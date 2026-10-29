@@ -10,6 +10,7 @@ from PIL.PngImagePlugin import PngInfo
 
 import origenerator.importer as imp
 from origenerator.db import Database
+from origenerator.generation_state import GenerationSource
 from origenerator.importer import (
     backfill_import_params,
     backfill_import_workflows,
@@ -561,6 +562,21 @@ def test_import_skips_already_imported(tmp_path):
     db = Database(tmp_path / "test.db")
     assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir) == 1
     assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir) == 0
+
+
+@pytest.mark.parametrize("source", [GenerationSource.REPLACED, GenerationSource.LEFT_OUT])
+def test_the_import_scan_never_imports_a_file_a_replaced_or_left_out_video_lists(tmp_path, source):
+    output_dir = tmp_path / "output" / "video"
+    output_dir.mkdir(parents=True)
+    (output_dir / "old_00001.mp4").write_bytes(b"made before")
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="old", workflow_name="wan22_i2v", workflow_version="v1",
+                         params_json="{}", workflow_json="{}", source=source)
+    db.update_generation("old", status="completed", output_files=json.dumps(
+        [{"filename": "old_00001.mp4", "subfolder": "video", "type": "output"}]))
+
+    assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db,
+                                 tmp_path / "thumbs") == 0
 
 
 def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):

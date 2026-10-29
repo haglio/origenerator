@@ -4076,6 +4076,21 @@ def test_picking_a_lora_whose_trigger_word_the_prompt_lacks_warns_and_a_click_ad
     assert form._warning_marks["lora"].isHidden()
 
 
+def test_the_workflows_warning_click_adds_the_first_of_a_loras_several_trigger_words(
+        qtbot, installed_models, worded_loras, blank_panel):
+    installed_models.add("loras", "example_acts.safetensors", arch=KREA2, lora=True)
+    worded_loras({"example_acts": ["alpha", "beta"]})
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form._widgets["positive_prompt"].setPlainText("a portrait")
+    lora = form._widgets["lora"]
+    lora.setCurrentIndex(lora.findData("example_acts.safetensors"))
+
+    qtbot.mouseClick(blank_panel._workflow_warning, Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == "alpha, a portrait"
+
+
 def test_a_shown_image_whose_prompt_left_off_its_loras_trigger_word_wears_the_warning(
         worded_style, saved_panel):
     panel, db = saved_panel

@@ -20,14 +20,17 @@ def trigger_words(lora) -> tuple[str, ...]:
     return tuple(word for word in (str(entry).strip() for entry in entries) if word)
 
 
-def missing_words(prompt: str, words) -> list[str]:
-    scenes = scene_prompts(prompt)
-    return [word for word in words if not all(_holds(scene, word) for scene in scenes)]
+def lacks_trigger_word(prompt: str, words) -> bool:
+    return not all(_holds_one(scene, words) for scene in scene_prompts(prompt))
 
 
-def with_words(prompt: str, words) -> str:
-    return story_of([ahead_of(", ".join(missing_words(scene, words)), scene)
+def with_trigger_word(prompt: str, words) -> str:
+    return story_of([scene if _holds_one(scene, words) else ahead_of(words[0], scene)
                      for scene in scene_prompts(prompt)])
+
+
+def _holds_one(text: str, words) -> bool:
+    return any(_holds(text, word) for word in words)
 
 
 def _holds(text: str, word: str) -> bool:

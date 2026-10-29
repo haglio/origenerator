@@ -48,7 +48,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.lora_training import TrainingOffer
 from origenerator.seed_history import SeedHistory, SeedUse
-from origenerator.setting_advice import Advice, MissingTriggerWord, setting_advice
+from origenerator.setting_advice import Advice, MissingTriggerWords, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
@@ -2316,7 +2316,7 @@ def test_resolving_a_warning_leaves_the_rest_of_the_form_as_it_was(qtbot):
             values.get("height")) == (40, "kept", 640, 960)
 
 
-_TRIGGER_WORD = {"lora": MissingTriggerWord("example_style.safetensors", "exmplstyle")}
+_TRIGGER_WORD = {"lora": MissingTriggerWords("example_style.safetensors", ("exmplstyle",))}
 _TRIGGER_WORD_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive "
                       "Prompt. Click to add it.")
 
@@ -2364,8 +2364,8 @@ def test_one_click_adds_once_a_word_two_loras_both_lack(qtbot):
     form = _wan_form(qtbot)
     form.set_values({"positive_prompt": "a portrait"})
     form.set_warnings({
-        "lora_high": MissingTriggerWord("example_style_high.safetensors", "exmplstyle"),
-        "lora_low": MissingTriggerWord("example_style_low.safetensors", "exmplstyle")})
+        "lora_high": MissingTriggerWords("example_style_high.safetensors", ("exmplstyle",)),
+        "lora_low": MissingTriggerWords("example_style_low.safetensors", ("exmplstyle",))})
 
     form.resolve_every_warning()
 

@@ -11,6 +11,7 @@ from origenerator.setting_advice import (
     recommendations,
     recommended_choices,
     setting_advice,
+    trigger_word_advice,
 )
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.lora_rows import lora_strength
@@ -344,3 +345,70 @@ def test_a_loras_page_holds_its_strength_in_any_row_even_while_loras_share_its_p
         "Example Speed's page recommends a strength of 1.", 1)
     assert advice["lora_strength_low"].text == (
         "Good range while another LoRA is picked for this pass: 0.6–0.8.")
+
+
+_STYLE = "example_style.safetensors"
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+               "Click to add it.")
+
+
+@pytest.fixture
+def worded_style(worded_loras, titled_models):
+    worded_loras({"example_style": ["exmplstyle"]})
+    titled_models({"example_style": "Example Style 1.0"})
+
+
+def test_a_picked_lora_whose_trigger_word_the_prompt_lacks_says_so_by_its_title(worded_style):
+    found = trigger_word_advice({"positive_prompt": "a portrait", "lora": _STYLE}, ("lora",))
+
+    assert (found["lora"].said, found["lora"].value_shown) == (_STYLE_SAID, "Example Style 1.0")
+
+
+def test_the_click_on_a_missing_trigger_word_puts_it_at_the_start_of_the_positive_prompt(
+        worded_style):
+    found = trigger_word_advice({"positive_prompt": "a portrait", "lora": _STYLE}, ("lora",))
+
+    assert found["lora"].writes == "positive_prompt"
+    assert found["lora"].fixed("a portrait, soft light") == "exmplstyle, a portrait, soft light"
+
+
+def test_a_lora_whose_trigger_word_the_prompt_holds_gets_no_warning(worded_style):
+    params = {"positive_prompt": "(Exmplstyle:1.1), a portrait", "lora": _STYLE}
+
+    assert trigger_word_advice(params, ("lora",)) == {}
+
+
+def test_a_lora_row_on_none_or_a_lora_with_no_word_written_down_gets_no_warning(worded_style):
+    params = {"positive_prompt": "a portrait", "lora": "None",
+              "lora_low": "example_plain.safetensors"}
+
+    assert trigger_word_advice(params, ("lora", "lora_low")) == {}
+
+
+def test_only_the_lora_rows_asked_about_are_checked(worded_style):
+    params = {"positive_prompt": "a portrait", "lora": _STYLE, "lora_low": _STYLE}
+
+    assert set(trigger_word_advice(params, ("lora_low",))) == {"lora_low"}
+
+
+def test_a_lora_with_several_trigger_words_or_a_passage_for_one_gets_no_warning(worded_loras):
+    worded_loras({"example_acts": ["alpha", "beta"],
+                  "example_scene": ["one two three four five six"]})
+    params = {"positive_prompt": "a portrait", "lora": "example_acts.safetensors",
+              "lora_low": "example_scene.safetensors"}
+
+    assert trigger_word_advice(params, ("lora", "lora_low")) == {}
+
+
+def test_a_trigger_word_of_five_words_is_still_one_to_warn_about(worded_loras):
+    worded_loras({"example_scene": ["one two three four five"]})
+    params = {"positive_prompt": "a portrait", "lora": "example_scene.safetensors"}
+
+    assert set(trigger_word_advice(params, ("lora",))) == {"lora"}
+
+
+def test_a_setting_advices_click_uses_its_fix_whatever_the_setting_holds():
+    found = setting_advice(_image(steps=50))["steps"]
+
+    assert (found.writes, found.fixed(50), found.said) == (
+        "", 40, "Example Model's page recommends 20–40 steps. Click to use 40.")

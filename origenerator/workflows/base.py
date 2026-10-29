@@ -89,7 +89,7 @@ def _text_encode(clip_ref, text: str) -> dict:
     return {"class_type": "CLIPTextEncode", "inputs": {"clip": clip_ref, "text": text}}
 
 
-def _ahead_of(own: str, prompt: str) -> str:
+def ahead_of(own: str, prompt: str) -> str:
     return ", ".join(text for text in (own, prompt) if text)
 
 
@@ -676,9 +676,9 @@ class WorkflowTemplate(ABC):
             if own["prompt"] or own["avoid"] or own["lora"]:
                 positive_id, negative_id = f"fix{index}_positive", f"fix{index}_negative"
                 nodes[positive_id] = _text_encode(
-                    clip, _ahead_of(own["prompt"], params["positive_prompt"]))
+                    clip, ahead_of(own["prompt"], params["positive_prompt"]))
                 nodes[negative_id] = _text_encode(
-                    clip, _ahead_of(own["avoid"], params["negative_prompt"]))
+                    clip, ahead_of(own["avoid"], params["negative_prompt"]))
                 positive, negative = [positive_id, 0], [negative_id, 0]
             nodes[detailer_id] = {
                 "class_type": "DetailerForEach",

@@ -99,6 +99,19 @@ def test_a_training_job_names_the_next_version_its_word_its_pictures_and_its_mod
     assert job["status"] == str(tmp_path / "lora training" / "Example Look" / "status.json")
 
 
+def test_the_next_version_trains_on_the_word_the_overlay_names_for_it_over_the_newest_versions(
+        monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
+    folder = tmp_path / "pictures"
+    folder.mkdir()
+    _trainable(monkeypatch, tmp_path, **{"Example Look": {
+        "pictures": str(folder), "base_model": "example_raw.safetensors",
+        "text_encoder": "example_te.safetensors", "vae": "example_vae.safetensors",
+        "trigger_words": ["qq"]}})
+    _installed(installed_models, titled_models, worded_loras, ("example_look", "Example Look 1.0"))
+
+    assert look_training.training_job("Example Look")["trigger_words"] == ["qq"]
+
+
 def test_a_first_version_goes_in_the_loras_folder_itself_with_no_word(
         monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
     _trainable(monkeypatch, tmp_path)

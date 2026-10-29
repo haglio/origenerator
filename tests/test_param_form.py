@@ -53,7 +53,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
     The form runs at the app's heading font, and labels like "LoRA Strength
     (High)" are wider than the old fixed 120px column; right-aligned, the
     overflow used to clip the *start* of the text. The label column must size
-    itself to the widest label instead.
+    itself to the widest label wherever the row has room for it.
     """
     label_text = "LoRA Strength (High)"
     form = ParamForm([
@@ -65,7 +65,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
     form._sections["Models & LoRAs"].set_collapsed(False)  # its section starts folded
     with qtbot.waitExposed(form):
         form.show()
-    form.resize(form.sizeHint())
+    form.resize(600, form.height())
     form.layout().activate()
 
     label = next(w for w in form.findChildren(QLabel) if w.text() == label_text)

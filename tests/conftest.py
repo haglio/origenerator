@@ -178,26 +178,29 @@ def installed_models(tmp_path, monkeypatch):
     return ModelTree(tmp_path)
 
 
-@pytest.fixture
-def titled_models(tmp_path, monkeypatch):
-    path = tmp_path / "model_titles.json"
-    monkeypatch.setattr(config, "MODEL_TITLES_PATH", path)
+def _kept_by_stem_in(tmp_path, monkeypatch, path_name: str):
+    path = tmp_path / f"{path_name}.json"
+    monkeypatch.setattr(config, path_name, path)
 
-    def write(titles: dict[str, str]) -> None:
-        path.write_text(json.dumps(titles), encoding="utf-8")
+    def write(kept: dict) -> None:
+        path.write_text(json.dumps(kept), encoding="utf-8")
 
     return write
+
+
+@pytest.fixture
+def titled_models(tmp_path, monkeypatch):
+    return _kept_by_stem_in(tmp_path, monkeypatch, "MODEL_TITLES_PATH")
 
 
 @pytest.fixture
 def worded_loras(tmp_path, monkeypatch):
-    path = tmp_path / "trigger_words.json"
-    monkeypatch.setattr(config, "TRIGGER_WORDS_PATH", path)
+    return _kept_by_stem_in(tmp_path, monkeypatch, "TRIGGER_WORDS_PATH")
 
-    def write(words: dict[str, list[str]]) -> None:
-        path.write_text(json.dumps(words), encoding="utf-8")
 
-    return write
+@pytest.fixture
+def recorded_base_models(tmp_path, monkeypatch):
+    return _kept_by_stem_in(tmp_path, monkeypatch, "BASE_MODELS_PATH")
 
 
 class FakeCommandAndRequestListener(QObject):

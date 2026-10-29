@@ -212,9 +212,10 @@ it), on the settings form's LoRA rows and in a fix's prompts window alike,
 which is where he chose to see it (2026-10-29). A trained look LoRA's title
 and trigger words are written when the app takes the finished version
 (`look_training.take`).
-Installing a LoRA also writes down the trigger words it answers to, beside the
-titles in `trigger_words.json`, by running `tools/record_trigger_words.py`; a
-LoRA trained here gets its word written there by hand, from its training.
+Installing a LoRA also writes down the trigger words it answers to and the base
+model Civitai files it under, beside the titles in `trigger_words.json` and
+`base_models.json`, by running `tools/record_trigger_words.py`; a LoRA trained
+here gets its word written there by hand, from its training.
 
 ## What a generation shows is said by hand, never read off its prompt
 
@@ -472,11 +473,13 @@ is the two hooks that call the guard, below.
   what this handler decides reaches a click only once it ships, and a preview
   shows only what an open copy does with the item it is handed.
 - `tools/record_trigger_words.py` — asks Civitai, by each file's SHA-256, for
-  the trigger words of every installed LoRA with none written down yet, and
-  writes them in `config.TRIGGER_WORDS_PATH` beside the titles: `[]` for one
-  Civitai does not know or lists none for, so a later run skips it, and a fix's
-  own LoRAs are left out. It prints counts, never a name or a word. Run it from
-  the production checkout, where that path is the library's file.
+  the trigger words and the base model of every installed LoRA missing either,
+  and writes each one only where it is missing, in `config.TRIGGER_WORDS_PATH`
+  and `config.BASE_MODELS_PATH` beside the titles: `[]` and `""` for one
+  Civitai does not know, so a later run skips it, and a fix's own LoRAs are
+  left out. A file several versions list answers with the version it is the
+  main file of. It prints counts, never a name or a word. Run it from the
+  production checkout, where those paths are the library's files.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of

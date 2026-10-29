@@ -21,6 +21,7 @@ from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
+from origenerator.base_models import loras_offered_beside
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
@@ -31,7 +32,7 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
-from origenerator.gui.param_fields import NOT_KNOWN, field_kind, grey_out_of_reach
+from origenerator.gui.param_fields import NOT_KNOWN, field_kind, grey_out_of_reach, offer_only
 from origenerator.gui.param_help import (
     advice_help,
     definition_help,
@@ -266,6 +267,10 @@ class ParamForm(QWidget):
         for row in self._widgets:
             if lora_key_of(row) in values:
                 self._set_row_visible(row, not strength_without_its_lora(row, values))
+        for pd in self._param_defs:
+            if pd.beside_model in values:
+                offer_only(pd, self._widgets[pd.key],
+                           loras_offered_beside(values[pd.beside_model], pd.options))
         for row, (in_use, shut_down_help) in _IN_USE_WHILE.items():
             if row not in self._widgets:
                 continue

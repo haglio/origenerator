@@ -128,6 +128,7 @@ from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.hud_queue import queue_section
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
@@ -15874,6 +15875,79 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
 
     assert view._queue._running.status_text() == ""
     assert view._queue._clear.isHidden()
+
+
+# --- Cancel All, which asks first -------------------------------------------------
+
+def _cancelable(key, cancelled):
+    return InFlightItem(key=key, caption="Alpha Workflow › a paper kite",
+                        reading=RunReading(status="queued"), reveal=lambda: None,
+                        cancel=lambda: cancelled.append(key))
+
+
+def _view_holding(qtbot, monkeypatch, items):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "_inflight_items", lambda rows=None, requests=None: items)
+    view._update_queue()
+    return view
+
+
+def test_cancel_all_cancels_nothing_when_the_answer_is_no(qtbot, monkeypatch):
+    cancelled = []
+    view = _view_holding(qtbot, monkeypatch, [_cancelable("a", cancelled),
+                                              _cancelable("b", cancelled)])
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.No)
+
+    view._queue._cancel_all.click()
+
+    assert cancelled == []
+
+
+def test_cancel_all_cancels_every_job_from_the_back_of_the_line_forward(qtbot, monkeypatch):
+    # So nothing waiting starts only to be stopped a moment later.
+    cancelled = []
+    view = _view_holding(qtbot, monkeypatch, [_cancelable(key, cancelled)
+                                              for key in ("a", "b", "c")])
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+
+    view._queue._cancel_all.click()
+
+    assert cancelled == ["c", "b", "a"]
+
+
+def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
+    asked = []
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(
+        lambda _parent, title, text, *_a, **_kw: asked.append((title, text))
+        or QMessageBox.StandardButton.No))
+    for held in ([_cancelable("a", []), _cancelable("b", []),
+                  InFlightItem(key="c", caption="Alpha Workflow › a paper kite",
+                               reading=RunReading(status="queued"), reveal=lambda: None)],
+                 [_cancelable("a", [])]):
+        _view_holding(qtbot, monkeypatch, held)._queue._cancel_all.click()
+
+    assert asked == [("Cancel All", "Cancel all 2 jobs in the Job Queue?"),
+                     ("Cancel All", "Cancel the job in the Job Queue?")]
+
+
+def test_cancel_all_leaves_auto_generate_on_to_start_its_next_seed(
+        qtbot, tmp_path, monkeypatch):
+    # His call (2026-10-28): Cancel All does not switch Auto-Generate off.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    (job,) = view._jobs.all_jobs
+    view.refresh()
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+
+    view._queue._cancel_all.click()
+
+    assert view._auto.is_active(key)
+    (next_seed,) = view._jobs.all_jobs
+    assert next_seed.prompt_id != job.prompt_id
 
 
 def test_a_tile_wears_an_enhancing_scrim_while_its_run_is_in_flight(qtbot, tmp_path):

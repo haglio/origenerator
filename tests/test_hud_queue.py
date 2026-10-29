@@ -9,11 +9,13 @@ from shared_ui.palette import RED
 
 from origenerator.gui.hud_queue import (
     CANCEL,
+    CANCEL_ALL,
     CLEAR,
     DOWN,
     FRAME,
     OPEN,
     SHIELD,
+    SHIELD_ALL,
     START_NOW,
     UP,
     QueuePointer,
@@ -154,6 +156,63 @@ def test_a_rows_shield_sits_just_left_of_its_cancel_lit_while_shielded():
     assert not drawn[f"{SHIELD}|j2"][1].lit
 
 
+def test_the_block_stacks_shield_all_over_cancel_all_at_its_right_end():
+    # Where the user put them in the Job Queue (2026-10-28), and so here too.
+    section = queue_section([_item("j1", status="running", cancel=lambda: None,
+                                   shield=lambda _on: None),
+                             _item("j2", cancel=lambda: None, shield=lambda _on: None)], 0)
+
+    _image, targets = _painted(section)
+
+    drawn = {button.command: (rect, button) for rect, button in targets}
+    (all_x, all_y, all_width, all_height), shield_all = drawn[SHIELD_ALL]
+    (cancel_x, cancel_y, cancel_width, _h), cancel_all = drawn[CANCEL_ALL]
+    rows_end = max(x + width for (x, _y, width, _h), button in targets
+                   if button.command.startswith("queue_open|"))
+    assert rows_end <= all_x == cancel_x and all_width == cancel_width
+    assert all_x + all_width == 10 + 400  # flush with the block's right edge
+    assert all_y + all_height < cancel_y
+    assert (shield_all.glyph, cancel_all.glyph) == ("All", "Cancel All")
+
+
+def test_with_nothing_of_ours_in_flight_shield_all_and_cancel_all_are_left_off():
+    # His answer for the Job Queue (2026-10-29), and so here beside another app's backlog.
+    _image, targets = _painted(queue_section([], 3))
+
+    assert not {SHIELD_ALL, CANCEL_ALL} & set(_posted(targets))
+
+
+def _brightest(image, rect) -> int:
+    x, y, width, height = rect
+    return int(np.asarray(image.crop((x, y, x + width, y + height)))[..., :3].max())
+
+
+def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield():
+    # His answer for the Job Queue (2026-10-29), and so here too: the panel's muted
+    # ink, never its bright one, on a press that would do nothing.
+    shielded = _item("j1", status="running", shield=lambda _on: None, shielded=True)
+    grayed = queue_section([shielded, _item("j2")], 0)  # one the slideshow cannot shield
+    lit = queue_section([shielded, _item("j2", shield=lambda _on: None)], 0)
+
+    for section, dim in ((grayed, True), (lit, False)):
+        image, targets = _painted(section)
+        rect, shield_all = next((rect, b) for rect, b in targets if b.command == SHIELD_ALL)
+        assert shield_all.dim == dim
+        assert (_brightest(image, rect) < 180) == dim
+
+
+def test_cancel_all_is_grayed_out_while_no_job_can_be_canceled():
+    # His answer for the Job Queue (2026-10-29), and so here too.
+    grayed = queue_section([_item("j1", status="running"), _item("j2")], 0)
+    lit = queue_section([_item("j1", status="running"), _item("j2", cancel=lambda: None)], 0)
+
+    for section, dim in ((grayed, True), (lit, False)):
+        image, targets = _painted(section)
+        rect, cancel_all = next((rect, b) for rect, b in targets if b.command == CANCEL_ALL)
+        assert cancel_all.dim == dim
+        assert (_brightest(image, rect) < 180) == dim
+
+
 def test_a_row_is_a_way_into_the_folder_its_job_will_land_in():
     section = queue_section([_item("j1")], 0)
 
@@ -188,6 +247,7 @@ class _Host:
         self.moved = []
         self.cleared = 0
         self.started_now = 0
+        self.cancelled_all = 0
 
     def move(self, key, before):
         self.moved.append((key, before))
@@ -197,6 +257,9 @@ class _Host:
 
     def start_now(self):
         self.started_now += 1
+
+    def cancel_all(self):
+        self.cancelled_all += 1
 
 
 def _pointer_over(items, foreign=0):
@@ -252,6 +315,24 @@ class TestThePointerOnTheBlock:
         pointer.release(*at)
 
         assert opened == []
+
+    def test_shield_all_puts_the_shield_on_every_job_that_has_none(self):
+        asked = []
+        pointer, host = _pointer_over([
+            _item("j1", shield=lambda on: asked.append(("j1", on)), shielded=True),
+            _item("j2", shield=lambda on: asked.append(("j2", on)))])
+
+        pointer.press(*_middle_of(pointer, SHIELD_ALL))
+
+        assert asked == [("j2", True)]
+        assert all(line.shielded for line in queue_section(*host.hud_queue).lines)
+
+    def test_cancel_all_is_asked_of_the_slideshow_which_asks_first(self):
+        pointer, host = _pointer_over([_item("j1", cancel=lambda: None)])
+
+        pointer.press(*_middle_of(pointer, CANCEL_ALL))
+
+        assert host.cancelled_all == 1
 
     def test_a_press_on_a_rows_shield_puts_it_on_and_lights_it_at_once(self):
         asked = []

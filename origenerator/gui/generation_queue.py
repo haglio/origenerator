@@ -62,7 +62,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 from shared_ui.mark_button import fill_square_with_mark
-from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
+from shared_ui.spacing import BUTTON_MARK_INSET, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.gui import icons
 from origenerator.gui.combination import Combination
@@ -70,10 +70,14 @@ from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.inflight import (
+    CANCEL_ALL_TEXT,
+    CANCEL_ALL_TIP,
     CANCEL_TEXT,
     CLEAR_TEXT,
     MOVE_DOWN_TIP,
     MOVE_UP_TIP,
+    SHIELD_ALL_TEXT,
+    SHIELD_ALL_TIP,
     SHIELD_TIP,
     START_NOW_TEXT,
     START_NOW_TOOLTIP,
@@ -82,11 +86,14 @@ from origenerator.gui.inflight import (
     clear_queue_tooltip,
     first_movable,
     foreign_queue_text,
+    jobs_to_cancel,
+    jobs_to_shield,
     movable,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
     seconds_until_start,
+    shield_every_job,
     starting_row_text,
 )
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
@@ -610,6 +617,7 @@ class GenerationQueue(QWidget):
     move_requested = pyqtSignal(str, object)  # a row let go just ahead of another, or past the last
     clear_queue_requested = pyqtSignal()  # wipe another app's work off ComfyUI
     start_now_requested = pyqtSignal()  # end the minute a video waits after an image
+    cancel_all_requested = pyqtSignal()  # Cancel All, which asks before anything goes
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -668,10 +676,36 @@ class GenerationQueue(QWidget):
         self._rows_column.addStretch(1)
         self._scroll.setWidget(self._host)
         layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
+        self._for_all = self._for_every_job()
+        layout.addWidget(self._for_all)
         self._rules = _Rules(self._drawn_rules, self)
         self._scroll.verticalScrollBar().valueChanged.connect(self._rules.update)
 
         self.set_items([])
+
+    def _for_every_job(self) -> QWidget:
+        column = QWidget()
+        stack = QVBoxLayout(column)
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.addStretch(1)
+        self._shield_all = QPushButton(SHIELD_ALL_TEXT)
+        self._shield_all.setIcon(icons.shield_icon())
+        mark = QueueRow.HEIGHT - 12 - 2 * BUTTON_MARK_INSET  # a row's shield's own size
+        self._shield_all.setIconSize(QSize(mark, mark))
+        self._shield_all.setToolTip(SHIELD_ALL_TIP)
+        self._shield_all.clicked.connect(self._shield_every_job)
+        self._cancel_all = QPushButton(CANCEL_ALL_TEXT)
+        self._cancel_all.setToolTip(CANCEL_ALL_TIP)
+        self._cancel_all.clicked.connect(self.cancel_all_requested)
+        for button in (self._shield_all, self._cancel_all):
+            button.setFixedHeight(QueueRow.HEIGHT - 12)
+            stack.addWidget(button)
+        stack.addStretch(1)
+        return column
+
+    def _shield_every_job(self):
+        shield_every_job(self._items)
+        self._line_up(self._items)
 
     # --- what the strip is showing -----------------------------------------
 
@@ -725,6 +759,7 @@ class GenerationQueue(QWidget):
         # about another app it is an empty third of the strip, and the hint would
         # be centered in the sliver beside it rather than in the strip itself.
         self._hint.setVisible(not items)
+        self._for_all.setVisible(bool(items))
         self._running.setVisible(bool(items) or bool(free_half))
         self._line_up(items)
 
@@ -747,6 +782,8 @@ class GenerationQueue(QWidget):
         # The scroll area would otherwise squeeze the whole line into its own
         # height, stacking the rows on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
+        _offer(self._shield_all, bool(jobs_to_shield(items)))
+        _offer(self._cancel_all, bool(jobs_to_cancel(items)))
         self._rules.update()
 
     # --- the rules drawn over the strip -------------------------------------

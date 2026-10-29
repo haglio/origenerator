@@ -257,8 +257,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     and wrote that prompt through went, and so did the one that found the folder an
     edited prompt belonged in. And the pane 84 -> 82: Latest's pages are drawn by
     the one pager any listing can take, so the three steps that drew, forgot and
-    revealed Latest's own pages are the one that hands a listing to it.)"""
+    revealed Latest's own pages are the one that hands a listing to it. 271 -> 272:
+    Cancel All asks before it cancels every job, from the job queue or a
+    slideshow's, so it is one method beside Start now's.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 271
+               for x in _class_def(VIEW, "GalleryView").body) == 272
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 81

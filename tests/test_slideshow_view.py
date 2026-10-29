@@ -1174,6 +1174,15 @@ def test_clearing_another_apps_work_goes_back_to_the_gallery(qtbot):
     assert cleared == [True]
 
 
+def test_cancel_all_goes_back_to_the_gallery_which_asks_first(qtbot):
+    asked = []
+    view = _view(qtbot, actions=SlideshowActions(cancel_all=lambda: asked.append(True)))
+
+    view.cancel_all()
+
+    assert asked == [True]
+
+
 def test_start_now_goes_back_to_the_gallery(qtbot):
     started = []
     view = _view(qtbot, actions=SlideshowActions(start_now=lambda: started.append(True)))

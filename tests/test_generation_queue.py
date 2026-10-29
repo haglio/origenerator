@@ -456,6 +456,7 @@ def test_our_first_job_beside_another_apps_backlog_brings_its_rule(dressed, qtbo
 def test_the_rule_keeps_to_the_gap_when_the_live_half_widens(dressed, qtbot, tmp_path):
     # A combine's job stands its frame and its source video side by side in the
     # corner, twice the width of one thumbnail, which pushes the line over.
+    dressed.resize(1100, 60)  # room for the row beside Shield All and Cancel All
     dressed.set_items([_item(job_kind="Video")])
     _settled(dressed)
     was = dressed.head_rule()[0]
@@ -648,6 +649,95 @@ def test_pressing_the_shield_does_not_also_open_the_folder(queue, qtbot):
     qtbot.mouseClick(queue.rows()[0]._shield, Qt.MouseButton.LeftButton)
 
     assert revealed == []
+
+
+# --- Shield All and Cancel All, stacked at the right end of the strip ---------
+
+def _box(queue, widget) -> QRect:
+    return QRect(widget.mapTo(queue, QPoint(0, 0)), widget.size())
+
+
+def test_shield_all_and_cancel_all_stand_stacked_at_the_right_end_of_the_strip(queue):
+    # His pick of four mockups (2026-10-28): the fourth.
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None),
+                     _item(key="b", status="queued", cancel=lambda: None,
+                           shield=lambda _on: None)])
+    QApplication.processEvents()
+
+    shield_all, cancel_all = _box(queue, queue._shield_all), _box(queue, queue._cancel_all)
+    assert queue._scroll.geometry().right() < shield_all.left() == cancel_all.left()
+    assert shield_all.bottom() < cancel_all.top()
+    above, below = shield_all.top(), queue.height() - 1 - cancel_all.bottom()
+    assert abs(above - below) <= 1
+
+
+def test_an_empty_job_queue_leaves_shield_all_and_cancel_all_off(queue):
+    # His answer (2026-10-29): off, so the empty Job Queue looks as it always did.
+    assert not (queue._shield_all.isVisible() or queue._cancel_all.isVisible())
+
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None)])
+    assert queue._shield_all.isVisible() and queue._cancel_all.isVisible()
+
+    queue.set_items([])
+    assert not (queue._shield_all.isVisible() or queue._cancel_all.isVisible())
+
+
+def test_shield_all_wears_the_shield_followed_by_all(queue):
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None)])
+
+    assert queue._shield_all.text() == "All"
+    assert not queue._shield_all.icon().isNull()
+    assert queue._shield_all.iconSize() == queue.rows()[0]._shield.iconSize()
+    assert queue._cancel_all.text() == "Cancel All"
+
+
+def test_shield_all_puts_the_shield_on_every_job_that_has_none(queue):
+    asked = []
+    queue.set_items([_item(key="a", shield=lambda on: asked.append(("a", on)), shielded=True),
+                     _item(key="b", status="queued", shield=lambda on: asked.append(("b", on))),
+                     _item(key="c", status="queued")])  # one this window cannot shield
+
+    queue._shield_all.click()
+
+    assert asked == [("b", True)]
+    assert [row._shield.isChecked() for row in queue.rows()] == [True, True, False]
+
+
+def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield(queue):
+    # His answer (2026-10-29) for a line already shielded, which a line of jobs that
+    # take no shield from here reaches too: either way a press would do nothing.
+    queue.set_items([_item(key="a", shield=lambda _on: None, shielded=True),
+                     _item(key="b", status="queued")])
+    assert (queue._shield_all.isVisible(), queue._shield_all.isEnabled()) == (True, False)
+    assert queue._shield_all.cursor().shape() == Qt.CursorShape.ArrowCursor
+
+    queue.set_items([_item(key="a", shield=lambda _on: None, shielded=True),
+                     _item(key="b", status="queued", shield=lambda _on: None)])
+    assert queue._shield_all.isEnabled()
+    assert queue._shield_all.cursor().shape() == Qt.CursorShape.PointingHandCursor
+
+    queue._shield_all.click()
+    assert not queue._shield_all.isEnabled()
+
+
+def test_cancel_all_is_grayed_out_while_no_job_in_the_queue_can_be_canceled(queue):
+    # His answer (2026-10-29), like Shield All's, for a line of jobs this window has
+    # no Cancel for, as when a restart has not taken them back yet.
+    queue.set_items([_item(key="a"), _item(key="b", status="queued")])
+    assert (queue._cancel_all.isVisible(), queue._cancel_all.isEnabled()) == (True, False)
+    assert queue._cancel_all.cursor().shape() == Qt.CursorShape.ArrowCursor
+
+    queue.set_items([_item(key="a"), _item(key="b", status="queued", cancel=lambda: None)])
+    assert queue._cancel_all.isEnabled()
+    assert queue._cancel_all.cursor().shape() == Qt.CursorShape.PointingHandCursor
+
+
+def test_cancel_all_is_asked_of_whoever_holds_the_jobs(queue, qtbot):
+    # It asks before anything goes, which is the gallery's to do.
+    queue.set_items([_item(key="a", cancel=lambda: None)])
+
+    with qtbot.waitSignal(queue.cancel_all_requested, timeout=1000):
+        queue._cancel_all.click()
 
 
 # --- clicking a row goes to the job's folder ----------------------------------
@@ -1398,4 +1488,4 @@ def test_the_bar_leaves_the_strip_to_the_queue(queue):
 
     _four(queue)
     QApplication.processEvents()
-    assert queue._scroll.width() > queue._running.width()
+    assert queue._scroll.width() + queue._for_all.width() > queue._running.width()

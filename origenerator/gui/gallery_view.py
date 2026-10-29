@@ -117,9 +117,12 @@ from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.gui.inflight import (
+    CANCEL_ALL_TEXT,
     CANCEL_TEXT,
+    cancel_all_question,
     cancel_tooltip,
     clear_queue_tooltip,
+    jobs_to_cancel,
     queue_wait_text,
     stop_auto_generate_text,
     stop_auto_generate_tooltip,
@@ -684,6 +687,7 @@ class GalleryView(QWidget):
         self._jobs.reordered.connect(self.queue_changed)
         self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
         self._queue.start_now_requested.connect(self.start_now)
+        self._queue.cancel_all_requested.connect(self.cancel_all)
         self._arrangement = PaneArrangement(
             toc=toc, browser=browser, info_pane=self._build_info_pane(),
             info_tabs=self._info_tabs, queue=self._queue)
@@ -3469,6 +3473,14 @@ class GalleryView(QWidget):
         self._jobs.start_now()
         self._update_queue()
 
+    def cancel_all(self):
+        items = jobs_to_cancel(self._inflight_items())
+        if not items or not _confirmed_cancel_all(self, len(items)):
+            return
+        for item in reversed(items):
+            item.cancel()
+        self._update_queue()
+
     def clear_foreign_queue(self):
         """Wipe another app's work off ComfyUI, on the user's say-so.
 
@@ -4288,6 +4300,14 @@ def _fetch_poll_facts(client, targets) -> _PollFacts:
             except Exception as e:
                 logger.debug("Could not read what ComfyUI is making: %s", e)
     return _PollFacts(histories, backlogs, _read_foreign_queue(client), executing)
+
+
+def _confirmed_cancel_all(parent, total: int) -> bool:
+    reply = QMessageBox.question(
+        parent, CANCEL_ALL_TEXT, cancel_all_question(total),
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+    )
+    return reply == QMessageBox.StandardButton.Yes
 
 
 def _read_foreign_queue(client):

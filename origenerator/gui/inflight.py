@@ -222,11 +222,34 @@ def movable(item) -> bool:
     return item.move_up is not None or item.move_down is not None
 
 
+def jobs_to_shield(items) -> list:
+    return [item for item in items if item.shield is not None and not item.shielded]
+
+
+def jobs_to_cancel(items) -> list:
+    return [item for item in items if item.cancel is not None]
+
+
+def shield_every_job(items) -> None:
+    for item in jobs_to_shield(items):
+        item.shielded = True
+        item.shield(True)
+
+
 ALREADY_MAKING_ONE_TIP = "This folder is already making one"
 SHIELD_TIP = ("Shield this generation: images you ask for while it is being made "
               "wait for it instead of stopping it")
 MOVE_UP_TIP = "Move this job up the Job Queue"
 MOVE_DOWN_TIP = "Move this job down the Job Queue"
+SHIELD_ALL_TEXT = "All"  # beside the shield, so it reads "Shield All"
+SHIELD_ALL_TIP = "Shield every job in the Job Queue"
+CANCEL_ALL_TEXT = "Cancel All"
+CANCEL_ALL_TIP = "Cancel every job in the Job Queue"
+
+
+def cancel_all_question(total: int) -> str:
+    return ("Cancel the job in the Job Queue?" if total == 1
+            else f"Cancel all {total} jobs in the Job Queue?")
 
 
 CANCEL_TEXT = "Cancel"

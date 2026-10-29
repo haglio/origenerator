@@ -176,7 +176,10 @@ here is a checkpoint whose name says Flux and whose tensors say SDXL, and the
 tensors are right. A WAN model's patch embedding says its kind too (16 channels
 text-to-video, `ref_conv` Fun Control), so the image-to-video forms take neither,
 and the SDXL graphs, which decode with the SDXL VAE, take no SD 1.5 checkpoint.
-**Unrecognized is not unwanted:**
+A WAN LoRA's header cannot say which of the two it was trained for, so there
+the base model Civitai files it under decides (`base_models.json`, written by
+`tools/record_from_civitai.py`), and one filed under text-to-video is left out
+of the image-to-video forms too. **Unrecognized is not unwanted:**
 `describe()` returns `arch=None` for a file it cannot read or match, and every
 filter keeps those. Be wrong in that direction. A listed option that errors on
 submit costs one run and says why; a working model missing from the dropdown has

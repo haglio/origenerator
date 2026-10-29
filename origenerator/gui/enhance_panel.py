@@ -80,6 +80,8 @@ from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help, with_training_date
 from origenerator.gui.training_controls import TrainingControls
+from origenerator.gui.warning_mark import WarningMark
+from origenerator.setting_advice import trigger_word_advice
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -747,11 +749,12 @@ class FixPromptsDialog(QDialog):
         layout.addWidget(heading)
         self.positive = QPlainTextEdit(current["prompt"])
         self.negative = QPlainTextEdit(current["avoid"])
+        self.prompt_warning, self.lora_warning = WarningMark(), WarningMark()
         side_by_side = QHBoxLayout()
-        for caption, field in (("Positive Prompt", self.positive),
-                               ("Negative Prompt", self.negative)):
+        for caption, field in (((self.prompt_warning, QLabel("Positive Prompt")), self.positive),
+                               ((QLabel("Negative Prompt"),), self.negative)):
             column = QVBoxLayout()
-            column.addWidget(QLabel(caption))
+            column.addWidget(_side_by_side(*caption), 0, Qt.AlignmentFlag.AlignLeft)
             column.addWidget(field, 1)
             side_by_side.addLayout(column)
         layout.addLayout(side_by_side, 1)
@@ -774,11 +777,31 @@ class FixPromptsDialog(QDialog):
         self._running: str | None = None
         self._offer_training()
         foot = FlowLayout(spacing=GAP_SMALL)
-        for together in ((QLabel("LoRA"), self.lora), (QLabel("LoRA Strength"), self.strength)):
+        for together in ((self.lora_warning, QLabel("LoRA"), self.lora),
+                         (QLabel("LoRA Strength"), self.strength)):
             foot.addWidget(_side_by_side(*together))
         foot.addWidget(self.training)
         foot.add_trailing(buttons)
         layout.addLayout(foot)
+        self.positive.textChanged.connect(self._warn_of_a_missing_trigger_word)
+        self.lora.currentIndexChanged.connect(self._warn_of_a_missing_trigger_word)
+        for mark in (self.prompt_warning, self.lora_warning):
+            mark.pressed.connect(self._add_the_missing_trigger_word)
+        self._warn_of_a_missing_trigger_word()
+
+    def _missing_trigger_word(self):
+        return trigger_word_advice({"positive_prompt": self.positive.toPlainText(),
+                                    "lora": self.lora.currentData()}, ("lora",)).get("lora")
+
+    def _warn_of_a_missing_trigger_word(self) -> None:
+        missing = self._missing_trigger_word()
+        for mark in (self.prompt_warning, self.lora_warning):
+            mark.warn(missing.said if missing is not None else "")
+
+    def _add_the_missing_trigger_word(self) -> None:
+        missing = self._missing_trigger_word()
+        if missing is not None:
+            self.positive.setPlainText(missing.fixed(self.positive.toPlainText()))
 
     def show_training(self, text: str | None) -> None:
         self._running = text

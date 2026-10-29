@@ -1892,6 +1892,59 @@ def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, mon
     assert (kept["lora"], kept["strength"]) == ("my_hands.safetensors", 0.7)
 
 
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+               "Click to add it.")
+
+
+@pytest.fixture
+def worded_fix(qtbot, monkeypatch, worded_loras, titled_models):
+    monkeypatch.setattr(enhance_panel_module, "list_lora_files",
+                        lambda fallback, accepts: ["None", "example_style.safetensors"])
+    worded_loras({"example_style": ["exmplstyle"]})
+    titled_models({"example_style": "Example Style 1.0"})
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    window.positive.setPlainText("a close-up")
+    window.lora.setCurrentIndex(window.lora.findData("example_style.safetensors"))
+    return window
+
+
+def test_a_fixs_lora_whose_trigger_word_its_prompt_lacks_warns_beside_its_prompt_and_lora(
+        worded_fix):
+    marks = (worded_fix.prompt_warning, worded_fix.lora_warning)
+
+    assert [(mark.isHidden(), mark.toolTip()) for mark in marks] == [(False, _STYLE_SAID)] * 2
+
+
+@pytest.mark.parametrize("mark", ["prompt_warning", "lora_warning"])
+def test_clicking_a_fixs_trigger_word_warning_puts_the_word_at_the_start_of_its_prompt(
+        qtbot, worded_fix, mark):
+    qtbot.mouseClick(getattr(worded_fix, mark), Qt.MouseButton.LeftButton)
+
+    assert worded_fix.positive.toPlainText() == "exmplstyle, a close-up"
+    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+
+
+def test_a_fixs_trigger_word_warning_goes_once_its_lora_is_put_on_none(worded_fix):
+    worded_fix.lora.setCurrentIndex(worded_fix.lora.findData("None"))
+
+    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+
+
+def test_a_fixs_trigger_word_warnings_sit_left_of_the_prompt_and_lora_captions(worded_fix):
+    worded_fix.resize(700, 600)
+    worded_fix.layout().activate()
+
+    for mark, caption in ((worded_fix.prompt_warning, "Positive Prompt"),
+                          (worded_fix.lora_warning, "LoRA")):
+        label = next(label for label in worded_fix.findChildren(QLabel)
+                     if label.text() == caption)
+        left_of_label = label.mapTo(worded_fix, QPoint()).x()
+        assert mark.mapTo(worded_fix, QPoint()).x() + mark.width() <= left_of_label
+        assert _rows_of(worded_fix, mark) & _rows_of(worded_fix, label)
+
+
 def test_a_fixs_lora_strength_says_what_range_works_well_as_every_forms_does(qtbot):
     panel, _edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()

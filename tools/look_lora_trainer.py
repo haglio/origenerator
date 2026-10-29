@@ -12,6 +12,9 @@ import time
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools import card_claim  # noqa: E402
+
 PICTURE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"}
 LONG_SIDE = 1536
 SHORT_SIDE_AT_LEAST = 512
@@ -181,8 +184,18 @@ def cache(job: dict, wait_for_idle=None) -> None:
 
 
 class Machine:
-    def __init__(self, comfyui: str):
+    def __init__(self, comfyui: str, holder: str = ""):
         self._comfyui = comfyui
+        self._holder = holder
+
+    def card_held_by_another(self) -> bool:
+        return card_claim.held_by_another(os.getpid())
+
+    def claim_card(self) -> bool:
+        return card_claim.take(self._holder, os.getpid())
+
+    def release_card(self) -> None:
+        card_claim.release(os.getpid())
 
     def jobs_waiting(self) -> int | None:
         try:
@@ -221,21 +234,30 @@ def wait_for_idle(job: dict, machine) -> None:
     while True:
         quiet = 0
         while quiet < IDLE_CHECKS:
-            quiet = quiet + 1 if machine.jobs_waiting() in (0, None) else 0
+            free = machine.jobs_waiting() in (0, None) and not machine.card_held_by_another()
+            quiet = quiet + 1 if free else 0
             machine.sleep(IDLE_CHECK_SECONDS)
         memory = machine.card_memory_mib()
         if memory is not None and memory >= CARD_FREE_MIB:
             machine.unload_comfyui()
             machine.sleep(10)
             memory = machine.card_memory_mib()
-        if memory is None or memory < CARD_FREE_MIB:
+        if memory is not None and memory >= CARD_FREE_MIB:
+            print(f"== the card still holds {memory} MiB with ComfyUI's line empty; waiting on",
+                  flush=True)
+        elif machine.claim_card():
             return
-        print(f"== the card still holds {memory} MiB with ComfyUI's line empty; waiting on", flush=True)
+        else:
+            print("== another trainer took the card first; waiting on", flush=True)
         machine.sleep(60)
 
 
+def _machine(job: dict) -> Machine:
+    return Machine(job["comfyui"], f"{job['display_name']} training")
+
+
 def _wait_for_the_card(job: dict) -> None:
-    wait_for_idle(job, Machine(job["comfyui"]))
+    wait_for_idle(job, _machine(job))
 
 
 def train_command(job: dict, steps: int, resume: Path | None = None) -> list[str]:
@@ -342,6 +364,7 @@ def train(job: dict, machine, popen=subprocess.Popen, kill=_end) -> None:
             done += step
             tally.write_text(str(done), encoding="utf-8")
             print(f"== progress kept: {done} of {job['steps']} steps saved", flush=True)
+        machine.release_card()
         if stopped_for_comfyui:
             machine.sleep(10)
             continue
@@ -382,22 +405,25 @@ def _said_why(job: dict) -> bool:
 
 
 def run(job: dict) -> None:
-    prepare(job)
-    describing = subprocess.run([sys.executable, str(Path(__file__).resolve()), "describe",
-                                 job["job_file"]], creationflags=_IN_THE_BACKGROUND)
-    if describing.returncode != 0:
-        if _said_why(job):
-            raise Stopped()
-        raise Stopped("Describing the pictures quit without saying why. An agent can read what "
-                      f"it printed in {job['log']}.")
-    dataset(job)
-    cache(job, wait_for_idle=_wait_for_the_card)
-    train(job, Machine(job["comfyui"]))
-    install(job)
+    try:
+        prepare(job)
+        describing = subprocess.run([sys.executable, str(Path(__file__).resolve()), "describe",
+                                     job["job_file"]], creationflags=_IN_THE_BACKGROUND)
+        if describing.returncode != 0:
+            if _said_why(job):
+                raise Stopped()
+            raise Stopped("Describing the pictures quit without saying why. An agent can read "
+                          f"what it printed in {job['log']}.")
+        dataset(job)
+        cache(job, wait_for_idle=_wait_for_the_card)
+        train(job, _machine(job))
+        install(job)
+    finally:
+        card_claim.release(os.getpid())
 
 
 STEPS = {"run": run, "prepare": prepare, "describe": describe, "dataset": dataset, "cache": cache,
-         "train": lambda job: train(job, Machine(job["comfyui"])), "install": install}
+         "train": lambda job: train(job, _machine(job)), "install": install}
 _DOING = {"run": "training", "prepare": "copying the pictures", "describe": "describing the pictures",
           "dataset": "writing the dataset", "cache": "preparing the pictures", "train": "training",
           "install": "installing the LoRA"}
@@ -421,6 +447,8 @@ def main(argv: list[str]) -> int:
                                              f"{_DOING[step]}. An agent can read why in "
                                              f"{job['log']}.")
         return 1
+    finally:
+        card_claim.release(os.getpid())
     return 0
 
 

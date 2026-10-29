@@ -5,6 +5,7 @@ import pytest
 import origenerator.setting_advice as advice_module
 from origenerator.setting_advice import (
     STRENGTH_BELOW_ONE,
+    fix_lora_model_advice,
     fresh_settings,
     not_installed,
     not_installed_advice,
@@ -440,3 +441,22 @@ def test_a_setting_advices_click_uses_its_fix_whatever_the_setting_holds():
 
     assert (found.writes, found.fixed(50), found.said) == (
         "", 40, "Example Model's page recommends 20–40 steps. Click to use 40.")
+
+
+def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so_and_a_click_uses_it(
+        titled_models):
+    titled_models({"trained_on": "Trained On v1"})
+
+    found = fix_lora_model_advice("picked.safetensors", {"hands": "trained_on.safetensors"},
+                                  ["picked.safetensors", "trained_on.safetensors"])
+
+    assert found["checkpoint"].said == (
+        "The Hands fix's LoRA was trained on Trained On v1. Click to use Trained On v1.")
+    assert found["checkpoint"].fixed("picked.safetensors") == "trained_on.safetensors"
+
+
+def test_no_model_advice_while_a_fixs_lora_has_its_model_or_that_model_is_not_installed():
+    assert fix_lora_model_advice("trained_on.safetensors", {"hands": "trained_on.safetensors"},
+                                 ["trained_on.safetensors"]) == {}
+    assert fix_lora_model_advice("picked.safetensors", {"hands": "gone.safetensors"},
+                                 ["picked.safetensors"]) == {}

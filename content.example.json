@@ -209,7 +209,8 @@
       "pictures": "C:/path/to/example_look_pictures",
       "base_model": "example_raw_bf16.safetensors",
       "text_encoder": "example_text_encoder_bf16.safetensors",
-      "vae": "example_vae.safetensors"
+      "vae": "example_vae.safetensors",
+      "trigger_words": ["examplelook"]
     }
   }
 }

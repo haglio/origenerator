@@ -52,6 +52,7 @@ import gc
 import json
 import os
 import struct
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -704,3 +705,13 @@ def _context_menus_open_on_release(qapp):
 @pytest.fixture(autouse=True)
 def _no_outline_detector_but_the_ones_a_test_installs(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_outline_detector_files", list)
+
+
+@pytest.fixture
+def another_program():
+    """A live program of the tests' own, whose pid can hold a claim and then die."""
+    program = subprocess.Popen([sys._base_executable, "-c", "import time; time.sleep(120)"],
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    yield program
+    program.kill()
+    program.wait()

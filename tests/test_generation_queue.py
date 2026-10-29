@@ -39,7 +39,7 @@ def dressed(qtbot):
     q = GenerationQueue()
     q.setStyleSheet(build_stylesheet())
     qtbot.addWidget(q)
-    q.resize(800, 60)
+    q.resize(1100, 60)  # room for a whole row beside Shield All and Cancel All
     with qtbot.waitExposed(q):
         q.show()
     return q
@@ -456,7 +456,6 @@ def test_our_first_job_beside_another_apps_backlog_brings_its_rule(dressed, qtbo
 def test_the_rule_keeps_to_the_gap_when_the_live_half_widens(dressed, qtbot, tmp_path):
     # A combine's job stands its frame and its source video side by side in the
     # corner, twice the width of one thumbnail, which pushes the line over.
-    dressed.resize(1100, 60)  # room for the row beside Shield All and Cancel All
     dressed.set_items([_item(job_kind="Video")])
     _settled(dressed)
     was = dressed.head_rule()[0]
@@ -491,9 +490,13 @@ def test_cancel_stops_the_job_on_its_own_row(queue):
     assert stopped == ["c", "a"]
 
 
-def test_cancel_is_hidden_on_a_job_that_cannot_be_stopped_from_here(queue):
+def test_cancel_is_grayed_out_on_a_job_that_cannot_be_stopped_from_here(queue):
+    # His answer (2026-10-29): grayed out like the arrows, rather than left off.
     queue.set_items([_item(key="a", cancel=None)])
-    assert not queue.rows()[0]._cancel.isVisible()
+    QApplication.processEvents()
+    cancel = queue.rows()[0]._cancel
+    assert (cancel.isVisible(), cancel.isEnabled()) == (True, False)
+    assert cancel.cursor().shape() == Qt.CursorShape.ArrowCursor
 
 
 def test_a_row_from_an_auto_generating_folder_says_cancel_too(queue):
@@ -635,9 +638,13 @@ def test_a_rows_shield_shows_whether_its_job_is_shielded_and_follows_it_in_place
     assert not row._shield.isChecked()
 
 
-def test_the_shield_is_hidden_on_a_job_that_cannot_be_shielded_from_here(queue):
+def test_the_shield_is_grayed_out_on_a_job_that_cannot_be_shielded_from_here(queue):
+    # His answer (2026-10-29), with the Cancel's.
     queue.set_items([_item(key="a")])
-    assert not queue.rows()[0]._shield.isVisible()
+    QApplication.processEvents()
+    shield = queue.rows()[0]._shield
+    assert (shield.isVisible(), shield.isEnabled()) == (True, False)
+    assert shield.cursor().shape() == Qt.CursorShape.ArrowCursor
 
 
 def test_pressing_the_shield_does_not_also_open_the_folder(queue, qtbot):
@@ -1243,7 +1250,8 @@ def test_what_the_rules_are_drawn_over_still_takes_every_press(queue):
     row = queue.rows()[1]
     frame = queue._running._frame
 
-    assert queue.childAt(row.mapTo(queue, row.rect().center())) is row
+    under = queue.childAt(row.mapTo(queue, row.rect().center()))
+    assert under is row or row.isAncestorOf(under)
     assert queue.childAt(frame.mapTo(queue, frame.rect().center())) is frame
 
 
@@ -1423,7 +1431,7 @@ def test_a_row_that_is_not_a_job_yet_says_so(queue):
 
     assert row._note_text == "Starting…"
     assert row._lead.text() == "~? · Video · dancing"   # what is known of it already
-    assert row._cancel.isHidden()               # nothing on the server to stop yet
+    assert not row._cancel.isEnabled()          # nothing on the server to stop yet
     assert "Not sent to ComfyUI yet" in row._lead.toolTip()
 
 

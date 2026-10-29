@@ -252,11 +252,8 @@ class QueueSection:
         return _FRAME + _GAP + column, _FRAME
 
     def _row_width(self, line: JobLine) -> int:
-        width = 2 * (CTRL_BTN + _GAP) + _BLOCK_W + _GAP + text_width(_tiny(), line.lead)
-        if line.shieldable:
-            width += CTRL_BTN + _GAP
-        if line.cancelable:
-            width += _word_width(CANCEL_TEXT) + _GAP
+        width = (3 * (CTRL_BTN + _GAP) + _word_width(CANCEL_TEXT) + _GAP + _BLOCK_W + _GAP
+                 + text_width(_tiny(), line.lead))
         if line.note:
             width += _GAP + text_width(_tiny(), line.note)
         return width
@@ -380,19 +377,17 @@ class QueueSection:
                                      width=CTRL_BTN, dim=not can_go),
                               pointer, targets)
                 cursor += CTRL_BTN + _GAP
-            if line.shieldable:
-                _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
-                              Button(f"{SHIELD}|{line.key}", shared_mark("shield"),
-                                     SHIELD_TIP, width=CTRL_BTN, lit=line.shielded),
-                              pointer, targets)
-                cursor += CTRL_BTN + _GAP
-            if line.cancelable:
-                word = _word_width(CANCEL_TEXT)
-                _paint_button(image, draw, (cursor, row, word, CTRL_BTN),
-                              Button(f"{CANCEL}|{line.key}", CANCEL_TEXT,
-                                     line.cancel_tooltip, width=word),
-                              pointer, targets)
-                cursor += word + _GAP
+            _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
+                          Button(f"{SHIELD}|{line.key}", shared_mark("shield"), SHIELD_TIP,
+                                 width=CTRL_BTN, lit=line.shielded, dim=not line.shieldable),
+                          pointer, targets)
+            cursor += CTRL_BTN + _GAP
+            word = _word_width(CANCEL_TEXT)
+            _paint_button(image, draw, (cursor, row, word, CTRL_BTN),
+                          Button(f"{CANCEL}|{line.key}", CANCEL_TEXT, line.cancel_tooltip,
+                                 width=word, dim=not line.cancelable),
+                          pointer, targets)
+            cursor += word + _GAP
             _paint_thumbnails(image, draw, cursor, row, line)
             cursor += _BLOCK_W + _GAP
             room = max(0, x + width - cursor)

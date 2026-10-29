@@ -453,12 +453,10 @@ class QueueRow(OpensAFolder, QWidget):
         self._shield.setCheckable(True)
         self._shield.setIcon(icons.shield_icon())
         self._shield.setToolTip(SHIELD_TIP)
-        self._shield.setCursor(Qt.CursorShape.PointingHandCursor)
         self._shield.clicked.connect(self._on_shield)
         layout.addWidget(self._shield)
         self._cancel = QPushButton(CANCEL_TEXT)
         self._cancel.setObjectName("queueCancelBtn")
-        self._cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self._cancel.setFixedHeight(self.HEIGHT - 12)
         self._cancel.clicked.connect(self._on_cancel)
         layout.addWidget(self._cancel)
@@ -510,8 +508,8 @@ class QueueRow(OpensAFolder, QWidget):
         self._note_text = starting_row_text(item.starting) or ""
         self._render_note()
         self._cancel.setToolTip(cancel_tooltip(item.auto_generating))
-        self._cancel.setVisible(item.cancel is not None)
-        self._shield.setVisible(item.shield is not None)
+        _offer(self._cancel, item.cancel is not None)
+        _offer(self._shield, item.shield is not None)
         self._shield.setChecked(item.shielded)
         self._render_thumbs(item)
 

@@ -423,7 +423,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # code that did it.
 # 16149 when the button that throws a run away came to say Cancel
 # everywhere, and the account of why it once said "Next seed" went.
-MAX_PROSE_LINES = 16149
+# 16148 when a row's Cancel and shield came to gray out where its job cannot
+# take them, and the note tying the gallery's menu to a hidden Cancel went.
+MAX_PROSE_LINES = 16148
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

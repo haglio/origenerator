@@ -55,3 +55,11 @@ def test_the_preview_launcher_marks_the_run_and_borrows_the_primary_venv():
     assert Path(report.value("directory")) == _REPO_ROOT
     assert report.value("arguments") == "-m origenerator"
     assert Path(report.value("log")) == _REPO_ROOT / "state" / "origenerator_launcher.log"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the Windows script host")
+def test_a_new_previews_first_click_shows_the_pictures_an_earlier_preview_left():
+    report = dry_run(_REPO_ROOT / "launch_preview_branch.vbs")
+
+    primary = _REPO_ROOT.parents[2]
+    assert Path(report.value("pictures")) == primary / "state" / "origenerator_launcher.screen" / "preview"

@@ -7,6 +7,7 @@ already received.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 import pytest
 from PIL import Image
@@ -65,6 +66,7 @@ from origenerator.gui.enhance_versions import (
 )
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
+from origenerator.workflows.model_files import NO_LORA
 from tests import gestures
 from tests.drop_style_seen import worn
 
@@ -2069,3 +2071,19 @@ def test_a_fixs_prompts_already_open_are_brought_forward_rather_than_opened_twic
     panel._fix_prompt_buttons["hands"].click()
 
     assert panel._fix_prompt_windows["hands"] is first
+
+
+def test_a_fix_windows_lora_dropdown_says_when_its_picked_lora_was_trained(
+        qtbot, installed_models, titled_models):
+    installed_models.add("loras", "fixes/hands 1.1.safetensors", arch="sdxl", lora=True,
+                         metadata={"ss_training_finished_at": "1792851468.891"})
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    assert window.lora.toolTip() == ""
+
+    window.lora.setCurrentIndex(window.lora.findData(r"fixes\hands 1.1.safetensors"))
+    assert window.lora.toolTip() == f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}."
+
+    window.lora.setCurrentIndex(window.lora.findData(NO_LORA))
+    assert window.lora.toolTip() == ""

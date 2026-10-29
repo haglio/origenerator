@@ -139,13 +139,14 @@ class ModelTree:
     def __init__(self, root):
         self.root = root
 
-    def add(self, category, name, *, arch=None, lora=False, body=None):
+    def add(self, category, name, *, arch=None, lora=False, body=None, metadata=None):
         """Write ``models/<category>/<name>``, returning its path.
 
         With *arch*, the file gets a real safetensors header naming that
         architecture's tensors — plus the LoRA suffixes when *lora* — which is
-        what the pickers classify it by. With *body*, the raw bytes are written
-        instead, for the unreadable-file cases.
+        what the pickers classify it by, and *metadata* goes into that header
+        as the trainer's own notes would. With *body*, the raw bytes are
+        written instead, for the unreadable-file cases.
         """
         path = self.root / "models" / category / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -155,9 +156,10 @@ class ModelTree:
         names = list(ARCH_TENSOR_NAMES[arch]) if arch else ["unknown.weight"]
         if lora:
             names = [f"{name}.lora_A.weight" for name in names]
-        header = json.dumps(
-            {n: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for n in names}
-        ).encode()
+        header = json.dumps({
+            **({"__metadata__": metadata} if metadata is not None else {}),
+            **{n: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for n in names},
+        }).encode()
         path.write_bytes(struct.pack("<Q", len(header)) + header + b"\x00\x00")
         return path
 

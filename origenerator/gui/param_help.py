@@ -15,6 +15,7 @@ workflow's params explained and advised before a new one can ship.
 """
 from __future__ import annotations
 
+from origenerator.model_titles import trained_sentence
 from origenerator.setting_advice import good_range_text
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
@@ -435,3 +436,7 @@ def advice_help(pd: ParamDef, recommendation: str = "") -> str:
 
 def option_help(key: str, option: str) -> str:
     return OPTION_HELP.get(key, {}).get(option, "")
+
+
+def with_training_date(tip: str, lora) -> str:
+    return " ".join(filter(None, (tip, trained_sentence(lora))))

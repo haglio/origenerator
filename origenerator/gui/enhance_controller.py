@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
 from typing import NamedTuple, Protocol
 
 from PyQt6.QtWidgets import QMessageBox
@@ -185,8 +184,7 @@ class EnhanceController:
                 "names no lora_training_python and lora_training_scripts.")
             return
         job = fix_training.training_job(part,
-                                        fix_training.model_to_train_for(self._settings.params),
-                                        datetime.now().astimezone())
+                                        fix_training.model_to_train_for(self._settings.params))
         self._watch(job).begin()
 
     def take_up_trainings(self) -> None:

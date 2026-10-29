@@ -271,7 +271,7 @@ def _tensor_names(path: Path) -> list[str] | None:
     return None
 
 
-def _safetensors_names(path: Path) -> list[str] | None:
+def _safetensors_header(path: Path) -> dict | None:
     """safetensors: a little-endian u64 byte length, then that much JSON."""
     with path.open("rb") as handle:
         (length,) = struct.unpack("<Q", handle.read(8))
@@ -280,7 +280,21 @@ def _safetensors_names(path: Path) -> list[str] | None:
         header = handle.read(length)
     if len(header) < length:
         return None   # truncated: never saw the index we would be judging
-    return [key for key in json.loads(header) if key != "__metadata__"]
+    return json.loads(header)
+
+
+def _safetensors_names(path: Path) -> list[str] | None:
+    header = _safetensors_header(path)
+    return None if header is None else [key for key in header if key != "__metadata__"]
+
+
+def safetensors_metadata(path: Path) -> dict:
+    try:
+        header = _safetensors_header(path)
+    except (OSError, struct.error, UnicodeDecodeError, ValueError):
+        return {}
+    metadata = (header or {}).get("__metadata__")
+    return metadata if isinstance(metadata, dict) else {}
 
 
 # GGUF's metadata values are typed; every type but string and array is a fixed

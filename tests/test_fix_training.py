@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import subprocess
 import types
-from datetime import datetime
 from pathlib import Path
 
 from origenerator import config, fix_training
@@ -89,7 +88,7 @@ def test_the_next_fix_to_train_is_the_first_with_photos_and_a_detector_not_train
 
 
 def test_a_training_job_names_the_fixs_photos_its_detector_and_the_model_to_train_for(
-        monkeypatch, tmp_path):
+        monkeypatch, tmp_path, installed_models):
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
     monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
     for folder, name in (("hands", "one.jpg"), ("shared", "two.jpg")):
@@ -98,20 +97,29 @@ def test_a_training_job_names_the_fixs_photos_its_detector_and_the_model_to_trai
     monkeypatch.setattr(config, "LORA_TRAINING_SCRIPTS", Path("C:/sd-scripts"))
     models = config.COMFYUI_DIR / "models"
 
-    job = fix_training.training_job(_part("hands"), "base.safetensors",
-                                    datetime(2026, 10, 19, 1, 30))
+    job = fix_training.training_job(_part("hands"), "base.safetensors")
 
     assert job["photos"] == [str(tmp_path / "hands" / "one.jpg"), str(tmp_path / "shared" / "two.jpg")]
     assert job["photos_folders"] == [str(tmp_path / "hands"), str(tmp_path / "shared")]
     assert list(job["photo_stamps"]) == ["hands/one.jpg", "shared/two.jpg"]
     assert job["automatic"] is False
-    assert fix_training.training_job(_part("hands"), "base.safetensors", datetime(2026, 10, 24),
+    assert fix_training.training_job(_part("hands"), "base.safetensors",
                                      automatic=True)["automatic"] is True
     assert job["detector"] == str(models / "ultralytics" / "bbox" / "hand_yolov8s.pt")
     assert job["base_model"] == str(models / "checkpoints" / "base.safetensors")
     assert job["output_dir"] == str(models / "loras" / "fixes")
-    assert job["output_name"] == "hands 2026-10-19 0130"
+    assert job["output_name"] == "hands 1.0"
+    assert job["display_name"] == "Hands fix 1.0"
     assert job["sd_scripts"] == str(Path("C:/sd-scripts"))
+
+
+def test_a_fix_trained_again_is_named_by_the_version_after_its_newest_lora(
+        monkeypatch, tmp_path, installed_models):
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
+    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+    installed_models.add("loras", "fixes/hands 2026-10-19 0130.safetensors", arch="sdxl", lora=True)
+
+    assert fix_training.training_job(_part("hands"), "base.safetensors")["output_name"] == "hands 1.1"
 
 
 def _started(monkeypatch) -> list:

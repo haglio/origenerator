@@ -214,7 +214,7 @@ and trigger words are written when the app takes the finished version
 (`look_training.take`).
 Installing a LoRA also writes down the trigger words it answers to and the base
 model Civitai files it under, beside the titles in `trigger_words.json` and
-`base_models.json`, by running `tools/record_trigger_words.py`; a LoRA trained
+`base_models.json`, by running `tools/record_from_civitai.py`; a LoRA trained
 here gets its word written there by hand, from its training.
 
 ## What a generation shows is said by hand, never read off its prompt
@@ -472,7 +472,7 @@ is the two hooks that call the guard, below.
   that had raised it, and he wants toasts to open production. So a change to
   what this handler decides reaches a click only once it ships, and a preview
   shows only what an open copy does with the item it is handed.
-- `tools/record_trigger_words.py` — asks Civitai, by each file's SHA-256, for
+- `tools/record_from_civitai.py` — asks Civitai, by each file's SHA-256, for
   the trigger words and the base model of every installed LoRA missing either,
   and writes each one only where it is missing, in `config.TRIGGER_WORDS_PATH`
   and `config.BASE_MODELS_PATH` beside the titles: `[]` and `""` for one

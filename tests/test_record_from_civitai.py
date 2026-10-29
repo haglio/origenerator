@@ -8,7 +8,7 @@ import struct
 import pytest
 
 from origenerator import config
-from tools import record_trigger_words
+from tools import record_from_civitai
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +37,7 @@ def _bases() -> dict:
 def test_a_lora_civitai_knows_has_its_base_model_written_down_beside_its_words(installed_models):
     style = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
 
-    record_trigger_words.main([], ask=lambda hashes: [_version(style, [], "Example Base 1.0")])
+    record_from_civitai.main([], ask=lambda hashes: [_version(style, [], "Example Base 1.0")])
 
     assert _bases() == {"example_style": "Example Base 1.0"}
 
@@ -52,7 +52,7 @@ def test_a_lora_whose_words_are_written_down_but_not_its_base_model_is_asked_and
         asked.append(hashes)
         return []
 
-    record_trigger_words.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
 
     assert asked == [[_sha256(trained)]]
     assert (_recorded(), _bases()) == ({"home_trained": ["hmtrnd"]}, {"home_trained": ""})
@@ -67,7 +67,7 @@ def test_a_lora_civitai_knows_is_recorded_with_the_words_it_was_trained_on(
         asked.append(hashes)
         return [_version(style, ["exmplstyle"])]
 
-    record_trigger_words.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
 
     assert asked == [[_sha256(style)]]
     assert _recorded() == {"example_style": ["exmplstyle"]}
@@ -85,7 +85,7 @@ def test_a_lora_whose_words_and_base_model_are_written_down_is_neither_asked_abo
         asked.append(hashes)
         return []
 
-    record_trigger_words.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
 
     assert asked == [[_sha256(style)]]
     assert _recorded()["home_trained"] == ["hmtrnd"]
@@ -100,8 +100,8 @@ def test_a_lora_civitai_does_not_know_is_written_down_with_no_words_and_not_aske
         asked.append(hashes)
         return []
 
-    record_trigger_words.main([], ask=civitai)
-    record_trigger_words.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
 
     assert len(asked) == 1
     assert (_recorded(), _bases()) == ({"unlisted_style": []}, {"unlisted_style": ""})
@@ -116,7 +116,7 @@ def test_a_fixs_own_lora_is_left_out(installed_models):
         asked.append(hashes)
         return []
 
-    record_trigger_words.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
 
     assert asked == []
     assert _recorded() == {}
@@ -133,7 +133,7 @@ def test_two_copies_of_one_lora_under_different_names_are_both_written_down(
         asked.append(hashes)
         return [_version(style, ["exmplstyle"])]
 
-    record_trigger_words.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
 
     assert asked == [[_sha256(style)]]
     assert _recorded() == {"example_style": ["exmplstyle"],
@@ -149,7 +149,7 @@ def test_a_lora_civitai_also_lists_beside_another_models_own_file_takes_its_own_
                               dict(listed, primary=False)]}
     its_own = {"trainedWords": ["exmplstyle"], "files": [dict(listed, primary=True)]}
 
-    record_trigger_words.main([], ask=lambda hashes: [bundled_with, its_own])
+    record_from_civitai.main([], ask=lambda hashes: [bundled_with, its_own])
 
     assert _recorded() == {"example_style": ["exmplstyle"]}
 
@@ -170,7 +170,7 @@ def test_civitai_is_asked_about_at_most_a_hundred_loras_at_a_time(installed_mode
         asked.append(hashes)
         return []
 
-    record_trigger_words.main([], ask=civitai)
+    record_from_civitai.main([], ask=civitai)
 
     assert sorted(len(hashes) for hashes in asked) == [1, 100]
     assert len(_recorded()) == 101
@@ -181,7 +181,7 @@ def test_it_prints_counts_and_never_a_name_or_a_word(installed_models, capsys):
     wordless = installed_models.add("loras", "example_light.safetensors", arch="flux", lora=True)
     installed_models.add("loras", "example_unlisted.safetensors", arch="sd15", lora=True)
 
-    record_trigger_words.main([], ask=lambda hashes: [_version(worded, ["exmplstyle"]),
+    record_from_civitai.main([], ask=lambda hashes: [_version(worded, ["exmplstyle"]),
                                                       _version(wordless, [])])
 
     assert capsys.readouterr().out == (
@@ -197,8 +197,8 @@ def test_civitai_is_sent_the_hashes_as_a_json_list_and_its_answer_read_back(monk
                     timeout=timeout)
         return io.BytesIO(json.dumps([{"trainedWords": ["exmplstyle"]}]).encode())
 
-    monkeypatch.setattr(record_trigger_words.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(record_from_civitai.urllib.request, "urlopen", urlopen)
 
-    assert record_trigger_words.ask_civitai(["ab" * 32]) == [{"trainedWords": ["exmplstyle"]}]
+    assert record_from_civitai.ask_civitai(["ab" * 32]) == [{"trainedWords": ["exmplstyle"]}]
     assert sent == {"url": "https://civitai.com/api/v1/model-versions/by-hash",
                     "method": "POST", "hashes": ["ab" * 32], "named": True, "timeout": 60}

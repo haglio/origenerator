@@ -271,19 +271,19 @@ class EnhanceController:
         settings there advertise an action that isn't on offer. A mixed folder
         keeps them: the images in it are still enhanceable.
         """
-        self.panel.set_applicable(not self._showing_only_videos(), NO_VIDEO_ENHANCER)
+        in_front = self._rows_in_front()
+        self.panel.set_applicable(not _all_video(in_front), NO_VIDEO_ENHANCER)
         self.panel.show_offer(offer.available, offer.tip)
+        self.panel.show_source_models({gallery.model_matching_the_source(row)
+                                       for row in in_front if gallery.is_enhanceable_row(row)})
 
-    def _showing_only_videos(self) -> bool:
-        """Whether everything in front of us is video — the picked thumbnails if
-        any are picked, else the folder on screen. Nothing in front (a collection with
-        no pick) is not "only videos": there is simply nothing to say."""
+    def _rows_in_front(self) -> list[dict]:
         rows = [row for pid in self._host.selected_prompt_ids()
                 if (row := self._host.row_for(pid)) is not None]
         if not rows and not self._browser.selected_ids:
             group = self._host.current_group()
             rows = list(getattr(group, "rows", []) or [])
-        return _all_video(rows)
+        return rows
 
     # --- what it would run on -------------------------------------------------
 

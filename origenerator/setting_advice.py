@@ -90,11 +90,12 @@ class MissingTriggerWords(NamedTuple):
         return with_trigger_word(prompt, self.words)
 
 
-def fix_lora_model_advice(model, trained_on: dict[str, str], offered) -> dict[str, Advice]:
+def fix_lora_model_advice(runs_on, trained_on: dict[str, str], offered) -> dict[str, Advice]:
     for fix, trained in trained_on.items():
-        if trained != model and trained in offered:
+        other = next((model for model in sorted(runs_on) if model != trained), None)
+        if other is not None and trained in offered:
             return {"checkpoint": Advice(f"The {fix.capitalize()} fix's LoRA was trained on "
-                                         f"{model_title(trained)}.", model, trained, model_title)}
+                                         f"{model_title(trained)}.", other, trained, model_title)}
     return {}
 
 

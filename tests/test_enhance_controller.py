@@ -57,6 +57,7 @@ class FakePanel:
         self.shown = None
         self.applicable = None
         self.offer = None
+        self.source_models = None
 
     def show_settings(self, settings):
         self.shown = settings
@@ -69,6 +70,9 @@ class FakePanel:
 
     def show_offer(self, available, tip):
         self.offer = (available, tip)
+
+    def show_source_models(self, models):
+        self.source_models = set(models)
 
     def show_fix_training(self, name, text):
         self.training[name] = text
@@ -242,14 +246,14 @@ class FakeHost:
         self.offers += 1
 
 
-def _image(prompt_id="i1", *, files=("one.png",), enhance_of=None):
+def _image(prompt_id="i1", *, files=("one.png",), enhance_of=None, params=None):
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "status": "completed",
         "media_type": "image",
         "output_files": json.dumps([{"filename": name} for name in files]),
-        "params_json": "{}",
+        "params_json": json.dumps(params or {}),
         "enhance_of": enhance_of,
     }
 
@@ -602,6 +606,29 @@ def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(en
     controller.sync_panel(Offer(False, "Nothing here to enhance"))
 
     assert controller.panel.offer == (False, "Nothing here to enhance")
+
+
+def test_the_panel_hears_the_model_each_picked_image_would_be_enhanced_by_matching_it(
+        enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: row["media_type"])
+    rows = [_image("i1", params={"checkpoint": "one.safetensors"}),
+            _image("i2", params={"checkpoint": "two.safetensors"}), _video("v1")]
+    controller, _host = enhance(FakeHost(picked=["i1", "i2", "v1"], rows=rows),
+                                browser=FakeBrowser(["i1", "i2", "v1"]))
+
+    controller.sync_panel(Offer(True, "Enhance 2 items"))
+
+    assert controller.panel.source_models == {"one.safetensors", "two.safetensors"}
+
+
+def test_with_nothing_picked_the_panel_hears_the_model_the_folders_images_match(enhance):
+    folder = gallery.SettingsGroup("k", "S", [_image("i1", params={"checkpoint": "one.safetensors"}),
+                                              _image("i2", params={"checkpoint": "one.safetensors"})])
+    controller, _host = enhance(FakeHost(group=folder))
+
+    controller.sync_panel(Offer(True, "Enhance 2 not-yet-enhanced images in this folder"))
+
+    assert controller.panel.source_models == {"one.safetensors"}
 
 
 # --- a run in flight, and where it shows -------------------------------------

@@ -106,6 +106,21 @@ def test_two_copies_of_one_lora_under_different_names_are_both_written_down(
                            "example_style_copy": ["exmplstyle"]}
 
 
+def test_a_lora_civitai_also_lists_beside_another_models_own_file_takes_its_own_versions_words(
+        installed_models, worded_loras):
+    worded_loras({})
+    style = installed_models.add("loras", "example_style.safetensors", arch="sdxl", lora=True)
+    listed = {"hashes": {"SHA256": _sha256(style).upper()}}
+    bundled_with = {"trainedWords": ["othrword"],
+                    "files": [{"primary": True, "hashes": {"SHA256": "ab" * 32}},
+                              dict(listed, primary=False)]}
+    its_own = {"trainedWords": ["exmplstyle"], "files": [dict(listed, primary=True)]}
+
+    record_trigger_words.main([], ask=lambda hashes: [bundled_with, its_own])
+
+    assert _recorded() == {"example_style": ["exmplstyle"]}
+
+
 def _distinct_lora(installed_models, n: int):
     header = json.dumps({f"distinct{n}.lora_A.weight": {
         "dtype": "F16", "shape": [1], "data_offsets": [0, 2]}}).encode()

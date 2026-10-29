@@ -210,7 +210,7 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         "acts", "pinned_kino_settings", "search_synonyms",
         "pinned_genau_settings", "detail_fix_parts", "genau_flick_prompts",
         "model_recommendations", "lora_recommendations",
-        "image_states", "image_state_grid", "animation_paths",
+        "picture_states", "picture_state_grid", "animation_paths",
     }
 
 

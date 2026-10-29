@@ -32,9 +32,10 @@ _.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:290, origenerator/gui/
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219
 
 # --- funestra's Funestra asks these of what runs on it, through its User protocol ---
-_.apply_command  # noqa  # origenerator/gui/slideshow_view.py:490
-_.top_block  # noqa  # origenerator/gui/slideshow_view.py:499
-_.set_showing  # noqa  # origenerator/gui/slideshow_view.py:502
+_.apply_command  # noqa  # origenerator/gui/slideshow_view.py:498
+_.top_block  # noqa  # origenerator/gui/slideshow_view.py:507
+_.set_showing  # noqa  # origenerator/gui/slideshow_view.py:510
+_.own_frame  # noqa  # origenerator/gui/slideshow_view.py:513
 
 # --- reached by name, from the table a spoken word is dispatched through ---
 # `voice_router._MOTION` maps the spoken on and off words for human inspired to

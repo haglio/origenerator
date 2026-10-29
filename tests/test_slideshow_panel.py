@@ -533,7 +533,7 @@ class TestTheRowOnTheOnePanel:
 
     def test_a_slideshow_of_an_image_keeps_the_scrubber_on_the_panel(self, qtbot):
         window = self._window(qtbot, [("scene one.png", "image")])
-        window._pane._engine.showing_picture = True
+        window._pane._engine.showing_image = True
 
         assert panel_targets(window).row is not None
 
@@ -556,8 +556,8 @@ class TestTheRowOnTheOnePanel:
             self, qtbot):
         window = self._window(qtbot, [("scene one.png", "image")])
         engine = window._pane._engine
-        engine.showing_picture = True
-        engine.picture_time = (7_000.0, 8_000.0)
+        engine.showing_image = True
+        engine.image_time = (7_000.0, 8_000.0)
 
         self._press_the_middle_of_the_track(window)
 

@@ -17,7 +17,7 @@ def _library(tmp_path: Path) -> dict:
     library = tmp_path / "library"
     return {
         "comfyui_output_dir": str(tmp_path / "comfyui saves"),
-        "origenerator_pictures_dir": str(library / "images"),
+        "origenerator_images_dir": str(library / "images"),
         "origenerator_videos_dir": str(library / "videos"),
         "origenerator_scripts_dir": str(library / "scripts"),
         "origenerator_audio_dir": str(library / "sounds"),

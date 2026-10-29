@@ -92,11 +92,12 @@ for one thing cost four. So:
   `picture_state_grid` load as `image_states` and `image_state_grid`, a tab
   saved with a `picture_border` restores it as its `media_border`, and the
   folders of his drawings, `pictures_being_looked_over.json` and the
-  `outside picture:` workflow names keep theirs. What another repo owns
-  changes there first: Funestra's `HOLD_PICTURE` and the engine, radio and
-  slideshow calls Origenerator answers for it, shared_ui's
-  `PressablePicture`, which the OSR2 console is drawn as, app_support's
-  `origenerator_pictures_dir` and its loading screen's `pictures.json`.
+  `outside picture:` workflow names keep theirs. So do the saved names
+  other repos own, each read under the new word there: Funestra's
+  `HOLD_PICTURE`, a verb every running Funestra speaks; the
+  `origenerator_pictures_dir` key in the settings all of Haglio share,
+  which app_support reads as `origenerator_images_dir`; and its loading
+  screen's `pictures.json`.
 - **Where the screen names nothing, the code takes the user's word.** The
   list of folders down the left of the gallery is the **TOC** (table of
   contents), and the marks that open and shut its folders are its

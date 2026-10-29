@@ -23,7 +23,7 @@ from funestra.console import OSR2_CONTROL_UNANSWERED
 from funestra.console_hud import ConsolePainter
 from funestra.device_panel import DevicePanel
 from PyQt6.QtCore import QTimer
-from shared_ui.pressable_picture import PressablePicture
+from shared_ui.pressable_drawing import PressableDrawing
 
 from origenerator import osr2
 from origenerator.gui.console import (
@@ -36,7 +36,7 @@ from origenerator.gui.console import (
 DEVICE_WATCH_MS = 1000
 
 
-class MotionPanel(PressablePicture):
+class MotionPanel(PressableDrawing):
     """The console, floated over whichever surface hosts it.
 
     It is always here, motion or no motion. With nothing driving, its readout
@@ -143,7 +143,7 @@ class MotionPanel(PressablePicture):
         return (OSR2_CONTROL_UNANSWERED if self._control is None
                 else self._control.state())
 
-    def picture(self) -> tuple[bytes, tuple[int, int]]:
+    def drawing(self) -> tuple[bytes, tuple[int, int]]:
         """The console drawn — the drawing, before it is a widget. Returned
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""

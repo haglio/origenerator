@@ -29,9 +29,9 @@ class FakeEngine:
         self.speed = 1.0
         self.pace_s: float | None = None
         self.held_for: float | None = None
-        self.showing_picture = False
+        self.showing_image = False
         self.showing_video = True
-        self.picture_time: tuple[float, float] | None = None
+        self.image_time: tuple[float, float] | None = None
         self.picture_seeks: list[float] = []
         self.source_dims = (0, 0)
         self.ab_loop: tuple[float, float] | None = None
@@ -90,10 +90,10 @@ class FakeEngine:
     def set_pace(self, seconds: float) -> None:
         self.pace_s = seconds
 
-    def hold_picture_for(self, seconds: float | None) -> None:
+    def hold_image_for(self, seconds: float | None) -> None:
         self.held_for = seconds or None
 
-    def seek_picture(self, ms: float) -> None:
+    def seek_image(self, ms: float) -> None:
         self.picture_seeks.append(ms)
 
     def push_still(self) -> None:

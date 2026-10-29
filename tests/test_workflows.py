@@ -1060,6 +1060,25 @@ def test_an_image_to_video_form_offers_no_model_that_makes_video_from_text_or_a_
                     f"{workflow}.{pd.key}")
 
 
+def test_an_image_to_video_form_offers_no_lora_civitai_files_under_text_to_video(
+        installed_models, recorded_base_models):
+    for stem in ("a_t2v_look", "an_i2v_look", "a_look_not_on_civitai"):
+        installed_models.add("loras", f"{stem}.safetensors", arch="wan", lora=True)
+    recorded_base_models({"a_t2v_look": "Wan Video 2.2 T2V-A14B",
+                          "an_i2v_look": "Wan Video 2.2 I2V-A14B"})
+    looks = {"a_t2v_look.safetensors", "an_i2v_look.safetensors",
+             "a_look_not_on_civitai.safetensors"}
+
+    for workflow in ("wan22_i2v", "wan22_flf2v_loop", "wan22_animate"):
+        lora_keys = WORKFLOW_REGISTRY[workflow].lora_keys
+        pickers = [pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
+                   if pd.key in lora_keys]
+        assert pickers, workflow
+        for pd in pickers:
+            assert looks.intersection(pd.options) == looks - {"a_t2v_look.safetensors"}, (
+                f"{workflow}.{pd.key}")
+
+
 def test_a_form_that_decodes_with_the_sdxl_vae_offers_no_sd15_checkpoint(installed_models):
     installed_models.add("checkpoints", "an_xl_model.safetensors", arch="sdxl")
     installed_models.add("checkpoints", "a_15_model.safetensors", arch="sd15")

@@ -18,9 +18,11 @@ prevent. :data:`ANY` is the way to say a category genuinely takes anything.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 from origenerator import config
+from origenerator.base_models import made_for_text_to_video
 from origenerator.model_titles import model_title
 from origenerator.workflows import model_arch
 
@@ -95,10 +97,16 @@ def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
     return not (expert and described.expert and described.expert != expert)
 
 
+def _as_civitai_files_it(name: str, described: model_arch.ModelFile) -> model_arch.ModelFile:
+    if described.is_lora and described.arch == model_arch.WAN and made_for_text_to_video(name):
+        return replace(described, arch=model_arch.WAN_T2V)
+    return described
+
+
 def _listing(category: str, fallback: list[str], accepts, expert, want_lora) -> list[str]:
     directory = config.COMFYUI_DIR / "models" / category
     found = sorted((name for name, described in _catalogue(directory)
-                    if _offer(described, accepts, expert, want_lora)),
+                    if _offer(_as_civitai_files_it(name, described), accepts, expert, want_lora)),
                    key=lambda name: (model_title(name).casefold(), name))
     return found or list(fallback)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.base_models import filed_apart
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.model_files import NO_LORA, is_no_lora, list_lora_files
 
@@ -32,6 +33,11 @@ def lora_key_of(key: str) -> str | None:
 def strength_without_its_lora(key: str, values: dict) -> bool:
     lora = lora_key_of(key)
     return lora in values and is_no_lora(values[lora])
+
+
+def a_lora_filed_apart_from_its_model(params: dict, definitions) -> bool:
+    return any(filed_apart(params.get(pd.key), params.get(pd.beside_model))
+               for pd in definitions if pd.beside_model)
 
 
 def keys_with_strengths(keys) -> tuple[str, ...]:

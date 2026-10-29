@@ -23,7 +23,10 @@ from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamType
 from origenerator.workflows.derived_size import without_an_explicit_size
-from origenerator.workflows.lora_rows import strength_without_its_lora
+from origenerator.workflows.lora_rows import (
+    a_lora_filed_apart_from_its_model,
+    strength_without_its_lora,
+)
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
@@ -141,7 +144,8 @@ class ExperimentPolicy:
     def _mutate(self, params, workflow, rows):
         """Mutate ``params`` in place along one or two of the workflow's
         dimensions, returning the mutated keys."""
-        dims = self._mutable_dims(workflow)
+        definitions = workflow.param_definitions()
+        dims = self._mutable_dims(definitions)
         if not dims:
             return []
         count = 2 if len(dims) > 1 and self._rng.random() < _SECOND_DIM_CHANCE else 1
@@ -153,7 +157,7 @@ class ExperimentPolicy:
         for dim in self._weighted_dim_order(dims):
             if len(mutated) == count:
                 break
-            if self._apply_mutation(params, dim, workflow, rows):
+            if self._apply_mutation(params, dim, definitions, workflow, rows):
                 mutated.append(dim.key)
         return mutated
 
@@ -171,13 +175,13 @@ class ExperimentPolicy:
         return order
 
     @staticmethod
-    def _mutable_dims(workflow):
+    def _mutable_dims(definitions):
         """The dimensions an experiment may vary: the prompt pair, any bounded
         numeric, and any multi-option combo — per the workflow's own form.
         Batch size is exempt: varying it re-runs the same settings in bulk, which
         explores nothing and multiplies the GPU bill."""
         dims = []
-        for pd in workflow.param_definitions():
+        for pd in definitions:
             if pd.key == "batch_size":
                 continue
             if pd.key == "positive_prompt" or (pd.type in (ParamType.INT, ParamType.FLOAT) and pd.min_val is not None \
@@ -185,7 +189,7 @@ class ExperimentPolicy:
                 dims.append(pd)
         return dims
 
-    def _apply_mutation(self, params, pd, workflow, rows) -> bool:
+    def _apply_mutation(self, params, pd, definitions, workflow, rows) -> bool:
         """Write one mutated value for ``pd`` into ``params``. Returns whether a
         change was made (a dimension with nothing to change to is a no-op)."""
         if pd.key == "positive_prompt":
@@ -193,7 +197,7 @@ class ExperimentPolicy:
         if strength_without_its_lora(pd.key, params):
             return False
         if pd.type == ParamType.COMBO:
-            return self._swap_combo(params, pd, workflow, rows)
+            return self._swap_combo(params, pd, definitions, workflow, rows)
         return self._jitter_numeric(params, pd, workflow, rows)
 
     def _crossover_prompts(self, params, workflow, rows):
@@ -226,8 +230,10 @@ class ExperimentPolicy:
         params["positive_prompt"], params["negative_prompt"] = choice
         return True
 
-    def _swap_combo(self, params, pd, workflow, rows):
-        candidates = [o for o in pd.options if o != params.get(pd.key)]
+    def _swap_combo(self, params, pd, definitions, workflow, rows):
+        candidates = [o for o in pd.options if o != params.get(pd.key)
+                      and not a_lora_filed_apart_from_its_model({**params, pd.key: o},
+                                                                definitions)]
         choice = self._pick_value(candidates, workflow, pd.key, rows)
         if choice is None:
             return False

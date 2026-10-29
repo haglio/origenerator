@@ -3,14 +3,17 @@ run while the app is shut."""
 from __future__ import annotations
 
 import json
+import urllib.error
 
 import pytest
 
 from origenerator import downtime, gallery, places_backfill, points_of_interest
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
 from origenerator.gui.main_window import OrigeneratorWindow
+from origenerator.output_places import OutputPlaces
 from origenerator.workflows import detail_parts
 from tests.comfyui_folders import SUITE_FOLDERS
 
@@ -22,8 +25,21 @@ def _installed_detectors(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["face_finder.pt", "eye_finder.pt"])
 
 
+@pytest.fixture
+def folders(tmp_path) -> ComfyFolders:
+    return ComfyFolders(input=tmp_path / "input", temp=tmp_path / "temp",
+                        places=OutputPlaces.in_one_folder(tmp_path / "output"))
+
+
 def _file(name, **extra):
     return {"filename": name, "subfolder": "image", "type": "output", **extra}
+
+
+def _on_disk(folders: ComfyFolders, *names: str) -> None:
+    for name in names:
+        image = folders.places.file(f"image/{name}")
+        image.parent.mkdir(parents=True, exist_ok=True)
+        image.write_bytes(b"fabricated image bytes")
 
 
 def _enhanced(db, prompt_id, enhanced_file, *, settings=FIXED):
@@ -40,7 +56,8 @@ def _enhanced(db, prompt_id, enhanced_file, *, settings=FIXED):
 
 
 class FakeComfy:
-    def __init__(self, histories: dict | None = None) -> None:
+    def __init__(self, folders: ComfyFolders, histories: dict | None = None) -> None:
+        self.folders = folders
         self.submitted: dict[str, dict] = {}
         self.histories = histories or {}
         self.cancelled: list[str] = []
@@ -104,11 +121,12 @@ def test_an_image_is_looked_over_by_its_own_enhancements_detectors_and_nothing_i
     assert not set(kinds) & {"DetailerForEach", "KSampler", "SaveImage", "VAEDecode"}
 
 
-def test_closing_hands_comfyui_one_finding_per_image_and_writes_down_which_finds_which(tmp_path):
+def test_closing_hands_comfyui_one_finding_per_image_and_writes_down_which_finds_which(tmp_path, folders):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     _enhanced(db, "b", _file("enhanced_b.png"))
-    comfy, record = FakeComfy(), tmp_path / "finding.json"
+    _on_disk(folders, "enhanced_a.png", "enhanced_b.png")
+    comfy, record = FakeComfy(folders), tmp_path / "finding.json"
 
     assert places_backfill.queue_finding(db.list_generations(), comfy, record) == 2
 
@@ -118,12 +136,13 @@ def test_closing_hands_comfyui_one_finding_per_image_and_writes_down_which_finds
         {"row": "a", "file": "enhanced_a.png"}, {"row": "b", "file": "enhanced_b.png"}]
 
 
-def test_one_absence_hands_comfyui_no_more_images_than_it_is_allowed(tmp_path):
+def test_one_absence_hands_comfyui_no_more_images_than_it_is_allowed(tmp_path, folders):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     _enhanced(db, "b", _file("enhanced_b.png"))
+    _on_disk(folders, "enhanced_a.png", "enhanced_b.png")
 
-    assert places_backfill.queue_finding(db.list_generations(), FakeComfy(), tmp_path / "f.json", limit=1) == 1
+    assert places_backfill.queue_finding(db.list_generations(), FakeComfy(folders), tmp_path / "f.json", limit=1) == 1
 
 
 class _TheProcessEnded(BaseException):
@@ -134,8 +153,8 @@ class _ComfyEndedPartway(FakeComfy):
     """The ComfyUI the closed app's turn was handing images to when that turn
     was ended, as a turn that runs out of its time is."""
 
-    def __init__(self, ended_after: int) -> None:
-        super().__init__()
+    def __init__(self, folders: ComfyFolders, ended_after: int) -> None:
+        super().__init__(folders)
         self._ended_after = ended_after
 
     def submit_job(self, payload: dict, prompt_id: str) -> None:
@@ -144,13 +163,14 @@ class _ComfyEndedPartway(FakeComfy):
         super().submit_job(payload, prompt_id)
 
 
-def test_a_hand_over_ended_partway_leaves_a_note_of_every_image_it_sent(tmp_path):
+def test_a_hand_over_ended_partway_leaves_a_note_of_every_image_it_sent(tmp_path, folders):
     # The next launch takes back off ComfyUI what the note names, so an image
     # sent and not written down would be looked over while the app is open again.
     db = Database(tmp_path / "t.db")
     for name in ("a", "b", "c"):
         _enhanced(db, name, _file(f"enhanced_{name}.png"))
-    comfy, record = _ComfyEndedPartway(ended_after=2), tmp_path / "finding.json"
+    _on_disk(folders, "enhanced_a.png", "enhanced_b.png", "enhanced_c.png")
+    comfy, record = _ComfyEndedPartway(folders, ended_after=2), tmp_path / "finding.json"
 
     with pytest.raises(_TheProcessEnded):
         places_backfill.queue_finding(db.list_generations(), comfy, record)
@@ -158,27 +178,64 @@ def test_a_hand_over_ended_partway_leaves_a_note_of_every_image_it_sent(tmp_path
     assert set(comfy.submitted) <= set(json.loads(record.read_text(encoding="utf-8")))
 
 
-def test_an_image_already_handed_to_comfyui_is_not_handed_over_again(tmp_path):
+def test_an_image_already_handed_to_comfyui_is_not_handed_over_again(tmp_path, folders):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
+    _on_disk(folders, "enhanced_a.png")
     record = tmp_path / "finding.json"
-    places_backfill.queue_finding(db.list_generations(), FakeComfy(), record)
+    places_backfill.queue_finding(db.list_generations(), FakeComfy(folders), record)
 
-    assert places_backfill.queue_finding(db.list_generations(), FakeComfy(), record) == 0
+    assert places_backfill.queue_finding(db.list_generations(), FakeComfy(folders), record) == 0
+
+
+def test_an_image_whose_file_is_gone_is_passed_over_and_comfyui_is_handed_the_rest(tmp_path, folders):
+    db = Database(tmp_path / "t.db")
+    _enhanced(db, "gone", _file("enhanced_gone.png"))
+    _enhanced(db, "a", _file("enhanced_a.png"))
+    _on_disk(folders, "enhanced_a.png")
+    record = tmp_path / "finding.json"
+
+    assert places_backfill.queue_finding(db.list_generations(), FakeComfy(folders), record) == 1
+
+    assert [one["row"] for one in json.loads(record.read_text(encoding="utf-8")).values()] == ["a"]
+
+
+class _ComfyNotRunning(FakeComfy):
+    def __init__(self, folders: ComfyFolders) -> None:
+        super().__init__(folders)
+        self.tries = 0
+
+    def submit_job(self, payload: dict, prompt_id: str) -> None:
+        self.tries += 1
+        raise urllib.error.URLError(ConnectionRefusedError(10061, "No connection could be made"))
+
+
+def test_a_comfyui_that_cannot_be_reached_ends_the_hand_over_at_the_first_image(tmp_path, folders):
+    db = Database(tmp_path / "t.db")
+    _enhanced(db, "a", _file("enhanced_a.png"))
+    _enhanced(db, "b", _file("enhanced_b.png"))
+    _on_disk(folders, "enhanced_a.png", "enhanced_b.png")
+    comfy, record = _ComfyNotRunning(folders), tmp_path / "finding.json"
+
+    assert places_backfill.queue_finding(db.list_generations(), comfy, record) == 0
+
+    assert comfy.tries == 1
+    assert json.loads(record.read_text(encoding="utf-8")) == {}
 
 
 def _report(*regions) -> dict:
     return {"text": [json.dumps(list(region)) for region in regions]}
 
 
-def test_the_next_launch_keeps_what_each_finished_run_found_and_takes_back_the_rest(tmp_path):
+def test_the_next_launch_keeps_what_each_finished_run_found_and_takes_back_the_rest(tmp_path, folders):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     _enhanced(db, "b", _file("enhanced_b.png"))
-    record, closing = tmp_path / "finding.json", FakeComfy()
+    _on_disk(folders, "enhanced_a.png", "enhanced_b.png")
+    record, closing = tmp_path / "finding.json", FakeComfy(folders)
     places_backfill.queue_finding(db.list_generations(), closing, record)
     runs = {one["row"]: run for run, one in json.loads(record.read_text(encoding="utf-8")).items()}
-    opening = FakeComfy(histories={runs["a"]: {
+    opening = FakeComfy(folders, histories={runs["a"]: {
         "prompt": [1, runs["a"], closing.submitted[runs["a"]], {}, []],
         "outputs": {"fix0_points": _report((100, 100, 300, 300), (0, 0, 1000, 1000))}}})
 
@@ -188,73 +245,78 @@ def test_the_next_launch_keeps_what_each_finished_run_found_and_takes_back_the_r
         {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.3, "part": "faces"}]
     assert opening.cancelled == [runs["b"]]
     assert _looked_over(db) == [("b", "enhanced_b.png")]
-    assert places_backfill.queue_finding(db.list_generations(), FakeComfy(), record) == 1
+    assert places_backfill.queue_finding(db.list_generations(), FakeComfy(folders), record) == 1
 
 
-def test_an_image_whose_run_found_nothing_is_not_looked_over_again(tmp_path):
+def test_an_image_whose_run_found_nothing_is_not_looked_over_again(tmp_path, folders):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
-    record, closing = tmp_path / "finding.json", FakeComfy()
+    _on_disk(folders, "enhanced_a.png")
+    record, closing = tmp_path / "finding.json", FakeComfy(folders)
     places_backfill.queue_finding(db.list_generations(), closing, record)
     [run] = closing.submitted
-    opening = FakeComfy(histories={run: {"prompt": [1, run, closing.submitted[run], {}, []],
-                                         "outputs": {"fix0_points": _report((0, 0, 1000, 1000))}}})
+    opening = FakeComfy(folders, histories={run: {"prompt": [1, run, closing.submitted[run], {}, []],
+                                                  "outputs": {"fix0_points": _report((0, 0, 1000, 1000))}}})
 
     places_backfill.fold_found_places(db, opening, record)
 
     assert _looked_over(db) == []
 
 
-def test_an_image_gone_before_its_places_came_back_is_passed_over(tmp_path):
+def test_an_image_gone_before_its_places_came_back_is_passed_over(tmp_path, folders):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
-    record, closing = tmp_path / "finding.json", FakeComfy()
+    _on_disk(folders, "enhanced_a.png")
+    record, closing = tmp_path / "finding.json", FakeComfy(folders)
     places_backfill.queue_finding(db.list_generations(), closing, record)
     [run] = closing.submitted
     db.delete_generation("a")
-    opening = FakeComfy(histories={run: {"prompt": [1, run, closing.submitted[run], {}, []],
-                                         "outputs": {"fix0_points": _report((100, 100, 300, 300), (0, 0, 1000, 1000))}}})
+    opening = FakeComfy(folders, histories={run: {"prompt": [1, run, closing.submitted[run], {}, []],
+                                                  "outputs": {"fix0_points": _report((100, 100, 300, 300), (0, 0, 1000, 1000))}}})
 
     assert places_backfill.fold_found_places(db, opening, record) == 0
 
 
-def test_once_closed_the_apps_turn_hands_comfyui_the_images_to_look_over(qtbot, tmp_path,
+def test_once_closed_the_apps_turn_hands_comfyui_the_images_to_look_over(qtbot, tmp_path, folders,
                                                                              monkeypatch):
     submitted = []
     monkeypatch.setattr(ComfyUIClient, "submit_job", lambda self, payload, prompt_id: submitted.append(prompt_id))
     monkeypatch.setattr(places_backfill, "RECORD", tmp_path / "finding.json")
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
+    _on_disk(folders, "enhanced_a.png")
     window = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(window)
     window.close()
     window.hand_comfyui_what_runs_while_closed()
     assert submitted == []
 
-    downtime.hand_comfyui_the_work_left(db, ComfyUIClient(folders=SUITE_FOLDERS), AppState(tmp_path / "ui.json"))
+    downtime.hand_comfyui_the_work_left(db, ComfyUIClient(folders=folders), AppState(tmp_path / "ui.json"))
 
     looked_over = list(json.loads((tmp_path / "finding.json").read_text(encoding="utf-8")))
     assert looked_over
     assert set(looked_over) <= set(submitted)
 
 
-def test_a_branch_preview_hands_comfyui_no_images_to_look_over(tmp_path, monkeypatch):
-    comfy = FakeComfy()
+def test_a_branch_preview_hands_comfyui_no_images_to_look_over(tmp_path, folders, monkeypatch):
+    comfy = FakeComfy(folders)
     monkeypatch.setattr(places_backfill, "RECORD", tmp_path / "finding.json")
     monkeypatch.setattr(places_backfill, "is_branch_session", lambda: True)
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
+    _on_disk(folders, "enhanced_a.png")
 
     assert places_backfill.queue_finding_for_the_absence(db, comfy) == 0
     assert comfy.submitted == {}
 
 
-def test_opening_the_app_keeps_the_places_found_while_it_was_closed(qtbot, tmp_path, monkeypatch):
+def test_opening_the_app_keeps_the_places_found_while_it_was_closed(qtbot, tmp_path, folders, monkeypatch):
     record = tmp_path / "finding.json"
     monkeypatch.setattr(places_backfill, "RECORD", record)
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
-    closing = FakeComfy()
+    _on_disk(folders, "enhanced_a.png")
+    closing = FakeComfy(folders)
     places_backfill.queue_finding(db.list_generations(), closing, record)
     [run] = closing.submitted
     finished = {"prompt": [1, run, closing.submitted[run], {}, []],

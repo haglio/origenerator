@@ -62,7 +62,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
-            *lora_rows(defaults, LORA_KEYS, accepts=(KREA2,)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(KREA2,), beside_model="unet"),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=512, max_val=2048, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=512, max_val=2048, step=16),

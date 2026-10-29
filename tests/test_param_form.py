@@ -2606,7 +2606,8 @@ def _lora_form(qtbot, **options):
     return form
 
 
-_FILED_ON_CIVITAI = {"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo", "speed_up": "Krea 2"}
+_FILED = {"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo", "speed_up": "Krea 2 Raw",
+          "a_look": "Krea 2"}
 
 
 def _offered(combo) -> list:
@@ -2614,7 +2615,7 @@ def _offered(combo) -> list:
 
 
 def _model_and_its_lora(qtbot, recorded_base_models, model):
-    recorded_base_models(_FILED_ON_CIVITAI)
+    recorded_base_models(_FILED)
     form = ParamForm([
         ParamDef("unet", "Model", "combo", model,
                  options=["raw_model.safetensors", "turbo_model.safetensors"]),
@@ -2662,7 +2663,7 @@ def test_a_form_told_no_lora_keys_offers_no_training(qtbot):
     assert form._training_controls == {}
 
 
-def test_a_lora_civitai_files_under_another_base_model_than_the_models_is_not_offered(
+def test_a_lora_filed_apart_from_the_picked_model_is_not_offered(
         qtbot, recorded_base_models):
     form = _model_and_its_lora(qtbot, recorded_base_models, "turbo_model.safetensors")
 

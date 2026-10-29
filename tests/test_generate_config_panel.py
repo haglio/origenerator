@@ -29,7 +29,7 @@ from shared_ui.spacing import GAP_MEDIUM
 
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
-import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
+import origenerator.workflows.model_pickers as model_pickers_module
 from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
 from origenerator import export_lane as export_lane_module
 from origenerator.act_settings import CATEGORIES
@@ -4043,7 +4043,7 @@ def recommended(monkeypatch):
     }
     monkeypatch.setattr(advice_module, "model_recommendations", lambda: models)
     monkeypatch.setattr(
-        sdxl_t2i_module, "list_model_files",
+        model_pickers_module, "list_model_files",
         lambda category, fallback, **terms: (
             [*fallback, "example_other.safetensors"] if category == "checkpoints" else list(fallback)))
     return models

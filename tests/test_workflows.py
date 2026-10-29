@@ -8,11 +8,8 @@ from PIL import Image
 
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.detail_parts as detail_module
-import origenerator.workflows.flux_t2i_upscaled as flux
 import origenerator.workflows.lora_rows as lora_rows_module
-import origenerator.workflows.sdxl_pose_transfer as pose
-import origenerator.workflows.sdxl_t2i as t2i
-import origenerator.workflows.wan_experts as experts
+import origenerator.workflows.model_pickers as pickers
 from origenerator import config, points_of_interest
 from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params
 from origenerator.gui.param_fields import clamped_number
@@ -170,7 +167,7 @@ def test_wan_video_workflows_expose_model_pickers(monkeypatch):
         "loras": ["l.safetensors"],
     }
     picker = lambda category, fallback, **terms: installed[category]
-    monkeypatch.setattr(experts, "list_model_files", picker)
+    monkeypatch.setattr(pickers, "list_model_files", picker)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -989,8 +986,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
 
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
     picker = lambda category, fallback, **terms: installed.get(category, list(fallback))
-    monkeypatch.setattr(t2i, "list_model_files", picker)
-    monkeypatch.setattr(pose, "list_model_files", picker)
+    monkeypatch.setattr(pickers, "list_model_files", picker)
 
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
@@ -1978,7 +1974,8 @@ def test_flux_t2i_upscaled_exposes_a_gguf_model_picker(monkeypatch):
     # models, like SDXL's checkpoint picker — the one thing a user varies most.
 
     installed = ["a_flux.gguf", "b_flux.gguf"]
-    monkeypatch.setattr(flux, "list_model_files", lambda category, fallback, **terms: installed)
+    monkeypatch.setattr(pickers, "list_model_files",
+                        lambda category, fallback, **terms: installed)
 
     wf = FluxT2iUpscaledWorkflow()
     by_key = {pd.key: pd for pd in wf.param_definitions()}

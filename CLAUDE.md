@@ -161,8 +161,10 @@ them as choices the user is being asked to make. That is exactly how the SDXL
 T2I form came to show WAN 2.2's high/low expert pairs, with nothing to
 say which one to pick or that neither belonged.
 
-So every picker states what its graph runs: `list_model_files(category, fallback,
-accepts=…)` and `list_lora_files(fallback, accepts=…)`, with `accepts` a family
+So every picker states what its graph runs: `model_picker(key, label, default,
+folder, accepts=…)`, which lists that folder with `list_model_files(category,
+fallback, accepts=…)` and keeps it on the picker, and `list_lora_files(fallback,
+accepts=…)`, with `accepts` a family
 from `workflows/model_arch.py`, a tuple of them, or `ANY` for a category that
 genuinely takes anything (the ESRGAN upscalers). Add `expert="high"` / `"low"` on
 a slot that fills one half of WAN 2.2's expert pair. `accepts` is keyword-only

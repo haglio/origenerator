@@ -62,7 +62,7 @@ def lora_rows(defaults: dict, keys, *, accepts, expert: str | None = None,
         rows += [
             ParamDef(key, f"LoRA{label}", ParamType.COMBO, defaults[key],
                      options=list_lora_files([defaults[key]], accepts=accepts, expert=expert),
-                     beside_model=beside_model),
+                     beside_model=beside_model, folder="loras"),
             lora_strength(strength_key_of(key), defaults[strength_key_of(key)], label),
         ]
     return rows

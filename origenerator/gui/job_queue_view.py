@@ -1,7 +1,7 @@
-"""The generation queue, as one strip along the foot of the gallery's own panes.
+"""The Job Queue, along the foot of the gallery's own panes.
 
 Two halves, each answering one question. On the left, *what is being made*: the
-live frame of the job ComfyUI is rendering, filling the strip's height out of its
+live frame of the job ComfyUI is rendering, filling the Job Queue's height out of its
 lower-left corner, and beside it a column no wider than a bar needs to be — the
 job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
 bar it measures. That frame opens the folder its run will land in, the way the
@@ -13,7 +13,7 @@ is exactly the thing a user is owed an explanation for. Whatever is true of the
 shared *server* is this half's to say — a row on the right is about one job of
 ours and nothing else. With nothing of ours in flight the same half says what
 that server is busy with instead, and offers a Clear for it.
-On the right, taking the rest of the strip, *what is queued*: every in-flight job
+On the right, taking the rest of the Job Queue, *what is queued*: every in-flight job
 as a row of its own — the one being made at the top — each led by its arrows, a
 shield and a Cancel, each opening its folder on a click or a double-click, and
 each draggable to a new place in the line. A row says what the job will cost and
@@ -25,15 +25,15 @@ animates, the gray clip a dropped-video combine takes its settings from, or a
 four-up of the folder the run will land in — because the one thumbnail a queued
 job cannot show is its own.
 Only a run that holds its place is fixed, a shielded one being made say: nothing
-can be moved in front of it. With nothing queued at all, the strip says so in dim letters across the middle of
+can be moved in front of it. With nothing queued at all, the Job Queue says so in dim letters across the middle of
 the whole of itself, rather than sitting blank: the left half has no frame, no
 bar and (barring another app's backlog to report) nothing to say, so it stands
-down and the line takes the strip's whole width to be centered in.
+down and the line takes the Job Queue's whole width to be centered in.
 
 It opens one progress bar tall — about two rows, the rest a scroll away — and its
 top edge is a splitter handle, so a long queue can be dragged open to as many rows
 as it's worth giving up. The extra height all goes to the line: the thumbnail
-never grows past the strip's opening height, so a queue dragged tall is a queue
+never grows past the Job Queue's opening height, so a queue dragged tall is a queue
 you can read rather than one enormous frame.
 
 It's fed the in-flight view-models the Recents collection uses
@@ -102,16 +102,16 @@ from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-# The strip's opening height, its floor, and so the widest the live thumbnail
+# The Job Queue's opening height, its floor, and so the widest the live thumbnail
 # ever gets: it takes the lower-left corner whole, being the one thing here worth
-# looking at (the full-size preview is still one click away). The strip never
+# looking at (the full-size preview is still one click away). The Job Queue never
 # opens taller than this however long the line gets, so the panes above it don't
 # move on their own — only on a drag of the handle at its top edge.
 _STRIP_HEIGHT = 88
 # The bar the clock is written across, sized off the line it carries — "45% ·
 # 12:30 elapsed · ~16:02 left" runs about 270px at the app's own font, and a bar
 # narrower than its caption elides the countdown away. The queue's names are
-# long, so the rest of the strip still goes to the line.
+# long, so the rest of the Job Queue still goes to the line.
 _BAR_WIDTH = 290
 _HALVES_GAP = GAP_MEDIUM
 # Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
@@ -134,7 +134,7 @@ class OpensAFolder:
     """Going from a job to where its result will land: a press and its release,
     or a double-click.
 
-    Both halves of the strip stand for a job you can go to — the live frame of
+    Both halves of the Job Queue stand for a job you can go to — the live frame of
     the one being made, and the rows of the ones waiting — so both answer the
     same two gestures, written once here.
 
@@ -181,7 +181,7 @@ class RunningPreview(OpensAFolder, QWidget):
     """What is being made: its live frame, and beside it a fat bar with the clock
     written across it — and, under the bar, what is holding the whole line up.
 
-    That second line is the strip's one place for a fact about the shared server
+    That second line is the Job Queue's one place for a fact about the shared server
     rather than about a job: another app's backlog, or a hold of this queue's own.
     While the head of the line is held up by another app's work its bar has no
     reading to write and only sweeps, and the line under it is the explanation
@@ -203,15 +203,15 @@ class RunningPreview(OpensAFolder, QWidget):
         self._press_at = None
 
         layout = QHBoxLayout(self)
-        # No margins: the frame is meant to reach the strip's edges, and the
+        # No margins: the frame is meant to reach the Job Queue's edges, and the
         # column beside it centers itself in the same height.
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)
         self._frame = QLabel()
         self._frame.setFixedSize(_STRIP_HEIGHT, _STRIP_HEIGHT)  # kept square: resizeEvent
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Pinned to the foot, so it still sits in the strip's corner once the
-        # strip is dragged taller than the square it stops growing at.
+        # Pinned to the foot, so it still sits in the Job Queue's corner once the
+        # Job Queue is dragged taller than the square it stops growing at.
         layout.addWidget(self._frame, 0, Qt.AlignmentFlag.AlignBottom)
 
         column = QVBoxLayout()
@@ -280,7 +280,7 @@ class RunningPreview(OpensAFolder, QWidget):
         and reporting that after the queue empties would be a stale clock.
 
         No production caller: on screen these are two stacked widgets and the
-        half shows whichever has something to say. This is the strip's
+        half shows whichever has something to say. This is the Job Queue's
         inspection surface, kept because the caption-else-bar rule is one rule
         and a second copy of it in a test helper is worse than a method.
         """
@@ -378,12 +378,12 @@ class RunningPreview(OpensAFolder, QWidget):
         self._frame.setPixmap(pixmap)
 
     def resizeEvent(self, event):
-        """Keep the frame the largest square the strip's height leaves room for.
+        """Keep the frame the largest square the Job Queue's height leaves room for.
 
         Taken off the height rather than a size of its own, so the thumbnail is
-        always as big as the corner it sits in: a strip laid out any other height
+        always as big as the corner it sits in: a Job Queue laid out any other height
         grows it to match instead of stranding it in an empty square. Only up to
-        the strip's opening height, though — a queue dragged open is being opened
+        the Job Queue's opening height, though — a queue dragged open is being opened
         to read the line, and every pixel past that goes to the rows.
         """
         super().resizeEvent(event)
@@ -400,7 +400,7 @@ class QueueRow(OpensAFolder, QWidget):
     line is the whole of what the row says about the job. The workflow-and-prompt
     name a Generate tab is titled with used to be here and is not: it answers
     "which settings", and every row of a folder being re-rolled carries the same
-    one, so a strip of eight said one thing eight times and none of them said
+    one, so a Job Queue of eight said one thing eight times and none of them said
     which was the ten-minute one. It is still a hover away.
 
     The thumbnail is second because that is where it lines up into a column and
@@ -419,7 +419,7 @@ class QueueRow(OpensAFolder, QWidget):
 
     A press-and-release opens the job's folder, and so does a double-click
     (:class:`OpensAFolder`); a press that travels starts a drag instead, which
-    the strip turns into a reorder, wherever the queue gives the job a move.
+    the Job Queue turns into a reorder, wherever the queue gives the job a move.
     """
 
     HEIGHT = 34  # about two of these fit beside the progress bar
@@ -473,7 +473,7 @@ class QueueRow(OpensAFolder, QWidget):
         # Only a wait needs explaining, so most rows leave this empty. It asks
         # for no width of its own and is elided into whatever is left
         # (:meth:`_render_note`): a label that demands its full text instead can
-        # widen the row past the strip and carry everything after it off the
+        # widen the row past the Job Queue and carry everything after it off the
         # end — the disappearance the button was moved to the front to escape.
         self._note = QLabel()
         self._note.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -527,7 +527,7 @@ class QueueRow(OpensAFolder, QWidget):
         self._note.setToolTip(self._note_text)
 
     def resizeEvent(self, event):
-        """Re-fit the note — the strip's width follows the window's."""
+        """Re-fit the note — the Job Queue's width follows the window's."""
         super().resizeEvent(event)
         self._render_note()
 
@@ -594,7 +594,7 @@ class QueueRow(OpensAFolder, QWidget):
 
 
 class _Rules(QWidget):
-    """Lines drawn over the strip's parts: the app's style sheet grounds the
+    """Lines drawn over the Job Queue's parts: the app's style sheet grounds the
     column the rows sit in, so a line painted beneath it would not show."""
 
     def __init__(self, lines, parent):
@@ -610,7 +610,7 @@ class _Rules(QWidget):
         painter.end()
 
 
-class GenerationQueue(QWidget):
+class JobQueueView(QWidget):
     """The live preview and its bar on the left, the whole line on the right."""
 
     move_requested = pyqtSignal(str, object)  # a row let go just ahead of another, or past the last
@@ -621,8 +621,8 @@ class GenerationQueue(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("generationQueue")
-        self.setAcceptDrops(True)  # a row dropped anywhere on the strip reorders it
-        # A floor, not a fixed height: the strip opens one bar tall and grows only
+        self.setAcceptDrops(True)  # a row dropped anywhere on the Job Queue reorders it
+        # A floor, not a fixed height: the Job Queue opens one bar tall and grows only
         # when its splitter handle is dragged, so the panes above never move on
         # their own however long the line gets.
         self.setMinimumHeight(_STRIP_HEIGHT)
@@ -634,7 +634,7 @@ class GenerationQueue(QWidget):
         outer.setSpacing(0)
 
         layout = QHBoxLayout()
-        # Flush at the left and both ends, so the live frame fills the strip's
+        # Flush at the left and both ends, so the live frame fills the Job Queue's
         # lower-left corner; only the far right is held off the window edge.
         layout.setContentsMargins(0, 0, GAP_SMALL, 0)
         layout.setSpacing(_HALVES_GAP)
@@ -654,18 +654,18 @@ class GenerationQueue(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Takes whatever height the strip has and asks for none of its own: a
-        # twelve-job line must not make the strip open twelve rows tall, and a
-        # strip dragged open must hand every extra pixel to these rows.
+        # Takes whatever height the Job Queue has and asks for none of its own: a
+        # twelve-job line must not make the Job Queue open twelve rows tall, and a
+        # Job Queue dragged open must hand every extra pixel to these rows.
         self._scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
         self._host = QWidget()
         self._rows_column = QVBoxLayout(self._host)
         self._rows_column.setContentsMargins(0, 0, 0, 0)
         self._rows_column.setSpacing(0)
         self._rows_column.addStretch(1)  # rows stack from the top
-        # What the empty line is for. The strip holds its space whether or not
+        # What the empty line is for. The Job Queue holds its space whether or not
         # anything is queued, so this side spends most of its life with nothing
-        # in it, and a blank half of a laid-out strip reads as something that
+        # in it, and a blank half of a laid-out Job Queue reads as something that
         # failed to draw. It sits between two stretches, so it centers in the
         # space it is explaining while nothing is listed, and the rows still
         # stack from the top once it has given way to them.
@@ -674,7 +674,7 @@ class GenerationQueue(QWidget):
         self._rows_column.addWidget(self._hint, 0, Qt.AlignmentFlag.AlignHCenter)
         self._rows_column.addStretch(1)
         self._scroll.setWidget(self._host)
-        layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
+        layout.addWidget(self._scroll, 1)  # the line takes the rest of the Job Queue
         self._for_all = self._for_every_job()
         layout.addWidget(self._for_all)
         self._rules = _Rules(self._drawn_rules, self)
@@ -706,13 +706,13 @@ class GenerationQueue(QWidget):
         shield_every_job(self._items)
         self._line_up(self._items)
 
-    # --- what the strip is showing -----------------------------------------
+    # --- what the Job Queue is showing -----------------------------------------
 
     def sizeHint(self) -> QSize:
         """One progress bar tall, whatever is or isn't in it.
 
-        Read off the strip's own opening height rather than added up from its
-        children, whose number changes: an idle strip, whose live half has stood
+        Read off the Job Queue's own opening height rather than added up from its
+        children, whose number changes: an idle Job Queue, whose live half has stood
         down to leave the hint the full width, asks for exactly the room a busy
         one does, so the splitter above it doesn't shift as the queue drains.
         """
@@ -755,8 +755,8 @@ class GenerationQueue(QWidget):
         # Nothing of ours in flight at all: the line has no rows to show, so it
         # says what it is for instead. The left half stands down with it unless
         # it has something to report — with no frame, no bar and nothing to say
-        # about another app it is an empty third of the strip, and the hint would
-        # be centered in the sliver beside it rather than in the strip itself.
+        # about another app it is an empty third of the Job Queue, and the hint would
+        # be centered in the sliver beside it rather than in the Job Queue itself.
         self._hint.setVisible(not items)
         self._for_all.setVisible(bool(items))
         self._running.setVisible(bool(items) or bool(free_half))
@@ -785,7 +785,7 @@ class GenerationQueue(QWidget):
         _offer(self._cancel_all, bool(jobs_to_cancel(items)))
         self._rules.update()
 
-    # --- the rules drawn over the strip -------------------------------------
+    # --- the rules drawn over the Job Queue -------------------------------------
 
     def head_rule(self) -> list[QPoint]:
         rows = self.rows()

@@ -27,8 +27,8 @@ from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.panes import PaneSplitter
+from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
-from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -82,7 +82,7 @@ def _fun_time_view(qtbot, rows=()):
 
 
 def _lit(model, action: str) -> bool:
-    """Whether the button posting *action* is drawn lit on the slideshow's panel."""
+    """Whether the button posting *action* is drawn lit on the slideshow's HUD."""
     return next(button.lit for row in model.rows for button in row
                 if button.command == action)
 
@@ -419,7 +419,7 @@ def test_a_region_slideshows_volume_is_not_what_a_standing_one_opens_at(qtbot, t
 
 def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     # The slideshow must answer its own keys the moment it opens — left unfocused,
-    # its arrows land in the main window and the view reads as dead.  The
+    # its arrows land in Core and the view reads as dead.  The
     # offscreen platform cannot express real activation, so the contract is
     # pinned at the seam: presenting raises and activates the window.
 
@@ -433,7 +433,7 @@ def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     # in the Funestras' HUD, as a real SlideshowView answers.
     stub.set_audio_muted = lambda muted: None
     stub.slideshow = SimpleNamespace(set_paused=lambda paused: None)
-    stub.wear_the_hud = lambda side, **how: None  # told whose panel it wears, and where
+    stub.wear_the_hud = lambda side, **how: None  # told whose HUD it wears, and where
     view._slideshows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 
@@ -476,7 +476,7 @@ def test_a_presented_slideshow_wears_the_funestras_own_hud(qtbot, tmp_path, monk
         "satellites_kino_activate", "origenerator_activate"]
     # The transport controls are the Funestras' own set.
     assert {"prev", "next", "lock", "trash"} <= set(names)
-    # The window a Funestra's minimize parks is not this slideshow's, so the panel
+    # The window a Funestra's minimize parks is not this slideshow's, so the HUD
     # declares no such button rather than drawing one whose press goes nowhere.
     assert "minimize" not in names
 
@@ -700,7 +700,7 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
 
 
 def test_a_hosted_slideshow_keeps_up_with_its_own_folder(qtbot, tmp_path, monkeypatch):
-    """A slideshow plays on a satellite region while the main window goes on being
+    """A slideshow plays on a satellite region while Core goes on being
     used, so by the time an auto-generated item lands the browser is usually
     elsewhere — and both regions may be playing different folders.  Each slideshow
     is fed from the location IT opened at, not from the view on screen."""
@@ -1156,7 +1156,7 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
     assert [where for _slideshow, where in view._slideshows._live_slideshows] == ["__all__::portrait"]
 
 
-def test_latest_on_a_hosted_slideshows_panel_plays_its_side_newest_first(
+def test_latest_on_a_hosted_slideshows_hud_plays_its_side_newest_first(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)

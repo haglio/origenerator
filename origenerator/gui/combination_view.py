@@ -2,8 +2,7 @@
 
 Two renderings of one look. :class:`CombinationView` is the live one, for a pane
 with room to loop the clip; :func:`combination_pixmap` is the same arithmetic as
-a still, for the surfaces that hold a pixmap rather than a widget — the queue
-strip's corner and a folder's generating tile. They are together here because what
+a still, for the surfaces that hold a pixmap rather than a widget — the Job Queue's corner and a folder's generating tile. They are together here because what
 they have to agree on is the look: a run in flight shows the same pair in all
 three places until ComfyUI streams a frame of the run itself, and three
 surfaces each drawing their own idea of it is what left one blurred, one blank
@@ -63,7 +62,7 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
     A still rather than the widget because the surfaces that want it are a
     thumbnail-sized label apiece, redrawn on every poll — and the halves come
     from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a cell the
-    strip has already scaled this second is not scaled again for the tile.
+    Job Queue has already scaled this second is not scaled again for the tile.
     """
     both = bool(combination.image and combination.source_video)
     enclosed = bool(combination.source_video) and combination.prompt_edited

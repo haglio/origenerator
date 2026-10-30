@@ -961,8 +961,7 @@ class JobQueue(QObject):
         """Stop and forget the job leading a folder's queue, dropping its row.
 
         The folder-level stop — the live tile's Cancel. A folder with more than one
-        job queued gives up the one in front; the rest are stopped from the queue
-        strip, a row at a time (:meth:`cancel_job`).
+        job queued gives up the one in front; the rest are stopped from the Job Queue, a row at a time (:meth:`cancel_job`).
 
         Silent — no :attr:`changed` emit: the tile's cancel button drives its own
         follow-up redraw.

@@ -1,9 +1,9 @@
-"""What a slideshow tells the Funestras' panel to draw, and which presses it answers itself.
+"""What a slideshow tells the Funestras' HUD to draw, and which presses it answers itself.
 
-Every slideshow wears the Funestras' own panel: the set and its map
+Every slideshow wears the Funestras' own HUD: the set and its map
 (:mod:`origenerator.gui.slideshow_map`), the device where this app's window drives
 one (:class:`~origenerator.gui.console.SlideshowDevice`), and at its foot the
-generation queue (:mod:`origenerator.gui.hud_queue`).  A slideshow on a session's
+Job Queue (:mod:`origenerator.gui.hud_queue`).  A slideshow on a session's
 Funestra publishes the model for the session to draw; a slideshow on this app's own
 Funestra hands it over in process, and the Funestra draws it.
 """
@@ -43,9 +43,9 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
     """The slideshow's state as the Funestras' HUD model, or ``None`` for a slideshow
     with nothing to map (``hud_map`` unanswered).
 
-    *hosted* and *own_window* decide which buttons the panel declares
+    *hosted* and *own_window* decide which buttons the HUD declares
     (:func:`~origenerator.slideshow_buttons.slideshow_rows`) and what reset goes back to;
-    both default to what a region slideshow wants.  *foot* is the generation queue
+    both default to what a region slideshow wants.  *foot* is the Job Queue
     (:mod:`origenerator.gui.hud_queue`) and *device* what this window is doing
     to the OSR2 (:class:`~origenerator.gui.console.SlideshowDevice`) -- each None
     where there is none, which is what a slideshow on a session's Funestra answers.
@@ -67,7 +67,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         # "Unlocked · Shuffle" exactly as a satellite browsing its library does;
         # and it names both narrowings beside the rest — F-mode over the
         # favorites, and the enhanced-only switch a slideshow's HUD is the one
-        # panel here to carry.
+        # HUD here to carry.
         title=hud_title(playing_set=looping_label(shown.loop) if shown.loop else "",
                         locked=locked, order=order_label,
                         f_mode=favorites_filter, enhanced=enhanced,
@@ -76,7 +76,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         # collection lists: it lights when the item on screen is a favorite.
         is_favorite=slideshow.hud_is_favorite,
         item_note=slideshow.hud_item_note,
-        # The buttons this slideshow answers, in the bands the panel draws them in —
+        # The buttons this slideshow answers, in the bands the HUD draws them in —
         # which ones depends on what is drawing it.
         rows=slideshow_rows(side, locked=locked, favorites_filter=favorites_filter,
                             enhanced=enhanced, order=order_label, hosted=hosted,
@@ -84,7 +84,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
                             has_other_versions=slideshow.has_other_versions,
                             clip_seconds=slideshow.dwell_s),
         # The device's own line and readout, where this window is the one
-        # driving: on the panel the set is on, so nothing is said twice.
+        # driving: on the HUD the set is on, so nothing is said twice.
         osr2_rows=device.osr2_rows if device is not None else (),
         osr2_controls=device.osr2_controls if device is not None else (),
         osr2=device.osr2 if device is not None else "",

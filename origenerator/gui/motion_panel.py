@@ -1,4 +1,4 @@
-"""The OSR2's section of Genau's console, at the top left of the main window.
+"""The OSR2's section of Genau's console, at the top left of Core.
 
 Nothing on it is drawn here. :class:`funestra.console_hud.ConsolePainter`
 paints it, and this widget renders that into a bitmap and blits it: the
@@ -11,7 +11,7 @@ The on/off switch IS on it: the console's OSR2 switch -- on driving, off
 parked -- is the app's one, and the toolbar's separate one is gone.
 
 This is the surface with no slideshow under it.  A slideshow does not float one of these:
-it wears ONE panel (:mod:`origenerator.gui.slideshow_panel`), which carries the device
+it wears ONE panel (:mod:`origenerator.gui.slideshow_hud`), which carries the device
 rows, the OSR2 line and the readout itself -- two panels in one corner said the
 status twice, in two lines that disagreed, and drew prev/next/lock/trash on
 each.

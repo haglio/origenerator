@@ -237,7 +237,7 @@ class SlideshowSet:
     def reorder(self, items, *, latest: bool, enhanced_ids=(),
                 keep_slide: bool = False) -> None:
         """Play *items* instead, newest first or shuffled — the order pair on
-        the panel, from the top unless *keep_slide* (:meth:`end_loop`)."""
+        the HUD, from the top unless *keep_slide* (:meth:`end_loop`)."""
         self._shuffle = in_order if latest else None
         self.loop = None
         self._library_moved()
@@ -652,7 +652,7 @@ def looping_note(slideshow_set: SlideshowSet) -> str:
 
 
 def thumb_of(slide: Slide) -> str:
-    """The still a map cell draws for *slide*, as the path the panel takes: its
+    """The still a map cell draws for *slide*, as the path the HUD takes: its
     stored thumbnail when it carries one (a video's only still), else the
     image itself, and nothing for a generation still being made."""
     if slide.is_live:

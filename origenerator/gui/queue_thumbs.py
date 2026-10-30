@@ -31,7 +31,7 @@ folder with room in it rather than as a thumbnail that failed to load; a start
 frame leaves the rest of the block empty, having nothing to say about how many
 thumbnails there might have been.
 
-Every scaled cell is cached by (file, size, gray) — the strip re-renders on
+Every scaled cell is cached by (file, size, gray) — the Job Queue re-renders on
 every poll, and a start frame is a full-size render off disk. That fitting and
 that cache are :func:`fitted_cell`, public because the pair drawn by
 :func:`~origenerator.gui.combination_view.combination_pixmap` is the same kind of
@@ -59,7 +59,7 @@ from origenerator.gui.thumbnail_box import centered_in_square, fitted_in
 _GAP = HAIRLINE
 # How many cells the block has, and so how many of a folder's thumbnails are
 # worth carrying. Four is what fits across without the line's text starting
-# halfway along the strip.
+# halfway along the Job Queue.
 FOLDER_CELLS = 4
 
 
@@ -194,7 +194,7 @@ class QueueThumbs(QLabel):
     """One row's thumbnail block, at a fixed size it never asks to grow past.
 
     :meth:`show_source` and :meth:`show_folder` each re-render only when what
-    they were handed has changed: the strip pushes every row a fresh view-model
+    they were handed has changed: the Job Queue pushes every row a fresh view-model
     on every poll, and recomposing four scaled cells a second and a half apart
     for a queue that hasn't moved is work nobody sees.
     """

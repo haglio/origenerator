@@ -47,7 +47,7 @@ from tests.test_gallery_view import (
     _seeded_db,
     _will_move_on,
 )
-from tests.test_slideshow_panel import _inflight
+from tests.test_slideshow_hud import _inflight
 
 
 def _session(tmp_path):
@@ -625,14 +625,14 @@ def test_closing_the_slideshow_a_request_was_said_to_drops_the_request(
 
 
 def _press(bridge, tmp_path, line: str) -> None:
-    """A press the session routed back here, as a Funestra's panel posted it."""
+    """A press the session routed back here, as a Funestra's HUD posted it."""
     (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")
     bridge._tick()
 
 
 def test_a_funestras_filter_presses_reach_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):
     """A session hands a Funestra's presses back verbatim, spelled the way the
-    panel posted them — so the slideshow's own two switches answer them here."""
+    HUD posted them — so the slideshow's own two switches answer them here."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id1"})
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
@@ -824,8 +824,8 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
     told = _told(tmp_path, "landscape")
     assert [verb for verb in told if verb.startswith("SET_PACE")][-1] == \
         f"SET_PACE {DEFAULT_S}"
-    panel = parse_hud((tmp_path / "origenerator_landscape_hud.json").read_text(encoding="utf-8"))
-    assert panel.corner.path == clicked[0]
+    hud = parse_hud((tmp_path / "origenerator_landscape_hud.json").read_text(encoding="utf-8"))
+    assert hud.corner.path == clicked[0]
     assert _told(tmp_path, "portrait") == []
 
 
@@ -947,7 +947,7 @@ def test_the_maps_own_verbs_all_reach_the_slideshow(qtbot, tmp_path, monkeypatch
 
 def test_a_rows_filter_press_is_spelled_the_other_way_round_and_still_reaches_the_slideshow(
         qtbot, tmp_path, monkeypatch):
-    """The panel posts a row's filter button as ``filter_<side>_<row>`` —
+    """The HUD posts a row's filter button as ``filter_<side>_<row>`` —
     the side in the middle — and a session hands it back verbatim."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
@@ -1082,8 +1082,8 @@ def test_a_clip_the_session_names_that_this_app_made_asks_the_room_to_show_this_
     assert _the_room_was_told(tmp_path) == ["origenerator_activate"]
 
 
-def test_the_session_says_where_each_sides_panel_sits(qtbot, tmp_path):
-    """The keys that move a panel are the room's, so the session keeps the
+def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):
+    """The keys that move a HUD are the room's, so the session keeps the
     answer and tells this app; a slideshow opened into that region later wears it."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
 

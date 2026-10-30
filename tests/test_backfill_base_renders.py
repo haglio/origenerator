@@ -29,9 +29,9 @@ from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
+from origenerator.gui.core import Core
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
-from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
 from tools import backfill_base_renders as backfill_tool
@@ -387,13 +387,13 @@ def test_closing_leaves_work_for_while_closed_and_opening_takes_it_back(qtbot, t
                                                                          monkeypatch):
     monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
     db = Database(tmp_path / "t.db")
-    window = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
+    window = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(window)
 
     window.close()
     assert downtime.work_left()
 
-    reopened = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
+    reopened = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(reopened)
     assert not downtime.work_left()
 
@@ -402,8 +402,8 @@ def test_a_branch_sessions_close_leaves_no_work_for_while_closed(qtbot, tmp_path
                                                                   monkeypatch):
     monkeypatch.setenv(ENV_FLAG, "1")
     monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
-    window = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
-                                AppState(tmp_path / "ui.json"))
+    window = Core(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
+                  AppState(tmp_path / "ui.json"))
     qtbot.addWidget(window)
 
     window.close()
@@ -421,7 +421,7 @@ def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
 
     db = Database(tmp_path / "t.db")
     state_path = tmp_path / "ui.json"
-    window = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(state_path))
+    window = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(state_path))
     qtbot.addWidget(window)
     monkeypatch.setattr(window, "_leave_work_for_while_closed", boom)
     window._gallery_view.select_generation("xyz")

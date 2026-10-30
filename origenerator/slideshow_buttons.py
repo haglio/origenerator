@@ -1,15 +1,15 @@
 """The buttons Origenerator declares on a slideshow's HUD.
 
-A slideshow wears the Funestras' own panel (:mod:`origenerator.gui.slideshow_panel`), and a
-panel's buttons are its source's to declare: rows of
+A slideshow wears the Funestras' own HUD (:mod:`origenerator.gui.slideshow_hud`), and a
+HUD's buttons are its source's to declare: rows of
 :class:`funestra.hud_button.Button`, each carrying the verb a press posts.
 The verbs are the side's own, spelled the way a satellite's are — hosted, the
 session routes ``portrait_next`` back to whatever holds that side; standalone,
 the slideshow answers the same verb itself.
 
 Only what a slideshow answers is declared, which depends on what is drawing the
-panel: the session's mode pair is drawn by a slideshow covering a region — but
-not by one handed to a Funestra, whose panel the session puts its own row on.  A
+HUD: the session's mode pair is drawn by a slideshow covering a region — but
+not by one handed to a Funestra, whose HUD the session puts its own row on.  A
 button drawn for sameness whose press is swallowed says a feature is there when
 it is not.
 """
@@ -103,7 +103,7 @@ def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = 
 
     *own_window* is whether this slideshow has a window of this app's.  Handed to
     one of a session's Funestras there is none, and the mode pair is the
-    session's own to put on its panel; in a window over a session's region the
+    session's own to put on its HUD; in a window over a session's region the
     slideshow draws that pair itself.
     """
     mode_row = hosted and own_window
@@ -172,26 +172,26 @@ _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
     "play_video": lambda host, path: host.show_item(path, lock=False),
     "lock_video": lambda host, path: host.show_item(path, lock=True),
 }
-PANEL_CORNER = "hud_corner"
-PANEL_MINIMIZED = "hud_minimized"
-PANEL_PLACES: dict[str, str] = {PANEL_CORNER: "{corner}", PANEL_MINIMIZED: "{on}"}
+HUD_CORNER = "hud_corner"
+HUD_MINIMIZED = "hud_minimized"
+HUD_PLACES: dict[str, str] = {HUD_CORNER: "{corner}", HUD_MINIMIZED: "{on}"}
 
 PRESSES = tuple(_PRESSES)
 PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "seed_loop", "action_loop", "loop",
                                      "cycle_seed", "cycle_action"})
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
-# The Job Queue's block at the panel's foot, each with where in it the pointer was.
+# The Job Queue's block at the HUD's foot, each with where in it the pointer was.
 PRESSES_ON_THE_QUEUE = {FOOT_PRESS: "{x}|{y}", FOOT_DRAG: "{x}|{y}", FOOT_RELEASE: "{x}|{y}",
                         FOOT_WHEEL: "{steps}|{x}|{y}"}
 
 
 def answer(host, action: str, argument: str = "") -> bool:
-    """Do what a press on a slideshow's panel asks of *host*, by the name its verb
+    """Do what a press on a slideshow's HUD asks of *host*, by the name its verb
     carries after the side ("next", "fmode", "play_video"), and say whether the
     slideshow had an answer.
 
-    One table for every way a press reaches a slideshow — its own window's panel
-    and shifted arrows, a session routing a Funestra's panel back here, and the
+    One table for every way a press reaches a slideshow — its own window's HUD
+    and shifted arrows, a session routing a Funestra's HUD back here, and the
     session's own keys — so a button means the same thing whichever of them drew
     it.  ``False`` for minimize, which is a window's rather than a slideshow's, and
     for the Funestras' chrome about acts, which a slideshow has no counterpart for.

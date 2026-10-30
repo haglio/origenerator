@@ -1,7 +1,7 @@
 """The contract for running inside a Fun Time session's satellite half.
 
 Launched with ``--fun-time``, Origenerator stops being a free-floating desktop
-app and becomes one of the session's managed windows: the main window occupies
+app and becomes one of the session's managed windows: Core occupies
 the rect Fun Time names (the Random Favs Browser's), each slideshow goes to the
 portrait or landscape side by its subject's orientation, and everything OSR2 is
 left to Fun Time's Main Funestra.  Fun Time drives the slideshows through a command
@@ -11,7 +11,7 @@ file-channel idioms its own Satellite Funestras speak
 
 What a side IS depends on what the session hands over.  A session that names
 each Funestra's own channel (:class:`FunestraChannel`) is handing this app its
-Funestras: a slideshow is then a playlist written for one, a few verbs, and the panel
+Funestras: a slideshow is then a playlist written for one, a few verbs, and the HUD
 this app publishes for it.  One that names none is an older session, whose
 slideshows open a window of this app's over each region instead.
 
@@ -40,7 +40,7 @@ from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
 from origenerator.slideshow import Slide
 from origenerator.slideshow_buttons import (
-    PANEL_PLACES,
+    HUD_PLACES,
     PRESSES,
     PRESSES_ABOUT_A_FILE,
     PRESSES_ON_THE_QUEUE,
@@ -66,7 +66,7 @@ MODULE = "origenerator"
 #: Present iff this app is being hosted.
 MODE_FLAG = "--fun-time"
 
-#: The main window's rect -- the Random Favs Browser's, which it covers -- and
+#: Core's rect -- the Random Favs Browser's, which it covers -- and
 #: the two satellite regions a slideshow of this app's opens over when the session
 #: hands no Funestra for that side.
 RECT_FIELDS = ("x", "y", "width", "height")
@@ -126,7 +126,7 @@ CHECK_LAUNCH_FLAG = "--check-launch"
 
 SPOKEN_PHRASES_MODULE = "origenerator.voice.hosted"
 
-#: The caption the main window wears, which a host resolves it by (together
+#: The caption Core wears, which a host resolves it by (together
 #: with the pid).  The splash deliberately wears another ("Origenerator
 #: Loading"), so a caption match cannot reach it.
 WINDOW_TITLE = "Origenerator"
@@ -197,7 +197,7 @@ def _lines_said_to(side: str) -> tuple[str, ...]:
         *(f"{spelled_for(side, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
         *(f"{spelled_for(side, press)}|{where}" for press, where in PRESSES_ON_THE_QUEUE.items()),
         *(f"{spelled_for(side, place)}|{payload}"
-          for place, payload in PANEL_PLACES.items()),
+          for place, payload in HUD_PLACES.items()),
         spelled_filter(side, "{row}"),
         f"{spelled_for(side, SAY)}:{{words}}",
     )
@@ -266,7 +266,7 @@ class FunestraChannel:
     The four files a content source and a Funestra trade through
     (``funestra.playlist`` / ``funestra_verbs`` / ``status`` /
     ``satellite_hud``): the list the Funestra plays, the verbs it drains, the
-    status it publishes back, and the panel this app publishes for the session
+    status it publishes back, and the HUD this app publishes for the session
     to draw on it.
     """
 

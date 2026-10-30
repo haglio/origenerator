@@ -1,6 +1,6 @@
 """A progress bar that carries its own caption, read on top of the fill.
 
-Every surface that reports a run in flight — the lower strip's queue, the
+Every surface that reports a run in flight — the Job Queue, the
 Recents collection's cards, a folder's generating tile — says two things at once: how
 far along it is, and how long that has taken. Laid out separately -- a line of
 text above a bar, or a percentage in a caption with no bar at all -- they spend

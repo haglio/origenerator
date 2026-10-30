@@ -50,7 +50,7 @@ def test_the_button_keeps_the_primary_blue_with_a_run_in_flight(styled_button):
 
 
 def test_the_button_tracks_no_run(button):
-    # Nothing here to feed a run's progress into: the strip's queue and the
+    # Nothing here to feed a run's progress into: the Job Queue and the
     # browser pane's card are the two places a run in flight is watched.
     assert not hasattr(button, "set_progress")
     assert not hasattr(button, "start")

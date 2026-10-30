@@ -176,7 +176,7 @@ def test_one_thumbnail_takes_the_same_width_as_four(qapp, tmp_path):
 
 def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):
     # Four is what fits across without the row's text starting halfway along the
-    # strip; the fifth thumbnail of a busy folder has nowhere to go.
+    # Job Queue; the fifth thumbnail of a busy folder has nowhere to go.
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255)]
     paths = [_thumbnail(tmp_path / f"{i}.png", c) for i, c in enumerate(colors)]
 
@@ -188,7 +188,7 @@ def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):
 
 
 def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypatch):
-    # The strip re-renders on every poll and a start frame is a full-size render;
+    # The Job Queue re-renders on every poll and a start frame is a full-size render;
     # decoding one a second and a half apart is work nobody sees.
     thumbnail = _thumbnail(tmp_path / "a.png", (255, 0, 0))
     queue_thumbs._CELLS.clear()

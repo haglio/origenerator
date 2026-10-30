@@ -122,7 +122,7 @@ class GeneratingTile(QFrame):
     def _render_timing(self):
         """A job ComfyUI hasn't started has no elapsed time and no steps to
         report, so the bar stays indeterminate with nothing written on it: its
-        wait is the strip's queue to explain."""
+        wait is the Job Queue to explain."""
         self._bar.show_progress(self._reading().caption(compact=True),
                                 *self._reading().bars())
 

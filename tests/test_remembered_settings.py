@@ -26,7 +26,7 @@ from origenerator.app_state import AppState
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.console import OSR2_CONTROL_BY_COMMAND
 from origenerator.gui.panes import PaneSplitter
-from tests.test_main_window import _seed_combine_db, _window
+from tests.test_core import _seed_combine_db, _window
 
 _SETTABLE = (QComboBox, QAbstractSpinBox, QAbstractSlider, QSplitter, CollapsibleSection,
              QLineEdit, QPlainTextEdit, QTextEdit, QTabBar, QTreeView)

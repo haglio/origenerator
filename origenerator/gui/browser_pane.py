@@ -987,7 +987,7 @@ class BrowserPane(QObject):
         The one act a queued or running card has, and until now the one act it
         offered nowhere: a finished tile answers a right-click with its own menu,
         and a card answered with nothing, so stopping a run meant finding it again
-        among the lower strip's rows. The wording is the strip's Cancel, which
+        among the Job Queue's rows. The wording is the Job Queue's Cancel, which
         while the folder is auto-generating starts another seed rather than
         stopping anything.
 

@@ -111,7 +111,6 @@ from origenerator.gui.gallery_tree import (
 )
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
-from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.gui.inflight import (
     CANCEL_ALL_TEXT,
@@ -126,6 +125,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.job_queue import JobQueue
+from origenerator.gui.job_queue_view import JobQueueView
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
@@ -387,7 +387,7 @@ class GalleryView(QWidget):
         self._poll_timer.start()
 
     def _build_the_queue_of_runs(self, db, client):
-        """The generation queue: the controller that owns the live jobs,
+        """The Job Queue: the controller that owns the live jobs,
         Auto-Generate, which keeps one folder generating, and what each of those
         has to remember between launches.
         """
@@ -612,7 +612,7 @@ class GalleryView(QWidget):
                     else:
                         self._undo()
                     return True
-            # The OSR2 motion keys work right here in the main window too — not
+            # The OSR2 motion keys work right here in Core too — not
             # only in the fullscreen slideshow — whatever was clicked last, unless it
             # is a text field taking the key as a character.
             if (self._gallery_owns_keys(even_from_the_info_pane=True)
@@ -676,13 +676,13 @@ class GalleryView(QWidget):
         layout = QVBoxLayout(self)
         toc = self._build_toc_pane()
         browser = self._build_browser_pane()
-        # A strip under those two lists every generation in flight — the app hands
+        # The Job Queue under those two lists every generation in flight — the app hands
         # ComfyUI one at a time, so a batch of Generates is a queue — reachable
         # from any folder or config tab. Fed on every rebuild and poll; a row
         # dragged to a new place asks the controller to re-line the queue. Its top
         # edge is this column's splitter handle, so a long queue can be dragged
         # open at the cost of the folder listing above it.
-        self._queue = GenerationQueue()
+        self._queue = JobQueueView()
         self._queue.move_requested.connect(self._jobs.move)
         self._jobs.reordered.connect(self.queue_changed)
         self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
@@ -1527,9 +1527,9 @@ class GalleryView(QWidget):
                 # Wherever they were drawn: the Recents collection, or a folder with
                 # a batch of them in flight.
                 self._browser.refresh_inflight(rows=rows, requests=requests)
-            # The lower strip is always on screen, so refresh it every tick —
+            # The Job Queue is always on screen, so refresh it every tick —
             # its rows' live frames and progress advance between rebuilds. The
-            # listing already in hand feeds it, so the strip costs the tick no
+            # listing already in hand feeds it, so the Job Queue costs the tick no
             # further table reads.
             self._update_queue(self._inflight_items(rows=rows, requests=requests))
             # And a slideshow's corner, for the same reason and one more: a run
@@ -2668,7 +2668,7 @@ class GalleryView(QWidget):
 
     def _sync_cancel_buttons(self):
         """Re-word the hover of every Cancel that throws a run away — the
-        folder's live tile, the lower strip's rows, each config tab's — after
+        folder's live tile, the Job Queue's rows, each config tab's — after
         Auto-Generate started or ended.
 
         Nothing else repaints them at that moment: switching Auto on over a folder
@@ -2966,7 +2966,7 @@ class GalleryView(QWidget):
 
     def set_room_paused(self, paused: bool) -> None:
         """The room stops, not just the slideshows: a hosting session's OmniPause,
-        or a click on a slideshow standing on its own.
+        or a click on a Standalone slideshow.
 
         The director keeps its own flag for a slideshow not opened yet, because a
         slideshow is built from a set rather than held as a widget. Everything else
@@ -2987,8 +2987,8 @@ class GalleryView(QWidget):
     def hud_place(self, side: str) -> tuple:
         return self._slideshows.hud_place(side)
 
-    def place_a_panel(self, side: str, action: str, argument: str) -> None:
-        self._slideshows.place_a_panel(side, action, argument)
+    def place_a_hud(self, side: str, action: str, argument: str) -> None:
+        self._slideshows.place_a_hud(side, action, argument)
 
     def region_slideshow(self, side: str):
         """The slideshow occupying satellite region *side*, or None. The hosting
@@ -3431,14 +3431,14 @@ class GalleryView(QWidget):
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
-        app's — the pair the lower strip and a slideshow's corner plate both draw."""
+        app's — the pair the Job Queue and a slideshow's corner plate both draw."""
         return self._inflight_items(), self._foreign_queue.total
 
     def _inflight_items(self, rows=None, requests=None) -> list:
         return self._browser.inflight_items(rows=rows, requests=requests)
 
     def _update_queue(self, inflight=None):
-        """Feed the lower strip every in-flight job, in the order ComfyUI will
+        """Feed the Job Queue every in-flight job, in the order ComfyUI will
         work through them, plus whatever another app has on ComfyUI — so the whole
         queue shows from anywhere, and one that isn't ours is visible before
         Generate rather than after.
@@ -3513,7 +3513,7 @@ class GalleryView(QWidget):
             return
         logger.info("Dropped %d job(s) another app had queued on ComfyUI", dropped)
         self._refresh_foreign_queue()
-        self._update_queue()  # the strip goes blank now rather than a poll later
+        self._update_queue()  # the Job Queue goes blank now rather than a poll later
 
     def _confirm_clear_queue(self, total: int) -> bool:
         """Ask before dropping it: the jobs are somebody's work, and one of them
@@ -3603,7 +3603,7 @@ class GalleryView(QWidget):
         cancel the enhancement in flight. An enhancement has no card of its own —
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
-        it the run had to be hunted down among the lower strip's rows. It sits
+        it the run had to be hunted down among the Job Queue's rows. It sits
         beside Enhance, the act that started it. And inside a custom folder, what
         it holds on its own can be taken back out of it, as its folders can.
         """
@@ -4265,7 +4265,7 @@ def _fetch_poll_facts(client, targets) -> _PollFacts:
     strings rather than the job objects, so nothing here touches GUI-owned
     state. /history is pulled for a job whose completion could have been
     missed, the queue position for one still waiting, what ComfyUI is making
-    once while any waits there, and the shared queue once for the strip. Each
+    once while any waits there, and the shared queue once for the Job Queue. Each
     read fails soft: a fetch that raises leaves its entry unread rather than
     failing the tick.
     """

@@ -752,7 +752,7 @@ def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
 
 def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
     """Set from a row carrying two acts it names both, and only a generation
-    carrying both answers it — the rule the panel lights its rows by."""
+    carrying both answers it — the rule the HUD lights its rows by."""
     slideshow_set, _dealt = _filterable()
 
     assert slideshow_set.set_act_filter("source image, alpha") is True

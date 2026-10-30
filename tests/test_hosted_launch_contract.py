@@ -20,7 +20,7 @@ from shared_ui.preview import Preview
 from origenerator import fun_time_mode as contract
 from origenerator.workflows import detail_parts
 from tests.children import run_python
-from tests.test_main_window import _fun_time_session, _window
+from tests.test_core import _fun_time_session, _window
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -79,7 +79,7 @@ def test_a_launch_that_is_not_hosted_needs_none_of_them():
 
 
 @pytest.mark.parametrize("preview", [None, Preview(feature="the new seed row")])
-def test_the_caption_the_document_names_is_the_one_the_hosted_main_window_wears(
+def test_the_caption_the_document_names_is_the_one_hosted_core_wears(
         qtbot, tmp_path, preview):
     window = _window(qtbot, tmp_path, fun_time=_fun_time_session(), preview=preview)
 
@@ -88,13 +88,13 @@ def test_the_caption_the_document_names_is_the_one_the_hosted_main_window_wears(
 
 def test_no_other_window_here_wears_that_caption():
     """A host matches the caption exactly, so a second window of this app's
-    wearing it would be picked up in the main window's place -- which is why
+    wearing it would be picked up in Core's place -- which is why
     the splash is "Origenerator Loading" rather than the plain name."""
     wears_it = re.compile(
         r'setWindowTitle\(\s*"' + re.escape(_document()["window_title"]) + r'"\s*\)')
     elsewhere = [
         source for source in (REPO_ROOT / "origenerator").rglob("*.py")
-        if source.name != "main_window.py"
+        if source.name != "core.py"
         and wears_it.search(source.read_text(encoding="utf-8"))
     ]
 

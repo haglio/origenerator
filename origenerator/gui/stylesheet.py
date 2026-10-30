@@ -335,8 +335,8 @@ def build_stylesheet() -> str:
         border-radius: 0;
         padding: 0;
     }}
-    /* A row in the lower strip's queue: flat, and lit while hovered or while it
-       is the one being dragged, so a drag reads as something the strip meant to
+    /* A row in the Job Queue: flat, and lit while hovered or while it
+       is the one being dragged, so a drag reads as something the Job Queue meant to
        offer rather than an accident. */
     QWidget#queueRow {{
         background-color: transparent;

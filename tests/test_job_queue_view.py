@@ -12,20 +12,20 @@ from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 
 from origenerator.gui.combination import Combination
-from origenerator.gui.generation_queue import (
+from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
+from origenerator.gui.job_queue_view import (
     _STRIP_HEIGHT,
     QUEUE_ROW_MIME,
-    GenerationQueue,
+    JobQueueView,
     QueueRow,
 )
-from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.marked_words import words
 
 
 @pytest.fixture
 def queue(qtbot):
-    q = GenerationQueue()
+    q = JobQueueView()
     qtbot.addWidget(q)
     q.resize(800, 60)
     q.show()
@@ -36,7 +36,7 @@ def queue(qtbot):
 def dressed(qtbot):
     # The app's own style sheet grounds the column the rows sit in, so anything
     # painted beneath that column is painted out of sight.
-    q = GenerationQueue()
+    q = JobQueueView()
     q.setStyleSheet(build_stylesheet())
     qtbot.addWidget(q)
     q.resize(1100, 60)  # room for a whole row beside Shield All and Cancel All
@@ -95,14 +95,14 @@ def _four(queue):
 
 
 def _settled(queue):
-    """The strip as it stands put on screen whole, so that what changes after
+    """The Job Queue as it stands put on screen whole, so that what changes after
     this shows only where it is repainted."""
     QApplication.processEvents()
     queue.repaint()
 
 
 def _on_screen(queue):
-    """What the strip's window shows, including whatever was never repainted."""
+    """What the Job Queue's window shows, including whatever was never repainted."""
     return QApplication.primaryScreen().grabWindow(queue.winId()).toImage()
 
 
@@ -116,10 +116,10 @@ def _drawn(image, points, color) -> bool:
     return True
 
 
-# --- the shape of the strip ---------------------------------------------------
+# --- the shape of the Job Queue ---------------------------------------------------
 
 def test_keeps_its_slot_when_idle(queue):
-    # The strip's space is reserved even when nothing runs, so a job appearing
+    # The Job Queue's space is reserved even when nothing runs, so a job appearing
     # doesn't shove the panes up. It stays laid out but blank.
     queue.set_items([])
     assert queue.isVisible()
@@ -128,8 +128,8 @@ def test_keeps_its_slot_when_idle(queue):
 
 
 def test_an_empty_line_says_what_it_is_for(queue):
-    # The strip keeps its slot with nothing queued, so this side of it is blank
-    # most of the time — and a blank half of a laid-out strip reads as something
+    # The Job Queue keeps its slot with nothing queued, so this side of it is blank
+    # most of the time — and a blank half of a laid-out Job Queue reads as something
     # that failed to draw. Dim letters, so it is a note about the space rather
     # than a row sitting in it.
 
@@ -142,7 +142,7 @@ def test_an_empty_line_says_what_it_is_for(queue):
 
 
 def test_the_hint_sits_in_the_middle_of_the_whole_strip(queue):
-    # The space it explains is the strip, not the part of it left over beside a
+    # The space it explains is the Job Queue, not the part of it left over beside a
     # live half with nothing in it: centered in that sliver, it reads as pushed
     # off to the right.
 
@@ -156,7 +156,7 @@ def test_the_hint_sits_in_the_middle_of_the_whole_strip(queue):
 
 def test_the_live_half_stands_down_when_it_has_nothing_in_it(queue):
     # With no frame, no bar and nothing to report it is an empty third of the
-    # strip, and the only thing it does there is push the hint off center.
+    # Job Queue, and the only thing it does there is push the hint off center.
 
     queue.set_items([])
     QApplication.processEvents()
@@ -228,8 +228,8 @@ def test_the_clock_is_written_across_the_bar_it_measures(queue):
 
 def test_the_thumbnail_fills_the_strip_from_its_top_edge_into_its_lower_left_corner(queue):
     # The live frame is what the left half is for, so it takes the biggest square
-    # the strip has room for, right into its corner. The splitter handle above
-    # the strip is its top border, so no line of the strip's own sits over it.
+    # the Job Queue has room for, right into its corner. The splitter handle above
+    # the Job Queue is its top border, so no line of the Job Queue's own sits over it.
 
     queue.set_items([_item(status="running")])
     QApplication.processEvents()
@@ -242,7 +242,7 @@ def test_the_thumbnail_fills_the_strip_from_its_top_edge_into_its_lower_left_cor
 
 def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
     # It is opened to read the queue, not to be shown one enormous frame: the
-    # thumbnail stops at the strip's own opening height and the rows take the rest.
+    # thumbnail stops at the Job Queue's own opening height and the rows take the rest.
 
 
     queue.set_items([_item(status="running")])
@@ -370,7 +370,7 @@ def test_a_live_frame_updates_the_rows_without_rebuilding_them(queue):
 def test_a_rule_runs_up_beside_the_live_half_and_along_the_foot_of_its_row(queue):
     # The job being made is shown twice, as the whole left half and as the top
     # row of the line. The rule says the two are one: up the gap between the
-    # halves from the strip's foot to the foot of that row, then along the
+    # halves from the Job Queue's foot to the foot of that row, then along the
     # row's foot to its end, walling off only the jobs waiting behind it.
     _four(queue)
     QApplication.processEvents()
@@ -590,14 +590,14 @@ def test_a_rows_arrows_follow_where_its_job_can_go_in_place(queue):
 def test_a_rows_text_elides_rather_than_widen_the_row_past_a_narrow_strip(queue):
     queue.resize(900, 60)
     queue.set_items([_item(key="a", status="queued", job_kind="Video",
-                           act="an act with a name long enough to run past the strip",
+                           act="an act with a name long enough to run past the Job Queue",
                            cancel=lambda: None, shield=lambda _on: None)])
     QApplication.processEvents()
     row = queue.rows()[0]
 
     assert row.width() <= queue._scroll.viewport().width()
     assert row._lead.display_text(row._lead.width()).endswith("…")
-    assert row._lead.text().endswith("past the strip")
+    assert row._lead.text().endswith("past the Job Queue")
 
 
 # --- the shield, which keeps a run going for the images asked for after it ----
@@ -658,7 +658,7 @@ def test_pressing_the_shield_does_not_also_open_the_folder(queue, qtbot):
     assert revealed == []
 
 
-# --- Shield All and Cancel All, stacked at the right end of the strip ---------
+# --- Shield All and Cancel All, stacked at the right end of the Job Queue ---------
 
 def _box(queue, widget) -> QRect:
     return QRect(widget.mapTo(queue, QPoint(0, 0)), widget.size())
@@ -959,7 +959,7 @@ def test_no_clock_on_a_job_comfyui_has_not_started(queue):
 
 
 def test_the_clock_advances_between_polls(queue):
-    # The gallery re-feeds the strip every 1.5s, which would make a seconds count
+    # The gallery re-feeds the Job Queue every 1.5s, which would make a seconds count
     # skip; the running half re-reads the clock itself so it moves a second at a
     # time.
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
@@ -992,7 +992,7 @@ def test_another_apps_backlog_takes_the_slot_back_when_ours_empties(queue):
 
 
 def test_the_clock_keeps_the_strip_the_same_height(queue):
-    # Same reason the idle strip holds its slot: the clock rides in the strip's
+    # Same reason the idle Job Queue holds its slot: the clock rides in the Job Queue's
     # own height rather than adding a line that would shove the panes above it.
     queue.set_items([])
     idle = queue.sizeHint().height()
@@ -1032,7 +1032,7 @@ def test_a_press_that_travels_starts_a_drag_carrying_the_rows_id(queue, monkeypa
 
 def test_the_dragged_row_lights_up_while_it_is_being_dragged(queue, monkeypatch):
     # Otherwise the gesture is invisible and reads as an accident rather than
-    # something the strip offers.
+    # something the Job Queue offers.
     _four(queue)
     row = queue.rows()[2]
     lit = []
@@ -1169,7 +1169,7 @@ def _asked_to_move(queue) -> list:
 
 
 def test_dropping_a_row_above_another_asks_to_move_it_there(queue):
-    # The queue moves it and the strip is drawn again from the queue's line: a
+    # The queue moves it and the Job Queue is drawn again from the queue's line: a
     # job that cannot go exactly there lands where the queue's rules put it.
     asked = _asked_to_move(queue)
     _four(queue)
@@ -1276,7 +1276,7 @@ def test_a_row_let_go_where_it_already_was_asks_for_nothing(queue):
 
 def test_a_drop_carrying_something_else_is_ignored(queue):
     # Gallery thumbnails are dragged around this app too; one let go over the
-    # strip must not be read as a reorder.
+    # Job Queue must not be read as a reorder.
 
     asked = _asked_to_move(queue)
     _four(queue)

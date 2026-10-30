@@ -88,7 +88,7 @@ def test_the_drawing_is_the_console_funestra_paints(qtbot):
     assert (raw, size) == (expected, expected_size)
 
 
-def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
+def test_cores_console_is_its_osr2_section_alone(qtbot):
     panel, _motion = _panel(qtbot)
     panel.drawing()
     actions = [b.command for _rect, b in panel._painter.buttons]

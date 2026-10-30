@@ -1,8 +1,8 @@
 """What every surface knows about a generation that is still in flight.
 
 Three widgets show queued and running work — the Recents collection's cards
-(:mod:`origenerator.gui.inflight_card`), the lower strip's queue
-(:mod:`origenerator.gui.generation_queue`), and the config pane's live preview
+(:mod:`origenerator.gui.inflight_card`), the Job Queue
+(:mod:`origenerator.gui.job_queue_view`), and the config pane's live preview
 note — and none of them should know where a job came from or how to reach it.
 They are handed :class:`InFlightItem` instead: a plain view-model the gallery
 builds per job, carrying what to draw, how to stop it, and how to go to it.

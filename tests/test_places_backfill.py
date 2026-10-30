@@ -12,7 +12,7 @@ from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
-from origenerator.gui.main_window import OrigeneratorWindow
+from origenerator.gui.core import Core
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import detail_parts
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -285,7 +285,7 @@ def test_once_closed_the_apps_turn_hands_comfyui_the_images_to_look_over(qtbot, 
     db = Database(tmp_path / "t.db")
     _enhanced(db, "a", _file("enhanced_a.png"))
     _on_disk(folders, "enhanced_a.png")
-    window = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
+    window = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(window)
     window.close()
     window.hand_comfyui_what_runs_while_closed()
@@ -323,7 +323,7 @@ def test_opening_the_app_keeps_the_places_found_while_it_was_closed(qtbot, tmp_p
                 "outputs": {"fix0_points": _report((100, 100, 300, 300), (0, 0, 1000, 1000))}}
     monkeypatch.setattr(ComfyUIClient, "fetch_history", lambda self, prompt_id: finished if prompt_id == run else {})
 
-    qtbot.addWidget(OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json")))
+    qtbot.addWidget(Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json")))
 
     assert gallery.row_output_files(db.get_generation("a"))[0]["points_of_interest"] == [
         {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.3, "part": "faces"}]

@@ -82,7 +82,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # lines and the info pane's 71 are 30 and 31, which is what took the tree from
 # 19416 to here. What they keep is what a test cannot say -- where the creep into
 # an image lives, why a run joins a slideshow on its first frame and not before, why
-# a slideshow wears one panel where Fun Time wears two, why the tab row carries no
+# a slideshow wears one HUD where Fun Time wears two, why the tab row carries no
 # "+" of its own, and that an edit is what a person did rather than what a load
 # did. Every rule cut was already a test named for the claim (161 of them across
 # the two files); each preamble now says so and names the file.
@@ -317,7 +317,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 18408 when the Slideshow moved onto a Funestra: the window the slideshow drew for
 # itself, the HUD it painted, the stills either side and the position line went
 # with the paragraphs that explained them; how the Funestra plays a pass, draws
-# the panel and places a press is funestra's to state, and what the slideshow
+# the HUD and places a press is funestra's to state, and what the slideshow
 # keeps of the set is tests/test_slideshow_view.py's, each claim a test's name.
 #
 # 18338 when closing the loading screen came to cancel the launch, taken down to

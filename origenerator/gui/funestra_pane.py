@@ -70,11 +70,11 @@ class PaneChannel:
 
 
 class FunestraPane(QWidget):
-    def __init__(self, parent=None, *, channel: PaneChannel, user, panel, engine_for=None,
+    def __init__(self, parent=None, *, channel: PaneChannel, user, hud, engine_for=None,
                  radio=None, volume=None, on_volume_moved=None):
         super().__init__(parent)
         self._user = user
-        self._panel = panel
+        self._hud = hud
         self._radio = radio
         self._volume = volume
         self._on_volume_moved = on_volume_moved
@@ -135,7 +135,7 @@ class FunestraPane(QWidget):
         self._engine = engine
         self._funestra = Funestra(
             engine, channels=Channels(), playlist=self.channel.items, audible=True,
-            muted=self._muted, users={"slideshow": self._user}, panel=self._panel,
+            muted=self._muted, users={"slideshow": self._user}, hud=self._hud,
             radio=None if self._radio is None else self._radio.held_by_a_slideshow(),
             on_volume_moved=self._on_volume_moved)
         self._funestra.set_muted(self._muted)

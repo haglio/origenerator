@@ -94,7 +94,7 @@ def test_every_job_in_flight_is_a_row_of_its_own():
 
 
 def test_the_job_being_made_leads_the_block_with_its_frame_and_its_clock():
-    """The live half of the lower strip, on the panel: what is being made, and
+    """The live half of Core's Job Queue, on the HUD: what is being made, and
     how far along it is."""
     section = queue_section([_item("running-one", status="running", frame=b"jpeg",
                                    started_at=0.0, typical_seconds=30,
@@ -129,7 +129,7 @@ def test_with_nothing_of_ours_in_flight_the_block_names_another_apps_backlog():
 
 
 def _painted(section, width=400):
-    """The block on a panel-sized canvas, with what it drew there."""
+    """The block on a HUD-sized canvas, with what it drew there."""
     image = Image.new("RGBA", (width + 20, section.size()[1] + 20), (0, 0, 0, 0))
     return image, section.paint(image, 10, 10, width, None)
 
@@ -266,7 +266,7 @@ def _brightest(image, rect) -> int:
 
 
 def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield():
-    # His answer for the Job Queue (2026-10-29), and so here too: the panel's muted
+    # His answer for the Job Queue (2026-10-29), and so here too: the HUD's muted
     # ink, never its bright one, on a press that would do nothing.
     shielded = _item("j1", status="running", shield=lambda _on: None, shielded=True)
     grayed = queue_section([shielded, _item("j2")], 0)  # one the slideshow cannot shield
@@ -300,15 +300,15 @@ def test_a_row_is_a_way_into_the_folder_its_job_will_land_in():
 
 
 def _reds(image) -> int:
-    """How many pixels of the block are within a hair of the panel's red."""
+    """How many pixels of the block are within a hair of the HUD's red."""
     pixels = np.asarray(image).reshape(-1, 4).astype(int)
     near = np.all(np.abs(pixels[:, :3] - np.array(RED[:3])) < 24, axis=1)
     return int(np.count_nonzero(near & (pixels[:, 3] > 0)))
 
 
-def test_the_word_that_throws_a_job_away_is_drawn_in_the_panels_own_ink():
-    """The strip under the window draws Cancel in the panel's ordinary gray,
-    and the panel's own copy of that queue reads the same: red here is the
+def test_the_word_that_throws_a_job_away_is_drawn_in_the_huds_own_ink():
+    """Core's Job Queue draws Cancel in the HUD's ordinary gray,
+    and the HUD's own copy of that queue reads the same: red here is the
     color the Funestras keep for a live recording."""
     section = queue_section([_item("j1", cancel=lambda: None)], 0)
 
@@ -360,7 +360,7 @@ def _lower_half_of(pointer, command):
 
 class TestThePointerOnTheBlock:
     """The source painted the block and knows what is drawn where, so the
-    panel hands it the pointer in the block's own pixels: a press, a drag,
+    HUD hands it the pointer in the block's own pixels: a press, a drag,
     the button coming up and the wheel."""
 
     def test_a_press_on_a_rows_button_throws_that_job_away(self):

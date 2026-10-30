@@ -227,7 +227,7 @@ def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLeve
 
     An image's versions are listed even before there are two of them: a place
     that appears only once you already have versions is a place you never find,
-    and the enhance you just launched replaces the strip's only other content
+    and the enhance you just launched replaces the Job Queue's only other content
     while it runs. A video has no enhancer, so it lists versions only once
     Evolver has upscaled it — that ``upscale`` over the video itself.
 

@@ -135,8 +135,8 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import DEFAULT_S
-from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.media import MediaType
@@ -161,7 +161,7 @@ from tests.drop_style_seen import worn
 from tests.lit_switches import lit_in
 from tests.marked_words import words
 from tests.osr2_fakes import FakeBroker
-from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names, panel_targets
+from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names, hud_targets
 from tests.slideshow_support import ahead
 from tests.test_combine_panel import _listed_under_recent
 from tests.test_enhance_panel import _dropped_on
@@ -5456,8 +5456,8 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert view._arrangement.folder_panes.count() == 2
     assert view._arrangement.folder_panes.widget(0).isAncestorOf(view._tree)
     assert view._arrangement.folder_panes.widget(1).isAncestorOf(view._scroll)
-    # ...with the queue strip under both of them, and the info pane beside the
-    # whole column at full height — the strip is the folders' foot, not the
+    # ...with the Job Queue under both of them, and the info pane beside the
+    # whole column at full height — the Job Queue is the folders' foot, not the
     # window's.
     assert view._arrangement.left_column.count() == 2
     assert view._arrangement.left_column.widget(0) is view._arrangement.folder_panes
@@ -8344,7 +8344,7 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     assert not view._bank.slideshow.isHidden()   # everything is still there to play
 
 
-def test_a_slideshow_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
+def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
     # A slideshow used to float two: the Funestras' HUD over the set, and Genau's whole
     # console under it for the device.  Between them the status was said twice
     # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
@@ -8353,7 +8353,7 @@ def test_a_slideshow_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
 
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
     assert slideshow.findChildren(MotionPanel) == []
-    posted = [button.command for _rect, button in panel_targets(slideshow.shown).buttons]
+    posted = [button.command for _rect, button in hud_targets(slideshow.shown).buttons]
     assert "robot_hand_cycle_shape" in posted   # the motion's row is on it
     assert any(command.endswith("_clip_seconds_up") for command in posted)  # and the pace's
     assert slideshow.shown._hud_model().drive is not None  # with the readout under them
@@ -9237,7 +9237,7 @@ def _generation_failed_dialog(view):
 def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path):
     """A failed run leaves nothing — no file, so no tile, and the row it
     does leave is one every collection filters out for having produced nothing. So it
-    used to simply disappear: minutes of GPU, the tile gone off the strip, and no
+    used to simply disappear: minutes of GPU, the tile gone off the Job Queue, and no
     word anywhere but the log. Someone watching read that as a success and went
     looking for the clip."""
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
@@ -10310,7 +10310,7 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
         qtbot, tmp_path, monkeypatch):
     # A card is the whole of what the collection shows of a run being made, and it used
     # to answer a right-click with nothing at all: stopping the run meant finding
-    # it again among the lower strip's rows.
+    # it again among the Job Queue's rows.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -10330,7 +10330,7 @@ def test_an_auto_generating_folders_card_offers_a_cancel_and_a_real_stop(
         qtbot, tmp_path, monkeypatch):
     # A Cancel ends nothing while Auto-Generate is on — it throws this seed away
     # and Auto-Generate launches another — and the menu says it in the same words
-    # the tile's button and the strip's row use. Unlike those, it has room to
+    # the tile's button and the Job Queue's row use. Unlike those, it has room to
     # offer the stop as well, which is the thing you cannot otherwise ask for
     # without going to the header for the Auto switch.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
@@ -10372,7 +10372,7 @@ def test_canceling_from_an_auto_generating_folders_card_ends_auto_generate_too(
 
 def test_a_card_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
     # A running row this session never adopted (a restart mid-generation) has
-    # nothing here to stop it with — the strip hides the same button — so the
+    # nothing here to stop it with — the Job Queue hides the same button — so the
     # right-click raises nothing rather than a menu that cannot act.
     db = FakeDB([_image("done", "a cat", 50, 1)])
     db.add(_running_row("gen1"))
@@ -10555,7 +10555,7 @@ def _queued_job(prompt_id, state="idle"):
 
 def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
     # An image jumping ahead of a video, or a drag moving a row, leaves no mark on
-    # anything the rows record — so the strip is ordered by the queue's own line,
+    # anything the rows record — so the Job Queue is ordered by the queue's own line,
     # here the reverse of the order the rows were made in.
     db = FakeDB([
         _row("first", "sdxl_t2i", {"positive_prompt": "a"}, "a.png",
@@ -10589,13 +10589,13 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
 
 
 def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
-    # The lower strip surfaces in-flight work from anywhere in the view, then
+    # The Job Queue surfaces in-flight work from anywhere in the view, then
     # empties once nothing runs — keeping its slot so the panes never shift.
     db = FakeDB([_image("done", "a cat", 50, 1)])
     db.add(_running_row("gen1", prompt="a dog"))
     view = GalleryView(db)
     qtbot.addWidget(view)
-    with qtbot.waitExposed(view):   # showEvent -> refresh -> feeds the strip
+    with qtbot.waitExposed(view):   # showEvent -> refresh -> feeds the Job Queue
         view.show()
 
     assert view._queue.isVisible()
@@ -10610,7 +10610,7 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
 
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
-    # The slideshow covers the strip, so the queue follows onto the panel in front
+    # The slideshow covers the Job Queue, so the queue follows onto the HUD in front
     # of the user, in the same order.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
@@ -10625,7 +10625,7 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
     slideshow = view._slideshows.showing
 
     # Filled at the opening rather than a poll and a half later, and with the
-    # same rows and the same job being made the docked strip is showing.
+    # same rows and the same job being made Core's Job Queue is showing.
     assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == view._queue.keys() == ["gen1"]
     assert queue_section(*slideshow.shown.queue_foot.hud_queue).leader.key == "gen1"
 
@@ -10638,7 +10638,7 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 
 def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at_once(
         qtbot, monkeypatch):
-    # The block on the slideshow's panel lists the same line as the lower strip and
+    # The block on the slideshow's HUD lists the same line as the Job Queue and
     # asks for the same things, so it reaches the same queue, and both are drawn
     # again from its line the moment it moves.
     _resolve_by_id(monkeypatch)
@@ -12504,7 +12504,7 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
 
     # Both images share one source config, so their enhances share one folder —
     # and both go to ComfyUI, which works through them one at a time with the
-    # lower strip showing the line.
+    # Job Queue showing the line.
     jobs = view._jobs.all_jobs
     assert len(jobs) == 2
     assert {j.workflow.name for j in jobs} == {"image_enhance"}
@@ -13020,7 +13020,7 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
     # An enhancement gets no card of its own — it shows on the tile of the image
     # it improves — so that tile's menu is the only thing in the middle column
     # that can be asked to stop it. Without the entry the run had to be hunted
-    # down among the lower strip's rows.
+    # down among the Job Queue's rows.
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -13076,7 +13076,7 @@ def test_a_tile_with_nothing_in_flight_offers_no_cancel(qtbot, tmp_path, monkeyp
 def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     # An enhancement is a version of an image, not an item beside it — so the
     # collection shows the run on that image's own tile, under the scrim, and never as
-    # a second card claiming something else is being made. The lower strip's
+    # a second card claiming something else is being made. The Job Queue's
     # queue still lists it: that is what the GPU is doing.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -14305,7 +14305,7 @@ def test_a_standing_slideshows_volume_comes_back_after_a_restart(qtbot, monkeypa
 
 
 def _click_the_slide(slideshow):
-    """A click on the slideshow's slide, clear of its panel and of the corners that
+    """A click on the slideshow's slide, clear of its HUD and of the corners that
     open it, through the window the Funestra draws into."""
     engine_of(slideshow.shown)
     slideshow.shown.showFullScreen()
@@ -14378,7 +14378,7 @@ def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
     assert view._osr2_motion.frozen
 
 
-def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):
+def test_the_motion_keys_work_in_core_too(qtbot, monkeypatch):
     # "Always available": the same keys the fullscreen views answer are routed
     # app-wide by the gallery's event filter, under its own-keys guards.
     view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
@@ -15890,7 +15890,7 @@ def _queue_view(qtbot, client):
 def test_the_strip_names_another_apps_queue_before_generate_is_pressed(qtbot):
     # The reported bug: the queue read as free, then Generate reported six jobs
     # ahead of it out of nowhere. Polling the server's own queue is what lets the
-    # strip say so while nothing of ours is in flight at all.
+    # Job Queue say so while nothing of ours is in flight at all.
     client = _QueueClient(ForeignQueue(running=["r"], pending=["a", "b"]))
     view = _queue_view(qtbot, client)
 

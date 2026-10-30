@@ -1,7 +1,6 @@
 """A stand-in for the OSR2 motion a console acts on.
 
-Shared because three surfaces press the same console verbs -- the panel in the
-main window's top left, a slideshow's own panel, and the keys -- and each was growing its
+Shared because three surfaces press the same console verbs -- the panel in Core's top left, a slideshow's own panel, and the keys -- and each was growing its
 own half-driver to be pressed against.
 """
 from __future__ import annotations

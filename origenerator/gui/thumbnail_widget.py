@@ -287,7 +287,7 @@ class ThumbnailWidget(QWidget):
 
     def _render_enhancing_timing(self):
         """Write the run's reading across the bar at the thumbnail's foot — the
-        compact one, since a tile is a third of the lower strip's width."""
+        compact one, since a tile is a third of the Job Queue's width."""
         run = self._enhancing
         if run is None:
             return

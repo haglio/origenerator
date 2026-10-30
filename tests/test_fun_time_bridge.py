@@ -85,7 +85,7 @@ def _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path, count=3):
         Image.new("RGB", (100, 200)).save(still)
         items.append((str(still), "image", f"id{n}", str(still)))
     monkeypatch.setattr(view, "rows_to_play",
-                        lambda: [{"prompt_id": item[2]} for item in items])
+                        lambda: [_row_of(item) for item in items])
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
     view._slideshows.start()

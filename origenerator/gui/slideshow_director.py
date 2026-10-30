@@ -237,9 +237,18 @@ def _narrowed_to(held: HeldSlideshow, shape: str, ids) -> HeldSlideshow:
                    state=_place_among(ids, held.state))
 
 
-def _side_of_the_set(rows, items) -> str | None:
+def _shapes_in(rows, items) -> list[str]:
     ids = {item[2] for item in items}
-    return the_side_of(row_orientation(row) for row in rows if row["prompt_id"] in ids)
+    return [row_orientation(row) for row in rows if row["prompt_id"] in ids]
+
+
+def _side_of_the_set(rows, items) -> str | None:
+    return the_side_of(_shapes_in(rows, items))
+
+
+def _shape_of_the_set(rows, items) -> str:
+    shapes = _shapes_in(rows, items)
+    return majority_shape(shapes) if shapes else region_for_items(items)
 
 
 def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
@@ -247,9 +256,7 @@ def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
         return row_orientation(row)
     if (shape := the_one_shape_on(side)) is not None:
         return shape
-    if rows:
-        return majority_shape(map(row_orientation, rows))
-    return region_for_items(items)
+    return _shape_of_the_set(rows, items)
 
 
 class SlideshowDirector:
@@ -508,7 +515,7 @@ class SlideshowDirector:
         # the whole screen.
         run = self._run_being_made_at(location) if not items else None
         where = side or (row_orientation(run) if run is not None
-                         else region_for_items(items or folder_items or []))
+                         else _shape_of_the_set(rows, items or folder_items or []))
         # And what that side IS: one of the session's Funestras, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None

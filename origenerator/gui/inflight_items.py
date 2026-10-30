@@ -43,6 +43,7 @@ class InFlightItems:
     """
 
     def __init__(self, *, db, jobs, auto, tree, image_rows: Callable[[], list],
+                 image_index: Callable[[], dict],
                  on_cancel: Callable[[str], None], on_reveal: Callable[[str], None],
                  on_go_to_item: Callable[[str], None],
                  on_shield: Callable[[str, bool], None]):
@@ -51,6 +52,7 @@ class InFlightItems:
         self._auto = auto
         self._tree = tree
         self._image_rows = image_rows
+        self._image_index = image_index
         self._on_cancel = on_cancel
         self._on_reveal = on_reveal
         self._on_go_to_item = on_go_to_item
@@ -87,7 +89,6 @@ class InFlightItems:
         # lookup per job: the table is small and the queue rarely is.
         records = {r["prompt_id"]: r for r in (self._db.list_requests()
                                                if requests is None else requests)}
-        image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
         if rows is None:
@@ -122,9 +123,7 @@ class InFlightItems:
                 move_down = (partial(self._jobs.move_down, pid)
                              if self._jobs.can_move_down(pid) else None)
             else:  # a running row no live job holds — no live frame, progress, or cancel
-                if image_index is None:
-                    image_index = gallery.build_image_config_index(self._image_rows())
-                folder_key = gallery.settings_folder_key(row, image_index)
+                folder_key = gallery.settings_folder_key(row, self._image_index())
                 frame, progress, cancel, foreign, started = None, None, None, None, None
                 starts_at = None
                 pass_progress, stage, stop_auto, state = None, "", None, row.get("status")

@@ -196,7 +196,7 @@ def make_animated_preview(row: dict, places: OutputPlaces, thumb_dir: Path) -> s
     on disk (keyed by the row's ``prompt_id``), so only the first request pays the
     frame-sampling cost, which is seconds per video and never the window's to pay.
     """
-    video = _video_of(row, places)
+    video = video_file_of(row, places)
     if video is None:
         return None
     try:
@@ -208,13 +208,13 @@ def make_animated_preview(row: dict, places: OutputPlaces, thumb_dir: Path) -> s
 
 
 def animated_preview_if_made(row: dict, places: OutputPlaces, thumb_dir: Path) -> str | None:
-    if _video_of(row, places) is None:
+    if video_file_of(row, places) is None:
         return None
     made = animated_thumbnail_path(thumb_dir, row["prompt_id"])
     return str(made) if made.exists() else None
 
 
-def _video_of(row: dict, places: OutputPlaces) -> Path | None:
+def video_file_of(row: dict, places: OutputPlaces) -> Path | None:
     preview = resolve_preview(row, places)
     return preview[0] if preview is not None and preview[1] == MediaType.VIDEO else None
 

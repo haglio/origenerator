@@ -2544,6 +2544,17 @@ def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
     assert caption == f"{gallery.folder_id(gallery.settings_folder_key(held))} 000"
 
 
+def test_an_old_version_the_backfill_sent_to_the_trash_says_so_on_its_tile(qtbot):
+    held = {**_image("d1", "a cat", 50, 1), "old_version_of": "the video it was made again as"}
+    view = GalleryView(_bin_db(held=[("d1", held)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
+    caption = view._browser._thumb_widgets["d1"]._text_label.text()
+    assert caption == f"Old version · {gallery.folder_id(gallery.settings_folder_key(held))} 000"
+
+
 def test_the_trash_collection_states_no_deadline_over_what_it_holds(qtbot):
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)

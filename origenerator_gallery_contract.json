@@ -17,7 +17,8 @@
     "evolver_exported_at",
     "evolver_unsent_at",
     "genau_exported_at",
-    "genau_unsent_at"
+    "genau_unsent_at",
+    "remade_at"
   ],
   "params_model_keys": [
     "unet_high",

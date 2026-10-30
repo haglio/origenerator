@@ -55,6 +55,7 @@ OPTIONAL_COLUMNS = (
     "evolver_unsent_at",
     "genau_exported_at",
     "genau_unsent_at",
+    "remade_at",
 )
 
 #: Inside ``params_json``, the keys a run's model is named under, most specific

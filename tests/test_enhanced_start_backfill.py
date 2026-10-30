@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from origenerator import downtime, gallery
+from origenerator import downtime, gallery, recovery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.enhanced_start_backfill import (
@@ -21,16 +21,18 @@ from origenerator.enhanced_start_backfill import (
     fold_completed_backfill,
     pay_the_owed_favorites,
     queue_backfill,
-    trash_what_the_backfill_replaced,
     videos_to_backfill,
 )
 from origenerator.export_lane import EXPORT_LANES, KINO
+from origenerator.funscript import funscript_path_for
+from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import record_of
+from origenerator.trash import Trash
 from tests.comfyui_folders import SUITE_FOLDERS
 
 
@@ -310,25 +312,178 @@ def _kino_copy(tmp_path, prompt_id, *, favorite=False):
     return copy
 
 
+def _places(tmp_path):
+    return OutputPlaces.in_one_folder(tmp_path / "output")
+
+
+def _thumbnails(tmp_path):
+    return tmp_path / "thumbnails"
+
+
 def _fold(db, tmp_path):
-    trashed = []
-    folded = fold_completed_backfill(db, _evolver(tmp_path), trash=trashed.extend)
-    return folded, [row["prompt_id"] for row in trashed]
+    trash = GalleryActions(db, _places(tmp_path), Trash(tmp_path / "trash")).delete_rows
+    folded = fold_completed_backfill(db, _places(tmp_path), _thumbnails(tmp_path), trash=trash)
+    return folded, [record["prompt_id"] for record in db.list_deletions()
+                    if not record["row"].get("old_version_of")]
 
 
-def test_a_finished_backfill_run_takes_the_old_videos_place_and_its_star(tmp_path):
+def _old_versions_in_trash(db, tmp_path):
+    return [row for row in recovery.bin_items(db.list_deletions()) if row.get("old_version_of")]
+
+
+def test_a_finished_backfill_run_becomes_its_old_video_which_keeps_its_star_and_sends(
+        tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image", enhanced=True)
     _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    _sent_everywhere(db, "video")
+    sent = {lane.flag: db.get_generation("video")[lane.flag] for lane in EXPORT_LANES}
     _finished_backfill_run(db, tmp_path, "again", of="video")
 
     assert _fold(db, tmp_path) == (1, [])
 
     listed = {row["prompt_id"]: row for row in db.list_generations()}
-    assert "video" not in listed
-    assert listed["again"]["source"] == GenerationSource.GENERATED
-    assert listed["again"]["starred"]
-    assert not db.get_generation("video")["starred"]
+    assert "again" not in listed
+    video = listed["video"]
+    assert json.loads(video["params_json"]) == {"noise_seed": 7, "audio_seed": 8}
+    assert video["starred"] and video["source"] == GenerationSource.GENERATED
+    assert {flag: video[flag] for flag in sent} == sent
+
+
+def test_the_remade_video_takes_its_old_videos_file_name(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    first = _made_on_disk(tmp_path, "video", b"first made")
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+
+    _fold(db, tmp_path)
+
+    assert first.read_bytes() == b"made again"
+    assert not (first.parent / "again_00001.mp4").exists()
+    named = [entry["filename"] for entry in gallery.row_output_files(db.get_generation("video"))]
+    assert named == [first.name]
+
+
+def test_the_old_version_waits_in_trash_as_an_item_of_its_own_marked_as_the_old_version(
+        tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    db.mark_evolver_exported("video")
+    _made_on_disk(tmp_path, "video", b"first made")
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+
+    _fold(db, tmp_path)
+
+    [old] = _old_versions_in_trash(db, tmp_path)
+    assert old["old_version_of"] == "video" and old["prompt_id"] != "video"
+    assert not old["starred"] and not old["evolver_exported_at"]
+    [held] = gallery.row_output_files(old)
+    assert gallery.output_file_path(held, _places(tmp_path)).read_bytes() == b"first made"
+
+
+def test_a_video_remade_in_place_says_when_so_evolver_takes_the_new_one(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+
+    _fold(db, tmp_path)
+
+    assert db.get_generation("video")["remade_at"]
+
+
+def test_a_video_the_earlier_fold_put_beside_its_old_one_is_remade_into_it(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", start=_plain("image"))
+    first = _made_on_disk(tmp_path, "video", b"first made")
+    db.set_source("video", GenerationSource.REPLACED)
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+    db.set_source("again", GenerationSource.GENERATED)
+    db.set_generation_favorite("again", True)
+
+    assert _fold(db, tmp_path) == (1, [])
+
+    video = db.get_generation("video")
+    assert video["source"] == GenerationSource.GENERATED and video["starred"]
+    assert db.get_generation("again") is None
+    assert first.read_bytes() == b"made again"
+
+
+def test_the_video_wears_the_remade_thumbnails_and_its_old_version_keeps_its_own(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    _made_on_disk(tmp_path, "video", b"first made")
+    thumbnails = _thumbnails(tmp_path)
+    thumbnails.mkdir()
+    (thumbnails / "video.jpg").write_bytes(b"first frame")
+    (thumbnails / "again.jpg").write_bytes(b"remade frame")
+    (thumbnails / "video_anim.webp").write_bytes(b"first frames")
+    (thumbnails / "again_anim.webp").write_bytes(b"remade frames")
+    db.update_generation("video", thumbnail_path=str(thumbnails / "video.jpg"))
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+    db.update_generation("again", thumbnail_path=str(thumbnails / "again.jpg"))
+
+    _fold(db, tmp_path)
+
+    assert Path(db.get_generation("video")["thumbnail_path"]).read_bytes() == b"remade frame"
+    assert (thumbnails / "video_anim.webp").read_bytes() == b"remade frames"
+    [old] = _old_versions_in_trash(db, tmp_path)
+    assert Path(old["thumbnail_path"]).read_bytes() == b"first frame"
+    assert (thumbnails / f"{old['prompt_id']}_anim.webp").read_bytes() == b"first frames"
+
+
+def _script_on_disk(tmp_path, video, content):
+    script = funscript_path_for(video, places=_places(tmp_path))
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(content, encoding="utf-8")
+    return script
+
+
+def test_the_remade_videos_script_takes_the_old_scripts_name(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    first = _script_on_disk(tmp_path, _made_on_disk(tmp_path, "video", b"first made"), "first")
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+    again = _script_on_disk(tmp_path, tmp_path / "output" / "video" / "again_00001.mp4", "again")
+
+    _fold(db, tmp_path)
+
+    assert first.read_text(encoding="utf-8") == "again"
+    assert not again.exists()
+
+
+@pytest.mark.parametrize("held", ["video", "script"])
+def test_a_remake_stopped_by_a_file_held_open_finishes_at_the_next_launch(
+        tmp_path, monkeypatch, held):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    first = _made_on_disk(tmp_path, "video", b"first made")
+    script = _script_on_disk(tmp_path, first, "first")
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+    remade = tmp_path / "output" / "video" / "again_00001.mp4"
+    held_file = {"video": remade, "script": _script_on_disk(tmp_path, remade, "again")}[held]
+    replace = Path.replace
+
+    def held_open(path, target):
+        if Path(path) == held_file:
+            raise PermissionError("held open")
+        return replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", held_open)
+    assert _fold(db, tmp_path) == (0, [])
+    monkeypatch.undo()
+
+    assert _fold(db, tmp_path) == (1, [])
+
+    assert first.read_bytes() == b"made again"
+    assert script.read_text(encoding="utf-8") == "again"
+    assert len(_old_versions_in_trash(db, tmp_path)) == 1
 
 
 def _latest_videos(db):
@@ -336,7 +491,7 @@ def _latest_videos(db):
             if gallery.media_type_of_row(row) == MediaType.VIDEO]
 
 
-def test_a_finished_backfill_run_sits_where_the_old_video_sat_in_latest(tmp_path):
+def test_a_video_remade_in_place_keeps_its_place_in_latest(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image", enhanced=True)
     _video(db, "video", made_from="image", starred=True, start=_plain("image"))
@@ -348,7 +503,7 @@ def test_a_finished_backfill_run_sits_where_the_old_video_sat_in_latest(tmp_path
 
     _fold(db, tmp_path)
 
-    assert _latest_videos(db) == ["made later", "again"]
+    assert _latest_videos(db) == ["made later", "video"]
 
 
 def _asked_for(db_path, prompt_id, when):
@@ -357,7 +512,7 @@ def _asked_for(db_path, prompt_id, when):
                      (when, prompt_id))
 
 
-def test_a_finished_backfill_run_is_headed_with_the_old_videos_sitting_in_latest(tmp_path):
+def test_a_video_remade_in_place_keeps_the_sitting_latest_heads_it_with(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image", enhanced=True)
     _video(db, "video", made_from="image", starred=True, start=_plain("image"))
@@ -366,7 +521,7 @@ def test_a_finished_backfill_run_is_headed_with_the_old_videos_sitting_in_latest
 
     _fold(db, tmp_path)
 
-    assert gallery.section_headings([db.get_generation("again")], zone=UTC,
+    assert gallery.section_headings([db.get_generation("video")], zone=UTC,
                                     today=date(2026, 10, 29)) == ["Sat Oct 24, 5:46 AM"]
 
 
@@ -387,22 +542,7 @@ def _sent_everywhere(db, prompt_id):
     db.mark_genau_exported(prompt_id)
 
 
-def test_the_new_video_keeps_the_old_ones_sends_and_evolver_keeps_the_copies_it_holds(tmp_path):
-    db = Database(tmp_path / "t.db")
-    _image(db, "image", enhanced=True)
-    _video(db, "video", made_from="image", start=_plain("image"))
-    _sent_everywhere(db, "video")
-    _finished_backfill_run(db, tmp_path, "again", of="video")
-
-    _fold(db, tmp_path)
-
-    again, old = db.get_generation("again"), db.get_generation("video")
-    assert not (tmp_path / "inbox").exists()
-    for lane in EXPORT_LANES:
-        assert again[lane.flag] == old[lane.flag] and not old[lane.unsent_flag]
-
-
-def test_the_act_said_of_the_old_video_is_said_of_the_new_one(tmp_path):
+def test_a_video_remade_in_place_keeps_its_act_and_its_source_video(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image", enhanced=True)
     _video(db, "video", made_from="image", starred=True, start=_plain("image"))
@@ -411,11 +551,11 @@ def test_the_act_said_of_the_old_video_is_said_of_the_new_one(tmp_path):
 
     _fold(db, tmp_path)
 
-    again = db.get_generation("again")
-    assert (again["act"], again["source_video"]) == ("alpha", "its source video")
+    video = db.get_generation("video")
+    assert (video["act"], video["source_video"]) == ("alpha", "its source video")
 
 
-def test_a_fun_time_favorite_stays_on_the_old_videos_copy_and_nothing_is_owed(tmp_path):
+def test_a_fun_time_favorite_stays_on_the_kino_copy_of_a_video_remade_in_place(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image", enhanced=True)
     _video(db, "video", made_from="image", start=_plain("image"))
@@ -428,7 +568,6 @@ def test_a_fun_time_favorite_stays_on_the_old_videos_copy_and_nothing_is_owed(tm
 
     assert copy.read_bytes() == b"upscaled"
     assert record_of(copy, tmp_path / "library" / "metadata").favorite
-    assert not db.get_generation("again")["fun_time_favorite_owed"]
 
 
 def _owed_a_favorite(db_path, prompt_id):
@@ -487,7 +626,7 @@ def test_a_backfill_run_for_a_video_deleted_while_it_ran_goes_to_the_trash(tmp_p
     assert _fold(db, tmp_path) == (0, ["again"])
 
 
-def test_a_video_asked_for_out_loud_as_a_genau_stays_asked_for_once_backfilled(tmp_path):
+def test_a_video_asked_for_out_loud_as_a_genau_stays_asked_for_once_remade(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image", enhanced=True)
     _video(db, "video", made_from="image", starred=True, start=_plain("image"))
@@ -496,7 +635,7 @@ def test_a_video_asked_for_out_loud_as_a_genau_stays_asked_for_once_backfilled(t
 
     _fold(db, tmp_path)
 
-    assert db.get_generation("again")["genau_requested_at"]
+    assert db.get_generation("video")["genau_requested_at"]
 
 
 def test_a_backfill_run_whose_video_is_not_on_disk_leaves_both_videos_for_the_next_launch(
@@ -550,46 +689,6 @@ def test_opening_the_app_drops_the_backfill_runs_the_absence_had_not_reached(tmp
     assert client.cancelled == ["queued"]
     assert db.get_generation("queued") is None
     assert db.get_generation("landed") is not None
-
-
-# --- and the old video to the Trash, once Evolver holds no copy of it ---------
-
-
-def _trashed_after_the_fold(db, tmp_path):
-    _fold(db, tmp_path)
-    trashed = []
-    trash_what_the_backfill_replaced(db, trash=trashed.extend)
-    return trashed
-
-
-def test_an_old_video_sent_nowhere_goes_to_the_trash_as_a_video_of_the_gallery(tmp_path):
-    db = Database(tmp_path / "t.db")
-    _image(db, "image", enhanced=True)
-    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
-    _finished_backfill_run(db, tmp_path, "again", of="video")
-
-    trashed = _trashed_after_the_fold(db, tmp_path)
-
-    assert [(row["prompt_id"], row["source"]) for row in trashed] == \
-        [("video", GenerationSource.GENERATED)]
-
-
-def _sent_and_backfilled(db, tmp_path):
-    _image(db, "image", enhanced=True)
-    _video(db, "video", made_from="image", start=_plain("image"))
-    _sent_everywhere(db, "video")
-    _made_on_disk(tmp_path, "video", b"first made")
-    _finished_backfill_run(db, tmp_path, "again", of="video")
-
-
-def test_an_old_video_sent_to_kino_or_genau_waits_out_of_sight_while_evolver_holds_its_copies(
-        tmp_path):
-    db = Database(tmp_path / "t.db")
-    _sent_and_backfilled(db, tmp_path)
-
-    assert _trashed_after_the_fold(db, tmp_path) == []
-
-    assert "video" not in [row["prompt_id"] for row in db.list_generations()]
 
 
 def test_a_video_made_from_the_enhancement_is_left_alone(tmp_path):

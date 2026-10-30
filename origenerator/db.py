@@ -117,9 +117,11 @@ class Database:
     def set_source(self, prompt_id: str, source: str):
         return self.generations.set_source(prompt_id, source)
 
-    def take_the_place_of(self, prompt_id: str, old: dict):
-        return self.generations.take_the_place_of(prompt_id, old)
+    def take_the_content_of(self, prompt_id: str, remade: dict):
+        return self.generations.take_the_content_of(prompt_id, remade)
 
+    def mark_remade(self, prompt_id: str):
+        return self.generations.mark_remade(prompt_id)
     def pay_a_fun_time_favorite(self, prompt_id: str):
         return self.generations.pay_a_fun_time_favorite(prompt_id)
 
@@ -155,10 +157,6 @@ class Database:
 
     def insert_rows(self, rows: list[dict]):
         return self.generations.insert_rows(rows)
-
-    def replaced_generations(self) -> list[dict]:
-        return self.generations.replaced_generations()
-
     def library_paths(self) -> set[str]:
         return self.generations.library_paths()
 

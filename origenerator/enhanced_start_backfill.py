@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import uuid
 from collections import Counter
 from dataclasses import dataclass
 from functools import cached_property
@@ -11,6 +13,8 @@ from origenerator.base_backfill import BATCH_MINUTES, queue_within_budget
 from origenerator.db_generations import was_kept, was_sent
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.export_lane import KINO
+from origenerator.file_numbers import NUMBERED
+from origenerator.funscript import funscript_path_for
 from origenerator.generation_config import filled_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.inflight import drop_in_flight
@@ -18,6 +22,7 @@ from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import mark_a_favorite
 from origenerator.record_fold import fold_record_into
+from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -73,12 +78,8 @@ class Evolver:
     def _kino_copies(self) -> EvolverUpscales:
         return EvolverUpscales.scan(self.upscaled_dir, KINO.source)
 
-    def video_of(self, row: dict) -> Path | None:
-        shown = gallery.resolve_preview(row, self.places)
-        return shown[0] if shown is not None and shown[1] == MediaType.VIDEO else None
-
     def kino_copy_of(self, row: dict) -> Path | None:
-        video = self.video_of(row)
+        video = gallery.video_file_of(row, self.places)
         return self._kino_copies.upscale_of(video) if video is not None else None
 
     def mark_a_fun_time_favorite(self, row: dict) -> bool:
@@ -87,20 +88,33 @@ class Evolver:
             copy, self.records_folder)
 
 
-def fold_completed_backfill(db, evolver: Evolver, *, trash) -> int:
+def fold_completed_backfill(db, places: OutputPlaces, thumb_dir: Path, *, trash) -> int:
     folded = 0
-    for run in db.list_generations():
-        if source_of(run) != GenerationSource.BACKFILL or gallery.is_in_progress(run):
-            continue
-        if not gallery.produced_output(run):
-            db.delete_generation(run["prompt_id"])
-        elif not run.get("backfill_of"):
-            continue
-        elif (old := db.get_generation(run["backfill_of"])) is None:
-            trash([run])
-        elif _put_in_place(db, run, old, evolver):
+    for row in db.list_generations():
+        old = (_old_video_of_a_finished_run(db, row, trash)
+               if source_of(row) == GenerationSource.BACKFILL else _old_video_left_beside(db, row))
+        if old is not None and _remake_in_place(db, row, old, places, thumb_dir, trash):
             folded += 1
     return folded
+
+
+def _old_video_of_a_finished_run(db, run: dict, trash) -> dict | None:
+    if gallery.is_in_progress(run):
+        return None
+    if not gallery.produced_output(run):
+        db.delete_generation(run["prompt_id"])
+        return None
+    if not run.get("backfill_of"):
+        return None
+    old = db.get_generation(run["backfill_of"])
+    if old is None:
+        trash([run])
+    return old
+
+
+def _old_video_left_beside(db, row: dict) -> dict | None:
+    old = db.get_generation(row["backfill_of"]) if row.get("backfill_of") else None
+    return old if old is not None and source_of(old) == GenerationSource.REPLACED else None
 
 
 def pay_the_owed_favorites(db, evolver: Evolver) -> int:
@@ -115,34 +129,85 @@ def cancel_backfill(db, client) -> int:
     return drop_in_flight(db, client, GenerationSource.BACKFILL, "backfill run")
 
 
-def trash_what_the_backfill_replaced(db, *, trash) -> int:
-    let_go = [{**old, "source": GenerationSource.GENERATED} for old in db.replaced_generations()
-              if not was_sent(old)]
-    trash(let_go)
-    return len(let_go)
-
-
-def _put_in_place(db, backfilled: dict, old: dict, evolver: Evolver) -> bool:
-    if evolver.video_of(backfilled) is None:
-        logger.warning("%s has no video on disk to take the place of %s; both wait for the "
-                       "next launch", backfilled["prompt_id"], old["prompt_id"])
+def _remake_in_place(db, remade: dict, old: dict, places: OutputPlaces, thumb_dir: Path,
+                     trash) -> bool:
+    if gallery.video_file_of(remade, places) is None:
+        logger.warning("%s has no video on disk to remake %s with; both wait for the next "
+                       "launch", remade["prompt_id"], old["prompt_id"])
         return False
-    _carry_over(db, old, backfilled)
-    _take_back(db, old)
-    db.set_source(backfilled["prompt_id"], GenerationSource.GENERATED)
+    names = _names_of(remade), _names_of(old)
+    if None in names:
+        logger.warning("%s or %s is filed under a name with no number; both wait",
+                       remade["prompt_id"], old["prompt_id"])
+        return False
+    renamed = _renamed(*names)
+    try:
+        if gallery.video_file_of(old, places) is not None:
+            _send_the_old_version_to_the_trash(db, old, thumb_dir, trash)
+        _move_animated_preview(thumb_dir, remade["prompt_id"], old["prompt_id"])
+        for path in _files_ending_with_the_video(remade, places):
+            path.replace(path.with_name(renamed(path.name)))
+    except OSError:
+        logger.warning("Could not put %s's files under %s's names; both wait for the next launch",
+                       remade["prompt_id"], old["prompt_id"], exc_info=True)
+        return False
+    fold_record_into(db, db.list_generations(), remade, old)
+    db.take_the_content_of(old["prompt_id"], {
+        **remade, "output_files": json.dumps(
+            [{**entry, "filename": renamed(entry.get("filename") or "")}
+             for entry in gallery.row_output_files(remade)])})
+    db.set_source(old["prompt_id"], GenerationSource.GENERATED)
+    db.mark_remade(old["prompt_id"])
+    db.delete_generation(remade["prompt_id"])
+    db.forget_item_numbers([remade["prompt_id"]])
     return True
 
 
-def _carry_over(db, old: dict, backfilled: dict) -> None:
-    fold_record_into(db, db.list_generations(), old, backfilled)
-    db.take_the_place_of(backfilled["prompt_id"], old)
-    db.set_settings_source(backfilled["prompt_id"], category=old.get("act"),
-                           video_prompt_id=old.get("source_video"))
+def _names_of(row: dict) -> str | None:
+    for entry in gallery.row_output_files(row):
+        if match := NUMBERED.match(entry.get("filename") or ""):
+            return f"{match['stem']}_{match['counter']}"
+    return None
 
 
-def _take_back(db, old: dict) -> None:
-    db.set_generation_favorite(old["prompt_id"], False)
-    db.set_source(old["prompt_id"], GenerationSource.REPLACED)
+def _renamed(remade_name: str, old_name: str):
+    def renamed(name: str) -> str:
+        return old_name + name[len(remade_name):] if name.startswith(remade_name) else name
+    return renamed
+
+
+def _files_ending_with_the_video(row: dict, places: OutputPlaces) -> list[Path]:
+    files = gallery.output_disk_files(row, places)
+    videos = [path for path in files if media_type_from_filename(path.name) == MediaType.VIDEO]
+    scripts = [script for script in (funscript_path_for(video, places=places) for video in videos)
+               if script.exists()]
+    return scripts + [path for path in files if path not in videos] + videos
+
+
+_LEFT_WITH_THE_VIDEO = {
+    "starred": 0, "shielded": 0, "fun_time_favorite_owed": 0, "remade_at": None,
+    "backfill_of": None, "genau_requested_at": None, "evolver_exported_at": None,
+    "evolver_unsent_at": None, "genau_exported_at": None, "genau_unsent_at": None,
+}
+
+
+def _send_the_old_version_to_the_trash(db, old: dict, thumb_dir: Path, trash) -> None:
+    version = {**{column: value for column, value in old.items() if column != "id"},
+               **_LEFT_WITH_THE_VIDEO, "prompt_id": str(uuid.uuid4()),
+               "source": GenerationSource.GENERATED, "old_version_of": old["prompt_id"]}
+    db.insert_rows([version])
+    try:
+        trash([db.get_generation(version["prompt_id"])])
+    except OSError:
+        db.delete_generation(version["prompt_id"])
+        raise
+    _move_animated_preview(thumb_dir, old["prompt_id"], version["prompt_id"])
+
+
+def _move_animated_preview(thumb_dir: Path, shown_for: str, now_for: str) -> None:
+    preview = animated_thumbnail_path(thumb_dir, shown_for)
+    if preview.exists():
+        preview.replace(animated_thumbnail_path(thumb_dir, now_for))
 
 
 def backfill_params_for(video: dict, image: dict) -> dict:

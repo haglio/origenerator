@@ -214,8 +214,8 @@ def _put_the_backfill_in_place(library: Library):
         _scrap(library, rows)
 
     enhanced_start_backfill.cancel_backfill(library.db, library.client)
-    folded = enhanced_start_backfill.fold_completed_backfill(library.db, evolver, trash=trash)
-    enhanced_start_backfill.trash_what_the_backfill_replaced(library.db, trash=trash)
+    folded = enhanced_start_backfill.fold_completed_backfill(
+        library.db, library.places, library.thumb_dir, trash=trash)
     enhanced_start_backfill.pay_the_owed_favorites(library.db, evolver)
     return folded
 

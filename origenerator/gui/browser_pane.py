@@ -262,6 +262,8 @@ _FOLDER_TILE = "folder"
 _SEEDS_TILE = "folder with re-rolls"
 _TRASH_TILE = "trash"
 
+OLD_VERSION = "Old version"
+
 
 def _back_of_the_line_first(items, keys) -> list:
     return [item for item in reversed(items) if item.key in keys]
@@ -889,11 +891,14 @@ class BrowserPane(QObject):
             corner_actions=corner_actions,
         )
 
-    def _draw_tile(self, flow, row, wiring: str, wire, **appearance) -> ThumbnailWidget:
+    def _draw_tile(self, flow, row, wiring: str, wire, *, caption: str | None = None,
+                   **appearance) -> ThumbnailWidget:
         """The last pane's tile for *row*, when it would be built again the same and
         wired the same way, else a new one *wire* connects."""
         prompt_id = row["prompt_id"]
-        thumb_path, caption = row.get("thumbnail_path"), self._host.item_name(prompt_id)
+        thumb_path = row.get("thumbnail_path")
+        if caption is None:
+            caption = self._host.item_name(prompt_id)
         tile = self._kept.take(
             prompt_id, ThumbnailWidget.look_of(prompt_id, thumb_path, caption, **appearance),
             wiring)
@@ -1115,8 +1120,10 @@ class BrowserPane(QObject):
             tile.context_requested.connect(self._trash_context_menu)
             tile.corner_action_triggered.connect(self.trash_action_triggered)
 
+        name = self._host.item_name(row["prompt_id"])
         return self._draw_tile(
             flow, row, _TRASH_TILE, wire,
+            caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),

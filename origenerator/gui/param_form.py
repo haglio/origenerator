@@ -41,16 +41,16 @@ from origenerator.gui.param_help import (
     with_training_date,
 )
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_field import set_in_use
+from origenerator.gui.prompt_boxes import PromptBoxes, set_in_use
 from origenerator.gui.request_field import RequestField
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.gui.training_controls import TrainingControls
-from origenerator.gui.unread_words import gray_past
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.lora_training import TrainingOffer
+from origenerator.prompt_tokens import PromptReading
 from origenerator.seed_history import SeedHistory
 from origenerator.setting_advice import Advice, MissingTriggerWords
 from origenerator.speech import CUSTOM_VOICE
@@ -412,10 +412,12 @@ class ParamForm(QWidget):
             *(advice_help(other, self._recommendations.get(other.key, ""))
               for other in warned_here)]))
 
-    def show_where_reading_stops(self, stops: dict[str, int | None]) -> None:
-        for key, stops_at in stops.items():
-            if isinstance(self._widgets.get(key), QPlainTextEdit):
-                gray_past(self._widgets[key], stops_at)
+    def show_readings(self, readings: dict[str, PromptReading | None]) -> None:
+        for key, widget in self._widgets.items():
+            if isinstance(widget, PromptBoxes):
+                widget.set_reading(readings.get(key))
+        if self._scenes is not None:
+            self._scenes.show_readings(readings)
 
     def explain(self, recommendations: dict[str, str]) -> None:
         self._recommendations = dict(recommendations)
@@ -449,7 +451,7 @@ class ParamForm(QWidget):
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
         cell.addWidget(field, 1)
-        multiline = isinstance(field, QPlainTextEdit)
+        multiline = isinstance(field, PromptBoxes)
         for extra in extras:
             if isinstance(extra, CopyButton) and multiline:
                 cell.addWidget(extra, 0, Qt.AlignmentFlag.AlignTop)
@@ -572,11 +574,13 @@ class ParamForm(QWidget):
         made_with = made_with or {}
         scenes = (self._scenes.fields_beside_their_texts(made_with)
                   if self._scenes is not None else [])
-        others = [(widget, made_with.get(key)) for key, widget in self._widgets.items()
-                  if isinstance(widget, QPlainTextEdit)]
-        for widget, was in scenes + others:
+        for widget, was in scenes:
             tracked_prompt.track(
                 widget, was if isinstance(was, str) else diff_text.live_text(widget))
+        for key, widget in self._widgets.items():
+            if isinstance(widget, PromptBoxes):
+                was = made_with.get(key)
+                widget.track(was if isinstance(was, str) else widget.value())
 
     def clear_prompt_rewrites(self) -> None:
         """Stop tracking every field, leaving each an ordinary prompt input."""
@@ -593,7 +597,8 @@ class ParamForm(QWidget):
         prompt is searchable the day it lands. What Ctrl+F searches.
         """
         scenes = self._scenes.text_fields() if self._scenes is not None else []
-        return scenes + [w for w in self._widgets.values() if isinstance(w, QPlainTextEdit)]
+        return scenes + [box for widget in self._widgets.values()
+                         if isinstance(widget, PromptBoxes) for box in widget.boxes()]
 
     def drop_slots(self) -> tuple[DropSlot, ...]:
         return tuple(w for w in self._widgets.values() if isinstance(w, DropSlot))

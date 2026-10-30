@@ -42,11 +42,13 @@ from origenerator.gui.param_form import (
 )
 from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.lora_training import TrainingOffer
+from origenerator.prompt_tokens import CUT_OFF
 from origenerator.seed_history import SeedHistory, SeedUse
 from origenerator.setting_advice import Advice, MissingTriggerWords, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
@@ -54,6 +56,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
 from origenerator.workflows.lora_rows import strength_key_of
 from origenerator.workflows.model_files import NO_LORA
+from tests.text_readers import word_reading
 from tests.thumbnail_rows import painted_row, square
 
 
@@ -88,7 +91,7 @@ def test_prompts_a_request_rewrites_show_their_whole_change_at_once(qtbot):
 
     form.set_prompts("a dog on a couch", "")
 
-    field = form._widgets["positive_prompt"]
+    (field,) = form._widgets["positive_prompt"].boxes()
     assert diff_text.live_text(field) == "a dog on a couch"
     assert "cat" in field.toPlainText()  # struck through beside the dog
 
@@ -195,7 +198,7 @@ def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
         ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
     ])
     qtbot.addWidget(form)
-    form._widgets["positive_prompt"].setPlainText("a red fox in snow")
+    form._widgets["positive_prompt"].boxes()[0].setPlainText("a red fox in snow")
 
     form._copy_buttons["positive_prompt"].click()
 
@@ -212,11 +215,11 @@ def test_prompt_fields_are_draggable_and_filed_under_their_param(qtbot):
         ParamDef("name", "Name", "str", ""),      # single-line: an ordinary field
     ])
     qtbot.addWidget(form)
-    prompt = form._widgets["positive_prompt"]
-    assert isinstance(prompt, PromptField)
-    assert prompt._key == "positive_prompt"
-    assert not isinstance(form._widgets["name"], PromptField)
-    assert form.text_fields() == [prompt]
+    (box,) = form._widgets["positive_prompt"].boxes()
+    assert isinstance(box, PromptField)
+    assert box._key == "positive_prompt"
+    assert not isinstance(form._widgets["name"], PromptBoxes)
+    assert form.text_fields() == [box]
 
 
 def test_plain_scalar_and_single_line_fields_get_no_copy_button(qtbot):
@@ -1996,15 +1999,17 @@ def test_the_sound_prompts_are_shut_down_while_every_scene_speaks(qtbot):
 
 
 def _shut_down_with(form, key, tip):
-    field, label = form._widgets[key], form._labels[key]
-    return (_row_visible(form, key) and field.isReadOnly() and field.property("inert") is True
-            and label.property("inert") is True and field.toolTip() == label.toolTip() == tip)
+    label = form._labels[key]
+    return (_row_visible(form, key) and label.property("inert") is True and label.toolTip() == tip
+            and all(box.isReadOnly() and box.property("inert") is True and box.toolTip() == tip
+                    for box in form._widgets[key].boxes()))
 
 
 def _in_use_with(form, key, tip):
-    field, label = form._widgets[key], form._labels[key]
-    return (_row_visible(form, key) and not field.isReadOnly() and field.property("inert") is False
-            and label.property("inert") is False and field.toolTip() == label.toolTip() == tip)
+    label = form._labels[key]
+    return (_row_visible(form, key) and label.property("inert") is False and label.toolTip() == tip
+            and all(not box.isReadOnly() and box.property("inert") is False
+                    and box.toolTip() == tip for box in form._widgets[key].boxes()))
 
 
 def test_the_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):
@@ -2712,22 +2717,27 @@ def _grayed(field) -> list[tuple[int, int, str]]:
             for span in field.document().firstBlock().layout().formats()]
 
 
+_READ = " ".join(["rain"] * 76)
+
+
 def test_a_prompt_grays_the_words_its_reader_never_reads(qtbot):
     form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
-    form.set_values({"audio_prompt": "rain on a tin roof"})
+    form.set_values({"audio_prompt": f"{_READ} on a tin roof"})
 
-    form.show_where_reading_stops({"audio_prompt": 8})
+    form.show_readings({"audio_prompt": word_reading(76, CUT_OFF)})
 
-    assert _grayed(form._widgets["audio_prompt"]) == [(8, 10, TEXT_MUTED.name())]
+    (box,) = form._widgets["audio_prompt"].boxes()
+    assert _grayed(box) == [(len(_READ) + 1, len("on a tin roof"), TEXT_MUTED.name())]
 
 
 def test_a_prompt_read_to_its_end_grays_nothing(qtbot):
     form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
+    form.set_values({"audio_prompt": f"{_READ} on a tin roof"})
+    form.show_readings({"audio_prompt": word_reading(76, CUT_OFF)})
+
     form.set_values({"audio_prompt": "rain on a tin roof"})
-    form.show_where_reading_stops({"audio_prompt": 8})
 
-    form.show_where_reading_stops({"audio_prompt": None})
-
-    assert _grayed(form._widgets["audio_prompt"]) == []
+    (box,) = form._widgets["audio_prompt"].boxes()
+    assert _grayed(box) == []

@@ -11766,7 +11766,8 @@ def test_unticking_random_after_a_generate_keeps_the_seed_that_made_it(qtbot, tm
     _finish_reroll(view, made)
 
     panel._param_form.set_seed_random(False)
-    panel._param_form._widgets["positive_prompt"].setPlainText("a brand new prompt, at dusk")
+    panel._param_form._widgets["positive_prompt"].boxes()[0].setPlainText(
+        "a brand new prompt, at dusk")
     panel._on_generate()
 
     (tweaked,) = view._live_jobs.values()

@@ -13,13 +13,12 @@ from PyQt6.QtCore import QSignalBlocker, Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 
-from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.drop_slot import DropSlot, placeholder_for
 from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.param_help import option_help
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_field import PromptField
+from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.seed_combo import SeedComboBox
 from origenerator.media import MediaType
 from origenerator.model_titles import option_title
@@ -147,20 +146,18 @@ class _Prompt(FieldKind):
         self._heights = heights
 
     def make(self, pd):
-        widget = PromptField(pd.key, heights=self._heights)
-        widget.setPlainText(str(pd.default))
+        widget = PromptBoxes(pd.key, heights=self._heights)
+        widget.set_value(str(pd.default))
         return widget
 
     def change_signal(self, widget):
         return widget.textChanged
 
     def read(self, pd, widget):
-        # Never the raw document: while a request's change is marked in the
-        # field, that document also holds the words the change took out.
-        return diff_text.live_text(widget)
+        return widget.value()
 
     def write(self, pd, widget, value):
-        tracked_prompt.write(widget, str(value))
+        widget.set_value(str(value))
 
 
 class _Tick(FieldKind):

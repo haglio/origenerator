@@ -13,11 +13,10 @@ from origenerator.prompt_tokens import (
     CUT_OFF,
     READ_IN_PIECES,
     READ_WHOLE,
-    prompt_length,
+    prompt_reading,
     where_reading_stops,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import ParamType
 from origenerator.workflows.prompt_readers import SOUND_PROMPT_KEYS
 from tests.text_readers import clap_reader, word_reader
 
@@ -89,80 +88,96 @@ def _cats(count: int) -> str:
     return " ".join(["cat"] * count)
 
 
+def _clip(comfyui):
+    _clip_reader(comfyui)
+    return prompt_reading("sdxl_t2i", {}, "positive_prompt")
+
+
 def test_an_sdxl_prompt_is_counted_in_clip_tokens_and_its_weights_are_not(comfyui):
-    _clip_reader(comfyui)
+    reading = _clip(comfyui)
 
-    length = prompt_length("sdxl_t2i", {"positive_prompt": "(cat:1.2), dog"}, "positive_prompt")
-
-    assert [scene.tokens for scene in length.scenes] == [5]
-    assert (length.reads_well, length.past_it) == (75, READ_IN_PIECES)
+    assert reading.tokens("(cat:1.2), dog") == 5
+    assert (reading.reads_well, reading.past_it) == (75, READ_IN_PIECES)
 
 
-def test_an_sdxl_prompt_past_75_tokens_is_read_in_two_pieces(comfyui):
-    _clip_reader(comfyui)
+def test_an_sdxl_prompt_of_75_tokens_or_fewer_is_read_in_one_piece(comfyui):
+    assert _clip(comfyui).pieces(_cats(75)) == [(0, 75)]
 
-    length = prompt_length("sdxl_t2i", {"negative_prompt": _cats(80)}, "negative_prompt")
 
-    assert (length.scenes[0].tokens, length.scenes[0].pieces) == (80, 2)
+def test_an_sdxl_prompt_past_75_tokens_is_cut_where_comfyui_cuts_it(comfyui):
+    text = _cats(80)
+
+    assert _clip(comfyui).pieces(text) == [(0, 75), (text.index("cat", 75 * 4), 5)]
+
+
+def test_a_word_running_past_75_tokens_is_cut_in_the_middle_as_comfyui_cuts_it(comfyui):
+    text = f"{_cats(74)} dog"
+
+    assert _clip(comfyui).pieces(text) == [(0, 75), (text.index("dog") + 1, 2)]
 
 
 def test_a_weighted_phrase_too_short_to_split_starts_the_next_piece_whole(comfyui):
-    _clip_reader(comfyui)
     phrase = f"({_cats(7)})"
-    prompt = f"{_cats(70)} {phrase} {_cats(70)} {phrase} {_cats(70)}"
+    text = f"{_cats(70)} {phrase} {_cats(70)}"
 
-    length = prompt_length("sdxl_t2i", {"positive_prompt": prompt}, "positive_prompt")
+    assert _clip(comfyui).pieces(text) == [(0, 70), (text.index(phrase), 75), (
+        text.index(phrase) + len(phrase) + 1 + 4 * 68, 2)]
 
-    assert (length.scenes[0].tokens, length.scenes[0].pieces) == (224, 4)
 
+def test_an_escaped_bracket_is_read_as_a_bracket_where_the_pieces_are_cut(comfyui):
+    text = _cats(74) + r" \(cat\) cat"
 
-def test_a_line_of_dashes_outside_a_story_is_part_of_the_one_prompt(comfyui):
-    _clip_reader(comfyui)
+    pieces = _clip(comfyui).pieces(text)
 
-    length = prompt_length("sdxl_t2i", {"positive_prompt": "cat\n---\ncat"}, "positive_prompt")
-
-    assert len(length.scenes) == 1
+    assert pieces[0] == (0, 75) and text[pieces[1][0]:].startswith("cat")
 
 
 def test_a_flux_prompt_is_read_whole_by_t5(comfyui):
     word_reader(comfyui / "comfy" / "text_encoders" / "t5_tokenizer" / "tokenizer.json")
 
-    length = prompt_length("flux_t2i_upscaled", {"positive_prompt": "(alpha beta:1.1) gamma"},
-                           "positive_prompt")
+    reading = prompt_reading("flux_t2i_upscaled", {}, "positive_prompt")
 
-    assert [scene.tokens for scene in length.scenes] == [3]
-    assert (length.reads_well, length.past_it) == (511, READ_WHOLE)
+    assert reading.tokens("(alpha beta:1.1) gamma") == 3
+    assert (reading.reads_well, reading.past_it) == (511, READ_WHOLE)
 
 
 def test_krea_2_reads_weight_marks_as_part_of_the_prompt(comfyui):
     _byte_reader(comfyui)
 
-    length = prompt_length("krea2_t2i", {"positive_prompt": "(ab:1.2)"}, "positive_prompt")
+    reading = prompt_reading("krea2_t2i", {}, "positive_prompt")
 
-    assert [scene.tokens for scene in length.scenes] == [8]
-    assert (length.reads_well, length.past_it) == (507, READ_WHOLE)
+    assert reading.tokens("(ab:1.2)") == 8
+    assert (reading.reads_well, reading.past_it) == (507, READ_WHOLE)
 
 
-def test_a_wan_story_is_counted_scene_by_scene_from_its_own_text_reader_file(comfyui):
+def test_a_wan_prompt_is_counted_by_its_own_text_reader_file(comfyui):
     _umt5_reader(comfyui)
-    params = {"positive_prompt": "cat cat dog\n---\ncat", "clip_name": _UMT5_FILE}
 
-    length = prompt_length("wan22_i2v", params, "positive_prompt")
+    reading = prompt_reading("wan22_i2v", {"clip_name": _UMT5_FILE}, "positive_prompt")
 
-    assert [scene.tokens for scene in length.scenes] == [3, 1]
-    assert (length.reads_well, length.past_it) == (511, READ_WHOLE)
+    assert reading.tokens("cat cat dog") == 3
+    assert (reading.reads_well, reading.past_it) == (511, READ_WHOLE)
 
 
 def test_a_sound_prompt_is_cut_off_after_76_tokens(comfyui, tmp_path):
     clap_reader(tmp_path / "hub")
 
-    length = prompt_length("wan22_i2v", {"audio_prompt": "rain on a tin roof"}, "audio_prompt")
+    reading = prompt_reading("wan22_i2v", {}, "audio_prompt")
 
-    assert [scene.tokens for scene in length.scenes] == [5]
-    assert (length.reads_well, length.past_it) == (76, CUT_OFF)
+    assert reading.tokens("rain on a tin roof") == 5
+    assert (reading.reads_well, reading.past_it) == (76, CUT_OFF)
 
 
 def test_a_sound_prompt_past_its_cut_off_says_where_its_reader_stops(comfyui, tmp_path):
+    clap_reader(tmp_path / "hub")
+    read = " ".join(["rain"] * 76)
+    reading = prompt_reading("wan22_i2v", {}, "audio_prompt")
+
+    assert (reading.stops_at(f"{read} on a tin roof"), reading.stops_at("hiss")) == (
+        len(read) + 1, None)
+
+
+def test_where_a_forms_sound_prompts_stop_being_read(comfyui, tmp_path):
     clap_reader(tmp_path / "hub")
     read = " ".join(["rain"] * 76)
     params = {"audio_prompt": f"{read} on a tin roof", "audio_negative_prompt": "hiss",
@@ -173,23 +188,21 @@ def test_a_sound_prompt_past_its_cut_off_says_where_its_reader_stops(comfyui, tm
 
 
 def test_a_prompt_whose_text_reader_is_not_installed_is_of_unknown_length(comfyui):
-    assert prompt_length("sdxl_t2i", {"positive_prompt": "cat"}, "positive_prompt") is None
+    assert prompt_reading("sdxl_t2i", {}, "positive_prompt") is None
 
 
 def test_a_field_no_text_reader_reads_has_no_length(comfyui):
     _clip_reader(comfyui)
 
-    assert prompt_length("sdxl_t2i", {"seed": "7"}, "seed") is None
+    assert prompt_reading("sdxl_t2i", {}, "seed") is None
 
 
 def test_a_text_reader_is_read_from_its_files_once(comfyui):
     folder = _clip_reader(comfyui)
-    prompt_length("sdxl_t2i", {"positive_prompt": "cat"}, "positive_prompt")
+    prompt_reading("sdxl_t2i", {}, "positive_prompt")
     shutil.rmtree(folder)
 
-    length = prompt_length("sdxl_t2i", {"positive_prompt": "cat dog"}, "positive_prompt")
-
-    assert [scene.tokens for scene in length.scenes] == [4]
+    assert prompt_reading("sdxl_t2i", {}, "positive_prompt").tokens("cat dog") == 4
 
 
 @pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))
@@ -200,11 +213,3 @@ def test_every_prompt_comfyui_reads_names_its_text_reader(name):
     assert not workflow.generates_here or prompts - set(SOUND_PROMPT_KEYS) <= {
         "positive_prompt", "negative_prompt"}
     assert not workflow.generates_here or workflow.text_reader is not None
-
-
-@pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))
-def test_a_workflow_with_scenes_reads_its_prompts_scene_by_scene(name):
-    workflow = WORKFLOW_REGISTRY[name]
-    tells_scenes = any(pd.type == ParamType.SCENES for pd in workflow.param_definitions())
-
-    assert bool(workflow.scene_prompt_keys) == tells_scenes

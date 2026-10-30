@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from PyQt6.QtCore import QPoint, Qt, QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -22,7 +22,7 @@ from shared_ui.icons import glyph_icon, marked_text
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
-from origenerator import act_settings, evolver_export, look_training, outside_videos, prompt_edit
+from origenerator import act_settings, evolver_export, look_training, outside_videos
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
@@ -82,7 +82,7 @@ from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
-from origenerator.gui.request_worker import ReviseTask, RevisionWorker
+from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import ZoneItems
 from origenerator.image_states import state_names
@@ -245,7 +245,8 @@ class GenerateConfigPanel(DropZone):
                  inbox: evolver_export.EvolverInbox | None = None,
                  library: LibraryViews | None = None,
                  names: ItemNames | None = None,
-                 previews: MovingPreviews | None = None):
+                 previews: MovingPreviews | None = None,
+                 requests: RequestAnswerer | None = None):
         super().__init__(parent=parent)
         self._heights = heights  # the window's prompt heights, for its forms
         # Where a clip is handed to Evolver. Asked for rather than performed
@@ -321,8 +322,7 @@ class GenerateConfigPanel(DropZone):
         self._autoshow_held = False   # see _point_elsewhere
         self._request_aim: _RequestAim | None = None
         self._asked = 0  # how many times the Request has been edited, so a late answer can tell
-        self._rewriter = RevisionWorker(prompt_edit.work_out, parent=self)
-        self._rewriter.revised.connect(self._on_rewritten)
+        self._requests = requests or RequestAnswerer(db, None, client, parent=self)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
         self._go_to_folder.setVisible(False)  # until the gallery says there is a folder
@@ -1740,8 +1740,10 @@ class GenerateConfigPanel(DropZone):
             self._param_form.set_prompts(*(aim.shown if words == aim.words else aim.asked_of))
             self._param_form.request_field().done()
             return
-        QThreadPool.globalInstance().start(ReviseTask(
-            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words))
+        self._requests.ask(
+            aim.prompt_id, *aim.asked_of, words, owner=self,
+            then=lambda revision, context=(self._asked, aim.prompt_id): self._on_rewritten(
+                context, revision))
 
     def _on_rewritten(self, context, revision) -> None:
         asked, prompt_id = context

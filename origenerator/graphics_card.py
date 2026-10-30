@@ -12,13 +12,13 @@ CARD_MIB_NEEDED = 9000  # 6.6 GB of weights, 1.3 GB for a 40,960-token window, r
 _POLL_S = 2.0
 _ROOM_WAIT_S = 30.0
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+NVIDIA_SMI = ("nvidia-smi", "--query-gpu=memory.free,memory.total", "--format=csv,noheader,nounits")
 
 
 def card_memory_mib() -> tuple[int, int] | None:
     try:
-        done = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.free,memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=20, creationflags=_NO_WINDOW)
+        done = subprocess.run([*NVIDIA_SMI], capture_output=True, text=True, timeout=20,
+                              creationflags=_NO_WINDOW)
         free, total = done.stdout.strip().splitlines()[0].split(",")
         return int(free), int(total)
     except (OSError, subprocess.SubprocessError, ValueError, IndexError):
@@ -27,14 +27,15 @@ def card_memory_mib() -> tuple[int, int] | None:
 
 def _comfyui_busy(comfyui) -> bool | None:
     try:
-        return bool(comfyui.fetch_queue())
+        return len(comfyui.fetch_queue()) > 0
     except Exception as e:  # noqa: BLE001 -- not running, or not answering: nothing holds the card
         logger.info("ComfyUI could not be asked what it is making: %s", e)
         return None
 
 
 def wait_for_the_card(comfyui, *, needed_mib: int = CARD_MIB_NEEDED, deadline_s: float = 600.0,
-                      memory=card_memory_mib, clock=time.monotonic, sleep=time.sleep) -> bool:
+                      memory=None, clock=time.monotonic, sleep=time.sleep) -> bool:
+    memory = memory or card_memory_mib
     deadline = clock() + deadline_s
     while (busy := _comfyui_busy(comfyui)):
         if clock() >= deadline:

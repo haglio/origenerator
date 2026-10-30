@@ -133,7 +133,6 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import DEFAULT_S
@@ -143,7 +142,7 @@ from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, key_holds, oriented_key
 from origenerator.output_places import OutputPlaces
-from origenerator.prompt_edit import apply_request
+from origenerator.prompt_edit import apply_request, work_out
 from origenerator.slideshow import LIVE
 from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
@@ -16526,10 +16525,11 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
                         lambda row, places: ("orig.png", "image"))
     view = GalleryView(_requestable_db(tmp_path, **kw), client=_reroll_client())
     qtbot.addWidget(view)
-    # The words alone, with no smart matcher: these cover the policy and the
-    # plumbing, and a matcher would put a local LLM in the middle of both.
-    view._voice._revision = RevisionWorker(apply_request, parent=view)
-    view._voice._revision.revised.connect(view._voice._on_revised)
+    # The words alone, with no model: these cover the policy and the plumbing,
+    # and a model would put Ollama in the middle of both.
+    view._request_answerer._work_out = (
+        lambda positive, negative, words, **_: apply_request(positive, negative, words))
+    view._request_answerer._wait_for_the_card = lambda comfyui, **settings: True
     view._bank.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()
     _select_first_leaf(view)
@@ -16590,6 +16590,21 @@ def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monke
     _speak_request(view, qtbot, "Request, no hat, over.")
 
     assert words(view._slideshows.showing.shown._note) == "Request submitted"
+
+
+def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    view._request_answerer._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words,
+        ask=lambda p, n, r, exchange, notes: ("a woman, soft light", n, "Took the hat off her."))
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    assert words(view._slideshows.showing.shown._note) == "Took the hat off her."
+    (job,) = view._live_jobs.values()
+    assert job.params["positive_prompt"] == "a woman, soft light"
+    assert view._db.exchange_of(job.prompt_id) == [("no hat", "Took the hat off her.")]
 
 
 def test_a_request_for_something_absent_goes_to_the_negative_prompt(

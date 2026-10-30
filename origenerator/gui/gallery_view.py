@@ -136,6 +136,7 @@ from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
 from origenerator.gui.prompt_reveal import reveal_prompt
+from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.slideshow_director import SlideshowDirector
@@ -394,6 +395,7 @@ class GalleryView(QWidget):
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
         self._jobs = JobQueue(db, client)
+        self._request_answerer = RequestAnswerer(db, self._jobs, client, parent=self)
         self._jobs.changed.connect(self._rerender_current_leaf)
         self._jobs.changed.connect(self._reconcile_generating)
         self._jobs.changed.connect(lambda: self._enhance.reconcile())
@@ -558,7 +560,8 @@ class GalleryView(QWidget):
         # caption is placed by _build_ui, and the bank it presses is bound to it
         # once _build_ui has built one.
         self._voice = VoiceRouter(self, parent=self, db=db, slideshows=self._slideshows,
-                                  client=client, motion=self._osr2_motion)
+                                  client=client, motion=self._osr2_motion,
+                                  requests=self._request_answerer)
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
 
     def _intercept_the_rooms_keys(self, intercepting: bool):
@@ -857,7 +860,8 @@ class GalleryView(QWidget):
         # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time,
                                        heights=self._prompt_heights, names=self._item_names,
-                                       previews=self._moving_previews)
+                                       previews=self._moving_previews,
+                                       requests=self._request_answerer)
         # One OSR2 driver for the whole view, under the one global switch
         # (self.osr2_control): while that's on it follows whichever video is foreground —
         # an open slideshow, else whatever scripted video is in the front tab —
@@ -2904,8 +2908,9 @@ class GalleryView(QWidget):
     # --- a spoken request's own generation -----------------------------------
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
-        """Launch the revised generation and record the request under it;
-        return the line to say about it and its kind.
+        """Launch the revised generation and record the request under it, with
+        the turn of the exchange it made; return the line to say about it, the
+        model's own sentence when it answered, and its kind.
 
         The revision is the target's own settings with its prompt pair edited and
         *the same seed* — "the same image but without X" means the image, so
@@ -2927,8 +2932,9 @@ class GalleryView(QWidget):
             old_negative=revision.old_negative, new_positive=revision.positive,
             new_negative=revision.negative,
         )
+        self._db.record_turns(job.prompt_id, [(spoken.text, revision.answer)])
         self.refresh()  # the queue marks the job as a request the moment it is spoken
-        return "Request submitted", NOTICE
+        return revision.answer or "Request submitted", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
         """Bin some of one image's versions, from the info pane's version list.

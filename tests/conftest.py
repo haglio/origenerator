@@ -69,6 +69,7 @@ from pytestqt.qtbot import QtBot
 from origenerator import (
     config,
     enhance_presets,
+    graphics_card,
     notice_toast,
     osr2_driver,
     osr2_motion_driver,
@@ -342,6 +343,15 @@ def refuse_the_comfyui_on_this_machine(setattr) -> None:
 def _never_reach_the_comfyui_on_this_machine():
     with pytest.MonkeyPatch.context() as patch:
         refuse_the_comfyui_on_this_machine(patch.setattr)
+        yield
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _never_read_this_machines_graphics_card():
+    """A wait for the card reads nothing off this machine's: with no reading, the
+    model is taken on trust, and no test sleeps on how full the card here is."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(graphics_card, "NVIDIA_SMI", ("nvidia-smi-the-suite-never-runs",))
         yield
 
 

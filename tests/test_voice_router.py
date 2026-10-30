@@ -258,6 +258,18 @@ class FakeHost:
         return "queued it", NOTICE
 
 
+class FakeAnswerer:
+    """The one place a request is asked of the model, reduced to a recorder."""
+
+    def __init__(self):
+        self.asked = []
+        self.then = None
+
+    def ask(self, about, positive, negative, words, *, owner, then):
+        self.asked.append((about, positive, negative, words))
+        self.then = then
+
+
 class Spoken:
     """One step of a dictated request, as the dictation hands it over."""
 
@@ -279,13 +291,13 @@ def router(qtbot, monkeypatch):
     built = []
 
     def build(host=None, *, slideshows=None, db=None, client=object(), motion=None,
-              bank=None, mic_on=True):
+              bank=None, mic_on=True, requests=None):
         host = host or FakeHost()
         slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
         qtbot.addWidget(parent)
         router = VoiceRouter(host, parent=parent, db=db or FakeDB(), slideshows=slideshows,
-                             client=client, motion=motion)
+                             client=client, motion=motion, requests=requests or FakeAnswerer())
         built.append((parent, router))
         buttons = dict(bank or {})
         router.bind_the_bank(
@@ -777,10 +789,22 @@ def test_a_video_this_app_cannot_rebuild_is_answered_here(router):
         "this one can't be re-made, so there's nothing to revise")
 
 
+def test_a_finished_request_is_asked_of_the_model_about_the_image_it_was_said_over(router):
+    requests = FakeAnswerer()
+    voice, _host, _slideshows = router(db=FakeDB([_row("g1")]), requests=requests)
+
+    voice._begin_request("g1", Spoken("no hat"))
+
+    ((about, _positive, _negative, asked),) = requests.asked
+    assert (about, asked) == ("g1", "no hat")
+    assert "working out" in words(voice.status)
+
+
 def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
     class Revision:
         changed = False
         term = "hat"
+        answer = ""
 
     voice, host, _slideshows = router()
 
@@ -788,6 +812,20 @@ def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
 
     assert host.queued == []
     assert words(voice.status) == "“hat” is already how you asked for it"
+
+
+def test_a_revision_that_changed_nothing_but_was_answered_says_the_models_sentence(router):
+    class Revision:
+        changed = False
+        term = "freckles"
+        answer = "The freckles are already there."
+
+    voice, host, _slideshows = router()
+
+    voice._on_revised((_row("g1"), object(), {}, Spoken("more freckles"), None), Revision())
+
+    assert host.queued == []
+    assert words(voice.status) == "The freckles are already there."
 
 
 def test_a_revision_nobody_could_read_says_so(router):

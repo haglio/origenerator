@@ -24,13 +24,13 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
-from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui import colors
 from shared_ui.palette import BG_PRIMARY, WHITE, as_hex, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS, MARGIN_STANDARD
 
-from origenerator import gallery, prompt_edit
+from origenerator import gallery
 from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
@@ -47,7 +47,6 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE, WARNING, set_marked_text
-from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
 )
@@ -188,7 +187,7 @@ class VoiceRouter(QObject):
     caption_shown = pyqtSignal(bool)   # the caption has a line to show, or none
 
     def __init__(self, host: VoiceHost, *, parent: QObject, db, slideshows, client,
-                 motion):
+                 motion, requests):
         super().__init__(parent)
         self._host = host
         self._db = db
@@ -210,10 +209,7 @@ class VoiceRouter(QObject):
         self.listener.heard.connect(self._on_heard)
         self.listener.error.connect(self._on_error)
         self.listener.request.connect(self.on_spoken_request)
-        # A finished request is worked out on the pool, since that can be a call
-        # to the local LLM (prompt_edit.work_out).
-        self._revision = RevisionWorker(prompt_edit.work_out, parent=self)
-        self._revision.revised.connect(self._on_revised)
+        self._requests = requests  # the one place a finished request is asked of the model
         # The generation an open request is about, captured the moment the
         # request opens rather than when it finishes: a slideshow holds still for the
         # sentence, but the words take seconds and the item on screen when they
@@ -738,14 +734,15 @@ class VoiceRouter(QObject):
         params = filled_params(row, workflow)
         self._answer_request(slideshow, f"working out “{spoken.text}”…", spoken,
                              working=True)
-        QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken, side),
-            params.get("positive_prompt", ""), params.get("negative_prompt", ""),
-            spoken.text,
-        ))
+        context = (row, workflow, params, spoken, side)
+        self._requests.ask(
+            row["prompt_id"], params.get("positive_prompt", ""), params.get("negative_prompt", ""),
+            spoken.text, owner=self,
+            then=lambda revision: self._on_revised(context, revision))
 
     def _on_revised(self, context, revision) -> None:
-        """The revision came back from the pool: queue it, and say what it did.
+        """The revision came back: queue it, and say what it did, in the model's
+        own sentence where it gave one.
 
         The slideshow is looked up now rather than remembered, so an answer that took
         a couple of seconds still lands wherever the speaker is looking — on
@@ -759,9 +756,12 @@ class VoiceRouter(QObject):
                 kind=WARNING)
             return
         if not revision.changed:
-            self._answer_request(
-                slideshow, f"“{revision.term}” is already how you asked for it", spoken,
-                kind=WARNING)
+            if revision.answer:
+                self._answer_request(slideshow, revision.answer, spoken)
+            else:
+                self._answer_request(
+                    slideshow, f"“{revision.term}” is already how you asked for it", spoken,
+                    kind=WARNING)
             return
         message, kind = self._host.queue_request(row, workflow, params, spoken, revision)
         self._answer_request(slideshow, message, spoken, kind=kind)

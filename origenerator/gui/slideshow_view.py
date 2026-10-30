@@ -20,7 +20,6 @@ from dataclasses import replace
 from funestra.console import ModeHud
 from funestra.file_channel import append_command
 from funestra.funestra_verbs import SPEED_DOWN, SPEED_UP
-from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_placement import HudCorner
 from funestra.pointer import OMNIPAUSE_TOGGLE
 from PyQt6.QtCore import Qt, QTimer
@@ -34,14 +33,13 @@ from origenerator.console_commands import side_press, spelled_for
 from origenerator.gui.console import (
     REPAINT_MS,
     post_device_action,
-    post_pace_action,
     slideshow_device,
 )
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
-from origenerator.gui.hud_queue import QueuePointer, queue_section
+from origenerator.gui.hud_queue import QueueFoot
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, NoticeOverlay
 from origenerator.gui.slideshow_panel import (
@@ -51,12 +49,11 @@ from origenerator.gui.slideshow_panel import (
     slideshow_hud_model,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
-from origenerator.slideshow_buttons import answer
+from origenerator.slideshow_buttons import PRESSES_ON_THE_QUEUE, answer
 
 # How often the panel is rebuilt: on its own beat, and faster while something
 # on it is moving -- the drive's trace.
 _REFRESH_MS = 300
-_FOOT_VERBS = frozenset({FOOT_PRESS, FOOT_DRAG, FOOT_RELEASE, FOOT_WHEEL})
 _RATE_STEPS = {"speed_up": SPEED_UP, "speed_down": SPEED_DOWN}
 
 _PANEL_MOVES = {
@@ -94,9 +91,8 @@ class SlideshowView(QWidget):
         self._panel_model = None
         self._panel_built_at = float("-inf")
         self._panel_stale = True
-        self._queue_items: list = []
-        self._foreign_queued = 0
-        self._queue_pointer = QueuePointer(self)
+        self.queue_foot = QueueFoot(
+            self._actions, beside=lambda: self if self._dashboard_cmd_file is None else None)
         self._paused = False
         self._closing = False
         self.setWindowTitle("Slideshow")
@@ -188,7 +184,7 @@ class SlideshowView(QWidget):
         self._panel_built_at = now
         model = slideshow_hud_model(self._hud_side, self.slideshow,
                                     hosted=self._dashboard_cmd_file is not None,
-                                    device=self.hud_device, foot=self._queue())
+                                    device=self.hud_device, foot=self.queue_foot.section())
         if model is not None:
             model = replace(model, hud_corner=self._corner, hud_minimized=self._minimized)
         self._panel_model = model
@@ -225,8 +221,8 @@ class SlideshowView(QWidget):
 
     def _route(self, command: str) -> bool:
         verb, _, payload = command.partition("|")
-        if verb in _FOOT_VERBS:
-            self._press_the_queue(verb, payload)
+        if verb in PRESSES_ON_THE_QUEUE:
+            self.queue_foot.press(verb, payload)
             return True
         if verb == OMNIPAUSE_TOGGLE:
             self._press_on_the_slide()
@@ -253,17 +249,6 @@ class SlideshowView(QWidget):
         append_command(self._dashboard_cmd_file, command)
         return True
 
-    def _press_the_queue(self, verb: str, payload: str) -> None:
-        numbers = [int(part) for part in payload.split("|")]
-        if verb == FOOT_WHEEL:
-            self._queue_pointer.wheel(*numbers)
-        elif verb == FOOT_PRESS:
-            self._queue_pointer.press(*numbers)
-        elif verb == FOOT_DRAG:
-            self._queue_pointer.drag(*numbers)
-        else:
-            self._queue_pointer.release(*numbers)
-
     def _place_here_or_out_there(self, command: str, action: str, corner: str) -> None:
         if self._dashboard_cmd_file is not None:
             append_command(self._dashboard_cmd_file, command)
@@ -286,35 +271,8 @@ class SlideshowView(QWidget):
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         """Take what is in flight — the same list, in the same order, the lower
         strip this view is covering would be showing."""
-        self._queue_items = list(items)
-        self._foreign_queued = foreign_queued
+        self.queue_foot.set(items, foreign_queued)
         self.refresh_panel()
-
-    @property
-    def hud_queue(self) -> tuple[list, int]:
-        return self._queue_items, self._foreign_queued
-
-    def _queue(self):
-        return queue_section(self._queue_items, self._foreign_queued,
-                             first=self._queue_pointer.first,
-                             drop_at=self._queue_pointer.drop,
-                             pointer=self._queue_pointer)
-
-    def move(self, key: str, before: str | None) -> None:
-        if self._actions.move is not None:
-            self._actions.move(key, before)
-
-    def clear_foreign_queue(self) -> None:
-        if self._actions.clear_queue is not None:
-            self._actions.clear_queue()
-
-    def start_now(self) -> None:
-        if self._actions.start_now is not None:
-            self._actions.start_now()
-
-    def cancel_all(self) -> None:
-        if self._actions.cancel_all is not None:
-            self._actions.cancel_all()
 
     # --- the OSR2, which this app drives standalone --------------------------
 
@@ -326,19 +284,19 @@ class SlideshowView(QWidget):
             return None
         control = self._actions.osr2_control
         return slideshow_device(
-            self._motion, pace_s=self.slideshow.dwell_s, device=osr2_device.device_mode(),
+            self._motion, device=osr2_device.device_mode(),
             trouble=osr2_device.device_trouble(),
             control=control.state() if control is not None else "",
-            script=control.script if control is not None else None)
+            script=control.script if control is not None else None,
+            broker_running=osr2_device.broker_running())
 
     def press_console(self, action: str) -> bool:
-        """Take a press off the device rows of that panel — the pace, the
-        motion, the four control states, a level dragged on the readout."""
+        """Take a press off the device rows of that panel — the motion, the
+        four control states, a level dragged on the readout."""
         if self._motion is None:
             return False
-        return (post_device_action(action, motion=self._motion,
-                                   control=self._actions.osr2_control)
-                or post_pace_action(action, self.slideshow))
+        return post_device_action(action, motion=self._motion,
+                                  control=self._actions.osr2_control)
 
     @property
     def player(self):

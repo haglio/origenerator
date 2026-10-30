@@ -34,6 +34,8 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.slideshow_director import SlideshowDirector
+from origenerator.gui.slideshow_pace import DEFAULT_S as DEFAULT_PACE_S
+from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.item_names import ItemNames
 from origenerator.orientation import oriented_key
 from origenerator.output_places import OutputPlaces
@@ -76,6 +78,7 @@ class FakeSlideshow:
     def __init__(self, items=(), *, actions=None, pace=None, hud=None, **kwargs):
         self.items = list(items)
         self.actions = actions
+        self.pace = pace
         self.hud = hud
         self.shown = FakeSessionsFunestra()
         self.opened_with = kwargs
@@ -193,9 +196,6 @@ class FakeSlideshow:
     def note_voice_run(self, prompt_id, message, *, kind=NOTICE):
         self.runs_said.append((prompt_id, message))
 
-    def set_dwell_s(self, seconds):
-        self.dwell_s = seconds
-
     def set_paused(self, paused):
         if self.pause_raises:
             raise RuntimeError("this slideshow will not freeze")
@@ -258,10 +258,13 @@ class FakeSlideshow:
 
 class FakeSessionsFunestra:
     """Where a slideshow handed to one of a session's Funestras is seen: on the
-    session's own window, so nothing of this app's draws a queue for it."""
+    session's own window, which draws the panel this app publishes for it."""
+
+    def __init__(self) -> None:
+        self.queue_set = None
 
     def set_queue(self, items, foreign_total):
-        pass
+        self.queue_set = (list(items), foreign_total)
 
 
 class FakeWindow:
@@ -366,14 +369,6 @@ class FakeJobQueue:
         self.moved.append((key, before))
 
 
-class FakePace:
-    def __init__(self):
-        self.seconds = None
-
-    def set_seconds(self, seconds):
-        self.seconds = seconds
-
-
 class FakeBrowser:
     """The middle pane reduced to the questions a slideshow asks of it.
 
@@ -440,6 +435,7 @@ class FakeHost:
         self.started_now = 0
         self.cancelled_all = 0
         self.queue = ([], 0)
+        self.core = object()
         self.visible = [row["prompt_id"] for row in self.rows]
         self.picked = []
 
@@ -472,6 +468,9 @@ class FakeHost:
 
     def queue_now(self):
         return self.queue
+
+    def window(self):
+        return self.core
 
     def clear_foreign_queue(self):
         self.cleared_queue += 1
@@ -595,7 +594,7 @@ def slideshows(monkeypatch):
         db = db or FakeDB()
         director = SlideshowDirector(
             host, db=db, browser=browser or FakeBrowser(),
-            jobs=FakeJobQueue(), pace=FakePace(), motion=None,
+            jobs=FakeJobQueue(), pace=SlideshowPace(), motion=None,
             fun_time=fun_time, names=ItemNames(db))
         host.slideshows = director
         # The playlist is what a slideshow is of; deriving it from files on disk is
@@ -1150,7 +1149,7 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
 def _director():
     db = FakeDB()
     return SlideshowDirector(FakeHost(), db=db, browser=FakeBrowser(),
-                             jobs=FakeJobQueue(), pace=FakePace(), motion=None,
+                             jobs=FakeJobQueue(), pace=SlideshowPace(), motion=None,
                              fun_time=None, names=ItemNames(db))
 
 
@@ -1435,6 +1434,32 @@ def test_a_side_let_go_before_it_was_handed_over_forgets_the_slideshow_asked_for
     assert [item[2] for item in made[0].items] == ["g4"]
 
 
+def test_a_slideshow_handed_to_a_sessions_funestra_opens_with_what_is_in_flight(slideshows):
+    host = FakeHost()
+    waiting = _being_made("g-waiting", frame=None)
+    host.queue = ([waiting], 3)
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
+    director, _host, made = slideshows(
+        host, browser=browser,
+        fun_time=FakeSession(funestras={PORTRAIT: object(), LANDSCAPE: object()}))
+
+    director.fill_the_region(PORTRAIT)
+
+    assert made[0].shown.queue_set == ([waiting], 3)
+
+
+def test_what_is_in_flight_reaches_a_slideshow_on_a_sessions_funestra(slideshows):
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
+    director, _host, made = slideshows(
+        browser=browser, fun_time=FakeSession(funestras={PORTRAIT: object(), LANDSCAPE: object()}))
+    director.fill_the_region(PORTRAIT)
+    waiting = _being_made("g-waiting", frame=None)
+
+    director.note_queue([waiting], 2)
+
+    assert made[0].shown.queue_set == ([waiting], 2)
+
+
 def test_a_region_already_holding_a_slideshow_is_left_alone(slideshows):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, _made = slideshows(browser=browser, fun_time=FakeSession())
@@ -1549,7 +1574,7 @@ def test_the_spoken_pause_with_no_slideshow_up_pauses_the_room_as_esc_does(slide
     director.run_slideshow_command(SlideshowCommand.PAUSE, None)
 
     assert host.room_paused == [True]
-    assert director._pace.seconds is None
+    assert director._pace.seconds == DEFAULT_PACE_S
     assert host.said == ["paused"]
 
 
@@ -1910,6 +1935,13 @@ def test_the_blocks_cancel_all_asks_the_gallery(slideshows):
     made[0].actions.cancel_all()
 
     assert host.cancelled_all == 1
+
+
+def test_a_slideshow_asks_the_gallery_for_cores_window(slideshows):
+    director, host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+
+    assert made[0].actions.core_window() is host.core
 
 
 def test_a_row_dragged_down_the_block_re_lines_the_queue(slideshows):
@@ -2318,6 +2350,19 @@ def test_the_next_launch_picks_up_the_slideshow_the_last_one_left(slideshows):
 
     assert made[-1].resumed == replace(left, location="workflow/a")
     assert made[-1].taken_up == (SlideshowFilters(enhanced=True), False)
+
+
+def test_a_new_session_opens_its_regions_at_standalones_clip_seconds_again(slideshows):
+    director, _host, made = slideshows(fun_time=FakeSession())
+    director._pace.set_seconds(6)
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+    made[-1].pace.step(3)
+
+    director.become_standalone(motion=None)
+    director.become_hosted(FakeSession())
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    assert made[-1].pace.seconds == 6
 
 
 def test_the_next_launch_opens_its_slideshows_at_the_pace_the_last_one_was_left_at(slideshows):

@@ -62,6 +62,7 @@ from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.level_stepper import Version
 from origenerator.gui.notice_overlay import FAVORITE, HEARD_MARK, NOTICE, WARNING
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
+from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.item_names import ItemNames
@@ -142,6 +143,9 @@ class SlideshowHost(Protocol):
     def start_now(self) -> None: ...
 
     def cancel_all(self) -> None: ...
+
+    def window(self):
+        """Core's window, which shows the Job Queue itself whenever it can be seen."""
 
     def follow_link(self, prompt_id: str) -> None:
         """Land on this generation: its folder, its tile, its config tab."""
@@ -262,6 +266,7 @@ class SlideshowDirector:
         self._browser = browser
         self._jobs = jobs
         self._pace = pace
+        self._region_paces: dict[str, SlideshowPace] = {}
         self._motion = motion
         self._fun_time = fun_time
         # The fullscreen slideshow window while one is open — whether it was
@@ -313,6 +318,7 @@ class SlideshowDirector:
         self._fun_time = session
         self._motion = None
         self._region_slideshows = dict.fromkeys(_ORIENTATIONS)
+        self._region_paces = {}
 
     def become_standalone(self, motion) -> None:
         self._taken_into_the_session = {}
@@ -343,6 +349,9 @@ class SlideshowDirector:
             surfaces.append(surface)
         return surfaces
 
+    def any_up(self) -> bool:
+        return any(surface.is_showing() for surface in self.surfaces())
+
     def locked_prompt_ids(self) -> set[str]:
         return {slideshow.locked_on for slideshow in self.surfaces()
                 if slideshow.is_showing() and slideshow.locked_on is not None}
@@ -363,6 +372,13 @@ class SlideshowDirector:
         window is no occupant, however recently it was one."""
         return _still_up(self._region_slideshows.get(side))
 
+    def _pace_on(self, side: str) -> SlideshowPace:
+        if self._fun_time is None:
+            return self._pace
+        if side not in self._region_paces:
+            self._region_paces[side] = SlideshowPace(self._pace.seconds)
+        return self._region_paces[side]
+
     def _window_up(self):
         """The fullscreen window this app has on the monitor, or None — asked
         standalone, where that window is the whole of what is up."""
@@ -376,7 +392,7 @@ class SlideshowDirector:
 
     def start(self, *, side: str | None = None):
         """Open what's on screen — a folder, or the Latest/Favorites collection —
-        as a fullscreen slideshow running at the app-wide pace, standing on the
+        as a fullscreen slideshow at its side's Clip seconds, standing on the
         one generation picked there, else where the last slideshow was left
         when this comes back to it."""
         location = self._host.slideshow_location()
@@ -583,6 +599,7 @@ class SlideshowDirector:
             clear_queue=self._host.clear_foreign_queue,
             start_now=self._host.start_now,
             cancel_all=self._host.cancel_all,
+            core_window=self._host.window,
             # Space reaches the one OSR2 switch, like every other surface's,
             # and the console's control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,
@@ -644,9 +661,10 @@ class SlideshowDirector:
             return occupant
         slideshow = FunestraSlideshow(items, side=side, channel=channel,
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
-                          actions=actions, pace=self._pace, hud=hud,
+                          actions=actions, pace=self._pace_on(side), hud=hud,
                           say=self._host.say, **kwargs)
         slideshow.set_levels(levels)
+        slideshow.shown.set_queue(*self._host.queue_now())
         self._region_slideshows[side] = slideshow
         # A slideshow opened while the hosting session is frozen opens frozen, the
         # way a window one does.
@@ -673,7 +691,7 @@ class SlideshowDirector:
         built = view is None
         if built:
             view = SlideshowView(items, side=side, actions=actions,
-                                 pace=self._pace, motion=self._motion, hud=hud,
+                                 pace=self._pace_on(side), motion=self._motion, hud=hud,
                                  **self._the_sound_standing_on_its_own(), **kwargs)
         else:
             view.slideshow.play(items, actions=actions, hud=hud, **kwargs)
@@ -1420,11 +1438,11 @@ class SlideshowDirector:
             surface.note_enhancing(statuses, frames)
 
     def note_queue(self, items, foreign_total: int) -> None:
-        """Hand an open slideshow what is in flight, for the block its panel hangs at
-        its foot — the same line as the window's lower strip, saying the same
+        """Hand every open slideshow what is in flight, for the block its panel hangs
+        at its foot — the same line as the window's lower strip, saying the same
         thing."""
-        if self._slideshow is not None:
-            self._slideshow.shown.set_queue(items, foreign_total)
+        for slideshow in self.surfaces():
+            slideshow.shown.set_queue(items, foreign_total)
 
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
         """Put a spoken line in the slideshow's own notice, if a slideshow is up."""

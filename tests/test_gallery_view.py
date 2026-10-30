@@ -3128,7 +3128,7 @@ def _click_tile(view, prompt_id):
 
 def _two_images_on_screen(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
-    _on_screen(qtbot, view, 1200, 900)
+    _on_screen(qtbot, view, 1400, 900)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     return view, view._browser._thumb_widgets["i2"]
 
@@ -3954,6 +3954,57 @@ def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
         view.show()
 
     assert view._poll_timer.isActive()
+
+
+class _MinimizedCore:
+    def isMinimized(self) -> bool:
+        return True
+
+
+def _a_minimized_gallery(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    with qtbot.waitExposed(view):
+        view.show()
+    view.refresh()
+    monkeypatch.setattr(view, "window", _MinimizedCore)
+    return view
+
+
+def test_a_gallery_hidden_by_core_minimizing_keeps_its_poll(qtbot, monkeypatch):
+    view = _a_minimized_gallery(qtbot, monkeypatch)
+
+    view.hide()
+
+    assert view._poll_timer.isActive()
+
+
+def test_a_minimized_gallery_with_no_slideshow_up_reads_nothing_on_its_tick(
+        qtbot, monkeypatch):
+    view = _a_minimized_gallery(qtbot, monkeypatch)
+    reads = []
+    monkeypatch.setattr(view, "off_thread", lambda *hop: reads.append(hop))
+
+    view._poll_timer.timeout.emit()
+
+    assert reads == []
+
+
+def test_a_minimized_gallery_under_an_open_slideshow_reads_on_its_tick(qtbot, monkeypatch):
+    """The slideshow shows what is in flight while Core cannot be seen -- the
+    Job Queue at its foot, and the pictures still being made -- so the poll that
+    feeds both goes on."""
+    view = _a_minimized_gallery(qtbot, monkeypatch)
+    _select_first_leaf(view)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing.shown)
+    reads = []
+    monkeypatch.setattr(view, "off_thread", lambda *hop: reads.append(hop))
+
+    view._poll_timer.timeout.emit()
+
+    assert len(reads) == 1
 
 
 @pytest.mark.real_thread_hop
@@ -8291,7 +8342,7 @@ def test_a_slideshow_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
     assert slideshow.findChildren(MotionPanel) == []
     posted = [button.command for _rect, button in panel_targets(slideshow.shown).buttons]
     assert "robot_hand_cycle_shape" in posted   # the motion's row is on it
-    assert "genau_clip_seconds_up" in posted    # and the pace's
+    assert any(command.endswith("_clip_seconds_up") for command in posted)  # and the pace's
     assert slideshow.shown._hud_model().drive is not None  # with the readout under them
     slideshow.close()
 
@@ -10541,12 +10592,12 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 
     # Filled at the opening rather than a poll and a half later, and with the
     # same rows and the same job being made the docked strip is showing.
-    assert [item.key for item in slideshow.shown.hud_queue[0]] == view._queue.keys() == ["gen1"]
-    assert queue_section(*slideshow.shown.hud_queue).leader.key == "gen1"
+    assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == view._queue.keys() == ["gen1"]
+    assert queue_section(*slideshow.shown.queue_foot.hud_queue).leader.key == "gen1"
 
     db.delete_generation("gen1")  # the job ends
     view._poll()
-    assert queue_section(*slideshow.shown.hud_queue) is None  # nothing in flight, no block
+    assert queue_section(*slideshow.shown.queue_foot.hud_queue).lines == ()
 
     slideshow.close()
 
@@ -10573,9 +10624,9 @@ def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at
     qtbot.addWidget(view._slideshows.showing.shown)
     slideshow = view._slideshows.showing
 
-    slideshow.shown.move("w2", "w1")  # the last waiting job, up one
+    slideshow.shown.queue_foot.move("w2", "w1")  # the last waiting job, up one
 
-    assert [item.key for item in slideshow.shown.hud_queue[0]] == ["gen1", "w2", "w1"]
+    assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == ["gen1", "w2", "w1"]
     assert view._queue.keys() == ["gen1", "w2", "w1"]
     view._slideshows.showing.close()
 

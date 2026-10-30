@@ -29,6 +29,7 @@ from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.hud_queue import CANCEL
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import answer
 from tests.slideshow_hud_support import funestra_of, open_both_sides
@@ -46,6 +47,7 @@ from tests.test_gallery_view import (
     _seeded_db,
     _will_move_on,
 )
+from tests.test_slideshow_panel import _inflight
 
 
 def _session(tmp_path):
@@ -641,6 +643,18 @@ def test_a_funestras_filter_presses_reach_the_slideshow_on_that_side(qtbot, tmp_
     assert slideshow.pass_size() == 1
 
 
+def test_a_press_on_a_funestras_clip_seconds_paces_the_slideshow_on_that_side(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+
+    _press(bridge, tmp_path, "portrait_clip_seconds_up")
+    assert slideshow.dwell_s == DEFAULT_S + 1
+
+    _press(bridge, tmp_path, "portrait_clip_seconds_down")
+    assert slideshow.dwell_s == DEFAULT_S
+
+
 def test_a_thumbnail_press_carries_its_path_through_the_colon_in_it(qtbot, tmp_path, monkeypatch):
     """A path rides after the "|", and a Windows path has a colon of its own —
     which must not be read as the start of a spoken phrase."""
@@ -708,6 +722,42 @@ def test_a_session_that_hands_over_its_funestras_gets_both_sides_on_them(
     assert [str(item.path) for item in read_playlist(tmp_path / "portrait.tsv")] == [str(tall)]
     assert [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")] == [str(wide)]
     assert view.region_slideshow("portrait").is_showing()
+
+
+class _MinimizedCore:
+    def isVisible(self) -> bool:
+        return True
+
+    def isMinimized(self) -> bool:
+        return True
+
+
+def test_the_document_names_each_press_on_the_job_queue_a_funestra_draws():
+    lines = contract.declaration()["command_lines"]
+
+    assert {"portrait_foot_press|{x}|{y}", "landscape_foot_wheel|{steps}|{x}|{y}"} <= set(lines)
+
+
+def test_a_press_on_the_job_queue_a_funestra_draws_reaches_that_job(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "window", _MinimizedCore)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [_row_of(
+        (str(tall), "image", "id-tall", str(tall)))] if key == "__all__::portrait" else [])
+    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
+    _press(bridge, tmp_path, "portrait_open_slideshow")
+    shown = view.region_slideshow("portrait").shown
+    stopped = []
+    shown.set_queue([_inflight("j1", cancel=lambda: stopped.append("j1"), typical_seconds=30)])
+    x, y, width, height = shown.queue_foot.pointer.where(f"{CANCEL}|j1")
+
+    _press(bridge, tmp_path, f"portrait_foot_press|{x + width // 2}|{y + height // 2}")
+
+    assert stopped == ["j1"]
 
 
 def _stills(tmp_path, prefix, count, size):
@@ -929,7 +979,7 @@ def _told_on_a_fresh_bridge(tmp_path, line: str) -> None:
 def _a_line_like(template: str, tmp_path) -> str:
     return template.format(
         file=r"C:\library\scene one.png", row="alpha", words="favorites",
-        corner="lower_right", on="1",
+        corner="lower_right", on="1", x="10", y="5", steps="-1",
         frames=str(tmp_path / "frame.bin"), input=str(tmp_path / "input.txt"))
 
 

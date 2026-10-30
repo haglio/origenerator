@@ -1149,7 +1149,7 @@ def test_the_view_holds_what_is_in_flight_for_its_panel(qtbot):
     view.set_queue([_inflight(status="running", typical_seconds=30, job_kind="Image"),
                     _inflight(key="j2", typical_seconds=600, job_kind="Video")], 3)
 
-    items, foreign = view.hud_queue
+    items, foreign = view.queue_foot.hud_queue
     assert [item.key for item in items] == ["j1", "j2"]
     assert foreign == 3
 
@@ -1160,7 +1160,7 @@ def test_a_row_let_go_elsewhere_on_the_panel_goes_to_the_gallery_to_be_moved(qtb
         move=lambda key, before: asked.append((key, before))))
     view.set_queue([_inflight(), _inflight(key="j2"), _inflight(key="j3")])
 
-    view.move("j3", "j2")
+    view.queue_foot.move("j3", "j2")
 
     assert asked == [("j3", "j2")]
 
@@ -1169,7 +1169,7 @@ def test_clearing_another_apps_work_goes_back_to_the_gallery(qtbot):
     cleared = []
     view = _view(qtbot, actions=SlideshowActions(clear_queue=lambda: cleared.append(True)))
 
-    view.clear_foreign_queue()
+    view.queue_foot.clear_foreign_queue()
 
     assert cleared == [True]
 
@@ -1178,7 +1178,7 @@ def test_cancel_all_goes_back_to_the_gallery_which_asks_first(qtbot):
     asked = []
     view = _view(qtbot, actions=SlideshowActions(cancel_all=lambda: asked.append(True)))
 
-    view.cancel_all()
+    view.queue_foot.cancel_all()
 
     assert asked == [True]
 
@@ -1187,7 +1187,7 @@ def test_start_now_goes_back_to_the_gallery(qtbot):
     started = []
     view = _view(qtbot, actions=SlideshowActions(start_now=lambda: started.append(True)))
 
-    view.start_now()
+    view.queue_foot.start_now()
 
     assert started == [True]
 
@@ -1418,7 +1418,7 @@ def test_the_consoles_clip_seconds_are_the_app_wide_ones(qtbot):
     pace = SlideshowPace(parent=None)
     view = _view(qtbot, pace=pace)
 
-    view.slideshow.set_dwell_s(2)
+    view.slideshow.step_dwell(-2)
     _settle(view)
 
     assert (view.slideshow.dwell_s, pace.seconds, _engine(view).pace_s) == (2, 2, 2)
@@ -1480,7 +1480,7 @@ def test_a_new_pace_reaches_a_locked_slide_without_opening_it_again(qtbot):
     _press(view, Qt.Key.Key_Down)
     opened = list(_engine(view).opened)
 
-    view.slideshow.set_dwell_s(8)
+    view.slideshow.step_dwell(4)
     _settle(view)
 
     assert _engine(view).pace_s == 8
@@ -1493,7 +1493,7 @@ def test_a_new_pace_reaches_the_image_on_screen_without_opening_it_again(qtbot):
     view = _view(qtbot, _KEYED)
     opened = list(_engine(view).opened)
 
-    view.slideshow.set_dwell_s(8)
+    view.slideshow.step_dwell(4)
     _settle(view)
 
     assert _engine(view).pace_s == 8
@@ -1751,7 +1751,7 @@ def test_a_pace_set_while_versions_are_compared_waits_for_the_arrow_that_moves_o
     _shift(view, Qt.Key.Key_Right)
     opened = list(_engine(view).opened)
 
-    view.slideshow.set_dwell_s(9)
+    view.slideshow.step_dwell(5)
     _settle(view)
     held = (_engine(view).pace_s, list(_engine(view).opened))
     _press(view, Qt.Key.Key_Right)

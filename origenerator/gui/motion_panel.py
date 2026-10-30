@@ -148,10 +148,10 @@ class MotionPanel(PressableDrawing):
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         self._drawn_device = self._device()
-        device, trouble = self._drawn_device
+        device, trouble, broker_running = self._drawn_device
         return self._painter.rgba(console_hud(
             self._motion, device=device, trouble=trouble,
-            control=self._osr2_control(), script=self._script()))
+            control=self._osr2_control(), script=self._script(), broker_running=broker_running))
 
     def _redraw_if_the_device_switched(self) -> bool:
         if self._device() == self._drawn_device:
@@ -166,5 +166,5 @@ class MotionPanel(PressableDrawing):
         nothing to cache the answer against."""
         ask = self._ask_device if self._ask_device is not None else osr2.device_mode
         ask_why = self._ask_trouble if self._ask_trouble is not None else osr2.device_trouble
-        return ask(), ask_why()
+        return ask(), ask_why(), osr2.broker_running()
 

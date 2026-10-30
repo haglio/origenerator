@@ -1,4 +1,4 @@
-"""The generation queue as a block of the one panel a slideshow wears."""
+"""The Job Queue as a block of the one HUD a slideshow wears."""
 from __future__ import annotations
 
 import time
@@ -19,9 +19,10 @@ from origenerator.gui.hud_queue import (
     START_NOW,
     UP,
     QueuePointer,
+    QueueSection,
     queue_section,
 )
-from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 
 
 def _item(key="j1", caption="Alpha Workflow › a paper kite", status="queued", **kw):
@@ -37,9 +38,48 @@ def _item(key="j1", caption="Alpha Workflow › a paper kite", status="queued", 
                         reveal=kw.pop("reveal", lambda: None), **kw)
 
 
-def test_nothing_in_flight_is_no_block_at_all():
-    """A slideshow with an idle queue wears the panel it always wore."""
-    assert queue_section([], 0) is None
+def test_an_idle_job_queue_says_what_cores_does_when_nothing_is_queued():
+    section = queue_section([], 0)
+
+    assert section.empty_note == EMPTY_QUEUE_TEXT
+    assert _inked(_painted(section)[0])
+
+
+def test_a_job_queue_with_anything_in_it_says_nothing_of_being_empty():
+    assert queue_section([_item("waiting-one")], 0).empty_note == ""
+    assert queue_section([], 3).empty_note == EMPTY_QUEUE_TEXT
+
+
+def test_the_job_queue_keeps_one_size_whatever_is_in_flight():
+    sizes = {queue_section(items, foreign).size() for items, foreign in (
+        ([], 0),
+        ([], 3),
+        ([_item("running-one", status="running", started_at=0.0, typical_seconds=30)], 0),
+        ([_item(f"j{index}", typical_seconds=30) for index in range(7)], 2),
+    )}
+
+    assert len(sizes) == 1
+
+
+def test_the_job_queue_fits_the_width_the_hud_already_has():
+    long_line = [_item("j1", caption="Alpha Workflow › " + "a paper kite " * 40,
+                       typical_seconds=30)]
+
+    assert queue_section(long_line, 0).size()[0] == 0
+
+
+def test_a_job_queue_kept_blank_holds_its_room_and_draws_nothing():
+    shown = queue_section([_item("j1", typical_seconds=30)], 0)
+    blank = QueueSection(blank=True)
+
+    image, targets = _painted(blank)
+
+    assert blank.size() == shown.size()
+    assert targets == [] and not _inked(image)
+
+
+def _inked(image) -> bool:
+    return bool(np.asarray(image)[..., 3].any())
 
 
 def test_every_job_in_flight_is_a_row_of_its_own():

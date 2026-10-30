@@ -115,6 +115,18 @@ for one thing cost four. So:
   loop", an agent repeated the word to the user, and he had to ask what it
   meant. So the code names it after the button, and so does every message
   to him.
+- **The parts no label names have the user's names too, and an agent says
+  them: HUD, Job Queue, Core and Standalone.** The **HUD** is the controls a
+  Funestra draws over what it plays, a slideshow's included; the **Job
+  Queue** is the list of jobs in flight or waiting, in Core and at the foot
+  of a slideshow's HUD; **Core** is this app's main window, which a Fun Time
+  session shows in the place of its Random Favs Browser (the **RFB**), one
+  of the two hidden while the other shows; and
+  **Standalone** is this app run on its own, outside a Fun Time session.
+  That the code says hud, job_queue and standalone is no reason to reach
+  for another word: an audit that called the HUD a "panel", the Job Queue
+  "the list of pictures and videos being made or waiting" and Standalone
+  "on its own" left him asking whether each meant his word.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 

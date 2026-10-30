@@ -378,6 +378,10 @@ def keep_off_the_device(setattr) -> None:
     setattr(motion_panel.osr2, "device_mode",
             lambda **_kw: motion_panel.osr2.osr2_device.Osr2Mode.CONTROLLED)
     setattr(motion_panel.osr2, "device_trouble", lambda **_kw: None)
+    # The Broker's heartbeat is as live as those stamps, and a press on its
+    # button would start or stop the machine's own Broker.
+    setattr(motion_panel.osr2, "broker_running", lambda **_kw: True)
+    setattr(motion_panel.osr2, "press_the_broker", lambda **_kw: None)
 
 
 @pytest.fixture(autouse=True)

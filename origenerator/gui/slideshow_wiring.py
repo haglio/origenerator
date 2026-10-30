@@ -80,6 +80,8 @@ class SlideshowActions:
     clear_queue: Callable[[], None] | None = None
     start_now: Callable[[], None] | None = None
     cancel_all: Callable[[], None] | None = None
+    # Core's window, which shows the Job Queue itself whenever it can be seen.
+    core_window: Callable[[], object] | None = None
     drive_toggle: Callable[[], None] | None = None
     osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None

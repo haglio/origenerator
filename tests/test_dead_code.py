@@ -432,7 +432,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 16076 when an image a request is still making came to show its words, its marks
 # and what it was requested from, and the Request section's aim lost the docstring
 # its tests now say.
-MAX_PROSE_LINES = 16076
+# 16073 when the Job Queue on a slideshow's HUD came to keep one size, and the
+# Broker button and a Satellite's Clip seconds came to its HUDs.
+MAX_PROSE_LINES = 16073
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -74,6 +74,7 @@ from origenerator.gui.inflight import (
     CANCEL_ALL_TIP,
     CANCEL_TEXT,
     CLEAR_TEXT,
+    EMPTY_QUEUE_TEXT,
     MOVE_DOWN_TIP,
     MOVE_UP_TIP,
     SHIELD_ALL_TEXT,
@@ -668,7 +669,7 @@ class GenerationQueue(QWidget):
         # failed to draw. It sits between two stretches, so it centers in the
         # space it is explaining while nothing is listed, and the rows still
         # stack from the top once it has given way to them.
-        self._hint = QLabel("(queued jobs show up here)")
+        self._hint = QLabel(EMPTY_QUEUE_TEXT)
         self._hint.setObjectName("estimateLabel")  # muted secondary text
         self._rows_column.addWidget(self._hint, 0, Qt.AlignmentFlag.AlignHCenter)
         self._rows_column.addStretch(1)

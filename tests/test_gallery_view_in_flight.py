@@ -1035,6 +1035,23 @@ def test_i2v_reroll_without_a_known_source_image_reuses_the_input(qtbot, tmp_pat
 # --- Recents collection: in-flight cards for queued/running generations -------
 
 
+def test_a_slideshow_is_handed_the_job_queue_worked_out_off_the_listing_in_hand(qtbot):
+    # Worked out off both tables read again for each slideshow that opened, the
+    # line held a double-click up to a quarter of a second more.
+    db = FakeDB([_image("done", "a cat", 50, 1)])
+    db.add(_running_row("gen1", prompt="a dog"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    listings = []
+    listing = db.list_generations
+    db.list_generations = lambda: listings.append(1) or listing()
+
+    items, _foreign = view.queue_now()
+
+    assert ([item.key for item in items], listings) == (["gen1"], [])
+
+
 def test_recents_shows_an_inflight_card_above_finished_items(qtbot):
     # An in-flight generation (a running DB row, as a re-roll inserts) shows as a
     # card on Recents; the finished item still lists below it, and the output-less

@@ -436,6 +436,7 @@ class GalleryView(QWidget):
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
         self._listed_rows: list[dict] = []
+        self._listed_requests: list[dict] = []
         self._image_index: dict | None = None  # memo, dropped by every rebuild
 
     def _build_the_panes(self, db, client, search_expander):
@@ -1618,7 +1619,7 @@ class GalleryView(QWidget):
         self._search.index.update(rows + held, gallery.folder_names_by_row(
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_folders), item_name=self._item_names.of)
-        requests = self._db.list_requests()
+        requests = self._listed_requests = self._db.list_requests()
         bumped = gallery.enhancement_recency(rows)
         self._browser.set_model(
             gallery.recent_generations(rows, bumped=bumped),
@@ -3434,7 +3435,8 @@ class GalleryView(QWidget):
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
         app's — the pair the Job Queue and a slideshow's corner plate both draw."""
-        return self._inflight_items(), self._foreign_queue.total
+        return (self._inflight_items(rows=self._listed_rows, requests=self._listed_requests),
+                self._foreign_queue.total)
 
     def _inflight_items(self, rows=None, requests=None) -> list:
         return self._starting.placed_among(

@@ -658,14 +658,12 @@ class SlideshowDirector:
         and the HUD this app publishes goes with it — no window of ours."""
         occupant = self.region_slideshow(side)
         if occupant is not None:
-            occupant.play(items, hud=hud, **kwargs)
-            occupant.set_levels(levels)
+            occupant.play(items, hud=hud, levels=levels, **kwargs)
             return occupant
         slideshow = FunestraSlideshow(items, side=side, channel=channel,
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace_on(side), hud=hud,
-                          say=self._host.say, **kwargs)
-        slideshow.set_levels(levels)
+                          levels=levels, say=self._host.say, **kwargs)
         slideshow.shown.set_queue(*self._host.queue_now())
         self._region_slideshows[side] = slideshow
         # A slideshow opened while the hosting session is frozen opens frozen, the
@@ -694,12 +692,10 @@ class SlideshowDirector:
         if built:
             view = SlideshowView(items, side=side, actions=actions,
                                  pace=self._pace_on(side), motion=self._motion, hud=hud,
-                                 **self._the_sound_standing_on_its_own(), **kwargs)
+                                 levels=levels, **self._the_sound_standing_on_its_own(),
+                                 **kwargs)
         else:
-            view.slideshow.play(items, actions=actions, hud=hud, **kwargs)
-        # Shift+Left/Right gets its own axis, so a level can be compared against
-        # the one below it at full size rather than in a thumbnail.
-        view.slideshow.set_levels(levels)
+            view.slideshow.play(items, actions=actions, hud=hud, levels=levels, **kwargs)
         if built:
             self._present_surface(view, side)
             view.set_queue(*self._host.queue_now())

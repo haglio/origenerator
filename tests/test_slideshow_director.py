@@ -75,7 +75,7 @@ class FakeSignal:
 class FakeSlideshow:
     """A slideshow reduced to what the director asks of one."""
 
-    def __init__(self, items=(), *, actions=None, pace=None, hud=None, **kwargs):
+    def __init__(self, items=(), *, actions=None, pace=None, hud=None, levels=None, **kwargs):
         self.items = list(items)
         self.actions = actions
         self.pace = pace
@@ -93,7 +93,7 @@ class FakeSlideshow:
         self.said = []
         self.said_kinds = []
         self.runs_said = []
-        self.levels = None
+        self.levels = levels
         self.resumed = None
         self.taken_up = None
         self.filters = SlideshowFilters()
@@ -139,9 +139,10 @@ class FakeSlideshow:
         return self.visible
 
     # what the director tells it
-    def play(self, items, *, hud=None, **kwargs):
+    def play(self, items, *, hud=None, levels=None, **kwargs):
         self.items = list(items)
         self.hud = hud
+        self.levels = levels
         self.played.append(list(items))
 
     def set_levels(self, levels):

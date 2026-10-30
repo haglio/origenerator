@@ -11,10 +11,10 @@ constants this repo has accumulated. It also keeps the report readable, since
 vulture reports every one of them.
 
 `vulture_whitelist.py` holds nothing but callers vulture cannot follow — Qt's
-C++ event loop, sqlite3, COM, funestra, one string-dispatch table. It had a
-second half when the gate went in, the 38 names the first scan reported and
-nobody had yet judged; backlog item 24 emptied it, deleting each name or giving
-it a reader.
+C++ event loop, sqlite3, COM, funestra, the tokenizers library, one
+string-dispatch table. It had a second half when the gate went in, the 38 names
+the first scan reported and nobody had yet judged; backlog item 24 emptied it,
+deleting each name or giving it a reader.
 """
 from __future__ import annotations
 

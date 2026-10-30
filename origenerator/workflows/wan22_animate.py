@@ -20,6 +20,7 @@ from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import WAN, WAN_ANIMATE
 from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.video_writer import video_writer
 
 # Comfy's own Animate template runs the model under this LoRA: six steps, no guidance.
@@ -44,6 +45,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
     derived_size_source = "video"
     model_keys = ("unet",)
     lora_keys = LORA_KEYS
+    text_reader = UMT5
     loras_keyed_only_when_named = LORA_KEYS[1:]
     output_node_id = "24"
 

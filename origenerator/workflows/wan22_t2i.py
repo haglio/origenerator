@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
+from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.wan_experts import wan_expert_shift_param
 
 
@@ -28,6 +29,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     display_name = "WAN 2.2 T2I"
     output_type = MediaType.IMAGE
     model_keys = ("unet_high", "unet_low")
+    text_reader = UMT5
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "14"
     base_output_node_id = "21"  # the pre-enhance frame, saved when the tail runs

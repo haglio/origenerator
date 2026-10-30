@@ -13,6 +13,7 @@ from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_files import ANY
 from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import CLIP
 
 # The pixel budget the output is scaled to. SDXL is trained at ~1 megapixel, so
 # the pose image's aspect ratio is kept at that budget — unlike the video
@@ -64,6 +65,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     derives_size_from_input = True
     model_keys = ("checkpoint",)
     lora_keys = loras_keyed_only_when_named = LORA_KEYS
+    text_reader = CLIP
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "14"
     # The pre-enhance render, saved when the tail runs. 21 is the union

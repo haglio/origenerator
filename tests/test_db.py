@@ -1022,3 +1022,20 @@ def test_opening_db_without_the_genau_columns_migrates_them(tmp_path):
     db.mark_genau_exported("old-001")
     row = db.get_generation("old-001")
     assert row["genau_requested_at"] is not None and row["genau_exported_at"] is not None
+
+
+# --- the prompt collection, as the notes on it read it -----------------------
+
+
+def test_the_distinct_prompts_come_once_each_in_the_order_first_written_without_other_sites(
+        tmp_path):
+    db = Database(tmp_path / "test.db")
+    for pid, prompt, source in (("g1", "a baker waving", "generated"), ("g2", "", "generated"),
+                                ("g3", "a baker yawning", "experiment"),
+                                ("g4", "a baker waving", "generated"), ("g5", None, "generated"),
+                                ("g6", "someone else's words", "outside")):
+        db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+                             positive_prompt=prompt, params_json="{}", workflow_json="{}",
+                             source=source)
+
+    assert db.distinct_positive_prompts() == ["a baker waving", "a baker yawning"]

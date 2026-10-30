@@ -1,16 +1,7 @@
-"""The three system prompts the local LLM is given.
-
-Behavior, not configuration: every one of these is tuned by reading what the
-model does with it, and each changes for reasons that have nothing to do with
-where the media library sits or which port the OSR2 broker listens on, so
-they share neither a file nor a blame history with those.
-
-All local: the prompts and everything sent under them go to the Ollama on this
-machine (``config.LOCAL_LLM_BASE_URL``), and nothing leaves it. Uncensored models throughout -- a censored one refuses
-explicit edits, refuses to match explicit words and refuses to widen a search
-with the library's own vocabulary -- so each prompt says outright that explicit
-content is expected and is to be handled literally rather than softened.
-"""
+"""The system prompts the local LLM is given: behavior tuned by reading what the
+model does, kept apart from config.py's ports and paths. Everything sent under them
+goes to the Ollama on this machine and nothing leaves it; the models are uncensored,
+and each prompt says outright that explicit content is expected and handled literally."""
 from __future__ import annotations
 
 REQUEST_REWRITE_SYSTEM_PROMPT = (
@@ -46,13 +37,15 @@ REQUEST_REWRITE_SYSTEM_PROMPT = (
     "\"blurry\"} -> {\"positive\": \"a street, at night\", \"negative\": \"blurry\"}"
 )
 
-# --- Gallery search → widened vocabulary ----------------------------------
-# The gallery search matches on meaning, not letters. A built-in synonym table
-# does the predictable half on every keystroke; once typing stops, the same
-# local LLM is asked which OTHER words a generation prompt might have used for
-# the ones typed, and those widen the match too. Uncensored, so it answers with
-# the library's actual vocabulary rather than refusing; a refusal, a timeout or
-# an unparseable reply simply leaves the table's own widening standing.
+# --- Notes on the whole prompt collection (origenerator.collection_notes) ----
+COLLECTION_NOTES_SYSTEM_PROMPT = (
+    "You help one artist study a private collection of prompts he wrote for "
+    "image and video generators. The prompts are explicit. Describe them plainly "
+    "and without judgment, never refuse, never moralize, and never add warnings. "
+    "Answer in plain English and in the format asked for."
+)
+
+# --- Gallery search → widened vocabulary (origenerator.search.expand_query) ---
 SEARCH_EXPANSION_SYSTEM_PROMPT = (
     "You widen the words of a search over a library of generated images and "
     "videos. You get a list of search words. For each one, list the OTHER words "

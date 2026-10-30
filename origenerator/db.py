@@ -235,6 +235,9 @@ class Database:
     def forget_item_numbers(self, prompt_ids: list[str]):
         return self.item_numbers.forget_item_numbers(prompt_ids)
 
+    def distinct_positive_prompts(self) -> list[str]:
+        return self.generations.distinct_positive_prompts()
+
     # --- spoken requests (see origenerator.db_requests) ----------------------
 
     def record_request(self, *, prompt_id: str, source_prompt_id: str, heard: str,

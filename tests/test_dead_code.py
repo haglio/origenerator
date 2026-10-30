@@ -436,7 +436,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # Broker button and a Satellite's Clip seconds came to its HUDs.
 # 16071 when a story handed to ComfyUI with nobody left to answer its voice came
 # to be spoken where it is asked.
-MAX_PROSE_LINES = 16071
+# 16066 when the local model came to be asked through Ollama's own door and to take
+# notes on the collection while Origenerator is closed.
+MAX_PROSE_LINES = 16066
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

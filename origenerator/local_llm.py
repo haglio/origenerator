@@ -1,18 +1,13 @@
-"""The one way this app asks the local model for an answer: one POST to Ollama's
-own chat door on this machine, over stdlib ``urllib``.
-
-Ollama's door rather than its OpenAI-shaped one, because only its own takes how
-much the model reads at once (``num_ctx``): a question that carries notes on a
-whole collection is far longer than the default window, and the OpenAI shape has
-no way to say so.
-"""
+"""The one way this app asks the local model for an answer: Ollama's own chat door,
+the one that takes how much the model reads at once, which its OpenAI-shaped door
+does not, and a question carrying notes on a whole collection needs."""
 from __future__ import annotations
 
 import json
 import re
 import urllib.request
 
-_THINKING = re.compile(r"<think>.*?</think>", re.S)
+_THINKING = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
 def answer_of(completion: dict) -> dict:
@@ -48,6 +43,15 @@ def ask(messages: list[dict], *, base_url: str, model: str, temperature: float,
         payload["format"] = "json"
     if stays_loaded is not None:
         payload["keep_alive"] = stays_loaded
+    return _post(base_url, payload, timeout)
+
+
+def let_go(*, base_url: str, model: str, timeout: float = 30.0) -> None:
+    # Ollama unloads a model at once when asked nothing and told to keep it no longer.
+    _post(base_url, {"model": model, "messages": [], "keep_alive": "0"}, timeout)
+
+
+def _post(base_url: str, payload: dict, timeout: float) -> dict:
     request = urllib.request.Request(
         base_url.rstrip("/") + "/api/chat", data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"}, method="POST",

@@ -1,5 +1,4 @@
-"""The one way the app asks the local model for an answer: Ollama's own chat
-door, which is the one that takes how much the model reads at once."""
+"""The one way the app asks the local model for an answer: Ollama's own chat door."""
 from __future__ import annotations
 
 import json
@@ -93,6 +92,20 @@ def test_the_words_of_an_answer_come_back_without_the_models_thinking():
     completion = {"message": {"content": "<think>\nhmm\n</think>\n\nNotes: subjects recur."}}
 
     assert local_llm.text_of(completion) == "Notes: subjects recur."
+
+
+def test_the_model_is_let_go_of_with_an_empty_question_that_keeps_it_no_longer():
+    sent = {}
+
+    def urlopen(request, timeout=None):
+        sent["url"], sent["body"] = request.full_url, json.loads(request.data)
+        return _Resp({"done": True})
+
+    with patch.object(local_llm.urllib.request, "urlopen", urlopen):
+        local_llm.let_go(base_url="http://x", model="m")
+
+    assert sent["url"] == "http://x/api/chat"
+    assert sent["body"] == {"model": "m", "messages": [], "keep_alive": "0"}
 
 
 def test_how_much_a_question_took_is_read_off_the_answer():

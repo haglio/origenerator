@@ -127,7 +127,7 @@ class SlideshowHost(Protocol):
     def image_config_index(self) -> dict:
         """The settings-signature index a folder name is derived against."""
 
-    def listed_prompt_ids(self) -> list[str]:
+    def listed_rows(self) -> list[dict]:
         """The generations the browser lists, in the order shown."""
 
     def selected_prompt_ids(self) -> list[str]:
@@ -456,7 +456,7 @@ class SlideshowDirector:
         is still running under it — in which case the slideshow opens on that run
         and goes on following it until it lands.
         """
-        listed = self._folder_rows()
+        listed = self._host.listed_rows()
         folder_items = None
         if media is None:  # following a run: it has no place among the files yet
             items, rows, start, folder_items = [], listed, 0, self.items_of(listed)
@@ -473,11 +473,6 @@ class SlideshowDirector:
                          hud=HudFacts(
                              order_label=LATEST_LABEL,
                              favorite_ids=self._favorite_prompt_ids()))
-
-    def _folder_rows(self) -> list[dict]:
-        """The rows the browser lists, in its order."""
-        rows = (self._host.row_for(pid) for pid in self._host.listed_prompt_ids())
-        return [row for row in rows if row is not None]
 
     def _location_of(self, row: dict | None) -> str | None:
         if row is None:

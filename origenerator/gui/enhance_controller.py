@@ -274,8 +274,7 @@ class EnhanceController:
         in_front = self._rows_in_front()
         self.panel.set_applicable(not _all_video(in_front), NO_VIDEO_ENHANCER)
         self.panel.show_offer(offer.available, offer.tip)
-        self.panel.show_source_models({gallery.model_matching_the_source(row)
-                                       for row in in_front if gallery.is_enhanceable_row(row)})
+        self.panel.show_images_in_front(in_front)
 
     def _rows_in_front(self) -> list[dict]:
         rows = [row for pid in self._host.selected_prompt_ids()

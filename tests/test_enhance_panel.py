@@ -1967,21 +1967,29 @@ def test_no_model_warning_while_the_fix_is_off_or_the_model_is_the_one_it_was_tr
     assert hands_trained_on({"hands": 0.45}, "trained_on.safetensors")[0]._model_warning.isHidden()
 
 
+def _made_by(model: str, *, file: str = "one.png") -> dict:
+    return {"prompt_id": file, "workflow_name": "sdxl_t2i", "status": "completed",
+            "output_files": json.dumps([{"filename": file}]),
+            "params_json": json.dumps({"checkpoint": model})}
+
+
 def test_matching_the_source_warns_not_while_the_images_in_front_were_made_by_the_fixs_model(
         hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
-    panel.show_source_models({"trained_on.safetensors"})
+    panel.show_images_in_front([_made_by("trained_on.safetensors"),
+                                _made_by("picked.safetensors", file="two.mp4")])
 
     assert panel._model_warning.isHidden()
 
 
-@pytest.mark.parametrize("in_front", [{"trained_on.safetensors", "picked.safetensors"}, set()])
+@pytest.mark.parametrize("in_front", [
+    [_made_by("trained_on.safetensors"), _made_by("picked.safetensors", file="two.png")], []])
 def test_matching_the_source_warns_while_an_image_in_front_or_none_is_made_by_another_model(
         hands_trained_on, in_front):
     panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
-    panel.show_source_models(in_front)
+    panel.show_images_in_front(in_front)
 
     assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
         False, _TRAINED_ON_SAID)

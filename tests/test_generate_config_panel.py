@@ -2762,6 +2762,48 @@ def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
     assert _notice(panel) == ""
 
 
+def test_generate_takes_the_red_and_green_off_its_prompts(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+    field = panel._param_form._widgets["positive_prompt"]
+    field.setPlainText("a dog on a couch")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+
+    panel._on_generate()
+
+    assert _struck_and_lit(field) == ("", "")
+    assert field.toPlainText() == "a dog on a couch"
+
+
+def test_what_is_typed_after_generate_is_marked_against_what_it_made(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+    field = panel._param_form._widgets["positive_prompt"]
+    field.setPlainText("a dog on a couch")
+    panel._on_generate()
+
+    field.setPlainText("a dog on a rug")
+
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("couch", "rug"), timeout=5000)
+
+
+def test_undo_after_generate_takes_back_what_was_typed_before_it(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+    field = panel._param_form._widgets["positive_prompt"]
+    field.moveCursor(QTextCursor.MoveOperation.End)
+    qtbot.keyClicks(field, "s")
+    panel._on_generate()
+
+    qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    assert diff_text.live_text(field) == "a cat on a couch"
+    assert _struck_and_lit(field) == ("couchs", "couch")
+
+
 def test_showing_the_next_image_never_reaches_the_marks_as_typing(saved_panel, monkeypatch):
     panel, db = saved_panel
     first = _image_row(db, "img1", prompt="a cat on a couch")
@@ -3051,6 +3093,19 @@ def test_an_image_a_request_made_is_marked_against_the_one_it_was_asked_of(
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
     assert _positive(panel) == "a cat"
     assert _notice(panel) == ""
+
+
+def test_generate_on_a_request_leaves_what_the_request_changed_marked(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+    panel.show_saved_generation(image, [image])
+    positive = panel._param_form._widgets["positive_prompt"]
+    qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
+
+    panel._on_generate()
+
+    assert "hat" in _struck_and_lit(positive)[0]
 
 
 def test_each_scene_of_a_requested_video_is_marked_against_the_scene_it_was_asked_of(
@@ -3474,6 +3529,17 @@ def test_generate_asks_for_the_folder_rather_than_these_settings(modifying, qtbo
     assert folder_key == _FOLDER_KEY
     assert workflow_name == "sdxl_t2i"
     assert params["positive_prompt"] == "a dog on a couch"
+
+
+def test_modify_takes_the_red_and_green_off_its_prompts(modifying, qtbot):
+    field = _positive_field(modifying)
+    field.setPlainText("a dog on a couch")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+
+    modifying._generate_btn.click()
+
+    assert _struck_and_lit(field) == ("", "")
+    assert field.toPlainText() == "a dog on a couch"
 
 
 def test_a_modify_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(

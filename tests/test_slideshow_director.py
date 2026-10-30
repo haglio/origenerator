@@ -667,6 +667,20 @@ def test_a_double_clicked_item_plays_the_rows_the_browser_listed_without_reading
     assert asked == []
 
 
+def test_a_double_clicked_item_s_slideshow_takes_the_shape_its_rows_say_opening_no_file(
+        slideshows, monkeypatch):
+    # Every item's file opened to measure it held a double-click on Latest for
+    # sixteen seconds, when the rows already say which shape each item is.
+    rows = [_shaped("g1", TALL), _shaped("g2", TALL), _shaped("g3", WIDE)]
+    director, _host, made = slideshows(FakeHost(rows=rows))
+    monkeypatch.setattr(module, "region_for_items",
+                        lambda items: pytest.fail("a file was opened to measure it"))
+
+    director.open_on_preview(("g3.png", "image"), "g3")
+
+    assert made[0].opened_with["side"] == PORTRAIT
+
+
 def test_a_slideshow_put_back_goes_on_taking_in_what_lands_where_it_plays(slideshows):
     landed = _row("g2")
     director, _host, made = slideshows(browser=FakeBrowser(collections={"collection/a": [_row("g1"), landed]}))

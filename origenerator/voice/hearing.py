@@ -41,7 +41,7 @@ class Hearing(QObject):
                  engines: Engines | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rules = CommandRules(phrases=frozenset(phrases),
-                                   never_rescued=frozenset(never_repaired).__contains__,
+                                   never_repaired=frozenset(never_repaired).__contains__,
                                    said_in=said_in)
         self._engines = engines
         self._thread = ListeningThread(

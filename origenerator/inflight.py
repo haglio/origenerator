@@ -28,7 +28,7 @@ from pathlib import Path
 from origenerator.completion import extract_completion, mark_generation_completed
 from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.signatures import parse_params
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.library_filing import saved_in_its_run_folder
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -75,8 +75,19 @@ def reconcile_in_flight(db, client, places: OutputPlaces, thumb_dir: Path) -> di
     # which the server has never heard of and cannot be asked about — the app
     # takes those back itself (see :meth:`JobQueue.reconnect_running`),
     # so checking them here would only delete a queue the user is still waiting on.
-    rows = [r for r in db.list_generations()
-            if r.get("status") == GenerationStatus.RUNNING]
+    return _reconcile(db, client, [r for r in db.list_generations()
+                                   if r.get("status") == GenerationStatus.RUNNING],
+                      places, thumb_dir, "in-flight generations")
+
+
+def reconcile_the_backfill(db, client, places: OutputPlaces, thumb_dir: Path) -> dict:
+    waiting_or_running = [r for r in db.list_generations()
+                          if source_of(r) == GenerationSource.BACKFILL and is_in_progress(r)]
+    return _reconcile(db, client, waiting_or_running, places, thumb_dir, "the backfill's runs")
+
+
+def _reconcile(db, client, rows: list[dict], places: OutputPlaces, thumb_dir: Path,
+               what: str) -> dict:
     summary = {"finalized": 0, "running": 0, "cleared": 0}
     if not rows:
         return summary
@@ -90,8 +101,8 @@ def reconcile_in_flight(db, client, places: OutputPlaces, thumb_dir: Path) -> di
     for row in rows:
         summary[_reconcile_row(db, client, row, queued, places, thumb_dir)] += 1
     logger.info(
-        "Reconciled in-flight generations: %d finalized, %d still running, %d cleared",
-        summary["finalized"], summary["running"], summary["cleared"],
+        "Reconciled %s: %d finalized, %d still running, %d cleared",
+        what, summary["finalized"], summary["running"], summary["cleared"],
     )
     return summary
 

@@ -306,10 +306,31 @@ def _training_job(tmp_path, body: str, **more) -> dict:
     return job
 
 
+_BELOW_NORMAL = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
+
+
 def _popen_the_fake(job):
+    """The fake trainer at the suite's own priority: the real one runs below normal
+    so his generations come first, and on a machine whose cores are full of other
+    sessions' test runs a child at that priority can wait longer than a test may."""
     def popen(command, **options):
+        options["creationflags"] = options.get("creationflags", 0) & ~_BELOW_NORMAL
         return subprocess.Popen([sys.executable, job["trainer_program"], *command], **options)
     return popen
+
+
+def test_the_trainer_runs_its_child_below_normal_priority_so_his_generations_come_first(tmp_path):
+    job = _training_job(tmp_path, "import sys\nsys.exit(0)\n")
+    flags = []
+
+    def popen(command, **options):
+        flags.append(options["creationflags"])
+        return _popen_the_fake(job)(command, **options)
+
+    look_lora_trainer.train(job, _Machine(waiting=[0], memory=[100]), popen=popen, kill=lambda p: None)
+
+    assert flags == [look_lora_trainer._IN_THE_BACKGROUND]
+    assert flags[0] & _BELOW_NORMAL
 
 
 _SAVES_A_STATE = '''

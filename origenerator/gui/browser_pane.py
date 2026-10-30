@@ -460,6 +460,7 @@ class BrowserPane(QObject):
         self._recent_rows = _Listing()      # every generated row, newest first
         self._pages = _Pages()              # the open pane's tiles, drawn a page at a time
         self._listed = _Listing()
+        self._row_by_id: dict[str, dict] = {}
         self._enhanced_rows = _Listing()    # every enhanced image, newest first
         self._experiment_rows = _Listing()  # unreviewed experiments, newest first
         self._trash_rows = _Listing()       # held deletions, newest first
@@ -487,6 +488,7 @@ class BrowserPane(QObject):
         self._models_taken += 1
         self._recent_rows = _Listing(recent_rows)
         self._listed = _Listing(listed_rows)
+        self._row_by_id = {row["prompt_id"]: row for row in (*trash_rows, *listed_rows)}
         self._enhanced_rows = _Listing(gallery.enhanced_generations(listed_rows))
         self._experiment_rows = _Listing(experiment_rows)
         self._trash_rows = _Listing(trash_rows)
@@ -1340,6 +1342,10 @@ class BrowserPane(QObject):
 
     def listed_prompt_ids(self) -> list[str]:
         return self._selection.shown
+
+    def listed_rows(self) -> list[dict]:
+        return [self._row_by_id[prompt_id] for prompt_id in self._selection.shown
+                if prompt_id in self._row_by_id]
 
     # --- multi-selection ---------------------------------------------------
 

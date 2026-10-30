@@ -460,8 +460,9 @@ class FakeHost:
     def image_config_index(self):
         return {}
 
-    def listed_prompt_ids(self):
-        return list(self.visible)
+    def listed_rows(self):
+        return [row for prompt_id in self.visible for row in self.rows
+                if row["prompt_id"] == prompt_id]
 
     def selected_prompt_ids(self):
         return list(self.picked)
@@ -649,6 +650,21 @@ def test_a_double_clicked_item_plays_its_folder_newest_first_and_says_latest(sli
 
     (slideshow,) = made
     assert slideshow.hud.order_label == LATEST_LABEL
+
+
+def test_a_double_clicked_item_plays_the_rows_the_browser_listed_without_reading_each_again(
+        slideshows):
+    # Asked of the library one at a time, the rows of Latest kept a double-click
+    # waiting eleven seconds before its slideshow could open.
+    host = FakeHost(rows=[_row("a2"), _row("a1")])
+    asked = []
+    host.row_for = asked.append
+    director, _host, made = slideshows(host)
+
+    director.open_on_preview(("a2.png", "image"), "a2")
+
+    assert [item[2] for item in made[0].items] == ["a2", "a1"]
+    assert asked == []
 
 
 def test_a_slideshow_put_back_goes_on_taking_in_what_lands_where_it_plays(slideshows):

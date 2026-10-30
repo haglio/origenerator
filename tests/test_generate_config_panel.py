@@ -2441,7 +2441,7 @@ def _notice(panel):
 
 
 def _set_prompt(panel, text):
-    panel._param_form._widgets["positive_prompt"].setPlainText(text)
+    _positive_field(panel).setPlainText(text)
 
 
 def test_a_browsed_generation_arrives_unmarked(saved_panel):
@@ -2776,7 +2776,7 @@ def test_editing_a_shown_image_s_prompt_marks_how_it_now_differs(saved_panel, qt
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
 
     field.setPlainText("a dog on a couch")
 
@@ -2788,7 +2788,7 @@ def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
     field.moveCursor(QTextCursor.MoveOperation.End)
     qtbot.keyClicks(field, "s")
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("couch", "couchs"), timeout=5000)
@@ -3059,7 +3059,7 @@ def _ask(panel, qtbot, words):
 
 
 def _positive(panel):
-    return diff_text.live_text(panel._param_form._widgets["positive_prompt"])
+    return panel._param_form._widgets["positive_prompt"].value()
 
 
 def test_an_image_a_request_made_shows_its_words_in_the_request_section(saved_panel):
@@ -3110,7 +3110,7 @@ def test_an_image_a_request_is_still_making_is_marked_against_the_one_it_was_ask
 
     panel.show_running_generation(running)
 
-    positive = panel._param_form._widgets["positive_prompt"]
+    positive = _positive_field(panel)
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
     assert _positive(panel) == "a cat"
     assert _notice(panel) == ""
@@ -3138,7 +3138,7 @@ def test_an_image_a_request_made_is_marked_against_the_one_it_was_asked_of(
 
     panel.show_saved_generation(image, [image])
 
-    positive = panel._param_form._widgets["positive_prompt"]
+    positive = _positive_field(panel)
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
     assert _positive(panel) == "a cat"
     assert _notice(panel) == ""
@@ -3408,7 +3408,7 @@ def modifying(blank_panel, tmp_path):
 
 
 def _positive_field(panel):
-    return panel._param_form._widgets["positive_prompt"]
+    return panel._param_form._widgets["positive_prompt"].boxes()[0]
 
 
 def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(modifying):
@@ -4051,7 +4051,7 @@ def test_generate_is_off_while_its_folder_is_already_making_one(panel, qtbot):
     # used to make a second image nobody asked for.
     panel.set_making_one_check(
         lambda config: config.params["positive_prompt"] == "a folder making one")
-    prompt = panel._param_form._widgets["positive_prompt"]
+    prompt = _positive_field(panel)
 
     prompt.setPlainText("a folder making one")
     assert panel._generate_btn.isEnabled() is False
@@ -4176,7 +4176,7 @@ def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
 
     form._widgets["cfg"].setValue(1.0)
 
-    field, label = form._widgets["negative_prompt"], form._labels["negative_prompt"]
+    (field,), label = form._widgets["negative_prompt"].boxes(), form._labels["negative_prompt"]
     assert field.property("inert") is True
     assert field.toolTip() == label.toolTip() == STRENGTH_ONE_HELP
 
@@ -4267,7 +4267,7 @@ def test_picking_a_lora_whose_trigger_word_the_prompt_lacks_warns_and_a_click_ad
         qtbot, worded_style, blank_panel):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
     form = _on_screen(qtbot, blank_panel)._param_form
-    form._widgets["positive_prompt"].setPlainText("a portrait")
+    form._widgets["positive_prompt"].boxes()[0].setPlainText("a portrait")
     lora = form._widgets["lora"]
 
     lora.setCurrentIndex(lora.findData("example_style.safetensors"))
@@ -4286,7 +4286,7 @@ def test_the_workflows_warning_click_adds_the_first_of_a_loras_several_trigger_w
     worded_loras({"example_acts": ["alpha", "beta"]})
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
     form = _on_screen(qtbot, blank_panel)._param_form
-    form._widgets["positive_prompt"].setPlainText("a portrait")
+    form._widgets["positive_prompt"].boxes()[0].setPlainText("a portrait")
     lora = form._widgets["lora"]
     lora.setCurrentIndex(lora.findData("example_acts.safetensors"))
 
@@ -4483,7 +4483,7 @@ def test_a_sound_prompt_grays_the_words_past_where_its_reader_stops(
 
     blank_panel._param_form.set_values({"audio_prompt": f"{read} on a tin roof"})
 
-    field = blank_panel._param_form._widgets["audio_prompt"]
+    (field,) = blank_panel._param_form._widgets["audio_prompt"].boxes()
     assert [(span.start, span.format.foreground().color().name())
             for span in field.document().firstBlock().layout().formats()] == [
         (len(read) + 1, TEXT_MUTED.name())]

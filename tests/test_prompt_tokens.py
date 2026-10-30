@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import string
 import struct
 
 import pytest
@@ -14,11 +13,11 @@ from origenerator.prompt_tokens import (
     READ_IN_PIECES,
     READ_WHOLE,
     prompt_reading,
-    where_reading_stops,
+    prompt_readings,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.prompt_readers import SOUND_PROMPT_KEYS
-from tests.text_readers import clap_reader, word_reader
+from tests.text_readers import clap_reader, clip_reader, word_reader
 
 _UMT5_FILE = "example_umt5.safetensors"
 
@@ -29,19 +28,6 @@ def comfyui(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", root)
     monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hub"))
     return root
-
-
-def _clip_reader(root):
-    folder = root / "comfy" / "sd1_tokenizer"
-    folder.mkdir(parents=True)
-    pieces = ["<|startoftext|>", "<|endoftext|>"]
-    for char in string.ascii_lowercase + string.digits + ",.:()":
-        pieces += [char, f"{char}</w>"]
-    pieces += ["ca", "cat</w>"]
-    (folder / "vocab.json").write_text(json.dumps({p: i for i, p in enumerate(pieces)}),
-                                       encoding="utf-8")
-    (folder / "merges.txt").write_text("#version: 0.2\nc a\nca t</w>\n", encoding="utf-8")
-    return folder
 
 
 def _byte_reader(root):
@@ -89,7 +75,7 @@ def _cats(count: int) -> str:
 
 
 def _clip(comfyui):
-    _clip_reader(comfyui)
+    clip_reader(comfyui)
     return prompt_reading("sdxl_t2i", {}, "positive_prompt")
 
 
@@ -177,14 +163,15 @@ def test_a_sound_prompt_past_its_cut_off_says_where_its_reader_stops(comfyui, tm
         len(read) + 1, None)
 
 
-def test_where_a_forms_sound_prompts_stop_being_read(comfyui, tmp_path):
+def test_a_form_hears_how_each_of_its_prompts_is_read(comfyui, tmp_path):
     clap_reader(tmp_path / "hub")
-    read = " ".join(["rain"] * 76)
-    params = {"audio_prompt": f"{read} on a tin roof", "audio_negative_prompt": "hiss",
-              "positive_prompt": " ".join(["cat"] * 600)}
+    _umt5_reader(comfyui)
 
-    assert where_reading_stops("wan22_i2v", params) == {"audio_prompt": len(read) + 1,
-                                                        "audio_negative_prompt": None}
+    readings = prompt_readings("wan22_i2v", {"clip_name": _UMT5_FILE})
+
+    assert {key: (reading.reads_well, reading.past_it) for key, reading in readings.items()} == {
+        "positive_prompt": (511, READ_WHOLE), "negative_prompt": (511, READ_WHOLE),
+        **dict.fromkeys(SOUND_PROMPT_KEYS, (76, CUT_OFF))}
 
 
 def test_a_prompt_whose_text_reader_is_not_installed_is_of_unknown_length(comfyui):
@@ -192,13 +179,13 @@ def test_a_prompt_whose_text_reader_is_not_installed_is_of_unknown_length(comfyu
 
 
 def test_a_field_no_text_reader_reads_has_no_length(comfyui):
-    _clip_reader(comfyui)
+    clip_reader(comfyui)
 
     assert prompt_reading("sdxl_t2i", {}, "seed") is None
 
 
 def test_a_text_reader_is_read_from_its_files_once(comfyui):
-    folder = _clip_reader(comfyui)
+    folder = clip_reader(comfyui)
     prompt_reading("sdxl_t2i", {}, "positive_prompt")
     shutil.rmtree(folder)
 

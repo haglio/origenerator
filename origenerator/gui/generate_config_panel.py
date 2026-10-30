@@ -91,7 +91,7 @@ from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.model_titles import model_title
 from origenerator.osr2_driver import drive_target_for
-from origenerator.prompt_tokens import where_reading_stops
+from origenerator.prompt_tokens import prompt_readings
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
     fresh_settings,
@@ -789,7 +789,7 @@ class GenerateConfigPanel(DropZone):
             form.set_warnings({**trigger_word_advice(values, lora_keys),
                                **setting_advice(values, definitions),
                                **self._file_advice(values, definitions, workflow)})
-            form.show_where_reading_stops(where_reading_stops(self._form_workflow_key, values))
+            form.show_readings(prompt_readings(self._form_workflow_key, values))
             form.mark_recommended(recommended_choices(values))
             form.explain(recommendations(values))
         self._workflow_warning.warn(form.every_warning() if form is not None else "")

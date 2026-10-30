@@ -102,17 +102,9 @@ def prompt_reading(workflow_name: str, params: dict, key: str) -> PromptReading 
     return PromptReading(reader.reads_well, reader.past_it, reader.weighted, tokenizer)
 
 
-def where_reading_stops(workflow_name: str, params: dict) -> dict[str, int | None]:
-    workflow = WORKFLOW_REGISTRY.get(workflow_name)
-    readings = {key: prompt_reading(workflow_name, params, key) for key in params
-                if _cuts_off(_reader_of(workflow, key))}
-    return {key: reading.stops_at(str(params.get(key) or "")) for key, reading in readings.items()
-            if reading is not None}
-
-
-def _cuts_off(name: str | None) -> bool:
-    reader = _READERS.get(name)
-    return reader is not None and reader.past_it == CUT_OFF
+def prompt_readings(workflow_name: str, params: dict) -> dict[str, PromptReading | None]:
+    return {key: prompt_reading(workflow_name, params, key)
+            for key in (*_TEXT_ENCODER_PROMPTS, *SOUND_PROMPT_KEYS)}
 
 
 def _reader_of(workflow, key: str) -> str | None:

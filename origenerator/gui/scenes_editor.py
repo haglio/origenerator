@@ -49,7 +49,9 @@ from origenerator.gui.icons import tab_close_icon
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_field import PromptField, set_in_use
+from origenerator.gui.prompt_boxes import Countdown, count_down, set_in_use
+from origenerator.gui.prompt_field import PromptField
+from origenerator.prompt_tokens import PromptReading
 from origenerator.workflows.base import (
     ParamDef,
     chained_frames,
@@ -118,6 +120,8 @@ class _Scene(QFrame):
         # once they hold text; each carries its param's own help.
         self.fields: dict[str, PromptField] = {}
         self.captions: dict[str, ElidingLabel] = {}
+        self._countdowns: dict[str, Countdown] = {}
+        self._readings: dict[str, PromptReading | None] = {}
         for key, caption in TEXT_CAPTIONS.items():
             if key == "scene_lines" and not lines:
                 continue
@@ -130,6 +134,10 @@ class _Scene(QFrame):
             column.addWidget(field)
             self.fields[key] = field
             self.captions[key] = label
+            if key in SPOKEN_OVER:
+                self._countdowns[key] = Countdown()
+                column.addWidget(self._countdowns[key])
+                field.textChanged.connect(lambda key=key: self._count_down(key))
         if lines:
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
             # Every path that fills a line -- typing, loading settings, a voice
@@ -138,6 +146,14 @@ class _Scene(QFrame):
         self.reflect_use()
         self.length.editTextChanged.connect(self.changed)
         self.length.edited.connect(self._settle)
+
+    def show_readings(self, readings: dict[str, PromptReading | None]) -> None:
+        self._readings = readings
+        for key in self._countdowns:
+            self._count_down(key)
+
+    def _count_down(self, key: str) -> None:
+        count_down(self._countdowns[key], self.fields[key], self._readings.get(key))
 
     def speaking(self) -> bool:
         """Whether this scene has a line, and so renders as her speaking."""
@@ -179,6 +195,7 @@ class ScenesEditor(QWidget):
         self._lines = lines
         self._shut_down = shut_down
         self._scenes: list[_Scene] = []
+        self._readings: dict[str, PromptReading | None] = {}
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_MEDIUM)
@@ -198,6 +215,7 @@ class ScenesEditor(QWidget):
         starts out keeping out what the scene before it keeps out: a negative
         mostly holds across a story, so blank would mean typing it again."""
         scene = _Scene(self._pd, self._prepare_length, self._shut_down, lines=self._lines)
+        scene.show_readings(self._readings)
         if self._scenes:
             scene.fields["negative_prompt"].setPlainText(
                 diff_text.live_text(self._scenes[-1].fields["negative_prompt"]))
@@ -212,6 +230,11 @@ class ScenesEditor(QWidget):
     def reflect_use(self) -> None:
         for scene in self._scenes:
             scene.reflect_use()
+
+    def show_readings(self, readings: dict[str, PromptReading | None]) -> None:
+        self._readings = {key: readings.get(key) for key in SPOKEN_OVER}
+        for scene in self._scenes:
+            scene.show_readings(self._readings)
 
     def remove_scene(self, which) -> None:
         """Take a scene out, by index or by card; the last one stays."""

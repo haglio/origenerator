@@ -247,7 +247,7 @@ class QueueSection:
 
     def _paint_for_all(self, image, draw, x, y, pointer, targets) -> None:
         column = _for_all_width()
-        top = y + (self.size()[1] - 2 * CTRL_BTN - BLOCK_GAP) // 2
+        top = y + (_FRAME - 2 * CTRL_BTN - BLOCK_GAP) // 2
         _paint_shield_all(image, draw, (x, top, column, CTRL_BTN), pointer, targets,
                           dim=not self.any_to_shield)
         _paint_button(image, draw, (x, top + CTRL_BTN + BLOCK_GAP, column, CTRL_BTN),
@@ -257,9 +257,6 @@ class QueueSection:
 
     def _paint_whats_in_flight(self, image, x, y, width, pointer, targets) -> None:
         draw = ImageDraw.Draw(image)
-        if self.lines:
-            width = max(0, width - _GAP - _for_all_width())
-            self._paint_for_all(image, draw, x + width + _GAP, y, pointer, targets)
         if self.leader is not None or self.foreign:
             self._paint_head(image, draw, x, y, width, pointer, targets)
         rows = y + _FRAME + BLOCK_GAP
@@ -277,6 +274,9 @@ class QueueSection:
                   fill=(*TEXT_MUTED, 255))
 
     def _paint_head(self, image, draw, x, y, width, pointer, targets) -> None:
+        if self.lines:
+            width = max(0, width - _GAP - _for_all_width())
+            self._paint_for_all(image, draw, x + width + _GAP, y, pointer, targets)
         column, room = x, width
         if self.leader is not None:
             frame_width = self._paint_frame(image, draw, x, y)

@@ -4,9 +4,11 @@ from __future__ import annotations
 import time
 
 import numpy as np
+from funestra.satellite_hud import map_block_width
 from PIL import Image
 from shared_ui.palette import RED
 
+from origenerator.gui import hud_queue
 from origenerator.gui.hud_queue import (
     CANCEL,
     CANCEL_ALL,
@@ -208,23 +210,47 @@ def test_a_rows_shield_and_cancel_are_grayed_where_its_job_cannot_take_them():
     assert (dim[f"{SHIELD}|j2"], dim[f"{CANCEL}|j2"]) == (False, False)
 
 
-def test_the_block_stacks_shield_all_over_cancel_all_at_its_right_end():
-    # Where the user put them in the Job Queue (2026-10-28), and so here too.
+def test_the_block_stacks_shield_all_over_cancel_all_at_the_right_end_of_its_top_line():
+    # Where the user moved them on every slideshow's HUD (2026-10-29): beside the
+    # job being made, its bar stopping short of them.
     section = queue_section([_item("j1", status="running", cancel=lambda: None,
                                    shield=lambda _on: None),
                              _item("j2", cancel=lambda: None, shield=lambda _on: None)], 0)
 
-    _image, targets = _painted(section)
+    image, targets = _painted(section)
 
     drawn = {button.command: (rect, button) for rect, button in targets}
+    (_x, frame_y, _w, frame_height), _frame = drawn[f"{FRAME}|j1"]
     (all_x, all_y, all_width, all_height), shield_all = drawn[SHIELD_ALL]
-    (cancel_x, cancel_y, cancel_width, _h), cancel_all = drawn[CANCEL_ALL]
-    rows_end = max(x + width for (x, _y, width, _h), button in targets
-                   if button.command.startswith("queue_open|"))
-    assert rows_end <= all_x == cancel_x and all_width == cancel_width
+    (cancel_x, cancel_y, cancel_width, cancel_height), cancel_all = drawn[CANCEL_ALL]
+    assert all_x == cancel_x and all_width == cancel_width
     assert all_x + all_width == 10 + 400  # flush with the block's right edge
     assert all_y + all_height < cancel_y
+    above, below = all_y - frame_y, frame_y + frame_height - (cancel_y + cancel_height)
+    assert above >= 0 and below >= 0 and abs(above - below) <= 1
+    assert image.getpixel((all_x - 1, frame_y + 1))[3] == 0
     assert (shield_all.glyph, cancel_all.glyph) == ("All", "Cancel All")
+
+
+def test_a_usual_line_reads_in_full_across_the_portrait_satellites_hud(monkeypatch):
+    real_fit_text = hud_queue.fit_text
+    fitted = []
+
+    def fit_text(font, text, room):
+        fitted.append(real_fit_text(font, text, room))
+        return fitted[-1]
+
+    monkeypatch.setattr(hud_queue, "fit_text", fit_text)
+    width = map_block_width("portrait")
+    section = queue_section([_item("j1", status="running", typical_seconds=30),
+                             _item("j2", job_kind="Video", typical_seconds=600,
+                                   cancel=lambda: None, shield=lambda _on: None)], 0)
+
+    _image, targets = _painted(section, width)
+
+    rows = [rect for rect, button in targets if button.command.startswith(f"{OPEN}|")]
+    assert len(rows) == 2 and all((x, row) == (10, width) for x, _y, row, _h in rows)
+    assert section.lines[1].lead in fitted
 
 
 def test_with_nothing_of_ours_in_flight_shield_all_and_cancel_all_are_left_off():

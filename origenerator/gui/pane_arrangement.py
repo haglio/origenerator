@@ -24,6 +24,8 @@ from PyQt6.QtWidgets import QBoxLayout, QSplitter, QWidget
 
 from origenerator.gui.panes import PaneSplitter
 
+TOC_OPENING_WIDTH = 220
+
 
 class PaneArrangement:
     def __init__(self, *, toc: QWidget, browser: QWidget, info_pane: QWidget,
@@ -62,7 +64,7 @@ class PaneArrangement:
         # horizontal scroll bar back under the form.
         self.folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
         self.folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
-        self.folder_panes.setSizes([max(220, self._toc.sizeHint().width()), 560])
+        self.folder_panes.setSizes([max(TOC_OPENING_WIDTH, self._toc.sizeHint().width()), 560])
         # The Job Queue opens at its own height and stays there: all the growth
         # goes to the folders above it, so a taller window is more gallery
         # rather than more queue.
@@ -86,8 +88,8 @@ class PaneArrangement:
         self.panes.insertWidget(1, self.folder_panes)
 
         # The upright arrangement, from the top down: the generate tabs (with
-        # the find bar riding under them), then the browser beside a
-        # collapsible tree, then the queue across the foot.  The generator
+        # the find bar riding under them), then the browser beside the
+        # tree, then the queue across the foot.  The generator
         # leads because it is what the user is doing — a tall rect that
         # opens on a folder listing puts the form they came to fill below
         # the fold.  The floors shrink with the column: each floor spans the
@@ -96,12 +98,11 @@ class PaneArrangement:
         self.stack.addWidget(self._info_pane)
         self.stack.addWidget(self.panes)
         self.stack.addWidget(self._queue)
-        self.panes.setCollapsible(0, True)  # the tree may be dragged shut
         self._info_tabs.setMinimumWidth(210)
         self._info_pane.setMinimumWidth(210)
         self.panes.setStretchFactor(0, 0)
         self.panes.setStretchFactor(1, 1)
-        self.panes.setSizes([180, 660])
+        self.panes.setSizes([TOC_OPENING_WIDTH, 660])
         # The Job Queue opens at its own height and stays there, as it does
         # standalone: a taller rect is more gallery and more form, not more
         # queue.  The two panes above it split the rest, the browser a

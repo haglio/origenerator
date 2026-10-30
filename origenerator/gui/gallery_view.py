@@ -922,7 +922,6 @@ class GalleryView(QWidget):
         self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
         self._osr2_motion = self._osr2_driver = self._motion_panel = None
         self.wear_the_room(session)
-        hold_the_borders_still(self, True)
 
     def wear_the_room(self, session) -> None:
         """The panes in the shape this room leaves them: the upright fold for
@@ -933,6 +932,7 @@ class GalleryView(QWidget):
             self._arrangement.fold_into_the_session_column(self.layout())
         elif folded and not wants_the_fold:
             self._arrangement.unfold_from_the_session_column(self.layout())
+        hold_the_borders_still(self, session is not None)
 
     def become_standalone(self) -> None:
         self.set_room_paused(False)
@@ -950,7 +950,6 @@ class GalleryView(QWidget):
             drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic)
         self.wear_the_room(None)
-        hold_the_borders_still(self, False)
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source

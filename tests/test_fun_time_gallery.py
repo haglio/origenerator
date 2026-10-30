@@ -26,6 +26,7 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.pane_arrangement import TOC_OPENING_WIDTH
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
@@ -169,11 +170,18 @@ def test_fun_time_gallery_gives_the_lower_corner_to_the_queue(qtbot):
 def test_fun_time_gallery_has_no_collapse_toggle_on_its_left_pane(qtbot):
     """No chevron for the tree.  It sat beside the back/forward chevrons and
     read as a third one of those, and folding the tree away bought a column
-    this narrow very little — the divider still drags shut for anyone who
-    wants the room."""
+    this narrow very little."""
     view = _fun_time_view(qtbot)
     assert not hasattr(view, "_toc_toggle")
-    assert view._arrangement.panes.isCollapsible(0)
+
+
+def test_fun_time_gallery_opens_its_toc_at_the_width_a_window_of_its_own_starts_from(qtbot):
+    view = _fun_time_view(qtbot)
+    view.resize(900, 1400)
+    with qtbot.waitExposed(view):
+        view.show()
+
+    assert view._arrangement.panes.widget(0).width() == TOC_OPENING_WIDTH
 
 
 def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_list(qtbot):
@@ -1725,6 +1733,18 @@ def test_a_gallery_taken_into_a_session_holds_its_borders_until_handed_back(qtbo
 
     view.become_standalone()
     assert all(border.isEnabled() for border in _thick_borders(view))
+
+
+def test_a_hosted_gallery_holds_its_borders_through_the_headset_and_back(qtbot):
+    view = _fun_time_view(qtbot)
+    in_a_headset = replace(_session(), frames_file=Path("frame.bin"),
+                           input_file=Path("input.txt"))
+
+    view.wear_the_room(in_a_headset)
+    assert not any(border.isEnabled() for border in _thick_borders(view))
+
+    view.wear_the_room(_session())
+    assert not any(border.isEnabled() for border in _thick_borders(view))
 
 
 def test_a_tab_opened_in_a_session_holds_its_border_still(qtbot):

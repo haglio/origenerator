@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 
-from origenerator import app_link, config, content, evolver_agreement, gallery
+from origenerator import app_link, config, content, evolver_agreement, gallery, recovery
 from origenerator.app import (
     MAINTENANCE,
     Library,
@@ -1229,7 +1229,6 @@ _MAINTENANCE_PASSES = (
     ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.enhanced_start_backfill", "cancel_backfill"),
     ("origenerator.enhanced_start_backfill", "fold_completed_backfill"),
-    ("origenerator.enhanced_start_backfill", "trash_what_the_backfill_replaced"),
     ("origenerator.enhanced_start_backfill", "pay_the_owed_favorites"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
@@ -1357,12 +1356,12 @@ def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(
     assert db.get_generation("video")["genau_exported_at"]
 
 
-def test_a_backfilled_video_that_landed_while_the_app_was_closed_replaces_its_old_one(
+def test_a_backfilled_video_that_landed_while_the_app_was_closed_becomes_its_old_one(
         tmp_path, monkeypatch):
     output = tmp_path / "output"
     (output / "video").mkdir(parents=True)
-    for name in ("first_00001.mp4", "again_00001.mp4"):
-        (output / "video" / name).write_bytes(b"a video")
+    for name, made in (("first_00001.mp4", b"first made"), ("again_00001.mp4", b"made again")):
+        (output / "video" / name).write_bytes(made)
     monkeypatch.setattr(config, "TRASH_DIR", tmp_path / "trash")
     monkeypatch.setattr(config, "EVOLVER_UPSCALED_DIR", tmp_path / "upscaled")
     monkeypatch.setattr(evolver_agreement, "records_folder", lambda checkout, root: None)
@@ -1382,10 +1381,13 @@ def test_a_backfilled_video_that_landed_while_the_app_was_closed_replaces_its_ol
 
     assert _put_the_backfill_in_place(library) == 1
 
-    assert db.get_generation("again")["starred"]
-    assert db.get_generation("first") is None
-    assert db.get_deletion("first") is not None
-    assert not (output / "video" / "first_00001.mp4").exists()
+    assert db.get_generation("first")["starred"]
+    assert db.get_generation("again") is None
+    assert (output / "video" / "first_00001.mp4").read_bytes() == b"made again"
+    [old] = recovery.bin_items(db.list_deletions())
+    assert old["old_version_of"] == "first"
+    [held] = gallery.row_output_files(old)
+    assert gallery.output_file_path(held, library.places).read_bytes() == b"first made"
 
 
 def test_an_enhancement_of_a_deleted_image_goes_to_the_trash_at_startup(tmp_path, monkeypatch):

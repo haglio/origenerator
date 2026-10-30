@@ -122,6 +122,7 @@ from origenerator.gallery.output import (
     produced_output,
     resolve_preview,
     row_output_files,
+    video_file_of,
 )
 from origenerator.gallery.signatures import (
     GENERATION_SEED_KEYS,
@@ -308,6 +309,7 @@ __all__ = [
     "source_image_of",
     "start_frame_index",
     "unreviewed_experiments",
+    "video_file_of",
     "videos_from_source_image",
     "was_made_from",
     "workflow_output_type",

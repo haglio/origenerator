@@ -127,7 +127,13 @@ CREATE TABLE IF NOT EXISTS generations (
     backfill_of TEXT,
     -- Set on a backfill run whose old video's copy in Kino was a Fun Time
     -- favorite, which its own copy is to be once Evolver has filed it.
-    fun_time_favorite_owed INTEGER NOT NULL DEFAULT 0
+    fun_time_favorite_owed INTEGER NOT NULL DEFAULT 0,
+    -- When the backfill last made this video again in place, for Evolver to
+    -- take the new one in place of the copies it holds of the old.
+    remade_at TEXT,
+    -- On the old version the backfill sent to Trash, the video it was made
+    -- again as, by its prompt_id: what Trash labels it an old version by.
+    old_version_of TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -277,6 +283,8 @@ ADDED_COLUMNS = {
         "shielded": "INTEGER NOT NULL DEFAULT 0",
         "backfill_of": "TEXT",
         "fun_time_favorite_owed": "INTEGER NOT NULL DEFAULT 0",
+        "remade_at": "TEXT",
+        "old_version_of": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -309,7 +317,7 @@ GENERATION_COLUMNS = (
     "evolver_unsent_at", "genau_exported_at", "genau_unsent_at",
     "genau_requested_at", "recipe_category", "recipe_video_id",
     "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
-    "backfill_of", "fun_time_favorite_owed",
+    "backfill_of", "fun_time_favorite_owed", "remade_at", "old_version_of",
 )
 
 

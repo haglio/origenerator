@@ -264,15 +264,22 @@ class GenerationStore(Store):
     def set_source(self, prompt_id: str, source: str):
         self._set(prompt_id, "source", source)
 
-    def take_the_place_of(self, prompt_id: str, old: dict):
-        self._set(prompt_id, "created_at", old["created_at"])
-        self._set(prompt_id, "completed_at", old["completed_at"])
-        self._set(prompt_id, "evolver_exported_at", old["evolver_exported_at"])
-        self._set(prompt_id, "evolver_unsent_at", old["evolver_unsent_at"])
-        self._set(prompt_id, "genau_exported_at", old["genau_exported_at"])
-        self._set(prompt_id, "genau_unsent_at", old["genau_unsent_at"])
-        self._set(prompt_id, "genau_requested_at", old["genau_requested_at"])
+    def take_the_content_of(self, prompt_id: str, remade: dict):
+        self._set(prompt_id, "workflow_version", remade["workflow_version"])
+        self._set(prompt_id, "positive_prompt", remade["positive_prompt"])
+        self._set(prompt_id, "negative_prompt", remade["negative_prompt"])
+        self._set(prompt_id, "seed", remade["seed"])
+        self._set(prompt_id, "params_json", remade["params_json"])
+        self._set(prompt_id, "workflow_json", remade["workflow_json"])
+        self._set(prompt_id, "provenance", remade["provenance"])
+        self.update_generation(prompt_id, output_files=remade["output_files"],
+                               thumbnail_path=remade["thumbnail_path"],
+                               duration_seconds=remade["duration_seconds"])
 
+    def mark_remade(self, prompt_id: str):
+        with self._connect() as conn:
+            conn.execute("UPDATE generations SET remade_at = datetime('now') WHERE prompt_id = ?",
+                         (prompt_id,))
     def pay_a_fun_time_favorite(self, prompt_id: str):
         self._set(prompt_id, "fun_time_favorite_owed", 0)
 
@@ -427,12 +434,6 @@ class GenerationStore(Store):
                     ).fetchall()
                 self._listed = (version, [as_read(r) for r in rows])
             return [dict(r) for r in self._listed[1]]
-
-    def replaced_generations(self) -> list[dict]:
-        with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM generations WHERE source = ?",
-                                (GenerationSource.REPLACED,)).fetchall()
-        return [dict(row) for row in rows]
 
     def rows_made_by(self, workflow_name: str) -> list[dict]:
         with self._connect() as conn:

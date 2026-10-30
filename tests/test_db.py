@@ -1039,3 +1039,41 @@ def test_the_distinct_prompts_come_once_each_in_the_order_first_written_without_
                              source=source)
 
     assert db.distinct_positive_prompts() == ["a baker waving", "a baker yawning"]
+
+
+# --- the exchange that led to an item: each Request's words and the model's answer
+
+
+def test_the_exchange_that_led_to_an_item_is_every_turn_along_the_way_oldest_first(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _record(db, "gen-1", source="src-1")
+    db.record_turns("gen-1", [("a hat", "Gave her a straw hat.")])
+    _record(db, "gen-2", source="gen-1")
+    db.record_turns("gen-2", [("make it red", "The hat is red now."), ("brighter", "Brighter.")])
+
+    assert db.exchange_of("gen-2") == [("a hat", "Gave her a straw hat."),
+                                       ("make it red", "The hat is red now."),
+                                       ("brighter", "Brighter.")]
+    assert db.exchange_of("gen-1") == [("a hat", "Gave her a straw hat.")]
+    assert db.exchange_of("src-1") == []
+
+
+def test_an_exchange_whose_records_point_at_each_other_still_ends(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _record(db, "gen-1", source="gen-2")
+    _record(db, "gen-2", source="gen-1")
+    db.record_turns("gen-1", [("a hat", "")])
+
+    assert db.exchange_of("gen-1") == [("a hat", "")]
+
+
+def test_a_turn_outlives_the_item_it_led_to(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="gen-1", workflow_name="sdxl_t2i", workflow_version="v002",
+                         params_json="{}", workflow_json="{}")
+    _record(db, "gen-1")
+    db.record_turns("gen-1", [("a hat", "Gave her a hat.")])
+
+    db.delete_generation("gen-1")
+
+    assert db.exchange_of("gen-1") == [("a hat", "Gave her a hat.")]

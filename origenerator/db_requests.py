@@ -69,3 +69,29 @@ class RequestStore(Store):
                 "SELECT * FROM requests WHERE prompt_id = ?", (prompt_id,)
             ).fetchone()
             return dict(row) if row else None
+
+    def record_turns(self, prompt_id: str, turns) -> None:
+        with self._connect() as conn:
+            conn.executemany(
+                "INSERT INTO request_turns (prompt_id, said, answered) VALUES (?, ?, ?)",
+                [(prompt_id, said, answered) for said, answered in turns])
+
+    def turns_of(self, prompt_id: str) -> list[tuple[str, str]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT said, answered FROM request_turns WHERE prompt_id = ? ORDER BY id",
+                (prompt_id,)).fetchall()
+            return [(row["said"], row["answered"]) for row in rows]
+
+    def exchange_of(self, prompt_id: str) -> list[tuple[str, str]]:
+        """Every turn along the way to this item, oldest first: those of the item
+        it was requested from, and theirs before, then its own."""
+        exchange: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        current: str | None = prompt_id
+        while current and current not in seen:
+            seen.add(current)
+            exchange = self.turns_of(current) + exchange
+            request = self.get_request(current)
+            current = request["source_prompt_id"] if request else None
+        return exchange

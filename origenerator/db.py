@@ -260,6 +260,12 @@ class Database:
     def get_request(self, prompt_id: str) -> dict | None:
         return self.requests.get_request(prompt_id)
 
+    def record_turns(self, prompt_id: str, turns) -> None:
+        return self.requests.record_turns(prompt_id, turns)
+
+    def exchange_of(self, prompt_id: str) -> list[tuple[str, str]]:
+        return self.requests.exchange_of(prompt_id)
+
 
     # --- folder metadata (see origenerator.db_folder_meta) ------------------
 

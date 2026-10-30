@@ -13,6 +13,7 @@ import json
 
 import pytest
 
+from origenerator import gallery
 from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
@@ -126,14 +127,16 @@ class FakeTree:
 @pytest.fixture
 def build():
     def make(rows=(), *, requests=(), jobs_by_folder=None, order=(),
-             auto_generating=(), image_rows=(), groups=None, cancelled=None, revealed=None,
-             went_to=None, shielded=None, training=None, jobs=None):
+             auto_generating=(), image_rows=(), image_index=None, groups=None, cancelled=None,
+             revealed=None, went_to=None, shielded=None, training=None, jobs=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
             jobs=jobs or FakeJobQueue(jobs_by_folder, order, training),
             auto=FakeAuto(auto_generating),
             tree=FakeTree(groups),
             image_rows=lambda: list(image_rows),
+            image_index=lambda: (gallery.build_image_config_index(list(image_rows))
+                                 if image_index is None else image_index),
             on_cancel=(cancelled if cancelled is not None else lambda _p: None),
             on_reveal=(revealed if revealed is not None else lambda _k: None),
             on_go_to_item=(went_to if went_to is not None else lambda _p: None),
@@ -148,6 +151,18 @@ def test_only_the_rows_still_being_made_get_a_card(build):
                    _row("g3", status="running"), _row("g4", status="error")])
 
     assert {item.key for item in items} == {"g2", "g3"}
+
+
+def test_a_running_row_no_live_job_holds_is_placed_by_the_gallery_s_own_index(
+        build, monkeypatch):
+    # Built again at every look at the queue, the index cost a double-click a
+    # fifth of a second, and every poll the same while such a run waited.
+    monkeypatch.setattr(gallery, "build_image_config_index",
+                        lambda rows: pytest.fail("the index was built again"))
+
+    items = build([_row("g1", status="running")], image_index={})
+
+    assert [item.key for item in items] == ["g1"]
 
 
 def test_a_running_row_no_live_job_holds_still_gets_a_plain_card(build):

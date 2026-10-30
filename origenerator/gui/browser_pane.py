@@ -416,6 +416,7 @@ class BrowserPane(QObject):
         self._queue_model = InFlightItems(
             db=db, jobs=jobs, auto=auto, tree=tree,
             image_rows=host.image_rows,
+            image_index=lambda: self._image_index,
             on_cancel=self.cancel_requested.emit,
             on_reveal=self.reveal_reroll_requested.emit,
             on_go_to_item=self.item_jump_requested.emit,

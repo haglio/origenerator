@@ -1250,6 +1250,16 @@ _MAINTENANCE_PASSES = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _the_application_keeps_nothing_a_launch_hung_on_it(qapp):
+    already = qapp.children()
+    yield
+    kept = {id(child) for child in already}
+    for left in qapp.children():
+        if id(left) not in kept and type(left).__module__.startswith("origenerator."):
+            left.deleteLater()
+
+
 @contextmanager
 def _a_faked_boot(record, *, passes=None, **patches):
     """``main`` with every collaborator faked, each maintenance pass recording.

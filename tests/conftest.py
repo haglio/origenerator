@@ -49,6 +49,7 @@ _content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT
 import contextlib
 import errno
 import gc
+import itertools
 import json
 import os
 import struct
@@ -422,10 +423,25 @@ def keep_out_of_windows(setattr) -> None:
     setattr(notice_toast, "take_back", lambda *_a, **_kw: None)
 
 
+@pytest.fixture(scope="session")
+def _a_folder_for_each_test(tmp_path_factory):
+    run = tmp_path_factory.mktemp("each_test")
+    return (run / str(number) for number in itertools.count())
+
+
+@pytest.fixture
+def _this_tests_own_folder(_a_folder_for_each_test) -> Path:
+    folder = next(_a_folder_for_each_test)
+    folder.mkdir()
+    return folder
+
+
 @pytest.fixture(autouse=True)
-def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
+def _never_name_this_app_to_the_real_windows(monkeypatch, _this_tests_own_folder):
     """keep_out_of_windows, with the notices' marks in an AppData of the run's own."""
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
+    appdata = _this_tests_own_folder / "appdata"
+    appdata.mkdir()
+    monkeypatch.setenv("LOCALAPPDATA", str(appdata))
     keep_out_of_windows(monkeypatch.setattr)
 
 
@@ -483,10 +499,10 @@ def _no_dialog_nobody_can_answer(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _enhance_presets_of_the_tests_own(monkeypatch, tmp_path_factory):
+def _enhance_presets_of_the_tests_own(monkeypatch, _this_tests_own_folder):
     """Every window loads the presets, and one test's saved preset is no other's."""
     monkeypatch.setattr(enhance_presets, "PRESETS_PATH",
-                        tmp_path_factory.mktemp("presets") / "enhance_presets.json")
+                        _this_tests_own_folder / "enhance_presets.json")
 
 
 def pytest_collection_finish(session):

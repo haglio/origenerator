@@ -5,6 +5,7 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    prompt_conditioning,
     sampler_params,
 )
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
@@ -112,14 +113,8 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
             **loras.nodes,
-            "2": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["positive_prompt"]},
-            },
-            "3": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["negative_prompt"]},
-            },
+            **prompt_conditioning("2", loras.clip, params["positive_prompt"]),
+            **prompt_conditioning("3", loras.clip, params["negative_prompt"]),
             "4": {
                 "class_type": "EmptyLatentImage",
                 "inputs": {

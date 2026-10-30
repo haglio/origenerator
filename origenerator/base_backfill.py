@@ -216,7 +216,7 @@ def render_base_now(client, workflow, params: dict, *,
     """
     prompt_id = str(uuid.uuid4())
     client.submit_job(
-        saving_into_its_run_folder(workflow.build_api_payload(params), OUTPUT_PLACES, prompt_id),
+        saving_into_its_run_folder(workflow.payload_for_comfyui(params), OUTPUT_PLACES, prompt_id),
         prompt_id)
     deadline = now() + RENDER_TIMEOUT_SECONDS
     while now() < deadline:

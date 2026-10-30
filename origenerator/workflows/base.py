@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from origenerator import points_of_interest
+from origenerator.box_breaks import prompt_boxes, unboxed
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
@@ -91,6 +92,34 @@ def _text_encode(clip_ref, text: str) -> dict:
 
 def ahead_of(own: str, prompt: str) -> str:
     return ", ".join(text for text in (own, prompt) if text)
+
+
+def _without_box_breaks(value):
+    if isinstance(value, str):
+        return unboxed(value)
+    if isinstance(value, dict):
+        return {key: _without_box_breaks(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_without_box_breaks(item) for item in value]
+    return value
+
+
+def prompt_conditioning(node_id: str, clip_ref, text: str, *, ahead: str = "") -> dict:
+    boxes = prompt_boxes(text)
+    if len(boxes) == 1:
+        return {node_id: _text_encode(clip_ref, ahead_of(ahead, text))}
+    pieces = [piece for piece in (ahead, *boxes) if piece.strip()] or [""]
+    if len(pieces) == 1:
+        return {node_id: _text_encode(clip_ref, pieces[0])}
+    nodes = {f"{node_id}_box{index}": _text_encode(clip_ref, piece)
+             for index, piece in enumerate(pieces, start=1)}
+    joined = [f"{node_id}_box1", 0]
+    for index in range(2, len(pieces) + 1):
+        join_id = node_id if index == len(pieces) else f"{node_id}_join{index}"
+        nodes[join_id] = {"class_type": "ConditioningConcat", "inputs": {
+            "conditioning_to": joined, "conditioning_from": [f"{node_id}_box{index}", 0]}}
+        joined = [join_id, 0]
+    return nodes
 
 
 @dataclass(frozen=True)
@@ -348,6 +377,9 @@ class WorkflowTemplate(ABC):
     @abstractmethod
     def build_api_payload(self, params: dict) -> dict:
         """Build the ComfyUI API-format prompt dict from user params."""
+
+    def payload_for_comfyui(self, params: dict) -> dict:
+        return _without_box_breaks(self.build_api_payload(params))
 
     def authored_actions(self, params: dict) -> list[dict] | None:
         """The script this clip's movements follow, or ``None`` to take the metronome."""
@@ -679,10 +711,10 @@ class WorkflowTemplate(ABC):
             positive, negative = positive_ref, negative_ref
             if own["prompt"] or own["avoid"] or own["lora"]:
                 positive_id, negative_id = f"fix{index}_positive", f"fix{index}_negative"
-                nodes[positive_id] = _text_encode(
-                    clip, ahead_of(own["prompt"], params["positive_prompt"]))
-                nodes[negative_id] = _text_encode(
-                    clip, ahead_of(own["avoid"], params["negative_prompt"]))
+                nodes.update(prompt_conditioning(positive_id, clip, params["positive_prompt"],
+                                                 ahead=own["prompt"]))
+                nodes.update(prompt_conditioning(negative_id, clip, params["negative_prompt"],
+                                                 ahead=own["avoid"]))
                 positive, negative = [positive_id, 0], [negative_id, 0]
             nodes[detailer_id] = {
                 "class_type": "DetailerForEach",

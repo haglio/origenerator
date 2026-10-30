@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
+from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate, prompt_conditioning
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.detail_parts import FIX_MAX
 from origenerator.workflows.model_arch import SDXL
@@ -132,14 +132,8 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
-            "3": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["2", 1], "text": params["positive_prompt"]},
-            },
-            "4": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["2", 1], "text": params["negative_prompt"]},
-            },
+            **prompt_conditioning("3", ["2", 1], params["positive_prompt"]),
+            **prompt_conditioning("4", ["2", 1], params["negative_prompt"]),
             "5": {
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},

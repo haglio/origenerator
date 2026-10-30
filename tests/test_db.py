@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.db import Database
 from origenerator.db_schema import STORED_NAMES
 from origenerator.provenance import WORKFLOW, WORKFLOW_VERSION
@@ -42,6 +43,20 @@ def test_insert_and_get_generation(tmp_path):
     assert row["seed"] == 12345
     assert row["status"] == "pending"
     assert row["source"] == "generated"
+
+
+def test_a_boxed_prompts_columns_hold_it_read_whole_and_its_settings_keep_its_boxes(tmp_path):
+    db = Database(tmp_path / "test.db")
+    params = {"positive_prompt": f"a cat,{BOX_BREAK}on a mat", "negative_prompt": f"ugly{BOX_BREAK}dim"}
+    db.insert_generation(prompt_id="boxed", workflow_name="sdxl_t2i", workflow_version="v002",
+                         positive_prompt=params["positive_prompt"],
+                         negative_prompt=params["negative_prompt"], seed=1,
+                         params_json=json.dumps(params), workflow_json="{}")
+
+    row = db.get_generation("boxed")
+
+    assert (row["positive_prompt"], row["negative_prompt"]) == ("a cat, on a mat", "ugly dim")
+    assert json.loads(row["params_json"]) == params
 
 
 def test_a_generation_goes_in_with_the_provenance_its_launch_stamped(tmp_path):

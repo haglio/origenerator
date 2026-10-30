@@ -1,10 +1,9 @@
-"""How a press on the Funestras' console or a slideshow's panel is spelled.
+"""How a press on the Funestras' console or a slideshow's HUD is spelled.
 
 The console painter and the satellite HUD hand their presses back as bare
-strings, and three surfaces here decode them: the console under the main
-window and under a fullscreen slideshow
-(:func:`~origenerator.gui.console.post_device_action`), a slideshow's own panel
-(:mod:`origenerator.gui.slideshow_panel`), and the channel a Fun Time session drives
+strings, and three surfaces here decode them: the console under Core and under a fullscreen slideshow
+(:func:`~origenerator.gui.console.post_device_action`), a slideshow's own HUD
+(:mod:`origenerator.gui.slideshow_hud`), and the channel a Fun Time session drives
 a hosted slideshow through (:mod:`origenerator.fun_time_bridge`).  Each used to
 hold its own slice index and its own way of gluing a side's name onto a verb,
 so the spelling lived in three places and matched by coincidence.
@@ -60,7 +59,7 @@ FILTER = "filter"
 
 
 def side_press(side: str, verb: str, argument: str = "") -> tuple[str, str]:
-    """A press as the panel spells it, taken apart into what it asks and what
+    """A press as the HUD spells it, taken apart into what it asks and what
     it carries: ``<side>_<action>`` and its ``|`` payload for most, and
     :data:`FILTER`'s row for the one spelled the other way round."""
     filtering = spelled_filter(side, "")
@@ -70,12 +69,12 @@ def side_press(side: str, verb: str, argument: str = "") -> tuple[str, str]:
 
 
 def spelled_for(side: str, action: str) -> str:
-    """How *side*'s panel spells *action* -- what :func:`side_press` undoes."""
+    """How *side*'s HUD spells *action* -- what :func:`side_press` undoes."""
     return f"{side}_{action}"
 
 
 def spelled_filter(side: str, row: str) -> str:
-    """How *side*'s panel spells narrowing to *row* -- what :func:`side_press` undoes."""
+    """How *side*'s HUD spells narrowing to *row* -- what :func:`side_press` undoes."""
     return f"{FILTER}_{side}_{row}"
 
 
@@ -83,7 +82,7 @@ def side_spoken_to(keyword: str, sides) -> str | None:
     """Which of *sides* a verb is said to, or ``None`` for none of them.
 
     Case-blind, because a session sends its verbs folded
-    (``PORTRAIT_NEXT``) where a panel posts them as it drew them.
+    (``PORTRAIT_NEXT``) where a HUD posts them as it drew them.
     """
     folded = keyword.casefold()
     for side in sides:

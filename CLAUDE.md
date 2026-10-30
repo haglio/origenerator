@@ -121,8 +121,12 @@ for one thing cost four. So:
   session shows in the place of its Random Favs Browser (the **RFB**), one
   of the two hidden while the other shows; and
   **Standalone** is this app run on its own, outside a Fun Time session.
-  That the code says hud, job_queue and standalone is no reason to reach
-  for another word: an audit that called the HUD a "panel", the Job Queue
+  The code says the same four: `hud` (`gui/slideshow_hud.py`, `Hud`), the
+  Job Queue (`JobQueueView` in Core and `gui/hud_queue.py` on a HUD, with
+  `JobQueue` the controller behind both), `core` (`gui/core.py`, `Core`) and
+  `standalone`, and "panel" is left to the Generate, Enhance and Combine
+  forms and the OSR2 console at Core's top left. So no agent reaches for
+  another word: an audit that called the HUD a "panel", the Job Queue
   "the list of pictures and videos being made or waiting" and Standalone
   "on its own" left him asking whether each meant his word.
 
@@ -288,7 +292,7 @@ since taken its name.
 
 ## A feature the session can reach is half a feature until Fun Time answers it
 
-This app runs two ways — on its own, and hosted inside a Fun Time session as one
+This app runs two ways — Standalone, and hosted inside a Fun Time session as one
 of the room's managed windows — so anything added here that the session touches
 has a matching half over there, and the two are one piece of work rather than a
 feature and a follow-up. Four shapes it takes: a verb in
@@ -298,7 +302,7 @@ them in `origenerator_contract.json`, and fun_time publishes every line, launch
 flag and headset word it sends here in its `tests/origenerator_expectations.json`,
 which `tests/test_fun_time_expectations.py` holds this app to before it ships --
 so a line, flag or word fun_time still sends is retired on fun_time's side
-first), a switch on the shared HUD in `gui/slideshow_panel.py` (which posts a verb
+first), a switch on the shared HUD in `gui/slideshow_hud.py` (which posts a verb
 `fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
 `windows_bridge_startup.py`; that module declares the flags and the window
@@ -501,7 +505,7 @@ off his screen refuses it.
 Origenerator keeps every setting a person can change in one place and brings
 it back at the next launch, the way Fun Time does. The one place is the
 window's session, saved in `state/ui_state.json` through one table,
-`SESSION_UI_STATE` in `gui/main_window.py`: a key, what the view is asked for
+`SESSION_UI_STATE` in `gui/core.py`: a key, what the view is asked for
 on the way out, what it is told on the way back in. A control added without a
 line there is forgotten at every launch with nothing failing, which is how
 Separate and Together, Images / Videos / Both, the folders left open in the
@@ -522,7 +526,7 @@ could run unnoticed.
 Inside a Fun Time session the window draws what the session asks for -- one
 list per shape, its own borders held still, the room's device and sound --
 and leaves the standalone choices it overrides as it found them, so a window
-handed back, or the next launch on its own, is where he left it.
+handed back, or the next launch in Standalone, is where he left it.
 
 ## Judging a branch before it lands
 
@@ -545,8 +549,8 @@ nothing and reads as a dummy -- which is what a Fun Time session handed him on
 has neither.
 
 Re-copy as the LAST step before the link goes out, and then import the window
-chain against that copy (`from origenerator.gui.main_window import
-OrigeneratorWindow` in a fresh interpreter, no `PYTHONPATH`): `tests/
+chain against that copy (`from origenerator.gui.core import
+Core` in a fresh interpreter, no `PYTHONPATH`): `tests/
 test_launch_smoke.py` deliberately stands the committed sample in for the
 local overlay, because a public checkout has only the sample, so it cannot
 see a local overlay the code can no longer read. A copy taken two hours

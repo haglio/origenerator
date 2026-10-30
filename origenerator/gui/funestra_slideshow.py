@@ -8,7 +8,7 @@ the window's in this process (:class:`~origenerator.gui.funestra_pane.PaneChanne
 The Funestra owns what is on screen from there: it holds an image for the pace,
 plays a clip to its end and rolls onto the next, repeats the one it is locked
 onto, and freezes with the room.  What differs is only where the slideshow is
-seen -- *shown*: the panel, the lines it says and the room's pause go to the
+seen -- *shown*: the HUD, the lines it says and the room's pause go to the
 session's Funestra and the gallery's caption, or to the window.
 """
 from __future__ import annotations
@@ -43,10 +43,10 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_map import SEED_AXIS
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
 from origenerator.gui.slideshow_set import (
     LOOP_IS_A_LOCK,
@@ -213,7 +213,7 @@ class FunestraSlideshow(QObject):
     def _pass_changed(self, kept: bool) -> None:
         """A fresh pass was dealt: the Funestra is playing the old one, so it is
         handed the new one — keeping the slide on screen when the pass kept it,
-        and sent to this slideshow's own when it did not.  The panel follows at
+        and sent to this slideshow's own when it did not.  The HUD follows at
         once, so a loop lights its button on the press rather than a tick
         later."""
         if self._set.loop is not None:
@@ -224,7 +224,7 @@ class FunestraSlideshow(QObject):
     # --- what the Funestra says it is showing ---------------------------------
 
     def tick(self) -> None:
-        """Read the Funestra's status, follow it, and publish the panel."""
+        """Read the Funestra's status, follow it, and publish the HUD."""
         if not self._open:
             return
         fields = self.channel.status()
@@ -361,9 +361,9 @@ class FunestraSlideshow(QObject):
                      if video and self._file_of(item) == video), None)
 
     def _publish(self) -> None:
-        self.shown.panel_changed()
+        self.shown.hud_changed()
 
-    # --- the transport: a button on the panel, a word, a session's hotkey ----
+    # --- the transport: a button on the HUD, a word, a session's hotkey ----
 
     @property
     def locked(self) -> bool:
@@ -633,11 +633,11 @@ class FunestraSlideshow(QObject):
             return
         self._jump_to(target)
 
-    # --- the two switches, and what the panel reads off the set --------------
+    # --- the two switches, and what the HUD reads off the set --------------
 
     @property
     def hud_prompt_id(self) -> str:
-        """The generation on screen, by id — what names it on the panel."""
+        """The generation on screen, by id — what names it on the HUD."""
         return self._set.current_prompt_id() or ""
 
     @property
@@ -900,7 +900,7 @@ class FunestraSlideshow(QObject):
     def close(self) -> None:
         """Give the side back, handing the gallery the slide that was on it.
 
-        The panel goes with it, so the session draws its own again; the Funestra
+        The HUD goes with it, so the session draws its own again; the Funestra
         keeps playing this list until the session hands it its own, which is
         what leaving origenerator mode does.
         """
@@ -921,7 +921,7 @@ class FunestraSlideshow(QObject):
 
 
 class OnASessionsFunestra:
-    """Where a slideshow on one of a session's Funestras is seen: the panel it
+    """Where a slideshow on one of a session's Funestras is seen: the HUD it
     publishes for the session to draw over that Funestra, and the gallery's caption,
     which is on screen beside the Funestras, for the lines it says.  The session
     pauses its Funestras itself, and drives the OSR2 from its Main Funestra."""
@@ -937,7 +937,7 @@ class OnASessionsFunestra:
         self.queue_foot = QueueFoot(actions)
         self._job_queue_file = JobQueueFile(channel.hud_file, side)
 
-    def panel_changed(self) -> None:
+    def hud_changed(self) -> None:
         model = slideshow_hud_model(self._side, self._slideshow, hosted=True, own_window=False,
                                     foot=self._job_queue_file.of(self.queue_foot.section()))
         text = hud_text(model) if model is not None else ""
@@ -961,11 +961,11 @@ class OnASessionsFunestra:
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         self.queue_foot.set(items, foreign_queued)
-        self.panel_changed()
+        self.hud_changed()
 
     def press_the_queue(self, verb: str, payload: str) -> None:
         self.queue_foot.press(verb, payload)
-        self.panel_changed()
+        self.hud_changed()
 
     def gone(self) -> None:
         publish_whole(self._channel.hud_file, "",

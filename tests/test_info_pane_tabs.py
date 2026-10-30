@@ -676,7 +676,7 @@ def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
 
 def test_a_run_with_an_image_behind_it_stands_that_instead_of_a_note(tabs):
     # The complaint this answers: the pane sat blank under "Waiting for preview…"
-    # for the minute a WAN run spends loading models, while the strip's corner
+    # for the minute a WAN run spends loading models, while the Job Queue's corner
     # showed the frame and the folder's tile showed a blurred copy of it. All
     # three stand the same sum now.
     panel = tabs.currentWidget()

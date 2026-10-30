@@ -164,8 +164,8 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the square each of them shows among the folder's own are seven methods, and
     the lister of Latest's rows they replace went. 267 -> 266: a combination
     draws fresh seeds, so it never repeats a run and the question the gallery
-    put before one went. 266 -> 268: the room's keys move this app's panels too, so
-    where each side's slideshow wears its panel is answered here and set from the
+    put before one went. 266 -> 268: the room's keys move this app's HUDs too, so
+    where each side's slideshow wears its HUD is answered here and set from the
     session's line -- the corner and whether it is collapsed read back together,
     because a slideshow wears them together. 268 -> 270: the OSR2's max intensity is saved
     with the session beside its control state, through the pair every switch the
@@ -173,7 +173,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     collects what a set holds once for each model the pane takes rather than
     once for each image a running generation sends, and the pane's stamp is
     what says a new model has come. 270 -> 272: the slideshows -- where the last
-    one was left, its filters, where each side's panel sits and the pace -- are
+    one was left, its filters, where each side's HUD sits and the pace -- are
     saved with the session too, through that same pair. 272 -> 273: a Fun Time
     session opening while a slideshow is up takes that slideshow into the room,
     so whether one is up is asked here for the offer the window stands. 273 -> 275:

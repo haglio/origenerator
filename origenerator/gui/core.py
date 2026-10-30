@@ -104,7 +104,7 @@ def _run_on_its_own(chore) -> None:
         logger.warning("Close-time %s failed: %s", chore.__name__, e)
 
 
-class OrigeneratorWindow(QMainWindow):
+class Core(QMainWindow):
     handed_back = pyqtSignal()
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,

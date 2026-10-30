@@ -2,7 +2,7 @@
 
 The suite can be entirely green while the icon does nothing, and this is the
 gap. ``main()`` imports almost the whole app *inside the function* -- the
-database, the recovery bin, the ComfyUI client, the importer, the main window --
+database, the recovery bin, the ComfyUI client, the importer, Core --
 so nothing about a break in one of them reaches a test that imports
 ``origenerator.app`` and stops there. And every other test here runs under
 ``tests/conftest.py``, which pins the content overlay and puts ``shared_ui`` on
@@ -56,7 +56,7 @@ LAUNCH_FILES = (
 # present so a walk that silently found nothing -- a renamed file, a parse that
 # returned an empty tree -- cannot pass as a clean launch.
 _REACHED_ONLY_FROM_INSIDE_MAIN = (
-    "origenerator.gui.main_window",
+    "origenerator.gui.core",
     "origenerator.db",
     "origenerator.comfyui_client",
 )

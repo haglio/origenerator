@@ -10,10 +10,9 @@ Two things are read over that frame rather than in place of it. The stage —
 on a dimming scrim (:class:`origenerator.gui.stage_scrim.StageScrim`), the same
 one a finished thumbnail wears while its enhancement cooks; and along the frame's
 foot a bar carries how far along the run is and how long that has taken
-(:func:`origenerator.timing.progress_status_label`), in the same words the lower
-strip's queue uses for the same job. A stage message that *replaced* the thumbnail
+(:func:`origenerator.timing.progress_status_label`), in the same words the Job Queue uses for the same job. A stage message that *replaced* the thumbnail
 hid the one thing worth looking at, and a percentage that lived only in the queue
-left the card and the strip each telling half of one story.
+left the card and the Job Queue each telling half of one story.
 
 A card is fed by an :class:`origenerator.gui.inflight.InFlightItem`, so this
 widget stays unaware of where a job comes from or how it is revealed. The gallery
@@ -55,7 +54,7 @@ class InFlightCard(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # Right-click anywhere on the card asks the pane for a context menu, the
         # way a finished tile's does — the run this card stands for is otherwise
-        # only stoppable from the lower strip's queue.
+        # only stoppable from the Job Queue.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self._key, self.mapToGlobal(pos))
@@ -164,7 +163,7 @@ class InFlightCard(QWidget):
         self._bar.raise_()  # the scrim it sits on was just raised over everything
         self._bar.show_progress(
             # A tile's width takes the compact reading: what pass is being
-            # taken, how far along, and how much longer. The strip's queue has
+            # taken, how far along, and how much longer. The Job Queue has
             # the room for the elapsed count too.
             self._item.reading.caption(compact=True),
             *self._item.reading.bars(),

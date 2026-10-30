@@ -258,7 +258,7 @@ class FakeSlideshow:
 
 class FakeSessionsFunestra:
     """Where a slideshow handed to one of a session's Funestras is seen: on the
-    session's own window, which draws the panel this app publishes for it."""
+    session's own window, which draws the HUD this app publishes for it."""
 
     def __init__(self) -> None:
         self.queue_set = None
@@ -571,7 +571,7 @@ def _row(prompt_id, *, workflow_name="sdxl_t2i", favorite=False, params=None,
 
 @pytest.fixture
 def slideshows(monkeypatch):
-    """A director whose slideshows are recorders and whose HUD panel is absent."""
+    """A director whose slideshows are recorders and whose HUD HUD is absent."""
     made = []
 
     def build_slideshow(items, **kwargs):
@@ -639,7 +639,7 @@ def test_asking_for_a_second_slideshow_standalone_replays_the_one_already_up(sli
 
 def test_a_double_clicked_item_plays_its_folder_newest_first_and_says_latest(slideshows):
     """The gallery lists a folder's newest generation first and this slideshow plays
-    it in that order, which is the order Latest plays — so the panel lights
+    it in that order, which is the order Latest plays — so the HUD lights
     Latest over it rather than leaving both of the order pair dark."""
     host = FakeHost(rows=[_row("a2"), _row("a1")])
     host.visible = ["a2", "a1"]
@@ -2375,7 +2375,7 @@ def test_the_next_launch_opens_its_slideshows_at_the_pace_the_last_one_was_left_
     assert relaunched._pace.seconds == 9
 
 
-def test_the_next_launch_wears_the_panel_where_the_last_one_left_it(slideshows):
+def test_the_next_launch_wears_the_hud_where_the_last_one_left_it(slideshows):
     director, _host, _made = slideshows()
     director.move_the_hud("right", side=LANDSCAPE)
     director.collapse_the_hud(True, side=LANDSCAPE)
@@ -2387,7 +2387,7 @@ def test_the_next_launch_wears_the_panel_where_the_last_one_left_it(slideshows):
     assert relaunched.hud_place(PORTRAIT) == (HudCorner.UPPER_LEFT, False)
 
 
-def test_a_panel_opened_in_a_corner_is_there_and_open_on_the_next_launch(slideshows):
+def test_a_hud_opened_in_a_corner_is_there_and_open_on_the_next_launch(slideshows):
     director, _host, _made = slideshows()
     director.collapse_the_hud(True, side=LANDSCAPE)
 

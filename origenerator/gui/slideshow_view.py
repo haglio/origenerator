@@ -4,7 +4,7 @@ The slideshow in it is the one every Funestra runs
 (:class:`~origenerator.gui.funestra_slideshow.FunestraSlideshow`), driving the
 Funestra in this window's pane through the pane's channel exactly as it drives
 one of a session's through its files.  What the window answers for is what
-only a window has: the screen it fills, the keys pressed on it, the panel's
+only a window has: the screen it fills, the keys pressed on it, the HUD's
 place and the block at its foot, the OSR2 this app drives standalone, the lines
 it flashes over the slide, and the room's pause.
 
@@ -42,7 +42,7 @@ from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import QueueFoot
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, NoticeOverlay
-from origenerator.gui.slideshow_panel import (
+from origenerator.gui.slideshow_hud import (
     COLLAPSES,
     OPENS_IN,
     THE_SLIDESHOWS_OWN,
@@ -51,12 +51,12 @@ from origenerator.gui.slideshow_panel import (
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.slideshow_buttons import PRESSES_ON_THE_QUEUE, answer
 
-# How often the panel is rebuilt: on its own beat, and faster while something
+# How often the HUD is rebuilt: on its own beat, and faster while something
 # on it is moving -- the drive's trace.
 _REFRESH_MS = 300
 _RATE_STEPS = {"speed_up": SPEED_UP, "speed_down": SPEED_DOWN}
 
-_PANEL_MOVES = {
+_HUD_MOVES = {
     Qt.Key.Key_Left: "left",
     Qt.Key.Key_Right: "right",
     Qt.Key.Key_Up: "up",
@@ -77,7 +77,7 @@ class SlideshowView(QWidget):
                  clock=time.monotonic, parent=None):
         super().__init__(parent)
         # The half of each press that is a window's rather than a slideshow's: the
-        # queue's three, the room's pause, the panel's place and the OSR2 switch.
+        # queue's three, the room's pause, the HUD's place and the OSR2 switch.
         self._actions = actions if actions is not None else SlideshowActions()
         self._motion = motion  # the gallery's app-global motion driver, or None
         self._clock = clock
@@ -88,9 +88,9 @@ class SlideshowView(QWidget):
         self._minimized = False
         self._collapse = None
         self._open_in = None
-        self._panel_model = None
-        self._panel_built_at = float("-inf")
-        self._panel_stale = True
+        self._last_hud_model = None
+        self._hud_built_at = float("-inf")
+        self._hud_stale = True
         self.queue_foot = QueueFoot(
             self._actions, beside=lambda: self if self._dashboard_cmd_file is None else None)
         self._paused = False
@@ -125,24 +125,24 @@ class SlideshowView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self._pane = FunestraPane(
             self, channel=channel, user=lambda _playback: _TheWindowsPresses(self),
-            panel=self._hud_model,
+            hud=self._hud_model,
             engine_for=None if engine is None else (lambda _window_id: engine),
             radio=radio, volume=volume, on_volume_moved=self._volume_moved)
         layout.addWidget(self._pane, 1)
         self.slideshow.tick()  # a Funestra that opened with the pane is followed from the first
 
-    # --- the panel this slideshow wears -------------------------------------
+    # --- the HUD this slideshow wears -------------------------------------
 
     def wear_the_hud(self, side: str, *, dashboard_cmd_file=None, label_for=None,
                      corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
                      collapse=None, open_in=None) -> None:
-        """Put the Funestras' own panel on this slideshow, drawn by the Funestra.
+        """Put the Funestras' own HUD on this slideshow, drawn by the Funestra.
 
-        *side* is whose panel it is, which spells its verbs; *dashboard_cmd_file*
+        *side* is whose HUD it is, which spells its verbs; *dashboard_cmd_file*
         is the session's command channel, or ``None`` standalone -- which is also
         how a press knows which of the two it is on (see :meth:`press`);
         *label_for* names the item on screen in this app's own vocabulary, and
-        *collapse* is what parks the panel in its corner where there is no
+        *collapse* is what parks the HUD in its corner where there is no
         session to ask.
         """
         self._hud_side = side
@@ -151,7 +151,7 @@ class SlideshowView(QWidget):
         self._corner, self._minimized = corner, minimized
         self._collapse = collapse
         self._open_in = open_in
-        self.refresh_panel()
+        self.refresh_hud()
 
     @property
     def hud_side(self) -> str:
@@ -161,37 +161,37 @@ class SlideshowView(QWidget):
         if (corner, minimized) == (self._corner, self._minimized):
             return
         self._corner, self._minimized = corner, minimized
-        self.refresh_panel()
+        self.refresh_hud()
 
-    def refresh_panel(self) -> None:
-        """The panel's answer may have changed under a press that redraws on
+    def refresh_hud(self) -> None:
+        """The HUD's answer may have changed under a press that redraws on
         no signal of its own: the next frame rebuilds it rather than the beat."""
-        self._panel_stale = True
+        self._hud_stale = True
 
-    def panel_changed(self) -> None:
-        self.refresh_panel()
+    def hud_changed(self) -> None:
+        self.refresh_hud()
 
     def _hud_model(self):
-        """The panel as the Funestra draws it, rebuilt on its own beat -- and
+        """The HUD as the Funestra draws it, rebuilt on its own beat -- and
         faster while the drive's trace is moving across it."""
         if not self._hud_side:
             return None
         now = self._clock()
-        beat = REPAINT_MS if self._panel_moving() else _REFRESH_MS
-        if not self._panel_stale and (now - self._panel_built_at) * 1000 < beat:
-            return self._panel_model
-        self._panel_stale = False
-        self._panel_built_at = now
+        beat = REPAINT_MS if self._hud_moving() else _REFRESH_MS
+        if not self._hud_stale and (now - self._hud_built_at) * 1000 < beat:
+            return self._last_hud_model
+        self._hud_stale = False
+        self._hud_built_at = now
         model = slideshow_hud_model(self._hud_side, self.slideshow,
                                     hosted=self._dashboard_cmd_file is not None,
                                     device=self.hud_device, foot=self.queue_foot.section())
         if model is not None:
             model = replace(model, hud_corner=self._corner, hud_minimized=self._minimized)
-        self._panel_model = model
+        self._last_hud_model = model
         return model
 
-    def _panel_moving(self) -> bool:
-        drive = self._panel_model.drive if self._panel_model is not None else None
+    def _hud_moving(self) -> bool:
+        drive = self._last_hud_model.drive if self._last_hud_model is not None else None
         return drive is not None and drive.live
 
     def item_label(self) -> str:
@@ -202,11 +202,11 @@ class SlideshowView(QWidget):
             return ""
         try:
             return self._label_for(prompt_id) or ""
-        except Exception:  # naming is decoration; it never costs the panel
+        except Exception:  # naming is decoration; it never costs the HUD
             return ""
 
     def press(self, command: str) -> bool:
-        """Route one press on the panel, as the Funestra hands it over: the
+        """Route one press on the HUD, as the Funestra hands it over: the
         block at the foot takes the pointer, what the slideshow answers for itself
         lands on it, the session's transport goes out on the dashboard channel
         — or, with no session under this slideshow, onto the slideshow as well —
@@ -262,23 +262,22 @@ class SlideshowView(QWidget):
         """A press with no session under it: the slideshow answers it itself,
         through the same answers a session's round trip would have ended at."""
         if answer(self.slideshow, action):
-            self.refresh_panel()  # the readout answers the press without waiting for the beat
+            self.refresh_hud()  # the readout answers the press without waiting for the beat
             return True
         return False
 
-    # --- the queue block at the panel's foot ---------------------------------
+    # --- the queue block at the HUD's foot ---------------------------------
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
-        """Take what is in flight — the same list, in the same order, the lower
-        strip this view is covering would be showing."""
+        """Take what is in flight — the same list, in the same order, the Job Queue this view is covering would be showing."""
         self.queue_foot.set(items, foreign_queued)
-        self.refresh_panel()
+        self.refresh_hud()
 
     # --- the OSR2, which this app drives standalone --------------------------
 
     @property
     def hud_device(self):
-        """What this window is doing to the OSR2, for the one panel to draw —
+        """What this window is doing to the OSR2, for the one HUD to draw —
         None with no motion wired, and so no device half at all."""
         if self._motion is None:
             return None
@@ -291,7 +290,7 @@ class SlideshowView(QWidget):
             broker_running=osr2_device.broker_running())
 
     def press_console(self, action: str) -> bool:
-        """Take a press off the device rows of that panel — the motion, the
+        """Take a press off the device rows of that HUD — the motion, the
         four control states, a level dragged on the readout."""
         if self._motion is None:
             return False
@@ -341,7 +340,7 @@ class SlideshowView(QWidget):
 
     def dictating(self, note: str) -> None:
         """Hold *note* while a spoken request pauses the slideshow, or let it go for
-        nothing -- the only sign, in a view with no panels, that the mic is
+        nothing -- the only sign, in a view with no HUDs, that the mic is
         taking a sentence."""
         if note:
             self._note_timer.stop()  # it holds, rather than fading after a beat
@@ -376,8 +375,8 @@ class SlideshowView(QWidget):
 
     # --- keys -----------------------------------------------------------------
 
-    def _move_the_panel(self, key) -> None:
-        direction = _PANEL_MOVES.get(key)
+    def _move_the_hud(self, key) -> None:
+        direction = _HUD_MOVES.get(key)
         if direction is not None and self._actions.move_hud is not None:
             self._actions.move_hud(direction)
 
@@ -386,7 +385,7 @@ class SlideshowView(QWidget):
         shifted = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
         slideshow = self.slideshow
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            self._move_the_panel(key)
+            self._move_the_hud(key)
         elif key == Qt.Key.Key_Escape:
             self._toggle_pause()
         elif key == Qt.Key.Key_Left:
@@ -413,10 +412,10 @@ class SlideshowView(QWidget):
 
     def _answered(self) -> None:
         """A key or a press was taken: the Funestra here has already answered it,
-        so the slideshow reads it now rather than at its next look, and the panel
+        so the slideshow reads it now rather than at its next look, and the HUD
         is drawn afresh rather than on its beat."""
         self.slideshow.tick()
-        self.refresh_panel()
+        self.refresh_hud()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -445,8 +444,8 @@ class SlideshowView(QWidget):
 
 
 class _TheWindowsPresses:
-    """The window as the Funestra sees it: what a press on the panel it wears is
-    asked of, and what heads that panel.  The window is the slideshow's own, so
+    """The window as the Funestra sees it: what a press on the HUD it wears is
+    asked of, and what heads that HUD.  The window is the slideshow's own, so
     closing the Funestra closes nothing here."""
 
     def __init__(self, window: SlideshowView) -> None:

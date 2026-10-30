@@ -87,7 +87,7 @@ from origenerator.slideshow import (
     SlideshowState,
     in_order,
 )
-from origenerator.slideshow_buttons import PANEL_CORNER
+from origenerator.slideshow_buttons import HUD_CORNER
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.dictation import words_of
 from origenerator.voice.slideshow_commands import SlideshowCommand
@@ -135,7 +135,7 @@ class SlideshowHost(Protocol):
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
-        app's -- the block a slideshow's panel hangs at its foot."""
+        app's -- the block a slideshow's HUD hangs at its foot."""
 
     def clear_foreign_queue(self) -> None:
         """Drop another app's work off ComfyUI, as that block's Clear does."""
@@ -509,7 +509,7 @@ class SlideshowDirector:
         """
         # Which side this slideshow belongs to: the one asked for, else the shape of
         # the run it is opened over, else the one its set's own shape belongs on.
-        # Standalone it names nothing but the panel's own verbs, since the monitor is
+        # Standalone it names nothing but the HUD's own verbs, since the monitor is
         # the whole screen.
         run = self._run_being_made_at(location) if not items else None
         where = side or (row_orientation(run) if run is not None
@@ -592,7 +592,7 @@ class SlideshowDirector:
             reset=(self.reset_region if self._fun_time is not None else None),
             reorder=self.reorder_slideshow,
             browse_all=self.browse_it_all,
-            # The queue's own four: the block at the panel's foot re-lines the
+            # The queue's own four: the block at the HUD's foot re-lines the
             # line, its Clear drops another app's work, its Start now ends a
             # video's wait and its Cancel All asks before it cancels every job.
             move=self._jobs.move,
@@ -653,7 +653,7 @@ class SlideshowDirector:
     def _hand_to_the_funestra(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
         """A slideshow on one of the session's Funestras: the set goes to the Funestra
-        and the panel this app publishes goes with it — no window of ours."""
+        and the HUD this app publishes goes with it — no window of ours."""
         occupant = self.region_slideshow(side)
         if occupant is not None:
             occupant.play(items, hud=hud, **kwargs)
@@ -855,7 +855,7 @@ class SlideshowDirector:
         topmost itself; Fun Time restacks the band as its modes change.
 
         Either way it ends up wearing the Funestras' HUD (:meth:`_wear_the_hud`):
-        the panel is about the slideshow, and a slideshow is a slideshow wherever it is.
+        the HUD is about the slideshow, and a slideshow is a slideshow wherever it is.
         """
         if self._fun_time is None:
             self._show_on_its_monitor(view, built=True)
@@ -888,7 +888,7 @@ class SlideshowDirector:
                                       rect.x, rect.y, rect.width, rect.height)
         # The slideshow answers its own keys (a slideshow's arrows, a fullscreen
         # view's paging), so it takes the keyboard the moment it opens —
-        # left unfocused, those keys land in the main window and the view
+        # left unfocused, those keys land in Core and the view
         # reads as dead.  raise_() first: activation alone does not lift a
         # window over the topmost Funestras it shares the region with.
         view.raise_()
@@ -905,9 +905,9 @@ class SlideshowDirector:
         return (self._hud_corners.get(side, HudCorner.UPPER_LEFT),
                 self._hud_minimized.get(side, False))
 
-    def place_a_panel(self, side: str, action: str, argument: str) -> None:
+    def place_a_hud(self, side: str, action: str, argument: str) -> None:
         corner, minimized = self.hud_place(side)
-        if action == PANEL_CORNER:
+        if action == HUD_CORNER:
             self._hud_corners[side] = read_mode(HudCorner, argument, corner)
         else:
             self._hud_minimized[side] = argument == "1"
@@ -932,14 +932,14 @@ class SlideshowDirector:
                 surface.shown.set_hud_place(*self.hud_place(side))
 
     def _wear_the_hud(self, view, side: str) -> None:
-        """Put the Funestras' own HUD on *view* — the same panel, rendered by the
+        """Put the Funestras' own HUD on *view* — the same HUD, rendered by the
         same shared code: the title, this side's transport, and the nav
         map speaking the set as a seed family.  The view's own furnishings come
         off with it, because the map says all of it.
 
         Hosted, the slideshow covers a Satellite Funestra's HUD and has to BE that
         HUD: its session commands go out on the session's channel and the mode
-        pair leads the panel.  Standalone the panel is the same panel minus
+        pair leads the HUD.  Standalone the HUD is the same HUD minus
         those two — no channel to post on, so the transport lands on the slideshow
         itself, and no session to switch modes on, so no mode row.
         """
@@ -1011,13 +1011,13 @@ class SlideshowDirector:
 
     def remembered(self) -> dict:
         state = self._place_left()
-        panels = {}
+        huds = {}
         for side in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
             corner, minimized = self.hud_place(side)
-            panels[side] = {"corner": corner, "minimized": minimized}
+            huds[side] = {"corner": corner, "minimized": minimized}
         volume = self._volume_left_at
         return {"last_show": state.saved(), "filters": asdict(self._filters),
-                "panels": panels, "pace": self._pace.seconds,
+                "panels": huds, "pace": self._pace.seconds,
                 "volume": None if volume is None else asdict(volume)}
 
     def remember(self, saved) -> None:
@@ -1028,8 +1028,8 @@ class SlideshowDirector:
         if type(saved.get("pace")) is int:
             self._pace.set_seconds(saved["pace"])
         self._volume_left_at = _volume_saved_as(saved.get("volume"))
-        panels = saved.get("panels")
-        for side, place in (panels.items() if isinstance(panels, dict) else ()):
+        huds = saved.get("panels")
+        for side, place in (huds.items() if isinstance(huds, dict) else ()):
             if isinstance(place, dict):
                 self._hud_corners[side] = read_mode(HudCorner, place.get("corner"),
                                                     HudCorner.UPPER_LEFT)
@@ -1229,7 +1229,7 @@ class SlideshowDirector:
 
     def browse_it_all(self, slideshow) -> bool:
         """The way out of a loop over a set that is one seed row: this slideshow's
-        shape of the library, in the order its panel says, from the slide up."""
+        shape of the library, in the order its HUD says, from the slide up."""
         return self._play_the_library(
             slideshow, latest=slideshow.hud_order_label == LATEST_LABEL, keep_slide=True)
 
@@ -1278,7 +1278,7 @@ class SlideshowDirector:
         items Auto-Generate makes while it runs are exactly the ones it never reaches.
         Asked of each slideshow's OWN location, remembered when it opened, rather
         than of the view on screen: inside Fun Time the slideshows play on the
-        satellite regions while the main window goes on being used, so by the
+        satellite regions while Core goes on being used, so by the
         time a generation lands the browser is usually somewhere else — and
         there may be two slideshows, of two different folders, both keeping up.
         """
@@ -1438,8 +1438,8 @@ class SlideshowDirector:
             surface.note_enhancing(statuses, frames)
 
     def note_queue(self, items, foreign_total: int) -> None:
-        """Hand every open slideshow what is in flight, for the block its panel hangs
-        at its foot — the same line as the window's lower strip, saying the same
+        """Hand every open slideshow what is in flight, for the block its HUD hangs
+        at its foot — the same line as the window's Job Queue, saying the same
         thing."""
         for slideshow in self.surfaces():
             slideshow.shown.set_queue(items, foreign_total)

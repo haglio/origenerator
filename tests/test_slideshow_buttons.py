@@ -24,7 +24,7 @@ def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
     """"portrait_next", "landscape_trash" — the same spelling a satellite's
     band posts, so the session routes a slideshow's press with no new verbs; and
-    every glyph on this panel is cryptic on purpose, so each one names itself
+    every glyph on this HUD is cryptic on purpose, so each one names itself
     on hover."""
     for side in ("portrait", "landscape"):
         for button in slideshow_rows(side)[-1]:
@@ -64,7 +64,7 @@ def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
 
 def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize():
     """Hosted, this slideshow covers a Satellite Funestra and has no window of its own
-    to park, so the mode pair leads the panel with this mode lit — and the
+    to park, so the mode pair leads the HUD with this mode lit — and the
     minimize a Funestra's band ends with is not declared at all."""
     rows = slideshow_rows("portrait", hosted=True)
     mode_row = [button.command for button in rows[0]]
@@ -86,7 +86,7 @@ def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
 
 def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
     """The Funestra's window is the session's, so minimize is the session's; and
-    the mode pair is on the panel the session draws around this band, not in
+    the mode pair is on the HUD the session draws around this band, not in
     it.  What is left is exactly what the slideshow itself answers."""
     rows = slideshow_rows("portrait", hosted=True, own_window=False)
 
@@ -189,7 +189,7 @@ def test_the_versions_button_is_dim_where_the_item_has_only_itself():
 
 
 def test_every_declared_button_is_answered_by_the_slideshow():
-    """A button this panel declares and nothing answers would be drawn dead —
+    """A button this HUD declares and nothing answers would be drawn dead —
     so every one of them, minimize aside, reaches the slideshow."""
     host = _Host()
     for button in slideshow_rows("portrait", hosted=True, own_window=False)[0]:

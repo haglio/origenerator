@@ -34,7 +34,7 @@ class SlideshowActions:
     which lives in a database the slideshow has never seen. Each of these is that
     second half, and each is optional: a slideshow handed none of them still answers
     every key, it just asks nobody. That is what a test's slideshow gets, and what a
-    slideshow standing outside a session gets for the three that are a session's.
+    Standalone slideshow gets for the three that are a session's.
 
     ``delete``, ``favorite`` and ``unfavorite`` take the slide's prompt_id. ``enhance``
     takes one too and answers whether a run actually started, which is what
@@ -61,7 +61,7 @@ class SlideshowActions:
     which a loop picked back up plays whatever set it reopened on.
 
     ``volume_moved`` takes the volume the viewer moved the slideshow's
-    Funestra to.  Standing on its own, that is Origenerator Radio's volume
+    Funestra to.  In Standalone, that is Origenerator Radio's volume
     too, so a move of it turns the Radio on, and the next slideshow opens at it.
     """
 
@@ -73,7 +73,7 @@ class SlideshowActions:
     reset: Callable[[object], None] | None = None
     reorder: Callable[[object, bool], bool] | None = None
     browse_all: Callable[[object], bool] | None = None
-    # The block at the panel's foot: ``move`` lets a row go just ahead of another
+    # The block at the HUD's foot: ``move`` lets a row go just ahead of another
     # (past the last for None), ``clear_queue`` drops another app's work off
     # ComfyUI, ``start_now`` ends a video's wait, ``cancel_all`` asks, then cancels.
     move: Callable[[str, str | None], None] | None = None
@@ -98,8 +98,8 @@ class SlideshowActions:
 class HudFacts:
     """What this slideshow's own HUD says about the set it is playing.
 
-    All of it is the Funestras' vocabulary, because the panel is the Funestras'
-    panel: ``order_label`` is how the set is ordered — "Latest" for Recents and
+    All of it is the Funestras' vocabulary, because the HUD is the Funestras'
+    HUD: ``order_label`` is how the set is ordered — "Latest" for Recents and
     for a folder opened on one of its items, both of which play newest
     first, and "Shuffle" for everything else; ``favorite_ids`` is which of
     the items are favorites, so the star readout and the F-mode narrowing mean

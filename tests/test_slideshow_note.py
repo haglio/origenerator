@@ -4,7 +4,7 @@ Working out what a request changes can mean asking the local LLM which of the
 prompt's own terms the speaker meant — which is what that path is for, and it
 routinely takes longer than a flash lasts.  Flashed, the note said the app was
 working and then left the corner blank while it still was, which in a view with
-no panels is indistinguishable from the request having been dropped.
+no HUD is indistinguishable from the request having been dropped.
 """
 from __future__ import annotations
 

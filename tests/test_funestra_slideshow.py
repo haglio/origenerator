@@ -1,7 +1,7 @@
 """The slideshow, driving a Funestra over its channel.
 
 What this covers is the channel between the two: the list the Funestra is handed,
-the verbs a press sends it, the panel this app publishes for it, and the slide
+the verbs a press sends it, the HUD this app publishes for it, and the slide
 on screen — which is the Funestra's answer, read back, not this app's own.
 """
 from __future__ import annotations
@@ -34,14 +34,14 @@ from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
 from origenerator.slideshow_buttons import answer
 from tests.slideshow_support import slides_named
-from tests.test_slideshow_panel import _inflight
+from tests.test_slideshow_hud import _inflight
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
 FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
 ROOT = Path(__file__).resolve().parent.parent
-DRIVERS = ("origenerator/gui/slideshow_panel.py", "origenerator/fun_time_bridge.py",
+DRIVERS = ("origenerator/gui/slideshow_hud.py", "origenerator/fun_time_bridge.py",
            "origenerator/gui/console.py")
 
 
@@ -559,8 +559,8 @@ def test_narrowing_reaches_a_funestra_partway_through_reading_the_last_list(qtbo
     assert played == ["three.png"]
 
 
-def test_the_panel_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
-    """The session draws the panel on the Funestra, so this app publishes the
+def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
+    """The session draws the HUD on the Funestra, so this app publishes the
     model for it: the slideshow's map, its title and the buttons it answers —
     and not the mode pair, which is the session's own to add."""
     slideshow = _slideshow(qtbot, tmp_path)
@@ -688,7 +688,7 @@ def test_a_new_pace_is_the_clip_seconds_the_satellites_hud_shows_at_once(qtbot, 
 
 
 def test_a_slideshow_that_is_over_gives_the_side_back(qtbot, tmp_path):
-    """The panel goes with it, so the session draws its own again on that
+    """The HUD goes with it, so the session draws its own again on that
     Funestra rather than leaving this app's last one up."""
     slideshow = _slideshow(qtbot, tmp_path)
 
@@ -698,7 +698,7 @@ def test_a_slideshow_that_is_over_gives_the_side_back(qtbot, tmp_path):
     assert slideshow.channel.hud_file.read_text(encoding="utf-8") == ""
 
 
-def test_a_slideshow_that_is_over_takes_its_panel_down_though_the_funestra_is_reading_it(
+def test_a_slideshow_that_is_over_takes_its_hud_down_though_the_funestra_is_reading_it(
         qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
 
@@ -984,7 +984,7 @@ class TestVersions:
             ("one.png", "image", "Original")]})
 
         assert f"SET_PACE {slideshow.dwell_s}" not in _sent(slideshow)
-        assert _panel(slideshow).item_note == "Enhancement 2/2"
+        assert _hud(slideshow).item_note == "Enhancement 2/2"
 
     def test_a_videos_other_version_is_played_with_its_script(
             self, qtbot, tmp_path, monkeypatch):
@@ -1080,7 +1080,7 @@ def _around(prompt_id):
                         group=(other_act,))
 
 
-def test_the_panel_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
+def test_the_hud_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
 
     model = parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
@@ -1443,44 +1443,44 @@ def test_a_folder_handed_to_a_funestra_publishes_its_seed_loop_lit(qtbot, tmp_pa
 
 # --- what is being made of the item on screen ---------------------------------
 
-def _panel(slideshow: FunestraSlideshow):
+def _hud(slideshow: FunestraSlideshow):
     return parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
 
 
-def test_the_panel_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
+def test_the_hud_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     slideshow.set_levels(_LEVELS)
 
-    assert _panel(slideshow).item_note == "Enhancement 1/1"
+    assert _hud(slideshow).item_note == "Enhancement 1/1"
 
 
-def test_the_panel_says_whether_a_better_version_is_being_made_or_waiting(qtbot, tmp_path):
+def test_the_hud_says_whether_a_better_version_is_being_made_or_waiting(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     slideshow.note_enhancing({"id-1": "queued"})
-    assert _panel(slideshow).item_note == "Enhancement queued"
+    assert _hud(slideshow).item_note == "Enhancement queued"
     slideshow.note_enhancing({"id-1": "running"})
-    assert _panel(slideshow).item_note == "Enhancing…"
+    assert _hud(slideshow).item_note == "Enhancing…"
 
 
-def test_a_lock_that_asks_for_a_better_version_says_so_on_the_panel(qtbot, tmp_path):
+def test_a_lock_that_asks_for_a_better_version_says_so_on_the_hud(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(enhance=lambda pid: True))
 
     slideshow.slideshow_toggle_lock()
     _says(slideshow, video="one.png", locked=True)
     slideshow.tick()
 
-    assert _panel(slideshow).item_note == "Enhancement queued"
+    assert _hud(slideshow).item_note == "Enhancement queued"
 
 
-def test_a_better_version_that_landed_leaves_nothing_in_flight_on_the_panel(qtbot, tmp_path):
+def test_a_better_version_that_landed_leaves_nothing_in_flight_on_the_hud(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.note_enhancing({"id-1": "running"})
 
     slideshow.note_enhanced("id-1", "one_enhanced.png")
 
-    assert _panel(slideshow).item_note == ""
+    assert _hud(slideshow).item_note == ""
 
 
 def test_a_slideshow_opened_while_an_item_of_it_is_being_enhanced_plays_that_item_first(

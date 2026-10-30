@@ -16,7 +16,7 @@ from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL, default_en
 from origenerator.gui import enhance_panel
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import fix_prompts_of, part_named
-from tests.test_main_window import _window
+from tests.test_core import _window
 
 
 def _enhanced(prompt_id, checkpoint="anemone_v3.safetensors", **settings):

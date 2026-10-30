@@ -2,7 +2,7 @@
 
 What :class:`funestra.mpv_engine.MpvEngine` offers a Funestra, answered
 from memory: the file it was handed, the one staged after it, the pace and an
-image's hold, the freeze, the sound, a still's move, and the overlays the panel and an image
+image's hold, the freeze, the sound, a still's move, and the overlays the HUD and an image
 are composited with.
 """
 from __future__ import annotations

@@ -7,7 +7,7 @@ browser's textarea does.
 
 The height belongs to the *param*, app-wide — every Positive Prompt is as tall
 as the last one you dragged, in every tab and every workflow, and it comes back
-that size next launch (:mod:`origenerator.gui.main_window` carries the sizes in
+that size next launch (:mod:`origenerator.gui.core` carries the sizes in
 and out of ``ui_state.json``). A per-widget height would be lost on each of
 those, and this form is rebuilt on every workflow switch and every new tab, so
 it would mean dragging the same field open over and over. Each param keeps its own

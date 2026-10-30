@@ -532,10 +532,10 @@ def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
 
 
 def _build_window(client, db, app_state, fun_time, preview, taskbar, next_launch):
-    from origenerator.gui.main_window import OrigeneratorWindow
+    from origenerator.gui.core import Core
 
-    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time, preview=preview,
-                                taskbar=taskbar, next_launch=next_launch)
+    window = Core(client, db, app_state, fun_time=fun_time, preview=preview,
+                  taskbar=taskbar, next_launch=next_launch)
     if fun_time is not None and not fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -757,7 +757,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         from origenerator.app_state import AppState
         from origenerator.comfyui_client import ComfyUIClient
         from origenerator.db import Database
-        from origenerator.gui.main_window import OrigeneratorWindow  # noqa: F401
+        from origenerator.gui.core import Core  # noqa: F401
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
 

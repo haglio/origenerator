@@ -15,7 +15,7 @@ which plays that shelf the way its slideshow button would.
 The side ("landscape fix teeth", "landscape favorites") is what makes them
 usable inside Fun Time, where two slideshows run at once on the satellite regions
 and NEITHER is the active window — the speaker is looking at one of them while
-the main window has the keyboard, so "the slideshow that is up" names nothing and a
+Core has the keyboard, so "the slideshow that is up" names nothing and a
 collection command has no region to land on. Standalone there is one slideshow and no
 regions, so a side is accepted and ignored.
 

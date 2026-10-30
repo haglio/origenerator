@@ -29,21 +29,21 @@ def engine_of(slideshow) -> FakeEngine:
     return slideshow._pane._engine
 
 
-def panel_targets(slideshow):
-    """What the panel the slideshow's Funestra drew put where."""
+def hud_targets(slideshow):
+    """What the HUD the slideshow's Funestra drew put where."""
     funestra = funestra_of(slideshow)
     slideshow._pane.tick()
-    return funestra._panel.targets
+    return funestra._hud.targets
 
 
 def hud_button_names(slideshow) -> list[str]:
-    """The buttons on that panel, by their own names."""
+    """The buttons on that HUD, by their own names."""
     return [button.command.removeprefix(f"{slideshow.hud_side}_")
-            for _rect, button in panel_targets(slideshow).buttons]
+            for _rect, button in hud_targets(slideshow).buttons]
 
 
 def _on_screen(slideshow, rect) -> QPoint:
-    """The middle of a rect of the panel, in the slideshow's window's own pixels."""
+    """The middle of a rect of the HUD, in the slideshow's window's own pixels."""
     left, top, _pixels = engine_of(slideshow).overlays[HUD_OVERLAY_ID]
     x, y, width, height = rect
     scale = slideshow._pane._window.devicePixelRatioF()
@@ -51,19 +51,19 @@ def _on_screen(slideshow, rect) -> QPoint:
 
 
 def button_on_screen(slideshow, command) -> QPoint:
-    rect, = [rect for rect, button in panel_targets(slideshow).buttons if button.command == command]
+    rect, = [rect for rect, button in hud_targets(slideshow).buttons if button.command == command]
     return _on_screen(slideshow, rect)
 
 
 def thumbnail_on_screen(slideshow, path) -> QPoint:
-    rect, = [rect for rect, target in panel_targets(slideshow).click if target == path]
+    rect, = [rect for rect, target in hud_targets(slideshow).click if target == path]
     return _on_screen(slideshow, rect)
 
 
 def speaker_on_screen(pane) -> QPoint:
-    """The speaker on the panel a pane's Funestra drew, in its window's own pixels."""
+    """The speaker on the HUD a pane's Funestra drew, in its window's own pixels."""
     left, top, _pixels = pane._engine.overlays[HUD_OVERLAY_ID]
-    x, y, width, height = pane._funestra._panel.row.rect
+    x, y, width, height = pane._funestra._hud.row.rect
     cx, cy = chip_xy(win_w=width, win_h=height, timeline_h=TIMELINE_HEIGHT)
     scale = pane._window.devicePixelRatioF()
     return QPoint(round((left + x + cx + 4) / scale),

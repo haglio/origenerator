@@ -4,11 +4,11 @@ The three panes live in splitters, so the divider between each doubles as a
 drag handle: the TOC pane (folder tree), the browser pane (a folder's
 contents), and the info pane (preview + metadata).
 
-Nested rather than flat, because the queue strip belongs to the first two and
+Nested rather than flat, because the Job Queue belongs to the first two and
 not to the third: the tree and the browser sit side by side in ``folder_panes``,
-the strip goes under both of them in ``left_column``, and the info pane stands
+the Job Queue goes under both of them in ``left_column``, and the info pane stands
 beside that whole column at full height. Its tabs are where the user reads and
-edits a generation, and a strip cutting across their foot would take that
+edits a generation, and the Job Queue cutting across their foot would take that
 height for a queue they can already see next to it.
 
 Hosted by Fun Time the rect is an upright column, so the panes fold into
@@ -63,7 +63,7 @@ class PaneArrangement:
         self.folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
         self.folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
         self.folder_panes.setSizes([max(220, self._toc.sizeHint().width()), 560])
-        # The strip opens at its own height and stays there: all the growth
+        # The Job Queue opens at its own height and stays there: all the growth
         # goes to the folders above it, so a taller window is more gallery
         # rather than more queue.
         self.left_column.setStretchFactor(0, 1)
@@ -77,7 +77,7 @@ class PaneArrangement:
     def hosted(self) -> QSplitter:
         """The upright arrangement a Fun Time session's rect asks for."""
         self.stack = PaneSplitter(Qt.Orientation.Vertical)
-        # Hosted, the queue is not the folder column's strip.  It spans the
+        # Hosted, the Job Queue does not run under the folder column.  It spans the
         # whole foot of the rect (added to stack below), so the corner
         # under the tree is the queue rather than more tree — which is where
         # a standalone window's eye finds it, and the upright fold has no
@@ -102,7 +102,7 @@ class PaneArrangement:
         self.panes.setStretchFactor(0, 0)
         self.panes.setStretchFactor(1, 1)
         self.panes.setSizes([180, 660])
-        # The strip opens at its own height and stays there, as it does
+        # The Job Queue opens at its own height and stays there, as it does
         # standalone: a taller rect is more gallery and more form, not more
         # queue.  The two panes above it split the rest, the browser a
         # little ahead so the tree it sits beside has room to be read.

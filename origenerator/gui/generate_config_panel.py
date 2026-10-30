@@ -121,7 +121,7 @@ _RANDOM_SEED_TIP = (
 # One thing in the tab is wider than a tiling-narrow window can give the info pane
 # — an image's list of versions, a thumbnail beside a file's facts and buttons — and
 # a floor that insisted on it would take the whole window out of the monitor-third
-# slot it has to fit (see tests/test_main_window.py). Past this the settings scroll
+# slot it has to fit (see tests/test_core.py). Past this the settings scroll
 # sideways after all, which is the smaller of the two losses.
 _FLOOR_CAP = 330
 

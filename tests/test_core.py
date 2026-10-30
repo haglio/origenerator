@@ -31,9 +31,9 @@ from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY, FolderCollection
 from origenerator.gallery.sides import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import desktop_notices, main_window
+from origenerator.gui import core, desktop_notices
+from origenerator.gui.core import Core
 from origenerator.gui.headset_window import CAP_PX
-from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
@@ -53,7 +53,7 @@ _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifie
 
 def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, taskbar=None,
             next_launch=None):
-    win = OrigeneratorWindow(
+    win = Core(
         ComfyUIClient(folders=SUITE_FOLDERS),
         Database(tmp_path / "t.db"),
         app_state or AppState(tmp_path / "ui.json"),
@@ -596,7 +596,7 @@ def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtb
     db = Database(tmp_path / "t.db")
     _completed_image(db)
     client = _QueueSpyClient()
-    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
     win._gallery_view.set_experiments_enabled(True)
     win.close()
@@ -634,7 +634,7 @@ def test_once_the_window_has_gone_comfyui_is_asked_with_nothing_of_the_windows_r
     for prompt_id in ("first", "second"):
         _waiting_image(db, prompt_id)
     client = _QueueSpyClient()
-    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
     asked_while_open = len(client.submitted_on)
 
@@ -650,7 +650,7 @@ def test_with_the_switch_off_the_closed_apps_turn_runs_no_experiments(qtbot, tmp
     db = Database(tmp_path / "t.db")
     _completed_image(db)
     client = _QueueSpyClient()
-    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
     win.close()
     win.hand_comfyui_what_runs_while_closed()
@@ -671,7 +671,7 @@ def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
     client = _QueueSpyClient()
     state = AppState(tmp_path / "ui.json")
     state.set("experiments_enabled", True)  # seeded on from the production app
-    win = OrigeneratorWindow(client, db, state)
+    win = Core(client, db, state)
     qtbot.addWidget(win)
 
     win.close()
@@ -693,7 +693,7 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
     db.update_generation("exp-1", status="running")
     client = _QueueSpyClient()
 
-    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
     assert client.canceled == ["exp-1"]
@@ -717,7 +717,7 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
     db.update_generation("exp-1", status="running")
     client = _QueueSpyClient()
 
-    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
     assert client.canceled == []
@@ -741,7 +741,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
         "exp-1", status="completed",
         output_files=json.dumps([{"filename": "exp.png", "subfolder": ""}]),
     )
-    win = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), db, state)
+    win = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, state)
     qtbot.addWidget(win)
 
     view = win._gallery_view
@@ -803,7 +803,7 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
 
 
 def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
-    # The reported gap: after a restart the lower strip resumed but the Generate
+    # The reported gap: after a restart the Job Queue resumed but the Generate
     # button on the tab that started the run stayed idle. The session records which
     # run each tab launched, and the state is re-asserted once the view is up.
     db = Database(tmp_path / "t.db")
@@ -899,7 +899,7 @@ def test_close_event_persists_gallery_selection(qtbot, tmp_path):
 
 def test_a_crash_reopens_where_the_user_was_because_the_session_is_saved_as_it_changes(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(main_window, "SESSION_PERSIST_INTERVAL_MS", 10)
+    monkeypatch.setattr(core, "SESSION_PERSIST_INTERVAL_MS", 10)
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
 
@@ -910,7 +910,7 @@ def test_a_crash_reopens_where_the_user_was_because_the_session_is_saved_as_it_c
 
 def test_a_session_save_the_disk_refuses_is_tried_again_rather_than_ending_the_app(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(main_window, "SESSION_PERSIST_INTERVAL_MS", 10)
+    monkeypatch.setattr(core, "SESSION_PERSIST_INTERVAL_MS", 10)
     path = tmp_path / "ui.json"
     state = AppState(path)
     refusals = [PermissionError("the state file is open in another program")]
@@ -1425,9 +1425,9 @@ def test_a_takeover_by_the_headset_draws_at_the_desktop_scale(qtbot, tmp_path):
 
 def _watched_sight(monkeypatch):
     seen = []
-    monkeypatch.setattr(main_window, "keep_out_of_sight",
+    monkeypatch.setattr(core, "keep_out_of_sight",
                         lambda hwnd: seen.append(("out of sight", hwnd)))
-    monkeypatch.setattr(main_window, "bring_back_into_sight",
+    monkeypatch.setattr(core, "bring_back_into_sight",
                         lambda hwnd: seen.append(("in sight", hwnd)))
     return seen
 
@@ -1469,7 +1469,7 @@ def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path
     """A window hosted on the monitors is kept across a crossing, and the
     headset session that adopts it has no monitor to put it on: it asks for the
     frame through the session's own channel instead of launching another."""
-    win = OrigeneratorWindow(
+    win = Core(
         ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
     )
@@ -1485,7 +1485,7 @@ def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path
 def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tmp_path):
     """And the desktop session that adopts it back puts it where it always was:
     parked until the mode switch restores it, and no frame written for nobody."""
-    win = OrigeneratorWindow(
+    win = Core(
         ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
     )
@@ -1731,7 +1731,7 @@ def test_answering_a_notice_brings_the_window_forward_and_opens_the_item(
     win = _window(qtbot, tmp_path)
     win.showMinimized()
     fronted, went = [], []
-    monkeypatch.setattr(main_window, "bring_to_front", fronted.append)
+    monkeypatch.setattr(core, "bring_to_front", fronted.append)
     monkeypatch.setattr(win._gallery_view, "follow_link", went.append)
 
     win.go_to_generation("alpha-1")
@@ -1758,11 +1758,11 @@ def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
     # parked under the players, so taking the foreground for itself would be a
     # window over the room rather than a way to the item.
     session = replace(_fun_time_session(), dashboard_cmd_file=tmp_path / "dashboard.txt")
-    win = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
-                             AppState(tmp_path / "ui.json"), fun_time=session)
+    win = Core(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
+               AppState(tmp_path / "ui.json"), fun_time=session)
     qtbot.addWidget(win)
     fronted, went = [], []
-    monkeypatch.setattr(main_window, "bring_to_front", fronted.append)
+    monkeypatch.setattr(core, "bring_to_front", fronted.append)
     monkeypatch.setattr(win._gallery_view, "follow_link", went.append)
 
     win.go_to_generation("alpha-1")
@@ -1776,8 +1776,8 @@ def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
 def test_a_session_that_named_no_channel_still_opens_the_item(qtbot, tmp_path, monkeypatch):
     # An older session hands this app no way to ask the room for anything; the
     # item is still opened, so it is there when the user switches over.
-    win = OrigeneratorWindow(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
-                             AppState(tmp_path / "ui.json"), fun_time=_fun_time_session())
+    win = Core(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
+               AppState(tmp_path / "ui.json"), fun_time=_fun_time_session())
     qtbot.addWidget(win)
     went = []
     monkeypatch.setattr(win._gallery_view, "follow_link", went.append)
@@ -1792,13 +1792,13 @@ def test_both_ends_of_a_session_taking_this_window_are_recorded(qtbot, tmp_path,
     # had taken from one it had missed -- and those behave differently.
     win = _window(qtbot, tmp_path)
 
-    with caplog.at_level("INFO", logger="origenerator.gui.main_window"):
+    with caplog.at_level("INFO", logger="origenerator.gui.core"):
         caplog.clear()
         win.become_hosted(_fun_time_session())
         win.become_standalone()
 
     assert [record.message for record in caplog.records
-            if record.name == "origenerator.gui.main_window"] == [
+            if record.name == "origenerator.gui.core"] == [
         "Taken into a Fun Time session; the OSR2 and the appliance switches are "
         "the session's from here",
         "Handed back by the Fun Time session; standalone again"]
@@ -2084,7 +2084,7 @@ def test_a_window_is_out_of_sight_while_it_is_put_back_where_it_was_found(
         yield
         seen.append(("in sight", hwnd))
 
-    monkeypatch.setattr(main_window, "out_of_sight", watched)
+    monkeypatch.setattr(core, "out_of_sight", watched)
     monkeypatch.setattr(win, "restoreGeometry", lambda geometry: seen.append(("put back", None)))
 
     win.become_standalone()

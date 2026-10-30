@@ -426,12 +426,12 @@ def test_culling_releases_the_lock(qtbot):
 
 def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     # Space belongs to the app-global OSR2 motion everywhere; locking the
-    # slideshow is Down. The device rides on the slideshow's one panel.
+    # slideshow is Down. The device rides on the slideshow's one HUD.
     motion = FakeMotion()
     view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
                          motion=motion)
     qtbot.addWidget(view)
-    assert view.hud_device is not None  # the device half of the panel is there
+    assert view.hud_device is not None  # the device half of the HUD is there
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in motion.calls
     assert not view.slideshow.locked
@@ -480,7 +480,7 @@ def _collection_view(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
     view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
-    _on_screen_wearing_its_panel(qtbot, view)
+    _on_screen_wearing_its_hud(qtbot, view)
     opened = []
     view.slideshow.open_requested.connect(opened.append)
     return view, opened
@@ -1131,7 +1131,7 @@ def test_the_notice_wears_the_color_of_what_it_says(qtbot):
     assert GREEN.name() in notice.styleSheet()
 
 
-# --- the queue, which rides on the one panel this view wears -----------------
+# --- the queue, which rides on the one HUD this view wears -----------------
 
 def _inflight(**kw):
     kw.setdefault("key", "j1")
@@ -1142,7 +1142,7 @@ def _inflight(**kw):
     return InFlightItem(reading=RunReading(**reading), **kw)
 
 
-def test_the_view_holds_what_is_in_flight_for_its_panel(qtbot):
+def test_the_view_holds_what_is_in_flight_for_its_hud(qtbot):
     # The lower strip that normally carries the line is under this view.
     view = _view(qtbot)
 
@@ -1154,7 +1154,7 @@ def test_the_view_holds_what_is_in_flight_for_its_panel(qtbot):
     assert foreign == 3
 
 
-def test_a_row_let_go_elsewhere_on_the_panel_goes_to_the_gallery_to_be_moved(qtbot):
+def test_a_row_let_go_elsewhere_on_the_hud_goes_to_the_gallery_to_be_moved(qtbot):
     asked = []
     view = _view(qtbot, actions=SlideshowActions(
         move=lambda key, before: asked.append((key, before))))
@@ -1315,7 +1315,7 @@ def test_stepping_off_a_locked_slide_releases_it(qtbot):
     assert not view.slideshow.locked
 
 
-def _on_screen_wearing_its_panel(qtbot, view):
+def _on_screen_wearing_its_hud(qtbot, view):
     view.resize(900, 700)
     with qtbot.waitExposed(view):
         view.show()
@@ -1327,7 +1327,7 @@ def _on_screen_wearing_its_panel(qtbot, view):
 
 def test_a_move_of_its_volume_is_told_to_the_gallery(qtbot):
     moved = []
-    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot, on_volume_moved=moved.append))
+    view = _on_screen_wearing_its_hud(qtbot, _view(qtbot, on_volume_moved=moved.append))
 
     gestures.click(view._pane._window, speaker_on_screen(view._pane))
 
@@ -1335,14 +1335,14 @@ def test_a_move_of_its_volume_is_told_to_the_gallery(qtbot):
 
 
 def _on_the_slide(view) -> QPoint:
-    """Clear of the panel in the upper left and of the corners that open it."""
+    """Clear of the HUD in the upper left and of the corners that open it."""
     window = view._pane._window
     return QPoint(window.width() * 3 // 4, window.height() * 3 // 4)
 
 
 def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
     # The way out of every other fullscreen view here, and the way it used to work.
-    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot))
+    view = _on_screen_wearing_its_hud(qtbot, _view(qtbot))
     closes = []
     view.slideshow.closed.connect(lambda: closes.append(True))
 
@@ -1354,7 +1354,7 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
 
 def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_lock(qtbot):
     asked = []
-    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot, _KEYED, actions=SlideshowActions(
+    view = _on_screen_wearing_its_hud(qtbot, _view(qtbot, _KEYED, actions=SlideshowActions(
         neighbors=_around, favorite=lambda pid: asked.append(("star", pid)),
         enhance=lambda pid: asked.append(("enhance", pid)) or True,
         lock=lambda pid: asked.append(("lock", pid)))))
@@ -1367,7 +1367,7 @@ def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_
 
 
 def test_two_quick_clicks_on_next_step_on_twice_and_leave_the_slideshow_up(qtbot):
-    view = _on_screen_wearing_its_panel(qtbot, _view(qtbot))
+    view = _on_screen_wearing_its_hud(qtbot, _view(qtbot))
 
     gestures.double_click(view._pane._window, button_on_screen(view, "portrait_next"))
 
@@ -1985,8 +1985,8 @@ def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
     assert _engine(view).muted is False
 
 
-def test_a_scripted_clip_hands_its_motion_to_the_panel(qtbot, tmp_path):
-    """The colors used to be a strip under the slide; they fill the panel's
+def test_a_scripted_clip_hands_its_motion_to_the_hud(qtbot, tmp_path):
+    """The colors used to be a strip under the slide; they fill the HUD's
     own track now, and this is where they come from."""
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
@@ -2570,10 +2570,10 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     assert (view.slideshow.hud_act_filter, view.slideshow.hud_map().loop) == ("", "seed")
 
 
-class TestMovingTheSlideshowsPanel:
-    """Ctrl and the arrow keys or WASD move this slideshow's panel round the corners:
+class TestMovingTheSlideshowsHud:
+    """Ctrl and the arrow keys or WASD move this slideshow's HUD round the corners:
     the keys a Fun Time session gives its portrait Funestra and its landscape
-    one, since a slideshow on its own can be either shape."""
+    one, since a Standalone slideshow can be either shape."""
 
     @staticmethod
     def _slideshow(qtbot, moves):

@@ -382,7 +382,7 @@ class EnhanceController:
         """Launch a standalone enhance of each of ``rows``, at the current settings.
 
         All of them go to the controller at once: ComfyUI runs one prompt at a
-        time and the queue strip shows the line, so a batch of enhances is a
+        time and the Job Queue shows the line, so a batch of enhances is a
         queue the user can watch — and cancel a row out of — rather than a
         backlog held out of sight in here. (This view did hold one, because
         enhances of a single folder's images share a settings key and the

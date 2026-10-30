@@ -340,7 +340,7 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen",
                side_effect=lambda *a, **k: events.append("loading opened") or loading), \
-         patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
+         patch("origenerator.gui.core.Core", return_value=window), \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
@@ -425,7 +425,7 @@ def test_the_window_is_handed_where_the_next_launchs_loading_screen_meets_it(qap
     monkeypatch.setenv(launchers_screen.FOLDER, str(place.folder))
     window = MagicMock()
 
-    with _a_faked_boot([], **{"origenerator.gui.main_window.OrigeneratorWindow": window}):
+    with _a_faked_boot([], **{"origenerator.gui.core.Core": window}):
         assert main([]) == 0
 
     assert window.call_args.kwargs["next_launch"] == place
@@ -462,7 +462,7 @@ def test_a_launch_canceled_partway_finishes_the_step_in_hand_and_opens_nothing(q
 
     with _a_faked_boot(ran, passes={"import_comfyui_output": MagicMock(side_effect=scan_then_cancel)},
                        **_real_loading_screens(screens),
-                       **{"origenerator.gui.main_window.OrigeneratorWindow": window}):
+                       **{"origenerator.gui.core.Core": window}):
         assert main([]) == 0
 
     assert ran[-1] == "import_comfyui_output"
@@ -570,7 +570,7 @@ def test_a_window_built_while_the_launch_was_canceled_is_put_away_unseen_as_a_qu
         return window
 
     with _a_faked_boot([], **_real_loading_screens(screens), **{
-        "origenerator.gui.main_window.OrigeneratorWindow":
+        "origenerator.gui.core.Core":
             MagicMock(side_effect=built_as_the_cancel_comes_in),
         "origenerator.app._run_the_loop_only_to_quit": quit_through_the_loop,
     }):
@@ -608,7 +608,7 @@ def test_a_window_put_away_unseen_ends_the_process_if_its_quit_sticks(qapp, monk
         return _a_window_saying_when_it_hands_comfyui_its_work(events)
 
     with _a_faked_boot([], **_real_loading_screens(screens), **{
-        "origenerator.gui.main_window.OrigeneratorWindow":
+        "origenerator.gui.core.Core":
             MagicMock(side_effect=built_as_the_cancel_comes_in),
         "origenerator.freeze_watch.watch_the_window":
             MagicMock(return_value=_a_freeze_watch_saying_what_it_arms(events)),
@@ -630,7 +630,7 @@ def test_handing_comfyui_its_work_after_the_window_goes_has_a_deadline_of_its_ow
     events = []
 
     with _a_faked_boot([], **{
-        "origenerator.gui.main_window.OrigeneratorWindow":
+        "origenerator.gui.core.Core":
             MagicMock(return_value=_a_window_saying_when_it_hands_comfyui_its_work(events)),
         "origenerator.freeze_watch.watch_the_window":
             MagicMock(return_value=_a_freeze_watch_saying_what_it_arms(events)),
@@ -671,7 +671,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen", return_value=loading), \
-         patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
+         patch("origenerator.gui.core.Core", return_value=window), \
          patch("shared_ui.foreground.bring_to_front",
                side_effect=lambda w: events.append(
                    "front:window" if w is window else "front:something else")), \
@@ -770,7 +770,7 @@ def test_main_reclaims_unreachable_trash_on_startup(qapp):
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
-         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.gui.core.Core"), \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
@@ -796,7 +796,7 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
-         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.gui.core.Core"), \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.app.resolve_comfyui_client_id", return_value="persisted-id"), \
@@ -848,7 +848,7 @@ def test_a_hosted_boot_shows_every_window_under_the_sessions_taskbar_button(qapp
 
     with _a_faked_boot([], **{
         "origenerator.app._taskbar_identity": _taskbar_identity,
-        "origenerator.gui.main_window.OrigeneratorWindow": built,
+        "origenerator.gui.core.Core": built,
     }):
         assert main(hosted_launch(**{"--taskbar-identity": "FunTime.App.Preview"})) == 0
 
@@ -869,7 +869,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
-         patch("origenerator.gui.main_window.OrigeneratorWindow",
+         patch("origenerator.gui.core.Core",
                return_value=window) as mock_window, \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -886,7 +886,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     session = mock_window.call_args.kwargs["fun_time"]
     assert (session.main_rect.x, session.main_rect.y) == (5, 6)
     # What the session's channels are wired to is the window's own business
-    # (tests/test_main_window.py); the boot's part is threading the session in.
+    # (tests/test_core.py); the boot's part is threading the session in.
     # Parked until the session's own mode switch restores it: the session may be
     # in kino mode, where popping over the Random Favs Browser is wrong.
     window.showMinimized.assert_called_once()
@@ -899,7 +899,7 @@ def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
     window = MagicMock()
 
     with _a_faked_boot([], **{
-        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.core.Core": MagicMock(return_value=window),
     }):
         assert main(hosted_launch(headset=True, **{
             "--frames-file": str(tmp_path / "frame.bin"),
@@ -918,7 +918,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen") as mock_loading, \
-         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.gui.core.Core"), \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
@@ -940,7 +940,7 @@ def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(
     window = MagicMock()
     watch = MagicMock()
     with _a_faked_boot([], **{
-        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.core.Core": MagicMock(return_value=window),
         "origenerator.gui.fun_time_watch.FunTimeWatch": watch,
     }):
         assert main([]) == 0
@@ -962,7 +962,7 @@ def test_a_standalone_boot_offers_its_window_to_fun_time_before_building_it(
         "app_support.origenerator_handoff.offer_this_process":
             MagicMock(side_effect=lambda *state_dirs, starting: events.append(
                 ("offered", state_dirs, starting))),
-        "origenerator.gui.main_window.OrigeneratorWindow":
+        "origenerator.gui.core.Core":
             MagicMock(side_effect=lambda *a, **k: events.append("built") or MagicMock()),
     }):
         assert main([]) == 0
@@ -985,7 +985,7 @@ def test_a_boot_fun_time_launched_leaves_what_is_in_front_to_the_session(qapp):
     fronted = MagicMock()
 
     with _a_faked_boot([], **{
-        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.core.Core": MagicMock(return_value=window),
         "shared_ui.foreground.bring_to_front": fronted,
     }):
         assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
@@ -1002,7 +1002,7 @@ def test_a_window_a_session_took_while_it_was_being_built_is_neither_shown_nor_b
 
     with _a_faked_boot([], **{
         "origenerator.gui.fun_time_watch.FunTimeWatch": watch,
-        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.core.Core": MagicMock(return_value=window),
         "shared_ui.foreground.bring_to_front": fronted,
     }):
         assert main([]) == 0
@@ -1018,7 +1018,7 @@ def test_a_boot_answers_a_clicked_notice_with_the_window_it_just_built(qapp):
     window = MagicMock()
     listener = MagicMock()
     with _a_faked_boot([], **{
-        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.core.Core": MagicMock(return_value=window),
         "origenerator.gui.link_listener.LinkListener": listener,
     }):
         assert main([]) == 0
@@ -1030,7 +1030,7 @@ def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
     window = MagicMock()
     watch = MagicMock()
     with _a_faked_boot([], **{
-        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.core.Core": MagicMock(return_value=window),
         "origenerator.gui.fun_time_watch.FunTimeWatch": watch,
     }):
         assert main([]) == 0
@@ -1075,7 +1075,7 @@ def _boot(library_path, argv=()):
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
-         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.gui.core.Core"), \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -1264,7 +1264,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app._taskbar_identity": None,
         "origenerator.comfyui_launcher.ensure_comfyui_server": DEFAULT,
         "origenerator.gui.loading_screen.loading_screen": DEFAULT,
-        "origenerator.gui.main_window.OrigeneratorWindow": DEFAULT,
+        "origenerator.gui.core.Core": DEFAULT,
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,
@@ -1306,7 +1306,7 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
     with _a_faked_boot(
         ran,
         passes={"import_comfyui_output": MagicMock(side_effect=OSError("no output dir"))},
-        **{"origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window)},
+        **{"origenerator.gui.core.Core": MagicMock(return_value=window)},
     ):
         assert main([]) == 0
 
@@ -1599,7 +1599,7 @@ class TestAnOverlayShortOfAKey:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+            "origenerator.gui.core.Core": MagicMock(return_value=window),
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
             "PyQt6.QtWidgets.QMessageBox.critical": MagicMock(),
         }):
@@ -1651,7 +1651,7 @@ class TestAnOverlayShortOfAKey:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+            "origenerator.gui.core.Core": MagicMock(return_value=window),
             "PyQt6.QtWidgets.QMessageBox.critical": told,
         }):
             assert main([]) == 0
@@ -1707,7 +1707,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+            "origenerator.gui.core.Core": MagicMock(return_value=window),
             "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
             "PyQt6.QtWidgets.QMessageBox.warning": told,
         }):
@@ -1736,7 +1736,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         told = MagicMock()
 
         with _a_faked_boot([], **{
-            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(),
+            "origenerator.gui.core.Core": MagicMock(),
             "PyQt6.QtWidgets.QMessageBox.warning": told,
         }):
             assert main([]) == 0
@@ -1758,7 +1758,7 @@ class TestASecondCopy:
         with _a_faked_boot([], **{
             "PyQt6.QtWidgets.QMessageBox.information": told,
             "origenerator.comfyui_launcher.ensure_comfyui_server": comfyui,
-            "origenerator.gui.main_window.OrigeneratorWindow": window,
+            "origenerator.gui.core.Core": window,
         }):
             code = main([])
 
@@ -1778,7 +1778,7 @@ class TestASecondCopy:
 
         with _a_faked_boot([], **{
             "PyQt6.QtWidgets.QMessageBox.information": told,
-            "origenerator.gui.main_window.OrigeneratorWindow": window,
+            "origenerator.gui.core.Core": window,
         }):
             code = main([])
 
@@ -1792,7 +1792,7 @@ class TestASecondCopy:
 
         with _a_faked_boot([], **{
             "PyQt6.QtWidgets.QMessageBox.information": told,
-            "origenerator.gui.main_window.OrigeneratorWindow": window,
+            "origenerator.gui.core.Core": window,
         }):
             code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
@@ -1817,7 +1817,7 @@ def test_a_launch_while_another_copy_closes_waits_for_it_on_its_loading_screen_a
     logger = MagicMock()
 
     with _a_faked_boot([], **_real_loading_screens(screens), **{
-        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.core.Core": MagicMock(return_value=window),
         "origenerator.app._configure_logging": MagicMock(return_value=logger),
     }):
         assert main([]) == 0
@@ -1845,7 +1845,7 @@ def test_a_launch_canceled_while_it_waits_for_the_other_copy_opens_nothing_and_l
     window = MagicMock()
 
     with _a_faked_boot([], **_real_loading_screens(screens), **{
-        "origenerator.gui.main_window.OrigeneratorWindow": window,
+        "origenerator.gui.core.Core": window,
     }):
         assert main([]) == 0
 
@@ -1917,7 +1917,7 @@ def test_the_claim_says_the_copy_is_closing_ahead_of_every_quit_step_the_window_
     _the_copies(monkeypatch, claim)
 
     with _a_faked_boot([], **{
-        "origenerator.gui.main_window.OrigeneratorWindow":
+        "origenerator.gui.core.Core":
             MagicMock(side_effect=lambda *a, **k: events.append("built") or MagicMock()),
     }):
         assert main([]) == 0
@@ -1976,7 +1976,7 @@ with patch.object(app, "MAINTENANCE", ()), \\
         patch("origenerator.app._disconnect", disconnected), \\
         patch("origenerator.comfyui_client.ComfyUIClient"), \\
         patch("origenerator.gui.loading_screen.loading_screen"), \\
-        patch("origenerator.gui.main_window.OrigeneratorWindow", built), \\
+        patch("origenerator.gui.core.Core", built), \\
         patch("origenerator.freeze_watch.watch_the_window",
               lambda app, crash_log: QTimer.singleShot(0, app.quit)), \\
         patch("PyQt6.QtWidgets.QMessageBox.information",

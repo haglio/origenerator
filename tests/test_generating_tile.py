@@ -159,7 +159,7 @@ def test_started_signal_switches_the_scrim_to_generating(qtbot):
 
 
 def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
-    # The same line the lower strip's queue writes for the same job, so a run
+    # The same line the Job Queue writes for the same job, so a run
     # reads identically wherever it is being watched.
     job = FakeJob(state="running", last_progress=(10, 20),
                   started_at=time.time() - 90.5)
@@ -183,7 +183,7 @@ def test_the_bar_says_which_pass_is_being_taken(qtbot):
 
 
 def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
-    # It stood a blurred copy of the frame, where the strip's corner stood a
+    # It stood a blurred copy of the frame, where the Job Queue's corner stood a
     # sharp pair and the config tab stood a blank — three surfaces, three ideas
     # of one wait. All three stand the sum now.
 
@@ -219,7 +219,7 @@ def test_progress_signal_advances_the_bar(qtbot):
 
 
 def test_a_job_comfyui_has_not_started_leaves_the_bar_blank_and_sweeping(qtbot):
-    # Its wait is the strip's queue to explain; a zero counting up over a bar that
+    # Its wait is the Job Queue to explain; a zero counting up over a bar that
     # has not moved says the run is going nowhere.
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)

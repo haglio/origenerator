@@ -1,14 +1,14 @@
-"""The generation queue, painted onto the one panel a slideshow wears.
+"""The Job Queue, painted onto the one HUD a slideshow wears.
 
-A slideshow covers the lower strip that carries the queue, and it is the worst
+A slideshow covers Core's Job Queue, and it is the worst
 moment to lose it: a slideshow is when the user keeps adding to it.  So it rides on
-the panel the slideshow already wears rather than on a plate of its own, which would
+the HUD the slideshow already wears rather than on a plate of its own, which would
 be a second HUD.
 
-It says what the strip says: the job being made with its live frame and the
+It says what Core's Job Queue says: the job being made with its live frame and the
 clock across its bar, then each waiting job as a row -- its arrows, its shield,
 its Cancel, the image it is made from, and what it costs.  They go as the
-panel's own declared buttons (:class:`funestra.hud_button.Button`), so it
+HUD's own declared buttons (:class:`funestra.hud_button.Button`), so it
 presses and names them exactly as it presses its own.
 """
 from __future__ import annotations
@@ -20,10 +20,7 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
-from funestra.hud_button import Button
-from funestra.hud_marks import shared_mark
-from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
-from funestra.hud_panel import (
+from funestra.hud import (
     SYMBOL_FONT,
     button_ground,
     draw_button,
@@ -31,6 +28,9 @@ from funestra.hud_panel import (
     load_font,
     text_width,
 )
+from funestra.hud_button import Button
+from funestra.hud_marks import shared_mark
+from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.satellite_hud import (
     BLOCK_GAP,
     CTRL_BTN,
@@ -105,9 +105,9 @@ FRAME = "queue_frame"
 
 FRAME_TOOLTIP = "Open the folder this run will land in"
 
-# How many rows the block draws at once. The strip opens about this tall in the
-# main window, and a line longer than this is scrolled through rather than drawn
-# whole: a panel that grew a row per queued job would run off the screen the
+# How many rows the block draws at once. Core's Job Queue opens about this tall in
+# Core, and a line longer than this is scrolled through rather than drawn
+# whole: a HUD that grew a row per queued job would run off the screen the
 # first time a folder's Modify (all seeds) filled it.
 ROWS = 4
 # How far a press on a row has to travel before it is a drag rather than the
@@ -165,7 +165,7 @@ def _on(rect, pointer) -> bool:
 
 @dataclass(frozen=True)
 class JobLine:
-    """One job in the line, as the panel draws it."""
+    """One job in the line, as the HUD draws it."""
 
     key: str
     lead: str
@@ -209,7 +209,7 @@ class QueueSection:
     any_to_shield: bool = False
     any_to_cancel: bool = False
     # Which row the drawn window opens on, and where a dragged row would land —
-    # both the panel's own doing rather than the queue's, and both redrawn
+    # both the HUD's own doing rather than the queue's, and both redrawn
     # through here because the block is painted, not laid out in widgets.
     first: int = 0
     drop_at: int | None = None
@@ -314,8 +314,8 @@ class QueueSection:
 
     def _paint_bar(self, draw, x, y, width) -> None:
         """The clock, written across the bar it measures — the reading
-        :class:`~origenerator.gui.progress_caption.ProgressCaption` draws in the
-        strip, and empty rather than at nought for a run ComfyUI has not started."""
+        :class:`~origenerator.gui.progress_caption.ProgressCaption` draws in Core's
+        Job Queue, and empty rather than at nought for a run ComfyUI has not started."""
         leader = self.leader
         draw.rounded_rectangle([x, y, x + width - 1, y + _BAR_H - 1], radius=BUTTON_RADIUS_HUD,
                                fill=(*BORDER_SUBTLE, 90), outline=(*BORDER_SUBTLE, 255))
@@ -444,7 +444,7 @@ def _slot(draw, x, y, side) -> int:
 
 
 # (file, side, gray, written) -> the fitted cell, or None for a file that would
-# not load. The block is repainted on every beat of the panel, and a start frame
+# not load. The block is repainted on every beat of the HUD, and a start frame
 # is a full-size render off disk.
 _CELLS: dict[tuple[str, int, bool, int | None], Image.Image | None] = {}
 
@@ -525,7 +525,7 @@ def _paint_source(image, draw, x, y, side, source, prompt_edited: bool) -> int:
 
 
 def _paint_thumbnails(image, draw, x, y, line: JobLine) -> None:
-    """A row's thumbnail, as the strip draws the same one
+    """A row's thumbnail, as Core's Job Queue draws the same one
     (:mod:`origenerator.gui.queue_thumbs`): what the job is made from, else what
     its folder holds."""
     if _paint_source(image, draw, x, y, _CELL, line.source, line.prompt_edited):
@@ -694,7 +694,7 @@ def _removed(path: Path) -> bool:
 class QueuePointer:
     """The pointer on the block, in the block's own pixels.
 
-    The panel hands it a press, a drag, the button coming up and the wheel,
+    The HUD hands it a press, a drag, the button coming up and the wheel,
     and it places each against the rows and buttons as they were last painted:
     a press on a row's arrows, shield or Cancel moves, shields or drops its
     job, one on the row goes to the folder its job will land in once the button

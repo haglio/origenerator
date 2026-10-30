@@ -58,8 +58,8 @@ from origenerator.fun_time_mode import (
 )
 from origenerator.radio import deal_to_the_funestras
 from origenerator.slideshow_buttons import (
+    HUD_PLACES,
     ORIGENERATOR_MODE,
-    PANEL_PLACES,
     PRESSES_ABOUT_THE_SLIDE,
     answer,
     origenerator_mode_on,
@@ -225,8 +225,8 @@ class FunTimeBridge(QObject):
         if not marker and action in self._side_verbs:
             self._side_verbs[action](side)
             return
-        if action in PANEL_PLACES:
-            self._gallery.place_a_panel(side, action, argument)
+        if action in HUD_PLACES:
+            self._gallery.place_a_hud(side, action, argument)
             return
         if action == SAY and marker == ":":
             # The session owns the microphone for the whole room, so a spoken
@@ -293,9 +293,9 @@ class FunTimeBridge(QObject):
 
     def _apply_side(self, side: str, action: str, argument: str, line: str,
                     said_at: float | None) -> None:
-        """A press on *side*'s panel, onto whatever holds that side.
+        """A press on *side*'s HUD, onto whatever holds that side.
 
-        The same answers a slideshow's own panel gets
+        The same answers a slideshow's own HUD gets
         (:func:`~origenerator.slideshow_buttons.answer`): the session routes a
         Funestra's presses back here verbatim, and its own hotkeys spell the
         transport the same way, so one table says what every one of them means.

@@ -1,7 +1,7 @@
 """What this app tells the Funestras' console painter, and what a press on it means.
 
 The console is drawn in two places here — its OSR2 section alone at the top left
-of the main window, and that section on the panel a slideshow wears — so
+of Core, and that section on the HUD a slideshow wears — so
 what goes ON the console and what a press takes OFF it are written once, here,
 rather than once per surface.
 
@@ -125,15 +125,15 @@ class SlideshowDevice:
     """The device half of this app's console: the rows that aim the OSR2, who
     has the device, and the motion being sent.
 
-    Handed to the one panel a slideshow wears (:mod:`origenerator.gui.slideshow_panel`) so
-    it says all of it without a second panel underneath, and used to build the
-    console's OSR2 section in the main window.
+    Handed to the one HUD a slideshow wears (:mod:`origenerator.gui.slideshow_hud`) so
+    it says all of it without a second HUD underneath, and used to build the
+    console's OSR2 section in Core.
     """
 
     osr2_rows: tuple
     osr2: str
     # Whether the app's one OSR2 switch is on (driving) or off (parked), or empty where
-    # nobody handed a switch over -- the panel resolves the pair into one word.
+    # nobody handed a switch over -- the HUD resolves the pair into one word.
     osr2_control: str
     drive: DriveHud
     max_intensity: int
@@ -145,7 +145,7 @@ def slideshow_device(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
                      trouble: Osr2Trouble | None = None,
                      control: str = OSR2_CONTROL_UNANSWERED, script=None,
                      broker_running: bool = True) -> SlideshowDevice:
-    """What the device is doing, as a panel takes it — see :class:`SlideshowDevice`.
+    """What the device is doing, as a HUD takes it — see :class:`SlideshowDevice`.
 
     ``script`` is the funscript driver, when this app has one: while it has the
     device the readout is the script's line rather than the motion's, and the
@@ -184,11 +184,11 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
     motion for everything about the motion, and the app's one OSR2 switch for
     the control-state group and the max intensity.
 
-    *control* is that switch, or None where nobody handed one over — a panel
+    *control* is that switch, or None where nobody handed one over — a HUD
     outside the gallery, and a test's bare console.  The two holds still reach
-    the motion there, which is what such a panel can do about the device.
+    the motion there, which is what such a HUD can do about the device.
 
-    Answers whether this was one of the console's verbs at all, so a panel
+    Answers whether this was one of the console's verbs at all, so a HUD
     carrying other buttons beside them can go on routing the rest.
     """
     if not action:
@@ -228,7 +228,7 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
 
 def _ask_for_control(state: str, motion, control) -> None:
     """A press on the OSR2 switch.  With no switch handed over there is still
-    the motion to park, which is what a panel outside a gallery can do about the
+    the motion to park, which is what a HUD outside a gallery can do about the
     device."""
     if control is not None:
         control.set_state(state)

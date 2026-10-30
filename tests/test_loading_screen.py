@@ -46,7 +46,7 @@ def test_window_title_identifies_app(qtbot):
 
 
 def test_the_splash_never_wears_the_apps_own_caption(qtbot):
-    """A hosting Fun Time session resolves the main window by that exact
+    """A hosting Fun Time session resolves Core by that exact
     caption, so a loading screen wearing it would be mistaken for the window."""
     screen = _screen()
     qtbot.addWidget(screen)

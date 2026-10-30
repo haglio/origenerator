@@ -1,5 +1,5 @@
 """The pane a Slideshow's Funestra draws into: the pass it is handed through its
-channel, the panel it wears, the pointer it is handed, and the engine it opens on
+channel, the HUD it wears, the pointer it is handed, and the engine it opens on
 its window."""
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ class _Running:
         self.closed = False
 
     def apply_command(self, command: str) -> bool:
-        """A press on the panel is this one's to answer; a verb handed to the
+        """A press on the HUD is this one's to answer; a verb handed to the
         Funestra is the Funestra's own."""
         self.commands.append(command)
         return not command.split(" ", 1)[0].isupper()
@@ -60,7 +60,7 @@ class _Running:
         self.closed = True
 
 
-def _pane(qtbot, *, panel=lambda: None, engine=None, **kw):
+def _pane(qtbot, *, hud=lambda: None, engine=None, **kw):
     engine = engine if engine is not None else FakeEngine()
     running: list[_Running] = []
 
@@ -68,7 +68,7 @@ def _pane(qtbot, *, panel=lambda: None, engine=None, **kw):
         running.append(_Running(playback))
         return running[-1]
 
-    pane = FunestraPane(channel=PaneChannel(), user=make, panel=panel,
+    pane = FunestraPane(channel=PaneChannel(), user=make, hud=hud,
                         engine_for=lambda wid: engine, **kw)
     qtbot.addWidget(pane)
     return pane, engine, running
@@ -174,8 +174,8 @@ def test_a_line_stands_where_the_slide_would_until_there_is_one(qtbot, tmp_path)
     assert pane.message() == ""
 
 
-def test_the_panel_the_slideshow_hands_over_is_drawn_over_the_slide(qtbot, tmp_path):
-    pane, engine, _running = _pane(qtbot, panel=lambda: HudModel(funestra="portrait"))
+def test_the_hud_the_slideshow_hands_over_is_drawn_over_the_slide(qtbot, tmp_path):
+    pane, engine, _running = _pane(qtbot, hud=lambda: HudModel(funestra="portrait"))
     _hand_over(pane, _items(tmp_path, "one"))
 
     pane.tick()
@@ -254,7 +254,7 @@ def test_a_double_click_is_two_presses_and_the_second_says_it_came_again(qtbot, 
 
 
 def test_a_pass_handed_over_before_there_is_a_window_waits_for_one(qtbot, tmp_path):
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), panel=lambda: None)
+    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None)
     qtbot.addWidget(pane)
     items = _items(tmp_path, "one")
     _hand_over(pane, items)
@@ -270,7 +270,7 @@ def test_a_pass_handed_over_before_there_is_a_window_waits_for_one(qtbot, tmp_pa
 def test_a_pane_with_no_window_to_draw_into_opens_no_engine(qtbot, tmp_path):
     """The suite draws on a platform with no windows in it, and an engine
     handed one of those has nothing to paint."""
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), panel=lambda: None)
+    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None)
     qtbot.addWidget(pane)
 
     pane.show()
@@ -280,7 +280,7 @@ def test_a_pane_with_no_window_to_draw_into_opens_no_engine(qtbot, tmp_path):
 
 
 def test_an_engine_that_will_not_open_leaves_the_pane_without_one(qtbot, tmp_path, monkeypatch, caplog):
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), panel=lambda: None)
+    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None)
     qtbot.addWidget(pane)
     pane.show()
     monkeypatch.setattr(QApplication.instance(), "platformName", lambda: "windows")
@@ -354,10 +354,10 @@ def test_closing_the_pane_lets_its_slideshows_hold_on_the_radio_go(qtbot, tmp_pa
     assert radio.held.closed is True
 
 
-def test_a_press_on_the_panels_speaker_tells_the_slideshow_the_volume_it_moved_to(
+def test_a_press_on_the_huds_speaker_tells_the_slideshow_the_volume_it_moved_to(
         qtbot, tmp_path):
     moved = []
-    pane, _engine, _running = _pane(qtbot, panel=lambda: HudModel(funestra="portrait"),
+    pane, _engine, _running = _pane(qtbot, hud=lambda: HudModel(funestra="portrait"),
                                     on_volume_moved=moved.append)
     _hand_over(pane, _items(tmp_path, "one"))
     pane.tick()
@@ -439,7 +439,7 @@ def test_an_image_that_stops_moving_says_why_in_the_log(qtbot, tmp_path, caplog)
 
 def test_a_pass_handed_over_before_the_pane_is_shown_opens_the_moment_it_is(qtbot, tmp_path):
     engine = FakeEngine()
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), panel=lambda: None,
+    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None,
                         engine_for=lambda wid: engine if pane._window.isVisible() else None)
     qtbot.addWidget(pane)
     items = _items(tmp_path, "one")
@@ -453,7 +453,7 @@ def test_a_pass_handed_over_before_the_pane_is_shown_opens_the_moment_it_is(qtbo
 
 def test_a_line_said_once_a_pass_is_owed_does_not_stand_in_front_of_the_slide(qtbot, tmp_path):
     engine = FakeEngine()
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), panel=lambda: None,
+    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None,
                         engine_for=lambda wid: engine if pane._window.isVisible() else None)
     qtbot.addWidget(pane)
     items = _items(tmp_path, "one")
@@ -470,7 +470,7 @@ def test_the_verbs_handed_over_before_the_funestra_opens_are_taken_the_moment_it
         qtbot, tmp_path):
     engine = FakeEngine()
     pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback),
-                        panel=lambda: None,
+                        hud=lambda: None,
                         engine_for=lambda wid: engine if pane._window.isVisible() else None)
     qtbot.addWidget(pane)
     _hand_over(pane, _items(tmp_path, "one", "two"))

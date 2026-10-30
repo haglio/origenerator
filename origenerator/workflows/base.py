@@ -286,7 +286,6 @@ class WorkflowTemplate(ABC):
     # gallery then collapses that level to a single "(no LoRA)" folder.
     lora_keys: tuple[str, ...] = ()
     text_reader: str | None = None
-    scene_prompt_keys: tuple[str, ...] = ()
     loras_keyed_only_when_named: tuple[str, ...] = ()
     # Param keys the enhance tail reads that the ``enhance``/``enhance_*`` naming
     # doesn't already cover, so they join :meth:`enhance_keys` and stay out of the

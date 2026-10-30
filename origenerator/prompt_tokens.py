@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import struct
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import NamedTuple
 
@@ -11,7 +13,6 @@ from tokenizers import Regex, Tokenizer, models, normalizers, pre_tokenizers
 
 from origenerator import config
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import scene_prompts
 from origenerator.workflows.prompt_readers import CLIP, QWEN3VL, SOUND_PROMPT_KEYS, T5, UMT5
 
 READ_IN_PIECES = "in pieces"
@@ -26,18 +27,9 @@ _CLIP_WORDS = Regex(r"""'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]
 _QWEN_WORDS = Regex(r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}|"""
                     r""" ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+""")
 _SPIECE_UNKNOWN = 2
-
-
-class SceneLength(NamedTuple):
-    tokens: int
-    pieces: int
-    stops_at: int | None = None
-
-
-class PromptLength(NamedTuple):
-    scenes: tuple[SceneLength, ...]
-    reads_well: int
-    past_it: str
+_EMBEDDING = "embedding:"
+_AN_EMBEDDING = re.compile(r"(?<=\s)embedding:")
+_ESCAPED = {"\0\1": ")", "\0\2": "("}
 
 
 class _Reader(NamedTuple):
@@ -51,24 +43,71 @@ class _Reader(NamedTuple):
 _built: dict[tuple, Tokenizer] = {}
 
 
-def prompt_length(workflow_name: str, params: dict, key: str) -> PromptLength | None:
-    workflow = WORKFLOW_REGISTRY.get(workflow_name)
-    found = _reader_named(_reader_of(workflow, key), params)
+@dataclass(frozen=True)
+class PromptReading:
+    reads_well: int
+    past_it: str
+    weighted: bool
+    tokenizer: Tokenizer
+
+    def tokens(self, text: str) -> int:
+        return sum(len(group) for group in self._groups(text))
+
+    def pieces(self, text: str) -> list[tuple[int, int]]:
+        if self.past_it != READ_IN_PIECES:
+            return [(0, self.tokens(text))]
+        starts, counts = [0], [0]
+        for group in self._groups(text):
+            splits = len(group) >= _CLIP_PHRASE_TOO_SHORT_TO_SPLIT
+            while group:
+                if counts[-1] + len(group) <= _CLIP_PIECE:
+                    counts[-1] += len(group)
+                    group = []
+                    continue
+                if splits:
+                    room = _CLIP_PIECE - counts[-1]
+                    counts[-1] += room
+                    group = group[room:]
+                starts.append(_opening_brackets_before(text, group[0]))
+                counts.append(0)
+        return list(zip(starts, counts))
+
+    def stops_at(self, text: str) -> int | None:
+        if self.past_it != CUT_OFF:
+            return None
+        offsets = self.tokenizer.encode(text, add_special_tokens=False).offsets
+        return offsets[self.reads_well][0] if len(offsets) > self.reads_well else None
+
+    def _groups(self, text: str) -> list[list[int]]:
+        if not self.weighted:
+            return [self._token_starts(text, list(range(len(text))))]
+        escaped = text.replace("\\)", "\0\1").replace("\\(", "\0\2")
+        groups = []
+        for segment, start in _weighted_segments(escaped, 0):
+            plain, places = _unescaped(segment, start)
+            for word, at in _words(plain):
+                groups.append(self._token_starts(word, places[at:at + len(word)]))
+        return [group for group in groups if group]
+
+    def _token_starts(self, text: str, places: list[int]) -> list[int]:
+        return [places[start] for start, _end in
+                self.tokenizer.encode(text, add_special_tokens=False).offsets]
+
+
+def prompt_reading(workflow_name: str, params: dict, key: str) -> PromptReading | None:
+    found = _reader_named(_reader_of(WORKFLOW_REGISTRY.get(workflow_name), key), params)
     if found is None:
         return None
     reader, tokenizer = found
-    text = str(params.get(key) or "")
-    scenes = scene_prompts(text) if key in workflow.scene_prompt_keys else [text]
-    return PromptLength(tuple(_scene_length(reader, tokenizer, scene) for scene in scenes),
-                        reader.reads_well, reader.past_it)
+    return PromptReading(reader.reads_well, reader.past_it, reader.weighted, tokenizer)
 
 
 def where_reading_stops(workflow_name: str, params: dict) -> dict[str, int | None]:
     workflow = WORKFLOW_REGISTRY.get(workflow_name)
-    lengths = {key: prompt_length(workflow_name, params, key) for key in params
-               if _cuts_off(_reader_of(workflow, key))}
-    return {key: length.scenes[0].stops_at for key, length in lengths.items()
-            if length is not None}
+    readings = {key: prompt_reading(workflow_name, params, key) for key in params
+                if _cuts_off(_reader_of(workflow, key))}
+    return {key: reading.stops_at(str(params.get(key) or "")) for key, reading in readings.items()
+            if reading is not None}
 
 
 def _cuts_off(name: str | None) -> bool:
@@ -100,81 +139,64 @@ def _reader_named(name: str | None, params: dict) -> tuple[_Reader, Tokenizer] |
     return reader, _built[key]
 
 
-def _scene_length(reader: _Reader, tokenizer: Tokenizer, text: str) -> SceneLength:
-    if reader.past_it == CUT_OFF:
-        offsets = tokenizer.encode(text, add_special_tokens=False).offsets
-        past_it = len(offsets) > reader.reads_well
-        return SceneLength(len(offsets), 1, offsets[reader.reads_well][0] if past_it else None)
-    phrases = _unweighted_phrases(text) if reader.weighted else [text]
-    sizes = [len(tokenizer.encode(phrase, add_special_tokens=False).ids)
-             for phrase in phrases if phrase]
-    pieces = _clip_pieces(sizes) if reader.past_it == READ_IN_PIECES else 1
-    return SceneLength(sum(sizes), pieces)
+def _opening_brackets_before(text: str, position: int) -> int:
+    while position > 0 and text[position - 1] == "(" and not text[:position - 1].endswith("\\"):
+        position -= 1
+    return position
 
 
-def _clip_pieces(sizes: list[int]) -> int:
-    pieces, used = 1, 0
-    for size in sizes:
-        splits = size >= _CLIP_PHRASE_TOO_SHORT_TO_SPLIT
-        while size:
-            if used + size > _CLIP_PIECE:
-                if splits:
-                    size -= _CLIP_PIECE - used
-                pieces, used = pieces + 1, 0
-            else:
-                used, size = used + size, 0
-    return pieces
-
-
-def _unweighted_phrases(text: str) -> list[str]:
-    hidden = text.replace("\\)", "\0\1").replace("\\(", "\0\2")
-    return [phrase.replace("\0\1", ")").replace("\0\2", "(") for phrase in _phrases(hidden)]
-
-
-def _phrases(text: str) -> list[str]:
-    phrases = []
-    for part in _parenthesized(text):
-        if len(part) >= 2 and part[0] == "(" and part[-1] == ")":
-            phrases += _phrases(_without_weight(part[1:-1]))
+def _weighted_segments(string: str, offset: int) -> list[tuple[str, int]]:
+    segments = []
+    for item, start in _bracketed(string, offset):
+        if len(item) >= 2 and item[0] == "(" and item[-1] == ")":
+            inner = item[1:-1]
+            colon = inner.rfind(":")
+            if colon > 0:
+                try:
+                    float(inner[colon + 1:])
+                    inner = inner[:colon]
+                except ValueError:
+                    pass
+            segments += _weighted_segments(inner, start + 1)
         else:
-            phrases.append(part)
-    return phrases
+            segments.append((item, start))
+    return segments
 
 
-def _without_weight(text: str) -> str:
-    colon = text.rfind(":")
-    if colon > 0:
-        try:
-            float(text[colon + 1:])
-        except ValueError:
-            return text
-        return text[:colon]
-    return text
-
-
-def _parenthesized(text: str) -> list[str]:
-    parts, current, depth = [], "", 0
-    for char in text:
-        if char == "(":
-            if depth == 0:
-                if current:
-                    parts.append(current)
-                current = "("
-            else:
-                current += char
-            depth += 1
-        elif char == ")":
-            depth -= 1
-            if depth == 0:
-                parts.append(current + ")")
-                current = ""
-            else:
-                current += char
+def _bracketed(string: str, offset: int) -> list[tuple[str, int]]:
+    items, current, start, depth = [], "", offset, 0
+    for index, char in enumerate(string, start=offset):
+        if char == "(" and depth == 0:
+            if current:
+                items.append((current, start))
+            current, start = "(", index
+        elif char == ")" and depth == 1:
+            items.append((current + ")", start))
+            current = ""
         else:
+            if not current:
+                start = index
             current += char
+        depth += {"(": 1, ")": -1}.get(char, 0)
     if current:
-        parts.append(current)
-    return parts
+        items.append((current, start))
+    return items
+
+
+def _unescaped(segment: str, start: int) -> tuple[str, list[int]]:
+    plain, places, index = [], [], 0
+    while index < len(segment):
+        pair = segment[index:index + 2]
+        plain.append(_ESCAPED.get(pair, segment[index]))
+        places.append(start + index)
+        index += 2 if pair in _ESCAPED else 1
+    return "".join(plain), places
+
+
+def _words(plain: str) -> list[tuple[str, int]]:
+    bounds = [0, *(found.start() for found in _AN_EMBEDDING.finditer(plain)), len(plain)]
+    return [(plain[at:end], at) for at, end in zip(bounds, bounds[1:])
+            if plain[at:end] and not plain[at:end].startswith(_EMBEDDING)]
 
 
 def _shipped_with_comfyui(*parts: str) -> Path:

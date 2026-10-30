@@ -50,7 +50,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     model_keys = ("unet_high", "unet_low")
     lora_keys = LORA_KEYS_OF_BOTH_PASSES
     text_reader = UMT5
-    scene_prompt_keys = ("positive_prompt", "negative_prompt")
     loras_keyed_only_when_named = LORAS_KEYED_ONLY_WHEN_NAMED
     output_node_id = "16"
 

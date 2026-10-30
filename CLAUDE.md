@@ -94,10 +94,8 @@ for one thing cost four. So:
   folders of his drawings, `pictures_being_looked_over.json` and the
   `outside picture:` workflow names keep theirs. So do the saved names
   other repos own, each read under the new word there: Funestra's
-  `HOLD_PICTURE`, a verb every running Funestra speaks; the
-  `origenerator_pictures_dir` key in the settings all of Haglio share,
-  which app_support reads as `origenerator_images_dir`; and its loading
-  screen's `pictures.json`.
+  `HOLD_PICTURE`, a verb every running Funestra speaks, and app_support's
+  loading screen's `pictures.json`.
 - **Where the screen names nothing, the code takes the user's word.** The
   list of folders down the left of the gallery is the **TOC** (table of
   contents), and the marks that open and shut its folders are its

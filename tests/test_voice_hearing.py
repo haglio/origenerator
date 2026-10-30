@@ -100,10 +100,10 @@ def test_a_sentence_arrives_as_the_words_it_was_taken_down_as(qtbot):
     assert _said(qtbot, hearing) == "make her hair longer"
 
 
-def test_a_phrase_the_second_listener_reads_differently_arrives_as_the_sentence_it_was(qtbot):
+def test_a_phrase_the_verifying_listener_reads_differently_arrives_as_the_sentence_it_was(qtbot):
     # Said mid-thought, "undo the last one" is not the command its first word is.
     hearing = Hearing({"undo"}, engines=_engines(
-        ["undo"], second_opinion=lambda audio, hint: "undo the last one",
+        ["undo"], verifying_listener=lambda audio, hint: "undo the last one",
         take_down=lambda audio, hint: "undo the last one"))
 
     assert _said(qtbot, hearing) == "undo the last one"
@@ -111,8 +111,8 @@ def test_a_phrase_the_second_listener_reads_differently_arrives_as_the_sentence_
 
 def test_a_phrase_said_in_german_is_read_once_more_in_german_before_it_is_doubted(qtbot):
     hearing = Hearing({"genau"}, said_in={"genau": "de"}.get, engines=_engines(
-        ["genau"], second_opinion=lambda audio, hint: "Good night.",
-        second_opinion_in={"de": lambda audio, hint: "Genau."},
+        ["genau"], verifying_listener=lambda audio, hint: "Good night.",
+        verifying_listener_in={"de": lambda audio, hint: "Genau."},
         take_down=lambda audio, hint: "good night"))
 
     assert _said(qtbot, hearing) == "genau"
@@ -179,10 +179,10 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
     assert settings.speech_hint == request_bias()
     # Nothing said here reaches the disk.
     assert settings.miss_dir is None
-    assert isinstance(engines.second_opinion, WhisperReader)
+    assert isinstance(engines.verifying_listener, WhisperReader)
     assert isinstance(engines.take_down, WhisperReader)
-    assert engines.take_down is not engines.second_opinion
-    assert set(engines.second_opinion_in) == {"de"}
-    assert isinstance(engines.second_opinion_in["de"], WhisperReader)
+    assert engines.take_down is not engines.verifying_listener
+    assert set(engines.verifying_listener_in) == {"de"}
+    assert isinstance(engines.verifying_listener_in["de"], WhisperReader)
     # An utterance ends when its speaker pauses, however loud the room stays.
     assert isinstance(engines.hears_speech, HearsSpeech)

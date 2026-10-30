@@ -66,6 +66,8 @@ from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
     full_settings,
+    is_enhanceable_row,
+    model_matching_the_source,
 )
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
@@ -329,7 +331,8 @@ class EnhancePanel(QWidget):
         super().__init__(parent)
         self._on_change = on_change
         self._fix_training: dict[str, str] = {}
-        self._source_models: frozenset[str] = frozenset()
+        self._images_in_front: list[dict] = []
+        self._source_models: frozenset[str] | None = None
         self._loading = False  # suppress the write-back while filling the fields
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
@@ -712,22 +715,27 @@ class EnhancePanel(QWidget):
         self._show_the_preset_held()
         self._warn_of_a_fixs_lora_trained_on_another_model()
 
-    def show_source_models(self, models) -> None:
-        self._source_models = frozenset(models)
+    def show_images_in_front(self, rows) -> None:
+        self._images_in_front, self._source_models = list(rows), None
         self._warn_of_a_fixs_lora_trained_on_another_model()
 
     def _model_advice(self):
         params = self.settings().params
-        trained = {name: fix_training.trained_on(own["lora"])
-                   for name, own in fix_prompts(params).items() if own["lora"]}
-        return fix_lora_model_advice(self._models_it_runs(params.get("checkpoint")),
-                                     {name: model for name, model in trained.items() if model},
+        trained = {name: model for name, own in fix_prompts(params).items() if own["lora"]
+                   if (model := fix_training.trained_on(own["lora"]))}
+        if not trained:
+            return None
+        return fix_lora_model_advice(self._models_it_runs(params.get("checkpoint")), trained,
                                      self._options("checkpoint")).get("checkpoint")
 
     def _models_it_runs(self, held) -> frozenset:
-        if held == MATCH_SOURCE_MODEL and self._source_models:
-            return self._source_models
-        return frozenset({held})
+        if held != MATCH_SOURCE_MODEL:
+            return frozenset({held})
+        if self._source_models is None:
+            self._source_models = frozenset(model_matching_the_source(row)
+                                            for row in self._images_in_front
+                                            if is_enhanceable_row(row))
+        return self._source_models or frozenset({held})
 
     def _warn_of_a_fixs_lora_trained_on_another_model(self) -> None:
         found = self._model_advice()

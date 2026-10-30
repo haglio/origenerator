@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
-from PyQt6.QtGui import QColor, QDropEvent, QPixmap, QTextCursor, QTextDocumentFragment
+from PyQt6.QtGui import QColor, QDropEvent, QPalette, QPixmap, QTextCursor, QTextDocumentFragment
 from PyQt6.QtWidgets import (
     QApplication,
     QFormLayout,
@@ -1509,10 +1509,10 @@ def test_a_panel_still_on_the_picker_has_no_folder(blank_panel):
 
 # --- displaying a saved generation: the footer folded in from the inspect pane ---
 
-def _image_being_made(db, prompt_id="img1", prompt="a cat"):
+def _image_being_made(db, prompt_id="img1", prompt="a cat", **settings):
     """An SDXL image ComfyUI is still making, with no file yet."""
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
-                  positive_prompt=prompt, seed=1)
+                  positive_prompt=prompt, seed=1, **settings)
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt=prompt, seed=1,
@@ -1522,9 +1522,9 @@ def _image_being_made(db, prompt_id="img1", prompt="a cat"):
     return db.get_generation(prompt_id)
 
 
-def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
+def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png", **settings):
     """A completed SDXL image whose output file an i2v can name as its source."""
-    _image_being_made(db, prompt_id, prompt)
+    _image_being_made(db, prompt_id, prompt, **settings)
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": filename, "subfolder": "image"}]))
     return db.get_generation(prompt_id)
@@ -3973,6 +3973,29 @@ def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
     field, label = form._widgets["negative_prompt"], form._labels["negative_prompt"]
     assert field.property("inert") is True
     assert field.toolTip() == label.toolTip() == STRENGTH_ONE_HELP
+
+
+def _drawn_in(field) -> set[str]:
+    colors, cursor = set(), QTextCursor(field.document())
+    for position in range(1, len(field.toPlainText()) + 1):
+        cursor.setPosition(position)
+        own = cursor.charFormat().foreground()
+        colors.add((own.color() if own.style() != Qt.BrushStyle.NoBrush
+                    else field.palette().color(QPalette.ColorRole.Text)).name())
+    return colors
+
+
+@pytest.mark.parametrize("made_at, then, drawn", [(1.0, 5.0, TEXT_PRIMARY),
+                                                   (5.0, 1.0, TEXT_MUTED)])
+def test_a_shown_images_negative_prompt_is_gray_exactly_while_the_run_ignores_it(
+        app_chrome, saved_panel, made_at, then, drawn):
+    panel, db = saved_panel
+    image = _image_row(db, negative_prompt="blurry, low quality", cfg=made_at)
+    panel.show_saved_generation(image, [image])
+
+    panel._param_form._widgets["cfg"].setValue(then)
+
+    assert _drawn_in(panel._param_form._widgets["negative_prompt"]) == {drawn.name()}
 
 
 def _on_screen(qtbot, panel):

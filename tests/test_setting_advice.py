@@ -497,7 +497,8 @@ def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so_and_a_cli
         titled_models):
     titled_models({"trained_on": "Trained On v1"})
 
-    found = fix_lora_model_advice({"picked.safetensors"}, {"hands": "trained_on.safetensors"},
+    found = fix_lora_model_advice("picked.safetensors", {"picked.safetensors"},
+                                  {"hands": "trained_on.safetensors"},
                                   ["picked.safetensors", "trained_on.safetensors"])
 
     assert found["checkpoint"].said == (
@@ -505,8 +506,24 @@ def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so_and_a_cli
     assert found["checkpoint"].fixed("picked.safetensors") == "trained_on.safetensors"
 
 
+def test_a_fixs_lora_held_against_models_nobody_can_know_says_there_is_no_guarantee(
+        titled_models):
+    titled_models({"trained_on": "Trained On v1"})
+
+    found = fix_lora_model_advice("(match the source image)", None,
+                                  {"hands": "trained_on.safetensors"}, ["trained_on.safetensors"])
+
+    assert found["checkpoint"].said == (
+        "There's no guarantee the images here were made by Trained On v1, which the Hands fix's "
+        "LoRA was trained on. Click to use Trained On v1.")
+    assert found["checkpoint"].fixed("(match the source image)") == "trained_on.safetensors"
+
+
 def test_no_model_advice_while_a_fixs_lora_has_its_model_or_that_model_is_not_installed():
-    assert fix_lora_model_advice({"trained_on.safetensors"}, {"hands": "trained_on.safetensors"},
+    assert fix_lora_model_advice("trained_on.safetensors", {"trained_on.safetensors"},
+                                 {"hands": "trained_on.safetensors"},
                                  ["trained_on.safetensors"]) == {}
-    assert fix_lora_model_advice({"picked.safetensors"}, {"hands": "gone.safetensors"},
-                                 ["picked.safetensors"]) == {}
+    assert fix_lora_model_advice("picked.safetensors", {"picked.safetensors"},
+                                 {"hands": "gone.safetensors"}, ["picked.safetensors"]) == {}
+    assert fix_lora_model_advice("(match the source image)", None,
+                                 {"hands": "gone.safetensors"}, ["picked.safetensors"]) == {}

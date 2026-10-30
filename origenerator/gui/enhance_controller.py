@@ -271,18 +271,13 @@ class EnhanceController:
         settings there advertise an action that isn't on offer. A mixed folder
         keeps them: the images in it are still enhanceable.
         """
-        in_front = self._rows_in_front()
+        picked = [row for pid in self._host.selected_prompt_ids()
+                  if (row := self._host.row_for(pid)) is not None]
+        folder = None if picked or self._browser.selected_ids else self._host.current_group()
+        in_front = picked or list(getattr(folder, "rows", []) or [])
         self.panel.set_applicable(not _all_video(in_front), NO_VIDEO_ENHANCER)
         self.panel.show_offer(offer.available, offer.tip)
-        self.panel.show_images_in_front(in_front)
-
-    def _rows_in_front(self) -> list[dict]:
-        rows = [row for pid in self._host.selected_prompt_ids()
-                if (row := self._host.row_for(pid)) is not None]
-        if not rows and not self._browser.selected_ids:
-            group = self._host.current_group()
-            rows = list(getattr(group, "rows", []) or [])
-        return rows
+        self.panel.show_images_in_front(picked, folder)
 
     # --- what it would run on -------------------------------------------------
 

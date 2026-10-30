@@ -45,6 +45,7 @@ from origenerator.gallery.enhance_settings import (
     full_settings,
     level_settings,
 )
+from origenerator.gallery.groups import rows_under
 from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
 from origenerator.gallery.output import (
     frame_names_of,
@@ -412,6 +413,22 @@ def model_matching_the_source(row: dict) -> str:
     if isinstance(checkpoint, str) and checkpoint:
         return checkpoint
     return WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()["checkpoint"]
+
+
+def models_matching_the_sources(rows) -> frozenset[str]:
+    return frozenset(model_matching_the_source(row) for row in rows if is_enhanceable_row(row))
+
+
+def models_matching_a_folders_sources(folder) -> frozenset[str] | None:
+    if folder is None:
+        return None
+    models: set[str] = set()
+    for row in rows_under(folder):
+        if is_enhanceable_row(row):
+            models.add(model_matching_the_source(row))
+            if len(models) > 1:
+                return None
+    return frozenset(models)
 
 
 def enhance_targets_row(input_image: str | None, row: dict) -> bool:

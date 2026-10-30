@@ -125,6 +125,18 @@ def test_an_experiment_waiting_for_its_verdict_is_left_alone_and_one_kept_is_bac
     assert [video for video, _image in _backfilled(db)] == ["kept"]
 
 
+def test_a_video_from_an_image_listing_its_own_file_as_its_original_is_not_remade_from_it(
+        tmp_path):
+    # Such an image has no enhanced file to start from, so each remake started from
+    # the file the last one did, and one video was remade at every closing.
+    db = Database(tmp_path / "t.db")
+    _image(db, "image")
+    db.update_generation("image", original_files=json.dumps([_plain("image")]))
+    _video(db, "video", made_from="image", starred=True)
+
+    assert _backfilled(db) == []
+
+
 def test_a_video_already_on_its_way_through_the_backfill_is_not_queued_again(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image")

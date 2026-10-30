@@ -192,9 +192,10 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
 
 def enhanced_version_of(image_ref: str | None, image: dict) -> str | None:
     plain = {_frame_name(f.get("filename")) for f in original_files_of(image)}
-    if _frame_name(image_ref) not in plain:
+    enhanced = output_file_reference(row_output_files(image))
+    if _frame_name(image_ref) not in plain or _frame_name(enhanced) in plain:
         return None
-    return output_file_reference(row_output_files(image))
+    return enhanced
 
 
 def is_enhanced_row(row: dict) -> bool:

@@ -29,13 +29,11 @@ from collections.abc import Callable
 from dataclasses import fields, replace
 
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
 from funestra.satellite_hud import label_is_filtered
 
 from origenerator.gui.slideshow_map import (
-    ACTION_AXIS,
-    LOOP_CYCLE,
     NO_NEIGHBORS,
-    SEED_AXIS,
     Loop,
     MapNeighbors,
     SlideshowMap,
@@ -53,12 +51,6 @@ from origenerator.slideshow import (
     SlideshowState,
     in_order,
 )
-
-# What the loop key answers: the axis it started looping, that it ended the
-# loop, or — with nothing on either axis to loop — that the press is the lock
-# instead, which the surface owns.
-LOOP_OFF = "off"
-LOOP_IS_A_LOCK = "lock"
 
 NO_ACT_ON_SCREEN = "No act for this one"
 ENHANCEMENT_RUNNING = "running"
@@ -126,7 +118,7 @@ class SlideshowSet:
         played = self.playlist.in_play_order()
         if self._is_one_row([current, *played]):
             at = self.playlist.index
-            self.loop = Loop(SEED_AXIS, (*played[at:], *played[:at]))
+            self.loop = Loop(SEED, (*played[at:], *played[:at]))
 
     def _is_one_row(self, slides) -> bool:
         if not slides:
@@ -300,7 +292,7 @@ class SlideshowSet:
 
     def _take_into_a_looping_row(self, item: Slide) -> None:
         loop = self.loop
-        if (loop is None or loop.axis != SEED_AXIS or item.prompt_id is None
+        if (loop is None or loop.axis != SEED or item.prompt_id is None
                 or loop.position_of(item) is not None):
             return
         row = self.neighbors(loop.pool[0].prompt_id).seeds
@@ -379,7 +371,7 @@ class SlideshowSet:
         if current is None:
             return []
         around = self.neighbors(current.prompt_id)
-        return [current, *(around.seeds if axis == SEED_AXIS else around.group)]
+        return [current, *(around.seeds if axis == SEED else around.group)]
 
     def end_a_loop_of_one(self) -> bool:
         """End a loop left holding only the slide on screen: round a pass that
@@ -420,24 +412,18 @@ class SlideshowSet:
         self.replace_items(browse, keep_slide=True)
         return True
 
-    def step_loop(self, fall_back: Callable[[], bool] | None = None) -> str:
-        """One press of the loop key: the seed row, then the action column, then
-        off — each axis stepped over when it holds only the slide on screen, and
-        with neither able to loop the press is the lock instead
-        (:data:`LOOP_IS_A_LOCK`), so the key never lands on nothing.  Its off
-        stop is the off button, *fall_back* and all (see :meth:`end_loop`)."""
-        running = self.loop.axis if self.loop is not None else ""
-        start = LOOP_CYCLE.index(running) + 1 if running in LOOP_CYCLE else 0
-        for step in range(len(LOOP_CYCLE)):
-            axis = LOOP_CYCLE[(start + step) % len(LOOP_CYCLE)]
-            if not axis:
-                if running:
-                    self.end_loop(fall_back)
-                    return LOOP_OFF
-                continue
-            if self.start_loop(axis):
-                return axis
-        return LOOP_IS_A_LOCK
+    def step_loop(self, locked: bool, fall_back: Callable[[], bool] | None = None) -> str:
+        """One press of the loop key, and the stop it went to (:mod:`funestra.loop_cycle`):
+        a loop started or ended here, the lock left to the surface, which owns it.
+        Its off stop is the off button, *fall_back* and all (see :meth:`end_loop`)."""
+        running = self.loop.axis if self.loop is not None else OFF
+        stop = next_stop(standing_at(loop=running, locked=locked),
+                         lambda axis: len(self.loop_pool(axis)) > 1)
+        if stop == OFF:
+            self.end_loop(fall_back)
+        elif stop != LOCK:
+            self.start_loop(stop)
+        return stop
 
     def more_seeds(self) -> bool:
         """Widen the row past what exactly matches and loop what it becomes —
@@ -448,7 +434,7 @@ class SlideshowSet:
         additions = tuple(self._widen(current.prompt_id))
         if not additions:
             return False
-        return self.start_loop(SEED_AXIS, [*self.loop_pool(SEED_AXIS), *additions])
+        return self.start_loop(SEED, [*self.loop_pool(SEED), *additions])
 
     def state(self, *, locked: bool, level_index: int) -> SlideshowState:
         loop = self.loop or Loop("", ())
@@ -522,7 +508,7 @@ class SlideshowSet:
             return None
         bucket, index = shown.playing
         along_the_row = direction in ("right", "left")
-        axis = SEED_AXIS if along_the_row else ACTION_AXIS
+        axis = SEED if along_the_row else ACTION
         if bucket in ("corner", axis):
             cells = (shown.corner, *(shown.seeds if along_the_row else shown.actions))
             at = 0 if bucket == "corner" else index + 1

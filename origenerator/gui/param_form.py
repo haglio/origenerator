@@ -41,7 +41,7 @@ from origenerator.gui.param_help import (
 )
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import set_in_use
-from origenerator.gui.request_field import RequestField
+from origenerator.gui.request_exchange import RequestExchange
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
@@ -216,7 +216,7 @@ class ParamForm(QWidget):
         # reproduces them, without showing them.
         self._passthrough: dict = {}
         self._sections: dict[str, CollapsibleSection] = {}
-        self._request_field: RequestField | None = None
+        self._request_exchange: RequestExchange | None = None
         # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
         self._shut_down: dict[str, str] = {}
@@ -331,12 +331,12 @@ class ParamForm(QWidget):
         """The words the image on display is asked to change by, right under
         the prompts they rewrite."""
         section = CollapsibleSection("Request")
-        self._request_field = RequestField()
-        section.content_form().addRow(self._request_field)
+        self._request_exchange = RequestExchange()
+        section.content_form().addRow(self._request_exchange)
         return section
 
-    def request_field(self) -> RequestField | None:
-        return self._request_field
+    def request_exchange(self) -> RequestExchange | None:
+        return self._request_exchange
 
     def set_prompts(self, positive: str, negative: str) -> None:
         """Write a prompt pair into its fields, as typing it in would."""

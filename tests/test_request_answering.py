@@ -58,7 +58,7 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
     assert jobs.holds == 1  # the line is held from the moment of asking
     qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
     assert seen["asked"] == ("a woman, a hat", "blurry", "no hat")
-    assert seen["exchange"] == [("a hat", "Gave her a hat.")]
+    assert [(turn.said, turn.answered) for turn in seen["exchange"]] == [("a hat", "Gave her a hat.")]
     assert seen["notes"].patterns == "the patterns"
     assert seen["thread"] is not threading.main_thread()
     assert jobs.let_go == 1

@@ -179,8 +179,7 @@ class _Tracker(QObject):
                 end = cursor.position() + len(piece)
                 if kind != SAME:
                     cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
-                    cursor.mergeCharFormat(diff_text.added_format() if kind == ADDED
-                                           else diff_text.removed_format())
+                    cursor.mergeCharFormat(diff_text.format_for(kind))
                 cursor.setPosition(end)
             place = QTextCursor(self._edit.document())
             place.setPosition(min(self._document_offset(caret), len(text)))
@@ -203,7 +202,7 @@ class _Tracker(QObject):
                 end = cursor.position() + len(piece)
                 if kind == ADDED:
                     cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
-                    cursor.mergeCharFormat(diff_text.added_format())
+                    cursor.mergeCharFormat(diff_text.format_for(kind))
                 cursor.setPosition(end)
             diff_text.hold_value(self._edit, None)
 

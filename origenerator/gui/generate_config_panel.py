@@ -32,6 +32,7 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.db import Database
+from origenerator.db_requests import Turn
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.export_lane import UNSEND_CAPTION, lane_for
 from origenerator.gallery import (
@@ -102,7 +103,6 @@ from origenerator.setting_advice import (
     spoken_list,
 )
 from origenerator.timing import estimate_label
-from origenerator.voice.dictation import words_of
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES, offered_workflows, workflow_named
 from origenerator.workflows.model_files import NO_LORA
 
@@ -146,15 +146,11 @@ _MADE_ELSEWHERE_TIP = "Another site made this — Origenerator can't remake it"
 
 @dataclass(frozen=True)
 class _RequestAim:
-    """What the Request section asks its changes of: the image on display, the
-    words that made it when a request did, the prompt pair those words were asked
-    of, the image's own pair, and the image a request made here is about."""
+    """What the Request section asks its changes of: the image on display, and
+    its own prompt pair, which the next turn starts from."""
 
     prompt_id: str
-    words: str
-    asked_of: tuple[str, str]
     shown: tuple[str, str]
-    source_prompt_id: str
 
 
 def _nothing_to_start_from(missing_inputs: list[str]) -> str:
@@ -321,7 +317,8 @@ class GenerateConfigPanel(DropZone):
         self._form_checkpoint = None
         self._autoshow_held = False   # see _point_elsewhere
         self._request_aim: _RequestAim | None = None
-        self._asked = 0  # how many times the Request has been edited, so a late answer can tell
+        self._pending_turns: list[Turn] = []  # typed since the image was shown, for its Generate
+        self._asked = 0  # how many requests have been typed, so a late answer can tell
         self._requests = requests or RequestAnswerer(db, None, client, parent=self)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
@@ -835,8 +832,8 @@ class GenerateConfigPanel(DropZone):
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
         self._param_form.item_activated.connect(self.link_clicked)
-        if form.request_field() is not None:
-            form.request_field().asked.connect(self._on_request_asked)
+        if form.request_exchange() is not None:
+            form.request_exchange().asked.connect(self._on_request_asked)
         self._param_form.train_requested.connect(self.train_requested)
         self._param_form.changed.connect(self._offer_trainings)
         self._offered_loras = {}
@@ -1680,68 +1677,53 @@ class GenerateConfigPanel(DropZone):
         self.refresh_modified_notice()
 
     def _marked_against(self) -> dict | None:
-        aim = self._request_aim
-        requested = aim is not None and bool(aim.words)
-        if self._displayed_config is None and not requested:
-            return None
-        params = self._settings_shown().params
-        if not requested:
-            return params
-        return {**params, "positive_prompt": aim.asked_of[0],
-                "negative_prompt": aim.asked_of[1]}
+        return None if self._displayed_config is None else self._settings_shown().params
 
     def _settings_shown(self) -> ConfigSnapshot:
         return self._displayed_config or self._item_config()
 
-    # --- the Request section: words the image on display is asked to change by
+    # --- the Request section: the exchange about the image on display ---------
 
     def _aim_the_request(self, row: dict | None) -> None:
-        field = self._param_form.request_field()
-        if field is None:
+        exchange = self._param_form.request_exchange()
+        if exchange is None:
             self._request_aim = None
             return
         if row is None:
             self._request_aim = None
-            field.set_available(False)
+            exchange.set_available(False)
             return
         params = self._settings_shown().params
-        shown = (params.get("positive_prompt") or "", params.get("negative_prompt") or "")
-        record = self._db.get_request(row["prompt_id"])
-        words = words_of(record)
         self._request_aim = _RequestAim(
-            prompt_id=row["prompt_id"], words=words,
-            asked_of=((record.get("old_positive") or "", record.get("old_negative") or "")
-                      if words else shown),
-            shown=shown,
-            source_prompt_id=record["source_prompt_id"] if words else row["prompt_id"])
-        field.set_available(self._displayed_config is not None)
-        field.show_words(words)
+            prompt_id=row["prompt_id"],
+            shown=(params.get("positive_prompt") or "", params.get("negative_prompt") or ""))
+        self._pending_turns = []
+        exchange.set_available(self._displayed_config is not None)
+        exchange.show_exchange(self._db.exchange_of(row["prompt_id"]))
 
     def asked(self) -> dict | None:
         """The request this tab's Generate is making, for the gallery to record
-        beside each run it launches -- ``None`` while the Request is empty."""
-        field = self._param_form.request_field() if self._param_form is not None else None
+        beside each run it launches, with every turn typed since the image was
+        shown -- ``None`` while nothing has been asked."""
         aim = self._request_aim
-        if field is None or aim is None or not field.words():
+        if aim is None or not self._pending_turns:
             return None
-        return {"asked": field.words(), "source_prompt_id": aim.source_prompt_id,
-                "old_positive": aim.asked_of[0], "old_negative": aim.asked_of[1]}
+        return {"asked": self._pending_turns[-1].said, "source_prompt_id": aim.prompt_id,
+                "old_positive": aim.shown[0], "old_negative": aim.shown[1],
+                "turns": list(self._pending_turns)}
 
     def _on_request_asked(self, words: str) -> None:
-        """Rewrite the prompts to say what the Request now asks, off the UI
-        thread, since that is a call to the local LLM. The words that made the
-        image put its own prompts back, and no words put back the ones they
-        were asked of, neither of which needs asking anyone."""
+        """Ask the model what the Request now says, off the UI thread, of the
+        prompts as the form holds them, so each turn builds on the one before."""
         aim = self._request_aim
-        if aim is None:
+        if aim is None or not words:
             return
         self._asked += 1
-        if words == aim.words or not words:
-            self._param_form.set_prompts(*(aim.shown if words == aim.words else aim.asked_of))
-            self._param_form.request_field().done()
-            return
+        self._param_form.request_exchange().add_turn(words)
+        params = self.current_config().params
         self._requests.ask(
-            aim.prompt_id, *aim.asked_of, words, owner=self,
+            aim.prompt_id, params.get("positive_prompt") or "", params.get("negative_prompt") or "",
+            words, owner=self,
             then=lambda revision, context=(self._asked, aim.prompt_id): self._on_rewritten(
                 context, revision))
 
@@ -1749,13 +1731,17 @@ class GenerateConfigPanel(DropZone):
         asked, prompt_id = context
         aim = self._request_aim
         if asked != self._asked or aim is None or aim.prompt_id != prompt_id:
-            return  # the words, or the image, have changed since it was asked
-        field = self._param_form.request_field()
+            return  # another request, or another image, since it was asked
+        exchange = self._param_form.request_exchange()
         if revision is None:
-            field.failed()
+            exchange.failed()
             return
-        self._param_form.set_prompts(revision.positive, revision.negative)
-        field.done()
+        if revision.changed:
+            self._param_form.set_prompts(revision.positive, revision.negative)
+        turn = Turn(exchange.turns()[-1][0], revision.answer, revision.old_positive,
+                    revision.old_negative, revision.positive, revision.negative)
+        self._pending_turns.append(turn)
+        exchange.answered(turn)
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:
         current = self.current_config()

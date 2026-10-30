@@ -11376,7 +11376,13 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     view.refresh()
     view._on_thumbnail_clicked("orig")
     panel = view._info_tabs.current_config_panel()
-    panel._param_form.request_field()._words.setText("two cats")
+    view._request_answerer._wait_for_the_card = lambda comfyui, **settings: True
+    view._request_answerer._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words, ask=lambda p, n, r, exchange, notes: ("two cats", n, "Two cats."))
+    exchange = panel._param_form.request_exchange()
+    qtbot.keyClicks(exchange._line, "two cats")
+    qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
+    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", "Two cats.")], timeout=5000)
 
     view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
 
@@ -11384,6 +11390,9 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     record = db.get_request(job.prompt_id)
     assert (record["asked"], record["heard"], record["source_prompt_id"]) == ("two cats", "", "orig")
     assert (record["old_positive"], record["new_positive"]) == ("a cat", "two cats")
+    (turn,) = db.exchange_of(job.prompt_id)
+    assert (turn.said, turn.answered, turn.old_positive, turn.new_positive) == (
+        "two cats", "Two cats.", "a cat", "two cats")
 
 
 def test_a_run_generated_with_no_request_records_none(qtbot, tmp_path):
@@ -16604,7 +16613,9 @@ def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
     assert words(view._slideshows.showing.shown._note) == "Took the hat off her."
     (job,) = view._live_jobs.values()
     assert job.params["positive_prompt"] == "a woman, soft light"
-    assert view._db.exchange_of(job.prompt_id) == [("no hat", "Took the hat off her.")]
+    (turn,) = view._db.exchange_of(job.prompt_id)
+    assert (turn.said, turn.answered) == ("no hat", "Took the hat off her.")
+    assert (turn.old_positive, turn.new_positive) == ("a woman, a hat, soft light", "a woman, soft light")
 
 
 def test_a_request_for_something_absent_goes_to_the_negative_prompt(
@@ -16745,8 +16756,8 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    field = view._info_tabs.current_config_panel()._param_form.request_field()
-    assert field._words.text() == "no hat"
+    exchange = view._info_tabs.current_config_panel()._param_form.request_exchange()
+    assert exchange.turns() == [("no hat", "")]
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(

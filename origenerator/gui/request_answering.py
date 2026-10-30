@@ -1,7 +1,5 @@
-"""The one place a Request is asked of the model, spoken or typed: the Job Queue
-holds its line while the model has the graphics card, ComfyUI is waited for and
-asked to let go off the UI thread, and the answer comes back to whoever asked,
-if they are still there."""
+"""The one place a Request is asked of the model, spoken or typed: the Job Queue's
+line held while the model has the card, the ask off the UI thread, the answer back."""
 from __future__ import annotations
 
 import logging

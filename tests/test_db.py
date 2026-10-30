@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from origenerator.db import Database
+from origenerator.db_requests import Turn
 from origenerator.db_schema import STORED_NAMES
 from origenerator.provenance import WORKFLOW, WORKFLOW_VERSION
 
@@ -1047,14 +1048,17 @@ def test_the_distinct_prompts_come_once_each_in_the_order_first_written_without_
 def test_the_exchange_that_led_to_an_item_is_every_turn_along_the_way_oldest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     _record(db, "gen-1", source="src-1")
-    db.record_turns("gen-1", [("a hat", "Gave her a straw hat.")])
+    db.record_turns("gen-1", [Turn("a hat", "Gave her a straw hat.", "a woman", "blurry",
+                                   "a woman, a straw hat", "blurry")])
     _record(db, "gen-2", source="gen-1")
     db.record_turns("gen-2", [("make it red", "The hat is red now."), ("brighter", "Brighter.")])
 
-    assert db.exchange_of("gen-2") == [("a hat", "Gave her a straw hat."),
-                                       ("make it red", "The hat is red now."),
-                                       ("brighter", "Brighter.")]
-    assert db.exchange_of("gen-1") == [("a hat", "Gave her a straw hat.")]
+    assert [(turn.said, turn.answered) for turn in db.exchange_of("gen-2")] == [
+        ("a hat", "Gave her a straw hat."), ("make it red", "The hat is red now."),
+        ("brighter", "Brighter.")]
+    (first,) = db.exchange_of("gen-1")
+    assert first == Turn("a hat", "Gave her a straw hat.", "a woman", "blurry",
+                         "a woman, a straw hat", "blurry")
     assert db.exchange_of("src-1") == []
 
 
@@ -1064,7 +1068,7 @@ def test_an_exchange_whose_records_point_at_each_other_still_ends(tmp_path):
     _record(db, "gen-2", source="gen-1")
     db.record_turns("gen-1", [("a hat", "")])
 
-    assert db.exchange_of("gen-1") == [("a hat", "")]
+    assert db.exchange_of("gen-1") == [Turn("a hat")]
 
 
 def test_a_turn_outlives_the_item_it_led_to(tmp_path):
@@ -1076,4 +1080,4 @@ def test_a_turn_outlives_the_item_it_led_to(tmp_path):
 
     db.delete_generation("gen-1")
 
-    assert db.exchange_of("gen-1") == [("a hat", "Gave her a hat.")]
+    assert db.exchange_of("gen-1") == [Turn("a hat", "Gave her a hat.")]

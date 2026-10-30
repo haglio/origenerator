@@ -420,7 +420,7 @@ def build_request_messages(positive: str, negative: str, request: str, exchange,
     if notes is not None and notes.complete:
         parts.append(notes.as_told())
     if exchange:
-        turns = "\n".join(f"Artist: {said}\nYou: {answered}" for said, answered in exchange)
+        turns = "\n".join(f"Artist: {turn[0]}\nYou: {turn[1]}" for turn in exchange)
         parts.append(f"THE EXCHANGE SO FAR about this image, oldest first:\n{turns}")
     parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
     parts.append(f"THE ARTIST NOW ASKS:\n{request}")

@@ -213,11 +213,15 @@ CREATE TABLE IF NOT EXISTS requests (
 -- words and what the model answered. A spoken Request is one turn; typed ones
 -- are as many as were typed before Generate was pressed.
 CREATE TABLE IF NOT EXISTS request_turns (
-    id         INTEGER PRIMARY KEY,
-    prompt_id  TEXT NOT NULL,
-    said       TEXT NOT NULL,
-    answered   TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    id           INTEGER PRIMARY KEY,
+    prompt_id    TEXT NOT NULL,
+    said         TEXT NOT NULL,
+    answered     TEXT NOT NULL DEFAULT '',
+    old_positive TEXT NOT NULL DEFAULT '',
+    old_negative TEXT NOT NULL DEFAULT '',
+    new_positive TEXT NOT NULL DEFAULT '',
+    new_negative TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- A deleted generation the recovery bin is still holding: the whole row the

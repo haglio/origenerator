@@ -37,6 +37,7 @@ from origenerator.config import (
     TRASH_DIR,
 )
 from origenerator.db import Database
+from origenerator.db_requests import Turn
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
@@ -1367,6 +1368,7 @@ class GalleryView(QWidget):
             # mark is the only thing telling the queue what act a video is of.
             category, video_id, intent = launching.settings_source()
             asked = launching.asked()
+            turns = asked.pop("turns") if asked is not None else []
             for prompt_id in launched:
                 if category or video_id:
                     self._db.set_settings_source(prompt_id, category=category,
@@ -1378,6 +1380,7 @@ class GalleryView(QWidget):
                         prompt_id=prompt_id, heard="",
                         new_positive=batch[0].get("positive_prompt", ""),
                         new_negative=batch[0].get("negative_prompt", ""), **asked)
+                    self._db.record_turns(prompt_id, turns)
                 launching.note_launched(prompt_id)
         self._stand_on_the_run_in(key, rebuild=True)
 
@@ -2932,7 +2935,9 @@ class GalleryView(QWidget):
             old_negative=revision.old_negative, new_positive=revision.positive,
             new_negative=revision.negative,
         )
-        self._db.record_turns(job.prompt_id, [(spoken.text, revision.answer)])
+        self._db.record_turns(job.prompt_id, [Turn(
+            spoken.text, revision.answer, revision.old_positive, revision.old_negative,
+            revision.positive, revision.negative)])
         self.refresh()  # the queue marks the job as a request the moment it is spoken
         return revision.answer or "Request submitted", NOTICE
 

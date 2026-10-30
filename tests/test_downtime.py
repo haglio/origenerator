@@ -315,7 +315,7 @@ def test_taking_the_notes_waits_for_the_card_reads_the_collection_and_writes_the
     client = ComfyUIClient(folders=SUITE_FOLDERS)
     waited = []
     monkeypatch.setattr(downtime.graphics_card, "wait_for_the_card",
-                        lambda comfyui, **settings: waited.append(comfyui) or True)
+                        lambda comfyui, holder, **settings: waited.append(comfyui) or True)
     asked = []
 
     def ask(messages, **settings):
@@ -342,7 +342,7 @@ def test_notes_the_model_could_not_be_asked_for_are_left_for_the_next_turn(
     db.insert_generation(prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v002",
                          positive_prompt="a baker waving", params_json="{}", workflow_json="{}")
     monkeypatch.setattr(downtime.graphics_card, "wait_for_the_card",
-                        lambda comfyui, **settings: True)
+                        lambda comfyui, holder, **settings: True)
 
     def down(messages, **settings):
         raise OSError("Ollama is not running")

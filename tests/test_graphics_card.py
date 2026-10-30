@@ -1,11 +1,14 @@
 """Handing the graphics card from ComfyUI to the local model."""
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from origenerator import graphics_card
+from tools import card_claim
 
 
 class _Clock:
@@ -34,62 +37,94 @@ class _ComfyUI:
         self.let_go += 1
 
 
-def _wait(comfyui, *, memory=lambda: (14000, 16303), deadline_s=600.0):
+def _wait(comfyui, tmp_path, *, memory=lambda: (14000, 16303), deadline_s=600.0):
     clock = _Clock()
-    got_it = graphics_card.wait_for_the_card(comfyui, memory=memory, clock=clock,
-                                             sleep=clock.sleep, deadline_s=deadline_s)
+    got_it = graphics_card.wait_for_the_card(comfyui, "Origenerator's Request", memory=memory,
+                                             clock=clock, sleep=clock.sleep, deadline_s=deadline_s,
+                                             claim_path=tmp_path / "claim.json")
     return got_it, clock
 
 
-def test_comfyui_is_waited_for_then_asked_to_let_go_of_its_models():
+def test_comfyui_is_waited_for_then_asked_to_let_go_of_its_models(tmp_path):
     comfyui = _ComfyUI([{"a"}, {"a"}, set()])
 
-    got_it, clock = _wait(comfyui)
+    got_it, clock = _wait(comfyui, tmp_path)
 
     assert got_it is True
     assert comfyui.let_go == 1
     assert clock.now > 0  # it waited for the two polls that found ComfyUI busy
 
 
-def test_a_comfyui_that_never_finishes_within_the_deadline_is_given_up_on():
+def test_a_comfyui_that_never_finishes_within_the_deadline_is_given_up_on(tmp_path):
     comfyui = _ComfyUI([{"a"}])
 
-    got_it, clock = _wait(comfyui, deadline_s=60.0)
+    got_it, clock = _wait(comfyui, tmp_path, deadline_s=60.0)
 
     assert got_it is False
     assert comfyui.let_go == 0
     assert clock.now >= 60.0
+    assert not (tmp_path / "claim.json").exists()
 
 
-def test_a_comfyui_that_cannot_be_asked_counts_as_idle_and_is_not_asked_to_let_go():
+def test_a_comfyui_that_cannot_be_asked_counts_as_idle_and_is_not_asked_to_let_go(tmp_path):
     comfyui = _ComfyUI([set()], fails=True)
 
-    got_it, _clock = _wait(comfyui)
+    got_it, _clock = _wait(comfyui, tmp_path)
 
     assert got_it is True
     assert comfyui.let_go == 0
 
 
-def test_the_wait_goes_on_until_the_card_has_room_for_the_model():
+def test_the_wait_goes_on_until_the_card_has_room_for_the_model(tmp_path):
     readings = [(6000, 16303), (6500, 16303), (12000, 16303)]
-    got_it, clock = _wait(_ComfyUI([set()]), memory=lambda: readings.pop(0))
+    got_it, clock = _wait(_ComfyUI([set()]), tmp_path, memory=lambda: readings.pop(0))
 
     assert got_it is True
     assert readings == []  # it read the card until the room was there
 
 
-def test_a_card_that_never_makes_room_is_still_tried():
+def test_a_card_that_never_makes_room_is_still_tried(tmp_path):
     # ComfyUI let go and nothing else is asking for the card: the model loads
     # with whatever is free rather than never answering at all.
-    got_it, _clock = _wait(_ComfyUI([set()]), memory=lambda: (6000, 16303))
+    got_it, _clock = _wait(_ComfyUI([set()]), tmp_path, memory=lambda: (6000, 16303))
 
     assert got_it is True
 
 
-def test_without_nvidia_smi_the_card_is_taken_on_trust():
-    got_it, _clock = _wait(_ComfyUI([set()]), memory=lambda: None)
+def test_without_nvidia_smi_the_card_is_taken_on_trust(tmp_path):
+    got_it, _clock = _wait(_ComfyUI([set()]), tmp_path, memory=lambda: None)
 
     assert got_it is True
+
+
+def test_the_model_takes_the_one_claim_on_the_card_and_lets_go_of_it_after(tmp_path):
+    claim = tmp_path / "claim.json"
+
+    got_it, _clock = _wait(_ComfyUI([set()]), tmp_path)
+
+    assert got_it is True
+    written = json.loads(claim.read_text(encoding="utf-8"))
+    assert (written["holder"], written["pid"]) == ("Origenerator's Request", os.getpid())
+
+    graphics_card.let_go_of_the_card(claim)
+
+    assert not claim.exists()
+
+
+def test_a_card_a_trainer_holds_is_waited_for_until_the_trainer_lets_go(tmp_path, another_program):
+    claim = tmp_path / "claim.json"
+    assert card_claim.take("Example Look 1.1 training", another_program.pid, claim)
+
+    got_it, clock = _wait(_ComfyUI([set()]), tmp_path, deadline_s=30.0)
+    assert got_it is False
+    assert json.loads(claim.read_text(encoding="utf-8"))["pid"] == another_program.pid
+
+    another_program.kill()
+    another_program.wait()
+    got_it, _clock = _wait(_ComfyUI([set()]), tmp_path)
+
+    assert got_it is True
+    assert json.loads(claim.read_text(encoding="utf-8"))["pid"] == os.getpid()
 
 
 def test_the_cards_free_and_total_memory_are_read_from_nvidia_smi():

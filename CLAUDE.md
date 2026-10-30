@@ -456,8 +456,10 @@ is the two hooks that call the guard, below.
   `~/.haglio/graphics_card_claim.json` naming who holds it and its Windows
   pid. Both trainers take it before they use the card and let go when they
   stop, his hand training scripts beside the library take and honor the same
-  file, and a claim whose pid has died is stale: two trainings each yielding
-  only to ComfyUI's line took the card together on 2026-10-29 and both crawled.
+  file, the local model takes it through `graphics_card.wait_for_the_card`
+  for a Request's answer and for the notes on the collection, and a claim
+  whose pid has died is stale: two trainings each yielding only to ComfyUI's
+  line took the card together on 2026-10-29 and both crawled.
 - `tools/open_from_notification.py` — what Windows runs when a notification of
   this app's is clicked, registered as the command for the `origenerator:` link
   every notice carries. It hands the generation to the copy that has the

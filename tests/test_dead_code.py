@@ -444,7 +444,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # sentence back, and the request worker folded into the answerer.
 # 15989 when the Request section came to show the exchange, ask on Enter, and
 # show a request's change on its entry rather than in the prompt fields.
-MAX_PROSE_LINES = 15989
+# 15985 when the model came to take the one claim on the graphics card the
+# trainers take, measured on the branch rebased onto the trainers' change.
+MAX_PROSE_LINES = 15985
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

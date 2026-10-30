@@ -26,7 +26,7 @@ class _Jobs:
         self.let_go += 1
 
 
-def _answerer(qtbot, tmp_path, *, work_out, wait=lambda comfyui, **settings: True,
+def _answerer(qtbot, tmp_path, *, work_out, wait=lambda comfyui, holder, **settings: True,
               client=object()):
     db = Database(tmp_path / "t.db")
     jobs = _Jobs()
@@ -99,7 +99,7 @@ def test_a_comfyui_that_stays_busy_leaves_the_rules_to_answer_without_the_model(
         raise AssertionError("the model was asked")
 
     answerer, _db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=never,
-                                             wait=lambda comfyui, **settings: False)
+                                             wait=lambda comfyui, holder, **settings: False)
     answers = []
 
     answerer.ask("g1", "a woman, a hat, soft light", "blurry", "no hat", owner=parent,
@@ -111,7 +111,7 @@ def test_a_comfyui_that_stays_busy_leaves_the_rules_to_answer_without_the_model(
 
 
 def test_with_no_comfyui_the_card_is_not_waited_for(qtbot, tmp_path):
-    def never_wait(comfyui, **settings):
+    def never_wait(comfyui, holder, **settings):
         raise AssertionError("waited")
 
     answerer, _db, _jobs, parent = _answerer(

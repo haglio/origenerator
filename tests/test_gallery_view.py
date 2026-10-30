@@ -11376,7 +11376,7 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     view.refresh()
     view._on_thumbnail_clicked("orig")
     panel = view._info_tabs.current_config_panel()
-    view._request_answerer._wait_for_the_card = lambda comfyui, **settings: True
+    view._request_answerer._wait_for_the_card = lambda comfyui, holder, **settings: True
     view._request_answerer._work_out = lambda positive, negative, words, **_: work_out(
         positive, negative, words, ask=lambda p, n, r, exchange, notes: ("two cats", n, "Two cats."))
     exchange = panel._param_form.request_exchange()
@@ -16538,7 +16538,7 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     # and a model would put Ollama in the middle of both.
     view._request_answerer._work_out = (
         lambda positive, negative, words, **_: apply_request(positive, negative, words))
-    view._request_answerer._wait_for_the_card = lambda comfyui, **settings: True
+    view._request_answerer._wait_for_the_card = lambda comfyui, holder, **settings: True
     view._bank.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()
     _select_first_leaf(view)

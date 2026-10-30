@@ -13,6 +13,7 @@ from origenerator.gui.off_thread import run_off_thread
 logger = logging.getLogger(__name__)
 
 CARD_DEADLINE_S = 600.0  # how long a Request waits for ComfyUI before the rules answer alone
+HOLDER = "Origenerator's Request"  # what the card's claim says while the model answers one
 
 
 class RequestAnswerer(QObject):
@@ -38,13 +39,16 @@ class RequestAnswerer(QObject):
     def _answer(self, positive: str, negative: str, words: str, exchange):
         try:
             if (self._client is not None
-                    and not self._wait_for_the_card(self._client, deadline_s=CARD_DEADLINE_S)):
+                    and not self._wait_for_the_card(self._client, HOLDER,
+                                                    deadline_s=CARD_DEADLINE_S)):
                 return prompt_edit.apply_request(positive, negative, words)
             return self._work_out(positive, negative, words, exchange=exchange,
                                   notes=collection_notes.read(self._notes_path))
         except Exception as exc:  # noqa: BLE001 -- answered with nothing, never raised off-thread
             logger.warning("Could not work out a request (%s)", type(exc).__name__)
             return None
+        finally:
+            graphics_card.let_go_of_the_card()
 
     def _deliver(self, owner: QObject, then, revision) -> None:
         if self._jobs is not None:

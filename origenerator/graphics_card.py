@@ -1,10 +1,15 @@
 """The graphics card handed from ComfyUI to the local model: the two do not fit on
-it together, and a model squeezed beside ComfyUI's crawls or dies mid-answer."""
+it together, and a model squeezed beside ComfyUI's crawls or dies mid-answer. The
+model takes the one claim on the card the trainers take (tools.card_claim), so a
+training and the model never take the card together either."""
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import time
+
+from tools import card_claim
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +38,20 @@ def _comfyui_busy(comfyui) -> bool | None:
         return None
 
 
-def wait_for_the_card(comfyui, *, needed_mib: int = CARD_MIB_NEEDED, deadline_s: float = 600.0,
-                      memory=None, clock=time.monotonic, sleep=time.sleep) -> bool:
+def wait_for_the_card(comfyui, holder: str, *, needed_mib: int = CARD_MIB_NEEDED,
+                      deadline_s: float = 600.0, memory=None, clock=time.monotonic,
+                      sleep=time.sleep, claim_path=None) -> bool:
     memory = memory or card_memory_mib
+    pid = os.getpid()
     deadline = clock() + deadline_s
-    while (busy := _comfyui_busy(comfyui)):
+    while True:
+        busy = _comfyui_busy(comfyui)
+        if (not busy and not card_claim.held_by_another(pid, claim_path)
+                and card_claim.take(holder, pid, claim_path)):
+            break
         if clock() >= deadline:
-            logger.info("ComfyUI was still generating after %.0f s; the model is not loaded",
-                        deadline_s)
+            logger.info("The card was still ComfyUI's or another program's after %.0f s; the "
+                        "model is not loaded", deadline_s)
             return False
         sleep(_POLL_S)
     if busy is None:
@@ -53,3 +64,7 @@ def wait_for_the_card(comfyui, *, needed_mib: int = CARD_MIB_NEEDED, deadline_s:
     while (reading := memory()) is not None and reading[0] < needed_mib and clock() < room_by:
         sleep(_POLL_S)
     return True
+
+
+def let_go_of_the_card(claim_path=None) -> None:
+    card_claim.release(os.getpid(), claim_path)

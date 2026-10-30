@@ -189,7 +189,8 @@ def _notes_due(db) -> bool:
 
 
 def _take_notes(db, client) -> None:
-    if not graphics_card.wait_for_the_card(client, deadline_s=0):
+    if not graphics_card.wait_for_the_card(client, "Origenerator's notes on the collection",
+                                           deadline_s=0):
         return
     model = {"base_url": config.LOCAL_LLM_BASE_URL, "model": config.LOCAL_LLM_MODEL}
     try:
@@ -200,6 +201,8 @@ def _take_notes(db, client) -> None:
     except Exception as e:  # noqa: BLE001 -- Ollama down or refusing: the next turn tries again
         logger.info("Collection notes: the model could not be asked (%s)", e)
         return
+    finally:
+        graphics_card.let_go_of_the_card()
     collection_notes.write(config.COLLECTION_NOTES_PATH, notes)
 
 

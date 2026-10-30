@@ -38,7 +38,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
-from PyQt6.QtGui import QBrush, QKeySequence, QPalette, QTextCharFormat, QTextCursor
+from PyQt6.QtGui import QBrush, QKeySequence, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QPlainTextEdit
 
 from origenerator.gui import diff_text
@@ -51,14 +51,14 @@ from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
 SETTLE_MS = 150
 
 
-def _plain_format(edit: QPlainTextEdit) -> QTextCharFormat:
+def _plain_format() -> QTextCharFormat:
     """The unmarked look, spelled out rather than left default: the marks are
     re-applied from scratch on every pass, so a pass has to be able to take one
     back off a word that is no longer new."""
     fmt = QTextCharFormat()
     fmt.setFontStrikeOut(False)
     fmt.setBackground(QBrush(Qt.BrushStyle.NoBrush))
-    fmt.setForeground(QBrush(edit.palette().color(QPalette.ColorRole.Text)))
+    fmt.setForeground(QBrush(Qt.BrushStyle.NoBrush))
     return fmt
 
 
@@ -72,7 +72,7 @@ def _unmark(edit: QPlainTextEdit) -> None:
     """
     cursor = QTextCursor(edit.document())
     cursor.select(QTextCursor.SelectionType.Document)
-    cursor.mergeCharFormat(_plain_format(edit))
+    cursor.mergeCharFormat(_plain_format())
 
 
 def _spliced(layout: list, position: int, removed: int, inserted: str) -> list:
@@ -317,5 +317,5 @@ def untrack(edit: QPlainTextEdit) -> None:
     _unmark(edit)
     # ...and off whatever is typed or written into it next, which would otherwise
     # take the format that was under the caret when the marks came off.
-    edit.setCurrentCharFormat(_plain_format(edit))
+    edit.setCurrentCharFormat(_plain_format())
 

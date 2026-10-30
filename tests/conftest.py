@@ -651,6 +651,15 @@ def _collect_widgets_between_tests(_widgets_registered_this_test):
     _deliver_the_deletions_already_scheduled()
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_timeout_cancel_timer(item):
+    """pytest-timeout leaves each test's cancel on the test once it has run, and
+    with it the timer and its locks and events, which every later collection
+    walks: a run held thousands of them by its end."""
+    yield
+    vars(item).pop("cancel_timeout", None)
+
+
 def _print_qt_message(_kind, _context, message):
     print(message, file=sys.stderr)
 

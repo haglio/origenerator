@@ -401,11 +401,13 @@ class FakeDB:
     def __init__(self, rows=(), requests=()):
         self.rows = {row["prompt_id"]: row for row in rows}
         self.requests = {record["prompt_id"]: record for record in requests}
+        self.listings = 0
 
     def get_request(self, prompt_id):
         return self.requests.get(prompt_id)
 
     def list_generations(self):
+        self.listings += 1
         return list(self.rows.values())
 
     def get_generation(self, prompt_id):
@@ -2108,6 +2110,19 @@ def _fox(prompt_id, *, seed):
     image = _image(prompt_id, "a red fox", seed=seed)
     image["output_files"] = json.dumps([{"filename": f"{prompt_id}.png"}])
     return image
+
+
+def test_the_map_reads_the_library_once_for_each_state_of_it(slideshows):
+    # Read afresh for every slide the map was drawn around, the library held
+    # each step of a slideshow, and its double-click, a tenth of a second.
+    rows = [_fox("g1", seed=1), _fox("g2", seed=2)]
+    db = FakeDB(rows)
+    director, _host, _made = slideshows(_library(rows), db=db, browser=FakeBrowser(stamp=1))
+
+    director.neighbors_of("g1", side="portrait")
+    director.neighbors_of("g2", side="portrait")
+
+    assert db.listings == 1
 
 
 def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(slideshows, tmp_path):

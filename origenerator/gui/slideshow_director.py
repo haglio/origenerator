@@ -188,6 +188,21 @@ class HeldSlideshow:
     filters: SlideshowFilters
 
 
+class _KeptPerModel:
+    def __init__(self, stamp_of):
+        self._stamp_of = stamp_of
+        self._stamp = None
+        self._kept: dict = {}
+
+    def get(self, key, work_out):
+        stamp = self._stamp_of()
+        if stamp != self._stamp:
+            self._stamp, self._kept = stamp, {}
+        if key not in self._kept:
+            self._kept[key] = work_out()
+        return self._kept[key]
+
+
 def _still_up(slideshow):
     """*slideshow* if it is still on screen, else None — a closed one is no
     occupant of anything, however recently it was one."""
@@ -313,8 +328,8 @@ class SlideshowDirector:
         self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
         self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
-        self._held_at_stamp = None
-        self._held_at: dict[str, frozenset[str]] = {}
+        self._held_at = _KeptPerModel(browser.model_stamp)
+        self._library = _KeptPerModel(browser.model_stamp)
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
 
@@ -758,7 +773,8 @@ class SlideshowDirector:
         """The generations a slideshow on *side* is mapped against: the whole
         library of that side's shape — what the Satellite Funestras map their
         clips against too, each over its own sources."""
-        return filter_rows([row for row in self._db.list_generations() if in_sight(row)], side)
+        return self._library.get(side, lambda: filter_rows(
+            [row for row in self._db.list_generations() if in_sight(row)], side))
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))
@@ -1357,13 +1373,8 @@ class SlideshowDirector:
         return prompt_id in held or self._recents_would_take(row, location)
 
     def _held_at_location(self, location) -> frozenset[str]:
-        stamp = self._browser.model_stamp()
-        if stamp != self._held_at_stamp:
-            self._held_at_stamp, self._held_at = stamp, {}
-        if location not in self._held_at:
-            self._held_at[location] = frozenset(
-                r["prompt_id"] for r in self.rows_at(location))
-        return self._held_at[location]
+        return self._held_at.get(location, lambda: frozenset(
+            r["prompt_id"] for r in self.rows_at(location)))
 
     def _recents_would_take(self, row: dict, location) -> bool:
         base, side = _split_collection_key(location)

@@ -68,7 +68,7 @@ voice = ["faster-whisper>=1,<2"]
 # the half that pays for itself: it dumps the stack of the test that stopped,
 # which turns a stalled required check into a one-line diagnosis.
 # app_support.clocks holds all three halves of it.
-addopts = "-p app_support.sanitize.pytest_plugin -p app_support.clocks.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread"
+addopts = "-p app_support.sanitize.pytest_plugin -p app_support.clocks.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread --durations=30"
 testpaths = ["tests"]
 qt_api = "pyqt6"
 

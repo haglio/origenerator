@@ -147,3 +147,21 @@ def test_the_notes_file_is_written_whole_or_not_at_all(tmp_path):
 
     assert json.loads(path.read_text(encoding="utf-8"))["patterns"] == "p"
     assert list(path.parent.iterdir()) == [path]  # no partial file left beside it
+
+
+def test_the_notes_as_the_model_is_told_them_lead_with_the_patterns_then_each_batch():
+    notes = CollectionNotes(prompt_count=5, batches=2, batch_notes=["first", "second"],
+                            patterns="the patterns")
+
+    told = notes.as_told()
+
+    assert told.index("the patterns") < told.index("first") < told.index("second")
+
+
+def test_a_long_set_of_notes_is_cut_to_what_fits_from_the_end():
+    notes = CollectionNotes(prompt_count=5, batches=3, batch_notes=["x" * 50, "y" * 50, "z" * 50],
+                            patterns="p" * 20)
+
+    told = notes.as_told(limit_chars=100)
+
+    assert "p" * 20 in told and "x" * 50 in told and "z" * 50 not in told

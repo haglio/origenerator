@@ -438,7 +438,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # to be spoken where it is asked.
 # 16066 when the local model came to be asked through Ollama's own door and to take
 # notes on the collection while Origenerator is closed.
-MAX_PROSE_LINES = 16066
+# 16014 when every Request came to go to the model first, with the notes and the
+# exchange, and the step that matched one term went.
+MAX_PROSE_LINES = 16014
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

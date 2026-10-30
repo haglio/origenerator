@@ -1,7 +1,10 @@
-"""Turning a spoken request into an edit of a prompt pair.
+"""Turning a request into an edit of a prompt pair.
 
-A request is a wish about the image on screen — "no silver earrings", "more
-freckles" — and what it means for the prompt pair follows a fixed policy:
+A request is a wish about the image on screen — "no silver earrings", "change to
+a tropical beach" — and the local model answers it first, knowing the collection
+from the notes on it and the exchange so far about this image, and saying back
+in a sentence what it changed. When the model cannot answer, a fixed policy makes
+the smallest edit the words themselves allow:
 
 * A request AGAINST something. In the positive prompt? Take it out. Otherwise
   put it in the negative prompt — unless it is already there, in which case
@@ -10,37 +13,19 @@ freckles" — and what it means for the prompt pair follows a fixed policy:
   out. Otherwise raise its weight in the positive — or add it, if it is in
   neither.
 
-Each is the smallest change that answers the request, which is why the mirror is
-"take it out of the negative prompt" rather than "take it out and also add it":
-ask twice and the second pass, finding it in neither prompt, adds it.
-
-The policy is deterministic for every term a prompt already holds. A term in
-neither prompt is the one thing it can only append, and the prompt may say the
-opposite ("two women" over a prompt describing one), so that is handed to the
-local LLM to work into the whole pair (``rewrite``). The other thing a model is
-needed for is finding the term at all: "no earrings" is about a
-prompt that says "silver ear studs", and no amount of string matching gets from
-one to the other. So the two are split. :func:`literal_match` reads a prompt for
-the words themselves and is what runs by default; :func:`smart_match` asks the
-local LLM which of the prompt's own terms the request means, and is handed in by
-a caller that wants synonyms caught. Either way the rules above then apply
-unchanged, and a request whose wording can't be read at all comes back as
-``None`` for the caller to say so rather than being guessed at.
-
-Everything but :func:`smart_match` and :func:`rewrite_prompt` is pure and Qt-free,
-so the whole policy unit-tests without a model or a server.
+Everything but :func:`ask_the_model` is pure and Qt-free, so the whole policy
+unit-tests without a model or a server.
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 from dataclasses import dataclass
-from functools import partial
 
 from origenerator import local_llm
+from origenerator.collection_notes import CollectionNotes
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
-from origenerator.prompts import REQUEST_REWRITE_SYSTEM_PROMPT, VOICE_REQUEST_MATCH_SYSTEM_PROMPT
+from origenerator.prompts import REQUEST_SYSTEM_PROMPT
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -61,7 +46,13 @@ EXCLUDED = "excluded"    # added to the negative prompt
 RAISED = "raised"        # already wanted, now wanted harder
 ADDED = "added"          # added to the positive prompt
 ALLOWED = "allowed"      # taken out of the negative prompt
-REWRITTEN = "rewritten"  # in neither prompt, so worked into the whole of it
+REWRITTEN = "rewritten"  # the model reworked the whole pair
+
+# What the model reads for one request: the notes on the collection, the
+# exchange, both prompts and the request, with room over.
+REQUEST_WINDOW_TOKENS = 32768
+_ASK_TIMEOUT_S = 180.0
+
 
 def _both_spellings(words: set) -> frozenset:
     """``words`` plus the same words with their apostrophes dropped.
@@ -218,8 +209,7 @@ def _mentions(text: str, term: str) -> bool:
 
 
 def bare_terms(prompt: str) -> list[str]:
-    """A prompt's own terms, one per segment, stripped of weights — what a
-    request has to be matched against, and the list a matcher is shown."""
+    """A prompt's own terms, one per segment, stripped of weights."""
     return [_unwrap(segment)[0] for segment in _segments(prompt)]
 
 
@@ -236,20 +226,8 @@ def literal_match(terms: list[str], term: str) -> int | None:
     return None
 
 
-def _index_of(prompt: str, term: str, match) -> int | None:
-    """Which segment of ``prompt`` the request is about, or ``None``.
-
-    Literal first, always: when the prompt says the words the speaker said,
-    nothing else needs deciding, and a model asked anyway could talk itself out
-    of the obvious answer. ``match`` — the caller's smarter matcher, when it
-    supplied one — is asked only about a prompt that doesn't.
-    """
-    terms = bare_terms(prompt)
-    found = literal_match(terms, term)
-    if found is not None or match is None:
-        return found
-    found = match(terms, term)
-    return found if found is not None and 0 <= found < len(terms) else None
+def _index_of(prompt: str, term: str) -> int | None:
+    return literal_match(bare_terms(prompt), term)
 
 
 def _tidy(prompt: str) -> str:
@@ -287,7 +265,7 @@ def _without_nothing_weighted(prompt: str) -> str:
     return prompt if len(kept) == len(segments) else _tidy(",".join(kept))
 
 
-_ELLIPSIS = re.compile(r"\.\.\.|\u2026")
+_ELLIPSIS = re.compile(r"\.\.\.|…")
 
 
 def _said(old: str, new: str) -> str:
@@ -306,8 +284,8 @@ def _plus(prompt: str, term: str) -> str:
 
 @dataclass(frozen=True)
 class PromptRevision:
-    """One request applied to a prompt pair: what it was, what it became, and
-    which of the rules did it."""
+    """One request applied to a prompt pair: what it was, what it became, which
+    of the rules did it, and what the model said back ("" from the rules)."""
 
     old_positive: str
     old_negative: str
@@ -316,6 +294,7 @@ class PromptRevision:
     term: str
     polarity: str
     action: str
+    answer: str = ""
 
     @property
     def changed(self) -> bool:
@@ -325,21 +304,27 @@ class PromptRevision:
                 or self.negative != self.old_negative)
 
 
-def apply_request(positive: str, negative: str, request: str,
-                  match=None, rewrite=None) -> PromptRevision | None:
-    """Apply a ``request`` to a prompt pair, by the policy up top.
+def _scenes_of(positive: str, negative: str) -> tuple[list[str], list[str]]:
+    scenes = scene_prompts(positive)
+    negatives = scene_prompts(negative)
+    return scenes, [scene_text(negatives, index) for index in range(len(scenes))]
 
-    ``match(terms, term)`` is how a positive prompt that doesn't say the words
-    a request against something said is still searched — see
-    :func:`smart_match`. Every other lookup reads the words themselves only: a
-    model asked which of "blurry" meant "two women" answered blurry.
 
-    ``rewrite(positive, negative, request)`` answers what the policy can only
-    do bluntly: something in neither prompt, which the prompt may contradict
-    ("two women" over a prompt describing one), and something to take out of a
-    phrase that says more than it ("a woman wearing a straw hat"), so the local
-    model reworks the whole pair. A rewrite that fails leaves the policy's own
-    edit standing.
+def _joined(positive: str, negative: str, each_negative: list[str], parsed: tuple,
+            revisions: list[PromptRevision]) -> PromptRevision:
+    polarity, term = parsed
+    if len(revisions) == 1:
+        return revisions[0]
+    return PromptRevision(
+        positive, negative, story_of([revision.positive for revision in revisions]),
+        _negative_story(negative, each_negative, [revision.negative for revision in revisions]),
+        term, polarity, ", ".join(dict.fromkeys(revision.action for revision in revisions)),
+        " ".join(dict.fromkeys(revision.answer for revision in revisions if revision.answer)))
+
+
+def apply_request(positive: str, negative: str, request: str) -> PromptRevision | None:
+    """Apply a ``request`` to a prompt pair by the policy up top, reading the
+    words themselves alone, each scene of a story by its own prompts.
 
     ``None`` when the request names nothing to act on ("request … over" with
     only filler between the markers), so the caller can say it didn't catch a
@@ -349,19 +334,10 @@ def apply_request(positive: str, negative: str, request: str,
     if parsed is None:
         return None
     positive, negative = positive or "", negative or ""
-    scenes, negatives = scene_prompts(positive), scene_prompts(negative)
-    if len(scenes) == 1:
-        return _revised(positive, negative, request, parsed, match, rewrite)
-    each_negative = [scene_text(negatives, index) for index in range(len(scenes))]
-    revisions = [_revised(scene, scene_negative, request, parsed, match, rewrite)
+    scenes, each_negative = _scenes_of(positive, negative)
+    revisions = [_revised(scene, scene_negative, parsed)
                  for scene, scene_negative in zip(scenes, each_negative)]
-    polarity, term = parsed
-    return PromptRevision(positive, negative,
-                          story_of([revision.positive for revision in revisions]),
-                          _negative_story(negative, each_negative,
-                                          [revision.negative for revision in revisions]),
-                          term, polarity,
-                          ", ".join(dict.fromkeys(revision.action for revision in revisions)))
+    return _joined(positive, negative, each_negative, parsed, revisions)
 
 
 def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
@@ -372,155 +348,101 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
     return story_of(after)
 
 
-def _revised(positive: str, negative: str, request: str, parsed: tuple,
-             match, rewrite) -> PromptRevision:
+def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
     polarity, term = parsed
 
     def made(new_positive, new_negative, action) -> PromptRevision:
         return PromptRevision(positive, negative, new_positive, new_negative,
                               term, polarity, action)
 
-    def rewritten() -> PromptRevision | None:
-        if rewrite is None:
-            return None
-        try:
-            new_positive, new_negative = (
-                _said(old, _without_nothing_weighted(new))
-                for old, new in zip((positive, negative), rewrite(positive, negative, request)))
-        except Exception as exc:  # model down / unreadable: the rules' own edit stands
-            logger.warning("prompt_edit: could not rewrite the prompts for a request (%s)",
-                           type(exc).__name__)
-            return None
-        if (new_positive, new_negative) == (positive, negative):
-            return None  # it did nothing, which is no answer to a request
-        if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
-            return None
-        return made(new_positive, new_negative, REWRITTEN)
-
     if polarity == REMOVE:
-        index = _index_of(positive, term, match)
+        index = _index_of(positive, term)
         if index is not None:
-            within = bare_terms(positive)[index].lower() != term.lower()
-            return ((within and rewritten())
-                    or made(_without(positive, index), negative, DROPPED))
-        index = _index_of(negative, term, None)
+            return made(_without(positive, index), negative, DROPPED)
+        index = _index_of(negative, term)
         if index is not None:
             return made(positive, _reweighted(negative, index, WEIGHT_STEP), PUSHED)
         return made(positive, _plus(negative, term), EXCLUDED)
-    index = _index_of(negative, term, None)
+    index = _index_of(negative, term)
     if index is not None:
         return made(positive, _without(negative, index), ALLOWED)
-    index = _index_of(positive, term, None)
+    index = _index_of(positive, term)
     if index is not None:
         return made(_reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
-    return rewritten() or made(_plus(positive, term), negative, ADDED)
+    return made(_plus(positive, term), negative, ADDED)
 
 
-def work_out(positive: str, negative: str, request: str) -> PromptRevision | None:
-    """``request`` applied as every request is, spoken or typed: the local LLM
-    finding a term the prompt names in its own words, and rewriting the pair for
-    one in neither prompt."""
-    return apply_request(
-        positive, negative, request,
-        match=partial(smart_match, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-                      system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
-        rewrite=partial(rewrite_prompt, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-                        system_prompt=REQUEST_REWRITE_SYSTEM_PROMPT))
+def work_out(positive: str, negative: str, request: str, *, exchange=(),
+             notes: CollectionNotes | None = None, ask=None) -> PromptRevision | None:
+    """``request`` applied as every request is, spoken or typed: the local model
+    first, knowing the collection and the exchange, and the rules when the
+    model cannot answer."""
+    parsed = parse_request(request)
+    if parsed is None:
+        return None
+    positive, negative = positive or "", negative or ""
+    scenes, each_negative = _scenes_of(positive, negative)
+    revisions = []
+    for scene, scene_negative in zip(scenes, each_negative):
+        revision = _answered(scene, scene_negative, request, parsed, exchange, notes,
+                             ask or ask_the_model)
+        if revision is None:
+            return apply_request(positive, negative, request)
+        revisions.append(revision)
+    return _joined(positive, negative, each_negative, parsed, revisions)
 
 
-# --- the I/O boundary: which of a prompt's terms the request means ----------
-
-
-def build_match_messages(terms: list[str], term: str, system_prompt: str) -> list[dict]:
-    """The chat messages for one match: the rules, then the prompt's own terms
-    numbered, and the term the speaker used."""
-    listing = "\n".join(f"{i}. {text}" for i, text in enumerate(terms))
-    user = (
-        f"Terms already in the prompt:\n{listing}\n\n"
-        f"The speaker asked about: {term}\n\n"
-        'Reply with only JSON: {"choice": n}'
-    )
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user},
-    ]
-
-
-def parse_match(data: dict, count: int) -> int | None:
-    """The chosen index from a completion, or ``None`` for "none of them".
-
-    Anything out of range is read as no answer rather than clamped: a number the
-    model invented is not a term the speaker meant, and acting on it would edit
-    a part of the prompt nobody mentioned.
-    """
+def _answered(positive: str, negative: str, request: str, parsed: tuple, exchange, notes,
+              ask) -> PromptRevision | None:
+    polarity, term = parsed
     try:
-        obj = local_llm.answer_of(data)
-    except json.JSONDecodeError:
+        new_positive, new_negative, answer = ask(positive, negative, request, exchange, notes)
+    except Exception as exc:  # noqa: BLE001 -- model down or unreadable: the rules' own edit stands
+        logger.warning("prompt_edit: the model could not answer the request (%s)",
+                       type(exc).__name__)
         return None
-    choice = obj.get("choice")
-    if not isinstance(choice, int) or not 0 <= choice < count:
+    new_positive = _said(positive, _without_nothing_weighted(new_positive))
+    new_negative = _said(negative, _without_nothing_weighted(new_negative))
+    if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
         return None
-    return choice
+    if (new_positive, new_negative) == (positive, negative) and not answer:
+        return None  # it did nothing and said nothing, which is no answer to a request
+    return PromptRevision(positive, negative, new_positive, new_negative, term, polarity,
+                          REWRITTEN, answer)
 
 
-def smart_match(terms: list[str], term: str, *, base_url: str, model: str,
-                system_prompt: str, timeout: float = 20.0) -> int | None:
-    """Which of a prompt's own terms the speaker meant, or ``None`` for none.
-
-    What the literal search cannot do: "no earrings" is about a prompt that says
-    "silver ear studs", and no matching of the words themselves gets from one to
-    the other. So the prompt's terms are offered to the local LLM and it says
-    which one — a lookup, not a rewrite; the policy still decides what happens
-    to whatever comes back.
-
-    ``None`` on an unreachable model or an unusable answer, so the caller falls
-    back to what the words themselves said — which for a request against
-    something absent is to add it to the negative prompt, exactly as before.
-    """
-    if not terms:
-        return None
-    try:
-        chosen = parse_match(local_llm.ask(
-            build_match_messages(terms, term, system_prompt),
-            base_url=base_url, model=model, temperature=0.1, timeout=timeout), len(terms))
-    except Exception as exc:  # model down / unparseable: the words stand alone
-        logger.warning("prompt_edit: could not match the request against the "
-                       "prompt's %d terms (%s)", len(terms), exc)
-        return None
-    if chosen is not None:
-        logger.info("prompt_edit: the request matched index %d of the prompt's %d terms",
-                    chosen, len(terms))
-    return chosen
+# --- the I/O boundary: the model, with the notes and the exchange ------------
 
 
-# --- and the pair rewritten for a term in neither prompt ---------------------
+def build_request_messages(positive: str, negative: str, request: str, exchange,
+                           notes: CollectionNotes | None, system_prompt: str) -> list[dict]:
+    parts = []
+    if notes is not None and notes.complete:
+        parts.append(notes.as_told())
+    if exchange:
+        turns = "\n".join(f"Artist: {said}\nYou: {answered}" for said, answered in exchange)
+        parts.append(f"THE EXCHANGE SO FAR about this image, oldest first:\n{turns}")
+    parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
+    parts.append(f"THE ARTIST NOW ASKS:\n{request}")
+    parts.append(
+        'Reply with only a JSON object with three keys: "positive", holding the whole '
+        'rewritten positive prompt; "negative", holding the whole rewritten negative '
+        'prompt; and "answer", one or two plain sentences to the artist on what you '
+        "changed and what in his collection you drew on.")
+    return [{"role": "system", "content": system_prompt},
+            {"role": "user", "content": "\n\n".join(parts)}]
 
 
-def build_rewrite_messages(positive: str, negative: str, instruction: str,
-                           system_prompt: str) -> list[dict]:
-    """The chat messages for one rewrite: the editing rules, then the current
-    prompt pair and the spoken change as the user turn."""
-    user = (
-        f"Positive prompt:\n{positive}\n\n"
-        f"Negative prompt:\n{negative}\n\n"
-        f"Spoken instruction:\n{instruction}\n\n"
-        'Reply with only a JSON object with two keys: "positive", holding the whole '
-        'rewritten positive prompt, and "negative", holding the whole rewritten negative prompt.'
-    )
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user},
-    ]
-
-
-def rewrite_prompt(positive: str, negative: str, instruction: str, *, base_url: str,
-                   model: str, system_prompt: str, timeout: float = 30.0):
-    """Apply ``instruction`` to the (positive, negative) prompt pair via the local
-    LLM and return the revised pair. A field the model omits is left unchanged.
-    Raises on transport/decode errors so the caller can surface them."""
+def ask_the_model(positive: str, negative: str, request: str, exchange,
+                  notes: CollectionNotes | None) -> tuple[str, str, str]:
+    """The revised pair and the model's sentence; raises when the model cannot be
+    reached or read, which the caller answers with the rules' own edit."""
     obj = local_llm.answer_of(local_llm.ask(
-        build_rewrite_messages(positive, negative, instruction, system_prompt),
-        base_url=base_url, model=model, temperature=0.4, timeout=timeout))
-    new_positive = str(obj["positive"]).strip() if "positive" in obj else positive
-    new_negative = str(obj["negative"]).strip() if "negative" in obj else negative
-    return new_positive, new_negative
+        build_request_messages(positive, negative, request, exchange, notes,
+                               REQUEST_SYSTEM_PROMPT),
+        base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL, temperature=0.4,
+        timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
+        stays_loaded="0"))
+    return (str(obj["positive"]).strip() if "positive" in obj else positive,
+            str(obj["negative"]).strip() if "negative" in obj else negative,
+            str(obj.get("answer") or "").strip())

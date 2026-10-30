@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 WINDOW_TOKENS = 40960
 BATCH_CHARS = 90_000  # about 22,000 tokens of prompts, read inside the window above
 GROWTH = 0.1  # this much more of the collection than the notes describe, and they are retaken
+TOLD_CHARS = 80_000  # how much of the batch notes a Request's ask carries, oldest first
 _NOTE_TOKENS = 600
 _PATTERNS_TOKENS = 1200
 _WINDOW_MARGIN = 256
@@ -36,6 +37,18 @@ class CollectionNotes:
     @property
     def complete(self) -> bool:
         return bool(self.patterns)
+
+    def as_told(self, limit_chars: int = TOLD_CHARS) -> str:
+        told = [f"NOTES ON THE COLLECTION ({self.prompt_count} prompts)", "", "PATTERNS",
+                self.patterns, ""]
+        spent = 0
+        for index, note in enumerate(self.batch_notes, 1):
+            section = f"Batch {index}:\n{note}"
+            if spent + len(section) > limit_chars:
+                break
+            spent += len(section)
+            told.extend([section, ""])
+        return "\n".join(told).rstrip("\n")
 
 
 def batches(prompts: list[str], limit: int) -> Iterator[list[str]]:

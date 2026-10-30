@@ -2859,13 +2859,13 @@ def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
     every prompt pair and words it was asked about."""
     calls = []
 
-    def rewrite(positive, negative, words, **_settings):
+    def ask_the_model(positive, negative, words, exchange, notes):
         calls.append((positive, negative, words))
         if isinstance(answer, Exception):
             raise answer
-        return answer
+        return (*answer, "Done.")
 
-    monkeypatch.setattr(prompt_edit, "rewrite_prompt", rewrite)
+    monkeypatch.setattr(prompt_edit, "ask_the_model", ask_the_model)
     return calls
 
 
@@ -3009,7 +3009,7 @@ def test_asking_rewrites_the_prompts_of_the_image_on_display(saved_panel, qtbot,
 
 def test_new_words_for_a_requested_image_redo_the_request_on_what_it_was_asked_of(
         saved_panel, qtbot, monkeypatch):
-    _rewriting(monkeypatch)
+    _rewriting(monkeypatch, answer=RuntimeError("no model here"))
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     _request_made(db, "img1")

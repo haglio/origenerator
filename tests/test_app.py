@@ -33,6 +33,7 @@ from origenerator.app import (
     _configure_logging,
     _file_what_comfyui_left,
     _fold_enhancements,
+    _hand_the_remakes_down_again,
     _import_new_files,
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
@@ -53,7 +54,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
 from origenerator.db import Database
 from origenerator.evolver_export import EvolverInbox
-from origenerator.export_lane import GENAU
+from origenerator.export_lane import GENAU, KINO
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
@@ -1230,6 +1231,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.enhanced_start_backfill", "cancel_backfill"),
     ("origenerator.enhanced_start_backfill", "fold_completed_backfill"),
     ("origenerator.enhanced_start_backfill", "pay_the_owed_favorites"),
+    ("origenerator.enhanced_start_backfill", "hand_the_remakes_down_again"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "merge_soundless_copy_rows"),
@@ -1388,6 +1390,28 @@ def test_a_backfilled_video_that_landed_while_the_app_was_closed_becomes_its_old
     assert old["old_version_of"] == "first"
     [held] = gallery.row_output_files(old)
     assert gallery.output_file_path(held, library.places).read_bytes() == b"first made"
+
+
+def test_opening_the_app_hands_a_video_remade_in_place_to_kino_again(tmp_path):
+    output = tmp_path / "output"
+    (output / "video").mkdir(parents=True)
+    (output / "video" / "first_00001.mp4").write_bytes(b"made again")
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(prompt_id="first", workflow_name="wan22_i2v", workflow_version="v1",
+                         params_json="{}", workflow_json="{}", source="generated")
+    db.update_generation("first", status="completed", output_files=json.dumps(
+        [{"filename": "first_00001.mp4", "subfolder": "video", "type": "output"}]))
+    with sqlite3.connect(tmp_path / "t.db") as conn:
+        conn.execute("UPDATE generations SET evolver_exported_at = '2026-01-02 03:04:05'")
+    db.mark_remade("first")
+    inbox = tmp_path / "0_inbox"
+    library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
+                      thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs",
+                      inbox=EvolverInbox(inbox))
+
+    assert _hand_the_remakes_down_again(library) == 1
+
+    assert (inbox / KINO.source / "first_00001.mp4").read_bytes() == b"made again"
 
 
 def test_an_enhancement_of_a_deleted_image_goes_to_the_trash_at_startup(tmp_path, monkeypatch):

@@ -12,7 +12,7 @@ from origenerator import gallery
 from origenerator.base_backfill import BATCH_MINUTES, queue_within_budget
 from origenerator.db_generations import was_kept, was_sent
 from origenerator.evolver_upscales import EvolverUpscales
-from origenerator.export_lane import KINO
+from origenerator.export_lane import EXPORT_LANES, KINO, ExportLane
 from origenerator.file_numbers import NUMBERED
 from origenerator.funscript import funscript_path_for
 from origenerator.generation_config import filled_params
@@ -115,6 +115,26 @@ def _old_video_of_a_finished_run(db, run: dict, trash) -> dict | None:
 def _old_video_left_beside(db, row: dict) -> dict | None:
     old = db.get_generation(row["backfill_of"]) if row.get("backfill_of") else None
     return old if old is not None and source_of(old) == GenerationSource.REPLACED else None
+
+
+def hand_the_remakes_down_again(db, places: OutputPlaces, inbox) -> int:
+    handed = 0
+    for row in db.list_generations():
+        for lane in _lanes_sent_down_before_it_was_remade(row):
+            try:
+                lane.send_video_of(row, db=db, inbox=inbox, places=places)
+            except (OSError, ValueError):
+                logger.warning("Could not hand %s down the %s lane again; the next launch "
+                               "tries again", row["prompt_id"], lane.name, exc_info=True)
+                continue
+            handed += 1
+    return handed
+
+
+def _lanes_sent_down_before_it_was_remade(row: dict) -> list[ExportLane]:
+    remade_at = row.get("remade_at")
+    return [lane for lane in EXPORT_LANES
+            if remade_at and row.get(lane.flag) and row[lane.flag] < remade_at]
 
 
 def pay_the_owed_favorites(db, evolver: Evolver) -> int:

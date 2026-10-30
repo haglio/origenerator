@@ -19,10 +19,12 @@ from origenerator.enhanced_start_backfill import (
     backfill_params_for,
     cancel_backfill,
     fold_completed_backfill,
+    hand_the_remakes_down_again,
     pay_the_owed_favorites,
     queue_backfill,
     videos_to_backfill,
 )
+from origenerator.evolver_export import EvolverInbox
 from origenerator.export_lane import EXPORT_LANES, KINO
 from origenerator.funscript import funscript_path_for
 from origenerator.gallery_actions import GalleryActions
@@ -510,6 +512,44 @@ def _asked_for(db_path, prompt_id, when):
     with sqlite3.connect(db_path) as conn:
         conn.execute("UPDATE generations SET created_at = ? WHERE prompt_id = ?",
                      (when, prompt_id))
+
+
+def _sent_long_ago(db_path, prompt_id):
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE generations SET evolver_exported_at = '2026-01-02 03:04:05'"
+                     " WHERE prompt_id = ?", (prompt_id,))
+
+
+def test_a_video_remade_in_place_is_handed_down_the_lane_its_old_one_went_down(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    _made_on_disk(tmp_path, "video", b"first made")
+    db.mark_evolver_exported("video")
+    _sent_long_ago(tmp_path / "t.db", "video")
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+    _fold(db, tmp_path)
+    inbox = tmp_path / "0_inbox"
+
+    assert [hand_the_remakes_down_again(db, _places(tmp_path), EvolverInbox(inbox))
+            for _launch in range(2)] == [1, 0]
+
+    assert [path.read_bytes() for path in (inbox / KINO.source).iterdir()] == [b"made again"]
+
+
+def test_a_video_remade_in_place_after_its_send_was_taken_back_stays_taken_back(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    _made_on_disk(tmp_path, "video", b"first made")
+    db.mark_evolver_exported("video")
+    _sent_long_ago(tmp_path / "t.db", "video")
+    db.mark_evolver_unsent("video")
+    _finished_backfill_run(db, tmp_path, "again", of="video")
+    _fold(db, tmp_path)
+
+    assert hand_the_remakes_down_again(
+        db, _places(tmp_path), EvolverInbox(tmp_path / "0_inbox")) == 0
 
 
 def test_a_video_remade_in_place_keeps_the_sitting_latest_heads_it_with(tmp_path):

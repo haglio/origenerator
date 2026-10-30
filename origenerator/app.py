@@ -220,6 +220,13 @@ def _put_the_backfill_in_place(library: Library):
     return folded
 
 
+def _hand_the_remakes_down_again(library: Library):
+    from origenerator import enhanced_start_backfill
+
+    return enhanced_start_backfill.hand_the_remakes_down_again(
+        library.db, library.places, library.inbox)
+
+
 def _import_new_files(library: Library):
     from origenerator.importer import import_comfyui_output
 
@@ -370,6 +377,9 @@ MAINTENANCE = (
     BootPass(None, _put_the_backfill_in_place,
              counted="Put %d backfilled video(s) in the place of the videos they replace",
              failure="Putting backfilled videos in place failed: %s"),
+    BootPass(None, _hand_the_remakes_down_again,
+             counted="Handed %d remade video(s) down the lanes their old ones went down",
+             failure="Handing remade videos down their lanes again failed: %s"),
     BootPass("Scanning for new images...", _import_new_files,
              counted="Imported %d existing files from ComfyUI output",
              failure="Import failed: %s"),

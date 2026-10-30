@@ -147,13 +147,9 @@ class _Scene(QFrame):
     def reflect_use(self) -> None:
         speaking = self.speaking()
         for key in SPOKEN_OVER:
-            if speaking:
-                help_text, note = SPEAKING_HELP, SPEAKING_NOTE
-            else:
-                help_text, note = self._shut_down.get(key, param_help(key)), ""
             set_in_use(self.fields[key], self.captions[key],
-                       not speaking and key not in self._shut_down, help_text)
-            self.captions[key].setText(TEXT_CAPTIONS[key] + note)
+                       SPEAKING_HELP if speaking else self._shut_down.get(key), param_help(key))
+            self.captions[key].setText(TEXT_CAPTIONS[key] + (SPEAKING_NOTE if speaking else ""))
 
     def frames(self) -> int:
         seconds = self.length.value()

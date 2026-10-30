@@ -274,8 +274,7 @@ class ParamForm(QWidget):
             else:
                 self._shut_down[row] = shut_down_help(values)
             if self._widgets[row] is not self._scenes:
-                set_in_use(self._widgets[row], self._labels[row], row not in self._shut_down,
-                           self._tip(row))
+                self._explain(row)
         if self._scenes is not None:
             self._scenes.reflect_use()
 
@@ -381,29 +380,29 @@ class ParamForm(QWidget):
         self._explain(key)
 
     def _explain(self, key: str) -> None:
-        explained = self._tip(key)
-        label = self._labels[key]
-        label.setToolTip(explained or label.text())
-        widget = self._widgets.get(key)
-        if widget is not None and explained and not isinstance(widget, DropSlot):
+        help_text, label, widget = self._help(key), self._labels[key], self._widgets.get(key)
+        if key in _IN_USE_WHILE:
+            set_in_use(widget, label, self._shut_down.get(key), help_text)
+            return
+        label.setToolTip(help_text or label.text())
+        if widget is not None and help_text and not isinstance(widget, DropSlot):
             if key in self._lora_keys:
-                explained = with_training_date(explained, self._read_field(self._defs[key]))
-            widget.setToolTip(explained)  # a zone's tooltip names what it holds
+                help_text = with_training_date(help_text, self._read_field(self._defs[key]))
+            widget.setToolTip(help_text)  # a zone's tooltip names what it holds
 
     def _explain_lora_picks(self) -> None:
         for key in self._lora_keys:
             if key in self._labels:
                 self._explain(key)
 
-    def _tip(self, key: str) -> str:
+    def _help(self, key: str) -> str:
         pd = self._defs.get(key)
-        return self._shut_down.get(key) or (self._help(pd) if pd is not None else param_help(key))
-
-    def _help(self, pd: ParamDef) -> str:
+        if pd is None:
+            return param_help(key)
         warned_here = [other for other in self._param_defs
-                       if other.key != pd.key and self._row_of(other.key) == pd.key]
+                       if other.key != key and self._row_of(other.key) == key]
         return " ".join(filter(None, [
-            definition_help(pd, self._recommendations.get(pd.key, "")),
+            definition_help(pd, self._recommendations.get(key, "")),
             *(advice_help(other, self._recommendations.get(other.key, ""))
               for other in warned_here)]))
 

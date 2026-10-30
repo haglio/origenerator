@@ -191,11 +191,12 @@ class PromptField(QPlainTextEdit):
         painter.end()
 
 
-def set_in_use(field: QPlainTextEdit, label: QLabel, in_use: bool, tip: str) -> None:
+def set_in_use(field: QPlainTextEdit, label: QLabel, unused_because: str | None,
+               help_text: str) -> None:
     for widget in (field, label):
-        _mark_inert(widget, not in_use)
-        widget.setToolTip(tip)
-    field.setReadOnly(not in_use)
+        _mark_inert(widget, bool(unused_because))
+        widget.setToolTip(unused_because or help_text)
+    field.setReadOnly(bool(unused_because))
 
 
 def _mark_inert(widget, inert: bool) -> None:

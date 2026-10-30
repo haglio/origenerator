@@ -313,6 +313,27 @@ def test_a_story_the_backfill_remakes_while_the_app_is_closed_is_spoken_before_c
     assert run["status"] == "running"
 
 
+@pytest.mark.parametrize("status", ["running", "pending"])
+def test_a_backfill_run_comfyui_has_no_record_of_is_cleared_so_its_video_is_remade_while_closed(
+        qtbot, tmp_path, monkeypatch, status):
+    # One ComfyUI lost, or one an earlier pass left waiting in its line, kept its
+    # video from being offered again until Origenerator next opened (2026-10-29).
+    monkeypatch.setattr(downtime.config, "OUTPUT_PLACES", _places(tmp_path))
+    monkeypatch.setattr(downtime.config, "THUMB_DIR", _thumbnails(tmp_path))
+    client = _comfyui_taking_everything()
+    client.fetch_queue = MagicMock(return_value=set())
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "video", made_from="image", starred=True, start=_plain("image"))
+    _backfill_run(db, "lost", of="video", status=status, made=False)
+
+    assert downtime.hand_comfyui_more_of_the_backfill(
+        db, client, AppState(tmp_path / "ui_state.json")) == 1
+
+    assert [(row["prompt_id"] == "lost", row["backfill_of"]) for row in db.list_generations()
+            if row["source"] == GenerationSource.BACKFILL] == [(False, "video")]
+
+
 # --- putting a finished backfill run in the old video's place -----------------
 
 

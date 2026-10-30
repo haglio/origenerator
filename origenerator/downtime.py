@@ -19,6 +19,7 @@ from origenerator.enhanced_start_backfill import queue_backfill
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.generation_state import GenerationSource
+from origenerator.inflight import reconcile_the_backfill
 from origenerator.landed_while_away import running_trainings, training_notice
 from origenerator.media import MediaType
 from origenerator.notice_toast import raise_notice
@@ -137,7 +138,8 @@ def _handed_over(db, client, queue: Callable[[object], int]) -> int:
     return queued
 
 
-def _queue_the_backfill_into(jobs, db, ui: AppState) -> int:
+def _queue_the_backfill_into(jobs, db, client, ui: AppState) -> int:
+    reconcile_the_backfill(db, client, config.OUTPUT_PLACES, config.THUMB_DIR)
     return queue_the_backfill(
         jobs, db, db.list_generations(),
         enhance_settings=gallery.EnhanceSettings.parse(ui.get("enhance_settings")))
@@ -145,7 +147,7 @@ def _queue_the_backfill_into(jobs, db, ui: AppState) -> int:
 
 def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
     def everything(jobs) -> int:
-        return (_queue_the_backfill_into(jobs, db, ui)
+        return (_queue_the_backfill_into(jobs, db, client, ui)
                 + queue_the_work_left(jobs, db.list_generations(),
                                       experiments_on=ui.get("experiments_enabled") is True,
                                       policy=ExperimentPolicy(registry=WORKFLOW_REGISTRY,
@@ -158,7 +160,7 @@ def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
 
 
 def hand_comfyui_more_of_the_backfill(db, client, ui: AppState) -> int:
-    queued = _handed_over(db, client, lambda jobs: _queue_the_backfill_into(jobs, db, ui))
+    queued = _handed_over(db, client, lambda jobs: _queue_the_backfill_into(jobs, db, client, ui))
     if queued:
         logger.info("Handed ComfyUI %d more run(s) of the backfill while Origenerator stays "
                     "closed", queued)

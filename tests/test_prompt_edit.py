@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.prompt_edit import (
     ADD,
     ADDED,
@@ -77,6 +78,14 @@ def test_against_something_in_the_positive_prompt_takes_it_out():
     assert revision.positive == "a woman, soft light"
     assert revision.negative == "blurry"  # untouched: it was enough to drop it
     assert revision.action == DROPPED
+
+
+def test_a_prompt_in_boxes_is_asked_of_read_whole():
+    revision = apply_request(f"a woman, silver earrings,{BOX_BREAK}soft light",
+                             f"blurry,{BOX_BREAK}dim", "no silver earrings")
+
+    assert (revision.old_positive, revision.positive, revision.negative) == (
+        "a woman, silver earrings, soft light", "a woman, soft light", "blurry, dim")
 
 
 def test_against_something_in_neither_prompt_puts_it_in_the_negative():

@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from functools import partial
 
 from origenerator import local_llm
+from origenerator.box_breaks import unboxed
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.prompts import REQUEST_REWRITE_SYSTEM_PROMPT, VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
@@ -348,7 +349,7 @@ def apply_request(positive: str, negative: str, request: str,
     parsed = parse_request(request)
     if parsed is None:
         return None
-    positive, negative = positive or "", negative or ""
+    positive, negative = unboxed(positive or ""), unboxed(negative or "")
     scenes, negatives = scene_prompts(positive), scene_prompts(negative)
     if len(scenes) == 1:
         return _revised(positive, negative, request, parsed, match, rewrite)

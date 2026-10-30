@@ -480,7 +480,7 @@ def smart_match(terms: list[str], term: str, *, base_url: str, model: str,
     if not terms:
         return None
     try:
-        chosen = parse_match(local_llm.ask_json(
+        chosen = parse_match(local_llm.ask(
             build_match_messages(terms, term, system_prompt),
             base_url=base_url, model=model, temperature=0.1, timeout=timeout), len(terms))
     except Exception as exc:  # model down / unparseable: the words stand alone
@@ -518,7 +518,7 @@ def rewrite_prompt(positive: str, negative: str, instruction: str, *, base_url: 
     """Apply ``instruction`` to the (positive, negative) prompt pair via the local
     LLM and return the revised pair. A field the model omits is left unchanged.
     Raises on transport/decode errors so the caller can surface them."""
-    obj = local_llm.answer_of(local_llm.ask_json(
+    obj = local_llm.answer_of(local_llm.ask(
         build_rewrite_messages(positive, negative, instruction, system_prompt),
         base_url=base_url, model=model, temperature=0.4, timeout=timeout))
     new_positive = str(obj["positive"]).strip() if "positive" in obj else positive

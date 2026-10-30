@@ -388,18 +388,17 @@ def test_the_matcher_is_shown_the_prompts_own_terms_unweighted():
 
 
 def test_a_completion_names_the_chosen_term():
-    assert parse_match({"choices": [{"message": {"content": '{"choice": 1}'}}]}, 3) == 1
+    assert parse_match({"message": {"content": '{"choice": 1}'}}, 3) == 1
 
 
 def test_a_completion_refusing_to_choose_reads_as_no_match():
-    assert parse_match({"choices": [{"message": {"content": '{"choice": -1}'}}]}, 3) is None
-    assert parse_match({"choices": [{"message": {"content": 'nope'}}]}, 3) is None
+    assert parse_match({"message": {"content": '{"choice": -1}'}}, 3) is None
+    assert parse_match({"message": {"content": 'nope'}}, 3) is None
 
 
 def _model_answering(content):
     response = MagicMock()
-    response.read.return_value = json.dumps(
-        {"choices": [{"message": {"content": content}}]}).encode()
+    response.read.return_value = json.dumps({"message": {"content": content}}).encode()
     response.__enter__ = lambda self: self
     response.__exit__ = MagicMock(return_value=False)
     return patch("urllib.request.urlopen", return_value=response)
@@ -457,15 +456,15 @@ def test_a_rewrite_sends_both_prompts_and_answers_with_both():
     with _model_answering('{"positive": "a woman", "negative": "tan lines"}') as urlopen:
         result = rewrite_prompt(
             "a woman, tan", "", "no tan lines",
-            base_url="http://localhost:11434/v1", model="dolphin", system_prompt="SYSTEM",
+            base_url="http://localhost:11434", model="dolphin", system_prompt="SYSTEM",
         )
 
     (request,), _ = urlopen.call_args
     body = json.loads(request.data)
     assert result == ("a woman", "tan lines")
-    assert request.full_url == "http://localhost:11434/v1/chat/completions"
+    assert request.full_url == "http://localhost:11434/api/chat"
     assert body["model"] == "dolphin"
-    assert body["response_format"] == {"type": "json_object"}
+    assert body["format"] == "json"
     assert "a woman, tan" in body["messages"][1]["content"]
 
 
@@ -473,7 +472,7 @@ def test_rewrite_prompt_keeps_a_field_the_model_omits():
     with _model_answering('{"positive": "a man"}'):
         positive, negative = rewrite_prompt(
             "a woman", "existing negative", "make her a man",
-            base_url="http://x/v1", model="m", system_prompt="S",
+            base_url="http://x", model="m", system_prompt="S",
         )
 
     assert positive == "a man" and negative == "existing negative"  # negative preserved

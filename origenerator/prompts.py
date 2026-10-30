@@ -5,9 +5,8 @@ model does with it, and each changes for reasons that have nothing to do with
 where the media library sits or which port the OSR2 broker listens on, so
 they share neither a file nor a blame history with those.
 
-All local: the prompts and everything sent under them go to an
-OpenAI-compatible chat server on this machine (``config.LOCAL_LLM_BASE_URL``),
-and nothing leaves it. Uncensored models throughout -- a censored one refuses
+All local: the prompts and everything sent under them go to the Ollama on this
+machine (``config.LOCAL_LLM_BASE_URL``), and nothing leaves it. Uncensored models throughout -- a censored one refuses
 explicit edits, refuses to match explicit words and refuses to widen a search
 with the library's own vocabulary -- so each prompt says outright that explicit
 content is expected and is to be handled literally rather than softened.

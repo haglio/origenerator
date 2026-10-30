@@ -464,7 +464,7 @@ def test_a_one_word_group_widens_nothing():
 
 
 def _completion(content):
-    return {"choices": [{"message": {"content": content}}]}
+    return {"message": {"content": content}}
 
 
 def test_the_widening_request_names_every_word_of_the_query():

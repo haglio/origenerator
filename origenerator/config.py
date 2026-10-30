@@ -188,8 +188,8 @@ MOTION_DEFAULT_HZ = bpm_for_speed(MOTION_DEFAULT_SPEED) / 60
 # --- Voice, and the local LLM ----------------------------------------------
 # What is said is heard locally (voice_core: vosk and faster-whisper, CPU), and a
 # local LLM works a request into its prompts and widens a search.
-# All local — no audio or prompt text leaves the machine. Point LOCAL_LLM_* at your
-# own OpenAI-compatible chat server (Ollama's /v1, LM Studio, llama.cpp, …). What
+# All local — no audio or prompt text leaves the machine. LOCAL_LLM_* names the
+# Ollama on this machine (origenerator.local_llm speaks its own chat door). What
 # the LLM is *told* is behavior rather than configuration and lives in
 # origenerator.prompts.
 VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time listens with; cached under ~/.cache/vosk
@@ -197,5 +197,5 @@ VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time lis
 # a dead headset microphone the default input before. None, or a name nothing answers to today,
 # listens to the liveliest input instead (`python -m sounddevice` lists the names).
 VOICE_DEVICE_NAME = "Brio"
-LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
+LOCAL_LLM_BASE_URL = "http://localhost:11434"  # Ollama
 LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"  # uncensored; a censored one refuses explicit edits

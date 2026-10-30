@@ -35,6 +35,7 @@ typing, over the prompt rather than the document.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import contextmanager
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
@@ -84,6 +85,43 @@ def _spliced(layout: list, position: int, removed: int, inserted: str) -> list:
     return [(kind, text) for kind, text in before + [(ADDED, inserted)] + after if text]
 
 
+class UndoHistory(QObject):
+    def __init__(self, parent: QObject, read: Callable[[], str], show: Callable[[str], None]):
+        super().__init__(parent)
+        self._read = read
+        self._show = show
+        self._undone: list[str] = []
+        self._redone: list[str] = []
+
+    def took(self, before: str) -> None:
+        self._undone.append(before)
+        self._redone.clear()
+
+    def watch(self, edit: QPlainTextEdit) -> None:
+        edit.installEventFilter(self)
+
+    def unwatch(self, edit: QPlainTextEdit) -> None:
+        edit.removeEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress):
+            undo = event.matches(QKeySequence.StandardKey.Undo)
+            redo = event.matches(QKeySequence.StandardKey.Redo)
+            if undo or redo:
+                event.accept()  # the field's, not the window's own Undo
+                if event.type() == QEvent.Type.KeyPress:
+                    self._step(*((self._undone, self._redone) if undo
+                                 else (self._redone, self._undone)))
+                return True
+        return False
+
+    def _step(self, back: list[str], forth: list[str]) -> None:
+        if not back:
+            return
+        forth.append(self._read())
+        self._show(back.pop())
+
+
 class _Tracker(QObject):
     """Keeps one field's marks — and the prompt under them — in step with what is
     typed into it."""
@@ -98,8 +136,7 @@ class _Tracker(QObject):
         # rests on.
         self._layout: list = [(SAME, self._value)] if self._value else []
         self._writing = False  # our own rewrites, which must not re-enter
-        self._undone: list[str] = []  # the prompt before each burst of typing
-        self._redone: list[str] = []
+        self._history = UndoHistory(self, lambda: self._value, self._show_whole)
         self._settle = QTimer(self)
         self._settle.setSingleShot(True)
         self._settle.setInterval(SETTLE_MS)
@@ -110,12 +147,14 @@ class _Tracker(QObject):
         self._redraw.timeout.connect(self._show_prompt_only)
         edit.setUndoRedoEnabled(False)  # see the module docstring
         edit.installEventFilter(self)
+        self._history.watch(edit)
         edit.document().contentsChange.connect(self._on_contents_change)
 
     def detach(self) -> None:
         self._settle.stop()
         self._redraw.stop()
         self._edit.removeEventFilter(self)
+        self._history.unwatch(self._edit)
         self._edit.document().contentsChange.disconnect(self._on_contents_change)
         self._edit.setUndoRedoEnabled(True)
         self.setParent(None)
@@ -248,8 +287,7 @@ class _Tracker(QObject):
             return
         inserted = self._edit.toPlainText()[position:position + added]
         if not self._settle.isActive():  # the first keystroke of a burst
-            self._undone.append(self._value)
-            self._redone.clear()
+            self._history.took(self._value)
         start = self._prompt_offset(position)
         end = self._prompt_offset(position + removed)
         self._value = self._value[:start] + inserted + self._value[end:]
@@ -260,17 +298,8 @@ class _Tracker(QObject):
         self._redraw.start()
         self._settle.start()  # ...and the strikes come back once the typing stops
 
-    def _step(self, back: list[str], forth: list[str]) -> None:
-        """Undo or redo one burst of typing: the prompt it left goes on ``forth``
-        and the one off ``back`` takes its place."""
-        if not back:
-            return
-        forth.append(self._value)
-        self._show_whole(back.pop())
-
     def take(self, value: str) -> None:
-        self._undone.append(self._value)
-        self._redone.clear()
+        self._history.took(self._value)
         self._show_whole(value)
 
     def _show_whole(self, value: str) -> None:
@@ -283,15 +312,6 @@ class _Tracker(QObject):
         # Leaving the field ends the typing, whatever the clock still says.
         if event.type() == QEvent.Type.FocusOut:
             self.show_whole_change()
-        elif event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress):
-            undo = event.matches(QKeySequence.StandardKey.Undo)
-            redo = event.matches(QKeySequence.StandardKey.Redo)
-            if undo or redo:
-                event.accept()  # the field's, not the window's own Undo
-                if event.type() == QEvent.Type.KeyPress:
-                    self._step(*((self._undone, self._redone) if undo
-                                 else (self._redone, self._undone)))
-                return True
         return False
 
 

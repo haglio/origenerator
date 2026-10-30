@@ -675,6 +675,137 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
         QMessageBox.warning(None, "Origenerator: Evolver has moved", message)
 
 
+@dataclass
+class Boot:
+    """The launch's steps between the overlay checks and the window -- the claim on
+    the library, the loading screen, the offer to Fun Time, the crash log and the
+    listener for clicked notices -- each taken once and undone by a cancel or a
+    close. MAINTENANCE is what runs over the library in between."""
+
+    app: object
+    fun_time: object
+    preview: Preview | None
+    taskbar: object
+    logger: object
+    state_dir: Path
+    library_state_dir: Path
+    loading: object = None
+    claim: object = None
+    crash_log: object = None
+    clicked_notices: object = None
+    watch: object = None
+    freeze_watch: object = None
+
+    def say(self, step: str) -> None:
+        if self.loading is None:
+            self.loading = _open_the_loading(self.fun_time, self.app, self.logger,
+                                             self.preview, self.taskbar)
+        self.loading.say(step)
+
+    def stop_if_canceled(self) -> None:
+        self.loading.stop_if_canceled()
+
+    def done(self) -> None:
+        if self.loading is not None:
+            self.loading.done()
+
+    def claim_the_library(self, copies) -> int | None:
+        """One copy runs on a library at a time, and the copy Fun Time opens never
+        refuses: ``None`` to go on, else the code the process exits with."""
+        from origenerator.app_link import made_for_a_click
+        from origenerator.single_instance import say_another_copy_is_running
+
+        self.claim = copies.claim_the_library()
+        if self.claim is None and self.fun_time is None:
+            if copies.one_is_closing():
+                self.logger.info("Another copy is closing; waiting for it to let go of the library")
+                self.say(WAITING_FOR_THE_OTHER_COPY)
+                self.claim = copies.claim_the_library_once_the_closing_one_lets_go()
+            elif made_for_a_click():
+                self.logger.info("Another copy of Origenerator is already running; "
+                                 "the click is left to it")
+                return 0
+        if self.claim is None and self.fun_time is None:
+            self.done()
+            self.logger.warning("Another copy of Origenerator is already running; not starting")
+            say_another_copy_is_running()
+            return 1
+        if self.claim is not None:
+            self.claim.closes_with(self.app)
+        return None
+
+    def offer_to_fun_time(self) -> None:
+        if self.fun_time is None:
+            origenerator_handoff.offer_this_process(self.state_dir, self.library_state_dir,
+                                                    starting=True)
+
+    def arm_the_crash_log(self) -> None:
+        self.crash_log = _arm_the_crash_log(self.state_dir, self.logger)
+
+    def listen_for_clicked_notices(self, checkout: Path) -> None:
+        """From here rather than from the window: a launch takes a minute, and a
+        notice clicked during one would otherwise find nobody listening and start
+        a second copy (origenerator.app_link)."""
+        from origenerator.gui.link_listener import LinkListener
+
+        self.clicked_notices = LinkListener(checkout=checkout, parent=self.app)
+
+    def show(self, window) -> None:
+        """The window up, the loading screen down, then the window in front, since
+        Windows hands a closing window's activation to whatever is next. A window
+        a session took while it was being built, or one Fun Time opened, is the
+        session's to show; the clicks that arrived during the boot land last."""
+        if self.fun_time is None:
+            self.watch = _watch_for_fun_time(window, self.state_dir, self.library_state_dir)
+        still_offered = self.watch is not None and self.watch.stands_its_offer()
+        if still_offered:
+            window.show()
+        self.done()
+        if still_offered:
+            from shared_ui.foreground import bring_to_front
+            bring_to_front(window)
+        self.clicked_notices.answer_with(window.go_to_generation)
+
+    def run(self) -> int:
+        from origenerator.freeze_watch import watch_the_window
+
+        self.freeze_watch = (None if self.crash_log is None
+                             else watch_the_window(self.app, self.crash_log))
+        return self.app.exec()
+
+    def cancel(self, window, client) -> int:
+        """Canceled from the loading screen, which stays up until ComfyUI has been
+        let go of; a window already built is put away unseen."""
+        self.logger.info("Loading canceled from the loading screen")
+        if window is not None:
+            _put_away_unseen(window, self.app, self.crash_log)
+        _disconnect(client)
+        origenerator_handoff.withdraw_the_offer(self.state_dir, self.library_state_dir)
+        if self.claim is not None:
+            self.claim.let_go()
+        self.done()
+        return 0
+
+    def close(self, window, client) -> None:
+        if self.watch is not None:
+            self.watch.withdraw()
+        _hand_comfyui_what_runs_while_closed(window, self.freeze_watch)
+        _disconnect(client)
+        if self.claim is not None:
+            self.claim.let_go()
+
+
+def _check_the_launch(logger) -> int:
+    """Everything the launch imports, imported, and nothing opened or shown: a
+    hosting session's test runs the real command against a live machine, so this
+    returns before the database, ComfyUI and the first window."""
+    from origenerator import app_state, comfyui_client, db  # noqa: F401
+    from origenerator.gui import core  # noqa: F401
+
+    logger.info("Launch check passed (%s)", sys.executable)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Boot the app and run it; return the code the process should exit with.
 
@@ -709,8 +840,6 @@ def main(argv: list[str] | None = None) -> int:
 
 def _boot_and_run(app, app_args, preview) -> int:
     fun_time = app_args.fun_time
-    # Before config, because config is the first thing a missing key stops from
-    # importing, and before the splash, because there is nothing to put one over.
     from origenerator.content import missing_overlay_keys
     missing = missing_overlay_keys()
     if missing:
@@ -737,69 +866,23 @@ def _boot_and_run(app, app_args, preview) -> int:
         return _refuse_a_library_of_its_own(config.PROJECT_DIR, fun_time)
 
     logger = _configure_logging(STATE_DIR)
-
-    # Now that there is a log to record it in, and before the first window.
     _say_what_evolver_no_longer_agrees_with(fun_time)
-
-    # The one place the app is dressed — palette and stylesheet both, and both
-    # on the application rather than on a window. origenerator.gui.stylesheet
-    # says what each of them is answering for.
     from origenerator.gui.stylesheet import dress_application
     dress_application(app, preview)
     taskbar = _taskbar_identity(app, fun_time, preview, STATE_DIR)
-
     if app_args.check_launch:
-        # Everything the launch imports, imported -- including the modules that
-        # are only reached further down, which are where a break hides.  Nothing
-        # is opened or shown: this returns before the database, ComfyUI and the
-        # first window, so a hosting session's test can run the real command
-        # against a live machine without touching either.
-        from origenerator.app_state import AppState
-        from origenerator.comfyui_client import ComfyUIClient
-        from origenerator.db import Database
-        from origenerator.gui.core import Core  # noqa: F401
-        logger.info("Launch check passed (%s)", sys.executable)
-        return 0
+        return _check_the_launch(logger)
 
     next_launch = _say_where_the_window_comes_up(fun_time, UI_STATE_PATH)
-    from origenerator.app_link import made_for_a_click
-    from origenerator.single_instance import Copies, say_another_copy_is_running
-    copies = Copies(LIBRARY_STATE_DIR)
-    claim = copies.claim_the_library()
-    loading = None
-    if claim is None and fun_time is None and copies.one_is_closing():
-        logger.info("Another copy is closing; waiting for it to let go of the library")
-        loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
-        loading.say(WAITING_FOR_THE_OTHER_COPY)
-        claim = copies.claim_the_library_once_the_closing_one_lets_go()
-    elif claim is None and fun_time is None and made_for_a_click():
-        logger.info("Another copy of Origenerator is already running; the click is left to it")
-        return 0
-    if claim is None and fun_time is None:
-        if loading is not None:
-            loading.done()
-        logger.warning("Another copy of Origenerator is already running; not starting")
-        say_another_copy_is_running()
-        return 1
-    if claim is not None:
-        claim.closes_with(app)
-    if fun_time is None:
-        origenerator_handoff.offer_this_process(STATE_DIR, LIBRARY_STATE_DIR, starting=True)
+    from origenerator.single_instance import Copies
+    boot = Boot(app, fun_time, preview, taskbar, logger, STATE_DIR, LIBRARY_STATE_DIR)
+    refused = boot.claim_the_library(Copies(LIBRARY_STATE_DIR))
+    if refused is not None:
+        return refused
+    boot.offer_to_fun_time()
+    boot.arm_the_crash_log()
+    boot.listen_for_clicked_notices(PRODUCTION_CHECKOUT)
 
-    crash_log = _arm_the_crash_log(STATE_DIR, logger)
-
-    # Before the boot rather than after it: a launch here takes a minute, and a
-    # notice clicked during one is a click that would otherwise find nobody
-    # listening and start a second copy of the app (origenerator.app_link).
-    from origenerator.gui.link_listener import LinkListener
-    clicked_notices = LinkListener(checkout=PRODUCTION_CHECKOUT, parent=app)
-
-    if loading is None:
-        loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
-
-    # One AppState for the whole app: it holds the persisted ComfyUI client id the
-    # client reconnects under, and is handed to the window for the rest of the
-    # session state (open tabs, gallery folder, geometry).
     from origenerator.app_state import AppState
     app_state = AppState(UI_STATE_PATH)
 
@@ -814,13 +897,13 @@ def _boot_and_run(app, app_args, preview) -> int:
     from origenerator.gui.loading_screen import LoadingCanceled
     window = None
     try:
-        loading.say(STARTING_THE_SERVER)
+        boot.say(STARTING_THE_SERVER)
         comfyui_launcher.ensure_comfyui_server(
             logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR,
-            on_status=loading.say, pump_events=app.processEvents,
+            on_status=boot.say, pump_events=app.processEvents,
         )
 
-        loading.say(OPENING_THE_LIBRARY)
+        boot.say(OPENING_THE_LIBRARY)
         from origenerator.db import Database
         logger.info("Library: %s", DB_PATH)
         db = Database(DB_PATH)
@@ -830,53 +913,22 @@ def _boot_and_run(app, app_args, preview) -> int:
         _run_maintenance(
             Library(db=db, client=client, places=OUTPUT_PLACES,
                     thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR, inbox=default_inbox()),
-            MAINTENANCE, loading.say, logger,
+            MAINTENANCE, boot.say, logger,
         )
 
-        loading.say(CONNECTING)
+        boot.say(CONNECTING)
         client.start()
 
-        loading.say(BUILDING_THE_INTERFACE)
+        boot.say(BUILDING_THE_INTERFACE)
         window = _build_window(client, db, app_state, fun_time, preview, taskbar, next_launch)
-        loading.stop_if_canceled()
+        boot.stop_if_canceled()
     except LoadingCanceled:
-        logger.info("Loading canceled from the loading screen")
-        if window is not None:
-            _put_away_unseen(window, app, crash_log)
-        _disconnect(client)
-        origenerator_handoff.withdraw_the_offer(STATE_DIR, LIBRARY_STATE_DIR)
-        if claim is not None:
-            claim.let_go()
-        loading.done()
-        return 0
+        return boot.cancel(window, client)
 
-    watch = None if fun_time is not None else _watch_for_fun_time(
-        window, STATE_DIR, LIBRARY_STATE_DIR)
-    still_offered = watch is not None and watch.stands_its_offer()
-    if still_offered:
-        window.show()
-
-    loading.done()
-    if still_offered:
-        from shared_ui.foreground import bring_to_front
-        bring_to_front(window)
-    # Last, so a click that came in during the boot lands on a window that is
-    # up and in front rather than on one still being built.
-    clicked_notices.answer_with(window.go_to_generation)
+    boot.show(window)
     _look_for_other_sources_videos(db, app)
-
-    from origenerator.freeze_watch import watch_the_window
-    freeze_watch = None if crash_log is None else watch_the_window(app, crash_log)
-    exit_code = app.exec()
-    if watch is not None:
-        watch.withdraw()
-    _hand_comfyui_what_runs_while_closed(window, freeze_watch)
-    _disconnect(client)
-    if claim is not None:
-        claim.let_go()
-    # Whatever ComfyUI is still making outlives this window, and this app is the
-    # only thing watching it, so the waiting goes to a process of its own
-    # (origenerator.landed_while_away).
+    exit_code = boot.run()
+    boot.close(window, client)
     from origenerator.landed_while_away import hand_over_what_is_in_flight
     from origenerator.win32 import APP_USER_MODEL_ID
     hand_over_what_is_in_flight(db, taskbar_identity(APP_USER_MODEL_ID, preview))

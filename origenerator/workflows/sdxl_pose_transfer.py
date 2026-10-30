@@ -6,6 +6,7 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    prompt_conditioning,
     sampler_params,
 )
 from origenerator.workflows.derived_size import measure_derived_size
@@ -225,14 +226,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
             **loras.nodes,
-            "5": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["positive_prompt"]},
-            },
-            "6": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["negative_prompt"]},
-            },
+            **prompt_conditioning("5", loras.clip, params["positive_prompt"]),
+            **prompt_conditioning("6", loras.clip, params["negative_prompt"]),
             "9": {
                 "class_type": "ControlNetApplyAdvanced",
                 "inputs": {

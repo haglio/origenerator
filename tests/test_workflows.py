@@ -11,6 +11,7 @@ import origenerator.workflows.detail_parts as detail_module
 import origenerator.workflows.lora_rows as lora_rows_module
 import origenerator.workflows.model_pickers as pickers
 from origenerator import config, points_of_interest
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params
 from origenerator.gui.param_fields import clamped_number
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
@@ -47,6 +48,7 @@ from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
 from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
+from tests.graph_reading import read_in_order
 
 
 def _find_node(payload: dict, class_type: str) -> dict | None:
@@ -2657,6 +2659,34 @@ def test_a_part_with_its_own_prompts_is_redrawn_toward_them_ahead_of_the_images_
     sampler = _find_node(payload, "KSampler")["inputs"]
     assert payload[sampler["positive"][0]]["inputs"]["text"] == "a lantern on a jetty"
     assert payload[sampler["negative"][0]]["inputs"]["text"] == "blurry"
+
+
+def test_a_fix_reads_its_own_words_as_a_piece_ahead_of_a_boxed_prompts_boxes():
+    payload = _enhance_payload(
+        positive_prompt=f"a lantern {BOX_BREAK}on a jetty", negative_prompt="blurry",
+        enhance_detail_fixes={"hands": 0.45},
+        enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}},
+    )
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    assert read_in_order(payload, detailer["inputs"]["positive"][0]) == [
+        "open palms", "a lantern ", "on a jetty"]
+    assert read_in_order(payload, detailer["inputs"]["negative"][0]) == ["fists, blurry"]
+    sampler = _find_node(payload, "KSampler")["inputs"]
+    assert read_in_order(payload, sampler["positive"][0]) == ["a lantern ", "on a jetty"]
+
+
+@pytest.mark.parametrize(("name", "prompt_ids"), [
+    ("sdxl_t2i", ("2", "3")), ("sdxl_pose_transfer", ("5", "6")), ("image_enhance", ("3", "4"))])
+def test_an_sdxl_graph_reads_each_box_of_a_prompt_on_its_own(name, prompt_ids):
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), input_image="pick.png",
+        positive_prompt=f"a lantern {BOX_BREAK}on a jetty", negative_prompt=f"blurry {BOX_BREAK}dim"))
+
+    assert [read_in_order(payload, node_id) for node_id in prompt_ids] == [
+        ["a lantern ", "on a jetty"], ["blurry ", "dim"]]
+    assert BOX_BREAK not in json.dumps(payload)
 
 
 def test_an_image_with_no_prompt_leaves_a_part_its_own_prompts_alone():

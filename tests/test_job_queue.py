@@ -815,7 +815,7 @@ def test_a_queue_given_no_bring_up_brings_up_the_comfyui_this_machine_runs(
 
 
 class _UnbuildableWorkflow:
-    def build_api_payload(self, params):
+    def payload_for_comfyui(self, params):
         raise KeyError("width")
 
 

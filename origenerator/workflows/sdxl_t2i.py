@@ -11,6 +11,7 @@ from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_files import ANY
 from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import CLIP
 
 
 class SdxlT2iWorkflow(WorkflowTemplate):
@@ -38,6 +39,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     output_type = MediaType.IMAGE
     model_keys = ("checkpoint",)
     lora_keys = loras_keyed_only_when_named = LORA_KEYS
+    text_reader = CLIP
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "7"
     base_output_node_id = "15"  # the pre-enhance render, saved when the tail runs

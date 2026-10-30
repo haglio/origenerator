@@ -5,6 +5,7 @@ from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import T5
 
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
@@ -36,6 +37,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
     lora_keys = LORA_KEYS
+    text_reader = T5
     loras_keyed_only_when_named = LORA_KEYS[1:]
     output_node_id = "12"
     base_output_node_id = "17"  # the plain 4x upscale, saved when the tail runs

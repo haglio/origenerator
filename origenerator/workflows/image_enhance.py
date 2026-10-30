@@ -7,6 +7,7 @@ from origenerator.workflows.detail_parts import FIX_MAX
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_files import ANY
 from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import CLIP
 
 ENHANCE_MODEL_FAMILIES = (SDXL,)
 
@@ -51,6 +52,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     derives_size_from_input = True
     selectable = False
     model_keys = ("checkpoint",)
+    text_reader = CLIP
     output_node_id = "12"
 
     def default_params(self) -> dict:

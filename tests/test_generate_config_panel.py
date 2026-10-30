@@ -68,6 +68,7 @@ from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.text_readers import clap_reader
 from tests.thumbnail_rows import looping_clip, painted_row, where_the_thumbnail_is
 
 
@@ -4303,3 +4304,18 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
     assert blank_panel.pick_lora("lora", "example_look.safetensors") is True
     assert not controls.isHidden()
     assert blank_panel.pick_lora("seed", "example_look.safetensors") is False
+
+
+def test_a_sound_prompt_grays_the_words_past_where_its_reader_stops(
+        blank_panel, tmp_path, monkeypatch):
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hub"))
+    clap_reader(tmp_path / "hub")
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    read = " ".join(["rain"] * 76)
+
+    blank_panel._param_form.set_values({"audio_prompt": f"{read} on a tin roof"})
+
+    field = blank_panel._param_form._widgets["audio_prompt"]
+    assert [(span.start, span.format.foreground().color().name())
+            for span in field.document().firstBlock().layout().formats()] == [
+        (len(read) + 1, TEXT_MUTED.name())]

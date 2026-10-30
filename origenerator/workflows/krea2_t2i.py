@@ -5,6 +5,7 @@ from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import QWEN3VL
 
 
 def _negative_conditioning(negative_prompt: str) -> dict:
@@ -26,6 +27,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
     lora_keys = LORA_KEYS
+    text_reader = QWEN3VL
     loras_keyed_only_when_named = LORA_KEYS[1:]
     extra_enhance_keys = ("upscale_model",)
     output_node_id = "10"

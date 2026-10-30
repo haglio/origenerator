@@ -47,6 +47,7 @@ from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.gui.training_controls import TrainingControls
+from origenerator.gui.unread_words import gray_past
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.lora_training import TrainingOffer
@@ -410,6 +411,11 @@ class ParamForm(QWidget):
             definition_help(pd, self._recommendations.get(key, "")),
             *(advice_help(other, self._recommendations.get(other.key, ""))
               for other in warned_here)]))
+
+    def show_where_reading_stops(self, stops: dict[str, int | None]) -> None:
+        for key, stops_at in stops.items():
+            if isinstance(self._widgets.get(key), QPlainTextEdit):
+                gray_past(self._widgets[key], stops_at)
 
     def explain(self, recommendations: dict[str, str]) -> None:
         self._recommendations = dict(recommendations)

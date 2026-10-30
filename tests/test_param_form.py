@@ -2705,3 +2705,29 @@ def test_every_krea_2_t2i_lora_row_follows_the_model_picked_beside_it(
     assert [_offered(form._widgets[key]) for key in ("lora", "lora_2", "lora_3")] == [
         ["None", "a_look.safetensors"]] * 3
 
+
+
+def _grayed(field) -> list[tuple[int, int, str]]:
+    return [(span.start, span.length, span.format.foreground().color().name())
+            for span in field.document().firstBlock().layout().formats()]
+
+
+def test_a_prompt_grays_the_words_its_reader_never_reads(qtbot):
+    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
+    qtbot.addWidget(form)
+    form.set_values({"audio_prompt": "rain on a tin roof"})
+
+    form.show_where_reading_stops({"audio_prompt": 8})
+
+    assert _grayed(form._widgets["audio_prompt"]) == [(8, 10, TEXT_MUTED.name())]
+
+
+def test_a_prompt_read_to_its_end_grays_nothing(qtbot):
+    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
+    qtbot.addWidget(form)
+    form.set_values({"audio_prompt": "rain on a tin roof"})
+    form.show_where_reading_stops({"audio_prompt": 8})
+
+    form.show_where_reading_stops({"audio_prompt": None})
+
+    assert _grayed(form._widgets["audio_prompt"]) == []

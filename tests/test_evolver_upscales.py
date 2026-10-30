@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 
 from origenerator.evolver_upscales import EvolverUpscales
 
@@ -77,3 +78,29 @@ def test_an_upscale_moved_away_since_the_library_was_read_is_no_upscale(tmp_path
     upscale.unlink()
 
     assert upscales.upscale_of(video) is None
+
+
+def test_a_folder_of_upscales_unchanged_since_its_last_reading_is_not_listed_again(
+        tmp_path, monkeypatch):
+    # Listed afresh at every look, Evolver's folder of upscales was read three to
+    # eight times over before a double-clicked slideshow could open.
+    filed_in = _upscale(tmp_path).parent
+    _upscales(tmp_path)
+    listed = []
+    iterdir = Path.iterdir
+    monkeypatch.setattr(Path, "iterdir", lambda folder: listed.append(folder) or iterdir(folder))
+
+    _upscales(tmp_path)
+
+    assert filed_in not in listed
+
+
+def test_an_upscale_filed_since_the_last_reading_is_found(tmp_path):
+    video = _video(tmp_path)
+    os.utime(video, _LONG_AGO)
+    _file(tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator" / "other_topaz.mp4")
+    _upscales(tmp_path)
+
+    upscale = _upscale(tmp_path)
+
+    assert _upscales(tmp_path).upscale_of(video) == upscale

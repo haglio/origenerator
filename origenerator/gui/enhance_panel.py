@@ -66,8 +66,8 @@ from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
     full_settings,
-    is_enhanceable_row,
-    model_matching_the_source,
+    models_matching_a_folders_sources,
+    models_matching_the_sources,
 )
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
@@ -99,6 +99,7 @@ from origenerator.workflows.image_enhance import ENHANCE_MODEL_FAMILIES
 from origenerator.workflows.lora_rows import lora_strength
 from origenerator.workflows.model_files import NO_LORA, list_lora_files
 
+_NOT_READ = object()
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "
     "below. The original is kept, so an enhancement can always be compared "
@@ -331,8 +332,9 @@ class EnhancePanel(QWidget):
         super().__init__(parent)
         self._on_change = on_change
         self._fix_training: dict[str, str] = {}
-        self._images_in_front: list[dict] = []
-        self._source_models: frozenset[str] | None = None
+        self._picked: list[dict] = []
+        self._folder = None
+        self._source_models: frozenset[str] | object | None = _NOT_READ
         self._loading = False  # suppress the write-back while filling the fields
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
@@ -715,8 +717,8 @@ class EnhancePanel(QWidget):
         self._show_the_preset_held()
         self._warn_of_a_fixs_lora_trained_on_another_model()
 
-    def show_images_in_front(self, rows) -> None:
-        self._images_in_front, self._source_models = list(rows), None
+    def show_images_in_front(self, picked, folder=None) -> None:
+        self._picked, self._folder, self._source_models = list(picked), folder, _NOT_READ
         self._warn_of_a_fixs_lora_trained_on_another_model()
 
     def _model_advice(self):
@@ -725,17 +727,17 @@ class EnhancePanel(QWidget):
                    if (model := fix_training.trained_on(own["lora"]))}
         if not trained:
             return None
-        return fix_lora_model_advice(self._models_it_runs(params.get("checkpoint")), trained,
+        held = params.get("checkpoint")
+        return fix_lora_model_advice(held, self._models_it_runs(held), trained,
                                      self._options("checkpoint")).get("checkpoint")
 
-    def _models_it_runs(self, held) -> frozenset:
+    def _models_it_runs(self, held) -> frozenset[str] | None:
         if held != MATCH_SOURCE_MODEL:
             return frozenset({held})
-        if self._source_models is None:
-            self._source_models = frozenset(model_matching_the_source(row)
-                                            for row in self._images_in_front
-                                            if is_enhanceable_row(row))
-        return self._source_models or frozenset({held})
+        if self._source_models is _NOT_READ:
+            self._source_models = (models_matching_the_sources(self._picked) if self._picked
+                                   else models_matching_a_folders_sources(self._folder))
+        return self._source_models
 
     def _warn_of_a_fixs_lora_trained_on_another_model(self) -> None:
         found = self._model_advice()

@@ -47,6 +47,7 @@ from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceLevel,
     EnhanceSettings,
+    SettingsGroup,
     default_enhance_params,
     full_settings,
 )
@@ -1983,16 +1984,60 @@ def test_matching_the_source_warns_not_while_the_images_in_front_were_made_by_th
     assert panel._model_warning.isHidden()
 
 
-@pytest.mark.parametrize("in_front", [
-    [_made_by("trained_on.safetensors"), _made_by("picked.safetensors", file="two.png")], []])
-def test_matching_the_source_warns_while_an_image_in_front_or_none_is_made_by_another_model(
-        hands_trained_on, in_front):
+def test_matching_the_source_warns_while_a_picked_image_is_made_by_another_model(
+        hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
-    panel.show_images_in_front(in_front)
+    panel.show_images_in_front([_made_by("trained_on.safetensors"),
+                                _made_by("picked.safetensors", file="two.png")])
 
     assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
         False, _TRAINED_ON_SAID)
+
+
+def _folder(*rows) -> SettingsGroup:
+    return SettingsGroup("a folder", "A folder", list(rows))
+
+
+@pytest.mark.parametrize(("folder", "hidden"), [
+    (_folder(_made_by("trained_on.safetensors"), _made_by("trained_on.safetensors", file="b.png")),
+     True),
+    (_folder(_made_by("picked.safetensors")), False)])
+def test_matching_the_source_holds_the_fixs_model_against_the_folders_own(
+        hands_trained_on, folder, hidden):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_images_in_front([], folder)
+
+    assert panel._model_warning.isHidden() is hidden
+    assert hidden or panel._model_warning.toolTip() == _TRAINED_ON_SAID
+
+
+_NO_GUARANTEE_SAID = ("There's no guarantee the images here were made by trained_on, which the "
+                      "Hands fix's LoRA was trained on. Click to use trained_on.")
+
+
+@pytest.mark.parametrize("folder", [
+    _folder(_made_by("trained_on.safetensors"), _made_by("picked.safetensors", file="b.png")),
+    None])
+def test_matching_the_source_in_a_folder_of_several_models_or_a_collection_says_there_is_no_guarantee(
+        hands_trained_on, folder):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_images_in_front([], folder)
+
+    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+        False, _NO_GUARANTEE_SAID)
+
+
+def test_clicking_the_no_guarantee_warning_picks_the_model_the_fixs_lora_was_trained_on(
+        qtbot, hands_trained_on):
+    panel, edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+    panel.show_images_in_front([])
+
+    qtbot.mouseClick(panel._model_warning, Qt.MouseButton.LeftButton)
+
+    assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
 
 
 _CAPTIONS = ("Model", "Upscaler", "Scale", "Steps", "Redraw Amount")

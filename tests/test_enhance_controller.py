@@ -71,8 +71,8 @@ class FakePanel:
     def show_offer(self, available, tip):
         self.offer = (available, tip)
 
-    def show_images_in_front(self, rows):
-        self.images_in_front = [row["prompt_id"] for row in rows]
+    def show_images_in_front(self, picked, folder=None):
+        self.images_in_front = ([row["prompt_id"] for row in picked], folder)
 
     def show_fix_training(self, name, text):
         self.training[name] = text
@@ -615,7 +615,7 @@ def test_the_panel_hears_which_picked_thumbnails_are_in_front(enhance):
 
     controller.sync_panel(Offer(True, "Enhance 1 item"))
 
-    assert controller.panel.images_in_front == ["i1", "v1"]
+    assert controller.panel.images_in_front == (["i1", "v1"], None)
 
 
 def test_with_nothing_picked_the_panel_hears_the_folder_on_screen_is_in_front(enhance):
@@ -624,7 +624,7 @@ def test_with_nothing_picked_the_panel_hears_the_folder_on_screen_is_in_front(en
 
     controller.sync_panel(Offer(True, "Enhance 2 not-yet-enhanced images in this folder"))
 
-    assert controller.panel.images_in_front == ["i1", "i2"]
+    assert controller.panel.images_in_front == ([], folder)
 
 
 # --- a run in flight, and where it shows -------------------------------------

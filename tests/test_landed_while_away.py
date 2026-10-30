@@ -23,12 +23,12 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _in_flight(db, prompt_id="vid", workflow_name="wan22_i2v"):
+def _in_flight(db, prompt_id="vid", workflow_name="wan22_i2v", source="generated"):
     wf = WORKFLOW_REGISTRY[workflow_name]
     db.insert_generation(prompt_id=prompt_id, workflow_name=workflow_name,
                          workflow_version=wf.version, positive_prompt="it turns",
                          params_json=json.dumps(dict(wf.default_params())),
-                         workflow_json="{}")
+                         workflow_json="{}", source=source)
     db.update_generation(prompt_id, status="running")
     return db.get_generation(prompt_id)
 
@@ -179,6 +179,16 @@ def test_the_log_names_the_process_left_waiting_on_the_runs(tmp_path, started, c
         landed_while_away.hand_over_what_is_in_flight(db, "Origenerator")
 
     assert "4321" in caplog.text
+
+
+def test_quitting_with_only_the_backfills_runs_in_flight_starts_nothing(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _in_flight(db, source="backfill")
+    started = []
+
+    assert landed_while_away.hand_over_what_is_in_flight(
+        db, "Origenerator", spawn=started.append) is False
+    assert started == []
 
 
 def test_quitting_with_nothing_in_flight_starts_nothing(tmp_path):

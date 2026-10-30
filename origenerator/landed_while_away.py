@@ -28,7 +28,7 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.db import Database
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.inflight import take_in_what_landed
 from origenerator.notice_toast import raise_notice
 from origenerator.output_places import OutputPlaces
@@ -45,10 +45,11 @@ PATIENCE_SECONDS = 4 * 60 * 60
 CARRIES_THE_IDENTITY = "ORIGENERATOR_NOTICE_IDENTITY"
 
 
-def runs_in_flight(db) -> list[dict]:
-    """Every row ComfyUI is still the one to finish, oldest first."""
+def runs_left_in_flight(db) -> list[dict]:
+    """Every run ComfyUI is still the one to finish but the backfill's, oldest first."""
     return [row for row in reversed(db.list_generations())
-            if row.get("status") == GenerationStatus.RUNNING]
+            if row.get("status") == GenerationStatus.RUNNING
+            and source_of(row) != GenerationSource.BACKFILL]
 
 
 def take_what_landed(db, api, row: dict, *, places: OutputPlaces, thumb_dir: Path) -> Notice | None:
@@ -85,7 +86,7 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
     giving_up_at = now() + patience_seconds
     while not app_is_running():
         training = [job for job in training if not _training_ended(job, announce)]
-        waiting = runs_in_flight(db)
+        waiting = runs_left_in_flight(db)
         if not waiting and not training:
             logger.info("Stopped waiting: every run left in flight has landed")
             return
@@ -102,7 +103,7 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
                 announce(notice)
         if now() >= giving_up_at:
             logger.info("Stopped waiting: gave up on %d run(s) still in flight",
-                        len(runs_in_flight(db)))
+                        len(runs_left_in_flight(db)))
             return
         sleep(poll_seconds)
     logger.info("Stopped waiting: Origenerator is open again")
@@ -113,7 +114,7 @@ def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
 
     *identity* is the name Windows draws over this copy's notifications.
     """
-    if not runs_in_flight(db) and not fix_training.running_trainings():
+    if not runs_left_in_flight(db) and not fix_training.running_trainings():
         return False
     (spawn or _start_a_watcher)(identity)
     return True

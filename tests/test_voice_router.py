@@ -918,3 +918,15 @@ def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(
         assert voice.run_spoken_command("put the kettle on") is False
 
     assert caplog.messages == ["Voice (from the session): a 4-word utterance matched no command"]
+
+
+def test_a_requests_answer_on_the_caption_stays_up_long_enough_to_be_read(router):
+    voice, _host, _slideshows = router()
+    long_answer = ("Moved her to a tropical beach at golden hour, the way your beach prompts "
+                   "usually have it, and kept the pose and the lighting as they were.")
+
+    voice._answer_request(None, "Request submitted", Spoken("no hat"))
+    short = voice._flash_timer.interval()
+    voice._answer_request(None, long_answer, Spoken("a beach"))
+
+    assert voice._flash_timer.interval() > short

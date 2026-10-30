@@ -46,7 +46,14 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
-from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE, WARNING, set_marked_text
+from origenerator.gui.notice_overlay import (
+    ERROR,
+    HEARD_MARK,
+    NOTICE,
+    WARNING,
+    set_marked_text,
+    time_to_read_ms,
+)
 from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
 )
@@ -336,10 +343,11 @@ class VoiceRouter(QObject):
             self.status.show()
         self.caption_shown.emit(text is not None)
 
-    def _show(self, text: str, *, transient: bool, mark: str = HEARD_MARK) -> None:
+    def _show(self, text: str, *, transient: bool, mark: str = HEARD_MARK,
+              ms: int = _FLASH_MS) -> None:
         self._set_caption(text, mark)
         if transient:
-            self._flash_timer.start(_FLASH_MS)  # then revert to the idle caption
+            self._flash_timer.start(ms)  # then revert to the idle caption
         else:
             self._flash_timer.stop()
 
@@ -702,7 +710,7 @@ class VoiceRouter(QObject):
         if slideshow is not None:
             slideshow.note_request(message, spoken, working=working, kind=kind)
         else:
-            self._show(message, transient=not working)
+            self._show(message, transient=not working, ms=time_to_read_ms(message))
 
     def _begin_request(self, prompt_id: str | None, spoken,
                        side: str | None = None) -> None:

@@ -20,10 +20,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
 
+from origenerator import db_schema
 from origenerator.db import Database
 from origenerator.db_schema import ADDED_COLUMNS, GENERATION_COLUMNS
 
@@ -233,6 +235,17 @@ def test_a_read_only_open_of_the_file_sees_the_whole_generations_table(tmp_path)
         found = {row[1] for row in conn.execute("PRAGMA table_info(generations)")}
 
     assert found == {column for column, *_ in SCHEMA["generations"]}
+
+
+def test_a_new_database_is_made_whole_or_not_at_all(tmp_path, monkeypatch):
+    monkeypatch.setattr(db_schema, "SCHEMA", db_schema.SCHEMA + "\nCREATE TABLE half_made (;\n")
+    path = tmp_path / "origenerator.db"
+
+    with pytest.raises(sqlite3.OperationalError):
+        Database(path)
+
+    with closing(sqlite3.connect(path)) as conn:
+        assert _tables(conn) == set()
 
 
 def test_the_replayed_column_list_is_the_tables_own_order(opened):

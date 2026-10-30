@@ -17,6 +17,7 @@ from pathlib import Path
 from app_support import osr2_device
 from app_support.osr2_hold import ask_the_broker
 from app_support.osr2_slot import Osr2Sender
+from funestra import broker
 from funestra.tcode import format_tcode_command, to_tcode_position
 
 from origenerator.config import project_dir
@@ -41,6 +42,15 @@ def device_mode(*, now: float | None = None, state_dir=None) -> osr2_device.Osr2
 def device_trouble(*, now: float | None = None,
                    state_dir=None) -> osr2_device.Osr2Trouble | None:
     return osr2_device.trouble(_state_dir(state_dir), now=now)
+
+
+def broker_running(*, now: float | None = None, state_dir=None) -> bool:
+    return broker.is_running(_state_dir(state_dir), now=now)
+
+
+def press_the_broker(*, state_dir=None, checkout: Path | None = None) -> None:
+    checkout = project_dir("broker") if checkout is None else checkout
+    broker.press(_state_dir(state_dir), broker.tray_launcher_in(checkout))
 
 
 def format_position(pos_0_100: float, interval_ms: float) -> str:

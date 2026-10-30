@@ -18,8 +18,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from funestra.console import ROW_LABEL_W, VALUE_W
 from funestra.hud_button import FIT_THE_WORD, Button
 from funestra.hud_marks import FMODE_ICON, LOCK_ICON, NEXT_ICON, PREVIOUS_ICON, shared_mark
+from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.console_commands import FILTER, spelled_for
@@ -95,8 +97,8 @@ RESET_TOOLTIPS = {
 
 def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = False,
                    enhanced: bool = False, order: str = "", hosted: bool = False,
-                   own_window: bool = True,
-                   has_other_versions: bool = False) -> tuple[tuple[Button, ...], ...]:
+                   own_window: bool = True, has_other_versions: bool = False,
+                   clip_seconds: int | None = None) -> tuple[tuple[Button, ...], ...]:
     """The rows a slideshow's HUD draws, for the surface it is drawn on.
 
     *own_window* is whether this slideshow has a window of this app's.  Handed to
@@ -114,7 +116,18 @@ def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = 
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
         for index, name in enumerate(names)
     )
-    return (_mode_row(), band) if mode_row else (band,)
+    pace = () if clip_seconds is None else (clip_seconds_row(side, clip_seconds),)
+    return (_mode_row(), band, *pace) if mode_row else (band, *pace)
+
+
+def clip_seconds_row(side: str, seconds: int) -> tuple[Button, ...]:
+    return (
+        Button("", "Clip seconds", "", width=ROW_LABEL_W),
+        Button(f"{side}_clip_seconds_down", shared_mark("minus"), "Move on sooner",
+               group_break=True),
+        Button("", f"{seconds}s", "", width=VALUE_W),
+        Button(f"{side}_clip_seconds_up", shared_mark("plus"), "Leave each clip longer"),
+    )
 
 
 _NEWER, _OLDER = -1, 1
@@ -151,6 +164,8 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "cycle_action": lambda host: host.slideshow_nav("down"),
     "cycle_version": lambda host: host.slideshow_step_version(_NEWER),
     "cycle_version_back": lambda host: host.slideshow_step_version(_OLDER),
+    "clip_seconds_up": lambda host: host.step_dwell(1),
+    "clip_seconds_down": lambda host: host.step_dwell(-1),
 }
 # The map's thumbnails, whose presses carry the item they were made on.
 _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
@@ -165,6 +180,9 @@ PRESSES = tuple(_PRESSES)
 PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "seed_loop", "action_loop", "loop",
                                      "cycle_seed", "cycle_action"})
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
+# The Job Queue's block at the panel's foot, each with where in it the pointer was.
+PRESSES_ON_THE_QUEUE = {FOOT_PRESS: "{x}|{y}", FOOT_DRAG: "{x}|{y}", FOOT_RELEASE: "{x}|{y}",
+                        FOOT_WHEEL: "{steps}|{x}|{y}"}
 
 
 def answer(host, action: str, argument: str = "") -> bool:
@@ -182,6 +200,8 @@ def answer(host, action: str, argument: str = "") -> bool:
         _PRESSES[action](host)
     elif action in _PRESSES_ABOUT_A_FILE:
         _PRESSES_ABOUT_A_FILE[action](host, argument)
+    elif action in PRESSES_ON_THE_QUEUE:
+        host.press_the_queue(action, argument)
     elif action == FILTER:
         host.slideshow_filter(argument)
     else:

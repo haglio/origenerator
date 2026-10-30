@@ -40,9 +40,11 @@ from funestra.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.frame_files import FrameFiles
+from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
 from origenerator.gui.slideshow_map import SEED_AXIS
+from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
@@ -89,14 +91,15 @@ class FunestraSlideshow(QObject):
         self._on_screen = OnScreenHistory()
         self._side = side
         self.channel = channel
-        self.shown = shown if shown is not None else OnASessionsFunestra(self, side, channel, say)
+        # What a press here asks the gallery to do on its behalf — the half of
+        # each gesture that lands on the generation rather than on the slide.
+        self._actions = actions if actions is not None else SlideshowActions()
+        self.shown = shown if shown is not None else OnASessionsFunestra(
+            self, side, channel, say, actions=self._actions)
         self._frames = frames
         self._request_holds_it = False
         self._held_short = False
         self._frame_on_funestra: Path | None = None
-        # What a press here asks the gallery to do on its behalf — the half of
-        # each gesture that lands on the generation rather than on the slide.
-        self._actions = actions if actions is not None else SlideshowActions()
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
         self._take_set(items, start=start, shuffle=shuffle, hud=hud)
@@ -197,13 +200,15 @@ class FunestraSlideshow(QObject):
         """The seconds an unlocked image holds the Funestra's screen."""
         return self._pace.seconds
 
-    def set_dwell_s(self, seconds: int) -> None:
-        """Take a new pace, and hand it on: the number is app-wide, so a pace
-        set over this slideshow is what the next one opens at."""
-        self._pace.set_seconds(seconds)
+    def step_dwell(self, steps: int) -> None:
+        self._pace.step(steps * PACE_STEP_S)
+
+    def press_the_queue(self, verb: str, payload: str) -> None:
+        self.shown.press_the_queue(verb, payload)
 
     def _on_pace_changed(self, _seconds: int) -> None:
         self._tell_the_pace()
+        self._publish()
 
     def _pass_changed(self, kept: bool) -> None:
         """A fresh pass was dealt: the Funestra is playing the old one, so it is
@@ -923,15 +928,18 @@ class OnASessionsFunestra:
 
     player = None
 
-    def __init__(self, slideshow, side: str, channel, say=None) -> None:
+    def __init__(self, slideshow, side: str, channel, say=None, *, actions) -> None:
         self._slideshow = slideshow
         self._side = side
         self._channel = channel
         self._say = say
         self._published = ""
+        self.queue_foot = QueueFoot(actions)
+        self._job_queue_file = JobQueueFile(channel.hud_file, side)
 
     def panel_changed(self) -> None:
-        model = slideshow_hud_model(self._side, self._slideshow, hosted=True, own_window=False)
+        model = slideshow_hud_model(self._side, self._slideshow, hosted=True, own_window=False,
+                                    foot=self._job_queue_file.of(self.queue_foot.section()))
         text = hud_text(model) if model is not None else ""
         if text != self._published and publish_whole(self._channel.hud_file, text):
             self._published = text
@@ -952,10 +960,16 @@ class OnASessionsFunestra:
         pass
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
-        pass
+        self.queue_foot.set(items, foreign_queued)
+        self.panel_changed()
+
+    def press_the_queue(self, verb: str, payload: str) -> None:
+        self.queue_foot.press(verb, payload)
+        self.panel_changed()
 
     def gone(self) -> None:
         publish_whole(self._channel.hud_file, "",
                       attempts=round(READER_HOLD_BUDGET_S / _RETRY_SPACING_S),
                       delay_s=_RETRY_SPACING_S)
+        self._job_queue_file.forget()
 

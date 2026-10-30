@@ -13,13 +13,16 @@ presses and names them exactly as it presses its own.
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 from dataclasses import dataclass, field
 from functools import cache
+from pathlib import Path
 
 from funestra.hud_button import Button
 from funestra.hud_marks import shared_mark
+from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_panel import (
     SYMBOL_FONT,
     button_ground,
@@ -28,7 +31,13 @@ from funestra.hud_panel import (
     load_font,
     text_width,
 )
-from funestra.satellite_hud import BLOCK_GAP, CTRL_BTN, MAP_THUMB_H
+from funestra.satellite_hud import (
+    BLOCK_GAP,
+    CTRL_BTN,
+    MAP_THUMB_H,
+    PaintedFoot,
+    map_block_width,
+)
 from PIL import Image, ImageDraw
 from shared_ui.icons_pil import paste_glyph
 from shared_ui.lettering import fit_text
@@ -54,6 +63,7 @@ from origenerator.gui.inflight import (
     CANCEL_ALL_TIP,
     CANCEL_TEXT,
     CLEAR_TEXT,
+    EMPTY_QUEUE_TEXT,
     MOVE_DOWN_TIP,
     MOVE_UP_TIP,
     SHIELD_ALL_TEXT,
@@ -123,10 +133,7 @@ _MARK_SIDE = 12         # the frame the family's three dots are drawn in, as on 
 _DROP_W = 2             # the mark showing where a dragged row would land
 _SHIELD_MARK = CTRL_BTN - 2 * BUTTON_MARK_INSET  # a row's shield's own size
 _MARK_TO_WORD = 3       # between Shield All's shield and its word
-# The widest the block asks the panel to be. Past this the texts elide instead:
-# the panel is anchored in a corner of the screen, and a line of queued work is
-# not worth half the width of a slideshow.
-_MAX_W = 460
+_HEIGHT = _FRAME + BLOCK_GAP + 2 * _MARK_H + ROWS * _ROW_H
 
 _SLOT_ALPHA = 110       # a cell with nothing in it reads as a slot, not a thumbnail
 
@@ -193,7 +200,8 @@ class Leader:
 
 @dataclass(frozen=True)
 class QueueSection:
-    """What is in flight, as the slideshow's HUD draws it at the panel's foot."""
+    """What is in flight, as a slideshow's HUD draws it at its foot: one size
+    whatever that is, and *blank* while Core shows the Job Queue itself."""
 
     lines: tuple[JobLine, ...] = ()
     leader: Leader | None = None
@@ -208,6 +216,7 @@ class QueueSection:
     # The pointer on the block, told where each row and button was painted so
     # a press can be placed against them in the block's own pixels.
     pointer: QueuePointer | None = field(default=None, compare=False)
+    blank: bool = False
 
     @property
     def idle_note(self) -> str:
@@ -216,69 +225,22 @@ class QueueSection:
         return foreign_queue_text(self.foreign) or ""
 
     @property
+    def empty_note(self) -> str:
+        return "" if self.lines else EMPTY_QUEUE_TEXT
+
+    @property
     def drawn(self) -> tuple[JobLine, ...]:
         """The rows the window opens on — the whole line, where it fits."""
         return self.lines[self.first:self.first + ROWS]
 
-    @property
-    def windowed(self) -> bool:
-        return len(self.lines) > ROWS
-
     def size(self) -> tuple[int, int]:
-        head_width, head_height = self._head_size()
-        rows = self.drawn
-        width = max([head_width] + [self._row_width(line) for line in rows])
-        height = head_height
-        if rows:
-            width += _GAP + _for_all_width()
-            height += BLOCK_GAP + len(rows) * _ROW_H
-            if self.windowed:
-                height += 2 * _MARK_H
-        return min(width, _MAX_W), height
-
-    def _head_size(self) -> tuple[int, int]:
-        if self.leader is None:
-            if not self.foreign:
-                return 0, 0
-            width = text_width(_tiny(), self.idle_note) + _GAP + _word_width(CLEAR_TEXT)
-            return width, max(_line_height(), CTRL_BTN)
-        bar = text_width(_tiny(), self.leader.caption) + 2 * _BAR_PAD
-        under_the_bar = text_width(_tiny(), self.leader.wait)
-        if self.leader.start_now:
-            under_the_bar += _GAP + _word_width(START_NOW_TEXT)
-        column = max(bar, under_the_bar)
-        if self.foreign:
-            column += _GAP + _word_width(CLEAR_TEXT)
-        return _FRAME + _GAP + column, _FRAME
-
-    def _row_width(self, line: JobLine) -> int:
-        width = (3 * (CTRL_BTN + _GAP) + _word_width(CANCEL_TEXT) + _GAP + _BLOCK_W + _GAP
-                 + text_width(_tiny(), line.lead))
-        if line.note:
-            width += _GAP + text_width(_tiny(), line.note)
-        return width
-
+        return 0, _HEIGHT
 
     def paint(self, image, x: int, y: int, width: int,
               pointer: tuple[int, int] | None) -> list[tuple[tuple, Button]]:
-        draw = ImageDraw.Draw(image)
         targets: list[tuple[tuple, Button]] = []
-        top = y
-        if self.drawn:
-            width = max(0, width - _GAP - _for_all_width())
-            self._paint_for_all(image, draw, x + width + _GAP, y, pointer, targets)
-        head = self._head_size()[1]
-        if head:
-            self._paint_head(image, draw, x, top, width, pointer, targets)
-            top += head + BLOCK_GAP
-        if self.drawn:
-            if self.windowed:
-                self._paint_mark(image, x, top, width, self.first > 0)
-                top += _MARK_H
-            self._paint_rows(image, draw, x, top, width, pointer, targets)
-            if self.windowed:
-                self._paint_mark(image, x, top + len(self.drawn) * _ROW_H, width,
-                                 self.first + ROWS < len(self.lines))
+        if not self.blank:
+            self._paint_whats_in_flight(image, x, y, width, pointer, targets)
         if self.pointer is not None:
             self.pointer.painted(targets, (x, y))
         return targets
@@ -292,6 +254,27 @@ class QueueSection:
                       Button(CANCEL_ALL, CANCEL_ALL_TEXT, CANCEL_ALL_TIP, width=column,
                              dim=not self.any_to_cancel),
                       pointer, targets)
+
+    def _paint_whats_in_flight(self, image, x, y, width, pointer, targets) -> None:
+        draw = ImageDraw.Draw(image)
+        if self.lines:
+            width = max(0, width - _GAP - _for_all_width())
+            self._paint_for_all(image, draw, x + width + _GAP, y, pointer, targets)
+        if self.leader is not None or self.foreign:
+            self._paint_head(image, draw, x, y, width, pointer, targets)
+        rows = y + _FRAME + BLOCK_GAP
+        if not self.lines:
+            self._paint_empty_note(draw, x, rows if self.foreign else y, width, y + _HEIGHT)
+            return
+        self._paint_mark(image, x, rows, width, self.first > 0)
+        self._paint_rows(image, draw, x, rows + _MARK_H, width, pointer, targets)
+        self._paint_mark(image, x, rows + _MARK_H + ROWS * _ROW_H, width,
+                         self.first + ROWS < len(self.lines))
+
+    def _paint_empty_note(self, draw, x, top, width, bottom) -> None:
+        draw.text((x + width / 2, (top + bottom) / 2),
+                  fit_text(_tiny(), self.empty_note, width), font=_tiny(), anchor="mm",
+                  fill=(*TEXT_MUTED, 255))
 
     def _paint_head(self, image, draw, x, y, width, pointer, targets) -> None:
         column, room = x, width
@@ -593,14 +576,17 @@ def _leader(item) -> Leader:
     )
 
 
+def core_shows_the_queue(core, beside) -> bool:
+    if core is None or not core.isVisible() or core.isMinimized():
+        return False
+    return beside is None or not beside.frameGeometry().contains(core.frameGeometry().center())
+
+
 def queue_section(items, foreign: int = 0, *, first: int = 0,
                   drop_at: int | None = None,
-                  pointer: QueuePointer | None = None) -> QueueSection | None:
-    """The block the panel hangs at its foot, or ``None`` with nothing to say.
-    The head is whatever ComfyUI is making; with nothing of ours in flight it
-    names another app's backlog instead."""
-    if not items and not foreign:
-        return None
+                  pointer: QueuePointer | None = None) -> QueueSection:
+    """The Job Queue a HUD hangs at its foot.  The head is whatever ComfyUI is
+    making; with nothing of ours in flight it names another app's backlog instead."""
     lines = tuple(_line(item) for item in items)
     return QueueSection(lines=lines,
                         leader=_leader(items[0]) if items else None,
@@ -609,6 +595,100 @@ def queue_section(items, foreign: int = 0, *, first: int = 0,
                         any_to_cancel=bool(jobs_to_cancel(items)),
                         first=max(0, min(first, max(0, len(lines) - ROWS))),
                         drop_at=drop_at, pointer=pointer)
+
+
+class QueueFoot:
+    """The Job Queue a slideshow's HUD hangs at its foot, blank whenever Core
+    shows it beside the slideshow (*beside* answers the window the slideshow
+    fills the monitor with, or None for one in a session's room), and the
+    pointer on it."""
+
+    def __init__(self, actions, *, beside=lambda: None) -> None:
+        self._actions = actions
+        self._beside = beside
+        self._items: list = []
+        self._foreign = 0
+        self.pointer = QueuePointer(self)
+
+    def set(self, items, foreign: int = 0) -> None:
+        self._items = list(items)
+        self._foreign = foreign
+
+    @property
+    def hud_queue(self) -> tuple[list, int]:
+        return self._items, self._foreign
+
+    def section(self) -> QueueSection:
+        core = self._actions.core_window() if self._actions.core_window is not None else None
+        if core_shows_the_queue(core, beside=self._beside()):
+            return QueueSection(blank=True)
+        return queue_section(self._items, self._foreign, first=self.pointer.first,
+                             drop_at=self.pointer.drop, pointer=self.pointer)
+
+    def press(self, verb: str, payload: str) -> None:
+        numbers = [int(part) for part in payload.split("|")]
+        {FOOT_WHEEL: self.pointer.wheel, FOOT_PRESS: self.pointer.press,
+         FOOT_DRAG: self.pointer.drag, FOOT_RELEASE: self.pointer.release}[verb](*numbers)
+
+    def move(self, key: str, before: str | None) -> None:
+        if self._actions.move is not None:
+            self._actions.move(key, before)
+
+    def clear_foreign_queue(self) -> None:
+        if self._actions.clear_queue is not None:
+            self._actions.clear_queue()
+
+    def start_now(self) -> None:
+        if self._actions.start_now is not None:
+            self._actions.start_now()
+
+    def cancel_all(self) -> None:
+        if self._actions.cancel_all is not None:
+            self._actions.cancel_all()
+
+
+class JobQueueFile:
+    """The Job Queue painted to a file beside a session's HUD file, as wide as
+    *side*'s HUD holds it, for the Funestra in another program that draws that
+    HUD to draw at its foot."""
+
+    def __init__(self, hud_file: Path, side: str) -> None:
+        self._hud_file = Path(hud_file)
+        self._width = map_block_width(side)
+        self._written: list[Path] = []
+
+    def of(self, section: QueueSection) -> PaintedFoot:
+        height = section.size()[1]
+        image = Image.new("RGBA", (self._width, height), (0, 0, 0, 0))
+        targets = section.paint(image, 0, 0, self._width, None)
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        stamp = hashlib.sha1(buffer.getvalue()).hexdigest()[:12]
+        painted = self._hud_file.with_name(f"{self._hud_file.stem}_foot_{stamp}.png")
+        if not painted.exists():
+            partial = painted.with_name(f"{painted.stem}.partial")
+            partial.write_bytes(buffer.getvalue())
+            os.replace(partial, painted)
+        if painted not in self._written:
+            self._written.append(painted)
+        self._sweep(keeping=painted)
+        return PaintedFoot(file=str(painted), width=self._width, height=height, stamp=stamp,
+                           targets=tuple(targets))
+
+    def forget(self) -> None:
+        self._sweep(keeping=None)
+
+    def _sweep(self, *, keeping: Path | None) -> None:
+        self._written = [painted for painted in self._written
+                         if painted == keeping or not _removed(painted)]
+
+
+def _removed(path: Path) -> bool:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        return False  # the Funestra still has it open, and the next sweep takes it
+    return True
 
 
 class QueuePointer:

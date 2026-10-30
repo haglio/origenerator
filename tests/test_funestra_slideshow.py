@@ -24,15 +24,17 @@ from origenerator.funscript import funscript_path_for
 from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.hud_queue import OPEN
 from origenerator.gui.notice_overlay import HEARD_MARK
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
-from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
 from origenerator.slideshow_buttons import answer
 from tests.slideshow_support import slides_named
+from tests.test_slideshow_panel import _inflight
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -568,10 +570,55 @@ def test_the_panel_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path
     assert model.funestra == "portrait"
     assert model.corner.path == "one.png"
     assert model.seed_count == 1     # a set with no library under it maps the slide alone
-    assert [button.command for row in model.rows for button in row] == [
-        "portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
-        "portrait_fmode", "portrait_enhanced", "portrait_reset",
-        "portrait_shuffle", "portrait_latest", "portrait_cycle_version"]
+    assert [[button.command for button in row] for row in model.rows] == [
+        ["portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
+         "portrait_fmode", "portrait_enhanced", "portrait_reset",
+         "portrait_shuffle", "portrait_latest", "portrait_cycle_version"],
+        ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up"]]
+
+
+class _Core:
+    def __init__(self, *, minimized: bool) -> None:
+        self._minimized = minimized
+
+    def isVisible(self) -> bool:
+        return True
+
+    def isMinimized(self) -> bool:
+        return self._minimized
+
+
+def _published_foot(slideshow):
+    return parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8")).foot
+
+
+def _published_with_core(qtbot, tmp_path, *, minimized: bool):
+    tmp_path.mkdir(exist_ok=True)
+    core = _Core(minimized=minimized)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(core_window=lambda: core))
+    slideshow.shown.set_queue([_inflight("j1")], 0)
+    return _published_foot(slideshow)
+
+
+def _pressed_on(foot) -> list[str]:
+    return [button.command for _rect, button in foot.targets]
+
+
+def test_a_slideshow_on_a_sessions_funestra_hangs_the_job_queue_while_core_is_hidden(
+        qtbot, tmp_path):
+    foot = _published_with_core(qtbot, tmp_path, minimized=True)
+
+    assert Path(foot.file).exists()
+    assert f"{OPEN}|j1" in _pressed_on(foot)
+
+
+def test_a_slideshow_on_a_sessions_funestra_keeps_the_job_queues_room_empty_while_core_shows(
+        qtbot, tmp_path):
+    shown = _published_with_core(qtbot, tmp_path / "hidden", minimized=True)
+    blank = _published_with_core(qtbot, tmp_path / "shown", minimized=False)
+
+    assert _pressed_on(blank) == []
+    assert (blank.width, blank.height) == (shown.width, shown.height)
 
 
 def test_a_double_click_on_the_map_gives_that_item_the_lock_buttons_whole_lock(qtbot, tmp_path):
@@ -624,9 +671,20 @@ def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
-    slideshow.set_dwell_s(9)
+    slideshow.step_dwell(1)
 
-    assert _sent(slideshow) == ["SET_PACE 9"]
+    assert _sent(slideshow) == [f"SET_PACE {DEFAULT_S + 1}"]
+
+
+def test_a_new_pace_is_the_clip_seconds_the_satellites_hud_shows_at_once(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+
+    slideshow.step_dwell(2)
+
+    published = parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
+    row = next(row for row in published.rows
+               if any(button.command == "portrait_clip_seconds_up" for button in row))
+    assert f"{DEFAULT_S + 2}s" in [button.glyph for button in row]
 
 
 def test_a_slideshow_that_is_over_gives_the_side_back(qtbot, tmp_path):

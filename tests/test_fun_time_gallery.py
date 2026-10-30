@@ -27,6 +27,7 @@ from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.panes import PaneSplitter
+from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
@@ -263,6 +264,54 @@ def test_both_regions_can_hold_a_slideshow_at_once(qtbot, tmp_path, monkeypatch)
     assert portrait is not landscape
     for slideshow in (portrait, landscape):
         qtbot.addWidget(slideshow.shown)
+
+
+def _both_regions_playing(view, qtbot, monkeypatch, tmp_path):
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
+    _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
+    slideshows = view._slideshows._region_slideshows
+    for slideshow in slideshows.values():
+        qtbot.addWidget(slideshow.shown)
+    return slideshows["portrait"], slideshows["landscape"]
+
+
+def test_each_regions_clip_seconds_step_without_the_others(qtbot, tmp_path, monkeypatch):
+    view = _fun_time_view(qtbot)
+    portrait, landscape = _both_regions_playing(view, qtbot, monkeypatch, tmp_path)
+    before = landscape.dwell_s
+
+    portrait.step_dwell(2)
+
+    assert portrait.dwell_s == before + 2 * PACE_STEP_S
+    assert landscape.dwell_s == before
+
+
+def test_a_regions_clip_seconds_open_at_standalones_and_leave_it_as_it_was(
+        qtbot, tmp_path, monkeypatch):
+    view = _fun_time_view(qtbot)
+    view._pace.set_seconds(9)
+    portrait, landscape = _both_regions_playing(view, qtbot, monkeypatch, tmp_path)
+
+    portrait.step_dwell(1)
+    landscape.step_dwell(-1)
+
+    assert (portrait.dwell_s, landscape.dwell_s) == (10, 8)
+    assert view._pace.seconds == 9
+
+
+def test_the_next_slideshow_on_a_region_opens_at_the_clip_seconds_set_there(
+        qtbot, tmp_path, monkeypatch):
+    view = _fun_time_view(qtbot)
+    _open_slideshow(view, monkeypatch, tmp_path, "first", 100, 200)
+    first = view._slideshows._region_slideshows["portrait"]
+    qtbot.addWidget(first.shown)
+    first.step_dwell(3)
+
+    _open_slideshow(view, monkeypatch, tmp_path, "second", 90, 200)
+
+    second = view._slideshows._region_slideshows["portrait"]
+    qtbot.addWidget(second.shown)
+    assert second.dwell_s == first.dwell_s
 
 
 def test_a_slideshow_in_a_session_begins_on_the_one_item_picked(qtbot, tmp_path, monkeypatch):

@@ -39,7 +39,12 @@ from shared_ui.orientation import orientation_of_size
 from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
 from origenerator.slideshow import Slide
-from origenerator.slideshow_buttons import PANEL_PLACES, PRESSES, PRESSES_ABOUT_A_FILE
+from origenerator.slideshow_buttons import (
+    PANEL_PLACES,
+    PRESSES,
+    PRESSES_ABOUT_A_FILE,
+    PRESSES_ON_THE_QUEUE,
+)
 from origenerator.workflows.detail_parts import published_fix_phrases
 
 logger = logging.getLogger(__name__)
@@ -190,6 +195,7 @@ def _lines_said_to(side: str) -> tuple[str, ...]:
         *(spelled_for(side, verb) for verb in SIDE_VERBS),
         *(spelled_for(side, press) for press in PRESSES),
         *(f"{spelled_for(side, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
+        *(f"{spelled_for(side, press)}|{where}" for press, where in PRESSES_ON_THE_QUEUE.items()),
         *(f"{spelled_for(side, place)}|{payload}"
           for place, payload in PANEL_PLACES.items()),
         spelled_filter(side, "{row}"),

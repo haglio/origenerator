@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import queue
 import time
@@ -10,10 +11,24 @@ from app_support.file_channel import consume_command_file
 from app_support.osr2_device import SILENT_ONCE_OFF_S, Osr2Mode, Osr2Trouble
 from app_support.osr2_hold import PARK
 from app_support.osr2_slot import Osr2Slot
-from app_support.state_files import BROKER_CMD, BROKER_MODE, OSR2_NOT_FOUND, OSR2_SERIAL_RX
+from app_support.state_files import (
+    BROKER_CMD,
+    BROKER_HEARTBEAT,
+    BROKER_MODE,
+    OSR2_NOT_FOUND,
+    OSR2_SERIAL_RX,
+)
 from app_support.threading_utils import start_daemon_thread
+from funestra.broker import CONTRACT_FILE
 
-from origenerator.osr2 import Osr2Broker, device_mode, device_trouble, format_position
+from origenerator.osr2 import (
+    Osr2Broker,
+    broker_running,
+    device_mode,
+    device_trouble,
+    format_position,
+    press_the_broker,
+)
 
 
 @pytest.fixture
@@ -111,6 +126,30 @@ def test_a_broker_that_cannot_find_the_osr2_says_why_it_is_unheard(tmp_path):
     (tmp_path / OSR2_NOT_FOUND).write_text("999.5", encoding="utf-8")
 
     assert device_trouble(now=1000.0, state_dir=tmp_path) is Osr2Trouble.NOT_FOUND
+
+
+def test_the_broker_is_running_while_its_heartbeat_in_the_shared_directory_is_fresh(tmp_path):
+    assert not broker_running(now=1000.0, state_dir=tmp_path)
+
+    (tmp_path / BROKER_HEARTBEAT).write_text("999.0", encoding="utf-8")
+
+    assert broker_running(now=1000.0, state_dir=tmp_path)
+
+
+def test_a_press_on_the_broker_goes_through_the_launcher_its_checkout_names(
+        tmp_path, monkeypatch):
+    checkout = tmp_path / "relay"
+    checkout.mkdir()
+    (checkout / CONTRACT_FILE).write_text(json.dumps({
+        "app_name": "Relay", "package_dir": "relay_pkg", "broker_module": "relay_pkg.app",
+        "tray_module": "relay_pkg.tray", "tray_launcher": "launch_relay_tray.vbs",
+    }), encoding="utf-8")
+    pressed = []
+    monkeypatch.setattr("funestra.broker.press", lambda *args: pressed.append(args))
+
+    press_the_broker(state_dir=tmp_path, checkout=checkout)
+
+    assert pressed == [(tmp_path, checkout / "launch_relay_tray.vbs")]
 
 
 def test_an_app_named_no_port_reaches_the_brokers_own_slot(the_brokers_slot, monkeypatch):

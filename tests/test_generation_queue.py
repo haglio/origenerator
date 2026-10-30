@@ -18,7 +18,7 @@ from origenerator.gui.generation_queue import (
     GenerationQueue,
     QueueRow,
 )
-from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.marked_words import words
 
@@ -137,7 +137,7 @@ def test_an_empty_line_says_what_it_is_for(queue):
     QApplication.processEvents()
 
     assert queue._hint.isVisible()
-    assert queue._hint.text() == "(queued jobs show up here)"
+    assert queue._hint.text() == EMPTY_QUEUE_TEXT
     assert queue._hint.objectName() == "estimateLabel"  # the app's muted text
 
 

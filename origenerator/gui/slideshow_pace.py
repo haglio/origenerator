@@ -1,9 +1,7 @@
-"""How long a slide stays up — one number, app-wide.
+"""How long a slide stays up, which a slideshow's Clip seconds row sets.
 
-Genau's console carries a clip-seconds pair, and here the clips are the slides,
-so that pair on a slideshow's panel sets this. It is app-wide rather than
-per-slideshow: set it while one is running and that one changes pace under you,
-and the next slideshow opens at it.
+Standalone keeps one, and the next slideshow opens at it; in a Fun Time session
+each Satellite keeps its own, starting at Standalone's.
 """
 
 from __future__ import annotations

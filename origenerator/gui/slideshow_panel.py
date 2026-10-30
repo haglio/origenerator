@@ -25,7 +25,8 @@ THE_SLIDESHOWS_OWN = frozenset({
     "fmode", "enhanced", "reset", "shuffle", "latest", "no_loop", "seed_loop",
     "action_loop", "loop", "more_seeds", "play_video", "lock_video", "filter",
     "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
-    "cycle_action", "cycle_version", "cycle_version_back",
+    "cycle_action", "cycle_version", "cycle_version_back", "clip_seconds_up",
+    "clip_seconds_down",
 })
 
 COLLAPSES = {"hud_minimize": True, "hud_restore": False}
@@ -77,14 +78,15 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         item_note=slideshow.hud_item_note,
         # The buttons this slideshow answers, in the bands the panel draws them in —
         # which ones depends on what is drawing it.
-        rows=(*slideshow_rows(side, locked=locked, favorites_filter=favorites_filter,
-                              enhanced=enhanced, order=order_label, hosted=hosted,
-                              own_window=own_window,
-                              has_other_versions=slideshow.has_other_versions),
-              *(device.rows if device is not None else ())),
+        rows=slideshow_rows(side, locked=locked, favorites_filter=favorites_filter,
+                            enhanced=enhanced, order=order_label, hosted=hosted,
+                            own_window=own_window,
+                            has_other_versions=slideshow.has_other_versions,
+                            clip_seconds=slideshow.dwell_s),
         # The device's own line and readout, where this window is the one
         # driving: on the panel the set is on, so nothing is said twice.
         osr2_rows=device.osr2_rows if device is not None else (),
+        osr2_controls=device.osr2_controls if device is not None else (),
         osr2=device.osr2 if device is not None else "",
         osr2_control=device.osr2_control if device is not None else "",
         paused=device.paused if device is not None else False,

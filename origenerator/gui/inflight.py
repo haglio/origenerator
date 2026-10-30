@@ -268,6 +268,7 @@ def cancel_tooltip(auto_generating: bool) -> str:
             else "Cancel this generation")
 
 
+EMPTY_QUEUE_TEXT = "(queued jobs show up here)"
 START_NOW_TEXT = "Start now"
 START_NOW_TOOLTIP = "Start the video now instead of a minute after your last image"
 CLEAR_TEXT = "Clear"

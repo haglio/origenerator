@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 
+from funestra.console import BROKER_PRESS
 from PyQt6 import sip
 from PyQt6.QtWidgets import (
     QAbstractButton,
@@ -88,6 +89,7 @@ CONSOLE_PRESSES_REMEMBERED_AS = {
 }
 CONSOLE_PRESSES_THAT_ARE_NO_SETTING = {
     "a read-out, which nothing presses": "",
+    "starting or stopping the Broker, which runs whether or not this app is open": BROKER_PRESS,
 }
 
 

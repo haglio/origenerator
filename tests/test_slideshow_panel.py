@@ -7,6 +7,7 @@ import json
 import numpy as np
 import pytest
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
+from funestra.console import BROKER_PRESS
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
@@ -17,10 +18,10 @@ from PyQt6.QtCore import QEvent, QPoint, QPointF
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
-from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.osr2_control import Osr2Control
-from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S
+from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
 from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -164,8 +165,38 @@ class TestTheOnePanelASlideshowWears:
         """It sets how long an unheld slide stays up, which is about the set."""
         posted = [button.command for row in self._model(qtbot).rows for button in row]
 
-        assert "genau_clip_seconds_up" in posted
+        assert "portrait_clip_seconds_up" in posted
         assert "robot_hand_cycle_shape" not in posted
+
+    def test_a_slideshow_on_a_sessions_funestra_carries_the_clip_seconds_too(self, qtbot):
+        slideshow = self._window(qtbot).slideshow
+
+        rows = slideshow_hud_model("portrait", slideshow, own_window=False).rows
+
+        assert ("portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up") in [
+            tuple(button.command or button.glyph for button in row[1:]) for row in rows]
+
+    @pytest.mark.parametrize("running", [True, False])
+    def test_the_broker_button_rides_on_the_osr2_line_lit_while_the_broker_runs(
+            self, qtbot, monkeypatch, running):
+        monkeypatch.setattr("origenerator.osr2.broker_running", lambda: running)
+
+        (broker,) = self._model(qtbot).osr2_controls
+
+        assert broker.command == BROKER_PRESS
+        assert (broker.lit, broker.warn) == (running, not running)
+
+    def test_a_press_on_the_broker_button_presses_the_broker(self, qtbot, monkeypatch):
+        presses = []
+        monkeypatch.setattr("origenerator.osr2.press_the_broker", lambda: presses.append(True))
+
+        self._window(qtbot).press(BROKER_PRESS)
+
+        assert presses == [True]
+
+    def test_a_slideshow_on_a_sessions_funestra_leaves_the_broker_button_to_the_session(
+            self, qtbot):
+        assert slideshow_hud_model("portrait", self._window(qtbot).slideshow).osr2_controls == ()
 
     def test_everything_that_aims_the_device_rides_with_the_device(self, qtbot):
         """Human-inspired motion, the waveform and the OSR2 switch act on the
@@ -206,23 +237,21 @@ class TestTheOnePanelASlideshowWears:
         window = self._window(qtbot)
         window.wear_the_hud("portrait")
 
-        window.press("genau_clip_seconds_up")
+        window.press("portrait_clip_seconds_up")
         assert window.slideshow.dwell_s == 4 + STEP_S
 
-        window.press("genau_clip_seconds_down")
+        window.press("portrait_clip_seconds_down")
         assert window.slideshow.dwell_s == 4
 
-    def test_the_clip_seconds_pair_stops_at_its_ends(self, qtbot):
-        window = self._window(qtbot)
+    @pytest.mark.parametrize(("at", "press"), [(MAX_S, "portrait_clip_seconds_up"),
+                                               (MIN_S, "portrait_clip_seconds_down")])
+    def test_the_clip_seconds_pair_stops_at_its_ends(self, qtbot, at, press):
+        window = self._window(qtbot, pace=SlideshowPace(at))
         window.wear_the_hud("portrait")
 
-        window.slideshow.set_dwell_s(MAX_S)
-        window.press("genau_clip_seconds_up")
-        assert window.slideshow.dwell_s == MAX_S
+        window.press(press)
 
-        window.slideshow.set_dwell_s(MIN_S)
-        window.press("genau_clip_seconds_down")
-        assert window.slideshow.dwell_s == MIN_S
+        assert window.slideshow.dwell_s == at
 
     def test_a_hosted_side_verb_still_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
         """The device rows are checked before the session's transport now, so a
@@ -289,7 +318,7 @@ class TestWhereTheSlideshowsPanelSits:
     @staticmethod
     def _window(qtbot, **kw):
         window = _dressed(qtbot, [("scene one.png", "image")], **kw)
-        window.resize(900, 600)
+        window.resize(1200, 900)
         window.show()
         return window
 
@@ -459,6 +488,39 @@ def test_an_image_still_being_generated_is_drawn_on_the_map_without_its_frame_by
     assert (corner.path, corner.thumb) == ("", "")
 
 
+class _Core:
+    """Core's window as the panel asks after it: shown or minimized, and where it
+    sits -- beside the screen Qt reports for it, which off screen is the first
+    one whatever the window's place, and so no guide to its monitor."""
+
+    def __init__(self, place, *, screen=None, minimized: bool = False) -> None:
+        self._place, self._screen, self._minimized = place, screen, minimized
+
+    def isVisible(self) -> bool:
+        return True
+
+    def isMinimized(self) -> bool:
+        return self._minimized
+
+    def frameGeometry(self):
+        return self._place
+
+    def screen(self):
+        return self._screen
+
+
+def _core_as(qtbot, *, over: bool, minimized: bool = False, **dressed):
+    """A slideshow, and Core under it or beside it on another monitor."""
+    core = {}
+    window = _dressed(qtbot, actions=SlideshowActions(core_window=lambda: core["window"]),
+                      **dressed)
+    place = window.frameGeometry()
+    core["window"] = _Core(place if over else place.translated(place.width() + 50, 0),
+                           screen=window.screen(), minimized=minimized)
+    window.set_queue([_inflight("j1", job_kind="Image", typical_seconds=30)], 0)
+    return window
+
+
 class TestTheQueueOnTheOnePanel:
     """The lower strip's queue rides on the panel a slideshow already wears.
 
@@ -474,11 +536,46 @@ class TestTheQueueOnTheOnePanel:
 
         assert [line.key for line in window._hud_model().foot.lines] == ["j1"]
 
-    def test_a_panel_over_an_idle_queue_grows_no_block(self, qtbot):
+    def test_a_slideshow_on_another_monitor_than_core_leaves_the_job_queue_to_core(
+            self, qtbot):
+        window = _core_as(qtbot, over=False)
+
+        assert window._hud_model().foot.blank
+
+    def test_a_slideshow_over_core_hangs_the_job_queue_at_its_foot(self, qtbot):
+        window = _core_as(qtbot, over=True)
+
+        assert [line.key for line in window._hud_model().foot.lines] == ["j1"]
+
+    def test_a_slideshow_beside_a_minimized_core_hangs_the_job_queue_at_its_foot(
+            self, qtbot):
+        window = _core_as(qtbot, over=False, minimized=True)
+
+        assert [line.key for line in window._hud_model().foot.lines] == ["j1"]
+
+    def test_a_slideshow_over_a_sessions_region_leaves_the_job_queue_to_core_beside_it(
+            self, qtbot, tmp_path):
+        window = _core_as(qtbot, over=True, dashboard_cmd_file=tmp_path / "dashboard_cmd.txt")
+
+        assert window._hud_model().foot.blank
+
+    def test_a_hud_over_an_idle_job_queue_shows_it_saying_so(self, qtbot):
         window = _dressed(qtbot)
         window.set_queue([], 0)
 
-        assert window._hud_model().foot is None
+        foot = window._hud_model().foot
+        assert not foot.blank and foot.empty_note == EMPTY_QUEUE_TEXT
+
+    def test_the_hud_keeps_one_size_as_jobs_come_and_go_and_core_comes_into_view(
+            self, qtbot):
+        covering_core = _core_as(qtbot, over=True)
+        sizes = {_panel(_core_as(qtbot, over=False))[2].shape}
+        for items in ([], [_inflight("j1", job_kind="Image", typical_seconds=30)],
+                      [_inflight(f"j{index}", typical_seconds=30) for index in range(7)]):
+            covering_core.set_queue(items, 0)
+            sizes.add(_panel(covering_core)[2].shape)
+
+        assert len(sizes) == 1
 
     def test_a_press_on_the_block_reaches_the_queue_through_the_panel(self, qtbot):
         """The Funestra hands the pointer on the block back in the block's own
@@ -488,7 +585,7 @@ class TestTheQueueOnTheOnePanel:
         window.set_queue([_inflight("j1", cancel=lambda: stopped.append("j1"),
                                        typical_seconds=30)], 0)
         panel_targets(window)
-        x, y, width, height = window._queue_pointer.where(f"{CANCEL}|j1")
+        x, y, width, height = window.queue_foot.pointer.where(f"{CANCEL}|j1")
 
         window.press(f"foot_press|{x + width // 2}|{y + height // 2}")
 
@@ -501,7 +598,7 @@ class TestTheQueueOnTheOnePanel:
         window.set_queue([_inflight("j1", reveal=lambda: opened.append("j1"),
                                        typical_seconds=30)], 0)
         foot = panel_targets(window).foot
-        row = window._queue_pointer.where(f"{OPEN}|j1")
+        row = window.queue_foot.pointer.where(f"{OPEN}|j1")
         rect = (foot[0] + row[0], foot[1] + row[1], row[2], row[3])
 
         _click_at(window, rect)
@@ -512,7 +609,7 @@ class TestTheQueueOnTheOnePanel:
         window = _dressed(qtbot)
         window.set_queue([_inflight(f"j{index}", typical_seconds=30) for index in range(7)], 0)
         panel_targets(window)
-        x, y, width, height = window._queue_pointer.where(f"{OPEN}|j2")
+        x, y, width, height = window.queue_foot.pointer.where(f"{OPEN}|j2")
 
         window.press(f"foot_wheel|-1|{x + width // 2}|{y + height // 2}")
 

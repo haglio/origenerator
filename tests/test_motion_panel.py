@@ -13,6 +13,7 @@ import pytest
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
 from funestra.console import (
+    BROKER_PRESS,
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
@@ -94,7 +95,8 @@ def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
 
     assert not any(a.endswith("_minimize") for a in actions)
     for gone in ("genau_prev_clip", "genau_next_clip", "main_lock", "genau_weird_clip",
-                 "genau_clip_seconds_down", "genau_clip_seconds_up"):
+                 "portrait_clip_seconds_down", "portrait_clip_seconds_up",
+                 "landscape_clip_seconds_down", "landscape_clip_seconds_up"):
         assert gone not in actions, gone
     for kept in ("robot_hand_toggle_learned",
                  "robot_hand_cycle_shape", "robot_hand_release",
@@ -103,8 +105,6 @@ def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
 
 
 def test_the_console_declares_the_buttons_this_app_answers(qtbot):
-    """The motion's own row -- declared here rather than left to the Funestras'
-    stock set, which offers verbs this app has no answer for."""
     _panel_, motion = _panel(qtbot)
 
     hud = console_hud(motion, control=OSR2_DRIVING)
@@ -113,7 +113,30 @@ def test_the_console_declares_the_buttons_this_app_answers(qtbot):
     assert [[b.command for b in row if b.command] for row in hud.console.osr2_rows] == [
         ["robot_hand_park", "robot_hand_toggle_learned", "robot_hand_cycle_shape"],
     ]
-    assert hud.console.osr2_controls == ()
+    assert [b.command for b in hud.console.osr2_controls] == [BROKER_PRESS]
+
+
+@pytest.mark.parametrize("running", [True, False])
+def test_the_broker_button_is_lit_while_the_broker_runs_and_red_while_it_does_not(
+        qtbot, monkeypatch, running):
+    monkeypatch.setattr("origenerator.osr2.broker_running", lambda: running)
+    panel, _motion = _panel(qtbot)
+
+    panel.drawing()
+
+    (broker,) = [b for _rect, b in panel._painter.buttons if b.command == BROKER_PRESS]
+    assert (broker.lit, broker.warn) == (running, not running)
+
+
+def test_a_press_on_the_broker_button_presses_the_broker(qtbot, monkeypatch):
+    presses = []
+    monkeypatch.setattr("origenerator.osr2.press_the_broker", lambda: presses.append(True))
+    panel, _motion = _panel(qtbot)
+    panel.drawing()
+
+    _press(panel, BROKER_PRESS)
+
+    assert presses == [True]
 
 
 def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot):
@@ -139,18 +162,21 @@ def test_the_readouts_speed_amp_and_center_buttons_take_presses_while_the_room_i
     assert len(taken) == 6
 
 
-def test_every_button_the_console_declares_does_something_here(qtbot):
+def test_every_button_the_console_declares_does_something_here(qtbot, monkeypatch):
+    broker_presses = []
+    monkeypatch.setattr("origenerator.osr2.press_the_broker", lambda: broker_presses.append(True))
     control = FakeControl()
     panel, motion = _panel(qtbot, control=control)
     motion.active = True
     panel.drawing()
     console = console_hud(motion, control=control.state()).console
-    declared = [b.command for row in (*console.rows, *console.osr2_rows) for b in row if b.command]
+    declared = [b.command for row in (*console.rows, *console.osr2_rows, console.osr2_controls)
+                for b in row if b.command]
 
     for command in declared:
-        before = len(motion.calls) + len(control.asked)
+        before = len(motion.calls) + len(control.asked) + len(broker_presses)
         _press(panel, command)
-        assert len(motion.calls) + len(control.asked) > before, command
+        assert len(motion.calls) + len(control.asked) + len(broker_presses) > before, command
 
 
 def test_the_motion_buttons_reach_the_driver(qtbot):
@@ -443,6 +469,17 @@ def test_the_panel_redraws_once_the_device_switches_under_what_it_drew(qtbot):
 
     assert panel._redraw_if_the_device_switched() is False
     device["on"] = True
+    assert panel._redraw_if_the_device_switched() is True
+
+
+def test_the_panel_redraws_once_the_broker_starts_or_stops(qtbot, monkeypatch):
+    running = {"now": True}
+    monkeypatch.setattr("origenerator.osr2.broker_running", lambda: running["now"])
+    panel, _motion = _panel(qtbot, control=FakeControl(state=OSR2_PARKED))
+    panel.drawing()
+
+    assert panel._redraw_if_the_device_switched() is False
+    running["now"] = False
     assert panel._redraw_if_the_device_switched() is True
 
 

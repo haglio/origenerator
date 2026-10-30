@@ -1,15 +1,14 @@
 """What this app tells the Funestras' console painter, and what a press on it means.
 
 The console is drawn in two places here — its OSR2 section alone at the top left
-of the main window, and that section with the pace on the panel a slideshow wears — so
+of the main window, and that section on the panel a slideshow wears — so
 what goes ON the console and what a press takes OFF it are written once, here,
 rather than once per surface.
 
 Nothing is drawn here. :class:`funestra.console_hud.ConsolePainter` and the
 sections it is built from do the drawing; this only says what they are drawing:
-the pace an unlocked slide moves on at, the motion's bars sampled forward, the
-funscript's line where a script has the device, and whether the app's one OSR2
-switch is on.
+the motion's bars sampled forward, the funscript's line where a script has the
+device, and whether the app's one OSR2 switch is on.
 """
 
 from __future__ import annotations
@@ -20,14 +19,14 @@ from types import SimpleNamespace
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
 from funestra.console import (
+    BROKER_PRESS,
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
-    ROW_LABEL_W,
-    VALUE_W,
     ConsoleModel,
     aim_row,
+    osr2_controls,
 )
 from funestra.console_hud import ConsoleHud, ConsolePainter
 from funestra.drive_readout import (
@@ -36,14 +35,11 @@ from funestra.drive_readout import (
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
-from funestra.hud_button import Button
-from funestra.hud_marks import shared_mark
 from funestra.modes import MainMode, Osr2State
 from funestra.robot_hand import POSITION_MAX, control_limits
 
-from origenerator import motion_engine
+from origenerator import motion_engine, osr2
 from origenerator.console_commands import level_asked_for, max_intensity_asked_for
-from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
 # Which press on the console's OSR2 switch asks for which state, read off
 # funestra's own mapping so a press cannot drift from the button that lights.
@@ -99,7 +95,8 @@ def _bars_drawn(bars) -> dict:
 
 
 def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2Trouble | None = None,
-                control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ConsoleHud:
+                control: str = OSR2_CONTROL_UNANSWERED, script=None,
+                broker_running: bool = True) -> ConsoleHud:
     """The console's OSR2 section as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated motion over
@@ -110,12 +107,13 @@ def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2
     OSR2 row says FunScript -- the motion is stopped, and drawing it would be a
     drawing of something nobody is sending.
     """
-    shown = slideshow_device(motion, device=device, trouble=trouble, control=control, script=script)
+    shown = slideshow_device(motion, device=device, trouble=trouble, control=control, script=script,
+                             broker_running=broker_running)
     return ConsoleHud(
         console=ConsoleModel(
             main_mode=MainMode.GENAU,
             osr2=shown.osr2, osr2_control=control, paused=shown.paused,
-            osr2_rows=shown.osr2_rows,
+            osr2_rows=shown.osr2_rows, osr2_controls=shown.osr2_controls,
             max_intensity=shown.max_intensity,
         ),
         drive=shown.drive,
@@ -125,7 +123,7 @@ def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2
 @dataclass(frozen=True)
 class SlideshowDevice:
     """The device half of this app's console: the rows that aim the OSR2, who
-    has the device, and the motion being sent -- and on a slideshow's panel, the pace.
+    has the device, and the motion being sent.
 
     Handed to the one panel a slideshow wears (:mod:`origenerator.gui.slideshow_panel`) so
     it says all of it without a second panel underneath, and used to build the
@@ -139,15 +137,14 @@ class SlideshowDevice:
     osr2_control: str
     drive: DriveHud
     max_intensity: int
-    # The pace an unlocked slide moves on at -- about the SET, so it rides with
-    # the rows that step it rather than with the device.
-    rows: tuple = ()
     paused: bool = False
+    osr2_controls: tuple = ()
 
 
-def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Osr2Mode.CONTROLLED,
+def slideshow_device(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
                      trouble: Osr2Trouble | None = None,
-                     control: str = OSR2_CONTROL_UNANSWERED, script=None) -> SlideshowDevice:
+                     control: str = OSR2_CONTROL_UNANSWERED, script=None,
+                     broker_running: bool = True) -> SlideshowDevice:
     """What the device is doing, as a panel takes it — see :class:`SlideshowDevice`.
 
     ``script`` is the funscript driver, when this app has one: while it has the
@@ -163,9 +160,9 @@ def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Os
     driving = motion.active and on and not scripted
     return SlideshowDevice(
         osr2_control=control,
-        rows=() if pace_s is None else (pace_row(pace_s),),
         osr2_rows=(aim_row(learned=motion.state.learned.active,
                            shape=motion.state.state.shape.value, control=control),),
+        osr2_controls=osr2_controls(broker_running=broker_running),
         osr2=Osr2State.of(device, funscript_driving=scripted, trouble=trouble),
         drive=(script_hud(script, motion.state) if scripted
                else drive_hud(motion.state, driving)),
@@ -177,27 +174,6 @@ def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Os
 def panel_room(motion) -> tuple[int, int]:
     driving = SimpleNamespace(active=True, state=motion.state, parked_by_the_pause=False)
     return ConsolePainter(device_only=True).rgba(console_hud(driving, control=OSR2_DRIVING))[1]
-
-
-def pace_row(pace_s: int) -> tuple[Button, ...]:
-    return (
-        Button("", "Clip seconds", "", width=ROW_LABEL_W),
-        Button("genau_clip_seconds_down", shared_mark("minus"), "Move on sooner", group_break=True),
-        Button("", f"{pace_s}s", "", width=VALUE_W),
-        Button("genau_clip_seconds_up", shared_mark("plus"), "Leave each clip longer"),
-    )
-
-
-_PACE_STEPS = {"genau_clip_seconds_up": DWELL_STEP_S, "genau_clip_seconds_down": -DWELL_STEP_S}
-
-
-def post_pace_action(action: str, host) -> bool:
-    """Step *host*'s pace for a press on the clip-seconds pair, and say whether
-    the press was one of that pair."""
-    if action not in _PACE_STEPS:
-        return False
-    host.set_dwell_s(host.dwell_s + _PACE_STEPS[action])  # the pace clamps its own ends
-    return True
 
 
 def post_device_action(action: str, *, motion, control=None) -> bool:
@@ -239,6 +215,8 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
         step[0](step[1])
     elif action in OSR2_CONTROL_BY_COMMAND:
         _ask_for_control(OSR2_CONTROL_BY_COMMAND[action], motion, control)
+    elif action == BROKER_PRESS:
+        osr2.press_the_broker()
     elif action == "robot_hand_toggle_learned":
         motion.toggle_learned()
     elif action == "robot_hand_cycle_shape":

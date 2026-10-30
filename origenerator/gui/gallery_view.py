@@ -332,8 +332,7 @@ class GalleryView(QWidget):
         # switch: driving to parked leaves the switch on, and what has to change
         # is which driver is sending and what it is sending.
         self.osr2_control.changed.connect(self.reconcile_osr2)
-        # How long a slide holds the screen, app-wide: a slideshow's panel shows it
-        # as clip seconds and sets it, and the next slideshow opens at it.
+        # Standalone's Clip seconds, which each Satellite's starts at in a session.
         self._pace = SlideshowPace(parent=self)
         # Guards the one reconcile that owns both drive sources: starting or
         # stopping the motion is something it does, not something it reacts to.
@@ -1410,7 +1409,8 @@ class GalleryView(QWidget):
 
     def hideEvent(self, event):
         super().hideEvent(event)
-        self._poll_timer.stop()  # no need to poll while the tab is hidden
+        if not (event.spontaneous() or self.window().isMinimized()):
+            self._poll_timer.stop()  # no need to poll while the tab is hidden
 
     def closeEvent(self, event):
         """Put down everything this view arms application-wide, however it was
@@ -1470,7 +1470,8 @@ class GalleryView(QWidget):
         out is skipped rather than stacked, so a slow server thins the refresh
         instead of queueing freezes.
         """
-        if self._poll_inflight:
+        if self._poll_inflight or (self.window().isMinimized()
+                                   and not self._slideshows.any_up()):
             return
         self._poll_inflight = True
         jobs = self._jobs.all_jobs

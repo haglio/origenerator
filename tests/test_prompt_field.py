@@ -1,9 +1,10 @@
-"""Dragging a prompt field taller, and the height it keeps afterwards."""
+"""Dragging a prompt field taller and the height it keeps, and graying one out."""
 from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.prompt_field import (
     DEFAULT_HEIGHT,
@@ -11,6 +12,7 @@ from origenerator.gui.prompt_field import (
     PROMPT_HEIGHTS,
     PromptField,
     PromptHeights,
+    set_in_use,
 )
 
 
@@ -157,3 +159,15 @@ def test_a_drag_is_filed_in_the_set_the_field_was_given(qtbot):
 
     assert mine.height("negative_prompt") == 240
     assert PROMPT_HEIGHTS.height("negative_prompt") == DEFAULT_HEIGHT
+
+
+def test_a_prompt_given_no_reason_is_never_grayed_out(qtbot):
+    field, label = PromptField("negative_prompt"), QLabel("Negative Prompt")
+    for widget in (field, label):
+        qtbot.addWidget(widget)
+
+    set_in_use(field, label, "", "What to keep out of the image.")
+
+    assert (field.property("inert"), label.property("inert")) == (False, False)
+    assert not field.isReadOnly()
+    assert field.toolTip() == label.toolTip() == "What to keep out of the image."

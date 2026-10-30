@@ -436,7 +436,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # Broker button and a Satellite's Clip seconds came to its HUDs.
 # 16071 when a story handed to ComfyUI with nobody left to answer its voice came
 # to be spoken where it is asked.
-MAX_PROSE_LINES = 16071
+# 16049 when the loop key came to step the lock, seeds, actions and off by the
+# rule funestra keeps for every app, and this repo's copy of it went.
+MAX_PROSE_LINES = 16049
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

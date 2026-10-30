@@ -11,9 +11,9 @@ Funestra hands it over in process, and the Funestra draws it.
 from __future__ import annotations
 
 from funestra.hud_title import hud_title, looping_label
+from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
 
-from origenerator.gui.slideshow_map import SEED_AXIS
 from origenerator.gui.slideshow_set import thumb_of
 from origenerator.slideshow_buttons import slideshow_rows
 
@@ -102,7 +102,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         # lifts it, exactly as on a satellite.  With no filter on, a seed
         # loop lights the row it is playing, which is what the button on
         # that row says about it.
-        filter_query=act_filter or (shown.label if shown.loop == SEED_AXIS else ""),
+        filter_query=act_filter or (shown.label if shown.loop == SEED else ""),
         seed_count=len(shown.seeds) + 1,
         action_count=len(shown.column) + 1,
         playing=shown.playing,

@@ -19,14 +19,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from origenerator.slideshow import Slide
+from funestra.loop_cycle import SEED
 
-# The two axes of the map, and what the loop key steps through: the row, then
-# the column, then off.  "" is the off stop, and where a slideshow that is not
-# looping already stands, so the first press starts a seed loop.
-SEED_AXIS = "seed"
-ACTION_AXIS = "action"
-LOOP_CYCLE: tuple[str, ...] = (SEED_AXIS, ACTION_AXIS, "")
+from origenerator.slideshow import Slide
 
 Cell = tuple[str, int]  # ("corner", 0) | ("seed", i) | ("action", i)
 CORNER: Cell = ("corner", 0)
@@ -118,7 +113,7 @@ def build_map(current: Slide, loop: Loop | None,
     anchor = loop.pool[0]
     playing = CORNER if at == 0 else (loop.axis, at - 1)
     at_anchor = neighbors_of(anchor.prompt_id)
-    if loop.axis == SEED_AXIS:
+    if loop.axis == SEED:
         lit = neighbors_of(current.prompt_id)
         return SlideshowMap(anchor, loop.pool[1:], lit.column, playing, loop.axis,
                             at_anchor.label)

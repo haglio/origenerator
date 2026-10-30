@@ -1317,6 +1317,31 @@ def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
     assert slideshow.locked is True
 
 
+def test_the_loop_keys_first_press_locks_the_item_on_screen(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=_into(said))
+    _sent(slideshow)
+
+    slideshow.slideshow_loop_cycle()
+
+    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == ["LOCK_ON"]
+    assert (slideshow.locked, slideshow.hud_map().loop, said) == (True, "", ["Locked"])
+
+
+def test_the_loop_keys_off_stop_lets_go_of_a_lock_taken_inside_the_loop(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=_into(said))
+    slideshow.slideshow_loop("action")
+    slideshow.slideshow_toggle_lock()
+    _sent(slideshow)
+    said.clear()
+
+    slideshow.slideshow_loop_cycle()
+
+    assert "LOCK_OFF" in _sent(slideshow)
+    assert (slideshow.locked, slideshow.hud_map().loop, said) == (False, "", ["Loop off"])
+
+
 def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))

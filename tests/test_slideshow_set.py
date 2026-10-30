@@ -11,6 +11,7 @@ import random
 
 import pytest
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.loop_cycle import ACTION, LOCK, OFF, SEED
 
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
@@ -402,14 +403,15 @@ def test_a_loop_with_somewhere_to_go_is_not_one_to_end():
     assert slideshow_set.loop is not None
 
 
-def test_the_loop_key_steps_seeds_then_configs_then_off_and_round_again():
+def test_the_loop_key_steps_the_lock_then_seeds_then_configs_then_off_and_round_again():
     slideshow_set, _dealt = _mapped()
 
-    assert slideshow_set.step_loop() == "seed"
-    assert slideshow_set.step_loop() == "action"
+    assert slideshow_set.step_loop(locked=False) == LOCK
+    assert slideshow_set.step_loop(locked=True) == SEED
+    assert slideshow_set.step_loop(locked=False) == ACTION
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-1x"]
-    assert slideshow_set.step_loop() == "off"
-    assert slideshow_set.step_loop() == "seed"
+    assert slideshow_set.step_loop(locked=False) == OFF
+    assert slideshow_set.step_loop(locked=False) == LOCK
 
 
 def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
@@ -431,14 +433,15 @@ def test_an_axis_with_nothing_to_loop_is_stepped_over():
     seeds_only = lambda pid: MapNeighbors(seeds=_SEEDS.get(pid, ()))  # noqa: E731
     slideshow_set, _dealt = _set(neighbors=seeds_only)
 
-    assert slideshow_set.step_loop() == "seed"
-    assert slideshow_set.step_loop() == "off"
+    assert slideshow_set.step_loop(locked=True) == SEED
+    assert slideshow_set.step_loop(locked=False) == OFF
 
 
-def test_with_nothing_on_either_axis_the_loop_key_is_the_lock():
+def test_with_nothing_on_either_axis_the_loop_key_locks_and_lets_go():
     slideshow_set, dealt = _set()
 
-    assert slideshow_set.step_loop() == "lock"
+    assert slideshow_set.step_loop(locked=False) == LOCK
+    assert slideshow_set.step_loop(locked=True) == OFF
     assert dealt == []
 
 
@@ -527,7 +530,7 @@ def test_a_set_with_nothing_in_it_has_nothing_to_map_loop_widen_or_walk():
     slideshow_set, dealt = _set(items=[], neighbors=_neighbors, widen=lambda pid: ())
 
     assert slideshow_set.map() is None
-    assert slideshow_set.step_loop() == "lock"
+    assert slideshow_set.step_loop(locked=False) == LOCK
     assert slideshow_set.more_seeds() is False
     assert slideshow_set.set_act_filter("fox") is False
     assert slideshow_set.nav_target("right") is None
@@ -650,7 +653,7 @@ def test_the_loop_key_stepped_off_a_row_falls_back_the_same_way():
     slideshow_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
     fall_back, asked = _falls_back()
 
-    assert slideshow_set.step_loop(fall_back) == "off"
+    assert slideshow_set.step_loop(locked=False, fall_back=fall_back) == OFF
 
     assert asked == [True]
 

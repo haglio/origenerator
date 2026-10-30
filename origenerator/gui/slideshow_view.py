@@ -398,7 +398,7 @@ class SlideshowView(QWidget):
             slideshow.slideshow_nav("down") if shifted else slideshow.slideshow_toggle_lock()
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             # The loop key, on both of the keys a session gives its two
-            # satellites: seeds, then actions, then off.
+            # satellites: the lock, then seeds, then actions, then off.
             slideshow.slideshow_loop_cycle()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.close()    # out of the slideshow, into the folder of what is on screen

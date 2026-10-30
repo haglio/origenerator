@@ -722,12 +722,16 @@ def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot):
     assert words(view._note) == "Locked"
 
 
-def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
+def test_the_loop_key_locks_then_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
     browsing = [*_KEYED, ("z.png", "image", "id-z")]     # more than one row, so nothing loops yet
     view = _view(qtbot, browsing, actions=SlideshowActions(neighbors=_around))
 
     _press(view, Qt.Key.Key_E)
-    assert view.slideshow.hud_map().loop == "seed"
+    assert (view.slideshow.locked, view.slideshow.hud_map().loop) == (True, "")
+    assert words(view._note) == "Locked"
+
+    _press(view, Qt.Key.Key_E)
+    assert (view.slideshow.locked, view.slideshow.hud_map().loop) == (False, "seed")
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["id-a", "id-b"]
     assert words(view._note) == "Looping seeds: 2"
 
@@ -747,6 +751,7 @@ def test_the_forward_step_out_of_a_row_down_to_one_image_ends_the_loop(qtbot):
     set plays next, the way it steps out of a lock."""
     browsing = [*_KEYED, ("z.png", "image", "id-z")]
     view = _view(qtbot, browsing, actions=SlideshowActions(neighbors=_around))
+    _press(view, Qt.Key.Key_E)                   # the lock
     _press(view, Qt.Key.Key_E)                   # the seed row is the pass: id-a, id-b
     view.slideshow._set.playlist.drop("id-b")                  # culled down to the image on screen
     shown = _put_up(view)
@@ -761,6 +766,7 @@ def test_the_forward_step_out_of_a_row_down_to_one_image_ends_the_loop(qtbot):
 def test_the_forward_step_in_a_row_with_somewhere_to_go_stays_in_the_loop(qtbot):
     view = _view(qtbot, [*_KEYED, ("z.png", "image", "id-z")],
                  actions=SlideshowActions(neighbors=_around))
+    _press(view, Qt.Key.Key_E)                   # the lock
     _press(view, Qt.Key.Key_E)                   # the seed row is the pass: id-a, id-b
 
     view.slideshow.slideshow_step(1)
@@ -775,7 +781,8 @@ def test_the_back_step_in_a_row_down_to_one_image_leaves_it_looping(qtbot):
     own step the other way, and what it finds in a row of one is that image."""
     view = _view(qtbot, [*_KEYED, ("z.png", "image", "id-z")],
                  actions=SlideshowActions(neighbors=_around))
-    _press(view, Qt.Key.Key_E)
+    _press(view, Qt.Key.Key_E)                   # the lock
+    _press(view, Qt.Key.Key_E)                   # the seed row
     view.slideshow._set.playlist.drop("id-b")
 
     view.slideshow.slideshow_step(-1)
@@ -2306,8 +2313,8 @@ def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
         Slide("a.png", "image", "id-a"), Slide("c.png", "image", "id-c")))
     browsing = [*_KEYED, ("z.png", "image", "id-z")]
     closed = _view(qtbot, browsing, actions=library)
-    _press(closed, Qt.Key.Key_E)
-    _press(closed, Qt.Key.Key_E)
+    for _stop in ("the lock", "the seed row", "the action column"):
+        _press(closed, Qt.Key.Key_E)
     _press(closed, Qt.Key.Key_Right)
 
     reopened = _view(qtbot, browsing, actions=library)

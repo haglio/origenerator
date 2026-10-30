@@ -33,6 +33,7 @@ from funestra.funestra_verbs import (
     TRASH,
     play_file,
 )
+from funestra.loop_cycle import LOCK, SEED
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
 from funestra.satellite_hud import hud_text
@@ -44,13 +45,10 @@ from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
 from origenerator.gui.slideshow_hud import slideshow_hud_model
-from origenerator.gui.slideshow_map import SEED_AXIS
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
 from origenerator.gui.slideshow_set import (
-    LOOP_IS_A_LOCK,
-    LOOP_OFF,
     SlideshowSet,
     item_note,
     looping_note,
@@ -590,16 +588,16 @@ class FunestraSlideshow(QObject):
         return bool(self._actions.browse_all(self))
 
     def slideshow_loop_cycle(self) -> None:
-        """The loop key: seeds, then actions, then off — and the lock when
-        there is nothing on either axis to loop."""
-        stepped = self._set.step_loop(self._browse_it_all)
-        if stepped == LOOP_IS_A_LOCK:
-            self.set_locked(not self.locked)
-            self._flash("Locked" if self.locked else "Unlocked")
-        elif stepped == LOOP_OFF:
-            self._flash("Loop off")
-        else:
+        looping = self._set.loop is not None
+        stop = self._set.step_loop(self.locked, self._browse_it_all)
+        if stop == LOCK:
+            self.set_locked(True)
+            self._flash("Locked")
+        elif stop:
             self._flash(looping_note(self._set))
+        else:
+            self._unlock()
+            self._flash("Loop off" if looping else "Unlocked")
 
     def slideshow_more_seeds(self) -> None:
         if self._set.more_seeds():
@@ -617,7 +615,7 @@ class FunestraSlideshow(QObject):
         if row is not None:
             if row is not self._set.playlist.current():
                 self._jump_to(row)
-            self.slideshow_loop(SEED_AXIS)
+            self.slideshow_loop(SEED)
             return
         said, narrowed = narrow_to_acts(self._set, query)
         self._flash(said, kind=NOTICE if narrowed else WARNING)

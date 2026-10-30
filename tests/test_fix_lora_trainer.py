@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 import sys
 import types
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -211,10 +213,38 @@ def _cropped_job(tmp_path, sd_script: str) -> dict:
                 lora=r"fixes\hands 1.1.safetensors")
 
 
+@pytest.fixture
+def cropped_job_trained_at_the_suites_priority(tmp_path, monkeypatch):
+    monkeypatch.setattr(fix_lora_trainer, "_IN_THE_BACKGROUND", subprocess.CREATE_NO_WINDOW)
+    return partial(_cropped_job, tmp_path)
+
+
+def test_the_training_starts_below_normal_priority_and_without_a_window(tmp_path, monkeypatch):
+    started = {}
+
+    class Finished:
+        stdout = io.BytesIO(b"")
+
+        def wait(self):
+            return 0
+
+    def start(command, **options):
+        started.update(options)
+        return Finished()
+
+    monkeypatch.setattr(fix_lora_trainer.subprocess, "Popen", start)
+
+    fix_lora_trainer.train(_cropped_job(tmp_path, "print('done')\n"))
+
+    assert started["creationflags"] & subprocess.BELOW_NORMAL_PRIORITY_CLASS
+    assert started["creationflags"] & subprocess.CREATE_NO_WINDOW
+
+
 @pytest.mark.parametrize("said", ["torch.OutOfMemoryError: CUDA out of memory.",
                                   "torch.AcceleratorError: CUDA error: out of memory"])
-def test_a_training_the_graphics_card_runs_out_of_memory_for_says_so(tmp_path, said):
-    job = _cropped_job(tmp_path, f"import sys\nprint({said!r})\nsys.exit(1)\n")
+def test_a_training_the_graphics_card_runs_out_of_memory_for_says_so(
+        cropped_job_trained_at_the_suites_priority, said):
+    job = cropped_job_trained_at_the_suites_priority(f"import sys\nprint({said!r})\nsys.exit(1)\n")
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.train(job)
@@ -222,8 +252,10 @@ def test_a_training_the_graphics_card_runs_out_of_memory_for_says_so(tmp_path, s
     assert "graphics card ran out of memory" in str(stopped.value)
 
 
-def test_a_training_that_breaks_otherwise_clears_the_photos_and_names_the_log(tmp_path):
-    job = _cropped_job(tmp_path, "import sys\nprint('ValueError: bad option')\nsys.exit(1)\n")
+def test_a_training_that_breaks_otherwise_clears_the_photos_and_names_the_log(
+        cropped_job_trained_at_the_suites_priority):
+    job = cropped_job_trained_at_the_suites_priority(
+        "import sys\nprint('ValueError: bad option')\nsys.exit(1)\n")
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.train(job)
@@ -232,10 +264,12 @@ def test_a_training_that_breaks_otherwise_clears_the_photos_and_names_the_log(tm
     assert job["log"] in str(stopped.value)
 
 
-def test_a_training_says_how_many_of_its_steps_are_done_as_it_goes(tmp_path):
-    job = _cropped_job(tmp_path, "import sys\n"
-                                 "print('steps:  30%|###       | 3/10 [00:03<00:07]')\n"
-                                 "sys.stdout.flush()\nsys.exit(1)\n")
+def test_a_training_says_how_many_of_its_steps_are_done_as_it_goes(
+        cropped_job_trained_at_the_suites_priority):
+    job = cropped_job_trained_at_the_suites_priority(
+        "import sys\n"
+        "print('steps:  30%|###       | 3/10 [00:03<00:07]')\n"
+        "sys.stdout.flush()\nsys.exit(1)\n")
 
     with pytest.raises(fix_lora_trainer.Stopped):
         fix_lora_trainer.train(job)
@@ -243,8 +277,10 @@ def test_a_training_says_how_many_of_its_steps_are_done_as_it_goes(tmp_path):
     assert _status(job) == {"state": "training", "done": 3, "total": 10}
 
 
-def test_a_finished_training_names_its_lora_and_passes_on_what_it_printed(tmp_path, capfd):
-    job = _cropped_job(tmp_path, "print('steps:  50%|#####     | 5/10 [00:05<00:05]')\n")
+def test_a_finished_training_names_its_lora_and_passes_on_what_it_printed(
+        cropped_job_trained_at_the_suites_priority, capfd):
+    job = cropped_job_trained_at_the_suites_priority(
+        "print('steps:  50%|#####     | 5/10 [00:05<00:05]')\n")
 
     fix_lora_trainer.train(job)
 
@@ -252,9 +288,10 @@ def test_a_finished_training_names_its_lora_and_passes_on_what_it_printed(tmp_pa
     assert "5/10" in capfd.readouterr().out
 
 
-def test_a_finished_training_keeps_a_record_of_the_photos_it_trained_on(tmp_path):
+def test_a_finished_training_keeps_a_record_of_the_photos_it_trained_on(
+        tmp_path, cropped_job_trained_at_the_suites_priority):
     stamps = {"hands/one.png": [10, 20], "shared/two.png": [30, 40]}
-    job = dict(_cropped_job(tmp_path, "print('done')\n"), photo_stamps=stamps,
+    job = dict(cropped_job_trained_at_the_suites_priority("print('done')\n"), photo_stamps=stamps,
                trained=str(tmp_path / "work" / "trained.json"))
 
     fix_lora_trainer.train(job)

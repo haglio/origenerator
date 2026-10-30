@@ -236,7 +236,6 @@ def test_taking_an_item_away_and_shutting_the_mic_are_heard_only_when_said_outri
 def test_a_number_in_digits_is_how_whisper_writes_it_not_something_to_listen_for():
     # The grammar is made of words a speaker says; "amp 50" is one spelling of "amp fifty".
     assert not [phrase for phrase in spoken_phrases() if any(c.isdigit() for c in phrase)]
-    assert "amp 50" in _PHRASES
 
 
 def test_every_phrase_the_recognizer_is_asked_to_hear_is_a_command():

@@ -31,6 +31,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from voice_core.spelling import numbers_as_digits
+
 from origenerator.voice.text import words
 
 
@@ -117,8 +119,8 @@ class BarSetting:
     value: int
 
 
-# phrase -> command. Every key is a whole utterance, lowercased, its punctuation
-# already dropped: what :func:`match_app_command` reduces a transcription to.
+# phrase -> command. Every key is a whole utterance as a speaker says it, lowercased,
+# its punctuation already dropped.
 # A value is an :class:`AppCommand` for the things there is one of, and a
 # :class:`BarSetting` for the numeric grid, where a constant each would be three
 # dozen names for what is really one command with a number in it.
@@ -133,7 +135,7 @@ def _say(command: AppCommand | BarSetting, *phrases: str) -> None:
     raises here, where the module is imported, instead of at the mic.
 
     Compared by value, not identity: two ways of saying the same bar setting
-    ("amp fifty" and "amp 50") arrive as two equal :class:`BarSetting`
+    ("speed zero" and "min speed") arrive as two equal :class:`BarSetting`
     objects built at different moments, and that is agreement, not collision.
     """
     for phrase in phrases:
@@ -192,9 +194,9 @@ for _words, (_toggle, _on, _off) in (
         _say(_off, f"{_word} off")
 _say(AppCommand.MIC_OFF, "mic off", "voice off")
 # Fun Time's word for the console's control-off button, which is this switch
-# off -- the letters and the number however whisper writes them.
-_say(AppCommand.DRIVE_OFF, "osr 2 off", "o s r 2 off", "osr two off", "o s r two off")
-for _osr2 in ("osr 2", "o s r 2", "osr two", "o s r two"):
+# off -- the letters however whisper writes them.
+_say(AppCommand.DRIVE_OFF, "osr two off", "o s r two off")
+for _osr2 in ("osr two", "o s r two"):
     _say(AppCommand.DRIVE_OFF, f"{_osr2} control off")
     _say(AppCommand.DRIVE_ON, f"{_osr2} control on")
 
@@ -269,10 +271,7 @@ _EXTREMES: dict[str, int] = {"min": 0, "max": 100}
 
 for _bar in _BARS:
     for _word, _value in _TENS.items():
-        # Said and written. Whisper renders a spoken number as digits about as
-        # often as words — "amp fifty" comes back "amp 50" — and a vocabulary
-        # that knows only one of the two hears half of what was said.
-        _say(BarSetting(_bar, _value), f"{_bar} {_word}", f"{_bar} {_value}")
+        _say(BarSetting(_bar, _value), f"{_bar} {_word}")
     for _label, _value in _EXTREMES.items():
         _say(BarSetting(_bar, _value), f"{_label} {_bar}")
 
@@ -288,10 +287,7 @@ def phrases_for(*commands: AppCommand) -> frozenset[str]:
 
 
 def spoken_phrases() -> frozenset[str]:
-    """Every phrase of the vocabulary as a speaker says it, for a recognizer that
-    listens for words: the spellings with digits in them are whisper's."""
-    return frozenset(phrase for phrase in _PHRASES
-                     if not any(character.isdigit() for character in phrase))
+    return frozenset(_PHRASES)
 
 
 def _answered_when_hosted(command: AppCommand | BarSetting) -> bool:
@@ -316,4 +312,11 @@ def match_app_command(text: str) -> AppCommand | BarSetting | None:
     writes a spoken number either way, so "amp 50" and "amp fifty" are the same
     utterance said once and it is not the speaker who chose which.
     """
-    return _PHRASES.get(" ".join(words(text, keep_digits=True)))
+    return _PHRASES_IN_DIGITS.get(_in_digits(text))
+
+
+def _in_digits(text: str | None) -> str:
+    return " ".join(numbers_as_digits(words(text, keep_digits=True)))
+
+
+_PHRASES_IN_DIGITS = {_in_digits(phrase): command for phrase, command in _PHRASES.items()}

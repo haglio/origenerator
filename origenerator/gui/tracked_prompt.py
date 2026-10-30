@@ -214,10 +214,15 @@ class _Tracker(QObject):
         self._redraw.stop()
         caret = self._prompt_offset(self._edit.textCursor().position())
         spans = diff_spans(self._baseline, self._value)
-        if any(kind == REMOVED for kind, _piece in spans):
+        if (any(kind == REMOVED for kind, _piece in spans)
+                or self._edit.toPlainText() != self._value):
             self._paint(spans, caret)
         else:
             self._light(spans)  # nothing left: the document already reads right
+
+    def measure_against(self, baseline: str) -> None:
+        self._baseline = baseline
+        self.show_whole_change()
 
     def _show_prompt_only(self) -> None:
         """The field as the prompt alone, arriving words still lit — what it is
@@ -290,20 +295,23 @@ class _Tracker(QObject):
         return False
 
 
-def track(edit: QPlainTextEdit, baseline: str) -> None:
-    """Start showing ``edit`` as a rewrite of ``baseline``.
+def _tracker_of(edit: QPlainTextEdit) -> _Tracker | None:
+    return next(iter(edit.findChildren(_Tracker)), None)
 
-    Nothing is marked yet — a prompt is not a change to itself — and everything
-    typed from here on is.
-    """
-    untrack(edit)
-    _Tracker(edit, baseline).show_whole_change()
+
+def track(edit: QPlainTextEdit, baseline: str) -> None:
+    """Show ``edit`` as a rewrite of ``baseline``, now and as it is typed in."""
+    tracker = _tracker_of(edit)
+    if tracker is not None:
+        tracker.measure_against(baseline)
+    else:
+        _Tracker(edit, baseline).show_whole_change()
 
 
 def write(edit: QPlainTextEdit, value: str) -> None:
-    trackers = edit.findChildren(_Tracker)
-    if trackers:
-        trackers[0].take(value)
+    tracker = _tracker_of(edit)
+    if tracker is not None:
+        tracker.take(value)
     else:
         diff_text.forget(edit)
         edit.setPlainText(value)

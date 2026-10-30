@@ -945,12 +945,19 @@ class GenerateConfigPanel(DropZone):
             if self._folder_modify.is_unchanged(self.current_config()):
                 self._generate_btn.flash_guard(_MODIFY_GUARD)
                 return
+            self._mark_against_what_the_press_makes()
             self.modify_requested.emit(self._folder_modify.folder_key, key, params)
             return
         if self._would_remake_what_it_shows():
             self.use_random_seed()
+        if self.asked() is None:  # a request's runs stay marked against what it was asked of
+            self._mark_against_what_the_press_makes()
         self.generate_requested.emit(key, self._batch_of(self._how_many.how_many()))
         self._param_form.roll_random_seeds()
+
+    def _mark_against_what_the_press_makes(self) -> None:
+        with self._loading():  # marking the fields is no edit of them
+            self._param_form.track_prompt_rewrites()
 
     def _batch_of(self, how_many: int) -> list[dict]:
         batch = [self._param_form.get_values()]

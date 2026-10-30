@@ -38,8 +38,19 @@ def filed_upscales(upscaled_dir) -> list[tuple[str, Path]]:
         folder = Path(upscaled_dir) / orientation
         sources = sorted(p for p in folder.iterdir() if p.is_dir()) if folder.is_dir() else []
         for source in sources:
-            filed.extend((source.name, path) for path in sorted(source.iterdir()))
+            filed.extend((source.name, path) for path in _filed_in(source))
     return filed
+
+
+_READINGS: dict[Path, tuple[int, list[Path]]] = {}
+
+
+def _filed_in(source: Path) -> list[Path]:
+    written = source.stat().st_mtime_ns
+    reading = _READINGS.get(source)
+    if reading is None or reading[0] != written:
+        reading = _READINGS[source] = (written, sorted(source.iterdir()))
+    return reading[1]
 
 
 def original_stem(path) -> str | None:

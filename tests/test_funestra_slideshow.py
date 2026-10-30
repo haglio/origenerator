@@ -1925,6 +1925,22 @@ def test_an_image_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tm
     assert handed == {"one.png": FACE, "two.png": (), "three.png": ()}
 
 
+def test_a_slideshow_opened_with_its_versions_hands_the_funestra_its_list_once(
+        qtbot, tmp_path, monkeypatch):
+    # Handed over before its versions were armed and again after, Latest's
+    # list cost a double-click four seconds more.
+    written = []
+    write = FunestraChannel.write_playlist
+    monkeypatch.setattr(FunestraChannel, "write_playlist",
+                        lambda channel, items: written.append(len(items)) or write(channel, items))
+
+    slideshow = _slideshow(qtbot, tmp_path, levels=_PLACED)
+
+    handed = {str(item.path): item.points_of_interest
+              for item in read_playlist(slideshow.channel.playlist)}
+    assert (written, handed) == ([3], {"one.png": FACE, "two.png": (), "three.png": ()})
+
+
 def test_versions_that_bring_no_places_leave_the_pass_where_it_was(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)

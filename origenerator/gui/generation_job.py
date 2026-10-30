@@ -111,6 +111,7 @@ def record_unfinished_run(db, job: GenerationJob, kind: SeedUseKind) -> None:
 
 class GenerationJob(QObject):
     started = pyqtSignal()                       # first activity for our prompt
+    sent = pyqtSignal()                          # ComfyUI has our prompt
     progress = pyqtSignal(int, int)             # value, max
     preview = pyqtSignal(bytes)                 # live preview frame (encoded image)
     finished = pyqtSignal(list, object, object)  # output_files, thumb_path|None, duration|None
@@ -127,7 +128,7 @@ class GenerationJob(QObject):
         # Where ComfyUI reads a story's spoken lines from, and who speaks the
         # ones not spoken yet before the job is sent (see start()).
         self._input_dir = input_dir
-        self._speaker = speaker or ThreadedSpeaker(client)
+        self._speaker = speaker or Speaker(client)
         # Who asked for this run: "generated" for the user's own work,
         # "experiment" for a background experiment's. Kept on the job (not just
         # the DB row) so the controller can tell a preemptible experiment from
@@ -198,6 +199,10 @@ class GenerationJob(QObject):
     @property
     def start_image(self) -> str:
         return frame_name(self.params.get("input_image"))
+
+    @property
+    def speaks_first(self) -> bool:
+        return bool(speech.missing_speech(self.params, self._input_dir))
 
     @property
     def enhances(self) -> str:
@@ -332,23 +337,25 @@ class GenerationJob(QObject):
         wait a long time (see ``comfyui_api.submit_job``). ``submit`` is how a
         caller keeps that wait off its own thread: given the callable that
         makes the POST, it runs it wherever it likes and returns once it is
-        done, raising what it raised; left ``None``, the POST is made right
-        here. Either way the signals are attached before and the state set
-        after on the calling thread, so nothing of the job's is touched from
+        done, raising what it raised; left ``None``, a story's lines are spoken
+        and the POST made right here. Signals are attached before and the state
+        set after on the calling thread, so nothing of the job's is touched from
         another.
         """
         if self._state != JobState.IDLE:
             return
-        # A story whose lines are not all spoken yet is spoken first: the voice
-        # runs off the GUI thread and the job is sent when it is done, or fails
-        # without ever reaching ComfyUI if the voice does. Whoever holds the
-        # line takes the job as started either way: the machine is busy with
-        # its voice, which is that job's own work.
-        if speech.missing_speech(self.params, self._input_dir):
+        # Off the GUI thread, a story's voice sends the job when it is done, or
+        # fails it without ever reaching ComfyUI. Whoever holds the line takes
+        # the job as started either way: the machine is busy with its voice,
+        # which is that job's own work.
+        if not self.speaks_first:
+            self._submit(submit)
+        elif submit is None:
+            self._speaker.speak_here(self.params)
+            self._submit(None)
+        else:
             self._state = JobState.SPEAKING
             self._speaker.speak(self.params, lambda: self._spoken(submit), self._unspoken)
-            return
-        self._submit(submit)
 
     def _submit(self, submit):
         self._attach()
@@ -370,6 +377,7 @@ class GenerationJob(QObject):
             self._finish(landed[0])
             return
         self._state = JobState.QUEUED
+        self.sent.emit()
 
     def _stopped_run_landed(self) -> dict | None:
         """The history of this job's earlier run if that run finished after all,
@@ -597,11 +605,17 @@ class GenerationJob(QObject):
         self.failed.emit(message)
 
 
-class _Speaking(QThread):
-    """The voice at work, off the GUI thread: ComfyUI asked to give the GPU
-    back first (its resident models would leave the voice no room), then
-    every line the settings still lack spoken to disk."""
+def _speak(client, params: dict) -> None:
+    """ComfyUI asked to give the GPU back first (its resident models would leave
+    the voice no room), then every line the settings still lack spoken to disk."""
+    try:
+        client.free_memory()
+    except Exception as e:  # noqa: BLE001 -- a voice with less room, not a failed job
+        logger.info("ComfyUI kept its models while the lines were spoken: %s", e)
+    speech.ensure_speech_files(params, input_dir=COMFYUI_INPUT_DIR, python=SPEECH_PYTHON)
 
+
+class _Speaking(QThread):
     def __init__(self, client, params, parent=None):
         super().__init__(parent)
         self._client = client
@@ -610,17 +624,13 @@ class _Speaking(QThread):
 
     def run(self):
         try:
-            try:
-                self._client.free_memory()
-            except Exception as e:  # noqa: BLE001 -- a voice with less room, not a failed job
-                logger.info("ComfyUI kept its models while the lines were spoken: %s", e)
-            speech.ensure_speech_files(self._params, input_dir=COMFYUI_INPUT_DIR, python=SPEECH_PYTHON)
+            _speak(self._client, self._params)
         except Exception as e:  # noqa: BLE001 -- reported to the job, whatever it was
             self.error = str(e)
 
 
-class ThreadedSpeaker(QObject):
-    """Speaks a job's lines on a thread of their own and answers on the GUI's.
+class Speaker(QObject):
+    """Speaks a job's lines, on a thread of their own answering on the GUI's, or here.
 
     ``speak(params, done, failed)`` returns at once; ``done()`` or
     ``failed(message)`` is called on this object's thread when the voice has
@@ -637,6 +647,9 @@ class ThreadedSpeaker(QObject):
         thread.finished.connect(lambda: self._answer(thread, done, failed))
         self._speaking.append(thread)
         thread.start()
+
+    def speak_here(self, params: dict) -> None:
+        _speak(self._client, params)
 
     def _answer(self, thread, done, failed) -> None:
         self._speaking.remove(thread)

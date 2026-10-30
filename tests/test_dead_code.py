@@ -434,7 +434,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # its tests now say.
 # 16073 when the Job Queue on a slideshow's HUD came to keep one size, and the
 # Broker button and a Satellite's Clip seconds came to its HUDs.
-MAX_PROSE_LINES = 16073
+# 16071 when a story handed to ComfyUI with nobody left to answer its voice came
+# to be spoken where it is asked.
+MAX_PROSE_LINES = 16071
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

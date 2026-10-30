@@ -499,7 +499,7 @@ class JobQueue(QObject):
         its submit unanswered, the window alive meanwhile -- nothing else moves:
         whatever asked is answered when it lands, by the loop that sent it.
         """
-        while self._waiting and self._free_for_the_next_job():
+        while not self._closed and self._waiting and self._free_for_the_next_job():
             if (wait := self._wait_at_the_front()) > 0:
                 self._videos_wait.start(math.ceil(wait * 1000))
                 return
@@ -577,7 +577,6 @@ class JobQueue(QObject):
             job.cancel()  # canceled while out; the server has it and must not run it
             return False
         self._on_server.append(job)
-        self._db.update_generation(job.prompt_id, status=GenerationStatus.RUNNING)
         return True
 
     def _hold_for_comfyui(self, job: GenerationJob) -> None:
@@ -634,6 +633,10 @@ class JobQueue(QObject):
         handed = 0
         for job in list(self._waiting):
             if queue_line.waits_for_any(job, self.all_jobs):
+                continue
+            if job.speaks_first and self.making_something():
+                logger.info("Kept %s back for whoever comes next: its voice would share the "
+                            "graphics card with what ComfyUI is making", job.prompt_id)
                 continue
             self._waiting.remove(job)
             if self._hand_over(job):
@@ -721,6 +724,8 @@ class JobQueue(QObject):
         job.finished.connect(
             lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
         )
+        job.sent.connect(lambda j=job: self._db.update_generation(
+            j.prompt_id, status=GenerationStatus.RUNNING))
         job.failed.connect(lambda msg, k=key, j=job: self._on_failed(k, j, msg))
         job.unreachable.connect(lambda msg, k=key, j=job: self._comfyui_unreachable(k, j, msg))
         job.preview.connect(

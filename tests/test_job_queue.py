@@ -17,12 +17,12 @@ from origenerator import config, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import generation_job
 from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.story_voices import voices_asked_for
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 _IMAGE_WF = "flux_t2i_upscaled"
@@ -689,58 +689,111 @@ def test_a_bring_up_that_breaks_fails_what_waits_rather_than_holding_it_forever(
     assert said == [("k1", COMFYUI_DID_NOT_START)]
 
 
-def _a_voice_that_answers_when_told(monkeypatch):
-    """Every job's lines unspoken, and each asking voice's ``done`` handed to the test."""
-    spoken = []
-
-    class _Voice:
-        def __init__(self, client):
-            pass
-
-        def speak(self, params, done, failed):
-            spoken.append(done)
-
-    monkeypatch.setattr(generation_job, "ThreadedSpeaker", _Voice)
-    monkeypatch.setattr(generation_job.speech, "missing_speech", lambda params, input_dir: True)
-    return spoken
+def _launch_story(queue, key, **over):
+    return _launch_video(queue, key, scene_lines=["Come in."], **over)
 
 
 def test_a_story_whose_lines_were_spoken_while_comfyui_went_down_waits_for_it_too(
         qtbot, tmp_path, monkeypatch):
-    spoken = _a_voice_that_answers_when_told(monkeypatch)
+    voices = voices_asked_for(monkeypatch)
     client = _client()
     db = Database(tmp_path / "test.db")
     coming_up = _ComfyUIComingUp()
     queue = JobQueue(db, client, bring_up_comfyui=coming_up)
-    job = _launch_video(queue, "k1", seed=1)
+    job = _launch_story(queue, "k1", seed=1)
     client.submit_job = MagicMock(side_effect=_comfyui_down())
     said = []
     queue.failed.connect(lambda key, message: said.append(message))
 
-    spoken[0]()
+    voices[0].done()
 
     assert db.get_generation(job.prompt_id)["status"] == "pending"
     assert queue.queue_order == [job.prompt_id] and not queue.making_something()
     coming_up.finish.set()
-    qtbot.waitUntil(lambda: len(spoken) == 2, timeout=5000)
+    qtbot.waitUntil(lambda: len(voices) == 2, timeout=5000)
     assert said == []
 
 
 def test_with_nothing_to_start_comfyui_a_story_it_never_heard_fails_like_any_refusal(
         qtbot, tmp_path, monkeypatch):
-    spoken = _a_voice_that_answers_when_told(monkeypatch)
+    voices = voices_asked_for(monkeypatch)
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    job = _launch_video(queue, "k1", seed=1)
+    job = _launch_story(queue, "k1", seed=1)
     client.submit_job = MagicMock(side_effect=_comfyui_down())
     said = []
     queue.failed.connect(lambda key, message: said.append(message))
 
-    spoken[0]()
+    voices[0].done()
 
     assert len(said) == 1 and "10061" in said[0]
     assert db.get_generation(job.prompt_id)["status"] == "error"
+
+
+def test_a_storys_row_says_running_only_once_its_voice_is_done_and_comfyui_has_it(
+        qtbot, tmp_path, monkeypatch):
+    # A running row is one the next launch looks for on ComfyUI and clears when
+    # ComfyUI never heard of it, which is how a story still speaking as the app
+    # closed was lost.
+    voices = voices_asked_for(monkeypatch)
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, _client())
+    story = _launch_story(queue, "k1", seed=1)
+
+    assert db.get_generation(story.prompt_id)["status"] == "pending"
+    voices[0].done()
+    assert db.get_generation(story.prompt_id)["status"] == "running"
+
+
+def test_a_story_flushed_while_comfyui_makes_a_run_of_the_queues_waits_in_the_line(
+        qtbot, tmp_path, monkeypatch):
+    # Nobody is left to answer a voice once the line is flushed: the closing copy,
+    # or the command that hands ComfyUI the backfill while the app is closed, ends
+    # as the flush returns. A story whose voice was started there read as sent, and
+    # never reached ComfyUI (2026-10-29, at every closing after that until found).
+    voices = voices_asked_for(monkeypatch)
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, _client())
+    _launch_video(queue, "k1", seed=1)
+    story = _launch_story(queue, "k2", seed=2)
+
+    queue.flush_to_server()
+
+    assert voices == []
+    assert db.get_generation(story.prompt_id)["status"] == "pending"
+
+
+def test_a_story_a_closed_queue_hands_over_is_spoken_where_it_is_asked_then_sent(
+        qtbot, tmp_path, monkeypatch):
+    voices = voices_asked_for(monkeypatch)
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.close()
+    story = _launch_story(queue, "k1", seed=1)
+
+    queue.flush_to_server()
+
+    assert [voice.how for voice in voices] == ["here"]
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [story.prompt_id]
+    assert db.get_generation(story.prompt_id)["status"] == "running"
+
+
+def test_a_closed_queue_leaves_its_line_to_the_flush_which_asks_a_silent_comfyui_once(
+        qtbot, tmp_path):
+    client = _client()
+    client.submit_job = MagicMock(side_effect=[_comfyui_down(), _comfyui_down(),
+                                               RuntimeError("asked again")])
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.close()
+    waiting = _launch_video(queue, "k1", seed=1)
+
+    assert queue.flush_to_server() == 0
+
+    assert client.submit_job.call_count == 1
+    assert db.get_generation(waiting.prompt_id)["status"] == "pending"
 
 
 def test_a_queue_given_no_bring_up_brings_up_the_comfyui_this_machine_runs(

@@ -8,10 +8,12 @@ import json
 import sqlite3
 from datetime import UTC, date
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 from origenerator import downtime, gallery, recovery
+from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.enhanced_start_backfill import (
@@ -36,6 +38,7 @@ from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import record_of
 from origenerator.trash import Trash
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.story_voices import voices_asked_for
 
 
 def _file(name, subfolder):
@@ -65,9 +68,9 @@ def _reference(file):
 
 
 def _video(db, prompt_id, *, made_from, starred=False, start=None, source="generated",
-           workflow="wan22_i2v"):
+           workflow="wan22_i2v", lines=None):
     params = {"input_image": _reference(start or _plain(made_from)),
-              "noise_seed": 7, "audio_seed": 8}
+              "noise_seed": 7, "audio_seed": 8, **({"scene_lines": lines} if lines else {})}
     db.insert_generation(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
                          params_json=json.dumps(params), workflow_json="{}", source=source)
     db.update_generation(prompt_id, status="completed",
@@ -281,6 +284,33 @@ def test_the_work_left_for_while_closed_backfills_videos_and_enhances_their_imag
     assert sorted((row["workflow_name"], row["backfill_of"] or row["enhance_of"])
                   for row in queued) == [("image_enhance", "plain image"),
                                          ("wan22_i2v", "from enhanced")]
+
+
+def _comfyui_taking_everything():
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
+    client.submit_job = MagicMock(return_value="comfy-X")
+    client.fetch_history = MagicMock(return_value={})
+    return client
+
+
+def test_a_story_the_backfill_remakes_while_the_app_is_closed_is_spoken_before_comfyui_gets_it(
+        qtbot, tmp_path, monkeypatch):
+    # The program that hands ComfyUI the backfill ends once it has, so a voice it
+    # left speaking answered nobody, and the story never reached ComfyUI.
+    voices = voices_asked_for(monkeypatch)
+    client = _comfyui_taking_everything()
+    db = Database(tmp_path / "t.db")
+    _image(db, "image", enhanced=True)
+    _video(db, "story", made_from="image", starred=True, start=_plain("image"),
+           lines=["Come in."])
+
+    assert downtime.hand_comfyui_more_of_the_backfill(
+        db, client, AppState(tmp_path / "ui_state.json")) == 1
+
+    (run,) = [row for row in db.list_generations() if row["source"] == GenerationSource.BACKFILL]
+    assert [voice.how for voice in voices] == ["here"]
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [run["prompt_id"]]
+    assert run["status"] == "running"
 
 
 # --- putting a finished backfill run in the old video's place -----------------

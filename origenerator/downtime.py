@@ -131,6 +131,7 @@ def _handed_over(db, client, queue: Callable[[object], int]) -> int:
 
     _app = QCoreApplication.instance() or QCoreApplication([])
     jobs = JobQueue(db, client)
+    jobs.close()
     queued = queue(jobs)
     jobs.flush_to_server()
     return queued

@@ -28,6 +28,14 @@ class _Speaker:
     def speak(self, params, done, failed):
         self.asked.append((params, done, failed))
 
+    def speak_here(self, params):
+        self.asked.append((params, None, None))
+
+
+def _from_a_window(post):
+    """How a queue with a window to keep alive hands start() the POST; made at once here."""
+    post()
+
 
 def _client():
     client = ComfyUIClient(folders=SUITE_FOLDERS)
@@ -46,12 +54,23 @@ def _spoken_params():
 def test_a_story_with_lines_is_spoken_before_it_is_submitted(qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
     job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
-    job.start()
+    job.start(_from_a_window)
     assert job.state == "speaking"
     client.submit_job.assert_not_called()
     (params, done, _failed), = speaker.asked
     assert params["scene_lines"] == ["Come in."]
     done()
+    client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
+    assert job.state == "queued"
+
+
+def test_started_with_no_window_to_answer_its_voice_a_story_is_spoken_there_then_sent(
+        qtbot, tmp_path):
+    client, speaker = _client(), _Speaker()
+    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
+    job.start()
+    (params, done, _failed), = speaker.asked
+    assert params["scene_lines"] == ["Come in."] and done is None
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
     assert job.state == "queued"
 
@@ -83,7 +102,7 @@ def test_a_voice_that_fails_fails_the_job_before_comfyui_hears_of_it(qtbot, tmp_
     job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
     failed = []
     job.failed.connect(failed.append)
-    job.start()
+    job.start(_from_a_window)
     (_params, _done, fail), = speaker.asked
     fail("No voice is set up")
     assert failed == ["No voice is set up"]
@@ -100,13 +119,13 @@ def test_a_story_spoken_while_comfyui_is_down_says_so_and_can_be_sent_again(qtbo
     said = []
     job.unreachable.connect(said.append)
     job.failed.connect(said.append)
-    job.start()
+    job.start(_from_a_window)
     (params, done, _failed), = speaker.asked
 
     _spoken_file(params, tmp_path)
     done()
     assert len(said) == 1 and "10061" in said[0]
-    job.start()
+    job.start(_from_a_window)
 
     assert job.state == "queued"
     assert client.submit_job.call_count == 2
@@ -115,7 +134,7 @@ def test_a_story_spoken_while_comfyui_is_down_says_so_and_can_be_sent_again(qtbo
 def test_a_job_canceled_while_its_lines_are_spoken_is_not_sent(qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
     job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
-    job.start()
+    job.start(_from_a_window)
     job.cancel()
     (_params, done, _failed), = speaker.asked
     done()
@@ -155,7 +174,7 @@ def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, 
     timer.timeout.connect(lambda: ticks.append(time.monotonic()))
     timer.start(20)
     started = time.monotonic()
-    job.start()
+    job.start(_from_a_window)
     assert time.monotonic() - started < 0.25, "start() waited on the voice"
     assert job.state == "speaking"
     qtbot.waitUntil(lambda: job.state == "queued", timeout=5000)
@@ -164,6 +183,25 @@ def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, 
     assert seen["spoke_on"] != gui_thread
     assert seen["sent_on"] == gui_thread
     assert len(ticks) >= 5, "the window's events stopped while the voice spoke"
+
+
+def test_the_voice_a_job_with_no_window_asks_for_speaks_on_the_starting_thread(
+        qtbot, tmp_path, monkeypatch):
+    spoke_on = []
+
+    def speak(params, *, input_dir, python, **kwargs):
+        spoke_on.append(threading.get_ident())
+        return _spoken_file(params, input_dir)
+
+    monkeypatch.setattr(generation_job.speech, "ensure_speech_files", speak)
+    monkeypatch.setattr(generation_job, "COMFYUI_INPUT_DIR", tmp_path)
+    client = _client()
+    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
+    job.start()
+    assert spoke_on == [threading.get_ident()]
+    client.free_memory.assert_called_once()
+    client.submit_job.assert_called_once()
+    assert job.state == "queued"
 
 
 def test_the_voice_runs_as_a_real_process_without_holding_the_window(qtbot, tmp_path, monkeypatch):
@@ -185,7 +223,7 @@ def test_the_voice_runs_as_a_real_process_without_holding_the_window(qtbot, tmp_
     timer = QTimer()
     timer.timeout.connect(lambda: ticks.append(1))
     timer.start(20)
-    job.start()
+    job.start(_from_a_window)
     qtbot.waitUntil(lambda: job.state == "queued", timeout=10000)
     timer.stop()
     client.submit_job.assert_called_once()

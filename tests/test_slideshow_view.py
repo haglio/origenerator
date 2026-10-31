@@ -3,7 +3,7 @@
 Also everything the retired second full-screen viewer used to do on its own, which
 this view now covers: paging a folder in order, stepping an image's versions,
 following a generation that is still being made, and driving the OSR2 off the
-clip on screen.
+video on screen.
 """
 from __future__ import annotations
 
@@ -93,13 +93,13 @@ def _media_on_screen(view) -> str:
     return str(engine.on_screen)
 
 
-def _clip_up(view) -> bool:
-    """Whether a clip, rather than an image or a run's frames, is on screen."""
-    return view.slideshow._clip_on_screen() is not None
+def _video_up(view) -> bool:
+    """Whether a video, rather than an image or a run's frames, is on screen."""
+    return view.slideshow._video_on_screen() is not None
 
 
 def _runs_out(view):
-    """The item on screen ran out -- a clip played through, or an image's
+    """The item on screen ran out -- a video played through, or an image's
     pace expired -- and the Funestra rolled onto what it had staged next, if
     anything; the slideshow follows a frame later."""
     _engine(view).run_out()
@@ -320,7 +320,7 @@ def _fade(view):
 def test_opens_on_the_first_item(qtbot):
     view = _view(qtbot)
     assert view.slideshow._set.playlist.current() == Slide("a.png", "image")
-    assert _clip_up(view) is False
+    assert _video_up(view) is False
 
 
 @_ARROW_KEYS_OR_WASD
@@ -328,7 +328,7 @@ def test_right_and_left_navigate(qtbot, arrows):
     view = _view(qtbot)
     _press(view, arrows.right)
     assert view.slideshow._set.playlist.current() == Slide("b.mp4", "video")
-    assert _clip_up(view) is True
+    assert _video_up(view) is True
     _press(view, arrows.left)
     assert view.slideshow._set.playlist.current() == Slide("a.png", "image")
 
@@ -712,7 +712,7 @@ def test_an_image_taken_away_leaves_the_map_of_the_row_it_was_playing(qtbot):
 def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot):
     """A row holding only the image on screen cannot be looped, and the press
     still means "this one" — so it locks the image, the way a satellite's loop
-    button locks a clip whose group holds only it, rather than refusing."""
+    button locks a video whose group holds only it, rather than refusing."""
     view = _view(qtbot, _KEYED)                  # no neighbors: every row is one image
 
     view.slideshow.slideshow_loop("seed")
@@ -1564,7 +1564,7 @@ def test_a_request_released_under_the_rooms_freeze_leaves_it_frozen(qtbot):
 
 
 def test_a_request_leaves_a_clip_playing_and_only_stops_the_slideshow_moving_on(qtbot):
-    """The request is about what is on screen; a clip that stopped mid-sentence
+    """The request is about what is on screen; a video that stopped mid-sentence
     would be answering a question nobody asked."""
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Right)          # -> the video
@@ -1980,7 +1980,7 @@ def test_a_live_slideshow_drives_no_device(qtbot):
 # --- what a fullscreen slideshow is, as media -------------------------------
 
 def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
-    # Filling the screen with a clip is deliberate, so it's heard.
+    # Filling the screen with a video is deliberate, so it's heard.
     view = _view(qtbot)
     assert _engine(view).muted is False
 
@@ -2027,10 +2027,10 @@ def test_a_slideshow_wears_the_apps_icon_in_the_window_switcher(qtbot, qapp):
 
 
 def test_releasing_a_condemned_file_lets_go_of_it(qtbot, tmp_path):
-    clip = str(tmp_path / "c.mp4")
-    view = _view(qtbot, [(clip, "video")])
+    video = str(tmp_path / "c.mp4")
+    view = _view(qtbot, [(video, "video")])
 
-    view.slideshow.release_media([clip])
+    view.slideshow.release_media([video])
     _settle(view)
 
     assert _media_on_screen(view) == ""
@@ -2047,7 +2047,7 @@ def test_releasing_another_file_leaves_the_slideshow_alone(qtbot, tmp_path):
     assert _media_on_screen(view) == kept
 
 
-# --- the OSR2 drive target: the clip on screen ------------------------------
+# --- the OSR2 drive target: the video on screen ------------------------------
 
 def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
@@ -2062,7 +2062,7 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     assert target is not None
     path, tgt_player, actions = target
     # The pane itself is what the drive follows: it is what knows where the
-    # clip has got to, the way the config panel's media Funestra is there.
+    # video has got to, the way the config panel's media Funestra is there.
     assert path == str(vid) and tgt_player is view._pane and actions
 
 
@@ -2149,7 +2149,7 @@ def test_the_slide_stays_put_while_a_request_is_being_said(qtbot):
     view.slideshow.pause_for_request(True, "Request…")
     _settle(view)
 
-    _runs_out(view)  # the clip on screen ran out mid-sentence
+    _runs_out(view)  # the video on screen ran out mid-sentence
 
     assert view.slideshow.voice_target() == "id-a"
 
@@ -2182,7 +2182,7 @@ def test_a_finished_request_answers_in_the_corner(qtbot):
 
 
 def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_path):
-    """A video carries no dwell timer — its own length is its dwell — so a clip
+    """A video carries no dwell timer — its own length is its dwell — so a video
     that never reports an end is a black screen for the rest of the session.
     One this backend has no codec for is exactly that, and browsing the whole
     library is where it turns up.  It gets stepped past instead."""
@@ -2203,7 +2203,7 @@ def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_p
 
 
 def test_an_unopenable_clip_is_stepped_past_even_while_locked(qtbot, tmp_path):
-    """A lock replays the clip it holds, which would hold a clip that cannot
+    """A lock replays the video it holds, which would hold a video that cannot
     play forever.  So this one step happens regardless: the item stays in the
     set, but the screen does not stay black."""
 

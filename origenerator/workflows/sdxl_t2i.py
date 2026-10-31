@@ -120,11 +120,11 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             **loras.nodes,
             "2": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["positive_prompt"]},
+                "inputs": {"clip": loras.clip_ref, "text": params["positive_prompt"]},
             },
             "3": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["negative_prompt"]},
+                "inputs": {"clip": loras.clip_ref, "text": params["negative_prompt"]},
             },
             "4": {
                 "class_type": "EmptyLatentImage",

@@ -248,7 +248,7 @@ class GenerateConfigPanel(DropZone):
                  previews: MovingPreviews | None = None):
         super().__init__(parent=parent)
         self._heights = heights  # the window's prompt heights, for its forms
-        # Where a clip is handed to Evolver. Asked for rather than performed
+        # Where a video is handed to Evolver. Asked for rather than performed
         # here: the destination is one object's to know, and a test points it at
         # a directory of its own instead of patching a constant this module
         # imported (origenerator.evolver_export).
@@ -270,7 +270,7 @@ class GenerateConfigPanel(DropZone):
         self._watched_key: str | None = None
         self._live_note: str | None = None
         # The pair standing in for a frame that hasn't streamed — kept so the
-        # same one isn't rebuilt every poll, which would restart the clip's loop
+        # same one isn't rebuilt every poll, which would restart the video's loop
         # from frame one each second.
         self._live_source: Combination | None = None
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
@@ -1004,7 +1004,7 @@ class GenerateConfigPanel(DropZone):
 
     def show_combination(self, combination: Combination) -> None:
         """Put the combination this tab was opened with in the preview: the frame,
-        a plus, and the gray clip whose settings came with it. Nothing has been
+        a plus, and the gray video whose settings came with it. Nothing has been
         made from the pair yet, so there is no result for the pane to show."""
         if self._live_source is None:
             combination = combination._replace(
@@ -1529,7 +1529,7 @@ class GenerateConfigPanel(DropZone):
         later one as it streams (:meth:`show_live_frame`), and the item it
         lands as.
 
-        With no frame yet the pane stands ``made_from`` — the image and clip the
+        With no frame yet the pane stands ``made_from`` — the image and video the
         run was built on — or, for a run made from nothing, says it is waiting:
         ``note`` where the caller knows what for, marked live so a double-click
         opens the run fullscreen before its first frame.
@@ -1546,7 +1546,7 @@ class GenerateConfigPanel(DropZone):
     def show_live_source(self, made_from: Combination):
         """Stand what the followed run is being made from, in place of a frame it
         has not streamed yet. Repainted only when the pair changes, since the
-        poll re-reads the watch every tick and the clip beside it is looping."""
+        poll re-reads the watch every tick and the video beside it is looping."""
         if made_from == self._live_source:
             return
         self._live_source = made_from
@@ -1981,7 +1981,7 @@ class GenerateConfigPanel(DropZone):
     def _video_rows(self) -> list[dict]:
         return self._library.now().video_rows
 
-    # --- the export lanes: hand a displayed clip to a sibling app -----------
+    # --- the export lanes: hand a displayed video to a sibling app -----------
 
     def _update_lane_button(self, preview):
         """Offer the displayed generation to the one app :func:`lane_for` picks.
@@ -2033,7 +2033,7 @@ class GenerateConfigPanel(DropZone):
     def _on_unsend(self, lane):
         """Take the send back: the app it went to deletes every copy it holds.
 
-        Nothing is deleted from here. The clip has been sorted, upscaled and
+        Nothing is deleted from here. The video has been sorted, upscaled and
         re-filed since it was handed over, and only the app whose folders those
         are can still find it — so the whole of this is a stamp on the row, which
         that app reads on its next run. The button goes back to offering the

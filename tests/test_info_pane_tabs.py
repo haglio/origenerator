@@ -694,7 +694,7 @@ def test_a_run_with_an_image_behind_it_stands_that_instead_of_a_note(tabs):
 
 def test_the_pair_is_repainted_only_when_it_changes(tabs):
     # The poll re-reads the watch every tick, and rebuilding the pair would
-    # restart the clip looping beside the frame from its first frame each time.
+    # restart the video looping beside the frame from its first frame each time.
     panel = tabs.currentWidget()
     panel._preview.show_combination = MagicMock()
 

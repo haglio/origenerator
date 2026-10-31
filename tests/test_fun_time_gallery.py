@@ -632,7 +632,7 @@ def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, t
 
 
 def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monkeypatch):
-    """A thumbnail click switches a Funestra to that clip; on a slideshow it jumps the
+    """A thumbnail click switches a Funestra to that video; on a slideshow it jumps the
     set to that item — and the double-click's lock holds it there."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -1199,7 +1199,7 @@ def test_reset_stays_local_when_a_slideshow_holds_no_region(qtbot, tmp_path, mon
     assert slideshow.pass_size() == 3
 
 
-def _a_looping_clip(tmp_path):
+def _a_looping_video(tmp_path):
     webp = tmp_path / "loop.webp"
     frames = [Image.new("RGB", (64, 32), shade) for shade in ((10, 10, 10), (220, 220, 220))]
     frames[0].save(webp, save_all=True, append_images=frames[1:], duration=100, loop=0)
@@ -1229,7 +1229,7 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     A sweep cannot miss the fourth one, and it fails the moment someone adds a
     fifth that does not go through looping_preview.
     """
-    rows, webp = _a_looping_clip(tmp_path)
+    rows, webp = _a_looping_video(tmp_path)
     view = _fun_time_view(qtbot, rows)
     view.animated_preview = lambda row: str(webp)
     view.refresh()
@@ -1266,8 +1266,8 @@ def test_omnipause_reaches_a_slideshow_the_region_map_does_not_answer_for(
     assert not _will_move_on(slideshow)
 
 
-def test_a_frozen_slideshow_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, monkeypatch):
-    """Stepping past a clip that will not play is right while the slideshow is
+def test_a_frozen_slideshow_does_not_walk_past_an_unplayable_video(qtbot, tmp_path, monkeypatch):
+    """Stepping past a video that will not play is right while the slideshow is
     running and wrong while the room is held: a slideshow hunting through its set for
     something playable is the room moving during OmniPause."""
     view = _fun_time_view(qtbot)
@@ -1541,7 +1541,7 @@ def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_
 
 
 def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_again(qtbot, tmp_path):
-    rows, webp = _a_looping_clip(tmp_path)
+    rows, webp = _a_looping_video(tmp_path)
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.animated_preview = lambda row: str(webp)

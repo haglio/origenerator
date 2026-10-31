@@ -98,7 +98,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
 
     The form runs at the app's heading font, and labels like "LoRA Strength
     (High)" are wider than the old fixed 120px column; right-aligned, the
-    overflow used to clip the *start* of the text. The label column must size
+    overflow used to cut off the *start* of the text. The label column must size
     itself to the widest label wherever the row has room for it.
     """
     label_text = "LoRA Strength (High)"
@@ -251,8 +251,8 @@ def test_a_written_seed_pins_itself_by_default(qtbot):
 
 def test_a_form_that_does_not_pin_keeps_random_and_shows_a_fresh_seed_over_a_loaded_one(
         qtbot):
-    # The clip's deal: Random stays ticked, so the next press is another take of
-    # the motion rather than this clip's again, and the field shows that take's seed.
+    # The video's deal: Random stays ticked, so the next press is another take of
+    # the motion rather than this video's again, and the field shows that take's seed.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
     qtbot.addWidget(form)
 
@@ -1576,7 +1576,7 @@ def _preset_states(combo) -> dict:
 def test_a_duration_this_model_cannot_render_is_offered_greyed_out(qtbot):
     # The same lengths are offered on every video form, and the models stop at
     # different places. Picking one past the end doesn't fail, it quietly
-    # becomes the longest clip the model does render — so the list says which
+    # becomes the longest video the model does render — so the list says which
     # ones those are, and how far this one actually goes.
     form = ParamForm(_video_defs(max_frames=81))
     qtbot.addWidget(form)
@@ -1613,7 +1613,7 @@ def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_models_own_rate(qtb
 
 
 def test_the_frames_a_duration_asks_for_dont_move_when_the_frame_rate_does(qtbot):
-    # The rate decides how smooth the clip looks, not how much of it there is:
+    # The rate decides how smooth the video looks, not how much of it there is:
     # the extra frames are filled in afterwards, so five seconds is 81 frames of
     # sampling whether it is played at 16 fps or 48.
     form = ParamForm(_video_defs())
@@ -1653,7 +1653,7 @@ def test_a_duration_the_model_cannot_render_settles_to_what_it_can_once_the_edit
 def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbot):
     # Between two multiples there are no frames to show, and writing the file at
     # the rate asked for anyway would skew its speed. The field says so by
-    # landing on the rate the clip will really be written at.
+    # landing on the rate the video will really be written at.
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
     with qtbot.waitExposed(form):
@@ -1681,7 +1681,7 @@ def _scene_defs():
     ]
 
 
-def test_a_story_starts_as_one_scene_whose_length_is_the_clips(qtbot):
+def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
@@ -1691,14 +1691,14 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_clips(qtbot):
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
     # One row stands for the four, labeled as the scenes: a prompt row of the
-    # form's own beside the cards would read as the clip's where the cards' are
+    # form's own beside the cards would read as the video's where the cards' are
     # the scenes'.
     assert form._present_keys["Prompts"] == ["scene_frames"]
 
 
 def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(qtbot):
     # Every scene after the first starts on the frame before it, so 5 s and
-    # 10 s of scenes make 81 + 160 frames of clip, and the story is stored as
+    # 10 s of scenes make 81 + 160 frames of video, and the story is stored as
     # one prompt with a scene break between the two texts.
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1755,7 +1755,7 @@ def test_settings_from_before_scenes_load_as_one_scene_of_the_clips_length(qtbot
 
 
 def test_a_whole_clip_negative_carries_on_into_every_scene_of_a_story(qtbot):
-    # A story made when the negative was the clip's has one text for three
+    # A story made when the negative was the video's has one text for three
     # scenes; the graph keeps it out of every scene, and so the cards show it
     # on every scene -- what is seen is what renders.
     form = ParamForm(_scene_defs())
@@ -1931,9 +1931,9 @@ def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     assert "scene_lines" not in form.get_values()
 
 
-def test_settings_whose_lone_scene_disagrees_with_the_clip_follow_the_clip(qtbot):
-    # Settings from the overlay carry the clip length over the workflow's
-    # default scene list; the clip length is what the graph runs a lone scene
+def test_settings_whose_lone_scene_disagrees_with_the_video_follow_the_video(qtbot):
+    # Settings from the overlay carry the video length over the workflow's
+    # default scene list; the video length is what the graph runs a lone scene
     # for, so it is what the form shows and emits.
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)

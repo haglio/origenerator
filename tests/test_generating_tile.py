@@ -189,10 +189,10 @@ def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
 
     frame = tmp_path / "frame.png"
     Image.new("RGB", (60, 40), (0, 0, 255)).save(frame)
-    clip = tmp_path / "clip.png"
-    Image.new("RGB", (60, 40), (255, 0, 0)).save(clip)
+    video = tmp_path / "clip.png"
+    Image.new("RGB", (60, 40), (255, 0, 0)).save(video)
     job = FakeJob(state="running", started_at=time.time() - 5)
-    tile = GeneratingTile(job, made_from=Combination(str(frame), str(clip)))
+    tile = GeneratingTile(job, made_from=Combination(str(frame), str(video)))
     qtbot.addWidget(tile)
 
     thumbnail = tile._image.pixmap()

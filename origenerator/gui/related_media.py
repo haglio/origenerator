@@ -233,13 +233,13 @@ class RelatedMedia(QWidget):
 
     def _built_from(self, row: dict, image_rows: list[dict]):
         """``(the row this was built from, what to head the tile, its kind)``:
-        the clip a cut was cut out of, else a video's start frame."""
+        the video a cut was cut out of, else a video's start frame."""
         cut_from = row.get("trimmed_from")
         if cut_from:
-            clip = next((v for v in self._video_rows()
+            video = next((v for v in self._video_rows()
                          if v.get("prompt_id") == cut_from), None) or self._held_row(cut_from)
-            if clip is not None:
-                return clip, "Trimmed from", MediaType.VIDEO
+            if video is not None:
+                return video, "Trimmed from", MediaType.VIDEO
         frame = source_image_of(row, image_rows) or source_image_of(
             row, self._held_of_kind(MediaType.IMAGE))
         if frame is not None and was_made_from(row, frame):

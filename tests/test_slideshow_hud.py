@@ -687,7 +687,7 @@ class TestTheRowOnTheOneHud:
 
     def test_the_track_is_colored_by_the_funscript_of_the_video_on_screen(
             self, qtbot, tmp_path):
-        # Half as much motion in the first half of the clip as in the second.
+        # Half as much motion in the first half of the video as in the second.
         slow = [{"at": at, "pos": 100 * (index % 2)}
                 for index, at in enumerate(range(0, 2_000, 500))]
         fast = [{"at": at, "pos": 100 * (index % 2)}

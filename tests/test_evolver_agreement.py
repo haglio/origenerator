@@ -4,7 +4,7 @@
 published document, and skips where there is no Evolver beside the checkout --
 which is every run of this repo's gate.  So on the one machine where both apps
 are installed, nothing checked anything: a folder renamed on either side left
-clips arriving nowhere, both apps silent.
+videos arriving nowhere, both apps silent.
 
 These are that check's runtime twin, driven against written-out checkouts so
 each disagreement can be produced rather than waited for.

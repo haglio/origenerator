@@ -188,13 +188,13 @@ def test_the_output_places_are_resolved_when_the_sweep_runs(tmp_path, monkeypatc
 def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
     """The same defect on the same line: the motion rate was bound at import."""
     monkeypatch.setattr(config, "MOTION_DEFAULT_HZ", 2.5)
-    clip = tmp_path / "alpha.mp4"
-    clip.write_bytes(b"not really a video")
+    video = tmp_path / "alpha.mp4"
+    video.write_bytes(b"not really a video")
     rates = []
 
     funscript_backfill.backfill(
         FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
-        resolve=lambda row, places: (clip, "video"),
+        resolve=lambda row, places: (video, "video"),
         write=lambda path, *, hz, places: rates.append(hz) or None,
     )
 

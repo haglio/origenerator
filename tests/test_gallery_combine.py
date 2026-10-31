@@ -231,7 +231,7 @@ def _shaped(category="", **over):
 
 
 def test_genau_settings_are_generated_at_the_shortest_length_that_closes():
-    """Genau steers whatever it is given as ONE cycle, so the ideal clip is the
+    """Genau steers whatever it is given as ONE cycle, so the ideal video is the
     shortest that holds exactly one — 13 frames by the cadence arithmetic. It is
     29 because the model cannot CLOSE a loop that short: measured at a fixed
     seed, the last frame lands 2% off the first at 13 frames and 0.2% off at 29,
@@ -249,7 +249,7 @@ def test_genau_settings_play_at_the_top_rate_the_writer_allows():
 def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
     """At 29 frames the model fits about two cycles left to itself, so the lane
     asks for one outright. Added to the video's prompt rather than replacing it:
-    the prompt says what the clip is OF, and this says how it moves."""
+    the prompt says what the video is OF, and this says how it moves."""
     shaped = _shaped(positive_prompt="alpha form", negative_prompt="beta")
 
     assert shaped["positive_prompt"].startswith("alpha form ")

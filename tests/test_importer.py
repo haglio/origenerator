@@ -628,7 +628,7 @@ def test_a_video_is_never_filed_under_a_workflow_that_only_makes_images(tmp_path
 
 
 def test_import_same_stem_image_and_video_get_distinct_thumbnails(tmp_path):
-    """A still and a clip that share a filename stem must not share a thumbnail.
+    """A still and a video that share a filename stem must not share a thumbnail.
 
     ComfyUI's default ``SaveImage`` prefix yields ``ComfyUI_00001_.png`` while a
     video lands at ``video/ComfyUI_00001_.mp4``; both import as separate rows.
@@ -925,7 +925,7 @@ def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
 
     Before the per-prompt naming fix, ``ComfyUI_00001_.png`` and
     ``video/ComfyUI_00001_.mp4`` both wrote ``ComfyUI_00001_.jpg`` — the later
-    import winning — so the image row's thumbnail showed the clip's frame. The
+    import winning — so the image row's thumbnail showed the video's frame. The
     backfill re-renders each sharer from its own output under its prompt_id.
     """
     output_dir = tmp_path / "output"
@@ -935,7 +935,7 @@ def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
     Image.new("RGB", (512, 768), (255, 0, 0)).save(output_dir / "ComfyUI_00001_.png")
     (output_dir / "video" / "ComfyUI_00001_.mp4").write_bytes(b"")
     shared = thumb_dir / "ComfyUI_00001_.jpg"  # the single file both rows share
-    Image.new("RGB", (256, 144), (0, 255, 0)).save(shared)  # currently the clip's frame
+    Image.new("RGB", (256, 144), (0, 255, 0)).save(shared)  # currently the video's frame
 
     db = Database(tmp_path / "test.db")
     _completed(db, "img", "ComfyUI_00001_.png", "", thumbnail_path=str(shared))
@@ -948,7 +948,7 @@ def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
     assert img_thumb != vid_thumb
     assert Path(img_thumb).name == "img.jpg"   # named by prompt_id now
     assert Path(img_thumb).exists() and Path(vid_thumb).exists()
-    # The image row's thumbnail reflects its own portrait still, not the clip.
+    # The image row's thumbnail reflects its own portrait still, not the video.
     assert Image.open(img_thumb).size[0] < Image.open(img_thumb).size[1]
 
 

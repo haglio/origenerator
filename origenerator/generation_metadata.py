@@ -4,7 +4,7 @@ workflow version made it.
 
 The gallery's info-pane tab is an editable :class:`GenerateConfigPanel`. It renders
 the prompts and every parameter the workflow lays out as fields; whatever else a
-row carries — an import's extras, hidden passthrough like vae or clip — rides
+row carries — an import's extras, hidden passthrough like VAE or CLIP — rides
 along unshown, as ParamForm keeps it. So what is left for this block is its name,
 the output file, its timestamp and the workflow version, shown as a compact
 ``Basic`` section above the form.

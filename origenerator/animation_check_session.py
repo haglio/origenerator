@@ -16,7 +16,7 @@ class AnimationCheckSession:
         self._pinned = pinned or (lambda act, lane: None)
         self._paths = list(paths)
         self._ranks = {path: rank for rank, path in enumerate(self._paths)}
-        self._samples = {path: list(clips) for path, clips in samples.items()}
+        self._samples = {path: list(videos) for path, videos in samples.items()}
         self._store = store
         self._at = 0
 

@@ -43,7 +43,7 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.orientation import oriented_key
-from tests.thumbnail_rows import looping_clip
+from tests.thumbnail_rows import looping_video
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
@@ -348,10 +348,10 @@ def _tile_at(scroll, y):
     return next(tile for tile in _drawn(scroll) if tile.geometry().contains(10, y))
 
 
-def test_only_the_videos_in_sight_play_their_looping_clips(qtbot, tmp_path):
-    clip = looping_clip(tmp_path)
+def test_only_the_videos_in_sight_play_their_loops(qtbot, tmp_path):
+    video = looping_video(tmp_path)
     rows = [_row(f"g{n}", n) for n in range(200)]
-    pane, scroll = _pane(qtbot, rows, animated_preview=lambda row: clip)
+    pane, scroll = _pane(qtbot, rows, animated_preview=lambda row: video)
     scroll.setWidgetResizable(True)
     scroll.resize(800, 600)
     with qtbot.waitExposed(scroll):

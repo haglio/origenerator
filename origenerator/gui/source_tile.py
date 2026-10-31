@@ -6,7 +6,7 @@ badge in the corner. Clicking anywhere emits ``activated`` with the item's
 prompt_id, so the gallery navigates to it.
 
 A video's start frame is what it shows most often. The other relations borrow
-it — the item a spoken request revised, the clip a cycle was cut out of, the
+it — the item a spoken request revised, the video a cycle was cut out of, the
 video whose settings Combine ran — which is why its heading, its badge and
 whether its thumbnail is drained of color are set with each showing.
 """
@@ -75,7 +75,7 @@ class SourceTile(QWidget):
                     gray: bool = False):
         """Point the tile at an item. ``heading`` names the relation when it
         isn't the usual one — "requested from" for what a request revised,
-        "trimmed from" for the clip a single cycle was cut out of, "from source
+        "trimmed from" for the video a single cycle was cut out of, "from source
         video" for the video whose settings Combine ran. The last two are
         videos, so ``media_type`` moves the badge with them, and ``gray`` drains
         the one shown only for its settings. All three are per-showing, because

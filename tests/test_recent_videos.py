@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QProxyStyle, QStyle, QStyleOptionViewItem
 
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
-from tests.thumbnail_rows import looping_clip, painted_row, square
+from tests.thumbnail_rows import looping_video, painted_row, square
 from tests.thumbnail_rows import where_the_thumbnail_is as _where_the_thumbnail_is
 
 
@@ -154,7 +154,7 @@ def test_a_rows_thumbnail_sits_in_the_middle_of_the_row(qtbot, tmp_path):
 
 
 def test_a_videos_thumbnail_plays_in_its_row(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_clip(tmp_path)})
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_video(tmp_path)})
     dropdown.showPopup()
     first = painted_row(dropdown, 0)
     middle = _where_the_thumbnail_is(first).center()
@@ -165,7 +165,7 @@ def test_a_videos_thumbnail_plays_in_its_row(qtbot, tmp_path):
 
 
 def test_closing_the_list_stops_its_videos(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_clip(tmp_path)})
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_video(tmp_path)})
     dropdown.showPopup()
     painted_row(dropdown, 0)
 
@@ -187,7 +187,7 @@ class _Redraws(QObject):
 
 
 def test_the_open_list_redraws_a_playing_video_by_itself(qtbot, tmp_path):
-    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_clip(tmp_path)})
+    dropdown = _dropdown(qtbot, [RecentVideo("vid1", None)], {"vid1": looping_video(tmp_path)})
     dropdown.showPopup()
     painted_row(dropdown, 0)
     qtbot.wait(300)

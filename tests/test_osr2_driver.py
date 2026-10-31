@@ -43,7 +43,7 @@ def test_poll_drives_from_the_playhead_without_a_playback_state(qapp):
     assert broker.positions == [(100, 500)]  # from the floor, head to the top at 500 ms
 
 
-def test_poll_wraps_position_onto_a_looping_clip(qapp):
+def test_poll_wraps_position_onto_a_looping_video(qapp):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)
     # The preview loops, so a position past the script length maps back onto it.

@@ -41,7 +41,7 @@ def _video_row(prompt_id="vid1", input_image="sdxl_t2i_img1.png"):
 
 
 def _trim_row(prompt_id="cut1", trimmed_from="vid1", input_image="sdxl_t2i_img1.png"):
-    """One cycle cut out of a clip. It carries the clip's params, start frame
+    """One cycle cut out of a video. It carries the video's params, start frame
     and all — which is what makes the order of the links matter."""
     return {
         "prompt_id": prompt_id, "workflow_name": "wan22_i2v",
@@ -310,8 +310,8 @@ def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
 
 
 def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
-    clip = _video_row()
-    related = make_related(clip)
+    video = _video_row()
+    related = make_related(video)
 
     related.show_row(_trim_row(), [_image_row()])
 
@@ -325,9 +325,9 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
 def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_related):
     # A cut carries its source's params, start frame included. Asking for a start
     # frame first would answer with the image the ORIGINAL was animated from and
-    # quietly send the link past the clip the user is actually looking for.
-    clip = _video_row()
-    related = make_related(clip)
+    # quietly send the link past the video the user is actually looking for.
+    video = _video_row()
+    related = make_related(video)
 
     related.show_row(_trim_row(), [_image_row()])
 
@@ -335,7 +335,7 @@ def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_rela
 
 
 def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
-    # The clip was deleted out from under it. The relation it can still show is
+    # The video was deleted out from under it. The relation it can still show is
     # the one its copied params carry, rather than an empty slot.
     related = make_related()
 
@@ -345,7 +345,7 @@ def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
     assert related._source_tile._badge.media_type == "image"
 
 
-def test_a_cut_whose_clip_is_in_the_trash_still_points_back_at_the_clip(make_related):
+def test_a_cut_whose_video_is_in_the_trash_still_points_back_at_the_video(make_related):
     related = make_related(held=[_video_row()])
 
     related.show_row(_trim_row(), [_image_row()])

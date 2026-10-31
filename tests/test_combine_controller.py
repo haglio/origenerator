@@ -313,7 +313,7 @@ def combine(qtbot, monkeypatch):
 
 
 def test_the_image_slot_takes_an_image_with_a_file_to_seed_from(combine):
-    # Not merely anything that produced a file: a video's clip would satisfy
+    # Not merely anything that produced a file: a video would satisfy
     # that and cannot be a start frame.
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
@@ -857,7 +857,7 @@ def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_p
 
 def test_the_clip_lands_in_the_inbox_this_controller_was_handed(combine, monkeypatch,
                                                                 tmp_path):
-    """No patching of anything: where a clip goes used to be a config constant
+    """No patching of anything: where a video goes used to be a config constant
     this module imported, so a test could only redirect it by reaching into the
     module. It is an object now, given at construction."""
     output = tmp_path / "output"
@@ -887,7 +887,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(combine, monkeypatch, tmp_pa
 
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
                                                           tmp_path):
-    # The clip is safe either way, and Send-to-Genau is still there to retry with.
+    # The video is safe either way, and Send-to-Genau is still there to retry with.
     output = tmp_path / "output"
     output.mkdir()
     (output / "clip.mp4").write_bytes(b"pixels")
@@ -936,7 +936,7 @@ def test_switching_lanes_re_asks_which_acts_are_answerable(combine, monkeypatch)
 
 
 def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine, monkeypatch):
-    # One item at a time per folder, and the spoken request still gets its clip: the
+    # One item at a time per folder, and the spoken request still gets its video: the
     # run already going is stamped to be handed over when it lands, rather than a
     # second one being made of the same thing.
     workflow = FakeWorkflow()

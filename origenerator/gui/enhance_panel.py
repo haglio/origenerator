@@ -109,7 +109,7 @@ _NO_DETECTOR_TOOLTIP = (
 # What a fix field costs around its digits: the padding either side below, its
 # 1px border, and the pixels a spinner keeps for its cursor and its own inner
 # margin. Measured by rendering one and looking, since a field a hair too narrow
-# doesn't complain — it clips a digit off 0.45, which still reads as a number.
+# doesn't complain — it cuts a digit off 0.45, which still reads as a number.
 _FIX_FIELD_PADDING = GAP_SMALL
 _FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 16
 # The same for a number with its step buttons, measured the same way: at a few

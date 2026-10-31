@@ -67,7 +67,7 @@ from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
-from tests.thumbnail_rows import looping_clip, painted_row, where_the_thumbnail_is
+from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
 
 
 @pytest.fixture
@@ -657,9 +657,9 @@ def test_a_video_tabs_seed_dropdown_plays_the_videos_it_lists(blank_panel, qtbot
                                                               tmp_path):
     panel = blank_panel
     _video_row(panel._db, noise_seed=30)
-    clip = looping_clip(tmp_path)
+    video = looping_video(tmp_path)
     monkeypatch.setattr(gallery, "animated_preview_if_made",
-                        lambda row, *_folders: clip if row["prompt_id"] == "vid1" else None)
+                        lambda row, *_folders: video if row["prompt_id"] == "vid1" else None)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     field = panel._param_form._widgets["noise_seed"]
     field.showPopup()
@@ -1191,8 +1191,8 @@ def test_prefill_selects_workflow_and_sets_values(panel):
 
 
 def test_prefilling_a_clip_keeps_random_and_shows_a_fresh_take_of_its_seeds(panel):
-    # Prefilling a still pins its seed; prefilling a clip does not, so the next
-    # Generate is another take of the motion rather than this clip's again --
+    # Prefilling a still pins its seed; prefilling a video does not, so the next
+    # Generate is another take of the motion rather than this video's again --
     # and the fields show the seeds that take will use.
     panel.prefill("wan22_i2v", {"noise_seed": 11, "audio_seed": 33})
 
@@ -2138,7 +2138,7 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
 
 def _script_for(video_path, output_dir=None):
     """Write a script for ``video_path`` -- in the scripts folder under
-    ``output_dir``, or, with none named, in the old place beside the clip."""
+    ``output_dir``, or, with none named, in the old place beside the video."""
     actions = synthesize_actions(2.0, hz=1.0)
     dest = (video_path.with_suffix(".funscript") if output_dir is None
             else funscript_path_for(video_path, places=OutputPlaces.in_one_folder(output_dir)))
@@ -2162,8 +2162,8 @@ def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
 
 
 def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path):
-    """The drive reads a clip's script wherever it is, which for anything
-    generated from here on is the folder, not a file beside the clip."""
+    """The drive reads a video's script wherever it is, which for anything
+    generated from here on is the folder, not a file beside the video."""
     panel, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "video" / "vid1.mp4"
@@ -3602,9 +3602,9 @@ def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
                                 inbox=evolver_export.EvolverInbox(inbox))
     qtbot.addWidget(panel)
     panel._preview.show_media = MagicMock()
-    clip = tmp_path / "vid1.mp4"
-    clip.write_bytes(b"pixels")
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
+    video = tmp_path / "vid1.mp4"
+    video.write_bytes(b"pixels")
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (video, "video"))
 
     panel.show_saved_generation(_lane_video(db, lane), [])
     _press(panel, lane.send_caption)
@@ -3615,12 +3615,12 @@ def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
 def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
         qtbot, tmp_path, monkeypatch):
     output = tmp_path / "output"
-    clip = output / "video" / "vid1.mp4"
-    clip.parent.mkdir(parents=True)
-    clip.write_bytes(b"pixels")
-    write_funscript(funscript_path_for(clip, places=OutputPlaces.in_one_folder(output)), [{"at": 0, "pos": 0}])
+    video = output / "video" / "vid1.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"pixels")
+    write_funscript(funscript_path_for(video, places=OutputPlaces.in_one_folder(output)), [{"at": 0, "pos": 0}])
     monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (video, "video"))
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "0_inbox"
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db,
@@ -3737,7 +3737,7 @@ def test_pressing_unsend_takes_the_send_back_and_offers_it_again(saved_panel,
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
         saved_panel, monkeypatch, lane):
-    # Withdrawn, the button reads exactly as it does for a clip never sent, and
+    # Withdrawn, the button reads exactly as it does for a video never sent, and
     # nothing else on the tab mentions the other app at all -- so the one place
     # left to say the deletion was taken down is the words under the cursor.
     panel, db = saved_panel
@@ -3757,7 +3757,7 @@ def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
 def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
                                                            monkeypatch, lane):
     # The deletion waits for the other app's next run, so the send offered right
-    # after a withdrawal has to retract it -- otherwise the clip just handed over
+    # after a withdrawal has to retract it -- otherwise the video just handed over
     # is the one deleted.
     panel, db = saved_panel
     _lane_video(db, lane)
@@ -3778,7 +3778,7 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
 def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
                                                                   monkeypatch, lane):
     # The mirror of the send's guard, and the same reason: the button is only as
-    # fresh as the last time the footer was drawn. Condemning a clip that was
+    # fresh as the last time the footer was drawn. Condemning a video that was
     # never handed over would leave the row asking for a delete of nothing.
     panel, db = saved_panel
     _lane_video(db, lane)
@@ -3795,7 +3795,7 @@ def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
 def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
                                                                 monkeypatch, lane):
     # The row moved under a button still offering the send -- a spoken animation
-    # landing on this very clip. The press must do nothing at all: taking the
+    # landing on this very video. The press must do nothing at all: taking the
     # send back is the opposite of what the words under the cursor promised.
     panel, db = saved_panel
     _lane_video(db, lane)

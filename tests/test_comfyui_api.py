@@ -447,9 +447,9 @@ def _client_on(clock: _Clock) -> ComfyUIApi:
 def test_a_submit_answered_too_late_stands_once_comfyui_lists_the_prompt():
     # ComfyUI logs "got prompt" as the request lands and validates it on its
     # event loop; a validation that takes a minute (2026-09-05: 50 s for a
-    # two-scene clip whose one-scene twin took a tenth of one) answers nothing
+    # two-scene video whose one-scene twin took a tenth of one) answers nothing
     # meanwhile, so the POST times out on a prompt the server has and goes on
-    # to run. Declared failed, that job ran untracked and its clip never reached
+    # to run. Declared failed, that job ran untracked and its video never reached
     # the gallery. So a submit whose answer is late asks whether the prompt is
     # listed before it gives up -- and asks again while the same stall swallows
     # the reads.

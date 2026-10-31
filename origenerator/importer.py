@@ -92,7 +92,7 @@ def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -
                 and sibling_of_type(fpath, MediaType.IMAGE) is not None):
             continue
         # An image beside a video is that video's metadata/preview sidecar
-        # (VHS_VideoCombine writes one per clip): its entry should play the
+        # (VHS_VideoCombine writes one per video): its entry should play the
         # video, not show the still frame.
         play_path = fpath
         if output_type == MediaType.IMAGE:

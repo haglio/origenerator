@@ -11,7 +11,7 @@ Two things ride with it because nothing else has them. The stand-in row a press
 puts in the queue before there is a job: everything between the press and a real
 job takes seconds, and a button that seems to do nothing reads as an app that has
 died. And the spoken "animate as", which is this same act asked for out loud: the
-clip handed on the moment it exists, and a second ask over the same image
+video handed on the moment it exists, and a second ask over the same image
 refused, so saying it twice does not spend the GPU twice.
 
 What stays with the host is what a launch is *of* and where it lands: the folder
@@ -59,7 +59,7 @@ ALREADY_MAKING_ONE = "already making it — handing that one over"
 # What an image can be animated as is read off what it SHOWS, and an image
 # nobody has said that about yet can be animated as nothing at all. Said
 # rather than guessed: the guess would be an act the image cannot do, which
-# is minutes of the one machine spent on a clip that was never going to work.
+# is minutes of the one machine spent on a video that was never going to work.
 NOT_AN_IMAGE = "only an image can be animated"
 
 NO_PAST_VIDEO = "No past video yet"
@@ -108,7 +108,7 @@ class CombineController(QObject):
         self._jobs = jobs
         self._names = names or ItemNames(db)
         self._files = FilesOnly(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
-        # Where a clip is handed to Evolver. Asked for rather than performed
+        # Where a video is handed to Evolver. Asked for rather than performed
         # here: the destination is one object's to know, and a test points it at
         # a directory of its own instead of patching a constant this module
         # imported (origenerator.evolver_export).
@@ -163,7 +163,7 @@ class CombineController(QObject):
 
     def _accepts_image(self, image_id: str) -> bool:
         """Whether the image slot can hold this: a generation that is an image
-        with a file to seed an i2v from (a video's clip can't be a start frame),
+        with a file to seed an i2v from (a video can't be a start frame),
         or an image file from outside the gallery."""
         return self._image_reference(image_id) is not None
 
@@ -217,7 +217,7 @@ class CombineController(QObject):
 
     def _slot_preview(self, prompt_id: str) -> tuple[str | None, str | None]:
         """A dropped item's (thumbnail, looping-preview) paths for its slot: a video
-        loops its clip, an image shows its still. Either may be ``None`` when absent."""
+        loops, an image shows its still. Either may be ``None`` when absent."""
         row = self._db.get_generation(prompt_id)
         if row is None:
             return self._files.preview(prompt_id)
@@ -420,7 +420,7 @@ class CombineController(QObject):
         back out (:func:`~origenerator.gallery.combine.cycle_shaped`). The lane
         used to choose only WHICH settings were mined, and from there a Genau flick
         was made exactly like any other video; it can't be, because what Genau
-        needs of a clip is a property of the clip's own length, and the past clip
+        needs of a video is a property of the video's own length, and the past video
         being mined was made before anyone knew that.
 
         ``None`` when the pair can't be combined: the video row is gone or isn't
@@ -488,7 +488,7 @@ class CombineController(QObject):
         """Generate a new video from a dropped image + a dropped video's settings,
         landing it in the folder for that (image × settings) combination.
 
-        ``send`` hands the clip to Genau the moment it exists, as a spoken
+        ``send`` hands the video to Genau the moment it exists, as a spoken
         animation asks, and takes no dialog at all, because such a command is
         answered in the slideshow's notice. ``category`` names the act the dropdown was
         set to, when one was picked.
@@ -609,9 +609,9 @@ class CombineController(QObject):
         return True
 
     def _mark_for_sending(self, prompt_id: str, send: bool) -> None:
-        """Stamp a just-launched run to hand its clip on the moment it exists.
+        """Stamp a just-launched run to hand its video on the moment it exists.
 
-        Only a spoken animation asks for this. Pressing Generate leaves the clip
+        Only a spoken animation asks for this. Pressing Generate leaves the video
         in the gallery for Send-to-Genau, because someone at the keyboard can look
         at it first.
         """
@@ -623,7 +623,7 @@ class CombineController(QObject):
                           launching: str | None = None) -> None:
         """Run the settings that fit ``category`` on the dropped image: the
         settings assigned for it, else the act's most-used past video. ``intent``
-        chooses the lane both answer from; ``send`` hands the finished clip to
+        chooses the lane both answer from; ``send`` hands the finished video to
         Genau without a second ask.
 
         ``launching`` is the stand-in row the press already put in the line
@@ -644,7 +644,7 @@ class CombineController(QObject):
         the lane's own workflow as it starts, never a past video's settings.
 
         A run started from that tab is an ordinary Generate, so Genau settings opened
-        this way is not auto-sent; the tab's own Send-to-Genau does it once the clip
+        this way is not auto-sent; the tab's own Send-to-Genau does it once the video
         is there.
         """
         reference = self._image_reference(image_id)
@@ -660,11 +660,11 @@ class CombineController(QObject):
     # --- the Genau lane: said out loud, and handed on ------------------------
 
     def send_to_genau_if_requested(self, row: dict | None) -> None:
-        """Hand a just-finished clip to the Genau lane, if that is what it was for.
+        """Hand a just-finished video to the Genau lane, if that is what it was for.
 
         The run was stamped at launch (:meth:`_mark_for_sending`). Only a video
         with a file on disk that has not already gone is sent, and a failure is
-        logged rather than shown: the clip is safe in the gallery either way. The
+        logged rather than shown: the video is safe in the gallery either way. The
         lane names the folder, so a spoken send and a pressed one land alike.
         """
         if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):
@@ -682,10 +682,10 @@ class CombineController(QObject):
         logger.info("genau: sent %s down the Genau lane", preview[0].name)
 
     def _already_genaud(self, row: dict) -> bool:
-        """Whether this image has been Genau'd — a clip made from it already, or
+        """Whether this image has been Genau'd — a video made from it already, or
         one on the way. Saying it twice is what someone does when the first time
         appeared to do nothing, and a second identical run spends minutes of the
-        one GPU on a clip that already exists.
+        one GPU on a video that already exists.
 
         A run is a row stamped as spoken for (:meth:`_mark_for_sending`) and
         matched to this image by its start frame, counted whether it is still
@@ -706,7 +706,7 @@ class CombineController(QObject):
 
         An act left unsaid is settled by what the image shows, through
         :func:`~origenerator.animate_command.what_to_animate`. From there it is the
-        ordinary category path: the loop lane is stamped to hand its clip on and
+        ordinary category path: the loop lane is stamped to hand its video on and
         guarded against being said twice (:meth:`_already_genaud`), and the
         full-length lane is left in the gallery.
         """

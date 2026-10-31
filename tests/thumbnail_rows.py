@@ -14,7 +14,7 @@ def square(tmp_path, color):
     return str(path)
 
 
-def looping_clip(tmp_path) -> str:
+def looping_video(tmp_path) -> str:
     path = tmp_path / "clip.webp"
     frames = [Image.new("RGB", (160, 90), color) for color in ((255, 0, 0), (0, 255, 0))]
     frames[0].save(path, format="WEBP", save_all=True, append_images=frames[1:],

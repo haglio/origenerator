@@ -1014,7 +1014,7 @@ class GalleryView(QWidget):
         front is, or it would drive straight through the park.
         Otherwise the surface in front picks: a funscript when what it has on
         screen carries one, and the self-generated motion every other moment,
-        which is most of them — a folder of images, a clip with no script, an
+        which is most of them — a folder of images, a video with no script, an
         empty tab.
 
         Idempotent, so tab switches, browsing, completions and opening or closing
@@ -1045,7 +1045,7 @@ class GalleryView(QWidget):
                     self._osr2_driving = None
             else:
                 video_path, player, actions = target
-                # Same clip, new player (a slideshow opened over it) still re-aims.
+                # Same video, new player (a slideshow opened over it) still re-aims.
                 driving = (video_path, player)
                 if self._osr2_driving != driving:
                     self._osr2_driver.start(player, actions)
@@ -2518,11 +2518,11 @@ class GalleryView(QWidget):
 
     def _job_made_from(self, job, source_video_media) -> Combination:
         """What ``job`` was made from, for a surface with no frame of it yet: the
-        image, and the clip whose settings it follows as ``source_video_media`` shows
-        that clip — a still on the folder's tile, a loop in a config tab.
+        image, and the video whose settings it follows as ``source_video_media`` shows
+        that video — a still on the folder's tile, a loop in a config tab.
 
-        The clip only where a *video* was dropped: an act picked off the Combine
-        dropdown names what the run will do rather than a clip, and a thumbnail of
+        The video only where a *video* was dropped: an act picked off the Combine
+        dropdown names what the run will do rather than a video, and a thumbnail of
         some video the user never chose reads as a job that is that video — the
         same reason the queue's rows leave it out (see BrowserPane).
         """

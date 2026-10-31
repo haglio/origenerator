@@ -236,11 +236,11 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             **loras.nodes,
             "5": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["positive_prompt"]},
+                "inputs": {"clip": loras.clip_ref, "text": params["positive_prompt"]},
             },
             "6": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["negative_prompt"]},
+                "inputs": {"clip": loras.clip_ref, "text": params["negative_prompt"]},
             },
             "9": {
                 "class_type": "ControlNetApplyAdvanced",

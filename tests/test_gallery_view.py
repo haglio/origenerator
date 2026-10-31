@@ -2932,7 +2932,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
 
 def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     # End to end through the real delete: what the collection hands the preview is the
-    # clip where it now sits, not the folder it was taken out of.
+    # video where it now sits, not the folder it was taken out of.
     db = Database(tmp_path / "test.db")
     out = tmp_path / "out" / "video"
     out.mkdir(parents=True)
@@ -4271,8 +4271,8 @@ def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtb
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
     still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
-    clip = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
-    view = GalleryView(FakeDB([still, clip]))
+    video = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
+    view = GalleryView(FakeDB([still, video]))
     qtbot.addWidget(view)
     view.refresh()
     looping = workflow_label("wan22_flf2v_loop")
@@ -9239,7 +9239,7 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path):
     does leave is one every collection filters out for having produced nothing. So it
     used to simply disappear: minutes of GPU, the tile gone off the Job Queue, and no
     word anywhere but the log. Someone watching read that as a success and went
-    looking for the clip."""
+    looking for the video."""
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -10904,7 +10904,7 @@ def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, 
 
 def test_a_picked_act_shows_no_source_video_at_all(qtbot):
     # The act names what the video will do, which is the whole of what was
-    # chosen. The clip its settings were mined out of answers a question nobody
+    # chosen. The video its settings were mined out of answers a question nobody
     # asked, and an image of a video the user never picked reads as a job that
     # is that video.
     db = FakeDB([])
@@ -11127,7 +11127,7 @@ def _combine_db(tmp_path, *, enhanced=True):
 
 
 def _looping_video(db, prompt_id="loop"):
-    """A past looping clip for the Genau lane to mine, sampled the long way --
+    """A past looping video for the Genau lane to mine, sampled the long way --
     21 frames at 16fps, which is a cycle and a half and the whole problem."""
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
     db.insert_generation(
@@ -11142,9 +11142,9 @@ def _looping_video(db, prompt_id="loop"):
 
 
 def test_the_genau_lane_asks_for_settings_one_cycle_long(qtbot, tmp_path):
-    """The lane used to choose only WHICH past clip was mined, and from there a
+    """The lane used to choose only WHICH past video was mined, and from there a
     Genau flick was made exactly like any other video. It cannot be: what Genau
-    needs of a clip is a property of its LENGTH, and the clip being mined was
+    needs of a video is a property of its LENGTH, and the video being mined was
     made before anyone knew that."""
     db = _combine_db(tmp_path)
     wf = _looping_video(db)
@@ -11187,7 +11187,7 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
 
 
 def test_the_video_lane_takes_the_mined_settings_as_they_stand(qtbot, tmp_path):
-    # A clip for a Funestra is watched at its own rate and wants the settings that
+    # A video for a Funestra is watched at its own rate and wants the settings that
     # made the one it was mined from.
     db = _combine_db(tmp_path)
     wf = _looping_video(db)
@@ -11802,7 +11802,7 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
 
 
 def test_category_runs_the_acts_most_used_video(qtbot, tmp_path):
-    # The combine DB's one "dance" clip is the "dancing" act's most-used video.
+    # The combine DB's one "dance" video is the "dancing" act's most-used video.
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -11816,7 +11816,7 @@ def test_category_runs_the_acts_most_used_video(qtbot, tmp_path):
 
 
 def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip
+    db = _combine_db(tmp_path)  # its one video is a "dance" video
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
 
@@ -11890,11 +11890,11 @@ def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_pat
     item = view._queue._items[0]
     assert item.act == "dancing"
     assert item.source_image == "sdxl_pick.png [output]"  # the frame being animated
-    assert item.source_video_thumbnail is None  # an act names itself; no clip to show
+    assert item.source_video_thumbnail is None  # an act names itself; no video to show
     assert item.cancel is None            # nothing on the server to stop yet
 
 
-def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypatch):
+def test_the_stand_in_row_shows_the_dropped_video(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     db.update_generation("vid", thumbnail_path="thumbs/vid.jpg")
     view = GalleryView(db, client=_reroll_client())
@@ -11913,7 +11913,7 @@ def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypat
 
 def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, monkeypatch):
     # It stands in for a launch, so it must not outlive one that never happened.
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip: no epsilon video
+    db = _combine_db(tmp_path)  # its one video is a "dance" video: no epsilon video
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -11947,7 +11947,7 @@ def _launched_row(view):
 
 def test_settings_from_a_dropped_video_name_that_video(qtbot, tmp_path):
     # Nothing in the params says which video the settings were lifted off, and
-    # the queue row draws that clip in gray beside the frame being animated.
+    # the queue row draws that video in gray beside the frame being animated.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -12130,8 +12130,8 @@ def _combine_view_with_a_looping_video(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    clip = str(_write_looping_webp(tmp_path / "vid_anim.webp"))
-    view.animated_preview = lambda row: clip
+    video = str(_write_looping_webp(tmp_path / "vid_anim.webp"))
+    view.animated_preview = lambda row: video
     return view
 
 
@@ -12306,7 +12306,7 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
 
 
 def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon video exists
+    db = _combine_db(tmp_path)  # its one video is a "dance" video — no epsilon video exists
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -13652,7 +13652,7 @@ class _FakeDriver:
 
     def trace(self, count, seconds):
         """What the console asks a driver for while it has the device. These
-        cases carry no scripted clip, so there is no line to draw — the same
+        cases carry no scripted video, so there is no line to draw — the same
         empty answer the real driver gives for one."""
         return ()
 
@@ -13664,7 +13664,7 @@ def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target
     ``media`` is what the pane was showing — ``None`` for a generation still
     running under it — and the generation it names is the tile these tests
     clicked, which is what the tab shows.
-    ``target`` stands in for the OSR2 drive target the clip on screen would
+    ``target`` stands in for the OSR2 drive target the video on screen would
     offer, since these tests carry no real scripted video.
     """
     shown = view.selected_prompt_id() if media is not None else None
@@ -13676,7 +13676,7 @@ def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target
 
 
 def _aim_slideshow(view, slideshow, target):
-    """Say what the clip on screen offers the device, and reconcile as a step
+    """Say what the video on screen offers the device, and reconcile as a step
     onto it would."""
     slideshow.osr2_drive_target = lambda: target
     view.reconcile_osr2()
@@ -14068,19 +14068,19 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
 
 
 def test_stepping_a_double_clicked_slideshow_re_aims_the_osr2(qtbot):
-    # Stepping to another clip re-aims the one device at the newly shown video.
+    # Stepping to another video re-aims the one device at the newly shown video.
     view, driver, _panel = _osr2_view(qtbot)
     view.osr2_control.setChecked(True)
     slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
     assert driver.started[-1] == ("pA", "aA")
 
-    _aim_slideshow(view, slideshow, ("B.mp4", "pB", "aB"))  # Left/Right landed on another clip
+    _aim_slideshow(view, slideshow, ("B.mp4", "pB", "aB"))  # Left/Right landed on another video
     assert driver.started[-1] == ("pB", "aB")
     slideshow.close()
 
 
 def test_a_slideshow_opened_with_the_switch_off_drives_nothing(qtbot):
-    # Double-clicking a clip open once took the device whatever the switch said.
+    # Double-clicking a video open once took the device whatever the switch said.
     view, driver, _panel = _osr2_view(qtbot)
     slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
 
@@ -14400,7 +14400,7 @@ def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
-    # The toggle governs a slideshow as much as the tab preview: double-clicking a clip
+    # The toggle governs a slideshow as much as the tab preview: double-clicking a video
     # to watch it doesn't take the device on its own.
     view, driver, _panel = _osr2_view(qtbot)
     assert not view.osr2_control.isChecked()
@@ -14446,7 +14446,7 @@ def test_closing_the_slideshow_stops_driving_with_no_tab_video_behind_it(qtbot):
 
 
 def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot):
-    # With the toggle already driving the front-tab video, opening a clip fullscreen
+    # With the toggle already driving the front-tab video, opening a video fullscreen
     # re-aims the one device at the slideshow's player; closing hands it back.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
@@ -14463,7 +14463,7 @@ def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot)
 def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
     # The surface in front answers for the device alone: a slideshow opening on an
     # image hands the OSR2 to the motion, the way a Funestra hands back to it
-    # between scripted clips.  Falling through to the front tab left that tab's
+    # between scripted videos.  Falling through to the front tab left that tab's
     # funscript driving under a slideshow it has nothing to do with, until the slideshow
     # happened to reach a scripted video of its own.
     view, driver, panel = _osr2_view(qtbot)
@@ -16245,7 +16245,7 @@ def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
 
 
 def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
-    # Most video folders here hold a single clip, so skipping the arming for a
+    # Most video folders here hold a single video, so skipping the arming for a
     # lone item is what made "fullscreen on a video" look like a different mode.
     rows = [_i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
@@ -16763,11 +16763,11 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
 
     view._voice.listener.speak("no hat")
     assert "no hat" in words(view._slideshows.showing.shown._note)
-# --- the Genau lane: a looping clip, made but not sent anywhere ---------------
+# --- the Genau lane: a looping video, made but not sent anywhere ---------------
 
 
 def _genau_db(tmp_path):
-    """The combine DB plus a looping clip launched as the "alpha" act to mine.
+    """The combine DB plus a looping video launched as the "alpha" act to mine.
 
     The long-form video the fixture already carries was launched as the same act,
     so this also pins that the Genau lane picks the loop over it. "state two" is
@@ -16895,7 +16895,7 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
 def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path,
                                                                   monkeypatch):
     db = _genau_db(tmp_path)
-    # A sorted image of a state whose act the gallery holds no looping clip of.
+    # A sorted image of a state whose act the gallery holds no looping video of.
     db.insert_generation(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="another image", seed=3,
@@ -16953,9 +16953,9 @@ def _spoken_genau_rows(view):
 
 def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, monkeypatch):
     # Saying it twice is what you do when the first time appeared to do nothing,
-    # and it does appear to: the clip queues after whatever the machine is on
+    # and it does appear to: the video queues after whatever the machine is on
     # and the image on screen doesn't change. Two identical runs would spend
-    # minutes of the one GPU making a clip that is already coming.
+    # minutes of the one GPU making a video that is already coming.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
@@ -16971,7 +16971,7 @@ def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, mo
 
 def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
-    # A clip that has arrived is still a clip of this image — asking again
+    # A video that has arrived is still a video of this image — asking again
     # would only re-make it, so it is answered rather than run.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
@@ -16990,7 +16990,7 @@ def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
 
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
         qtbot, tmp_path, monkeypatch):
-    # Asking again is the only way to get a clip after a failure, so a row that
+    # Asking again is the only way to get a video after a failure, so a row that
     # produced nothing must not read as this image having been Genau'd.
     view = _genau_view(qtbot, tmp_path)
     view._slideshows._slideshow = _VoiceSurface("img_act")
@@ -17142,12 +17142,12 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
 
 def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
     # The folder is read off the lane, so a spoken send and a pressed one cannot
-    # differ about where a clip lands.
+    # differ about where a video lands.
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")   # as a spoken launch would have
-    clip = Path("C:/out/flf2v_loop_1.mp4")
+    video = Path("C:/out/flf2v_loop_1.mp4")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (clip, "video"))
+                        lambda row, out: (video, "video"))
     sent = []
     monkeypatch.setattr(combine_controller.evolver_export, "export_video",
                         lambda src, dest, funscript=None:
@@ -17155,7 +17155,7 @@ def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
 
     view._on_reroll_finished("k", "loop")
 
-    assert sent == [(clip, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
+    assert sent == [(video, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
     assert view._db.get_generation("loop")["genau_exported_at"]
 
 
@@ -17175,7 +17175,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
 
 
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
-    # The inbox copy is the only thing that failed; the clip itself is fine, and
+    # The inbox copy is the only thing that failed; the video itself is fine, and
     # Send-to-Genau is still there to retry with.
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")

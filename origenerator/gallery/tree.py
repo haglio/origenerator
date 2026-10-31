@@ -333,8 +333,8 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
 
     Made here or found on disk alike. Made here is a Generate tab or a gallery
     re-roll -- or, with no run under it at all, a single cycle cut out of a
-    clip for the Genau lane (``source`` ``"stroke_trim"``): a cut is something
-    the app just made for you, it lands in the settings folder of the clip it
+    video for the Genau lane (``source`` ``"stroke_trim"``): a cut is something
+    the app just made for you, it lands in the settings folder of the video it
     came from rather than anywhere you would think to go looking, and left off
     here there is nowhere at all that says it happened. Found on disk is a file
     ComfyUI wrote that no instance of this app queued (``source``
@@ -623,7 +623,7 @@ def start_frame_index(rows: list[dict]) -> dict:
     *slice* of the library — one shape's rows, say. The key of a video's folder
     names the image it animates, and that image can perfectly well be on the
     other side of the split (a portrait frame with the size unlocked to a
-    landscape clip, or a run placed by the size it asked for while its frame is
+    landscape video, or a run placed by the size it asked for while its frame is
     measured). An index built from the slice alone misses it, and keys the folder
     to something nothing else in the app computes. The folder is still drawn — it
     is simply unreachable: every reveal, star and custom name resolves a folder

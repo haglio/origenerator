@@ -131,7 +131,7 @@ class FakeEngine:
         self.overlays.pop(ident, None)
 
     def run_out(self) -> None:
-        """The item on screen ended: a clip played through, or an image's
+        """The item on screen ended: a video played through, or an image's
         pace ran out.  The engine rolls onto what was staged after it, where
         something was."""
         if len(self.playlist) > self.playlist_pos + 1:

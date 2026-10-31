@@ -1,7 +1,7 @@
 """The map a slideshow's HUD draws around the slide on screen, and the loop that
 holds it still.
 
-The Funestras' map is a gamma: the clip on screen in the corner, its seed row
+The Funestras' map is a gamma: the video on screen in the corner, its seed row
 running right, its column running down, one cell lit for what is playing.  A
 slideshow draws the same gamma over its own generations — the seed row is the same
 act under other seeds, the column what else was made of the same image

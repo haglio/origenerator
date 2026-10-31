@@ -1,6 +1,6 @@
 """The map around one generation, as the Funestras' HUD draws it.
 
-A Fun Time satellite maps the clip on screen against its library: the same
+A Fun Time satellite maps the video on screen against its library: the same
 act under other seeds runs right as the seed row, and the same subject's
 other acts run down as the column.  A slideshow of this app's generations reads
 the same way, in the gallery's own terms.  The subject is an image, and what

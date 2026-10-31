@@ -3,7 +3,7 @@
 A send copies the video into a folder of Evolver's and the gallery later reads
 Evolver's upscale back out of another -- both spelled here, from reading that
 repo's source, with nothing comparing them.  A folder renamed over there left
-this app dropping clips where nothing ingests them, and every suite stayed
+this app dropping videos where nothing ingests them, and every suite stayed
 green.
 
 Evolver publishes ``evolver_contract.json`` at its checkout root now.  These

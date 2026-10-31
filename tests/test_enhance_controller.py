@@ -299,7 +299,7 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
 
 def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
                                                                       monkeypatch):
-    # There is no video enhancer, and a picked clip looks no different picked.
+    # There is no video enhancer, and a picked video looks no different picked.
     monkeypatch.setattr(module.gallery, "is_enhanceable_row",
                         lambda row: row["media_type"] == "image")
     monkeypatch.setattr(module.gallery, "media_type_of_row",

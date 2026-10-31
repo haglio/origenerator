@@ -2567,9 +2567,9 @@ def test_a_latest_slideshow_takes_a_new_run_after_the_browser_has_moved_on(slide
 
 def test_a_slideshow_of_one_kinds_latest_takes_a_new_run_of_that_kind_alone(slideshows):
     videos_latest = oriented_key(FolderCollection(RECENTS_KEY, "video").key, LANDSCAPE)
-    clip_run = _row("v-run", workflow_name="wan22_i2v", files=("v-run.mp4",))
+    video_run = _row("v-run", workflow_name="wan22_i2v", files=("v-run.mp4",))
     browser = FakeBrowser(collections={videos_latest: [_row("v1", files=("v1.mp4",))]})
-    director, _host, made = slideshows(browser=browser, db=FakeDB([clip_run, _row("i-run")]),
+    director, _host, made = slideshows(browser=browser, db=FakeDB([video_run, _row("i-run")]),
                                        fun_time=FakeSession())
     director.open([("v1.mp4", "video", "v1", None)], location=videos_latest, side=LANDSCAPE)
 

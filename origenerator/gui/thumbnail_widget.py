@@ -21,7 +21,7 @@ from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.inflight import TICK_MS, RunReading
 from origenerator.gui.looping_preview import play_in
-from origenerator.gui.looping_preview import set_in_sight as clip_in_sight
+from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
@@ -212,7 +212,7 @@ class ThumbnailWidget(QWidget):
         play_in(self._image_label, movie_path, _IMAGE_SIZE)
 
     def set_in_sight(self, in_sight: bool) -> None:
-        clip_in_sight(self._image_label, in_sight)
+        video_in_sight(self._image_label, in_sight)
 
     def set_favorite(self, favorite: bool):
         self._favorite = favorite

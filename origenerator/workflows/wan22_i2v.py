@@ -7,7 +7,7 @@ from origenerator.speech import VOICE_OPTIONS, VOICE_PRESETS, scene_speech
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
-    LONGEST_CLIP_FRAMES,
+    LONGEST_VIDEO_FRAMES,
     ParamDef,
     ParamType,
     WorkflowTemplate,
@@ -130,7 +130,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("scene_frames", "Scenes", ParamType.SCENES, defaults["scene_frames"], min_val=5,
-                     max_val=LONGEST_CLIP_FRAMES, step=4, options=DURATION_OPTIONS,
+                     max_val=LONGEST_VIDEO_FRAMES, step=4, options=DURATION_OPTIONS,
                      unit="s", rate=NATIVE_FPS),
             ParamDef("scene_lines", "Her Lines", ParamType.LINES, defaults["scene_lines"]),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
@@ -142,7 +142,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("voice_sample_text", "Words in the Voice Sample", ParamType.STR, defaults["voice_sample_text"], multiline=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
             ParamDef("audio_seed", "Sound Seed", ParamType.SEED, defaults["audio_seed"]),
-            ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=LONGEST_CLIP_FRAMES, step=4,
+            ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=LONGEST_VIDEO_FRAMES, step=4,
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS, good=(81, 161)),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(20, 30)),
             ParamDef("split_step", "Handoff Step", ParamType.INT, defaults["split_step"], min_val=0, max_val=100),
@@ -279,14 +279,14 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                     index, scene, start, previous, length, offset,
                     positive_ref, negative_ref, (width_ref, height_ref), params)
                 return {**prompt_nodes, **negative_nodes, **nodes}, frames
-            clip_id, i2v_id, high_id, low_id, decode_id = (
+            clip_vision_id, i2v_id, high_id, low_id, decode_id = (
                 ("13", "14", "15", "16", "17") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
             )
             nodes = {
                 **prompt_nodes,
                 **negative_nodes,
-                clip_id: {
+                clip_vision_id: {
                     "class_type": "CLIPVisionEncode",
                     "inputs": {
                         "clip_vision": ["3", 0],
@@ -300,7 +300,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                         "positive": positive_ref,
                         "negative": negative_ref,
                         "vae": ["2", 0],
-                        "clip_vision_output": [clip_id, 0],
+                        "clip_vision_output": [clip_vision_id, 0],
                         "start_image": start,
                         "width": width_ref,
                         "height": height_ref,
@@ -351,15 +351,15 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             }
             return nodes, [decode_id, 0]
 
-        # A clip longer than one segment is chained from each segment's last
+        # A video longer than one segment is chained from each segment's last
         # frame (WorkflowTemplate.chain_segments); its frames come back joined.
         segments, decoded_ref, total_frames = self.chain_segments(params, start_ref, segment)
         # Scored for the frames the scenes really add up to, which is what the
-        # stored clip length says whenever the form wrote it.
+        # stored video length says whenever the form wrote it.
         foley, audio_ref = self.foley_audio_nodes(
             "22", "23", "24", decoded_ref, {**params, "frame_count": total_frames})
         # Her lines take the writer's track where she speaks: each spoken
-        # scene's file at its place in the clip, the foley's own stretch where
+        # scene's file at its place in the video, the foley's own stretch where
         # a scene says nothing (WorkflowTemplate.speech_track_nodes says why
         # not both at once). A story with no line keeps the graph it always had.
         speech = {}
@@ -370,7 +370,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken))],
                 audio_ref)
             speech.update(track)
-        # The decode's frames are the clip's motion; the writer's are that motion
+        # The decode's frames are the video's motion; the writer's are that motion
         # shown more often. Foley above watches the former, the writer below
         # encodes the latter, and at the native rate they are the same frames.
         interpolate, frames_ref = self.interpolation_nodes("25", decoded_ref, params)

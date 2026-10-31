@@ -656,20 +656,48 @@
       ]
     },
     {
-      "id": "osr2_console",
+      "id": "osr2_controls",
       "thing": "the OSR2 controls at the top left of Core, and the same section on a slideshow's HUD",
       "screen": [
         "OSR2"
       ],
       "his_word": "the OSR2 controls (2026-10-30)",
       "code_today": [
-        "console",
-        "motion panel",
-        "panel"
+        "osr2 controls"
       ],
       "code_word": "osr2 controls",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "motion panel",
+        "console"
+      ],
+      "keep": [
+        "funestra.console",
+        "console_hud",
+        "ConsoleHud",
+        "ConsolePainter",
+        "ConsoleModel",
+        "hud.console",
+        ".console.",
+        "console=ConsoleModel",
+        "Funestras' console",
+        "session's console",
+        "console painter",
+        "console log",
+        "console interpreter",
+        "console window",
+        "console-window",
+        "console copy",
+        "console of its own",
+        "Console logging",
+        "console=True",
+        "no console",
+        "hidden console",
+        "to the console",
+        "console, so the value",
+        "ComfyUI's console"
+      ]
     },
     {
       "id": "nav_map",

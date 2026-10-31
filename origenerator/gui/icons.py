@@ -10,7 +10,7 @@ The toolbar-button icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
 folder-level badges (:func:`level_badge_icon`) are lettered chips marking which
 of workflow/model/LoRA a folder is; the media-type badges
-(:func:`media_type_badge`) are corner chips marking a Recents tile as an image
+(:func:`media_type_badge`) are corner chips marking a Latest tile as an image
 or a video.
 
 :func:`recent_mark_icon` is the dot at the start of the row of a folder lately
@@ -54,7 +54,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.groups import MediaGroup, SettingsGroup, folder_level, rows_under
@@ -78,7 +78,7 @@ _LEVEL_BADGES = {
     "source_image": ("I", GREEN),
 }
 
-# The Recents collection mixes images and videos in one flow, so each tile wears a
+# The Latest collection mixes images and videos in one flow, so each tile wears a
 # small corner badge naming its kind. A white glyph on a translucent dark chip,
 # so it reads over a thumbnail of any color.
 _BADGE_CHIP = QColor(*palette.BLACK, 160)
@@ -234,7 +234,7 @@ def flask_icon() -> QIcon:
 @cache
 def collection_icon(collection: str) -> QIcon:
     return {
-        RECENTS_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
+        LATEST_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
         ENHANCED_KEY: enhance_icon, EXPERIMENTS_KEY: flask_icon, TRASH_KEY: trash_icon,
     }[collection]()
 
@@ -299,7 +299,7 @@ def recovery_action_icon(action: str) -> QIcon:
 
 @cache
 def media_type_badge(media_type: str) -> QPixmap:
-    """A small corner badge marking a Recents tile as an image or a video.
+    """A small corner badge marking a Latest tile as an image or a video.
 
     A white glyph — a play triangle for a video, a framed photo for an image — on
     a translucent dark chip, so it reads over a thumbnail of any color. Cached and

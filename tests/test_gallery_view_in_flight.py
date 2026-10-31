@@ -27,7 +27,7 @@ from origenerator import (
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.db import Database
 from origenerator.gallery.collection import (
-    RECENTS_KEY,
+    LATEST_KEY,
 )
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import gallery_view as gallery_view_module
@@ -62,7 +62,8 @@ from tests.gallery_view_support import (
     _image_workflow,
     _key,
     _menu_offering,
-    _open_recents,
+    _new_tile,
+    _open_latest,
     _png_bytes,
     _preview_of,
     _reroll_client,
@@ -1081,7 +1082,7 @@ def test_recents_shows_an_inflight_card_above_finished_items(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
 
     assert "gen1" in view._browser._inflight_cards
     assert view.listed_prompt_ids() == ["done"]          # cards aren't finished items
@@ -1099,7 +1100,7 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     view._jobs._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running", frame=_png_bytes()
     )]
-    _open_recents(view)
+    _open_latest(view)
 
     assert "rr1" in view._browser._inflight_cards
     assert not view._browser._inflight_cards["rr1"]._image.pixmap().isNull()  # the job's live frame
@@ -1118,7 +1119,7 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
     view.refresh()
     _key, job = _running_reroll(view)
     view.refresh()          # the launch's running row is in the DB now
-    _open_recents(view)
+    _open_latest(view)
     assert job.prompt_id in view._browser._inflight_cards
     labels = _menu_offering(monkeypatch, "browser_pane", pick="Cancel")
 
@@ -1142,7 +1143,7 @@ def test_an_auto_generating_folders_card_offers_a_cancel_and_a_real_stop(
     view._toggle_auto(True)          # Auto-Generate launches the first variation
     (job,) = view._jobs.all_jobs
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     labels = _menu_offering(monkeypatch, "browser_pane")
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
@@ -1163,7 +1164,7 @@ def test_canceling_from_an_auto_generating_folders_card_ends_auto_generate_too(
     view._toggle_auto(True)
     (job,) = view._jobs.all_jobs
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     _menu_offering(monkeypatch, "browser_pane", pick="Cancel and stop")
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
@@ -1181,7 +1182,7 @@ def test_a_card_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     assert "gen1" in view._browser._inflight_cards      # the card is there...
     labels = _menu_offering(monkeypatch, "browser_pane")
 
@@ -1290,7 +1291,7 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
     folder_key = _key(_at(_image_workflow(view._tree), 0, 0))
     view._jobs._jobs[folder_key] = [
         _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})]
-    _open_recents(view)
+    _open_latest(view)
     assert "rr1" in view._browser._inflight_cards
 
     # The re-roll finishes: its row becomes a completed generation, its job drops.
@@ -1312,7 +1313,7 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     folder_key = _key(_at(_image_workflow(view._tree), 0, 0))
     job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
     view._jobs._jobs[folder_key] = [job]
-    _open_recents(view)
+    _open_latest(view)
     card = view._browser._inflight_cards["rr1"]
 
     job.last_preview = _png_bytes()  # a live frame arrives on the tracked re-roll
@@ -1321,15 +1322,15 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     assert not card._image.pixmap().isNull()          # now showing the frame
 
 
-def test_recents_collection_appears_for_a_running_generation(qtbot):
-    # A generation is running (a running DB row, no output yet): the Recents collection
+def test_latest_collection_appears_for_a_running_generation(qtbot):
+    # A generation is running (a running DB row, no output yet): the Latest collection
     # appears and lists it as an in-flight card.
     view = GalleryView(FakeDB([_running_row("gen1")]))
     qtbot.addWidget(view)
     view.refresh()
 
     assert "Latest" in _alls(view._tree)
-    _open_recents(view)
+    _open_latest(view)
     assert "gen1" in view._browser._inflight_cards
 
 
@@ -1807,12 +1808,12 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     panel._on_generate()                          # emits generate_requested -> a re-roll
     (pid,) = [job.prompt_id for job in gv._live_jobs.values()]
 
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert pid in gv._browser._inflight_cards
 
     folder = _at(_image_workflow(gv._tree), 0, 0)
     gv._tree.setCurrentItem(folder)              # navigate away
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))    # and back
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))    # and back
     assert pid in gv._browser._inflight_cards, "card vanished after navigating away and back"
 
     gv._poll()
@@ -1832,11 +1833,11 @@ def test_reroll_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_pa
     gv._start_reroll(folder_key)
     rr_pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert rr_pid in gv._browser._inflight_cards
 
     gv._tree.setCurrentItem(gv._tree_item_for(folder_key))  # into the re-roll's folder
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))             # and back
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))             # and back
     assert rr_pid in gv._browser._inflight_cards, "re-roll card vanished after navigation"
 
     gv._poll()
@@ -1846,7 +1847,7 @@ def test_reroll_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_pa
 def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_path):
     # The user's real case: an i2v re-roll runs its image stage, then swaps to the
     # video stage under the same folder key (a new prompt id). The Recents card
-    # must follow that handoff, on Recents and after navigating away and back.
+    # must follow that handoff, on Latest and after navigating away and back.
     db = _seeded_i2v_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -1856,7 +1857,7 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
     _reroll_tile(view).add_requested.emit()
     img_job = view._live_jobs[key]
 
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert img_job.prompt_id in view._browser._inflight_cards
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image -> video
@@ -1867,11 +1868,11 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
     assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after handoff"
 
     view._tree.setCurrentItem(view._tree_item_for(key))   # away
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))        # and back
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))        # and back
     assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after navigation"
 
 
-def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
+def test_latest_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     # A re-roll left running in the DB but not tracked by a live job — e.g. a
     # restart that didn't re-adopt it into _live_jobs — must still show as
     # in-flight. The card reflects the database, the source of truth for what is
@@ -1885,7 +1886,7 @@ def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     gv = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(gv)
     gv.refresh()
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
 
     assert "rr_running" in gv._browser._inflight_cards
 

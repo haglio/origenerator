@@ -29,7 +29,7 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gui import (
@@ -1195,7 +1195,7 @@ def _listening(qtbot, tmp_path, db=None):
 @pytest.mark.parametrize("said, key", [
     ("experiments", EXPERIMENTS_KEY),
     ("trash", TRASH_KEY),
-    ("recents", RECENTS_KEY),
+    ("recents", LATEST_KEY),
     ("go to favorites", FAVORITES_KEY),
     ("go to experiments", EXPERIMENTS_KEY),
 ])

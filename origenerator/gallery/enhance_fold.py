@@ -194,7 +194,7 @@ def disown_foreign_runs(db) -> int:
     made, and say how many rows that repaired.
 
     A level records the id of the transient row its enhancement ran under
-    (:func:`_history_entries`), and the Recents collection seats an enhanced image by
+    (:func:`_history_entries`), and the Latest collection seats an enhanced image by
     that number wherever the level does not also say when the run finished — the
     image belongs where its newest enhancement falls in the library's order, not
     where its own generation does. So an id from somewhere else seats the image

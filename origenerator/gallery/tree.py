@@ -329,7 +329,7 @@ def folder_names_by_row(
 
 
 def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
-    """Every row with a result, newest first — the whole of the Recents collection's list.
+    """Every row with a result, newest first — the whole of the Latest collection's list.
 
     Made here or found on disk alike. Made here is a Generate tab or a gallery
     re-roll -- or, with no run under it at all, a single cycle cut out of a
@@ -443,7 +443,7 @@ def favorite_generations(rows: list[dict]) -> list[dict]:
     individual bookmarks the Favorites collection gathers alongside favorited folders.
 
     Any produced row the user favorited qualifies, imported files included (unlike
-    the Recents collection, which is app-made results only). ``rows`` arrive newest-first
+    the Latest collection, which is app-made results only). ``rows`` arrive newest-first
     (the caller lists them by descending id), so the result is too.
     """
     return [row for row in rows if row.get("starred") and produced_output(row)]
@@ -592,7 +592,7 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
     A running standalone enhance is machinery, not a generation: its result folds
     into the image it upgrades, so its transient row must not grow an "Image
     Enhance" folder while it cooks (its progress shows on the tile of the image
-    it is upgrading, under that tile's "Enhancing…" scrim — the Recents collection
+    it is upgrading, under that tile's "Enhancing…" scrim — the Latest collection
     gives it no card of its own either). A completed one still in the DB — its
     source image deleted before it could fold — stays visible, so it can be found
     and deleted rather than haunting the disk invisibly. A re-derived base render

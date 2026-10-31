@@ -134,7 +134,7 @@ class ThumbnailWidget(QWidget):
         layout.addWidget(self._text_label)
         self._apply_styles()
 
-        # In a mixed listing (the Recents collection) a corner badge names the kind;
+        # In a mixed listing (the Latest collection) a corner badge names the kind;
         # inside a single-type folder the caller leaves it off as redundant. Which
         # corner it takes is MediaBadge's own business, and it says so.
         if media_type:

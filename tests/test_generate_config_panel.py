@@ -5,6 +5,7 @@ import os
 import re
 from dataclasses import FrozenInstanceError
 from datetime import datetime
+from itertools import pairwise
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -1641,7 +1642,7 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
     values = [facts.itemAtPosition(line, 1).widget() for line in lines]
     longest = max(key.fontMetrics().horizontalAdvance(key.text()) for key in keys)
 
-    assert {value.x() - (key.x() + longest) for key, value in zip(keys, values)} == {GAP_MEDIUM}
+    assert {value.x() - (key.x() + longest) for key, value in zip(keys, values, strict=True)} == {GAP_MEDIUM}
 
 
 def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_panel):
@@ -2371,7 +2372,7 @@ def _gaps_between_sections(panel) -> dict[str, int]:
     shown = sorted((section for section in body.findChildren(CollapsibleSection)
                     if section.isVisibleTo(body)), key=top)
     return {lower.title(): top(lower) - (top(upper) + upper.height())
-            for upper, lower in zip(shown, shown[1:])}
+            for upper, lower in pairwise(shown)}
 
 
 def test_the_enhancement_levels_sit_one_gap_under_the_settings_as_each_section_does(saved_panel):

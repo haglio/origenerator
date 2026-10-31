@@ -41,7 +41,7 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
         qtbot, tmp_path):
     seen = {}
 
-    def work_out(positive, negative, words, *, exchange, notes, examples):
+    def work_out(positive, negative, words, *, exchange, notes, examples, settings):
         seen.update(thread=threading.current_thread(), exchange=exchange, notes=notes,
                     asked=(positive, negative, words))
         return "the revision"
@@ -67,7 +67,7 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
 def test_an_item_nothing_was_asked_of_starts_with_no_exchange(qtbot, tmp_path):
     seen = {}
 
-    def work_out(positive, negative, words, *, exchange, notes, examples):
+    def work_out(positive, negative, words, *, exchange, notes, examples, settings):
         seen.update(exchange=exchange, notes=notes, examples=examples)
         return "the revision"
 
@@ -84,7 +84,7 @@ def test_his_own_prompts_that_touch_the_request_are_gathered_newest_first_for_th
         qtbot, tmp_path):
     seen = {}
 
-    def work_out(positive, negative, words, *, exchange, notes, examples):
+    def work_out(positive, negative, words, *, exchange, notes, examples, settings):
         seen["examples"] = examples
         return "the revision"
 
@@ -162,3 +162,20 @@ def test_a_failure_answers_with_nothing_and_logs_only_its_kind(qtbot, tmp_path, 
 
     assert caplog.messages == ["Could not work out a request (ValueError)"]
     assert jobs.let_go == 1
+
+
+def test_the_settings_he_may_change_ride_along_to_the_model(qtbot, tmp_path):
+    seen = {}
+
+    def work_out(positive, negative, words, **given):
+        seen.update(given)
+        return "the revision"
+
+    answerer, _db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
+    answers = []
+
+    answerer.ask(None, "a woman", "", "fewer steps", settings=("told",), owner=parent,
+                 then=answers.append)
+
+    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    assert seen["settings"] == ("told",)

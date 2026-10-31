@@ -60,3 +60,16 @@ def test_a_change_to_the_positive_prompt_alone_renders_only_that_prompt():
     document = QTextDocument()
     document.setHtml(html)
     assert "Negative Prompt" not in document.toPlainText()
+
+
+def test_a_requests_setting_changes_show_under_the_prompts_label_before_and_after():
+    html = diff_text.request_change_html("a cat", "", "a cat", "",
+                                         settings=[("Width", "1024", "1216")])
+
+    document = QTextDocument()
+    document.setHtml(html)
+    text = document.toPlainText()
+    assert text.index("Positive Prompt") < text.index("Settings") < text.index("Width")
+    struck, lit = _struck_and_lit(html)
+    assert struck == "1024" and lit == "1216"
+

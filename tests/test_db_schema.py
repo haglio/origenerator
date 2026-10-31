@@ -137,6 +137,7 @@ SCHEMA = {
         ("new_positive", "TEXT", 1, "''", 0),
         ("new_negative", "TEXT", 1, "''", 0),
         ("created_at", "TEXT", 1, "datetime('now')", 0),
+        ("settings_json", "TEXT", 1, "''", 0),
     ),
     "seed_uses": (
         ("id", "INTEGER", 0, None, 1),

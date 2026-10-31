@@ -26,6 +26,7 @@ from origenerator import (
     gallery,
     outside_videos,
     recovery,
+    request_settings,
     timing,
 )
 from origenerator.branch_session import is_branch_session
@@ -2920,7 +2921,7 @@ class GalleryView(QWidget):
         the one thing deliberately not re-rolled is the seed that draws it.
         """
         params = {**params, "positive_prompt": revision.positive,
-                  "negative_prompt": revision.negative}
+                  "negative_prompt": revision.negative, **dict(revision.settings)}
         key = self.folder_key_for(row.get("workflow_name") or "", params)
         if not self._jobs.start_prepared(key, workflow, params):
             return "couldn't queue the request — see the log", ERROR
@@ -2937,7 +2938,8 @@ class GalleryView(QWidget):
         )
         self._db.record_turns(job.prompt_id, [Turn(
             spoken.text, revision.answer, revision.old_positive, revision.old_negative,
-            revision.positive, revision.negative)])
+            revision.positive, revision.negative,
+            request_settings.recorded(revision.setting_changes))])
         self.refresh()  # the queue marks the job as a request the moment it is spoken
         return revision.answer or "Request submitted", NOTICE
 

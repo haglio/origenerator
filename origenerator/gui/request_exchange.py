@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QScrollArea, QVBoxLa
 from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
+from origenerator.db_requests import Turn
 from origenerator.gui.diff_text import request_change_html
 
 _ASK = "What to change, e.g. two women"
@@ -38,8 +39,11 @@ class _Turn(QWidget):
     def take(self, turn) -> None:
         self.answered.setText(turn[1])
         self.answered.setVisible(bool(turn[1]))
-        change = tuple(turn[2:6])
-        self.setToolTip(request_change_html(*change) if any(change) else "")
+        turn = Turn(*turn)
+        change = (turn.old_positive, turn.old_negative, turn.new_positive, turn.new_negative)
+        settings = turn.changes()
+        self.setToolTip(request_change_html(*change, settings=settings)
+                        if any(change) or settings else "")
 
 
 class RequestExchange(QWidget):

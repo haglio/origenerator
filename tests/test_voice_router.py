@@ -265,7 +265,7 @@ class FakeAnswerer:
         self.asked = []
         self.then = None
 
-    def ask(self, about, positive, negative, words, *, owner, then):
+    def ask(self, about, positive, negative, words, *, settings=(), owner, then):
         self.asked.append((about, positive, negative, words))
         self.then = then
 

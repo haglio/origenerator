@@ -56,22 +56,35 @@ def format_for(kind: str) -> QTextCharFormat:
 
 
 def request_change_html(old_positive: str, old_negative: str, new_positive: str,
-                        new_negative: str) -> str:
+                        new_negative: str, settings=()) -> str:
     """A request's change as a tooltip's rich text: each prompt whole, marked as a field marks one."""
     document = QTextDocument()
     cursor = QTextCursor(document)
     heading = QTextCharFormat()
     heading.setFontWeight(QFont.Weight.Bold)
-    for label, before, after in (("Positive Prompt", old_positive, new_positive),
-                                 ("Negative Prompt", old_negative, new_negative)):
-        if not (before or after):
-            continue
+
+    def head(label: str) -> None:
         if cursor.position():
             cursor.insertBlock()
         cursor.insertText(label, heading)
         cursor.insertBlock()
+
+    for label, before, after in (("Positive Prompt", old_positive, new_positive),
+                                 ("Negative Prompt", old_negative, new_negative)):
+        if not (before or after):
+            continue
+        head(label)
         for kind, piece in diff_spans(before, after):
             cursor.insertText(piece, format_for(kind))
+    if settings:
+        head("Settings")
+        for n, (label, before, after) in enumerate(settings):
+            if n:
+                cursor.insertBlock()
+            cursor.insertText(f"{label}: ")
+            cursor.insertText(before, format_for(REMOVED))
+            cursor.insertText(" ")
+            cursor.insertText(after, format_for(ADDED))
     return document.toHtml()
 
 

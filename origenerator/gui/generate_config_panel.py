@@ -22,7 +22,13 @@ from shared_ui.icons import glyph_icon, marked_text
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
-from origenerator import act_settings, evolver_export, look_training, outside_videos
+from origenerator import (
+    act_settings,
+    evolver_export,
+    look_training,
+    outside_videos,
+    request_settings,
+)
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
@@ -1723,7 +1729,8 @@ class GenerateConfigPanel(DropZone):
         params = self.current_config().params
         self._requests.ask(
             aim.prompt_id, params.get("positive_prompt") or "", params.get("negative_prompt") or "",
-            words, owner=self,
+            words, settings=request_settings.settings_to_tell(self._param_form.param_defs(), params),
+            owner=self,
             then=lambda revision, context=(self._asked, aim.prompt_id): self._on_rewritten(
                 context, revision))
 
@@ -1738,8 +1745,11 @@ class GenerateConfigPanel(DropZone):
             return
         if revision.changed:
             self._param_form.set_prompts(revision.positive, revision.negative)
+        for key, value in revision.settings:
+            self._param_form.set_setting(key, value)
         turn = Turn(exchange.turns()[-1][0], revision.answer, revision.old_positive,
-                    revision.old_negative, revision.positive, revision.negative)
+                    revision.old_negative, revision.positive, revision.negative,
+                    request_settings.recorded(revision.setting_changes))
         self._pending_turns.append(turn)
         exchange.answered(turn)
 

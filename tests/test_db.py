@@ -1071,6 +1071,19 @@ def test_an_exchange_whose_records_point_at_each_other_still_ends(tmp_path):
     assert db.exchange_of("gen-1") == [Turn("a hat")]
 
 
+def test_a_turns_settings_changes_come_back_with_it(tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(prompt_id="made", workflow_name="sdxl_t2i", workflow_version="v002",
+                         params_json="{}", workflow_json="{}")
+    settings = json.dumps([["Width", "1024", "1216"]])
+    db.record_turns("made", [Turn("wider", "Made it wider.", "a cat", "", "a cat", "", settings)])
+
+    (turn,) = db.exchange_of("made")
+
+    assert turn.settings == settings
+    assert turn.changes() == [("Width", "1024", "1216")]
+
+
 def test_a_turn_outlives_the_item_it_led_to(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="gen-1", workflow_name="sdxl_t2i", workflow_version="v002",

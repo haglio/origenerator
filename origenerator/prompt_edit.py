@@ -21,7 +21,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from origenerator import local_llm
+from origenerator import local_llm, request_settings
 from origenerator.collection_notes import CollectionNotes
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
@@ -294,13 +294,16 @@ class PromptRevision:
     polarity: str
     action: str
     answer: str = ""
+    settings: tuple = ()
+    setting_changes: tuple = ()
 
     @property
     def changed(self) -> bool:
-        """Whether this actually moved either prompt — a request that changes
-        nothing is one there is no point generating."""
+        """Whether this actually moved either prompt or a setting — a request that
+        changes nothing is one there is no point generating."""
         return (self.positive != self.old_positive
-                or self.negative != self.old_negative)
+                or self.negative != self.old_negative
+                or bool(self.settings))
 
 
 def _scenes_of(positive: str, negative: str) -> tuple[list[str], list[str]]:
@@ -318,7 +321,8 @@ def _joined(positive: str, negative: str, each_negative: list[str], parsed: tupl
         positive, negative, story_of([revision.positive for revision in revisions]),
         _negative_story(negative, each_negative, [revision.negative for revision in revisions]),
         term, polarity, ", ".join(dict.fromkeys(revision.action for revision in revisions)),
-        " ".join(dict.fromkeys(revision.answer for revision in revisions if revision.answer)))
+        " ".join(dict.fromkeys(revision.answer for revision in revisions if revision.answer)),
+        revisions[0].settings, revisions[0].setting_changes)
 
 
 def apply_request(positive: str, negative: str, request: str) -> PromptRevision | None:
@@ -372,7 +376,8 @@ def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
 
 
 def work_out(positive: str, negative: str, request: str, *, exchange=(),
-             notes: CollectionNotes | None = None, examples=(), ask=None) -> PromptRevision | None:
+             notes: CollectionNotes | None = None, examples=(), settings=(),
+             ask=None) -> PromptRevision | None:
     """``request`` applied as every request is, spoken or typed: the local model
     first, knowing the collection, the exchange and his own prompts that touch
     the request, and the rules when the model cannot answer."""
@@ -384,7 +389,7 @@ def work_out(positive: str, negative: str, request: str, *, exchange=(),
     revisions = []
     for scene, scene_negative in zip(scenes, each_negative):
         revision = _answered(scene, scene_negative, request, parsed, exchange, notes, examples,
-                             ask or ask_the_model)
+                             settings, ask or ask_the_model)
         if revision is None:
             return apply_request(positive, negative, request)
         revisions.append(revision)
@@ -392,11 +397,11 @@ def work_out(positive: str, negative: str, request: str, *, exchange=(),
 
 
 def _answered(positive: str, negative: str, request: str, parsed: tuple, exchange, notes,
-              examples, ask) -> PromptRevision | None:
+              examples, settings, ask) -> PromptRevision | None:
     polarity, term = parsed
     try:
-        new_positive, new_negative, answer = ask(positive, negative, request, exchange, notes,
-                                                 examples)
+        new_positive, new_negative, answer, *more = ask(positive, negative, request, exchange,
+                                                        notes, examples, settings=settings)
     except Exception as exc:  # noqa: BLE001 -- model down or unreadable: the rules' own edit stands
         logger.warning("prompt_edit: the model could not answer the request (%s)",
                        type(exc).__name__)
@@ -405,10 +410,12 @@ def _answered(positive: str, negative: str, request: str, parsed: tuple, exchang
     new_negative = _said(negative, _without_nothing_weighted(new_negative))
     if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
         return None
-    if (new_positive, new_negative) == (positive, negative) and not answer:
+    changes = request_settings.changes_asked(more[0] if more else None, settings)
+    if (new_positive, new_negative) == (positive, negative) and not answer and not changes:
         return None
     return PromptRevision(positive, negative, new_positive, new_negative, term, polarity,
-                          REWRITTEN, answer)
+                          REWRITTEN, answer, tuple(changes.items()),
+                          tuple(request_settings.described(changes, settings)))
 
 
 # --- his own prompts that touch the request, shown to the model as examples --
@@ -471,7 +478,7 @@ def prompts_touching(request: str, prompts, *, limit: int = 8,
 
 def build_request_messages(positive: str, negative: str, request: str, exchange,
                            notes: CollectionNotes | None, system_prompt: str,
-                           examples=()) -> list[dict]:
+                           examples=(), settings=()) -> list[dict]:
     parts = []
     if notes is not None and notes.complete:
         parts.append(notes.as_told())
@@ -482,27 +489,31 @@ def build_request_messages(positive: str, negative: str, request: str, exchange,
         numbered = "\n".join(f"{number}. {prompt}" for number, prompt in enumerate(examples, 1))
         parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
                      f"carry over the details that go with them):\n{numbered}")
+    if settings:
+        parts.append("SETTINGS HE MAY ALSO CHANGE (current values):\n"
+                     + request_settings.as_told(settings))
     parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
     parts.append(f"THE ARTIST NOW ASKS:\n{request}")
     parts.append(
-        'Reply with only a JSON object with three keys: "positive", holding the whole '
+        'Reply with only a JSON object with four keys: "positive", holding the whole '
         'rewritten positive prompt; "negative", holding the whole rewritten negative '
-        'prompt; and "answer", one or two plain sentences to the artist on what you '
-        "changed and what in his collection you drew on.")
+        'prompt; "answer", one or two plain sentences to the artist on what you '
+        'changed and what in his collection you drew on; and "settings", the settings '
+        "to change by their [key], {} when none.")
     return [{"role": "system", "content": system_prompt},
             {"role": "user", "content": "\n\n".join(parts)}]
 
 
 def ask_the_model(positive: str, negative: str, request: str, exchange,
-                  notes: CollectionNotes | None, examples=()) -> tuple[str, str, str]:
+                  notes: CollectionNotes | None, examples=(), settings=()) -> tuple:
     """The revised pair and the model's sentence; raises when the model cannot be
     reached or read, which the caller answers with the rules' own edit."""
     obj = local_llm.answer_of(local_llm.ask(
         build_request_messages(positive, negative, request, exchange, notes,
-                               REQUEST_SYSTEM_PROMPT, examples),
+                               REQUEST_SYSTEM_PROMPT, examples, settings),
         base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL, temperature=0.4,
         timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
         stays_loaded="0"))
     return (str(obj["positive"]).strip() if "positive" in obj else positive,
             str(obj["negative"]).strip() if "negative" in obj else negative,
-            str(obj.get("answer") or "").strip())
+            str(obj.get("answer") or "").strip(), obj.get("settings"))

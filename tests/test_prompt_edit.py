@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from origenerator import local_llm
+from origenerator import local_llm, request_settings
 from origenerator.collection_notes import CollectionNotes
 from origenerator.prompt_edit import (
     ADD,
@@ -25,7 +25,7 @@ from origenerator.prompt_edit import (
     prompts_touching,
     work_out,
 )
-from origenerator.workflows.base import story_of
+from origenerator.workflows.base import ParamDef, ParamType, story_of
 
 # --- reading the request ----------------------------------------------------
 
@@ -215,9 +215,11 @@ class _Model:
         self.answers = list(answers)
         self.asked = []
 
-    def __call__(self, positive, negative, request, exchange, notes, examples=()):
+    def __call__(self, positive, negative, request, exchange, notes, examples=(),
+                 settings=()):
         self.asked.append((positive, negative, request, exchange, notes))
         self.examples = examples
+        self.settings = settings
         answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
         if isinstance(answer, Exception):
             raise answer
@@ -464,13 +466,13 @@ def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_
     def ask(messages, **settings):
         sent["messages"], sent["settings"] = messages, settings
         return {"message": {"content": '{"positive": "a woman", "negative": "tan lines", '
-                                       '"answer": "No tan lines now."}'}}
+                                       '"answer": "No tan lines now.", "settings": {}}'}}
 
     monkeypatch.setattr(local_llm, "ask", ask)
 
     answered = ask_the_model("a woman, tan", "", "no tan lines", EXCHANGE, NOTES)
 
-    assert answered == ("a woman", "tan lines", "No tan lines now.")
+    assert answered == ("a woman", "tan lines", "No tan lines now.", {})
     assert "a woman, tan" in sent["messages"][1]["content"]
     assert sent["settings"]["json_answer"] is True
     assert sent["settings"]["reads_tokens"] > 16000
@@ -496,4 +498,47 @@ def test_a_field_the_model_leaves_out_is_read_as_unchanged_or_unsaid(monkeypatch
         "message": {"content": '{"positive": "a man"}'}})
 
     assert ask_the_model("a woman", "existing negative", "make her a man", [], None) == (
-        "a man", "existing negative", "")
+        "a man", "existing negative", "", None)
+
+
+_SETTINGS_TOLD = request_settings.settings_to_tell(
+    [ParamDef("lora_strength", "LoRA Strength", ParamType.FLOAT, 0.8, min_val=0.0, max_val=2.0),
+     ParamDef("steps", "Steps", ParamType.INT, 50, min_val=1, max_val=200)],
+    {"lora_strength": 0.8, "steps": 50})
+
+
+def test_the_messages_list_the_settings_he_may_change_and_ask_for_them_in_the_answer():
+    content = build_request_messages("a woman", "", "stronger lora", [], None, "S",
+                                     settings=_SETTINGS_TOLD)[1]["content"]
+
+    assert "SETTINGS HE MAY ALSO CHANGE" in content
+    assert "LoRA Strength [lora_strength]: 0.8, a number from 0.0 to 2.0" in content
+    assert content.index("SETTINGS HE MAY") < content.index("CURRENT POSITIVE PROMPT")
+    assert '"settings"' in content.rsplit("\n\n", 1)[1]
+
+
+def test_without_settings_to_tell_the_messages_list_none():
+    content = build_request_messages("a woman", "", "no hat", [], None, "S")[1]["content"]
+
+    assert "SETTINGS HE MAY" not in content
+
+
+def test_a_request_about_a_setting_changes_it_within_its_range_and_leaves_the_prompts():
+    model = _Model(("a woman", "blurry", "Turned the LoRA up.", {"lora_strength": "2.5"}))
+
+    revision = work_out("a woman", "blurry", "stronger lora", settings=_SETTINGS_TOLD, ask=model)
+
+    assert model.settings == _SETTINGS_TOLD
+    assert revision.changed
+    assert (revision.positive, revision.negative) == ("a woman", "blurry")
+    assert revision.settings == (("lora_strength", 2.0),)
+    assert revision.setting_changes == (("LoRA Strength", "0.8", "2.0"),)
+    assert revision.answer == "Turned the LoRA up."
+
+
+def test_a_model_answering_with_no_settings_key_changes_none():
+    revision = work_out("a woman", "blurry", "no hat", settings=_SETTINGS_TOLD,
+                        ask=_Model(("a woman", "blurry, hat", "Took the hat off.")))
+
+    assert revision.settings == ()
+    assert revision.setting_changes == ()

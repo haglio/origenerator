@@ -16,6 +16,7 @@ holds -- so `heard` is empty there and `term`/`polarity`/`action` are unset.
 """
 from __future__ import annotations
 
+import json
 from typing import NamedTuple
 
 from origenerator.db_connection import Store
@@ -31,6 +32,10 @@ class Turn(NamedTuple):
     old_negative: str = ""
     new_positive: str = ""
     new_negative: str = ""
+    settings: str = ""
+
+    def changes(self) -> list[tuple[str, str, str]]:
+        return [tuple(change) for change in json.loads(self.settings)] if self.settings else []
 
 
 class RequestStore(Store):
@@ -89,14 +94,15 @@ class RequestStore(Store):
             conn.executemany(
                 """INSERT INTO request_turns
                        (prompt_id, said, answered, old_positive, old_negative,
-                        new_positive, new_negative)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        new_positive, new_negative, settings_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 [(prompt_id, *Turn(*turn)) for turn in turns])
 
     def _turns_of(self, prompt_id: str) -> list[Turn]:
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT said, answered, old_positive, old_negative, new_positive, new_negative
+                """SELECT said, answered, old_positive, old_negative, new_positive, new_negative,
+                          settings_json
                    FROM request_turns WHERE prompt_id = ? ORDER BY id""", (prompt_id,)).fetchall()
             return [Turn(*row) for row in rows]
 

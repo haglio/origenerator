@@ -28,15 +28,15 @@ class RequestAnswerer(QObject):
         self._wait_for_the_card = wait_for_the_card or graphics_card.wait_for_the_card
 
     def ask(self, about: str | None, positive: str, negative: str, words: str, *,
-            owner: QObject, then) -> None:
+            settings=(), owner: QObject, then) -> None:
         exchange = self._db.exchange_of(about) if about else []
         if self._jobs is not None:
             self._jobs.hold_for_the_model()
-        run_off_thread(lambda: self._answer(positive, negative, words, exchange),
+        run_off_thread(lambda: self._answer(positive, negative, words, exchange, settings),
                        lambda revision: self._deliver(owner, then, revision),
                        owner=self, waits_long=True)
 
-    def _answer(self, positive: str, negative: str, words: str, exchange):
+    def _answer(self, positive: str, negative: str, words: str, exchange, settings):
         try:
             if (self._client is not None
                     and not self._wait_for_the_card(self._client, HOLDER,
@@ -46,7 +46,7 @@ class RequestAnswerer(QObject):
                 words, reversed(self._db.distinct_positive_prompts()))
             return self._work_out(positive, negative, words, exchange=exchange,
                                   notes=collection_notes.read(self._notes_path),
-                                  examples=examples)
+                                  examples=examples, settings=settings)
         except Exception as exc:  # noqa: BLE001 -- answered with nothing, never raised off-thread
             logger.warning("Could not work out a request (%s)", type(exc).__name__)
             return None

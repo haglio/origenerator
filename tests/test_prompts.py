@@ -79,3 +79,12 @@ def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_as
 
     assert "the way those prompts" in rule.lower() or "the way they" in rule.lower()
     assert "never" in rule.lower() and "end" in rule.lower()
+
+
+def test_a_request_about_a_setting_is_taught_to_change_the_setting_and_leave_the_prompts():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("SETTINGS HE MAY ALSO CHANGE"):].split("\n")[0].lower()
+
+    assert '"settings"' in rule
+    assert "leave" in rule and "prompts" in rule
+    assert '"settings": {}' in prompt

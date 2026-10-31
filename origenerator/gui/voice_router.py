@@ -30,7 +30,7 @@ from shared_ui import colors
 from shared_ui.palette import BG_PRIMARY, WHITE, as_hex, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS, MARGIN_STANDARD
 
-from origenerator import gallery
+from origenerator import gallery, request_settings
 from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
@@ -745,7 +745,9 @@ class VoiceRouter(QObject):
         context = (row, workflow, params, spoken, side)
         self._requests.ask(
             row["prompt_id"], params.get("positive_prompt", ""), params.get("negative_prompt", ""),
-            spoken.text, owner=self,
+            spoken.text,
+            settings=request_settings.settings_to_tell(workflow.param_definitions(), params),
+            owner=self,
             then=lambda revision: self._on_revised(context, revision))
 
     def _on_revised(self, context, revision) -> None:

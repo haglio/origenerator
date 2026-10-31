@@ -346,6 +346,14 @@ class ParamForm(QWidget):
             elif pd.key == "negative_prompt":
                 self._write_field(pd, negative)
 
+    def param_defs(self) -> list[ParamDef]:
+        return list(self._param_defs)
+
+    def set_setting(self, key: str, value) -> None:
+        for pd in self._param_defs:
+            if pd.key == key:
+                self._write_field(pd, value)
+
     def _announce_every_edit(self):
         for pd in self._param_defs:
             widget = self._widgets[pd.key]

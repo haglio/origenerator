@@ -2881,19 +2881,19 @@ def _struck_and_lit_in(html: str) -> tuple[str, str]:
     return struck.strip(), lit.strip()
 
 
-def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
+def _rewriting(monkeypatch, answer=("two women on a couch", "blurry"), changes=None):
     """Stand the model in for the local LLM, answering ``answer`` (one pair, or a
     list of pairs taken in turn) and keeping every prompt pair and words it was
     asked about."""
     calls = []
     answers = list(answer) if isinstance(answer, list) else []
 
-    def ask_the_model(positive, negative, words, exchange, notes, examples=()):
+    def ask_the_model(positive, negative, words, exchange, notes, examples=(), settings=()):
         calls.append((positive, negative, words))
         current = answers.pop(0) if answers else answer
         if isinstance(current, Exception):
             raise current
-        return (*current, "Done.")
+        return (*current, "Done.", changes)
 
     monkeypatch.setattr(prompt_edit, "ask_the_model", ask_the_model)
     return calls
@@ -3068,6 +3068,22 @@ def test_asking_rewrites_the_prompts_of_the_image_on_display_and_shows_the_model
     assert exchange._status.isHidden()
     assert exchange._line.text() == ""
     assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_a_request_about_a_setting_changes_it_on_the_form_and_the_turn_shows_the_change(
+        saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=("a woman on a couch", "blurry"), changes={"steps": "30"})
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    panel.show_saved_generation(image, [image])
+
+    exchange = _ask(panel, qtbot, "fewer steps")
+
+    qtbot.waitUntil(lambda: panel.current_config().params.get("steps") == 30, timeout=5000)
+    assert _positive(panel) == "a woman on a couch"
+    (entry,) = exchange._entries()
+    assert "Steps" in entry.toolTip() and "30" in entry.toolTip()
+    assert panel.asked()["turns"][0].changes() == [("Steps", "50", "30")]
 
 
 def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(

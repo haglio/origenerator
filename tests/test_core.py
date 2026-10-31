@@ -1150,7 +1150,8 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
     win.close()
 
     saved = AppState(path).get("gallery_combine")
-    assert saved["image"] == "img" and saved["videos"] == {act_settings.VIDEO: "vid"}
+    assert saved["image"] == "img"
+    assert saved["videos"] == {act_settings.VIDEO: "vid"}
 
 
 def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
@@ -2045,7 +2046,8 @@ def test_a_window_found_open_is_open_again_once_the_session_hands_it_back(qtbot,
 
     win.become_standalone()
 
-    assert win.isVisible() and not win.isMinimized()
+    assert win.isVisible()
+    assert not win.isMinimized()
 
 
 def test_a_window_found_minimized_is_minimized_again_once_the_session_hands_it_back(qtbot, tmp_path):

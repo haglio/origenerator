@@ -113,7 +113,7 @@ class SlideshowSet:
 
     def _a_row_played_whole_is_its_loop(self) -> None:
         current = self.playlist.current()
-        if current is None or current.prompt_id is None or len(self.playlist) < 2:
+        if current is None or current.prompt_id is None or len(self.playlist) <= 1:
             return
         played = self.playlist.in_play_order()
         if self._is_one_row([current, *played]):
@@ -387,7 +387,7 @@ class SlideshowSet:
         staying where it is.  ``False`` for a pool of one, which is nothing to
         loop."""
         pool = list(self.loop_pool(axis) if pool is None else pool)
-        if len(pool) < 2:
+        if len(pool) <= 1:
             return False
         self.loop = Loop(axis, tuple(pool))
         self.replace_items(pool, keep_slide=True, shuffle=in_order)

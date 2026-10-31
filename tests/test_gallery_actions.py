@@ -66,7 +66,8 @@ def test_undo_restores_the_row_and_its_file(tmp_path):
 
     restored = db.get_generation("p1")
     assert restored == row  # whole row back, verbatim
-    assert file_path.exists() and file_path.read_bytes() == b"data"
+    assert file_path.exists()
+    assert file_path.read_bytes() == b"data"
     assert not actions.can_undo()
 
 
@@ -126,7 +127,8 @@ def test_delete_trashes_the_thumbnail_and_undo_brings_it_back(tmp_path):
     assert not thumb.exists()
 
     actions.undo()
-    assert thumb.exists() and thumb.read_bytes() == b"thumb"
+    assert thumb.exists()
+    assert thumb.read_bytes() == b"thumb"
 
 
 def test_delete_of_a_pending_row_without_files_is_still_undoable(tmp_path):
@@ -151,7 +153,8 @@ def test_deleting_many_rows_undoes_as_one_step(tmp_path):
         _completed_row(db, output_dir, "p2", "b.png"),
     ]
     actions.delete_rows(rows)
-    assert db.get_generation("p1") is None and db.get_generation("p2") is None
+    assert db.get_generation("p1") is None
+    assert db.get_generation("p2") is None
 
     actions.undo()  # a single undo brings the whole batch back
     assert db.get_generation("p1") is not None
@@ -180,13 +183,16 @@ def test_redo_re_applies_an_undone_delete(tmp_path):
     file_path = output_dir / "a.png"
     actions.delete_rows([row])
     actions.undo()
-    assert actions.can_redo() and not actions.can_undo()
+    assert actions.can_redo()
+    assert not actions.can_undo()
 
     actions.redo()
 
-    assert db.get_generation("p1") is None and not file_path.exists()
+    assert db.get_generation("p1") is None
+    assert not file_path.exists()
     # And it lands back on the undo stack, so the pair keeps working.
-    assert actions.can_undo() and not actions.can_redo()
+    assert actions.can_undo()
+    assert not actions.can_redo()
 
 
 def test_a_delete_can_be_undone_and_redone_over_and_over(tmp_path):
@@ -199,9 +205,11 @@ def test_a_delete_can_be_undone_and_redone_over_and_over(tmp_path):
 
     for _ in range(3):
         actions.undo()
-        assert db.get_generation("p1") == row and file_path.exists()
+        assert db.get_generation("p1") == row
+        assert file_path.exists()
         actions.redo()
-        assert db.get_generation("p1") is None and not file_path.exists()
+        assert db.get_generation("p1") is None
+        assert not file_path.exists()
 
 
 def test_redo_walks_back_up_several_undos_in_order(tmp_path):
@@ -214,7 +222,8 @@ def test_redo_walks_back_up_several_undos_in_order(tmp_path):
     actions.undo()  # p1 back
 
     actions.redo()  # the most recently undone step goes first
-    assert db.get_generation("p1") is None and db.get_generation("p2") is not None
+    assert db.get_generation("p1") is None
+    assert db.get_generation("p2") is not None
     actions.redo()
     assert db.get_generation("p2") is None
 
@@ -233,7 +242,8 @@ def test_a_new_action_forks_history_and_drops_the_redo(tmp_path):
 
 def test_redo_label_names_the_step_it_would_re_apply(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
-    assert actions.redo_label() is None and not actions.can_redo()
+    assert actions.redo_label() is None
+    assert not actions.can_redo()
     actions.custom_folders.create("Keepers", [])
     actions.undo()
     assert "create folder" in actions.redo_label().lower()
@@ -244,7 +254,8 @@ def test_redo_with_nothing_undone_is_a_noop(tmp_path):
     row = _completed_row(db, output_dir, "p1", "a.png")
     actions.delete_rows([row])
     actions.redo()  # never undone — nothing to re-apply
-    assert db.get_generation("p1") is None and actions.can_undo()
+    assert db.get_generation("p1") is None
+    assert actions.can_undo()
 
 
 def test_eviction_past_the_limit_leaves_the_oldest_in_the_bin(tmp_path):
@@ -361,9 +372,12 @@ def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
     kept = db.get_generation("e1")
     assert kept is not None                      # the row survives...
     assert kept["experiment_verdict"] == "down"  # ...carrying the verdict to learn from
-    assert kept["output_files"] is None and kept["thumbnail_path"] is None
-    assert not file_path.exists() and not thumb_path.exists()  # the leftovers are gone
-    assert actions.can_undo() and actions.undo_label() == "Reject experiment"
+    assert kept["output_files"] is None
+    assert kept["thumbnail_path"] is None
+    assert not file_path.exists()
+    assert not thumb_path.exists()
+    assert actions.can_undo()
+    assert actions.undo_label() == "Reject experiment"
 
 
 def test_delete_has_the_app_let_go_of_the_files_before_moving_them(tmp_path):

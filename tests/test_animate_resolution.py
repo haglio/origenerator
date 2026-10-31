@@ -26,8 +26,10 @@ def test_an_act_the_image_can_do_is_what_gets_animated():
 def test_an_act_the_image_cannot_do_is_refused_as_something_it_cannot_do():
     answer = _asked(VIDEO, "beta", "state one")
 
-    assert answer.act is None and answer.unsupported
-    assert "beta" in answer.said and "state one" in answer.said
+    assert answer.act is None
+    assert answer.unsupported
+    assert "beta" in answer.said
+    assert "state one" in answer.said
 
 
 def test_an_unsaid_act_is_the_one_the_image_leaves_no_choice_about():
@@ -38,19 +40,23 @@ def test_an_unsaid_act_is_the_one_the_image_leaves_no_choice_about():
 def test_an_unsaid_act_with_a_choice_to_make_is_asked_about_not_refused():
     answer = _asked(VIDEO, "", "state two")
 
-    assert answer.act is None and not answer.unsupported
-    assert "alpha" in answer.said and "beta" in answer.said
+    assert answer.act is None
+    assert not answer.unsupported
+    assert "alpha" in answer.said
+    assert "beta" in answer.said
 
 
 def test_an_image_nothing_can_be_made_of_in_this_lane_is_refused_too():
     answer = _asked(GENAU, "", "state one")
 
-    assert answer.act is None and answer.unsupported
+    assert answer.act is None
+    assert answer.unsupported
     assert "state one" in answer.said
 
 
 def test_an_image_nobody_has_sorted_yet_is_asked_about_before_anything_is_run():
     answer = _asked(VIDEO, "alpha", "")
 
-    assert answer.act is None and not answer.unsupported
+    assert answer.act is None
+    assert not answer.unsupported
     assert "sorted" in answer.said

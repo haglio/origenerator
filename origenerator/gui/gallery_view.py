@@ -1573,7 +1573,7 @@ class GalleryView(QWidget):
         # (a poll, a completed generation) must not silently collapse it back to
         # one row — the keys are re-picked once the tree is rebuilt.
         multi_keys = self._tree.selected_folder_keys()
-        if len(multi_keys) < 2:
+        if len(multi_keys) <= 1:
             multi_keys = []
         selected_gen = self.selected_generation()
         # A running re-roll's tile is the selected item, not a saved row, so
@@ -2074,7 +2074,7 @@ class GalleryView(QWidget):
         own restore had picked — so what comes back is exactly what was picked
         before, never that plus the folder the restore landed on."""
         items = [item for key in keys if (item := self._item_by_key.get(key)) is not None]
-        if len(items) < 2:
+        if len(items) <= 1:
             return
         self._tree.blockSignals(True)
         try:

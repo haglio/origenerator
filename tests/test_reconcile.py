@@ -344,7 +344,8 @@ def test_reconcile_repoints_both_favorites_across_the_enhancement_merge(tmp_path
     meta = db.folder_meta_map()
     assert meta.get(current_key, {}).get("starred") is True    # the star came along
     assert meta[current_key]["custom_name"] == "Cats"          # so did the name
-    assert plain_key not in meta and enhanced_key not in meta  # both old keys cleared
+    assert plain_key not in meta
+    assert enhanced_key not in meta
     assert summary["repointed"] == 2
 
 

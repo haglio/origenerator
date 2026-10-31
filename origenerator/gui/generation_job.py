@@ -301,8 +301,9 @@ class GenerationJob(QObject):
             # whole bar until its next tick.
             self._last_pass_progress = self._progress_tracker.current_pass()
         last = state.get("last_progress")
-        if isinstance(last, (list, tuple)) and len(last) == 2:
-            self._last_progress = (int(last[0]), int(last[1]))
+        match last:
+            case [value, maximum]:
+                self._last_progress = (int(value), int(maximum))
         started = state.get("started_at")
         if isinstance(started, (int, float)):
             self._started_at = float(started)

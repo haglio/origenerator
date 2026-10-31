@@ -59,7 +59,8 @@ def test_all_and_every_folder_above_a_row_hold_it():
 
     assert placement.held_by(ALL_KEY, rows) == rows
     assert placement.held_by(alpha.key, rows) == [rows[0]]
-    assert placement.holds(alpha.key, "p1") and not placement.holds(alpha.key, "p2")
+    assert placement.holds(alpha.key, "p1")
+    assert not placement.holds(alpha.key, "p2")
 
 
 def test_each_kind_holds_its_own_rows_in_their_order_and_all_holds_both():

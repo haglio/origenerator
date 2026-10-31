@@ -51,5 +51,8 @@ def _day(moment: datetime, today: date) -> str:
     return day if moment.year == today.year else f"{day} {moment.year}"
 
 
+_HALF_A_DAY = 12
+
+
 def _clock(moment: datetime) -> str:
-    return f"{moment.hour % 12 or 12}:{moment.minute:02d} {'AM' if moment.hour < 12 else 'PM'}"
+    return f"{moment.hour % _HALF_A_DAY or _HALF_A_DAY}:{moment.minute:02d} {'AM' if moment.hour < _HALF_A_DAY else 'PM'}"

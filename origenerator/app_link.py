@@ -96,9 +96,10 @@ def follow(argv, *, checkout: Path = CHECKOUT) -> int:
     *argv* is the launcher to start the app with and the link itself, in the
     order :func:`handler_command` writes them.
     """
-    if len(argv) != 2:
+    try:
+        launcher, link = argv
+    except ValueError:
         return 2
-    launcher, link = argv
     generation = generation_in(link)
     if generation is None:
         return 2

@@ -111,7 +111,7 @@ class FootSplitter(PaneSplitter):
         self._fit_the_foot()
 
     def _fit_the_foot(self) -> None:
-        if self._dragged or self.count() < 2:
+        if self._dragged or self.count() <= 1:
             return
         wanted = self.widget(self.count() - 1).sizeHint().height()
         self.setSizes([self.height() - self.handleWidth() - wanted, wanted])

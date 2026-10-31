@@ -973,7 +973,7 @@ class ParamForm(QWidget):
             if k not in self._widgets and k not in self._hidden_keys
         }
         if (self._scenes is not None and "frame_count" in params
-                and len(params.get("scene_frames") or []) < 2):
+                and len(params.get("scene_frames") or []) <= 1):
             # A lone scene is the whole clip and runs for the clip length, which
             # is all that settings from before scenes (or from the overlay) carry.
             params = {**params, "scene_frames": [params["frame_count"]]}

@@ -555,7 +555,10 @@ def _render_badge(letter: str, color) -> QPixmap:
     return _chip_pixmap(color, draw)
 
 
+_READS_AS_LIGHT = 150
+
+
 def _readable_on(color):
     """Near-black or the primary text color, whichever reads on ``color``."""
     luminance = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
-    return BG_PRIMARY if luminance > 150 else TEXT_PRIMARY
+    return BG_PRIMARY if luminance > _READS_AS_LIGHT else TEXT_PRIMARY

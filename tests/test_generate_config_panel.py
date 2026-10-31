@@ -1204,7 +1204,8 @@ def test_prefilling_a_clip_keeps_random_and_shows_a_fresh_take_of_its_seeds(pane
 
     shown = panel._param_form.get_values()
     assert panel.current_config().seed_is_random is True
-    assert shown["noise_seed"] != 11 and shown["audio_seed"] != 33
+    assert shown["noise_seed"] != 11
+    assert shown["audio_seed"] != 33
 
 
 def test_a_press_that_would_remake_the_item_on_show_draws_its_first_seed_fresh(saved_panel):
@@ -1390,7 +1391,8 @@ def test_title_changed_when_the_shown_item_changes(panel):
 
     panel.show_saved_generation(row, [row])
 
-    assert titles and titles[-1] == name
+    assert titles
+    assert titles[-1] == name
 
 
 def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):
@@ -1729,7 +1731,9 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     rows = _level_rows(panel)
     first = " / ".join(t for t in _row_texts(rows[0]) if t and t != "—")
     assert first.startswith("Enhancement 1/1")
-    assert "2x" in first and "20 steps" in first and "0.15 redraw" in first
+    assert "2x" in first
+    assert "20 steps" in first
+    assert "0.15 redraw" in first
     assert "Original" in _row_texts(rows[1])
 
 
@@ -1945,7 +1949,8 @@ def test_a_deleted_images_version_says_how_long_it_has_been_in_the_trash(saved_p
     panel.show_saved_generation(image, [image])
 
     files = [text for text in _version_texts(panel) if "sdxl_img1.png" in text]
-    assert files and all(text.startswith("(2 days in trash)") for text in files)
+    assert files
+    assert all(text.startswith("(2 days in trash)") for text in files)
 
 
 def _version_texts(panel):
@@ -2128,7 +2133,8 @@ def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, mo
 
     panel.show_saved_generation(video, [])
 
-    assert panel._lane_button.isHidden() and panel._sent_row.isHidden()
+    assert panel._lane_button.isHidden()
+    assert panel._sent_row.isHidden()
 
 
 def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, monkeypatch):
@@ -2887,7 +2893,8 @@ def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
     panel._param_form.set_values({"seed": image["seed"]})
 
     _resting_on(panel, image, monkeypatch, tmp_path)
-    assert panel._displayed_row is not None and _notice(panel) == ""
+    assert panel._displayed_row is not None
+    assert _notice(panel) == ""
 
     _set_prompt(panel, "a dog")
 
@@ -3899,7 +3906,8 @@ def test_pressing_unsend_takes_the_send_back_and_offers_it_again(saved_panel,
     _press(panel, export_lane_module.UNSEND_CAPTION)
 
     row = db.get_generation("vid1")
-    assert row[lane.unsent_flag] and not row[lane.flag]
+    assert row[lane.unsent_flag]
+    assert not row[lane.flag]
     assert _lane_offers(panel) == [lane.send_caption]
 
 
@@ -3940,7 +3948,8 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
     _press(panel, lane.send_caption)     # and send it again
 
     row = db.get_generation("vid1")
-    assert row[lane.flag] and not row[lane.unsent_flag]
+    assert row[lane.flag]
+    assert not row[lane.unsent_flag]
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)

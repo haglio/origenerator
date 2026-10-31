@@ -326,7 +326,8 @@ def test_a_run_a_folders_modify_queued_stands_under_the_image_it_rewrites(build)
                                    "heard": ""}])
 
     card = next(item for item in items if item.key == "g1")
-    assert card.modified and not card.requested
+    assert card.modified
+    assert not card.requested
     assert card.source_file == "asked-of.jpg"
 
 
@@ -336,7 +337,8 @@ def test_a_run_a_typed_request_queued_is_marked_as_one(build):
                                    "heard": "", "asked": "two women"}])
 
     card = next(item for item in items if item.key == "g1")
-    assert card.requested and not card.modified
+    assert card.requested
+    assert not card.modified
 
 
 def test_a_run_a_request_queued_is_marked_as_one(build):
@@ -345,7 +347,8 @@ def test_a_run_a_request_queued_is_marked_as_one(build):
                                    "heard": "Request, no hat, over."}])
 
     card = next(item for item in items if item.key == "g1")
-    assert card.requested and not card.modified
+    assert card.requested
+    assert not card.modified
 
 
 def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build):

@@ -281,7 +281,8 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
     QApplication.processEvents()
     corner = queue._running._frame
 
-    assert corner.pixmap() is not None and not corner.pixmap().isNull()
+    assert corner.pixmap() is not None
+    assert not corner.pixmap().isNull()
     assert corner.width() == corner.height()   # one thumbnail, one square
 
 
@@ -532,7 +533,8 @@ def test_every_row_leads_with_an_up_and_a_down_arrow_ahead_of_its_shield(queue):
     rows = queue.rows()
     for row in rows:
         up, down, shield = row._up.geometry(), row._down.geometry(), row._shield.geometry()
-        assert up.right() < down.left() and down.right() < shield.left()
+        assert up.right() < down.left()
+        assert down.right() < shield.left()
     assert len({row._up.geometry().x() for row in rows}) == 1
 
 
@@ -681,13 +683,16 @@ def test_shield_all_and_cancel_all_stand_stacked_at_the_right_end_of_the_strip(q
 
 def test_an_empty_job_queue_leaves_shield_all_and_cancel_all_off(queue):
     # His answer (2026-10-29): off, so the empty Job Queue looks as it always did.
-    assert not (queue._shield_all.isVisible() or queue._cancel_all.isVisible())
+    assert not (queue._shield_all.isVisible())
+    assert not (queue._cancel_all.isVisible())
 
     queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None)])
-    assert queue._shield_all.isVisible() and queue._cancel_all.isVisible()
+    assert queue._shield_all.isVisible()
+    assert queue._cancel_all.isVisible()
 
     queue.set_items([])
-    assert not (queue._shield_all.isVisible() or queue._cancel_all.isVisible())
+    assert not (queue._shield_all.isVisible())
+    assert not (queue._cancel_all.isVisible())
 
 
 def test_shield_all_wears_the_shield_followed_by_all(queue):
@@ -768,7 +773,8 @@ def test_double_clicking_a_row_opens_that_folder_too(queue, qtbot):
     queue.set_items([_item(key="a", status="queued",
                            reveal=lambda: revealed.append("a"))])
     qtbot.mouseDClick(queue.rows()[0], Qt.MouseButton.LeftButton)
-    assert revealed and set(revealed) == {"a"}
+    assert revealed
+    assert set(revealed) == {"a"}
 
 
 def test_the_live_frame_opens_the_running_jobs_folder_too(queue, qtbot):
@@ -781,7 +787,8 @@ def test_the_live_frame_opens_the_running_jobs_folder_too(queue, qtbot):
     frame = queue._running._frame
     qtbot.mouseClick(frame, Qt.MouseButton.LeftButton)
     qtbot.mouseDClick(frame, Qt.MouseButton.LeftButton)
-    assert revealed and set(revealed) == {"a"}
+    assert revealed
+    assert set(revealed) == {"a"}
 
 
 def test_the_bar_beside_the_live_frame_is_not_a_way_into_a_folder(queue, qtbot):
@@ -835,7 +842,8 @@ def test_the_wait_is_written_under_the_bar_it_explains(queue):
     QApplication.processEvents()
     half = queue._running
 
-    assert half._progress.isVisible() and half._progress.maximum() == 0  # sweeping
+    assert half._progress.isVisible()
+    assert half._progress.maximum() == 0
     assert half._caption.isVisible()
     assert half._caption.mapTo(half, QPoint(0, 0)).y() > half._progress.y()
 

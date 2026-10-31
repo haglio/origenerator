@@ -27,6 +27,9 @@ _LEVELS = {
 logger = logging.getLogger("qt")
 
 
+_FIRST_ROUND_NUMBER = 10
+
+
 def _a_round_number(count: int) -> bool:
     """Whether *count* is a power of ten from ten up, which is when a run still
     going says how far it has got.
@@ -36,7 +39,7 @@ def _a_round_number(count: int) -> bool:
     run of ten billion.  From ten, so a message said twice is not said three
     times.
     """
-    return count >= 10 and 10 ** (len(str(count)) - 1) == count
+    return count >= _FIRST_ROUND_NUMBER and 10 ** (len(str(count)) - 1) == count
 
 
 class RepeatCollapser:

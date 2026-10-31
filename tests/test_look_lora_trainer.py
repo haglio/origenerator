@@ -70,7 +70,9 @@ def test_every_usable_picture_is_copied_in_as_a_jpeg_no_wider_than_the_trainer_w
     assert kept == 1
     assert _status(job) == {"state": "preparing", "done": 3, "total": 3}
     said = capsys.readouterr().out
-    assert "1 copied" in said and "1 too small" in said and "1 unreadable" in said
+    assert "1 copied" in said
+    assert "1 too small" in said
+    assert "1 unreadable" in said
     assert "qzx" not in said
 
 
@@ -169,7 +171,8 @@ def test_the_dataset_puts_the_trigger_words_before_every_description(tmp_path):
     assert "resolution = [1024, 1024]" in settings
     assert f'image_directory = "{Path(job["work"], "images").as_posix()}"' in settings
     assert f'cache_directory = "{Path(job["work"], "cache").as_posix()}"' in settings
-    assert "enable_bucket = true" in settings and "bucket_no_upscale = true" in settings
+    assert "enable_bucket = true" in settings
+    assert "bucket_no_upscale = true" in settings
 
 
 def test_a_lora_trained_on_no_word_gets_the_bare_descriptions(tmp_path):
@@ -205,7 +208,8 @@ def test_caching_runs_musubis_two_cache_programs_on_the_dataset_while_the_card_i
     assert "--skip_existing" in latents
     assert text[1] == str(Path(job["scripts"], "src", "musubi_tuner", "krea2_cache_text_encoder_outputs.py"))
     assert text[text.index("--text_encoder") + 1] == job["text_encoder"]
-    assert "--batch_size" in text and "--skip_existing" in text
+    assert "--batch_size" in text
+    assert "--skip_existing" in text
     assert _status(job)["state"] == "caching"
 
 
@@ -412,8 +416,11 @@ def test_the_training_command_asks_musubi_for_a_krea_2_lora_at_the_settings_his_
                           ("--resume", str(state)),
                           ("--timestep_sampling", "krea2_shift"), ("--blocks_to_swap", "26")):
         assert command[command.index(option) + 1] == value, option
-    assert "--save_state" in command and "--fp8_base" in command and "--fp8_scaled" in command
-    assert "--sample_prompts" not in command and "--turbo_lora" not in command
+    assert "--save_state" in command
+    assert "--fp8_base" in command
+    assert "--fp8_scaled" in command
+    assert "--sample_prompts" not in command
+    assert "--turbo_lora" not in command
 
 
 # --- install ----------------------------------------------------------------------

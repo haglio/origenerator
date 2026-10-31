@@ -167,9 +167,12 @@ def _queue_number(item):
     return None
 
 
+_EXTRA_DATA_AT = 3
+
+
 def _queue_client_id(item):
     """Which websocket client submitted a ``/queue`` entry, from its extra_data."""
-    extra = item[3] if isinstance(item, (list, tuple)) and len(item) > 3 else None
+    extra = item[_EXTRA_DATA_AT] if isinstance(item, (list, tuple)) and len(item) > _EXTRA_DATA_AT else None
     return extra.get("client_id") if isinstance(extra, dict) else None
 
 

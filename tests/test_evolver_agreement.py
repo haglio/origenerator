@@ -57,7 +57,8 @@ class TestWhenEvolverIsBeside:
         said = evolver_agreement.disagreements(_ours(), checkout)
 
         assert len(said) == 1
-        assert "0_intake" in said[0] and "0_inbox" in said[0]
+        assert "0_intake" in said[0]
+        assert "0_inbox" in said[0]
 
     def test_a_renamed_upscale_folder_is_named_too(self, tmp_path: Path):
         checkout = _evolver(tmp_path, upscaled="videos/videos/2D/AI/2_outbox/by_shape")
@@ -73,7 +74,8 @@ class TestWhenEvolverIsBeside:
         said = evolver_agreement.disagreements(_ours(), checkout)
 
         assert len(said) == 1
-        assert ".writing." in said[0] and ".partial." in said[0]
+        assert ".writing." in said[0]
+        assert ".partial." in said[0]
 
     def test_every_disagreement_is_reported_at_once(self, tmp_path: Path):
         """Told one at a time, three renames are three launches."""

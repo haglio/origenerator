@@ -759,7 +759,8 @@ def test_watchers_of_lists_only_the_tabs_following_that_folder(tabs):
 
     assert tabs.watchers_of("k1") == [first, third]
     assert tabs.panel_watching("k2") is second
-    assert tabs.watchers_of("elsewhere") == [] and tabs.panel_watching("elsewhere") is None
+    assert tabs.watchers_of("elsewhere") == []
+    assert tabs.panel_watching("elsewhere") is None
 
 
 def test_stop_watching_puts_the_displayed_generation_back(tabs, monkeypatch):

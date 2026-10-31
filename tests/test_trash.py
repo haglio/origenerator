@@ -22,7 +22,8 @@ def test_store_moves_files_off_their_original_paths(tmp_path):
     assert len(batch.moves) == 1
     original, trashed = batch.moves[0]
     assert original == src
-    assert trashed.exists() and trashed.read_bytes() == b"x"
+    assert trashed.exists()
+    assert trashed.read_bytes() == b"x"
 
 
 def test_restore_puts_files_back_where_they_were(tmp_path):
@@ -32,7 +33,8 @@ def test_restore_puts_files_back_where_they_were(tmp_path):
 
     batch.restore()
 
-    assert src.exists() and src.read_bytes() == b"hello"
+    assert src.exists()
+    assert src.read_bytes() == b"hello"
 
 
 def test_a_file_whose_name_a_newer_file_took_comes_back_under_the_next_number(tmp_path):

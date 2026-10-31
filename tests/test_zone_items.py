@@ -101,7 +101,8 @@ def test_a_video_from_outside_shows_a_still_made_from_it(library, tmp_path):
     still, movie = items.preview(video)
 
     assert movie is None
-    assert Path(still).parent == tmp_path / "thumbs" and Path(still).is_file()
+    assert Path(still).parent == tmp_path / "thumbs"
+    assert Path(still).is_file()
     assert items.name_of(video) == "scene one.mp4"
 
 

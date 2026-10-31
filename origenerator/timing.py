@@ -76,8 +76,8 @@ def clock_duration(seconds: float) -> str:
     while a live count has to visibly advance, so the seconds stay on screen.
     """
     total = max(0, int(seconds))
-    hours, remainder = divmod(total, 3600)
-    minutes, secs = divmod(remainder, 60)
+    hours, remainder = divmod(total, _SECONDS_PER_HOUR)
+    minutes, secs = divmod(remainder, _SECONDS_PER_MINUTE)
     if hours:
         return f"{hours}:{minutes:02d}:{secs:02d}"
     return f"{minutes}:{secs:02d}"
@@ -88,6 +88,9 @@ def clock_duration(seconds: float) -> str:
 # coming off disk — so a rate measured across one or two of them predicts a run
 # several times longer than the real one.
 _PACE_MIN_FRACTION = 0.25
+_SECONDS_PER_MINUTE = 60
+_MINUTES_PER_HOUR = 60
+_SECONDS_PER_HOUR = _SECONDS_PER_MINUTE * _MINUTES_PER_HOUR
 _PACE_MIN_STEPS = 2
 
 
@@ -254,13 +257,13 @@ class RunTiming:
 
 def _coarse_duration(seconds: float) -> str:
     """A single-unit rounding for estimates, so they don't imply false precision."""
-    if seconds < 60:
+    if seconds < _SECONDS_PER_MINUTE:
         return f"{round(seconds)} sec"
-    if seconds < 3600:
-        return f"{round(seconds / 60)} min"
-    hours, remainder = divmod(round(seconds), 3600)
-    minutes = round(remainder / 60)
-    if minutes == 60:
+    if seconds < _SECONDS_PER_HOUR:
+        return f"{round(seconds / _SECONDS_PER_MINUTE)} min"
+    hours, remainder = divmod(round(seconds), _SECONDS_PER_HOUR)
+    minutes = round(remainder / _SECONDS_PER_MINUTE)
+    if minutes == _MINUTES_PER_HOUR:
         hours, minutes = hours + 1, 0
     return f"{hours} hr {minutes} min" if minutes else f"{hours} hr"
 

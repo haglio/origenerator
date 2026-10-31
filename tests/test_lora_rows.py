@@ -243,7 +243,8 @@ def test_two_loras_picked_together_both_reach_the_prompts_one_after_the_other(na
 
     readers = [node["inputs"]["clip"] for node in payload.values()
                if node["class_type"] == "CLIPTextEncode"]
-    assert readers and all(_loras_behind(payload, clip, "clip") == [
+    assert readers
+    assert all(_loras_behind(payload, clip, "clip") == [
         ("first_look.safetensors", 0.7), ("second_look.safetensors", 0.6)] for clip in readers)
 
 
@@ -267,10 +268,12 @@ def test_loras_picked_together_on_a_pass_all_reach_its_sampler_one_after_the_oth
         "lora_low_3": "second_detail.safetensors", "lora_strength_low_3": 0.5})
 
     passes = _each_pass_loras(payload)
-    assert passes["enable"] and all(loras == [("first_motion.safetensors", 0.9),
+    assert passes["enable"]
+    assert all(loras == [("first_motion.safetensors", 0.9),
                                               ("second_motion.safetensors", 0.6)]
                                     for loras in passes["enable"])
-    assert passes["disable"] and all(loras == [("first_detail.safetensors", 0.7),
+    assert passes["disable"]
+    assert all(loras == [("first_detail.safetensors", 0.7),
                                                ("second_detail.safetensors", 0.5)]
                                      for loras in passes["disable"])
 

@@ -43,9 +43,11 @@ def test_an_image_named_by_its_whole_path_goes_to_comfyui_as_a_copy_in_its_temp_
     posted = within_reach(payload, folders)
 
     ref = posted["1"]["inputs"]["image"]
-    assert ref.startswith(f"{HANDED_OVER}/") and ref.endswith("/jane_doe.png [temp]")
+    assert ref.startswith(f"{HANDED_OVER}/")
+    assert ref.endswith("/jane_doe.png [temp]")
     copies = _handed_over(folders)
-    assert len(copies) == 1 and copies[0].read_bytes() == image.read_bytes()
+    assert len(copies) == 1
+    assert copies[0].read_bytes() == image.read_bytes()
     assert ref == f"{copies[0].relative_to(folders.temp).as_posix()} [temp]"
     assert payload["1"]["inputs"]["image"] == str(image), "the run keeps the name it was given"
 
@@ -149,7 +151,8 @@ def test_only_the_loading_nodes_file_inputs_are_touched(tmp_path):
     posted = within_reach(payload, folders)
 
     assert posted["1"] != payload["1"]
-    assert posted["2"] == payload["2"] and posted["3"] == payload["3"]
+    assert posted["2"] == payload["2"]
+    assert posted["3"] == payload["3"]
 
 
 def test_the_apps_folders_are_comfyuis_input_and_temp_and_the_places_outputs_are_kept():

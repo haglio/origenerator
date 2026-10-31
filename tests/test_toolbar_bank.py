@@ -58,7 +58,8 @@ def bank(qtbot):
 def test_the_room_s_own_appliances_are_absent_when_a_session_owns_them(bank):
     hosted = bank(hosted=True)
 
-    assert hosted.radio is None and hosted.mic is None
+    assert hosted.radio is None
+    assert hosted.mic is None
     assert bank().radio is not None
 
 
@@ -79,7 +80,8 @@ def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(bank):
         return sorted(button.toolTip() for button in made.findChildren(QToolButton)
                       if not button.isHidden())
 
-    assert taken.radio is None and taken.mic is None
+    assert taken.radio is None
+    assert taken.mic is None
     assert shown(taken) == shown(built_hosted)
 
 
@@ -112,7 +114,8 @@ def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_yellow
     inked = [lit.pixelColor(x, y) for y in range(lit.height()) for x in range(lit.width())
              if lit.pixelColor(x, y).alpha() == 255]
 
-    assert inked and all(color == BG_PRIMARY for color in inked)
+    assert inked
+    assert all(color == BG_PRIMARY for color in inked)
 
 
 def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_one(bank):
@@ -129,7 +132,8 @@ def test_the_bank_opens_with_its_optional_buttons_away(bank):
     # the grouping are offered only where they mean something.
     made = bank()
 
-    assert made.slideshow.isHidden() and made.group.isHidden()
+    assert made.slideshow.isHidden()
+    assert made.group.isHidden()
     assert not made.auto.isHidden()
 
 
@@ -145,7 +149,8 @@ def test_one_state_writes_every_button(bank):
 
     assert made.back.isEnabled() is False
     assert made.undo.toolTip() == "Undo: delete of 2 items"
-    assert made.delete.isEnabled() is False and made.delete.toolTip() == "Nothing to delete"
+    assert made.delete.isEnabled() is False
+    assert made.delete.toolTip() == "Nothing to delete"
     assert made.slideshow.toolTip() == "Play Latest as a slideshow"
 
 
@@ -209,7 +214,8 @@ def test_the_first_group_that_shows_is_the_one_left_unindented(bank):
     made.apply(_state(back=Button(visible=False), forward=Button(visible=False)))
 
     gaps = [gap.isVisible() for gap, buttons in made._groups]
-    assert gaps[0] is False and gaps[1] is False  # nothing before the second group
+    assert gaps[0] is False
+    assert gaps[1] is False
     assert gaps[3] is True                        # a space in front of the trio
 
 

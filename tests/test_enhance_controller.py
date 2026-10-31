@@ -630,7 +630,8 @@ def test_a_queued_job_shows_as_queued_rather_than_borrowing_a_frame(enhance,
 
     run = controller.run_of(_image("i1"))
 
-    assert run.status == "queued" and run.frame is None
+    assert run.status == "queued"
+    assert run.frame is None
     assert run.typical_seconds == 42.0
 
 

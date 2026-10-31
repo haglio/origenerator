@@ -35,7 +35,8 @@ def test_a_slide_names_its_own_fields():
     # playlist holds and hands back says what each field is.
     slide = _playlist().current()
     assert (slide.path, slide.media_type) == ("a.png", "image")
-    assert slide.prompt_id is None and slide.still is None
+    assert slide.prompt_id is None
+    assert slide.still is None
 
 
 def test_an_empty_playlist_has_no_current():

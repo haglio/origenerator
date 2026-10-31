@@ -791,7 +791,8 @@ def test_a_picked_collection_row_is_blue_from_its_mark_to_its_name(qtbot):
     middle = tree.visualRect(tree.indexFromItem(collection)).center().y()
     image = tree.viewport().grab().toImage()
     between = [image.pixelColor(x, middle).name() for x in range(mark.right() + 1, name.left())]
-    assert between and set(between) == {BLUE.name()}
+    assert between
+    assert set(between) == {BLUE.name()}
 
 
 def test_a_picked_favorites_rows_star_is_ringed_in_white(qtbot):

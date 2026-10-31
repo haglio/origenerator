@@ -28,7 +28,7 @@ from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QMovie, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 from shared_ui.colors import TEXT_MUTED
-from shared_ui.icons import glyph_pixmap
+from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.gui.combination import (
@@ -206,7 +206,7 @@ class CombinationView(QWidget):
                 self._movie.setScaledSize(target)
         for label in (self.image_label, self.video_label):
             label.setFixedWidth(side)
-        self.plus_label.setPixmap(glyph_pixmap("plus", plus_width(side), TEXT_MUTED))
+        self.plus_label.setPixmap(icon_pixmap("plus", plus_width(side), TEXT_MUTED))
         self.plus_label.setFixedWidth(plus_width(side))
         for paren in self._parens:
             paren.setFont(paren_font(paren.font(), side))

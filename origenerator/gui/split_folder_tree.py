@@ -18,11 +18,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.spacing import (
+    BUTTON_FILLING_ICON,
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
-    BUTTON_MARK,
     BUTTON_ROW_GAP,
     GAP_MEDIUM,
     GAP_SMALL,
@@ -60,7 +60,7 @@ class _Choice(QFrame):
     def __init__(self, word: str, mark, tip: str):
         super().__init__()
         self.setToolTip(tip)
-        self.button = fill_square_with_mark(QPushButton())
+        self.button = fill_square_with_icon(QPushButton())
         self.button.setObjectName("sidesChoice")
         self.button.setProperty(CHOSEN, True)
         self.button.setIcon(QIcon(mark))
@@ -154,8 +154,8 @@ class SplitFolderTree(QWidget):
 
     def _build_radio(self) -> QWidget:
         """The two choices over the sections: a list per shape, or one of both."""
-        separate = _Choice(_SEPARATE_WORD, icons.separate_mark(BUTTON_MARK), _SEPARATE_TIP)
-        together = _Choice(_TOGETHER_WORD, icons.side_mark(BOTH, BUTTON_MARK), _TOGETHER_TIP)
+        separate = _Choice(_SEPARATE_WORD, icons.separate_mark(BUTTON_FILLING_ICON), _SEPARATE_TIP)
+        together = _Choice(_TOGETHER_WORD, icons.side_mark(BOTH, BUTTON_FILLING_ICON), _TOGETHER_TIP)
         self.separate_button = separate.button
         self.together_button = together.button
         radio = QButtonGroup(self)

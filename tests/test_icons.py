@@ -7,9 +7,9 @@ from pathlib import Path
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED, TEXT_PRIMARY
-from shared_ui.icon_geometry import glyph_names
-from shared_ui.icons import glyph_icon, glyph_pixmap
-from shared_ui.spacing import BUTTON_MARK
+from shared_ui.icon_geometry import icon_names
+from shared_ui.icons import icon_pixmap, qt_icon
+from shared_ui.spacing import BUTTON_FILLING_ICON
 
 import origenerator
 from origenerator.gallery.collection import RECENTS_KEY
@@ -20,8 +20,8 @@ from origenerator.media import MediaType
 
 def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
     drawn = []
-    real = icons.glyph_icon
-    monkeypatch.setattr(icons, "glyph_icon",
+    real = icons.qt_icon
+    monkeypatch.setattr(icons, "qt_icon",
                         lambda *args, **kwargs: drawn.append(args) or real(*args, **kwargs))
     icons.collection_icon.cache_clear()
 
@@ -35,7 +35,7 @@ def test_tab_close_icon_is_the_familys_cross(qtbot):
     # The corner's close-all must wear a tab's own cross, not a lookalike, so the
     # two controls read as one spelling of "close" rather than two.
     assert (icons.tab_close_icon().pixmap(16).toImage()
-            == glyph_icon("cross").pixmap(16).toImage())
+            == qt_icon("cross").pixmap(16).toImage())
 
 
 def test_level_badge_icons_render_for_each_level(qtbot):
@@ -108,18 +108,18 @@ def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
     # Laid out at numbers of its own, the pair came out wider than its canvas:
     # the upright frame's left edge and the lying-down one's right edge were cut
     # off at the sides of the button.
-    assert not _ink_at_the_edges(icons.separate_mark(BUTTON_MARK))
+    assert not _ink_at_the_edges(icons.separate_mark(BUTTON_FILLING_ICON))
 
 
 def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(qtbot):
     marks = {PORTRAIT: "portrait", LANDSCAPE: "landscape", BOTH: "portrait_and_landscape"}
 
     for side, mark in marks.items():
-        for size in (icons.MARK_BESIDE_A_WORD, BUTTON_MARK):
+        for size in (icons.MARK_BESIDE_A_WORD, BUTTON_FILLING_ICON):
             assert (icons.side_mark(side, size).toImage()
-                    == glyph_pixmap(mark, size, TEXT_PRIMARY).toImage()), (side, size)
-    assert (icons.separate_mark(BUTTON_MARK).toImage()
-            == glyph_pixmap("portrait_beside_landscape", BUTTON_MARK, TEXT_PRIMARY).toImage())
+                    == icon_pixmap(mark, size, TEXT_PRIMARY).toImage()), (side, size)
+    assert (icons.separate_mark(BUTTON_FILLING_ICON).toImage()
+            == icon_pixmap("portrait_beside_landscape", BUTTON_FILLING_ICON, TEXT_PRIMARY).toImage())
 
 
 def test_a_collection_mark_is_drawn_once():
@@ -366,7 +366,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
     )
     for icon, name, color in cases:
         drawn = icon.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage()
-        assert drawn == glyph_pixmap(name, 48, color).toImage(), name
+        assert drawn == icon_pixmap(name, 48, color).toImage(), name
 
 
 def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
@@ -379,12 +379,12 @@ def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
                        (icons.recovery_action_icon("restore"), "undo_arrow"),
                        (icons.recovery_action_icon("purge"), "trash")):
         drawn = icon.pixmap(QSize(48, 48)).toImage()
-        assert drawn == glyph_pixmap(name, 48, white).toImage(), name
+        assert drawn == icon_pixmap(name, 48, white).toImage(), name
 
 
 # Where each call that names one of shared_ui's marks takes the name.
-_MARK_ARGUMENT = {"glyph_icon": 0, "glyph_pixmap": 0, "shapes_of": 0, "shared_mark": 0,
-                  "draw_glyph": 1}
+_MARK_ARGUMENT = {"qt_icon": 0, "icon_pixmap": 0, "shapes_of": 0, "shared_mark": 0,
+                  "draw_icon": 1}
 
 
 def _names_in(argument):
@@ -411,4 +411,4 @@ def test_every_mark_this_app_names_is_one_its_shared_ui_draws():
             named |= set(_names_in(call.args[position]))
 
     assert "trash" in named
-    assert named - set(glyph_names()) == set()
+    assert named - set(icon_names()) == set()

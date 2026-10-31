@@ -19,7 +19,7 @@ from PyQt6.QtGui import QIcon, QKeyEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
-from shared_ui.icons import marked_text
+from shared_ui.icons import icon_then_text
 from shared_ui.notice_shape import NOTICE_TOP_MARGIN
 
 from origenerator.funscript import (
@@ -1105,8 +1105,8 @@ def test_a_press_is_answered_plain_and_a_spoken_word_after_the_mic(qtbot):
     assert (view._note.textFormat(), view._note.text()) == (Qt.TextFormat.PlainText, "Locked")
 
     view.slideshow.note_voice_command("next")
-    assert view._note.text() == marked_text(HEARD_MARK, "next", color=TEXT_PRIMARY,
-                                            size=view._note.fontMetrics().height())
+    assert view._note.text() == icon_then_text(HEARD_MARK, "next", color=TEXT_PRIMARY,
+                                               size=view._note.fontMetrics().height())
 
 
 def test_what_is_being_made_of_the_slide_is_no_notice_across_the_top(qtbot):

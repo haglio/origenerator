@@ -4,7 +4,7 @@ import pytest
 from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QApplication, QPushButton
 from shared_ui.colors import TEXT_SECONDARY
-from shared_ui.icons import CANVAS, glyph_pixmap
+from shared_ui.icons import CANVAS, icon_pixmap
 
 from origenerator.gui.copy_button import CopyButton
 
@@ -49,4 +49,4 @@ def test_wears_the_familys_copy_mark(qtbot):
     side = int(CANVAS)
 
     drawn = btn.icon().pixmap(QSize(side, side)).toImage()
-    assert drawn == glyph_pixmap("copy", side, TEXT_SECONDARY).toImage()
+    assert drawn == icon_pixmap("copy", side, TEXT_SECONDARY).toImage()

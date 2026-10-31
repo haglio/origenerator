@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionViewItem,
 )
 from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED
-from shared_ui.icons import draw_glyph_filling
+from shared_ui.icons import draw_icon_filling
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.grayscale import grayscale_pixmap
@@ -52,8 +52,8 @@ def unmade_thumbnail(side: int, size: tuple[int, int] | None) -> QPixmap:
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.fillRect(shape, QColor(BORDER_DEFAULT))
     inset = min(shape.width(), shape.height()) * 0.1
-    draw_glyph_filling(painter, "question", QColor(TEXT_MUTED),
-                       QRectF(shape).adjusted(inset, inset, -inset, -inset))
+    draw_icon_filling(painter, "question", QColor(TEXT_MUTED),
+                      QRectF(shape).adjusted(inset, inset, -inset, -inset))
     painter.end()
     return thumbnail
 

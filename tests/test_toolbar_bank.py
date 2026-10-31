@@ -14,7 +14,7 @@ from PyQt6.QtCore import QPoint, QRect, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolButton
 from shared_ui.colors import BG_PRIMARY
-from shared_ui.spacing import BUTTON_MARK_INSET, BUTTON_SIZE_HUD
+from shared_ui.spacing import BUTTON_ICON_INSET, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
 from origenerator.gui import omnipause
@@ -324,6 +324,6 @@ def test_every_mark_on_the_bank_stays_inside_the_familys_inset(bank):
     made = _every_button_showing_as_the_app_styles_it(bank)
 
     for button in made.findChildren(QToolButton):
-        room = button.rect().adjusted(BUTTON_MARK_INSET, BUTTON_MARK_INSET,
-                                      -BUTTON_MARK_INSET, -BUTTON_MARK_INSET)
+        room = button.rect().adjusted(BUTTON_ICON_INSET, BUTTON_ICON_INSET,
+                                      -BUTTON_ICON_INSET, -BUTTON_ICON_INSET)
         assert room.contains(_where_the_mark_lands(button)), button.toolTip()

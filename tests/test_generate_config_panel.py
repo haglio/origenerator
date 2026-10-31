@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QSplitterHandle,
 )
 from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
-from shared_ui.icons import inline_mark
+from shared_ui.icons import inline_icon
 
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
@@ -2422,7 +2422,7 @@ def test_the_note_under_the_workflow_dropdown_leads_with_the_familys_warning(sav
     panel.show_saved_generation(video, [])
 
     note = panel._cannot_remake_note
-    assert note.text().startswith(inline_mark("warning", color=AMBER, size=note.fontMetrics().height()))
+    assert note.text().startswith(inline_icon("warning", color=AMBER, size=note.fontMetrics().height()))
 
 
 def test_a_retired_workflows_video_leaves_no_settings_from_before(saved_panel):

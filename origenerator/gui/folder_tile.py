@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import TEXT_PRIMARY
-from shared_ui.icons import marked_text
+from shared_ui.icons import icon_then_text
 from shared_ui.palette import TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL, HAIRLINE
 
@@ -116,8 +116,8 @@ class FolderTile(QFrame):
     def _captioned(self, favorite: bool) -> str:
         if not favorite:
             return html.escape(self._text, quote=False)
-        return marked_text("star", self._text, color=TEXT_PRIMARY,
-                           size=grid_card.line_height())
+        return icon_then_text("star", self._text, color=TEXT_PRIMARY,
+                              size=grid_card.line_height())
 
     def _badge(self, icon, name: str) -> QLabel:
         badge = QLabel()

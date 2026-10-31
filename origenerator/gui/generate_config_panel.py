@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import AMBER, TEXT_PRIMARY
-from shared_ui.icons import glyph_icon, marked_text
+from shared_ui.icons import icon_then_text, qt_icon
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
@@ -583,7 +583,7 @@ class GenerateConfigPanel(DropZone):
         line.setSpacing(BUTTON_GAP)
         self._sent_note = QLabel()
         self._unsend_button = QPushButton(UNSEND_CAPTION)
-        self._unsend_button.setIcon(glyph_icon("cross"))
+        self._unsend_button.setIcon(qt_icon("cross"))
         self._unsend_button.clicked.connect(
             lambda _checked=False: self._on_unsend(self._offered_lane))
         line.addWidget(self._sent_note)
@@ -2003,8 +2003,8 @@ class GenerateConfigPanel(DropZone):
         self._lane_button.setText(lane.send_caption)
         self._lane_button.setToolTip(
             lane.withdrawn_tooltip if row.get(lane.unsent_flag) else lane.tooltip)
-        self._sent_note.setText(marked_text("check", lane.sent_caption, color=TEXT_PRIMARY,
-                                            size=self._sent_note.fontMetrics().height()))
+        self._sent_note.setText(icon_then_text("check", lane.sent_caption, color=TEXT_PRIMARY,
+                                               size=self._sent_note.fontMetrics().height()))
         self._unsend_button.setToolTip(lane.unsend_tooltip)
 
     def _on_send(self, lane):

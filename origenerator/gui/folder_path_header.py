@@ -30,7 +30,7 @@ class FolderPathHeader(QWidget):
         row.addWidget(self._path, 1)
 
     def show_folder(self, steps: Sequence[PathStep], *, mark: str = "") -> None:
-        self._show(steps, links_among=steps[:-1], marks={len(steps) - 1: mark} if mark else None)
+        self._show(steps, links_among=steps[:-1], icons={len(steps) - 1: mark} if mark else None)
 
     def show_search(self, words: str, steps: Sequence[PathStep]) -> None:
         self._show(steps, links_among=steps, lead=words)
@@ -39,9 +39,9 @@ class FolderPathHeader(QWidget):
         self._show([PathStep(text, None)], links_among=())
 
     def _show(self, steps: Sequence[PathStep], *, links_among: Sequence[PathStep],
-              lead: str = "", marks: Mapping[int, str] | None = None) -> None:
+              lead: str = "", icons: Mapping[int, str] | None = None) -> None:
         self._keys = tuple(step.key for step in steps)
-        self._path.set_path([step.name for step in steps], lead=lead, marks=marks,
+        self._path.set_path([step.name for step in steps], lead=lead, icons=icons,
                             linked=[i for i, step in enumerate(links_among) if step.key])
 
     def display_text(self) -> str:

@@ -4,7 +4,7 @@ from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QLabel
 from shared_ui.colors import AMBER
-from shared_ui.icons import draw_glyph
+from shared_ui.icons import draw_icon
 
 
 class WarningMark(QLabel):
@@ -25,8 +25,8 @@ class WarningMark(QLabel):
     def paintEvent(self, event):
         side = min(self.width(), self.height())
         painter = QPainter(self)
-        draw_glyph(painter, "warning", AMBER, size=side,
-                   x=(self.width() - side) / 2, y=(self.height() - side) / 2)
+        draw_icon(painter, "warning", AMBER, size=side,
+                  x=(self.width() - side) / 2, y=(self.height() - side) / 2)
 
     def warn(self, tip: str) -> None:
         self.setToolTip(tip)

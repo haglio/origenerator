@@ -52,8 +52,8 @@ from shared_ui.colors import (
     BORDER_SUBTLE,
     TEXT_MUTED,
 )
-from shared_ui.icons import glyph_icon
-from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.icon_button import fill_square_with_icon
+from shared_ui.icons import qt_icon
 from shared_ui.spacing import BUTTON_SIZE_HUD, GAP_SMALL
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
@@ -461,8 +461,8 @@ class EnhancePanel(QWidget):
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
         label = self._labeled(part.name.capitalize(), widget)
-        prompts_button = fill_square_with_mark(QToolButton(), size=BUTTON_SIZE_HUD)
-        prompts_button.setIcon(glyph_icon("pencil"))
+        prompts_button = fill_square_with_icon(QToolButton(), size=BUTTON_SIZE_HUD)
+        prompts_button.setIcon(qt_icon("pencil"))
         prompts_button.setToolTip(param_help("enhance_fix_prompts"))
         prompts_button.clicked.connect(lambda _on=False, name=part.name: self.open_fix_prompts(name))
         if detector_for_part(part) is None:

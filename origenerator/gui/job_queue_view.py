@@ -221,7 +221,7 @@ class RunningPreview(OpensAFolder, QWidget):
         # How far along the run is, how long it has been going and how much longer
         # it has — written across the bar those numbers measure, so the reading and
         # the thing read are one object rather than a line of text with a separate
-        # stripe under it. The same line, in the same words, as the browser pane's
+        # stripe under it. The same line, in the same words, as the Gallery pane's
         # in-flight tiles carry.
         self._progress = ProgressBar()
         self._progress.setFixedHeight(BAR_HEIGHT)

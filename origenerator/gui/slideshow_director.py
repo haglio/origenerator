@@ -134,10 +134,10 @@ class SlideshowHost(Protocol):
         """The settings-signature index a folder name is derived against."""
 
     def listed_prompt_ids(self) -> list[str]:
-        """The generations the browser lists, in the order shown."""
+        """The generations the Gallery pane lists, in the order shown."""
 
     def selected_prompt_ids(self) -> list[str]:
-        """The generations picked in the browser, in the order shown."""
+        """The generations picked in the Gallery pane, in the order shown."""
 
     def off_thread(self, work, done) -> None: ...
 
@@ -285,7 +285,7 @@ def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
 class SlideshowDirector:
     """Every fullscreen slideshow this window has open, and the words about them."""
 
-    def __init__(self, host: SlideshowHost, *, db, browser, jobs, pace, motion,
+    def __init__(self, host: SlideshowHost, *, db, gallery_pane, jobs, pace, motion,
                  fun_time, names: ItemNames, radio=None, turn_the_radio_on=None):
         self._host = host
         self._radio = radio
@@ -293,14 +293,14 @@ class SlideshowDirector:
         self._volume_left_at: VolumeHud | None = None
         self._db = db
         self._names = names
-        self._browser = browser
+        self._gallery_pane = gallery_pane
         self._jobs = jobs
         self._pace = pace
         self._region_paces: dict[str, SlideshowPace] = {}
         self._motion = motion
         self._fun_time = fun_time
         # The fullscreen slideshow window while one is open — whether it was
-        # started from the toolbar (a whole folder, shuffled) or by
+        # started from the Gallery pane buttons (a whole folder, shuffled) or by
         # double-clicking an item (that folder in order). One place, because
         # it is one view.
         self._slideshow = None
@@ -311,7 +311,7 @@ class SlideshowDirector:
         self._hud_minimized: dict[str, bool] = {}
         # Every slideshow currently up, each with the collection/folder key it opened
         # from: what a landing generation is offered to, so a slideshow keeps up
-        # with an auto-generating folder however far the browser has moved on.
+        # with an auto-generating folder however far the Gallery pane has moved on.
         # A list rather than one, because Fun Time runs two at once.
         self._live_slideshows: list[tuple] = []
         # The regions the hosting session has handed over, until it takes
@@ -341,9 +341,9 @@ class SlideshowDirector:
         self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
         self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
-        self._held_at = _KeptPerModel(browser.model_stamp)
-        self._library = _KeptPerModel(browser.model_stamp)
-        self._rows_by_id = _KeptPerModel(browser.model_stamp)
+        self._held_at = _KeptPerModel(gallery_pane.model_stamp)
+        self._library = _KeptPerModel(gallery_pane.model_stamp)
+        self._rows_by_id = _KeptPerModel(gallery_pane.model_stamp)
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
 
@@ -543,7 +543,7 @@ class SlideshowDirector:
              side=None, resume=None, filters=None, levels=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
-        The one place a slideshow is made, however it was asked for, so the toolbar's
+        The one place a slideshow is made, however it was asked for, so the Gallery pane buttons'
         and a double-click's differ only in the order they pass.
         ``folder_items`` is what to arm a slideshow that opened over a running
         generation with, since that one has no items of its own yet, and
@@ -557,7 +557,7 @@ class SlideshowDirector:
         ``location`` is the collection or folder key the set came from, kept so the
         slideshow can be fed what lands there while it runs (:meth:`note_finished`) —
         a running slideshow has to keep up with the folder it is playing, and the
-        browser will have moved on by then.  ``side`` names the satellite region
+        Gallery pane will have moved on by then.  ``side`` names the satellite region
         to land it on inside Fun Time, for a slideshow asked for by side rather than
         routed by its own shape.
         """
@@ -881,7 +881,7 @@ class SlideshowDirector:
         """
         if not location:
             return []
-        rows = self._browser.rows_for_collection(location)
+        rows = self._gallery_pane.rows_for_collection(location)
         if rows is not None:
             return self._one_per_run_where_the_order_is_newest_first(location, rows)
         group = self._host.group_for_key(location)
@@ -1364,7 +1364,7 @@ class SlideshowDirector:
         Asked of each slideshow's OWN location, remembered when it opened, rather
         than of the view on screen: inside Fun Time the slideshows play on the
         satellite regions while Core goes on being used, so by the
-        time a generation lands the browser is usually somewhere else — and
+        time a generation lands the Gallery pane is usually somewhere else — and
         there may be two slideshows, of two different folders, both keeping up.
         """
         if row is None:
@@ -1453,8 +1453,8 @@ class SlideshowDirector:
         if location:
             playing_latest = latest is not None and latest.which == _LATEST_KEY
         else:
-            playing_latest = (self._browser.showing_latest()
-                               and not self._browser.showing_search())
+            playing_latest = (self._gallery_pane.showing_latest()
+                               and not self._gallery_pane.showing_search())
         return bool(playing_latest
                     and source_of(row) == GenerationSource.GENERATED
                     and filter_rows([row], side)
@@ -1594,7 +1594,7 @@ class SlideshowDirector:
         it is when that collection's own slideshow button opens it — and Latest plays
         newest-first the way that collection's own slideshow does.  Standalone, and hosted
         with no side named, it is the collection on the side being browsed, the one
-        the word meant.  The browser is left where it is: this starts a slideshow,
+        the word meant.  The Gallery pane is left where it is: this starts a slideshow,
         it does not go browsing."""
         if command.collection_key == _FAVORITES_KEY:
             self.toggle_favorites_filter(command.side)
@@ -1705,7 +1705,7 @@ class SlideshowDirector:
         for side in _ORIENTATIONS:
             key = oriented_key(_FAVORITES_KEY, side)
             marked.update(row["prompt_id"]
-                          for row in (self._browser.rows_for_collection(key) or ()))
+                          for row in (self._gallery_pane.rows_for_collection(key) or ()))
         return marked
 
     def _enhanced_ids_of(self, rows) -> set[str]:

@@ -1,11 +1,11 @@
 """Which splitter holds which pane, standalone and inside a Fun Time session.
 
 The three panes live in splitters, so the divider between each doubles as a
-drag handle: the TOC pane (folder tree), the browser pane (a folder's
+drag handle: the TOC pane (folder tree), the Gallery pane (a folder's
 contents), and the info pane (preview + metadata).
 
 Nested rather than flat, because the Job Queue belongs to the first two and
-not to the third: the tree and the browser sit side by side in ``folder_panes``,
+not to the third: the tree and the Gallery pane sit side by side in ``folder_panes``,
 the Job Queue goes under both of them in ``left_column``, and the info pane stands
 beside that whole column at full height. Its tabs are where the user reads and
 edits a generation, and the Job Queue cutting across their foot would take that
@@ -13,7 +13,7 @@ height for a queue they can already see next to it.
 
 Hosted by Fun Time the rect is an upright column, so the panes fold into
 ``stack`` instead of sitting side by side: the info pane on top, the tree and
-browser as one row under it, and the queue across the foot of all three:
+Gallery pane as one row under it, and the queue across the foot of all three:
 hosted, the queue belongs to the window rather than to the folder column, so
 there is no ``left_column`` at all on that side.
 """
@@ -28,7 +28,7 @@ TOC_OPENING_WIDTH = 220
 
 
 class PaneArrangement:
-    def __init__(self, *, toc: QWidget, browser: QWidget, info_pane: QWidget,
+    def __init__(self, *, toc: QWidget, gallery_pane: QWidget, info_pane: QWidget,
                  info_tabs: QWidget, queue: QWidget):
         self._toc = toc
         self._info_pane = info_pane
@@ -39,8 +39,8 @@ class PaneArrangement:
         self.stack: QSplitter | None = None
         self.left_column: QSplitter | None = None
         toc.setMinimumWidth(120)
-        browser.setMinimumWidth(210)
-        self.folder_panes.addWidget(browser)
+        gallery_pane.setMinimumWidth(210)
+        self.folder_panes.addWidget(gallery_pane)
 
     def standalone(self) -> QSplitter:
         """The three panes side by side, as a window of its own opens them."""
@@ -50,8 +50,8 @@ class PaneArrangement:
         self.left_column.addWidget(self._queue)
         self.panes.addWidget(self.left_column)
         self.panes.addWidget(self._info_pane)
-        # The TOC pane holds its width; the browser and info panes both grow
-        # with the window (the browser faster), so the info pane stays
+        # The TOC pane holds its width; the Gallery pane and info pane both grow
+        # with the window (the Gallery pane faster), so the info pane stays
         # comfortably wide instead of a thin strip on a large screen. Long
         # metadata values wrap rather than scroll sideways, so these floors
         # only need to keep the panes readable — kept low enough that the
@@ -63,7 +63,7 @@ class PaneArrangement:
         # join it — pinning the pane narrower than its contents and putting a
         # horizontal scroll bar back under the form.
         self.folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
-        self.folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
+        self.folder_panes.setStretchFactor(1, 1)  # the Gallery pane takes the growth
         self.folder_panes.setSizes([max(TOC_OPENING_WIDTH, self._toc.sizeHint().width()), 560])
         # The Job Queue opens at its own height and stays there: all the growth
         # goes to the folders above it, so a taller window is more gallery
@@ -88,7 +88,7 @@ class PaneArrangement:
         self.panes.insertWidget(1, self.folder_panes)
 
         # The upright arrangement, from the top down: the generate tabs (with
-        # the find bar riding under them), then the browser beside the
+        # the find bar riding under them), then the Gallery pane beside the
         # tree, then the queue across the foot.  The generator
         # leads because it is what the user is doing — a tall rect that
         # opens on a folder listing puts the form they came to fill below
@@ -105,7 +105,7 @@ class PaneArrangement:
         self.panes.setSizes([TOC_OPENING_WIDTH, 660])
         # The Job Queue opens at its own height and stays there, as it does
         # standalone: a taller rect is more gallery and more form, not more
-        # queue.  The two panes above it split the rest, the browser a
+        # queue.  The two panes above it split the rest, the Gallery pane a
         # little ahead so the tree it sits beside has room to be read.
         self.stack.setStretchFactor(0, 2)
         self.stack.setStretchFactor(1, 3)

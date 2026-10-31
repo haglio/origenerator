@@ -5,7 +5,7 @@ import ast
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PANE = REPO_ROOT / "origenerator" / "gui" / "browser_pane.py"
+PANE = REPO_ROOT / "origenerator" / "gui" / "gallery_pane.py"
 
 
 def _class_def(path: Path, name: str) -> ast.ClassDef:
@@ -22,7 +22,7 @@ def test_the_pane_holds_no_view():
            for a in n.names}
     assert "GalleryView" not in named  # docstring prose may say it; code may not
     assert "_v" not in named  # the handle itself, under the name it had
-    init = next(n for n in _class_def(PANE, "BrowserPane").body
+    init = next(n for n in _class_def(PANE, "GalleryPane").body
                 if isinstance(n, ast.FunctionDef) and n.name == "__init__")
     assert [a.arg for a in init.args.args] == [
         "self", "scroll", "db", "jobs", "auto", "tree", "host"]

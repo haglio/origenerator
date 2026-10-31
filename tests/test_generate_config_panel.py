@@ -378,12 +378,12 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     """Narrowed, the buttons drop onto further lines, each still at its full width.
 
     The failure this exists for: a row layout squeezed them past their minimum and
-    clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
+    clipped what was left, so the Gallery pane buttons read "o fo", "to E", "to G", "anc", "ner".
     """
     panel._sent_note.setText(export_lane_module.KINO.sent_caption)
     buttons = [panel._sent_row, panel._cancel_btn, panel._generate_btn.parentWidget()]
     for button in buttons:
-        button.show()          # the busiest the bank ever is: every button on
+        button.show()          # the busiest the Gallery pane buttons ever is: every button on
     panel.show()
 
     panel.resize(340, 800)
@@ -392,7 +392,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     for button in buttons:
         assert button.width() == button.sizeHint().width(), button
     assert len({button.y() for button in buttons}) > 1        # it wrapped
-    # ...and every line still ends in the corner the bank sits in.
+    # ...and every line still ends in the corner the Gallery pane buttons sits in.
     lines = {}
     for button in buttons:
         lines[button.y()] = max(lines.get(button.y(), 0), button.x() + button.width())
@@ -489,10 +489,10 @@ def test_file_info_above_form_related_media_below(panel):
 
 
 def test_the_lane_button_shares_the_button_bank_with_generate_and_cancel(panel):
-    bank = _layout_containing(panel._settings_pane.layout(), panel._generate_btn.parentWidget())
-    assert bank is not None
-    assert bank.indexOf(panel._lane_button) != -1
-    assert bank.indexOf(panel._cancel_btn) != -1
+    buttons = _layout_containing(panel._settings_pane.layout(), panel._generate_btn.parentWidget())
+    assert buttons is not None
+    assert buttons.indexOf(panel._lane_button) != -1
+    assert buttons.indexOf(panel._cancel_btn) != -1
 
 
 def test_switching_workflow_detaches_the_old_form_at_once(panel):
@@ -1931,7 +1931,7 @@ def test_up_onto_the_enhance_row_and_enter_asks_for_an_enhance_of_the_image(save
 
 
 def test_the_preview_carries_the_shown_generations_corner_controls(saved_panel):
-    # The acts on a generation belong on its image, not in a bank under the
+    # The acts on a generation belong on its image, not in a row of buttons under the
     # settings — the same three corners a gallery thumbnail of it wears.
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")

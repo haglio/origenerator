@@ -988,7 +988,7 @@ _LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
 
 class TestVersions:
     """Stepping an item's own versions on the Funestra, the axis the shifted keys
-    and the band's versions button share with a slideshow in a window."""
+    and the HUD's versions button share with a slideshow in a window."""
 
     def test_a_step_holds_the_funestra_and_opens_the_other_version_still(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
@@ -1063,7 +1063,7 @@ class TestVersions:
     def test_the_sessions_shift_left_counts_the_enhancements_down_and_shift_right_up(
             self, qtbot, tmp_path):
         """The session sends Shift+Left as cycle_version_back, and Shift+Right as
-        cycle_version, which the band's versions button sends too."""
+        cycle_version, which the HUD's versions button sends too."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_levels({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
                                           ("one_1.png", "image", "Enhancement 1/2"),

@@ -119,7 +119,7 @@ _GAP = GAP_MEDIUM                # between the things on one row
 _ROW_H = CTRL_BTN + BLOCK_GAP
 _BAR_H = CTRL_BTN
 _BAR_PAD = GAP_MEDIUM            # the clock's breathing room at each end of its bar
-_BAND_H = 4             # the pass band along the bar's foot
+_SUBSTEP_BAR_H = 4      # the substep progress bar along the bar's foot
 _CELL = CTRL_BTN        # one thumbnail cell on a row
 _CELL_GAP = HAIRLINE
 _BLOCK_W = FOLDER_CELLS * _CELL + (FOLDER_CELLS - 1) * _CELL_GAP
@@ -314,7 +314,7 @@ class QueueSection:
 
     def _paint_bar(self, draw, x, y, width) -> None:
         """The clock, written across the bar it measures — the reading
-        :class:`~origenerator.gui.progress_caption.ProgressCaption` draws in Core's
+        :class:`~origenerator.gui.progress_bar.ProgressBar` draws in Core's
         Job Queue, and empty rather than at nought for a run ComfyUI has not started."""
         leader = self.leader
         draw.rounded_rectangle([x, y, x + width - 1, y + _BAR_H - 1], radius=BUTTON_RADIUS_HUD,
@@ -323,14 +323,14 @@ class QueueSection:
         if done:
             draw.rounded_rectangle([x, y, x + max(BUTTON_RADIUS_HUD, int(width * done)) - 1,
                                     y + _BAR_H - 1], radius=BUTTON_RADIUS_HUD, fill=(*BLUE, 255))
-        band = _fraction(leader.pass_progress)
-        if band is not None:
-            foot = y + _BAR_H - 1 - _BAND_H
-            draw.rectangle([x + 1, foot, x + width - 2, foot + _BAND_H - 1],
+        substep = _fraction(leader.pass_progress)
+        if substep is not None:
+            foot = y + _BAR_H - 1 - _SUBSTEP_BAR_H
+            draw.rectangle([x + 1, foot, x + width - 2, foot + _SUBSTEP_BAR_H - 1],
                            fill=(*BORDER_SUBTLE, 120))
-            if band:
-                draw.rectangle([x + 1, foot, x + 1 + int((width - 3) * band),
-                                foot + _BAND_H - 1], fill=(*BLUE_LIGHT, 255))
+            if substep:
+                draw.rectangle([x + 1, foot, x + 1 + int((width - 3) * substep),
+                                foot + _SUBSTEP_BAR_H - 1], fill=(*BLUE_LIGHT, 255))
         room = max(0, width - 2 * _BAR_PAD)
         caption = leader.caption
         if text_width(_tiny(), caption) > room:

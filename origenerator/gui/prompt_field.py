@@ -27,10 +27,10 @@ DEFAULT_HEIGHT = 100
 # A drag stops here: a field taller than any monitor is a slip of the mouse rather
 # than a request, and it would bury the rest of the form under itself.
 MAX_HEIGHT = 1600
-# The band along the lower edge that grabs the field instead of placing the text
+# The grip along the lower edge that grabs the field instead of placing the text
 # cursor. Narrow, like a splitter handle — the rest of the field is for typing.
 GRIP = 6
-# How wide the pair of rules drawn on that band is.
+# How wide the pair of rules drawn on that grip is.
 _MARK_WIDTH = 24
 
 
@@ -137,10 +137,10 @@ class PromptField(QPlainTextEdit):
     # --- dragging the edge ---------------------------------------------------
 
     def _in_grip(self, pos) -> bool:
-        """Is this point on the lower edge's drag band?
+        """Is this point on the lower edge's grip?
 
         Mouse events on a scroll area arrive in *viewport* coordinates, so the
-        band is measured from the viewport's own lower edge — which also means the
+        grip is measured from the viewport's own lower edge — which also means the
         scrollbar, a child with its own events, is never part of it.
         """
         return pos.y() >= self.viewport().height() - GRIP

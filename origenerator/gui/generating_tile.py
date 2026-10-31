@@ -21,7 +21,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import CANCEL_TEXT, TICK_MS, RunReading, cancel_tooltip
-from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
+from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.stage_scrim import StageScrim
 
 _RESTING_FRAME_CSS = tile_shape.idle_css("generatingTile")
@@ -73,7 +73,7 @@ class GeneratingTile(QFrame):
         # Both ride over the thumbnail rather than taking a row of their own, so the
         # tile is the same size and shape as every tile beside it.
         self._scrim = StageScrim(self)
-        self._bar = ProgressCaption(self)
+        self._bar = ProgressBar(self)
         self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._place_bar()
 

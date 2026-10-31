@@ -3,7 +3,7 @@
 One of the gallery's screen concerns, lifted out of the view that used to hold
 all of them. What lives here is the whole of a search's life — the debounce and
 the widening's longer one, the query and its expansions, the outcome, the tiles
-the pane draws and the Model / LoRA bands folded shut, the sort and the count line.
+the pane draws and the Model / LoRA sections folded shut, the sort and the count line.
 
 What stays with the host is what a search is *of*: which folder the tree has
 selected, what rows the gallery is holding, and what the pane and the header do
@@ -49,7 +49,7 @@ class SearchHost(Protocol):
     """What a search needs of the gallery around it, and nothing else."""
 
     def search_scope(self):
-        """The selected row's breadcrumb and the generations under it — what
+        """The selected row's folder path and the generations under it — what
         this query covers, and what the field and the header name it by."""
 
     def image_config_index(self) -> dict:
@@ -91,7 +91,7 @@ class GallerySearchController(QObject):
         self._outcome = search.SearchOutcome((), ())
         self._tiles: list = []      # its hits as the pane draws them
         self._sort = search.SORT_RECENT
-        self._collapsed: set[str] = set()   # Model / LoRA bands folded shut
+        self._collapsed: set[str] = set()   # Model / LoRA sections folded shut
         self._expander = expander or SearchExpander(self)
         self._expander.expanded.connect(self._on_expanded)
         self._timer = QTimer(self)
@@ -131,7 +131,7 @@ class GallerySearchController(QObject):
         # it is showing a slice; beside it, the order the results are laid out in.
         # Recency is one question ("the one I made recently"); model + LoRA is the
         # other ("which model and LoRA was that"), and picking it cuts the results into a
-        # labelled band per combination rather than interleaving them.
+        # labelled section per combination rather than interleaving them.
         self._count = QLabel("")
         self._count.setObjectName("estimateLabel")
         # No-wheel: it rides directly over the scrolling results, and a wheel
@@ -376,8 +376,8 @@ class GallerySearchController(QObject):
         return tiles
 
     def _on_section_toggled(self, heading: str, collapsed: bool) -> None:
-        """Remember a Model / LoRA band's fold state, so a redraw — a rebuild, a landing
-        generation, a widening — doesn't spring open the bands you shut."""
+        """Remember a Model / LoRA section's fold state, so a redraw — a rebuild, a landing
+        generation, a widening — doesn't spring open the sections you shut."""
         if collapsed:
             self._collapsed.add(heading)
         else:

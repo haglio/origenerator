@@ -213,19 +213,19 @@ def test_a_node_with_nothing_worth_saying_is_left_unnamed():
 
 
 def test_current_pass_reads_the_pass_in_hand_on_its_own_count():
-    # The lower band: it restarts per pass and counts steps, which is exactly
+    # The substep progress bar: it restarts per pass and counts steps, which is exactly
     # what the reading above it must not do.
     tracker = ProgressTracker(60, passes=3)
     tracker.update(5, 20)
     assert tracker.current_pass() == (5, 20)
     tracker.update(20, 20)
     tracker.update(3, 20)                        # the next pass begins
-    assert tracker.current_pass() == (3, 20)     # band back to 3/20...
+    assert tracker.current_pass() == (3, 20)     # substep progress bar back to 3/20...
     assert tracker.current() == (23, 60)         # ...while the run reads 23/60
 
 
 def test_a_single_pass_run_has_no_band():
-    # A band counting the same steps as the bar above it says nothing twice.
+    # A substep progress bar counting the same steps as the bar above it says nothing twice.
     tracker = ProgressTracker(30, passes=1)
     tracker.update(10, 30)
     assert tracker.current_pass() is None
@@ -233,7 +233,7 @@ def test_a_single_pass_run_has_no_band():
 
 def test_a_band_grows_when_an_unbudgeted_second_pass_turns_up():
     # A run budgeted for one pass that runs two: there IS something to say now,
-    # so the band appears rather than staying hidden for the rest of the job.
+    # so the substep progress bar appears rather than staying hidden for the rest of the job.
     tracker = ProgressTracker(20, passes=1)
     tracker.update(10, 10)
     assert tracker.current_pass() is None

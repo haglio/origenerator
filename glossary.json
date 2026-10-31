@@ -523,12 +523,14 @@
       "screen": null,
       "his_word": "item type icon (2026-10-30)",
       "code_today": [
-        "media badge",
-        "badge"
+        "item type icon"
       ],
       "code_word": "item type icon",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "media badge"
+      ]
     },
     {
       "id": "level_letter",

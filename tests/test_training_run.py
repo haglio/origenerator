@@ -250,7 +250,7 @@ def _yielding_kind(started: list):
                                  typical_seconds=lambda: None)
 
 
-def test_a_training_that_yields_the_card_itself_starts_at_once_whatever_comfyui_is_making(
+def test_a_training_that_yields_the_tile_itself_starts_at_once_whatever_comfyui_is_making(
         qtbot, monkeypatch, tmp_path):
     monkeypatch.setattr(training_run, "POLL_MS", 5)
     queue = _Queue(busy=True)

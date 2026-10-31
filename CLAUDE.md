@@ -32,14 +32,15 @@ for one thing cost four. So:
 - A submitted piece of work is a **job** (`JobQueue`, `GenerationJob`,
   `job_for`, `held_jobs`), from the press to the saved row. **Re-roll** is kept
   for the act it names -- a fresh variation of a settings folder, or a fresh
-  seed on one row (`start_reroll`, `reroll_image_seed`, `reroll_video_seed`,
-  `RerollTile`) -- and for nothing else; the class that owns every generation
+  seed on one row (`start_reroll`, `reroll_image_seed`, `reroll_video_seed`)
+  -- and for nothing else, the "+" that asks for one being the New tile
+  (`NewTile`); the class that owns every generation
   the app makes was called `RerollController` for years, and its own docstring
   had to say "it also *is* the queue" to undo the name. **Run** is only a
   chained job pair taken as a whole, which is what `origin` stamps. A
   **generation** is the saved row.
 - Work started and not finished is **in flight** (`InFlightItem`,
-  `InFlightCard`, `inflight_items`). "Cooking" said the same thing in fifty
+  `InFlightTile`, `inflight_items`). "Cooking" said the same thing in fifty
   comments and is gone.
 - On disk a waiting row's status is **pending**; on screen the line calls it
   **queued**. Both are right and `display_status()` is the one place that says

@@ -2762,6 +2762,18 @@ def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
     assert _notice(panel) == ""
 
 
+def test_showing_the_image_a_tab_already_shows_still_marks_what_is_typed(saved_panel, qtbot):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    panel.show_saved_generation(image, [image])
+
+    panel.show_saved_generation(image, [image])
+
+    field = panel._param_form._widgets["positive_prompt"]
+    field.setPlainText("a dog on a couch")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+
+
 def test_generate_takes_the_red_and_green_off_its_prompts(saved_panel, qtbot):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")

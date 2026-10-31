@@ -1443,8 +1443,7 @@ class GenerateConfigPanel(DropZone):
         self._hide_footer()
         self._related.show_requests_and_modifications(row["prompt_id"])
         self._preview.clear()          # whatever was up is not this run's
-        self._set_displayed_row(None)  # a running generation isn't a saved one
-        self._note_displayed_config(being_made=row)  # ...so nothing for a notice to deviate from
+        self._note_displayed_config(being_made=row)  # nothing saved for a notice to deviate from
         self._emit_title()
 
     def _point_elsewhere(self, row: dict):
@@ -1460,6 +1459,7 @@ class GenerateConfigPanel(DropZone):
         self.forget_launched()
         self._forget_watch()
         self._forget_settings_source()
+        self._set_displayed_row(None)
         self._end_folder_modify()  # a workflow this tab cannot lay out never reaches prefill
         workflow_name = row.get("workflow_name", "")
         self._autoshow_held = True

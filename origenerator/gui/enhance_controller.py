@@ -14,7 +14,7 @@ because both are this act with a different gate in front of them, and what they
 answer with is what this side knows.
 
 What stays with the host is what an enhancement is *of*: which images are
-picked, which folder is on screen, and the bank button that offers the act.
+picked, which folder is on screen, and the Gallery pane button that offers the act.
 :class:`EnhanceHost` names each of those.
 """
 from __future__ import annotations
@@ -96,7 +96,7 @@ class Offer(NamedTuple):
     """What the Enhance button would do right now, and what it says it would do.
 
     A record rather than the button itself: what the act is aimed at is this
-    side's answer, and lighting a button is the bank's.
+    side's answer, and lighting a button is the Gallery pane buttons'.
     """
 
     available: bool
@@ -131,12 +131,12 @@ class EnhanceHost(Protocol):
 class EnhanceController:
     """Every standalone enhance: its settings, its launches, and its live runs."""
 
-    def __init__(self, host: EnhanceHost, *, db, jobs, browser, slideshows,
+    def __init__(self, host: EnhanceHost, *, db, jobs, gallery_pane, slideshows,
                  info_tabs_of):
         self._host = host
         self._db = db
         self._jobs = jobs
-        self._browser = browser
+        self._gallery_pane = gallery_pane
         self._slideshows = slideshows
         # The tabs are built by the window's own layout, after this: asked for
         # rather than held, so a live run reaches whichever tabs exist by then.
@@ -260,11 +260,11 @@ class EnhanceController:
         # button is answering, so turning a setting is what brings it back.
         self._host.enhance_offer_changed()
         # Every image on screen is answering it too, in its own corner.
-        self._browser.refresh_corners()
+        self._gallery_pane.refresh_corners()
 
     def sync_panel(self, offer: Offer) -> None:
         """Gray the Enhance settings out where nothing they say could ever run,
-        and aim the panel's own Enhance button with the bank button's ``offer``.
+        and aim the panel's own Enhance button with the Gallery pane button's ``offer``.
 
         The panel is app-wide and follows you rather than the folder, which is
         why it shows in the collections as readily as on a settings folder — but a
@@ -274,7 +274,7 @@ class EnhanceController:
         """
         picked = [row for pid in self._host.selected_prompt_ids()
                   if (row := self._host.row_for(pid)) is not None]
-        folder = None if picked or self._browser.selected_ids else self._host.current_group()
+        folder = None if picked or self._gallery_pane.selected_ids else self._host.current_group()
         in_front = picked or list(getattr(folder, "rows", []) or [])
         self.panel.set_applicable(not _all_video(in_front), NO_VIDEO_ENHANCER)
         self.panel.show_offer(offer.available, offer.tip)
@@ -291,7 +291,7 @@ class EnhanceController:
         what picking them says); a whole folder is only its not-yet-enhanced
         images, so the button doesn't quietly re-run the ones that are done.
         """
-        if self._browser.selected_ids:
+        if self._gallery_pane.selected_ids:
             ids = self.enhanceable_selection()
             if ids:
                 return Offer(True, f"Enhance {len(ids)} item"
@@ -345,9 +345,9 @@ class EnhanceController:
                           if (row := self._db.get_generation(pid)) is not None)
 
     def enhance_the_selection(self) -> None:
-        """The bank button's action: enhance the picked thumbnails, or every
+        """The Gallery pane button's action: enhance the picked thumbnails, or every
         image in this folder that isn't enhanced yet."""
-        if self._browser.selected_ids:
+        if self._gallery_pane.selected_ids:
             ids = self.enhanceable_selection()
             if ids:
                 self.enhance_items(ids)
@@ -574,7 +574,7 @@ class EnhanceController:
         """The standalone enhance being made of this image right now, as the
         image's tile sees it, or ``None``.
 
-        The browser pane's tiles ask as they are built, so a folder generating
+        The Gallery pane's tiles ask as they are built, so a folder generating
         with the Auto switch on reads honestly: the base render is out, on
         screen, and something better is on the way. Without it the folder looks
         like it is turning out plain images and ignoring the switch."""
@@ -668,7 +668,7 @@ class EnhanceController:
                 for row in self._host.image_rows()
                 if self._of_row(job, row)
             }
-        self._browser.show_enhancing({
+        self._gallery_pane.show_enhancing({
             prompt_id: self._as_run(job)
             for prompt_id, job in self._by_prompt.items()
         })

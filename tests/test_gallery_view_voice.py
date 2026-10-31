@@ -87,7 +87,7 @@ def test_words_that_are_no_command_leave_a_running_auto_generate_as_it_was(
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._toggle_auto(True)
     prompt = view._live_jobs[key].params["positive_prompt"]
 
@@ -104,7 +104,7 @@ def test_auto_generate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view._toggle_auto(True)
     view._toggle_auto(False)
@@ -124,10 +124,10 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     assert not view._voice.listener.commands_on
     view._toggle_auto(False)
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     assert view._voice.listener.commands_on
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     assert not view._voice.listener.commands_on
 
 
@@ -137,14 +137,14 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
     view.refresh()
     _select_first_leaf(view)
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     assert not view._voice.status.isHidden()
     assert "Listening" in words(view._voice.status)
 
     view._voice.listener.heard.emit("no hat")
     assert "no hat" in words(view._voice.status)
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     assert view._voice.status.isHidden()
 
 
@@ -155,10 +155,10 @@ def test_the_captions_section_is_up_only_while_the_caption_is(qtbot, tmp_path):
     section = view._voice.status.parentWidget()
     assert not section.isVisible()
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     assert section.isVisible()
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     assert not section.isVisible()
 
 
@@ -169,7 +169,7 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("no hat")
 
     view._voice._flash_timer.timeout.emit()  # the beat is up
@@ -177,7 +177,7 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     assert words(view._voice.status) == "Listening…"
     assert not view._voice.status.isHidden()
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     view._voice._show("nothing here to enhance", transient=True)
 
     view._voice._flash_timer.timeout.emit()
@@ -194,7 +194,7 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view._voice.listener.heard.emit("Enhanced it.")
     assert "enhance it" in words(view._voice.status)
@@ -206,18 +206,18 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
 
 def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path):
     # It used to float centered over the top of the view, landing squarely on the
-    # header toolbar the user was trying to click. It now takes its own room at
+    # header buttons the user was trying to click. It now takes its own room at
     # the top of the left pane, so it covers nothing however long the message.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     _on_screen(qtbot, view, 1200, 800)
     _select_first_leaf(view)
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("give her a much longer caption than the idle one")
     qtbot.wait(1)  # let the layout settle around the grown caption
 
     caption = QRect(view._voice.status.mapTo(view, QPoint(0, 0)), view._voice.status.size())
-    for button in (view._bank.back, view._bank.forward, view._bank.undo, view._bank.delete):
+    for button in (view._buttons.back, view._buttons.forward, view._buttons.undo, view._buttons.delete):
         assert not caption.intersects(
             QRect(button.mapTo(view, QPoint(0, 0)), button.size())
         )
@@ -341,7 +341,7 @@ def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
@@ -357,12 +357,12 @@ def test_a_closed_gallery_leaves_the_mic_shut_and_its_button_as_it_was(qtbot, tm
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view.close()
 
     assert not view._voice.listener.commands_on
-    assert view._bank.mic.isChecked()
+    assert view._buttons.mic.isChecked()
 
 
 def test_a_slideshow_with_the_mic_off_hears_nothing(qtbot, tmp_path):
@@ -389,7 +389,7 @@ def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
     return view
@@ -459,7 +459,7 @@ def _voiceable(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     return view
 
 
@@ -1079,7 +1079,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
 
 
 def test_a_spoken_enhance_with_no_slideshow_up_presses_the_bank_button(qtbot, tmp_path):
-    # The word names a bank button as well as the image on screen, and with no
+    # The word names a Gallery pane button as well as the image on screen, and with no
     # image filling the screen it is the button — aimed the way a click aims
     # it, at the folder's images that have never been enhanced.
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
@@ -1178,7 +1178,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
-# --- the bare vocabulary: a collection, a bank button, a word over the slideshow ---
+# --- the bare vocabulary: a collection, a Gallery pane button, a word over the slideshow ---
 
 
 def _listening(qtbot, tmp_path, db=None):
@@ -1188,7 +1188,7 @@ def _listening(qtbot, tmp_path, db=None):
                        client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     return view
 
 
@@ -1288,17 +1288,17 @@ def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
         qtbot, tmp_path):
     # The tip already names the target it is aimed at, which is exactly what a
-    # speaker who is not looking at the bank needs told back.
+    # speaker who is not looking at the Gallery pane buttons needs told back.
     view = _listening(qtbot, tmp_path)
     _select_first_leaf(view)
     _click_off(view)                               # so the button is the folder's
-    aimed = view._bank.favorite.toolTip()
+    aimed = view._buttons.favorite.toolTip()
     assert aimed.startswith("Favorite folder")
 
     view._voice.listener.speak("favorite")
 
     assert words(view._voice.status) == aimed
-    assert view._bank.favorite.toolTip().startswith("Unfavorite folder")
+    assert view._buttons.favorite.toolTip().startswith("Unfavorite folder")
 
 
 def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):
@@ -1319,7 +1319,7 @@ def test_locking_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
     # Set through the button rather than around it, so a spoken switch and a
-    # clicked one are the same event and the bank lights the same way.
+    # clicked one are the same event and the Gallery pane buttons lights the same way.
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("drive on")
@@ -1345,13 +1345,13 @@ def test_osr2_off_parks_the_device_as_the_console_switch_does(qtbot, tmp_path):
 
 def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
     # And only shut: a mic that hears nothing cannot hear "mic on", so the
-    # toolbar switch is the only way back.
+    # Gallery pane buttons' switch is the only way back.
     view = _listening(qtbot, tmp_path)
     assert view._voice.listener.commands_on
 
     view._voice.listener.speak("mic off")
 
-    assert not view._bank.mic.isChecked()
+    assert not view._buttons.mic.isChecked()
     assert not view._voice.listener.commands_on
 
 

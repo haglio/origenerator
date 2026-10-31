@@ -293,7 +293,7 @@ def test_a_panel_with_no_switch_hands_the_max_intensity_to_the_motion(qtbot):
 
 def test_the_console_switch_is_the_apps_one_switch(qtbot):
     """A press while driving parks, and a press while parked drives -- which is
-    what the separate toolbar one was replaced by."""
+    what the separate Gallery pane button was replaced by."""
     control = FakeControl()
     panel, _motion = _panel(qtbot, control=control)
 

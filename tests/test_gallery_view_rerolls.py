@@ -408,7 +408,7 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
     # each get their own tile.
     assert _generating_tile(view) is not None
     in_front = view._jobs.queue_order[0]
-    assert set(view._browser._inflight_cards) == set(queued) - {in_front}
+    assert set(view._gallery_pane._inflight_tiles) == set(queued) - {in_front}
     assert len(queued) == 3
 
 
@@ -444,12 +444,12 @@ def test_toggling_auto_starts_auto_generate(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._bank.auto.click()  # the header's Auto toggle, switched on
+    view._buttons.auto.click()  # the header's Auto toggle, switched on
 
     assert view._auto.is_active(key)
     assert key in view._live_jobs          # a first variation is running
     client.submit_job.assert_called_once()
-    assert view._bank.auto.isChecked()
+    assert view._buttons.auto.isChecked()
 
 
 def test_auto_generating_in_a_folder_favorites_it(qtbot, tmp_path):
@@ -459,7 +459,7 @@ def test_auto_generating_in_a_folder_favorites_it(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._bank.auto.click()
+    view._buttons.auto.click()
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert view.group_for_key(key).favorite
@@ -473,7 +473,7 @@ def test_auto_generating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_pa
     key = _select_first_leaf(view)
     view._toggle_favorite(key)
 
-    view._bank.auto.click()
+    view._buttons.auto.click()
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert view.group_for_key(key).favorite
@@ -523,7 +523,7 @@ def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path
 
     assert view._auto.is_active(second)
     assert not view._auto.is_active(first)
-    assert view._bank.auto.isChecked()  # the switch follows the folder in front
+    assert view._buttons.auto.isChecked()  # the switch follows the folder in front
 
 
 def test_toggling_auto_off_stops_auto_generate(qtbot, tmp_path):
@@ -569,7 +569,7 @@ def test_cancelling_a_reroll_keeps_auto_generate_on_and_tries_another_seed(qtbot
     view._cancel_reroll(key)  # the live tile's Cancel: "not this seed", not "stop"
 
     assert view._auto.is_active(key)          # Auto-Generate is still on
-    assert view._bank.auto.isChecked()         # and the toggle still says so
+    assert view._buttons.auto.isChecked()         # and the toggle still says so
     assert client.submit_job.call_count == 2  # a fresh seed went out at once
     assert view._live_jobs[key].prompt_id != canceled
 
@@ -881,14 +881,14 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._bank.auto.isHidden()
-    assert view._bank.auto.isEnabled()
+    assert not view._buttons.auto.isHidden()
+    assert view._buttons.auto.isEnabled()
 
     view._tree.setCurrentItem(_image_workflow(view._tree))  # a workflow, not a leaf
 
-    assert not view._bank.auto.isHidden()   # still there
-    assert not view._bank.auto.isEnabled()  # with nothing to do from here
-    assert "open a settings folder" in view._bank.auto.toolTip()
+    assert not view._buttons.auto.isHidden()   # still there
+    assert not view._buttons.auto.isEnabled()  # with nothing to do from here
+    assert "open a settings folder" in view._buttons.auto.toolTip()
 
 
 def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtbot, tmp_path):
@@ -903,7 +903,7 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtb
     view._tree.setCurrentItem(_image_workflow(view._tree))  # look somewhere else
     assert _selected_folder(view) != key
 
-    view._bank.auto_tip.link_activated.emit("auto")
+    view._buttons.auto_tip.link_activated.emit("auto")
 
     assert _selected_folder(view) == key
 
@@ -913,7 +913,7 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtb
 
 def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_path):
     # Change 1: Generate in a tab whose settings match an existing folder launches a
-    # re-roll there and lands the browser in that folder, its live tile selected.
+    # re-roll there and lands the Gallery pane in that folder, its live tile selected.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()

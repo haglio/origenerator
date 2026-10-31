@@ -1,4 +1,4 @@
-"""Where the browser pane stands, and the scroll that brings a tile into view.
+"""Where the Gallery pane stands, and the scroll that brings a tile into view.
 
 No gallery here: a scroll area with a tall column of plain widgets is all these
 answers need, and it is the only place the arithmetic can be read on its own.

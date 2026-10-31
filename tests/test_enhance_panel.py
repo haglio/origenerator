@@ -1435,7 +1435,7 @@ def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
     (add_row,) = versions._host.findChildren(_AddRow)
-    plus = add_row._thumbnail.pixmap().toImage()  # drawn, like the bank's plus, not typed
+    plus = add_row._thumbnail.pixmap().toImage()  # drawn, like the Gallery pane buttons' plus, not typed
 
     inked = sum(1 for y in range(plus.height()) for x in range(plus.width())
                 if plus.pixelColor(x, y).alpha() > 128)

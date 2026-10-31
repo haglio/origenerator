@@ -406,7 +406,7 @@ def test_the_resting_tab_is_named_for_what_it_is_and_wears_no_mark(tabs):
     assert tabs.tabIcon(0).isNull()
 
 
-# --- load_selection: single-click a browser thumbnail ----------------------
+# --- load_selection: single-click a Gallery pane thumbnail ----------------------
 
 def test_load_selection_reuses_the_blank_current_tab(tabs):
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a wizard", seed=1),

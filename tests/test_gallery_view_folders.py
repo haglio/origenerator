@@ -72,9 +72,9 @@ def test_picking_several_folders_shows_them_together_as_one_folder(qtbot):
 
     _pick(view, cat, dog)
 
-    assert view._browser._listed_folders == [cat, dog]  # both, as tiles
+    assert view._gallery_pane._listed_folders == [cat, dog]  # both, as tiles
     assert "2 folders" in view._folder_path.display_text()
-    assert not view._bank.group.isHidden()  # offering to save the grouping
+    assert not view._buttons.group.isHidden()  # offering to save the grouping
 
 
 def test_the_slideshow_of_a_multi_selection_plays_every_picked_folder(qtbot):
@@ -93,7 +93,7 @@ def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
 
     assert view._selection_group is None
     assert view.listed_prompt_ids() == ["i1"]  # its own thumbnails, not tiles
-    assert view._bank.group.isHidden()
+    assert view._buttons.group.isHidden()
 
 
 def test_delete_takes_every_picked_folder_not_only_the_current_one(qtbot):
@@ -103,8 +103,8 @@ def test_delete_takes_every_picked_folder_not_only_the_current_one(qtbot):
     asked = []
     view._confirm = lambda text: asked.append(text) or True
 
-    assert view._bank.delete.toolTip() == "Delete 2 folders"
-    view._bank.delete.click()
+    assert view._buttons.delete.toolTip() == "Delete 2 folders"
+    view._buttons.delete.click()
 
     assert asked == ["Delete 2 folders and their 2 items?"]
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
@@ -123,7 +123,7 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
     assert record["folders"] == [cat, dog]
     # ...and the view has landed on it, showing what it gathered.
     assert _top_level(view._tree)["Favorites"] is view._tree.currentItem()
-    assert view._browser._listed_folders == [cat, dog]
+    assert view._gallery_pane._listed_folders == [cat, dog]
 
 
 def test_grouping_picked_folders_takes_a_custom_folder_among_them(qtbot, monkeypatch):
@@ -168,7 +168,7 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     view._tree.setCurrentItem(row)
 
     assert [_key(child) for child in _subs(row)] == [cat]
-    assert view._browser._listed_folders == [cat]
+    assert view._gallery_pane._listed_folders == [cat]
     assert {r["prompt_id"] for r in view.rows_to_play()} == {"i1"}
 
 
@@ -182,8 +182,8 @@ def test_a_custom_folder_shows_the_items_it_holds_ahead_of_its_folders(qtbot):
 
     assert _shown(_top_level(view._tree)["Mine"]) == "(2) Mine"
     assert _tile_kinds_in_order(view) == [ItemTile, FolderTile]
-    assert view._browser.listed_prompt_ids() == ["i1"]
-    assert view._browser._listed_folders == [dog]
+    assert view._gallery_pane.listed_prompt_ids() == ["i1"]
+    assert view._gallery_pane._listed_folders == [dog]
     assert [r["prompt_id"] for r in view.rows_to_play()] == ["i1", "i2"]
 
 
@@ -210,7 +210,7 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
 
     (record,) = view._db.list_custom_folders()
     assert record["folders"] == [cat, dog]
-    assert view._browser._listed_folders == [cat, dog]  # landed on it
+    assert view._gallery_pane._listed_folders == [cat, dog]  # landed on it
 
 
 def _drop_on(row, mime) -> bool:
@@ -292,7 +292,7 @@ def test_an_item_dropped_into_an_open_custom_folder_goes_in(qtbot):
     assert _drop_in_the_middle_pane(view, mime)
 
     assert view._db.list_custom_folders()[0]["items"] == ["i1"]
-    assert view._browser.listed_prompt_ids() == ["i1"]  # drawn again with it
+    assert view._gallery_pane.listed_prompt_ids() == ["i1"]  # drawn again with it
 
 
 def _folder_drag(view, key):
@@ -337,7 +337,7 @@ def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
     outer = next(r for r in view._db.list_custom_folders() if r["name"] == "Outer")
     assert outer["folders"] == [cat, inner]
     assert _shown(_top_level(view._tree)["Outer"]) == "(2) Outer"
-    assert view._browser._listed_folders == [cat, inner]  # landed on it
+    assert view._gallery_pane._listed_folders == [cat, inner]  # landed on it
     assert "Inner" not in _top_level(view._tree)
 
 
@@ -556,7 +556,7 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
     view.refresh()
 
     assert view._selection_group is not None
-    assert len(view._browser._listed_folders) == 2
+    assert len(view._gallery_pane._listed_folders) == 2
 
 
 # --- the tree's right-click menus: the only route to several of these actions --
@@ -1086,8 +1086,8 @@ def test_the_trash_can_takes_every_folder_picked_by_clicks_after_a_right_click(
     _answer_menu(monkeypatch, "Delete 2 folders…")
     _tree_menu(view, dog)
 
-    tip = view._bank.delete.toolTip()
-    view._bank.delete.click()
+    tip = view._buttons.delete.toolTip()
+    view._buttons.delete.click()
 
     assert (tip, asked) == ("Delete 2 folders", ["Delete 2 folders and their 2 items?"] * 2)
 
@@ -1149,4 +1149,4 @@ def test_picked_folders_offer_no_delete_when_one_of_them_cannot_be_deleted(
     _tree_menu(view, cat)
 
     assert "Delete 2 folders…" not in labels
-    assert not view._bank.delete.isEnabled()
+    assert not view._buttons.delete.isEnabled()

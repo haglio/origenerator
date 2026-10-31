@@ -159,7 +159,7 @@ class FakeDB:
         self.targets.append((prompt_id, target))
 
 
-class FakeBrowser:
+class FakeGalleryPane:
     def __init__(self, selected=()):
         self.selected_ids = set(selected)
         self.enhancing = None
@@ -274,12 +274,12 @@ def enhance(monkeypatch):
     """A controller whose panel and surfaces are all recorders."""
     monkeypatch.setattr(module, "EnhancePanel", FakePanel)
 
-    def build(host=None, *, db=None, jobs=None, browser=None, slideshows=None,
+    def build(host=None, *, db=None, jobs=None, gallery_pane=None, slideshows=None,
               tabs=None):
         host = host or FakeHost()
         return EnhanceController(
             host, db=db or FakeDB(), jobs=jobs or FakeReroll(),
-            browser=browser or FakeBrowser(), slideshows=slideshows or FakeSlideshows(),
+            gallery_pane=gallery_pane or FakeGalleryPane(), slideshows=slideshows or FakeSlideshows(),
             info_tabs_of=lambda: tabs or FakeTabs()), host
     return build
 
@@ -293,7 +293,7 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
                         lambda row, settings: None)
     controller, _host = enhance(
         FakeHost(picked=["i1", "i2"]),
-        db=FakeDB([_image("i1"), _image("i2")]), browser=FakeBrowser(["i1", "i2"]))
+        db=FakeDB([_image("i1"), _image("i2")]), gallery_pane=FakeGalleryPane(["i1", "i2"]))
 
     offer = controller.offer()
 
@@ -309,7 +309,7 @@ def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
     monkeypatch.setattr(module.gallery, "media_type_of_row",
                         lambda row: row["media_type"])
     controller, _host = enhance(
-        FakeHost(picked=["v1"]), db=FakeDB([_video("v1")]), browser=FakeBrowser(["v1"]))
+        FakeHost(picked=["v1"]), db=FakeDB([_video("v1")]), gallery_pane=FakeGalleryPane(["v1"]))
 
     offer = controller.offer()
 
@@ -325,7 +325,7 @@ def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
     monkeypatch.setattr(module.gallery, "level_matching_settings",
                         lambda row, settings: {"file": "one-enhanced.png"})
     controller, _host = enhance(
-        FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]), browser=FakeBrowser(["i1"]))
+        FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]), gallery_pane=FakeGalleryPane(["i1"]))
 
     assert controller.offer() == (False, ALREADY_AT_THESE_SETTINGS)
 
@@ -501,7 +501,7 @@ def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     jobs = FakeReroll()
     controller, _host = enhance(FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]),
-                                browser=FakeBrowser(["i1"]), jobs=jobs)
+                                gallery_pane=FakeGalleryPane(["i1"]), jobs=jobs)
 
     controller.panel.enhance_requested.emit()
 
@@ -524,15 +524,15 @@ def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance):
     # The panel holds the settings and the tabs hold the images, so the tile can
     # only know whether it would be a duplicate once the two meet.
     tab = FakeConfigPanel()
-    browser = FakeBrowser()
-    controller, host = enhance(browser=browser, tabs=FakeTabs([tab]))
+    gallery_pane = FakeGalleryPane()
+    controller, host = enhance(gallery_pane=gallery_pane, tabs=FakeTabs([tab]))
 
     settings = gallery.EnhanceSettings()
     controller.panel.on_changed(settings)
 
     assert tab.settings is settings
     assert host.offers == 1
-    assert browser.corner_refreshes == 1
+    assert gallery_pane.corner_refreshes == 1
 
 
 def test_the_settings_survive_a_restart(enhance):
@@ -581,7 +581,7 @@ def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatc
     monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: "video")
     rows = [_video("v1")]
     controller, _host = enhance(FakeHost(picked=["v1"], rows=rows),
-                                browser=FakeBrowser(["v1"]))
+                                gallery_pane=FakeGalleryPane(["v1"]))
 
     controller.sync_panel(Offer(False, NO_VIDEO_ENHANCER))
 
@@ -593,7 +593,7 @@ def test_a_mixed_folder_keeps_its_settings_live(enhance, monkeypatch):
                         lambda row: row["media_type"])
     rows = [_video("v1"), _image("i1")]
     controller, _host = enhance(FakeHost(picked=["v1", "i1"], rows=rows),
-                                browser=FakeBrowser(["v1", "i1"]))
+                                gallery_pane=FakeGalleryPane(["v1", "i1"]))
 
     controller.sync_panel(Offer(True, "Enhance 1 item"))
 
@@ -611,7 +611,7 @@ def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(en
 def test_the_panel_hears_which_picked_thumbnails_are_in_front(enhance):
     rows = [_image("i1"), _image("i2"), _video("v1")]
     controller, _host = enhance(FakeHost(picked=["i1", "v1"], rows=rows),
-                                browser=FakeBrowser(["i1", "v1"]))
+                                gallery_pane=FakeGalleryPane(["i1", "v1"]))
 
     controller.sync_panel(Offer(True, "Enhance 1 item"))
 
@@ -666,15 +666,15 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
                         lambda params: "upscale x2")
     row = _image("i1")
     tab = FakeConfigPanel(row)
-    browser, slideshows = FakeBrowser(), FakeSlideshows()
+    gallery_pane, slideshows = FakeGalleryPane(), FakeSlideshows()
     controller, _host = enhance(
         FakeHost(rows=[row]), jobs=FakeReroll([FakeJob("run-a")]),
-        browser=browser, slideshows=slideshows, tabs=FakeTabs([tab]))
+        gallery_pane=gallery_pane, slideshows=slideshows, tabs=FakeTabs([tab]))
 
     controller.reconcile()
 
     assert tab.pending == ("running", b"frame", "upscale x2")
-    assert set(browser.enhancing) == {"i1"}
+    assert set(gallery_pane.enhancing) == {"i1"}
     assert slideshows.told == {"i1": "running"}
     assert slideshows.frames == {"i1": b"frame"}
 
@@ -712,23 +712,23 @@ def test_cancelling_from_a_tile_leaves_the_image_exactly_as_it_was(enhance,
                                                                    monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    browser = FakeBrowser()
+    gallery_pane = FakeGalleryPane()
     jobs = FakeReroll([FakeJob("run-a")])
-    controller, _host = enhance(jobs=jobs, browser=browser)
+    controller, _host = enhance(jobs=jobs, gallery_pane=gallery_pane)
 
     controller.cancel_for([_image("i1")])
 
     assert jobs.cancelled == ["run-a"]
-    assert browser.enhancing == {}  # the scrim comes off in the same breath
+    assert gallery_pane.enhancing == {}  # the scrim comes off in the same breath
 
 
 def test_cancelling_with_nothing_in_flight_redraws_nothing(enhance):
-    browser = FakeBrowser()
-    controller, _host = enhance(browser=browser)
+    gallery_pane = FakeGalleryPane()
+    controller, _host = enhance(gallery_pane=gallery_pane)
 
     controller.cancel_for([_image("i1")])
 
-    assert browser.enhancing is None
+    assert gallery_pane.enhancing is None
 
 
 # --- said out loud -----------------------------------------------------------

@@ -48,8 +48,8 @@ from origenerator.orientation import key_holds, oriented_key, side_of, split_key
 # A search does not narrow this tree: a narrowed list of folder names is a poor
 # answer to "where is the one with the two of them on the couch", because a
 # folder's name is a short code and the thing you would actually recognize is
-# the thumbnail. The search fills the browser pane with matching thumbnails
-# instead (see BrowserPane.show_search_results), and the tree is left alone — so the folder
+# the thumbnail. The search fills the Gallery pane with matching thumbnails
+# instead (see GalleryPane.show_search_results), and the tree is left alone — so the folder
 # you were standing in is still there when the search clears.
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
@@ -337,7 +337,7 @@ class GalleryTree:
         The side comes from the row's own key rather than from a row above it —
         each half is a tree of its own — and it leads the path because a
         folder's label alone would not say which of the two copies of it you
-        are standing in. The header over the browser pane is a long way from
+        are standing in. The header over the Gallery pane is a long way from
         the label over the half you clicked.
         """
         steps = []

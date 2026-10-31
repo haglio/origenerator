@@ -23,9 +23,9 @@ class FlowLayout(QLayout):
     of buttons wraps onto a second line rather than squeezing every label down to
     an unreadable stub.
 
-    ``align_right`` pushes each row against the right edge, for a bank of buttons
+    ``align_right`` pushes each row against the right edge, for a row of buttons
     that sits in that corner — the rows stay ragged on the left, the way a button
-    bank reads, instead of walking away from the corner as it wraps.
+    row reads, instead of walking away from the corner as it wraps.
     """
 
     def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None,

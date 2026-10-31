@@ -10,8 +10,8 @@ from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
-from origenerator.gui.browser_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.corner_buttons import CORNER_INSET
+from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import CornerButton, ItemTile
 from origenerator.gui.item_type_icon import ItemTypeIcon

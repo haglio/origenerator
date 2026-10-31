@@ -53,7 +53,7 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
 def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_path):
-    # It keeps its place in the bank beside Favorite and Delete rather than coming
+    # It keeps its place in the Gallery pane buttons beside Favorite and Delete rather than coming
     # and going — a button that vanishes is one you have to go looking for — and
     # says in its tooltip what it would do here.
     db = _enhanceable_db(tmp_path, count=1)
@@ -62,9 +62,9 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view.refresh()
     _select_first_leaf(view)
     _click_off(view)                               # so the button is the folder's
-    assert not view._bank.enhance.isHidden()
-    assert view._bank.enhance.isEnabled()          # a plain image awaits
-    assert "1 not-yet-enhanced image" in view._bank.enhance.toolTip()
+    assert not view._buttons.enhance.isHidden()
+    assert view._buttons.enhance.isEnabled()          # a plain image awaits
+    assert "1 not-yet-enhanced image" in view._buttons.enhance.toolTip()
 
     # Once a standalone enhance of that image exists, nothing awaits: the button
     # stays put and goes dark.
@@ -78,9 +78,9 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view.refresh()
     key = gallery.settings_folder_key(db.get_generation("g0"))
     view._tree.setCurrentItem(view._tree_item_for(key))
-    assert not view._bank.enhance.isHidden()
-    assert not view._bank.enhance.isEnabled()
-    assert view._bank.enhance.toolTip() == "Nothing here to enhance"
+    assert not view._buttons.enhance.isHidden()
+    assert not view._buttons.enhance.isEnabled()
+    assert view._buttons.enhance.toolTip() == "Nothing here to enhance"
 
 
 def test_enhance_all_never_stops_one_of_its_own_images_for_the_next(qtbot, tmp_path):
@@ -278,8 +278,8 @@ def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tm
     button = view._enhance.panel._enhance_button
 
     assert button.isEnabled()
-    assert view._bank.enhance.isEnabled()
-    assert button.toolTip() == view._bank.enhance.toolTip()
+    assert view._buttons.enhance.isEnabled()
+    assert button.toolTip() == view._buttons.enhance.toolTip()
 
     button.click()
 
@@ -483,18 +483,18 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert view._browser._thumb_widgets["g0"]._enhancing is None
+    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is None
 
     view.enhance_items(["g0"])
 
     # The launch redraws the folder, so the tile to watch is the one now up.
-    tile = view._browser._thumb_widgets["g0"]
+    tile = view._gallery_pane._thumb_widgets["g0"]
     assert tile._enhancing is not None
-    assert view._browser._thumb_widgets["g1"]._enhancing is None
+    assert view._gallery_pane._thumb_widgets["g1"]._enhancing is None
 
     (job,) = view._jobs.all_jobs
     view._client.preview_image.emit(job.prompt_id, _png_bytes())
-    tile = view._browser._thumb_widgets["g0"]
+    tile = view._gallery_pane._thumb_widgets["g0"]
     assert tile._image_label.pixmap() is not None
     assert not tile._image_label.pixmap().isNull()
 
@@ -518,10 +518,10 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
     _select_first_leaf(view)
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
-    assert view._browser._thumb_widgets["g0"]._enhancing is not None
+    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
     labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
 
-    view._browser._thumbnail_context_menu("g0", QPoint(0, 0))
+    view._gallery_pane._thumbnail_context_menu("g0", QPoint(0, 0))
 
     assert "Cancel 1 enhancement" in labels[0]
     assert view._jobs.all_jobs == []                     # the run stopped
@@ -542,7 +542,7 @@ def test_canceling_one_enhancement_leaves_the_others_alone(
     leader, follower = view._jobs.all_jobs
     _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
 
-    view._browser._thumbnail_context_menu("g1", QPoint(0, 0))
+    view._gallery_pane._thumbnail_context_menu("g1", QPoint(0, 0))
 
     assert view._jobs.all_jobs == [leader]
     assert follower not in view._jobs.all_jobs
@@ -558,7 +558,7 @@ def test_a_tile_with_nothing_in_flight_offers_no_cancel(qtbot, tmp_path, monkeyp
     _select_first_leaf(view)
     labels = _menu_offering(monkeypatch, "gallery_view")
 
-    view._browser._thumbnail_context_menu("g0", QPoint(0, 0))
+    view._gallery_pane._thumbnail_context_menu("g0", QPoint(0, 0))
 
     assert not any(label.startswith("Cancel") for label in labels[0])
 
@@ -578,8 +578,8 @@ def test_a_running_enhance_gets_no_tile_of_its_own_on_latest(qtbot, tmp_path):
     view.refresh()          # the launch's transient row is in the DB now
     _open_latest(view)
 
-    assert job.prompt_id not in view._browser._inflight_cards
-    assert view._browser._thumb_widgets["g0"]._enhancing is not None
+    assert job.prompt_id not in view._gallery_pane._inflight_tiles
+    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
     assert view._queue.keys() == [job.prompt_id]
 
 
@@ -600,7 +600,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_latest(qtbot, tmp_path)
     view.refresh()          # the launch's transient row is in the DB now
 
     assert view.listed_prompt_ids() == ["g0", "g2", "g1"]
-    assert view._browser._thumb_widgets["g0"]._enhancing is not None
+    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
 
 
 def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
@@ -617,7 +617,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     leader, follower = view._jobs.all_jobs
     view._client.preview_image.emit(leader.prompt_id, _png_bytes())
 
-    tiles = view._browser._thumb_widgets
+    tiles = view._gallery_pane._thumb_widgets
     assert tiles["g0"]._enhancing is not None
     assert tiles["g1"]._enhancing is not None
     assert not tiles["g0"]._image_label.pixmap().isNull()
@@ -752,7 +752,7 @@ def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp
     ]
     assert not gallery.is_enhanced_row(updated)   # the badge goes with the level
     assert view._actions.can_undo()
-    assert not view._bank.undo.isHidden()
+    assert not view._buttons.undo.isHidden()
 
 
 def test_pressing_a_versions_trash_can_bins_that_level_and_the_last_one_has_none(qtbot,
@@ -808,13 +808,13 @@ def test_a_tile_wears_an_enhancing_scrim_while_its_run_is_in_flight(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    tile = view._browser._thumb_widgets["g0"]
+    tile = view._gallery_pane._thumb_widgets["g0"]
     assert tile._enhancing is None
 
     view.enhance_items(["g0"])
     view._rerender_current_leaf()
 
-    assert view._browser._thumb_widgets["g0"]._enhancing is not None
+    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
 
 
 def test_the_add_tile_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):

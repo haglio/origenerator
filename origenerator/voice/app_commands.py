@@ -2,7 +2,7 @@
 
 Fun Time's Funestras answer single words: "weird" condemns the video, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
-the toolbar does and the names of the collections that lead the tree — so
+the Gallery pane buttons do and the names of the collections that lead the tree — so
 "experiments" stands you in the Experiments collection exactly as clicking its row
 does, and "undo" takes back the last delete without reaching for the mouse.
 
@@ -71,7 +71,7 @@ class AppCommand(Enum):
     DRIVE_ON = "drive_on"
     DRIVE_OFF = "drive_off"
     # No "mic on": a muted recognizer hears nothing, so there is no spoken way
-    # back — the toolbar's switch is it. Fun Time's mic works the same way.
+    # back — the Gallery pane buttons' switch is it. Fun Time's mic works the same way.
     MIC_OFF = "mic_off"
 
     # What a slideshow may play: the switch beside F-mode on its HUD, which keeps

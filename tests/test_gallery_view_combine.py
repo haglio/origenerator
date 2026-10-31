@@ -777,7 +777,7 @@ def test_combine_new_folder_lands_on_latest_then_reveals_on_finish(qtbot, tmp_pa
 
     client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)
 
-    assert not view._browser.showing_recents()  # the finished row gave its folder a node
+    assert not view._gallery_pane.showing_latest()  # the finished row gave its folder a node
     new_row = db.get_generation(prompt_id)
     image_rows = [r for r in db.list_generations() if gallery.media_type_of_row(r) == "image"]
     expected = gallery.settings_folder_key(new_row, gallery.build_image_config_index(image_rows))
@@ -798,7 +798,7 @@ def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
     view._combine._generate_combination("img", "vid")
 
     expected = view._leaf_by_id["vsib"].data(0, _GROUP_ROLE).key
-    assert not view._browser.showing_recents()
+    assert not view._gallery_pane.showing_latest()
     assert _selected_folder(view) == expected
     assert view._selected_reroll_key == expected  # watching the live combine tile
 
@@ -980,7 +980,7 @@ def _lit_while_dragging(monkeypatch, drag_out, mime, zones) -> dict:
     return lit
 
 
-def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path, monkeypatch):
+def test_dragging_a_gallery_pane_thumbnail_lights_its_combine_slot(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -1026,7 +1026,7 @@ def test_combines_generate_grays_while_the_pair_dropped_in_it_is_being_made(qtbo
 
 
 def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, monkeypatch):
-    # The front generate tab's preview drags onto combine like a browser thumbnail.
+    # The front generate tab's preview drags onto combine like a Gallery pane thumbnail.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -1045,7 +1045,7 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
         qtbot, tmp_path, monkeypatch):
     view = _combine_view(qtbot, tmp_path)
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
-    tile = view._browser._thumb_widgets["vid"]
+    tile = view._gallery_pane._thumb_widgets["vid"]
     slot = view._combine.panel.video_slot._label
     in_flight = {}
 

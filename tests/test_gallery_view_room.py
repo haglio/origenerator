@@ -107,7 +107,7 @@ def _osr2_view(qtbot):
 
 def test_the_consoles_control_group_is_the_apps_one_osr2_switch(qtbot):
     """The whole point of the group: from a slideshow there was no way to reach
-    the toolbar's switch at all, and now there is no toolbar switch to reach."""
+    the Gallery pane buttons' switch at all, and now there is no Gallery pane buttons' switch to reach."""
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
 
@@ -331,10 +331,10 @@ def test_the_radio_switch_tunes_the_radio_in_and_silences_it(qtbot):
     view, radio = _radio_view(qtbot)
     assert (radio.starts, radio.stops) == (0, 0)  # off until asked
 
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
     assert radio.starts == 1
 
-    view._bank.radio.setChecked(False)
+    view._buttons.radio.setChecked(False)
     assert radio.stops == 1
 
 
@@ -345,7 +345,7 @@ def test_the_radio_switch_round_trips_for_persistence(qtbot):
     view.set_radio_enabled(True)
 
     assert view.radio_enabled() is True
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
     assert radio.starts == 1  # restoring the switch actually starts it playing
 
 
@@ -379,7 +379,7 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
 
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
     # Left/Right step through the folder: the slideshow is built from the visible
-    # items' media, in the browser's order, starting on the one already shown.
+    # items' media, in the Gallery pane's order, starting on the one already shown.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
@@ -394,13 +394,13 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
     slideshow = _double_click_slideshow(view, qtbot)
 
-    order = view._browser.listed_prompt_ids()
+    order = view._gallery_pane.listed_prompt_ids()
     # Each entry carries its generation's id, so the slideshow's Up and Down can name
     # what to trash and what to favorite, and its stored thumbnail, which is the
     # only still a video has for the neighbor previews.
     assert slideshow._set.playlist._items == [(f"{pid}.png", "image", pid, None)
                                           for pid in order]
-    assert slideshow._set.playlist.order == list(range(len(order)))  # the browser's order
+    assert slideshow._set.playlist.order == list(range(len(order)))  # the Gallery pane's order
     assert slideshow._set.playlist.current()[2] == "i2"  # opened on the shown item
     slideshow.close()
 
@@ -415,7 +415,7 @@ def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_i
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._bank.auto.click()
+    view._buttons.auto.click()
     _generating_tile(view).selected.emit()  # watching Auto-Generate in the tab
     landed = view._live_jobs[key].prompt_id
     client.job_completed.emit(landed, _REROLL_HISTORY)  # the tab shows it; the next runs
@@ -566,7 +566,7 @@ def test_a_move_of_a_standing_slideshows_volume_turns_the_radio_on(qtbot, monkey
 
     slideshow._actions.volume_moved(VolumeHud(volume=40, muted=False))
 
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
     assert radio.starts == 1
 
 
@@ -880,7 +880,7 @@ def _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch):
     view.refresh()
     _select_first_leaf(view)
     view.show()
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -899,7 +899,7 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
     assert radio.frozen
     assert view._slideshows.showing is slideshow
     assert slideshow.shown.isVisible()
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
 
 
 def test_esc_at_a_standalone_slideshow_has_its_osr2_line_say_parked_until_a_second_plays(
@@ -932,13 +932,13 @@ def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
     view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
     del view._other_window_owns_keys
     view._toggle_auto(True)
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
     assert omnipause.frozen()
     assert radio.frozen
     assert view._auto.is_active(key)
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
 
     _press_escape_at_the_gallery(view)
     assert not omnipause.frozen()
@@ -949,13 +949,13 @@ def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_aga
         qtbot, tmp_path, monkeypatch):
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
     del view._other_window_owns_keys
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
-    assert lit_in(view._bank.radio) == "yellow"
+    assert lit_in(view._buttons.radio) == "yellow"
 
     _press_escape_at_the_gallery(view)
-    assert lit_in(view._bank.radio) == "blue"
+    assert lit_in(view._buttons.radio) == "blue"
 
 
 def _startable_view(qtbot, tmp_path, monkeypatch):
@@ -988,10 +988,10 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     # Speaking is how anything gets going again without reaching for the keyboard.
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
     del view._other_window_owns_keys
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     _press_escape_at_the_gallery(view)
 
     assert omnipause.frozen()
-    assert view._bank.mic.isChecked()
+    assert view._buttons.mic.isChecked()
     assert view._voice.listener.commands_on

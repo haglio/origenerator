@@ -132,7 +132,7 @@ def test_an_out_of_range_start_falls_back_to_the_front():
 
 
 def test_in_order_leaves_the_set_exactly_as_handed_over():
-    # A folder played from a double-click is the browser's own listing, not a pass.
+    # A folder played from a double-click is the Gallery pane's own listing, not a pass.
     playlist = _playlist(shuffle=in_order)
     assert playlist.order == [0, 1, 2]
 

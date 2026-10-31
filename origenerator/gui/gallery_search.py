@@ -22,7 +22,7 @@ from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from origenerator import gallery, search
-from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
+from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
@@ -78,7 +78,7 @@ class SearchHost(Protocol):
 
 
 class GallerySearchController(QObject):
-    """The search field and the results it fills the browser pane with."""
+    """The search field and the results it fills the Gallery pane with."""
 
     def __init__(self, host: SearchHost, *, parent: QObject,
                  expander: SearchExpander | None = None):
@@ -104,7 +104,7 @@ class GallerySearchController(QObject):
         self._expand_timer.timeout.connect(self._request_expansion)
 
         # The gallery search. It sits over the tree but no longer narrows it: what
-        # it fills is the browser pane, with the matching generations themselves
+        # it fills is the Gallery pane, with the matching generations themselves
         # (see :meth:`run`), because a thumbnail is what the user recognizes and a
         # folder name — a short code — is not. Matching is by meaning rather than
         # by letters, so "two women" reaches "a pair of dolls" and "two tall
@@ -191,7 +191,7 @@ class GallerySearchController(QObject):
         self.field.set_scope(self._host.search_scope().path)
 
     def run(self) -> None:
-        """Fill the browser pane with what the standing query matches, within the
+        """Fill the Gallery pane with what the standing query matches, within the
         folder the tree has selected.
 
         Takes the pane over from that folder — the tree keeps its selection while

@@ -1,6 +1,6 @@
 """The controls a generation wears in the corners of its thumbnail or preview.
 
-A thumbnail in the browser pane and the preview in a config tab are showing the
+A thumbnail in the Gallery pane and the preview in a config tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
 favorite it (top right), trash it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
@@ -33,9 +33,9 @@ STAR = "star"
 TRASH = "trash"
 ENHANCE = "enhance"
 
-# The geometry the browser pane's other hover controls (a tile's per-seed
+# The geometry the Gallery pane's other hover controls (a tile's per-seed
 # re-rolls, a review collection's keep/reject) already use, shared so the star can sit
-# in a row with them along the top of a tile and read as one bank rather than as
+# in a row with them along the top of a tile and read as one row rather than as
 # a stray button beside two matching ones.
 CORNER_SIZE = BUTTON_SIZE
 CORNER_GAP = BUTTON_GAP
@@ -71,7 +71,7 @@ def enhance_state(row: dict, settings) -> str | None:
     settings*. So the corner says "you have this one" only while the panel would
     reproduce what is already there, and goes back to offering another the moment
     a setting moves — which is the same question the version list's ``+ Enhance``
-    row and the button bank's Enhance both answer
+    row and the Gallery pane buttons' Enhance both answer
     (:func:`~origenerator.gallery.enhance.level_matching_settings`).
     """
     if not gallery.is_enhanceable_row(row):

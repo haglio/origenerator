@@ -206,13 +206,13 @@ class GenerateConfigPanel(DropZones):
 
     Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
     for the gallery to launch as a re-roll of this config's settings folder. The
-    panel is one column: a fixed preview on top, then a single button bank over
+    panel is one column: a fixed preview on top, then a single button row over
     one scroll holding the File/Created block above the editable form and, at its
     foot, the displayed generation's related media. Generate's caption says when a
     press will draw a fresh seed rather than re-create what these settings have
     already made, and the info appears only while a saved generation is on show.
 
-    What acts on the generation itself is on the preview rather than in the bank:
+    What acts on the generation itself is on the preview rather than in the button row:
     the preview wears the same star / trash / plus corners a gallery thumbnail
     does, and right-clicking it raises the same menu. Each file row carries a
     "Go to folder" beside its Show in Explorer.
@@ -349,7 +349,7 @@ class GenerateConfigPanel(DropZones):
 
     def _build_ui(self):
         """The column, in the order it reads: the preview, then the splitter's
-        handle, then the button bank over one scroll holding everything that is
+        handle, then the button row over one scroll holding everything that is
         about the settings.
 
         Each region below builds itself and says why it is the way it is; this
@@ -362,7 +362,7 @@ class GenerateConfigPanel(DropZones):
         layout = QVBoxLayout(self)
         # Top and foot only: the splitter below spans the tab, so its handle
         # meets the pane's own border instead of stopping short of it, and the
-        # margin that keeps the preview, the form and the bank off the pane's
+        # margin that keeps the preview, the form and the button row off the pane's
         # sides is inside each of them.
         layout.setContentsMargins(0, MARGIN_STANDARD, 0, MARGIN_STANDARD)
         self._build_preview()
@@ -391,7 +391,7 @@ class GenerateConfigPanel(DropZones):
         newest matching result otherwise."""
         self._preview = PreviewWidget(show_scrubber=True)
         # Its corners and its right-click go to the gallery, which owns the
-        # favorite, the Trash and the enhance queue — the same route the browser
+        # favorite, the Trash and the enhance queue — the same route the Gallery pane
         # pane's thumbnails take, so an act means the same thing either side.
         self._preview.action_triggered.connect(self.item_action_requested)
         self._preview.context_requested.connect(self.context_menu_requested)
@@ -410,7 +410,7 @@ class GenerateConfigPanel(DropZones):
         return self._preview
 
     def _build_body_scroll(self) -> QVBoxLayout:
-        """One scroll under the button bank for everything else, and the column
+        """One scroll under the button row for everything else, and the column
         inside it that the three regions below fill.
 
         The read-only info on top, the editable form below it, so they scroll
@@ -538,16 +538,16 @@ class GenerateConfigPanel(DropZones):
         column = QVBoxLayout(settings_pane)
         column.setContentsMargins(0, MARGIN_STANDARD, 0, 0)
         column.setSpacing(0)
-        bank = self._build_button_bank()
-        bank.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, MARGIN_STANDARD)
-        column.addLayout(bank)
+        buttons = self._build_button_row()
+        buttons.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, MARGIN_STANDARD)
+        column.addLayout(buttons)
         self._settings_border = pane_border()
         column.addWidget(self._settings_border)
         column.addWidget(self._scroll, 1)
         return settings_pane
 
-    def _build_button_bank(self) -> FlowLayout:
-        """One bank, fixed over the scroll so Generate is always reachable.
+    def _build_button_row(self) -> FlowLayout:
+        """One button row, fixed over the scroll so Generate is always reachable.
 
         The lane button shows only for a video on display, and the discard
         button only while a run this tab launched is in flight — "Cancel", or "Next
@@ -712,7 +712,7 @@ class GenerateConfigPanel(DropZones):
             deriver = wf.derived_display_size if wf.derives_size_from_input else None
             # The enhance params stay off the form: everything laid out here
             # decides which gallery folder a run lands in, and an enhancement
-            # doesn't — the browser pane's Enhance subpanel owns it per folder.
+            # doesn't — the Gallery pane's Enhance subpanel owns it per folder.
             # They still round-trip, so reusing an old run reproduces it exactly.
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
                                          size_source=wf.derived_size_source,

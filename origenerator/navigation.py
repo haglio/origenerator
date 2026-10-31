@@ -1,4 +1,4 @@
-"""A browser-style back/forward history of the views the middle pane has shown.
+"""A web-browser-style back/forward history of the views the middle pane has shown.
 
 Qt-free so the traversal logic stays unit-testable without a widget toolkit. The
 gallery records every view the user lands on — a folder, a collection (Latest,

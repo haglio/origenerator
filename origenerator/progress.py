@@ -298,7 +298,7 @@ class ProgressTracker:
     is running — with that sampler's node id, where the caller has one — it
     returns ``(done, total)`` in the budgeted seconds of
     :func:`expected_sampling_seconds`. Each new pass restarts its own ``value``
-    from the low end; the tracker banks the finished pass's cost so the next
+    from the low end; the tracker puts by the finished pass's cost so the next
     continues where it left off instead of snapping back to zero. That restarting
     count is worth showing on its own, and :meth:`current_pass` is where it is
     kept — in steps, which is the honest unit for one pass of one sampler.
@@ -418,7 +418,7 @@ class ProgressTracker:
             self._pass_index = 1
             self._begin_pass(node)
         elif self._is_new_pass(value, node):
-            # Bank the finished pass at its own rate before taking up the next's.
+            # Put by the finished pass at its own rate before taking up the next's.
             self._banked += self._stage_max * self._stage_seconds
             self._stage_max = 0
             self._pass_index += 1

@@ -328,7 +328,7 @@ def test_snapshot_restore_resumes_a_multi_stage_ramp_across_a_restart():
     # continue the ramp — the next tick reads 14/20, not 4/20 as a tracker that
     # forgot the banked first pass would.
     tracker = ProgressTracker(20)
-    tracker.update(10, 10)          # first pass done -> banks 10
+    tracker.update(10, 10)          # first pass done -> puts by 10
     tracker.update(3, 10)           # second pass at 3 -> 13/20
     assert tracker.current() == (13, 20)
 

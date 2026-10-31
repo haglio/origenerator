@@ -1,7 +1,7 @@
-"""The button bank, written from one state and read with no gallery around it.
+"""The Gallery pane buttons, written from one state and read with no gallery around it.
 
 Every button's enabled state, tooltip and visibility used to be recomputed by a
-method of its own, and the only way to ask how the bank stood was to build the
+method of its own, and the only way to ask how the Gallery pane buttons stood was to build the
 app's central widget and read sixteen widgets off it. The state is a plain record
 now, so a test writes one by hand.
 
@@ -18,61 +18,61 @@ from shared_ui.spacing import BUTTON_ICON_INSET, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
 from origenerator.gui import omnipause
-from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.gui.toolbar_bank import (
+from origenerator.gui.gallery_pane_buttons import (
     AUTO_ELSEWHERE_TIP,
-    BankActs,
-    BankState,
     Button,
-    ToolbarBank,
+    ButtonActs,
+    ButtonStates,
+    GalleryPaneButtons,
 )
+from origenerator.gui.stylesheet import build_stylesheet
 from tests.lit_switches import lit_in
 
 
-def _acts(**overrides) -> BankActs:
+def _acts(**overrides) -> ButtonActs:
     """Handlers that record rather than act, so a press is observable."""
-    fields = {name: (lambda *a: None) for name in BankActs._fields}
+    fields = {name: (lambda *a: None) for name in ButtonActs._fields}
     fields.update(overrides)
-    return BankActs(**fields)
+    return ButtonActs(**fields)
 
 
-def _state(**overrides) -> BankState:
-    """A bank standing wholly available, with the parts a test cares about
+def _state(**overrides) -> ButtonStates:
+    """A row of buttons standing wholly available, with the parts a test cares about
     overridden."""
-    fields = {name: Button(tip=name) for name in BankState._fields
+    fields = {name: Button(tip=name) for name in ButtonStates._fields
               if name != "auto_tip"}
     fields["auto_tip"] = ""
     fields.update(overrides)
-    return BankState(**fields)
+    return ButtonStates(**fields)
 
 
 @pytest.fixture
-def bank(qtbot):
+def buttons(qtbot):
     def build(acts=None, *, hosted=False):
-        made = ToolbarBank(acts or _acts(), hosted=hosted)
+        made = GalleryPaneButtons(acts or _acts(), hosted=hosted)
         qtbot.addWidget(made)
         return made
     return build
 
 
-def test_the_room_s_own_appliances_are_absent_when_a_session_owns_them(bank):
-    hosted = bank(hosted=True)
+def test_the_room_s_own_appliances_are_absent_when_a_session_owns_them(buttons):
+    hosted = buttons(hosted=True)
 
     assert hosted.radio is None
     assert hosted.mic is None
-    assert bank().radio is not None
+    assert buttons().radio is not None
 
 
-def test_the_bank_holds_no_osr2_switch_at_all(bank):
+def test_the_row_holds_no_osr2_switch_at_all(buttons):
     # The Funestras' console carries the control-state group that switches the
     # device now -- parked, retracted, driving, control off -- and a second
     # switch for one device is what that group replaced.
-    assert not hasattr(bank(), "drive")
+    assert not hasattr(buttons(), "drive")
 
 
-def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(bank):
-    taken = bank()
-    built_hosted = bank(hosted=True)
+def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(buttons):
+    taken = buttons()
+    built_hosted = buttons(hosted=True)
 
     taken.become_hosted()
 
@@ -85,8 +85,8 @@ def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(bank):
     assert shown(taken) == shown(built_hosted)
 
 
-def test_a_bank_handed_back_from_a_session_has_its_room_switches_again(bank):
-    taken = bank()
+def test_a_bank_handed_back_from_a_session_has_its_room_switches_again(buttons):
+    taken = buttons()
     taken.become_hosted()
 
     taken.become_standalone()
@@ -95,8 +95,8 @@ def test_a_bank_handed_back_from_a_session_has_its_room_switches_again(bank):
                for switch in (taken.radio, taken.mic))
 
 
-def test_the_radio_switch_turned_on_in_a_paused_room_is_lit_yellow_at_once(bank):
-    switch = bank().radio
+def test_the_radio_switch_turned_on_in_a_paused_room_is_lit_yellow_at_once(buttons):
+    switch = buttons().radio
     omnipause.freeze(True)
 
     switch.setChecked(True)
@@ -104,10 +104,10 @@ def test_the_radio_switch_turned_on_in_a_paused_room_is_lit_yellow_at_once(bank)
     assert lit_in(switch) == "yellow"
 
 
-def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_yellow(bank):
+def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_yellow(buttons):
     """The family's yellow is light, so a mark on it takes the dark ink a lit yellow
     control on a HUD does."""
-    switch = bank().radio
+    switch = buttons().radio
     omnipause.freeze(True)
 
     lit = switch.icon().pixmap(QSize(48, 48), QIcon.Mode.Normal, QIcon.State.On).toImage()
@@ -118,8 +118,8 @@ def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_yellow
     assert all(color == BG_PRIMARY for color in inked)
 
 
-def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_one(bank):
-    switch = bank().radio
+def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_one(buttons):
+    switch = buttons().radio
     playing = switch.grab().toImage()
 
     omnipause.freeze(True)
@@ -127,18 +127,18 @@ def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_on
     assert switch.grab().toImage() == playing
 
 
-def test_the_bank_opens_with_its_optional_buttons_away(bank):
+def test_the_bank_opens_with_its_optional_buttons_away(buttons):
     # Auto-Generate runs until it is stopped, so Auto is never hidden; the slideshow and
     # the grouping are offered only where they mean something.
-    made = bank()
+    made = buttons()
 
     assert made.slideshow.isHidden()
     assert made.group.isHidden()
     assert not made.auto.isHidden()
 
 
-def test_one_state_writes_every_button(bank):
-    made = bank()
+def test_one_state_writes_every_button(buttons):
+    made = buttons()
 
     made.apply(_state(
         back=Button(enabled=False, tip="Back"),
@@ -154,11 +154,11 @@ def test_one_state_writes_every_button(bank):
     assert made.slideshow.toolTip() == "Play Latest as a slideshow"
 
 
-def test_a_switch_put_where_the_app_already_is_does_not_re_run_the_press(bank):
-    # Blocked around the write, not around the press: a bank re-aimed while
+def test_a_switch_put_where_the_app_already_is_does_not_re_run_the_press(buttons):
+    # Blocked around the write, not around the press: a row of buttons re-aimed while
     # Auto-Generate is running must not toggle it off.
     pressed = []
-    made = bank(_acts(toggle_auto=pressed.append))
+    made = buttons(_acts(toggle_auto=pressed.append))
 
     made.apply(_state(auto=Button(checked=True, tip="running here")))
 
@@ -166,8 +166,8 @@ def test_a_switch_put_where_the_app_already_is_does_not_re_run_the_press(bank):
     assert pressed == []
 
 
-def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(bank):
-    made = bank()
+def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(buttons):
+    made = buttons()
     made.auto.setChecked(True)
 
     made.apply(_state())  # auto's `checked` is None
@@ -175,10 +175,10 @@ def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(b
     assert made.auto.isChecked() is True
 
 
-def test_auto_generate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(bank):
+def test_auto_generate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(buttons):
     # Only one of the two ever appears: naming the folder is no use when a name
     # is a short code, so the tip offers to go there instead.
-    made = bank()
+    made = buttons()
 
     made.apply(_state(auto=Button(tip=""), auto_tip=AUTO_ELSEWHERE_TIP))
 
@@ -186,19 +186,19 @@ def test_auto_generate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(
     assert "Go to it" in made.auto_tip._html
 
 
-def test_the_tip_s_link_leads_wherever_auto_generate_is_now(bank):
+def test_the_tip_s_link_leads_wherever_auto_generate_is_now(buttons):
     followed = []
-    made = bank(_acts(go_to_auto_generating_folder=followed.append))
+    made = buttons(_acts(go_to_auto_generating_folder=followed.append))
 
     made.auto_tip.link_activated.emit("auto")
 
     assert followed == ["auto"]
 
 
-def test_a_group_with_nothing_showing_wears_no_gap(bank):
-    # A bank whose optional buttons are away must never wear a stray or doubled
+def test_a_group_with_nothing_showing_wears_no_gap(buttons):
+    # A row whose optional buttons are away must never wear a stray or doubled
     # gap, and must never start indented.
-    made = bank()
+    made = buttons()
 
     made.apply(_state(group=Button(visible=False), slideshow=Button(visible=False)))
 
@@ -207,8 +207,8 @@ def test_a_group_with_nothing_showing_wears_no_gap(bank):
     assert gaps[2] is False            # the grouping is away, so its space is too
 
 
-def test_the_first_group_that_shows_is_the_one_left_unindented(bank):
-    made = bank()
+def test_the_first_group_that_shows_is_the_one_left_unindented(buttons):
+    made = buttons()
     made.show()
 
     made.apply(_state(back=Button(visible=False), forward=Button(visible=False)))
@@ -219,9 +219,9 @@ def test_the_first_group_that_shows_is_the_one_left_unindented(bank):
     assert gaps[3] is True                        # a space in front of the trio
 
 
-def test_every_button_presses_its_own_handler(bank):
+def test_every_button_presses_its_own_handler(buttons):
     pressed = []
-    made = bank(_acts(
+    made = buttons(_acts(
         go_back=lambda: pressed.append("back"),
         undo=lambda: pressed.append("undo"),
         favorite=lambda: pressed.append("star"),
@@ -236,9 +236,9 @@ def test_every_button_presses_its_own_handler(bank):
     assert pressed == ["back", "undo", "star", "delete"]
 
 
-def test_a_switch_hands_its_handler_the_state_it_landed_in(bank):
+def test_a_switch_hands_its_handler_the_state_it_landed_in(buttons):
     heard = []
-    made = bank(_acts(toggle_radio=heard.append))
+    made = buttons(_acts(toggle_radio=heard.append))
 
     made.radio.setChecked(True)
     made.radio.setChecked(False)
@@ -246,8 +246,8 @@ def test_a_switch_hands_its_handler_the_state_it_landed_in(bank):
     assert heard == [True, False]
 
 
-def _every_button_showing_as_the_app_styles_it(bank) -> ToolbarBank:
-    made = bank()
+def _every_button_showing_as_the_app_styles_it(buttons) -> GalleryPaneButtons:
+    made = buttons()
     made.setStyleSheet(build_stylesheet())
     made.apply(_state())
     made.show()
@@ -267,15 +267,15 @@ def _where_the_mark_lands(button: QToolButton) -> QRect:
     return QRect(QPoint(min(xs), min(ys)), QPoint(max(xs), max(ys)))
 
 
-def test_every_button_on_a_standalone_bank_is_the_huds_square(bank):
-    made = _every_button_showing_as_the_app_styles_it(bank)
+def test_every_button_on_a_standalone_row_is_the_huds_square(buttons):
+    made = _every_button_showing_as_the_app_styles_it(buttons)
 
     for button in made.findChildren(QToolButton):
         assert button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD), button.toolTip()
 
 
-def test_a_hosted_banks_buttons_land_on_screen_the_size_a_standalone_banks_do(bank):
-    hosted = bank(hosted=True)
+def test_a_hosted_banks_buttons_land_on_screen_the_size_a_standalone_rows_do(buttons):
+    hosted = buttons(hosted=True)
 
     for button in hosted.findChildren(QToolButton):
         drawn = QSize(round(button.width() * ui_scale.HOSTED_SCALE),
@@ -283,22 +283,22 @@ def test_a_hosted_banks_buttons_land_on_screen_the_size_a_standalone_banks_do(ba
         assert drawn == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD), button.toolTip()
 
 
-def _gaps(made: ToolbarBank) -> tuple[int, int, int]:
+def _gaps(made: GalleryPaneButtons) -> tuple[int, int, int]:
     """Between two buttons of a group, between wrapped rows, and between groups."""
     layout = made.layout()
     return layout.spacing(), layout.row_spacing(), made._groups[0][0].width()
 
 
-def test_a_standalone_banks_gaps_land_on_screen_the_size_a_hosted_banks_do(bank):
-    standalone, hosted = bank(), bank(hosted=True)
+def test_a_standalone_banks_gaps_land_on_screen_the_size_a_hosted_rows_do(buttons):
+    standalone, hosted = buttons(), buttons(hosted=True)
 
     assert _gaps(standalone) == tuple(
         round(gap * ui_scale.HOSTED_SCALE) for gap in _gaps(hosted))
 
 
-def test_a_bank_taken_into_a_session_wears_the_squares_a_hosted_one_is_built_with(bank):
-    taken = bank()
-    built_hosted = bank(hosted=True)
+def test_a_bank_taken_into_a_session_wears_the_squares_a_hosted_one_is_built_with(buttons):
+    taken = buttons()
+    built_hosted = buttons(hosted=True)
 
     taken.become_hosted()
 
@@ -307,27 +307,27 @@ def test_a_bank_taken_into_a_session_wears_the_squares_a_hosted_one_is_built_wit
     assert _gaps(taken) == _gaps(built_hosted)
 
 
-def test_a_bank_handed_back_from_a_session_wears_the_huds_square_again(bank):
-    taken = bank()
+def test_a_bank_handed_back_from_a_session_wears_the_huds_square_again(buttons):
+    taken = buttons()
     taken.become_hosted()
 
     taken.become_standalone()
 
     assert {button.size() for button in taken.findChildren(QToolButton)} == {
         QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)}
-    assert _gaps(taken) == _gaps(bank())
+    assert _gaps(taken) == _gaps(buttons())
 
 
-def test_every_mark_on_the_bank_spans_more_than_half_its_button(bank):
-    made = _every_button_showing_as_the_app_styles_it(bank)
+def test_every_mark_on_the_row_spans_more_than_half_its_button(buttons):
+    made = _every_button_showing_as_the_app_styles_it(buttons)
 
     for button in made.findChildren(QToolButton):
         mark = _where_the_mark_lands(button)
         assert max(mark.width(), mark.height()) > button.height() / 2, button.toolTip()
 
 
-def test_every_mark_on_the_bank_stays_inside_the_familys_inset(bank):
-    made = _every_button_showing_as_the_app_styles_it(bank)
+def test_every_mark_on_the_row_stays_inside_the_familys_inset(buttons):
+    made = _every_button_showing_as_the_app_styles_it(buttons)
 
     for button in made.findChildren(QToolButton):
         room = button.rect().adjusted(BUTTON_ICON_INSET, BUTTON_ICON_INSET,

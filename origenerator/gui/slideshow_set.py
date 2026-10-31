@@ -2,7 +2,7 @@
 the slide on screen.
 
 A slideshow is handed a set of generations and deals a pass from it — shuffled, or
-in the browser's own order — narrows it to the favorites or to the images it
+in the Gallery pane's own order — narrows it to the favorites or to the images it
 has enhanced, and grows it as generations land in the folder it is playing.
 None of that is about a window: a slideshow drawn full screen by this app and a slideshow
 handed to one of a Fun Time session's Funestras keep exactly this set and differ

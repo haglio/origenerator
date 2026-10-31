@@ -17,7 +17,7 @@ import pytest
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
-from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
+from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.gallery_search import MIN_CHARS, GallerySearchController
 from origenerator.gui.search_expander import SearchExpander
 

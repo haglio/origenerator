@@ -1,4 +1,4 @@
-"""The button bank over the browser pane, and the state it is written from.
+"""The Gallery pane buttons, the row over the Gallery pane, and the state they are written from.
 
 The seventh and last of the gallery's screen concerns to come out of the view
 that used to hold all of them -- and the one with a model where there was none.
@@ -11,10 +11,10 @@ an extra call because the signal that normally re-synced that button never fires
 and it went on offering a slideshow of nothing. Both were bugs fixed by adding another
 call, and a protocol whose fix is another call guarantees more of them.
 
-There is one call now. :class:`BankState` says how all sixteen buttons stand, as
-plain values with no widget in sight; :meth:`ToolbarBank.apply` writes them, and
+There is one call now. :class:`ButtonStates` says how all sixteen buttons stand, as
+plain values with no widget in sight; :meth:`GalleryPaneButtons.apply` writes them, and
 the gaps between the groups fall out of what is showing. A handler that forgets to
-re-aim the bank forgets all of it at once, which is a thing you can see, rather
+re-aim the buttons forgets all of it at once, which is a thing you can see, rather
 than one button out of sixteen, which is not.
 """
 from __future__ import annotations
@@ -71,8 +71,8 @@ class Button(NamedTuple):
     checked: bool | None = None
 
 
-class BankState(NamedTuple):
-    """How the whole bank stands, as values a test can write by hand.
+class ButtonStates(NamedTuple):
+    """How the whole row of buttons stands, as values a test can write by hand.
 
     One record rather than sixteen methods: what each button depends on is
     gathered once, by whoever can see all of it, and written in one pass.
@@ -93,7 +93,7 @@ class BankState(NamedTuple):
     auto_tip: str = ""
 
 
-class BankActs(NamedTuple):
+class ButtonActs(NamedTuple):
     """What each button does when pressed — bound handlers, never names.
 
     By object rather than by attribute name, for the reason the spoken
@@ -137,9 +137,9 @@ def _tool_button(icon, tooltip: str, handler, *, checkable=False,
 
 
 def _group_gap() -> QWidget:
-    """The space between two groups of the bank.
+    """The space between two groups of the buttons.
 
-    Space alone is what separates them — a rule here used to, and in a bank that
+    Space alone is what separates them — a rule here used to, and in a row of buttons that
     wraps onto a second row a rule can land at the end of one row or the start of
     the next, marking nothing. An empty widget rather than layout spacing because
     the gap comes and goes with the group under it, and a widget is the thing a
@@ -148,11 +148,11 @@ def _group_gap() -> QWidget:
     return QWidget()
 
 
-class ToolbarBank(QWidget):
-    """The sixteen buttons over the browser pane, in six groups a space apart.
+class GalleryPaneButtons(QWidget):
+    """The sixteen buttons over the Gallery pane, in six groups a space apart.
 
-    Grouping is what makes an icon-only bank readable — a button's neighbors say
-    as much about it as its glyph does — and the bank takes the pane's whole
+    Grouping is what makes an icon-only row readable — a button's neighbors say
+    as much about it as its glyph does — and the row takes the pane's whole
     width, wrapping onto as many rows as that width needs. Beside the folder path
     it had to share a narrow pane with a name, and what a horizontal layout does
     when it runs out of room is squeeze every button until the glyphs are
@@ -167,7 +167,7 @@ class ToolbarBank(QWidget):
     every surface.
     """
 
-    def __init__(self, acts: BankActs, *, hosted: bool):
+    def __init__(self, acts: ButtonActs, *, hosted: bool):
         super().__init__()
         policy = self.sizePolicy()
         policy.setHeightForWidth(True)  # so the column above gives it the rows it asks for
@@ -232,7 +232,7 @@ class ToolbarBank(QWidget):
             )
             self.mic.setStyleSheet(_LIT)
         # The family's own gap along a row, and its wider one between wrapped
-        # rows -- at the single small gap this used, a bank that wrapped had its
+        # rows -- at the single small gap this used, a row that wrapped had its
         # two rows all but touching.
         layout = FlowLayout(self)
         self._groups: list[tuple[QWidget, tuple[QToolButton, ...]]] = []
@@ -284,10 +284,10 @@ class ToolbarBank(QWidget):
                 switch.setVisible(shown)
         self._show_the_gaps()
 
-    def apply(self, state: BankState) -> None:
-        """Write the whole bank from one state, then re-space the groups.
+    def apply(self, state: ButtonStates) -> None:
+        """Write every button from one state, then re-space the groups.
 
-        Every button, every time: a handler that forgets to re-aim the bank
+        Every button, every time: a handler that forgets to re-aim the buttons
         forgets all of it at once, which is a thing you can see.
         """
         for button, stands in (
@@ -316,7 +316,7 @@ class ToolbarBank(QWidget):
 
     def _show_the_gaps(self) -> None:
         """Show the space in front of each group that has something to show, and
-        hide the leading one — so a bank whose optional buttons (Group, Auto,
+        hide the leading one — so a row whose optional buttons (Group, Auto,
         Slideshow) are away never wears a stray or doubled gap, and never starts
         indented."""
         leading = True

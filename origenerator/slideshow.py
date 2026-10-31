@@ -139,9 +139,9 @@ def _without(indices: list, removed: int) -> list:
 def in_order(order: list) -> None:
     """A shuffle that doesn't: play the set in the order it was handed over.
 
-    What a double-clicked item opens in — its folder as the browser lists it,
+    What a double-clicked item opens in — its folder as the Gallery pane lists it,
     starting where the double-click landed — against the random pass a folder
-    played from the toolbar gets.
+    played from the Gallery pane buttons gets.
     """
 
 

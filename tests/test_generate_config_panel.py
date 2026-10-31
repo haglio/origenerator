@@ -1256,6 +1256,21 @@ def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
     assert panel._param_form.seed_is_random() is True
 
 
+def test_a_prompt_carried_from_a_workflow_that_reads_it_whole_flows_into_boxes_of_whole_words(
+        panel, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = " ".join(["cat"] * 74)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+    panel._param_form.set_values({"positive_prompt": f"{cats} abcdefgh"})
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+
+    boxes = panel._param_form._widgets["positive_prompt"].boxes()
+    assert [diff_text.live_text(box) for box in boxes] == [cats, "abcdefgh"]
+    assert panel._param_form.get_values()["positive_prompt"] == f"{cats}{BOX_BREAK}abcdefgh"
+
+
 def test_a_prompt_in_boxes_carried_to_a_workflow_that_reads_it_whole_is_read_whole(
         panel, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")

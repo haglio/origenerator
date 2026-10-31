@@ -53,6 +53,7 @@ class PromptBoxes(QWidget):
         self._make_box = make_box
         self._reading: PromptReading | None = None
         self._texts: list[str] = []
+        self._as_made = True
         self._cut_from: str | None = None
         self._baseline: str | None = None
         self._shares: list[str | None] = []
@@ -82,12 +83,10 @@ class PromptBoxes(QWidget):
         return self._cut_from if self._cut_from is not None else BOX_BREAK.join(self._texts)
 
     def set_value(self, value: str) -> None:
-        if self._baseline is None:
-            self._history.clear()
-        else:
-            self._history.took(self.value())
-        self._show_stored(value)
-        self.textChanged.emit()
+        self._take(value, as_made=True)
+
+    def carry(self, value: str) -> None:
+        self._take(value, as_made=False)
 
     def rewrite(self, change: Callable[[str], str]) -> None:
         self.edit(change(BOX_BREAK.join(self._texts)))
@@ -95,18 +94,34 @@ class PromptBoxes(QWidget):
     def edit(self, value: str) -> None:
         self._history.took(self.value())
         self._burst.stop()
-        self._reflow.stop()
-        self._flow_from = None
-        self._cut_from = None
-        self._show(prompt_boxes(value) if self._reading is None
-                   else self._reading.boxes_of(value))
+        self._as_made = False
+        self._show_value(value)
         self.textChanged.emit()
 
     def set_reading(self, reading: PromptReading | None) -> None:
         if reading != self._reading:
             self._reading = reading
             if not self._reflow.isActive():
-                self._show_stored(self.value())
+                self._show_value(self.value())
+
+    def _take(self, value: str, *, as_made: bool) -> None:
+        if self._baseline is None:
+            self._history.clear()
+        else:
+            self._history.took(self.value())
+        self._as_made = as_made
+        self._show_value(value)
+        self.textChanged.emit()
+
+    def _show_value(self, value: str) -> None:
+        if self._as_made:
+            self._show_stored(value)
+            return
+        self._reflow.stop()
+        self._flow_from = None
+        self._cut_from = None
+        self._show(prompt_boxes(value) if self._reading is None
+                   else self._reading.boxes_of(value))
 
     def track(self, baseline: str) -> None:
         self._baseline = baseline
@@ -194,7 +209,7 @@ class PromptBoxes(QWidget):
         if not self._burst.isActive():
             self._history.took(self.value())
         self._burst.start()
-        self._cut_from = None
+        self._as_made, self._cut_from = False, None
         self._texts = texts
         self._count_down()
         if self._flows() or any(BOX_BREAK in text for text in texts):
@@ -241,6 +256,7 @@ class PromptBoxes(QWidget):
     def _restore(self, value: str) -> None:
         self._burst.stop()
         focused = next((index for index, box in enumerate(self._boxes) if box.hasFocus()), None)
+        self._as_made = True
         self._show_stored(value)
         if focused is not None:
             target = self._boxes[min(focused, len(self._boxes) - 1)]

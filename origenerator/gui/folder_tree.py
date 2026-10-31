@@ -267,7 +267,7 @@ class FolderTree(QTreeWidget):
 
     def selected_folder_keys(self) -> list[str]:
         """The tree keys of the picked folder rows, top-down. Collection rows that hold
-        no folder of their own (Recents, Experiments) contribute nothing.
+        no folder of their own (Latest, Experiments) contribute nothing.
 
         Tree keys rather than folder keys so a set picked across both sides
         stays two distinct folders: composing one out of a folder key alone

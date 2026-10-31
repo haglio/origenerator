@@ -18,7 +18,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
 )
 from origenerator.gallery.sides import LANDSCAPE
 from origenerator.gui.folder_tile import FolderTile
@@ -54,8 +54,8 @@ from tests.gallery_view_support import (
     _key,
     _keys_are_the_gallerys,
     _on_screen,
+    _open_latest,
     _open_leaf,
-    _open_recents,
     _press_enter,
     _reroll_client,
     _resolve_by_id,
@@ -337,7 +337,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     assert "this folder" in view._bank.slideshow.toolTip()
 
     # The collections hold media too, so each plays as a folder does...
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert not view._bank.slideshow.isHidden()
     assert "Latest" in view._bank.slideshow.toolTip()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
@@ -422,12 +422,12 @@ def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
+def test_slideshow_plays_the_latest_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
 
     view._slideshows.start()
 
@@ -455,7 +455,7 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     newest, older = view.listed_prompt_ids()
     view._browser.apply_selection(older, _NO_MOD)
 
@@ -476,7 +476,7 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -499,7 +499,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -524,7 +524,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -552,7 +552,7 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
                                     "sdxl_t2i_i2.png", favorite=1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -573,7 +573,7 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -595,7 +595,7 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -614,7 +614,7 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
 
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
@@ -701,7 +701,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -710,7 +710,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, _NO_MOD))
 
     assert view._slideshows.showing is None               # out of the slideshow...
-    assert view._tree.currentItem() is _collection(view, RECENTS_KEY)  # ...still in the collection
+    assert view._tree.currentItem() is _collection(view, LATEST_KEY)  # ...still in the collection
     assert view._browser.selected_ids == {shown}     # with that image picked
     # And the item open in a tab: leaving a slideshow for an item is a decision to
     # work on it, which a folder under a stale form isn't.
@@ -1256,8 +1256,8 @@ def test_a_run_in_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeyp
     slideshow.close()
 
 
-def test_a_run_being_made_joins_a_recents_slideshow_too(qtbot, monkeypatch):
-    # Recents is a collection of results and a run has none yet, so it cannot answer
+def test_a_run_being_made_joins_a_latest_slideshow_too(qtbot, monkeypatch):
+    # Latest is a collection of results and a run has none yet, so it cannot answer
     # off its own list — but every generation this app makes lands there.
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])

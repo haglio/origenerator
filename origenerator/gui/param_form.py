@@ -131,9 +131,9 @@ class ParamForm(QWidget):
     are pinned at the workflow's own defaults, so what the form emits for them
     is always the same. This is how the enhance params stay off a form whose
     every other setting decides which gallery folder a run lands in. They belong
-    to the Enhance subpanel, which applies enhancement as a separate layer — and
+    to the Enhance pane, which applies enhancement as a separate layer — and
     pinning them is what stops a Generate seeded from an old enhanced run coming
-    out enhanced again with the subpanel's checkbox unchecked.
+    out enhanced again with the Enhance pane's checkbox unchecked.
 
     ``pins_reused_seed`` is the workflow's answer to
     :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
@@ -791,7 +791,7 @@ class ParamForm(QWidget):
     def _on_dimensions_unlock_toggled(self, unlocked: bool):
         """Flip the padlock and swap each dimension between its plain locked value
         and its editable spinner, re-locking back onto the derived size. Announces
-        the change so the panel refreshes with it."""
+        the change so the tab refreshes with it."""
         self._unlock_btn.setIcon(qt_icon(_PADLOCK[unlocked]))
         self._unlock_btn.setToolTip(self._unlock_tip(unlocked))
         for stack in self._dim_stacks.values():

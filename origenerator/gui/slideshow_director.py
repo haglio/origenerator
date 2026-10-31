@@ -156,7 +156,7 @@ class SlideshowHost(Protocol):
         """Core's window, which shows the Job Queue itself whenever it can be seen."""
 
     def follow_link(self, prompt_id: str) -> None:
-        """Land on this generation: its folder, its tile, its config tab."""
+        """Land on this generation: its folder, its tile, its Generate tab."""
 
     def show_generation(self, prompt_id: str) -> None:
         """That, with a hosting room asked for this window's place first."""

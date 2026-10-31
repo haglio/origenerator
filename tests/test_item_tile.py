@@ -274,7 +274,7 @@ def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):
 
 
 def test_an_enhanced_tile_keeps_its_plus_up_and_says_it_is_spent(qtbot):
-    # Holding the very version the panel describes is a finished statement, not
+    # Holding the very version the Enhance pane describes is a finished statement, not
     # an offer: pressing would spend a generation arriving at the image already
     # there, so the plus reports and does not act.
     tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_HELD)
@@ -316,7 +316,7 @@ def test_the_corners_ignore_the_cursor_crossing_the_tile(qtbot):
 
 
 def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
-    # A setting turned on the Enhance panel changes what every item on screen
+    # A setting turned on the Enhance pane changes what every item on screen
     # would get from a press, and none of those tiles were touched.
     tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_HELD)
     qtbot.addWidget(tw)

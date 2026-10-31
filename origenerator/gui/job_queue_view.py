@@ -351,7 +351,7 @@ class RunningPreview(OpensAFolder, QWidget):
         A live frame is the whole point of this corner and wins whenever there is
         one. There is none for a good while: a WAN video spends over a minute
         loading two 14B models before its first preview, and this corner stood
-        empty through all of it. So the wait shows the same sum the config tab
+        empty through all of it. So the wait shows the same sum the Generate tab
         and the folder's own tile show for that job — the frame, a plus, and the
         source video in gray where a combine brought one
         (:func:`~origenerator.gui.combination_view.combination_pixmap`) — and

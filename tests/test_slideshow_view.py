@@ -2072,7 +2072,7 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     assert target is not None
     path, tgt_player, actions = target
     # The pane itself is what the drive follows: it is what knows where the
-    # video has got to, the way the config panel's media Funestra is there.
+    # video has got to, the way the Generate tab's media Funestra is there.
     assert path == str(vid)
     assert tgt_player is view._pane
     assert actions

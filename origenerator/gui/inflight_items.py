@@ -141,7 +141,7 @@ class InFlightItems:
                 reveal = partial(self._on_reveal, folder_key)
             items.append(InFlightItem(
                 key=pid,
-                caption=gallery.config_tab_title(workflow_name, params),
+                caption=gallery.generate_tab_title(workflow_name, params),
                 reading=RunReading(
                     status=display_status(state),
                     frame=frame,
@@ -177,7 +177,7 @@ class InFlightItems:
                 source_file=source_file_of(
                     row_by_id.get((records.get(pid) or {}).get("source_prompt_id")),
                     params, kind),
-                # What the Combine panel was asked for, when this run came from
+                # What the Combine was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, lending the settings
                 # rather than the result. Never both. An act names what the video

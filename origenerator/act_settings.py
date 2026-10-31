@@ -139,7 +139,7 @@ def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
     """The acts a picked dropdown entry can actually answer: those ``video_rows``
     holds at least one usable video of (settings can be mined), plus those the
     overlay pins ``intent`` settings for (nothing to mine — the settings are
-    pinned). The panel greys out the rest, so an act that could only ever answer
+    pinned). Combine greys out the rest, so an act that could only ever answer
     "no past video yet" is never offered.
 
     Under ``GENAU`` only a looping workflow's videos count toward the mined half:

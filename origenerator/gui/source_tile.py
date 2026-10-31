@@ -1,6 +1,6 @@
 """The item a generation was built from, shown as a clickable thumbnail tile.
 
-Under a config tab's form: the item's thumbnail with its name centered beneath,
+Under a Generate tab's form: the item's thumbnail with its name centered beneath,
 styled like the gallery's other thumbnail tiles — a thin border and a media-type
 item type icon in the corner. Clicking anywhere emits ``activated`` with the item's
 prompt_id, so the gallery navigates to it.

@@ -7,7 +7,7 @@ The button does not fill with that run's progress: that would put a third,
 differently-worded account of one run on screen and tie the control that starts
 work to the state of work already going.
 
-Its resting caption is the panel's to set: settings that would re-create a past
+Its resting caption is the tab's to set: settings that would re-create a past
 generation exactly make the press draw a fresh seed instead, and the button says
 so ("Generate with Random seed") rather than a dialog asking after the click.
 """

@@ -214,7 +214,7 @@ PARAM_HELP: dict[str, str] = {
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
 
-    # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
+    # --- the enhance tail (off the form; the Enhance pane owns these) ---
     "enhance_scale": (
         "How much bigger the enhanced version is than the render it came from. The "
         "bigger it gets, the more the pass has to invent."

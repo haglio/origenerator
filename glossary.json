@@ -88,8 +88,7 @@
       "screen": null,
       "his_word": "HUD (2026-10-28: 'by panel do you mean HUD')",
       "code_today": [
-        "hud",
-        "panel"
+        "hud"
       ],
       "code_word": "hud",
       "status": "ruled",
@@ -353,20 +352,32 @@
       "id": "generate_tab",
       "thing": "one tab on the right of Core: an item's preview, its settings and the Generate button; the column of them is the Generate pane",
       "screen": [
-        "Close this configuration",
+        "Close this tab",
         "New generation"
       ],
       "his_word": "Generate tab (2026-09-28, 2026-10-28); Generate pane (2026-09-28); tab (2026-10-24)",
       "code_today": [
-        "config tab",
-        "info pane",
-        "panel",
-        "configuration",
+        "generate tab",
+        "generate pane",
         "tab"
       ],
       "code_word": "generate tab",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list; the tab's close tooltip says \"Close this tab\"",
+      "retired": [
+        "config tab",
+        "config panel",
+        "info pane",
+        "panel"
+      ],
+      "keep": [
+        "settings now on the panel",
+        "\"panels\"",
+        "device_panel",
+        "DevicePanel",
+        "BORDER_PANEL",
+        "\"config\": tab"
+      ]
     },
     {
       "id": "enhance_pane",
@@ -375,15 +386,17 @@
         "Enhance",
         "Fixes"
       ],
-      "his_word": "Enhancement pane (2026-10-13, 2026-10-25); Enhance subpanel (2026-08-14)",
+      "his_word": "Enhancement pane (2026-10-13, 2026-10-25); Enhance pane (2026-08-14)",
       "code_today": [
-        "enhance panel",
-        "subpanel",
-        "panel"
+        "enhance pane"
       ],
       "code_word": "enhance pane",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "enhance panel",
+        "subpanel"
+      ]
     },
     {
       "id": "combine",
@@ -395,12 +408,14 @@
       ],
       "his_word": "Combine (2026-10-30); Combine widget (2026-10-21, 2026-10-24, 2026-10-25)",
       "code_today": [
-        "combine panel",
-        "panel"
+        "combine"
       ],
       "code_word": "combine",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "combine panel"
+      ]
     },
     {
       "id": "drop_zone",
@@ -1227,17 +1242,6 @@
       "code_word": "pane",
       "status": "ruled",
       "ruled": "2026-10-30, his words on the glossary's list"
-    },
-    {
-      "id": "panel",
-      "thing": "no one thing: the code's word for a Generate tab, the Combine, the Enhance pane, the HUD and the OSR2 console alike",
-      "screen": null,
-      "his_word": "none: 'by panel do you mean HUD' (2026-10-28)",
-      "code_today": [
-        "panel"
-      ],
-      "code_word": null,
-      "status": "unruled"
     },
     {
       "id": "widget",

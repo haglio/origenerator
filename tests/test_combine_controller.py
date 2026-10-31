@@ -24,8 +24,8 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import combine_controller as module
 from origenerator.gui import file_pick
 from origenerator.gui.combination import Combination
+from origenerator.gui.combine import CombineRequest
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
-from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.media import MediaType
@@ -41,7 +41,7 @@ _A_CLIENT = object()
 
 
 class FakePanel:
-    """The combine panel reduced to what the controller drives."""
+    """The Combine reduced to what the controller drives."""
 
     class _Slot:
         def __init__(self):
@@ -201,16 +201,16 @@ class FakeSlideshows:
 
 
 class FakeTabs:
-    def __init__(self, panel=None):
-        self.panel = panel
+    def __init__(self, tab=None):
+        self.tab = tab
         self.opened = []
 
     def open_config(self, workflow_name, params):
         self.opened.append((workflow_name, dict(params)))
-        return self.panel
+        return self.tab
 
 
-class FakeConfigPanel:
+class FakeGenerateTab:
     def __init__(self):
         self.source = None
         self.combination = None
@@ -293,8 +293,8 @@ def starting(qtbot):
 @pytest.fixture
 def combine(qtbot, monkeypatch, starting):
     """A controller under a parent this fixture keeps alive, with a recorder for
-    a panel."""
-    monkeypatch.setattr(module, "CombinePanel", FakePanel)
+    a tab."""
+    monkeypatch.setattr(module, "Combine", FakePanel)
     built = []
 
     def build(host=None, *, db=None, jobs=None, client=_A_CLIENT, slideshows=None,
@@ -372,21 +372,21 @@ def _a_dropped_pair(combine, *, making=()):
     controller, _host = combine(FakeHost(rows=[image]),
                                 db=FakeDB([image, _video("clip")]),
                                 jobs=FakeReroll(making=making))
-    controller.panel.image_zone.set_item("img")
-    controller.panel.video_zone.set_item("clip")
+    controller.widget.image_zone.set_item("img")
+    controller.widget.video_zone.set_item("clip")
     return controller
 
 
 def test_generate_grays_while_the_folder_a_dropped_pair_lands_in_is_making_one(combine):
     controller = _a_dropped_pair(combine, making={"folder-of-clip"})
 
-    assert controller.panel.folder_generating is True
+    assert controller.widget.folder_generating is True
 
 
 def test_a_pair_whose_folder_is_making_nothing_leaves_generate_alone(combine):
     controller = _a_dropped_pair(combine, making={"folder-of-another"})
 
-    assert controller.panel.folder_generating is False
+    assert controller.widget.folder_generating is False
 
 
 def test_generate_comes_back_when_the_run_in_that_folder_ends(combine):
@@ -395,7 +395,7 @@ def test_generate_comes_back_when_the_run_in_that_folder_ends(combine):
     controller._jobs.making.clear()
     controller.reconcile_generating()
 
-    assert controller.panel.folder_generating is False
+    assert controller.widget.folder_generating is False
 
 
 def test_the_video_slot_takes_only_a_video_this_app_can_rebuild(combine):
@@ -416,7 +416,7 @@ def test_a_dropped_item_shows_its_still_and_its_loop(combine):
 def test_a_panel_with_no_server_behind_it_hides(combine):
     controller, _host = combine(client=None)
 
-    assert controller.panel.visible is False
+    assert controller.widget.visible is False
 
 
 # --- what a session keeps ---------------------------------------------------
@@ -426,10 +426,10 @@ def test_the_session_keeps_the_image_each_lanes_videos_the_lane_and_the_act(comb
     # None of the four is recoverable from the others: an act says nothing about
     # which lane answers it.
     controller, _host = combine()
-    controller.panel.image_zone.set_item("img")
-    controller.panel.set_dropped_videos({act_settings.VIDEO: "clip"})
-    controller.panel.set_intent(act_settings.GENAU)
-    controller.panel.set_category("waving")
+    controller.widget.image_zone.set_item("img")
+    controller.widget.set_dropped_videos({act_settings.VIDEO: "clip"})
+    controller.widget.set_intent(act_settings.GENAU)
+    controller.widget.set_category("waving")
 
     assert controller.selection() == {
         "image": "img", "videos": {act_settings.VIDEO: "clip"},
@@ -443,15 +443,15 @@ def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combin
                         "videos": {act_settings.VIDEO: "clip", act_settings.GENAU: "loop",
                                    "elsewhere": "gone"}})
 
-    assert controller.panel.dropped == {act_settings.VIDEO: "clip", act_settings.GENAU: "loop"}
-    assert controller.panel.video_zone.item == "loop"
+    assert controller.widget.dropped == {act_settings.VIDEO: "clip", act_settings.GENAU: "loop"}
+    assert controller.widget.video_zone.item == "loop"
 
 
 def test_a_video_put_in_the_slot_is_kept_in_the_library_under_its_lane(combine):
     db = FakeDB()
     controller, _host = combine(db=db)
 
-    controller.panel.video_used.emit(act_settings.GENAU, "clip")
+    controller.widget.video_used.emit(act_settings.GENAU, "clip")
 
     assert db.uses == [(act_settings.GENAU, "clip", None)]
 
@@ -462,10 +462,10 @@ def test_recent_lists_each_lanes_videos_out_of_the_library(combine):
                         "created_at": "2026-10-01 00:00:00"}]
     controller, _host = combine(db=db)
 
-    controller.panel.video_used.emit(act_settings.VIDEO, "clip")
+    controller.widget.video_used.emit(act_settings.VIDEO, "clip")
 
-    assert controller.panel.history(act_settings.VIDEO) == ["clip", "older"]
-    assert controller.panel.history(act_settings.GENAU) == ["older"]
+    assert controller.widget.history(act_settings.VIDEO) == ["clip", "older"]
+    assert controller.widget.history(act_settings.GENAU) == ["older"]
 
 
 def test_a_restore_puts_the_lane_in_before_the_act(combine):
@@ -476,8 +476,8 @@ def test_a_restore_puts_the_lane_in_before_the_act(combine):
     controller.restore({"image": "img", "video": "clip",
                         "intent": act_settings.GENAU, "category": "waving"})
 
-    assert controller.panel.intent == act_settings.GENAU
-    assert controller.panel.category == "waving"
+    assert controller.widget.intent == act_settings.GENAU
+    assert controller.widget.category == "waving"
 
 
 def test_a_restore_skips_an_item_that_no_longer_fits_its_slot(combine):
@@ -485,8 +485,8 @@ def test_a_restore_skips_an_item_that_no_longer_fits_its_slot(combine):
 
     controller.restore({"image": "img", "video": "gone"})
 
-    assert controller.panel.image_zone.item == "img"
-    assert controller.panel.video_zone.item is None
+    assert controller.widget.image_zone.item == "img"
+    assert controller.widget.video_zone.item is None
 
 
 def test_the_two_item_list_older_sessions_wrote_still_restores(combine):
@@ -494,8 +494,8 @@ def test_the_two_item_list_older_sessions_wrote_still_restores(combine):
 
     controller.restore(["img", "clip"])
 
-    assert controller.panel.image_zone.item == "img"
-    assert controller.panel.video_zone.item == "clip"
+    assert controller.widget.image_zone.item == "img"
+    assert controller.widget.video_zone.item == "clip"
 
 
 # --- the stand-in row -------------------------------------------------------
@@ -528,7 +528,7 @@ def test_a_picked_act_names_itself_rather_than_showing_a_video(combine, starting
 def test_the_stand_in_row_comes_off_however_the_launch_ends(combine, starting):
     controller, _host = combine(db=FakeDB([_image("img")]))  # its video is gone
 
-    controller.panel.combine_requested.emit(CombineRequest(
+    controller.widget.combine_requested.emit(CombineRequest(
         image_id="img", video_id="clip", intent=act_settings.VIDEO))
 
     assert starting.rows() == []
@@ -653,7 +653,7 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, starting, mon
     monkeypatch.setattr(module.act_settings, "most_used_video", lambda *a, **k: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    controller.panel.combine_requested.emit(CombineRequest(
+    controller.widget.combine_requested.emit(CombineRequest(
         image_id="img", category="waving", intent=act_settings.VIDEO))
 
     assert starting.rows() == []
@@ -669,15 +669,15 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
-    panel = FakeConfigPanel()
-    tabs = FakeTabs(panel)
+    tab = FakeGenerateTab()
+    tabs = FakeTabs(tab)
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]), tabs=tabs)
 
     controller._open_combination("img", "clip")
 
     assert tabs.opened == [(VIDEO_WORKFLOW, {"seed": 7})]
-    assert panel.source == ("", "clip", act_settings.VIDEO)
-    assert panel.combination == Combination("img-thumb.png", "clip.webp")
+    assert tab.source == ("", "clip", act_settings.VIDEO)
+    assert tab.combination == Combination("img-thumb.png", "clip.webp")
 
 
 def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
@@ -688,12 +688,12 @@ def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
-    panel = FakeConfigPanel()
-    controller, _host = combine(db=FakeDB([_image("img")]), tabs=FakeTabs(panel))
+    tab = FakeGenerateTab()
+    controller, _host = combine(db=FakeDB([_image("img")]), tabs=FakeTabs(tab))
 
     controller._open_category("img", "waving")
 
-    assert panel.combination == Combination("img-thumb.png")
+    assert tab.combination == Combination("img-thumb.png")
 
 
 def _nothing_assigned(monkeypatch):
@@ -713,8 +713,8 @@ def test_an_act_with_no_settings_assigned_opens_the_lanes_workflow_as_it_starts(
     # A past video of the act is there, and its settings are not what opens.
     _nothing_assigned(monkeypatch)
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
-    panel = FakeConfigPanel()
-    tabs = FakeTabs(panel)
+    tab = FakeGenerateTab()
+    tabs = FakeTabs(tab)
     controller, host = combine(
         db=FakeDB([_image("img", state=state), _video("clip", act="waving")]), tabs=tabs)
 
@@ -727,8 +727,8 @@ def test_an_act_with_no_settings_assigned_opens_the_lanes_workflow_as_it_starts(
     assert (params["positive_prompt"], params["negative_prompt"]) == ("", "")
     assert (_apart_from_the_image_and_the_seeds(params, workflow)
             == _apart_from_the_image_and_the_seeds(workflow.default_params(), workflow))
-    assert panel.source == ("waving", None, act_settings.VIDEO)
-    assert panel.combination == Combination("img-thumb.png")
+    assert tab.source == ("waving", None, act_settings.VIDEO)
+    assert tab.combination == Combination("img-thumb.png")
     assert host.told == []
 
 
@@ -743,7 +743,7 @@ def test_the_lanes_workflow_opens_with_its_prompts_empty_whatever_it_starts_with
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, StartsWithWords())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
-    tabs = FakeTabs(FakeConfigPanel())
+    tabs = FakeTabs(FakeGenerateTab())
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]), tabs=tabs)
 
     controller._open_category("img", "waving")
@@ -757,11 +757,11 @@ def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
     monkeypatch.setattr(module.animation_settings, "settings_for", lambda *_: assigned)
     monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
-    jobs, tabs = FakeReroll(), FakeTabs(FakeConfigPanel())
+    jobs, tabs = FakeReroll(), FakeTabs(FakeGenerateTab())
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]),
                                 jobs=jobs, tabs=tabs)
 
-    controller.panel.combine_requested.emit(CombineRequest(
+    controller.widget.combine_requested.emit(CombineRequest(
         image_id="img", category="waving", intent=lane, edit_first=edit_first))
 
     ran = tabs.opened if edit_first else [
@@ -921,7 +921,7 @@ def test_an_act_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
     controller.offer_the_acts([_video("clip"), _image("img"),
                                _video("half", status="running")])
 
-    assert controller.panel.available == ["clip"]
+    assert controller.widget.available == ["clip"]
 
 
 def test_switching_lanes_re_asks_which_acts_are_answerable(combine, monkeypatch):
@@ -931,9 +931,9 @@ def test_switching_lanes_re_asks_which_acts_are_answerable(combine, monkeypatch)
     monkeypatch.setattr(module.act_settings, "available_categories",
                         lambda rows, intent: seen.append(intent) or [])
     controller, _host = combine(db=FakeDB([_video("clip")]))
-    controller.panel.set_intent(act_settings.GENAU)
+    controller.widget.set_intent(act_settings.GENAU)
 
-    controller.panel.intent_changed.emit(act_settings.GENAU)
+    controller.widget.intent_changed.emit(act_settings.GENAU)
 
     assert seen == [act_settings.GENAU]
 
@@ -1086,28 +1086,28 @@ def test_the_acts_narrow_to_what_the_dropped_image_can_start_from(combine,
     controller, _host = combine(db=FakeDB([_image("img", state="state one"),
                                            _video("clip")]))
 
-    controller.panel.image_zone.set_item("img")
+    controller.widget.image_zone.set_item("img")
 
-    assert sorted(controller.panel.available) == ["leaning", "waving"]
+    assert sorted(controller.widget.available) == ["leaning", "waving"]
 
     monkeypatch.setattr(module.animation_paths, "acts_for",
                         lambda state, lane, **kw: ("waving",))
     controller.image_dropped()
 
-    assert sorted(controller.panel.available) == ["waving"]
+    assert sorted(controller.widget.available) == ["waving"]
 
 
 def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
     # Graying every act over an image that says nothing about itself would read
-    # as the panel being broken.
+    # as the tab being broken.
     _paths(monkeypatch)
     monkeypatch.setattr(module.act_settings, "available_categories",
                         lambda rows, intent: {"waving", "leaning"})
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
-    controller.panel.image_zone.set_item("img")
+    controller.widget.image_zone.set_item("img")
 
-    assert sorted(controller.panel.available) == ["leaning", "waving"]
+    assert sorted(controller.widget.available) == ["leaning", "waving"]
 
 
 def test_the_settings_accepted_for_this_images_own_state_outrank_the_acts_pin(
@@ -1148,7 +1148,7 @@ def test_edit_default_opens_the_window_that_settles_each_animation(combine, monk
     qtbot.addWidget(made)
     monkeypatch.setattr(module, "the_animation_window", lambda: made)
 
-    controller.panel.animation_settings_requested.emit()
+    controller.widget.animation_settings_requested.emit()
 
     assert made.isVisible()
 
@@ -1165,14 +1165,14 @@ def test_a_second_press_brings_that_window_back_rather_than_another(combine, mon
 
     monkeypatch.setattr(module, "the_animation_window", one_more)
 
-    controller.panel.animation_settings_requested.emit()
-    controller.panel.animation_settings_requested.emit()
+    controller.widget.animation_settings_requested.emit()
+    controller.widget.animation_settings_requested.emit()
 
     assert len(built) == 1
 
 
 def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch):
-    """Every other test here drives a recorder in the panel's place, so the one
+    """Every other test here drives a recorder in the tab's place, so the one
     thing it cannot answer is whether the button he presses is wired at all."""
     made = QWidget()
     qtbot.addWidget(made)
@@ -1184,7 +1184,7 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
         info_tabs_of=lambda: FakeTabs(), slideshows=FakeSlideshows(),
         starting=StartingRows())
 
-    controller.panel._defaults_btn.click()
+    controller.widget._defaults_btn.click()
 
     assert made.isVisible()
 
@@ -1192,8 +1192,8 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
 def test_an_image_browsed_from_outside_runs_the_settings_on_that_file(combine, tmp_path):
     photo = square(tmp_path, "red")
     controller, _host = combine(db=FakeDB([_video("clip")]))
-    controller.panel.image_zone.set_item(photo)
-    controller.panel.video_zone.set_item("clip")
+    controller.widget.image_zone.set_item(photo)
+    controller.widget.video_zone.set_item("clip")
 
     workflow, params, video_row, image_row = controller._combined_params(photo, "clip")
 
@@ -1203,7 +1203,7 @@ def test_an_image_browsed_from_outside_runs_the_settings_on_that_file(combine, t
     assert controller._accepts_image(str(tmp_path / "nowhere.png")) is False
     assert controller._state_of(photo) == ""
     assert controller._zone_preview(photo) == (photo, None)
-    assert controller.panel.name_of(photo) == "made-red.png"
+    assert controller.widget.name_of(photo) == "made-red.png"
 
 
 def test_browsing_an_image_puts_the_file_in_the_image_zone(combine, monkeypatch, tmp_path):
@@ -1212,9 +1212,9 @@ def test_browsing_an_image_puts_the_file_in_the_image_zone(combine, monkeypatch,
                         lambda *_args: (photo, ""))
     controller, _host = combine()
 
-    controller.panel.browse_image()
+    controller.widget.browse_image()
 
-    assert controller.panel.image_zone.current_id() == photo
+    assert controller.widget.image_zone.current_id() == photo
 
 
 def test_a_picked_act_runs_its_pinned_settings_on_a_browsed_image(combine, tmp_path, monkeypatch):

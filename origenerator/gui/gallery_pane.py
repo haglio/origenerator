@@ -15,7 +15,7 @@ It stands alone: everything it works with arrives at construction — its scroll
 area, the database, the re-roll and auto-generate controllers, and two narrow
 records of what it may ask the gallery around it (:class:`TreeNavigation`,
 :class:`PaneHost`). Every gesture made on a tile leaves as a signal; the view
-connects them and answers — the info pane on a click, the tree on a drill, the
+connects them and answers — the Generate pane on a click, the tree on a drill, the
 delete on a menu.
 """
 from __future__ import annotations
@@ -332,7 +332,7 @@ class PaneHost:
     animated_preview: Callable[[dict], str | None]
     # The standalone enhance being made of this image right now, or None.
     enhancing_run: Callable[[dict], object]
-    # What every enhance runs at, app-wide — the Enhance subpanel's value.
+    # What every enhance runs at, app-wide — the Enhance pane's value.
     enhance_settings: Callable[[], object]
     # Whether the background experimenter is on (the empty collection teaches off it).
     experiments_enabled: Callable[[], bool]
@@ -808,7 +808,7 @@ class GalleryPane(QObject):
         """The Latest collection: a tile for every in-flight generation (queued or
         running, from a Generate tab or a gallery re-roll) atop the recently
         finished items. Clicking an in-flight tile reveals where its job runs; a
-        finished one previews in the info pane, right here in the collection, the way
+        finished one previews in the Generate pane, right here in the collection, the way
         a thumbnail does inside a folder — and double-clicking it jumps to its
         own folder.
 
@@ -1102,7 +1102,7 @@ class GalleryPane(QObject):
 
         Its files are all in the trash rather than gone, and the Trash kept its row
         whole, so it previews on a click, loops if it's a video, opens full size,
-        plays in the collection's slideshow and fills a config tab with the settings
+        plays in the collection's slideshow and fills a Generate tab with the settings
         that made it — the whole point of a Trash being that you can look before you
         decide. Double-clicking opens it as a Generate tab (the gesture a folder's
         tiles carry) rather than jumping to its folder, which is the one thing a
@@ -1438,7 +1438,7 @@ class GalleryPane(QObject):
 
         Right-clicking a tile that isn't part of the current selection first
         selects just it, so the menu always acts on something visible. The menu
-        itself is the gallery's, not this pane's — the preview in a config tab
+        itself is the gallery's, not this pane's — the preview in a Generate tab
         raises the very same one over the very same generation
         (:meth:`~origenerator.gui.gallery_view.GalleryView.generation_menu`).
         """
@@ -1458,14 +1458,14 @@ class GalleryPane(QObject):
 
     def _enhance_state(self, row) -> str | None:
         """What the plus in this row's lower-right corner has to say, at the
-        Enhance panel's current settings (:func:`corner_buttons.enhance_state`)."""
+        Enhance pane's current settings (:func:`corner_buttons.enhance_state`)."""
         return enhance_state(row, self._host.enhance_settings())
 
     def refresh_corners(self):
         """Re-read every drawn tile's enhance corner, without rebuilding the pane.
 
-        Turning a setting in the Enhance subpanel changes what every item on
-        screen would get from a press — an image holding the version the panel
+        Turning a setting in the Enhance pane changes what every item on
+        screen would get from a press — an image holding the version the pane
         described a moment ago is now one enhancement short of the new one — and
         none of those tiles were touched, so nothing else would tell them.
         """

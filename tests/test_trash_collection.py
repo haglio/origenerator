@@ -93,7 +93,7 @@ def test_a_trash_items_output_files_point_at_where_they_actually_are():
     (f,) = json.loads(item["output_files"])
 
     assert f["path"] == trashed
-    # And it still says what the generation produced — the name the info pane
+    # And it still says what the generation produced — the name the Generate pane
     # shows and the copy button hands over is the file's own, not the trash's.
     assert (f["filename"], f["subfolder"]) == ("clip.mp4", "video")
 

@@ -202,7 +202,7 @@ class ItemTile(QWidget):
 
     def set_enhance(self, enhance: str | None):
         """Re-read the enhance corner without rebuilding the tile — what a turn of
-        the Enhance panel's settings does to every item on screen at once."""
+        the Enhance pane's settings does to every item on screen at once."""
         if enhance == self._enhance:
             return
         self._enhance = enhance
@@ -248,7 +248,7 @@ class ItemTile(QWidget):
         """Paint the latest frame of the enhancement being made of this image.
 
         The tile is where the user is looking while a folder enhances itself, so
-        the run streams here as well as in the info pane — the overlays stay over
+        the run streams here as well as in the Generate pane — the overlays stay over
         the top, because what is on the tile is still not the finished file."""
         pixmap = QPixmap()
         if not pixmap.loadFromData(frame) or pixmap.isNull():

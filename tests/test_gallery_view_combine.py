@@ -26,9 +26,9 @@ from origenerator.gui import (
     combine_controller,
 )
 from origenerator.gui import gallery_view as gallery_view_module
-from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import generating_tile as generating_tile_module
-from origenerator.gui.combine_panel import CombineRequest
+from origenerator.gui.combine import CombineRequest
 from origenerator.gui.drags import under_way
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generation_drag import generation_mime
@@ -48,7 +48,7 @@ from tests.gallery_view_support import (
     _selected_folder,
     _write_looping_webp,
 )
-from tests.test_combine_panel import _listed_under_recent
+from tests.test_combine import _listed_under_recent
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
@@ -179,7 +179,7 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
 
     assert view._live_jobs == {}                 # opened for editing, not launched
     view._client.submit_job.assert_not_called()
-    config = view._info_tabs.current_config_panel().current_config()
+    config = view._generate_pane.current_generate_tab().current_config()
     assert config.workflow_name == "wan22_i2v"
     assert config.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
     assert config.seed_is_random                                     # a new take of the motion
@@ -192,7 +192,7 @@ def test_the_tab_edit_individual_opens_lists_only_the_video_workflows(qtbot, tmp
 
     view._combine._open_combination("img", "vid")
 
-    combo = view._info_tabs.current_config_panel()._workflow_combo
+    dropdown = view._generate_pane.current_generate_tab()._workflow_dropdown
     assert [dropdown.itemData(i) for i in range(dropdown.count())] == [
         workflow.name for workflow in offered_workflows(makes=MediaType.VIDEO)]
 
@@ -204,14 +204,14 @@ def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tm
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tabs = view._info_tabs
+    tabs = view._generate_pane
     before = tabs.count()
 
     view._combine._open_combination("img", "vid")
 
     assert tabs.count() == before  # no "New generation" left standing beside it
-    panel = tabs.current_config_panel()
-    assert tabs.tabBar()._preview_index == tabs.indexOf(panel)
+    tab = tabs.current_generate_tab()
+    assert tabs.tabBar()._preview_index == tabs.indexOf(tab)
 
 
 def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_starts(
@@ -233,7 +233,7 @@ def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_star
     assert view._live_jobs == {}
     view._client.submit_job.assert_not_called()
     assert shown == []
-    config = view._info_tabs.current_config_panel().current_config()
+    config = view._generate_pane.current_generate_tab().current_config()
     assert WORKFLOW_REGISTRY[config.workflow_name].display_name == (
         "WAN 2.2 I2V (Looping)")
     assert config.params["input_image"] == "sdxl_pick.png [output]"
@@ -249,11 +249,11 @@ def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine.panel.combine_requested.emit(CombineRequest(
+    view._combine.widget.combine_requested.emit(CombineRequest(
         image_id="img", video_id="vid", edit_first=True))
 
     assert view._live_jobs == {}
-    config = view._info_tabs.current_config_panel().current_config()
+    config = view._generate_pane.current_generate_tab().current_config()
     assert config.workflow_name == "wan22_i2v"
     assert config.params["input_image"] == "sdxl_pick.png [output]"
 
@@ -268,20 +268,20 @@ def _insert_completed_video(db, prompt_id, params, filename):
                          output_files=json.dumps([{"filename": filename, "subfolder": ""}]))
 
 
-def test_the_combine_panel_is_up_under_the_folders_when_comfyui_can_be_reached(qtbot, tmp_path):
+def test_the_combine_is_up_under_the_folders_when_comfyui_can_be_reached(qtbot, tmp_path):
     view = GalleryView(Database(tmp_path / "test.db"), client=_reroll_client())
     qtbot.addWidget(view)
     view.show()
 
-    assert view._combine.panel.isVisible()
+    assert view._combine.widget.isVisible()
 
 
-def test_without_comfyui_the_combine_panel_takes_its_section_with_it(qtbot, tmp_path):
+def test_without_comfyui_the_combine_takes_its_section_with_it(qtbot, tmp_path):
     view = GalleryView(Database(tmp_path / "test.db"))
     qtbot.addWidget(view)
     view.show()
 
-    assert not view._combine.panel.parentWidget().isVisible()
+    assert not view._combine.widget.parentWidget().isVisible()
 
 
 def test_combining_a_pair_already_made_makes_another_video(qtbot, tmp_path):
@@ -350,7 +350,7 @@ def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
 
     view.refresh()
 
-    combo = view._combine.panel._category
+    dropdown = view._combine.widget._category
     enabled = {dropdown.itemText(i) for i in range(1, dropdown.count())
                if dropdown.model().item(i).isEnabled()}
     # "dancing" has a video to mine; "gamma" needs none — the example overlay
@@ -410,11 +410,11 @@ def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, 
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._combine.panel
+    combine = view._combine.widget
 
-    assert _listed_under_recent(panel) == ["vid"]
+    assert _listed_under_recent(combine) == ["vid"]
     panel.set_intent(act_settings.GENAU)
-    assert _listed_under_recent(panel) == ["vid"]
+    assert _listed_under_recent(combine) == ["vid"]
 
 
 def test_a_picked_act_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path, monkeypatch):
@@ -461,10 +461,10 @@ def test_a_generate_from_an_opened_combination_still_names_its_video(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
     view._combine._open_combination("img", "vid")
-    panel = _front_panel(view)
-    panel._param_form.set_values({"positive_prompt": "edited before running"})
+    tab = _front_panel(view)
+    tab._param_form.set_values({"positive_prompt": "edited before running"})
 
-    panel._on_generate()
+    tab._on_generate()
 
     assert _launched_row(view)["source_video"] == "vid"
 
@@ -489,11 +489,11 @@ def test_a_tab_pointed_at_another_generation_drops_the_settings_source(qtbot, tm
     qtbot.addWidget(view)
     view.refresh()
     view._combine._open_combination("img", "vid")
-    panel = _front_panel(view)
+    tab = _front_panel(view)
 
-    panel.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
+    tab.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
 
-    assert panel.settings_source() == ("", None, "")
+    assert tab.settings_source() == ("", None, "")
 
 
 def test_a_tab_switched_to_another_workflow_drops_the_settings_source(qtbot, tmp_path):
@@ -503,11 +503,11 @@ def test_a_tab_switched_to_another_workflow_drops_the_settings_source(qtbot, tmp
     qtbot.addWidget(view)
     view.refresh()
     view._combine._open_combination("img", "vid")
-    panel = _front_panel(view)
+    tab = _front_panel(view)
 
-    panel.prefill("sdxl_t2i", _SDXL.default_params())
+    tab.prefill("sdxl_t2i", _SDXL.default_params())
 
-    assert panel.settings_source() == ("", None, "")
+    assert tab.settings_source() == ("", None, "")
 
 
 def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_path):
@@ -544,16 +544,16 @@ def test_the_video_an_opened_combination_makes_keeps_both_links(qtbot, tmp_path)
     qtbot.addWidget(view)
     view.refresh()
     view._combine._open_combination("img", "vid")
-    panel = _front_panel(view)
-    panel._on_generate()
+    tab = _front_panel(view)
+    tab._on_generate()
     job = next(iter(view._live_jobs.values()))
 
     client.job_completed.emit(job.prompt_id, _VID_REROLL_HISTORY)
 
-    assert panel.displayed_row()["prompt_id"] == job.prompt_id
-    assert panel._related._source_tile._prompt_id == "img"
-    assert panel._related._source_video_tile._prompt_id == "vid"
-    assert not panel._related._source_video_tile.isHidden()
+    assert tab.displayed_row()["prompt_id"] == job.prompt_id
+    assert tab._related._source_tile._prompt_id == "img"
+    assert tab._related._source_video_tile._prompt_id == "vid"
+    assert not tab._related._source_video_tile.isHidden()
 
 
 def test_an_act_whose_settings_came_from_no_video_links_to_the_image_alone(qtbot, tmp_path):
@@ -587,7 +587,7 @@ def test_a_combination_opened_for_genau_has_its_source_video_in_parentheses_befo
         qtbot, tmp_path):
     _view, panel = _opened_combination(qtbot, tmp_path, intent=act_settings.GENAU)
 
-    assert not panel._preview._combination.open_paren_label.isHidden()
+    assert not tab._preview._combination.open_paren_label.isHidden()
 
 
 @pytest.mark.parametrize(("key", "as_made", "edited"), [
@@ -596,14 +596,14 @@ def test_a_combination_opened_for_genau_has_its_source_video_in_parentheses_befo
 ])
 def test_the_clip_of_an_opened_combination_stands_in_parentheses_while_its_prompt_differs(
         qtbot, tmp_path, key, as_made, edited):
-    _view, panel = _opened_combination(qtbot, tmp_path)
-    parens = panel._preview._combination.open_paren_label
+    _view, tab = _opened_combination(qtbot, tmp_path)
+    parens = tab._preview._combination.open_paren_label
     assert parens.isHidden()
 
-    panel._param_form.set_values({key: edited})
+    tab._param_form.set_values({key: edited})
     assert not parens.isHidden()
 
-    panel._param_form.set_values({key: as_made})
+    tab._param_form.set_values({key: as_made})
     assert parens.isHidden()
 
 
@@ -612,16 +612,16 @@ def test_a_run_from_an_edited_combination_keeps_its_source_video_in_parentheses_
     drawn = []
     monkeypatch.setattr(generating_tile_module, "combination_pixmap",
                         lambda made_from, size: drawn.append(made_from))
-    view, panel = _opened_combination(qtbot, tmp_path)
-    panel._param_form.set_values({"positive_prompt": "dance in the rain"})
+    view, tab = _opened_combination(qtbot, tmp_path)
+    tab._param_form.set_values({"positive_prompt": "dance in the rain"})
 
-    panel._on_generate()
+    tab._on_generate()
 
     assert drawn[-1].prompt_edited
-    assert panel._live_source.prompt_edited
+    assert tab._live_source.prompt_edited
 
 
-def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_source_video_in_parentheses(
+def test_a_genau_run_straight_from_the_combine_waits_with_its_source_video_in_parentheses(
         qtbot, tmp_path):
     view = _combine_view_with_a_looping_video(qtbot, tmp_path)
 
@@ -637,11 +637,11 @@ def test_a_pressed_combine_stands_in_line_with_its_source_video_marked_as_its_ru
         qtbot, tmp_path, monkeypatch, lane, stands_apart):
     view = _combine_view(qtbot, tmp_path)
     monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
-    _pick_lane(view._combine.panel, lane)
+    _pick_lane(view._combine.widget, lane)
 
-    view._combine.panel.combine_requested.emit(
+    view._combine.widget.combine_requested.emit(
         CombineRequest(image_id="img", video_id="vid",
-                       intent=view._combine.panel.selected_intent()))
+                       intent=view._combine.widget.selected_intent()))
 
     (standing,) = view._starting.rows()
     assert standing.prompt_edited is stands_apart
@@ -649,11 +649,11 @@ def test_a_pressed_combine_stands_in_line_with_its_source_video_marked_as_its_ru
 
 def test_changing_a_setting_other_than_the_prompt_leaves_the_clip_out_of_parentheses(
         qtbot, tmp_path):
-    _view, panel = _opened_combination(qtbot, tmp_path)
+    _view, tab = _opened_combination(qtbot, tmp_path)
 
-    panel._param_form.set_values({"seed": 7})
+    tab._param_form.set_values({"seed": 7})
 
-    assert panel._preview._combination.open_paren_label.isHidden()
+    assert tab._preview._combination.open_paren_label.isHidden()
 
 
 @pytest.mark.parametrize(("zone_name", "prompt_id"), [("image_zone", "img"),
@@ -662,7 +662,7 @@ def test_clicking_a_combine_drop_zone_goes_to_what_it_holds(qtbot, tmp_path, zon
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    slot = getattr(view._combine.panel, slot_name)
+    zone = getattr(view._combine.widget, zone_name)
     zone.set_item(prompt_id)
 
     qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
@@ -673,12 +673,12 @@ def test_clicking_a_combine_drop_zone_goes_to_what_it_holds(qtbot, tmp_path, zon
 
 def test_combines_drop_zones_name_what_was_dropped_on_them(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
-    panel = view._combine.panel
+    combine = view._combine.widget
 
-    drops.let_go_over(panel.image_slot, "img")
-    drops.let_go_over(panel.video_slot, "vid")
+    drops.let_go_over(combine.image_zone, "img")
+    drops.let_go_over(combine.video_zone, "vid")
 
-    named = (panel.image_slot._caption.text(), panel.video_slot._caption.text())
+    named = (combine.image_zone._caption.text(), combine.video_zone._caption.text())
     assert named == (view._item_names.of("img"), view._item_names.of("vid"))
     assert "" not in named
 
@@ -690,8 +690,8 @@ def test_what_a_launch_puts_back_in_combine_is_named_once_the_gallery_draws(qtbo
 
     view.refresh()
 
-    panel = view._combine.panel
-    named = (panel.image_slot._caption.text(), panel.video_slot._caption.text())
+    combine = view._combine.widget
+    named = (combine.image_zone._caption.text(), combine.video_zone._caption.text())
     assert named == (view._item_names.of("img"), view._item_names.of("vid"))
     assert "" not in named
 
@@ -701,13 +701,13 @@ def test_a_start_image_a_launch_puts_back_is_named_once_the_gallery_draws(qtbot,
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     Image.new("RGB", (8, 8)).save(output_dir / "sdxl_pick.png")
-    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    panel = view._info_tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("wan22_i2v"))
-    start = panel._param_form._widgets["input_image"]
-    panel._param_form.set_values({"input_image": "sdxl_pick.png [output]"})
+    tab = view._generate_pane.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("wan22_i2v"))
+    start = tab._param_form._widgets["input_image"]
+    tab._param_form.set_values({"input_image": "sdxl_pick.png [output]"})
 
     view.refresh()
 
@@ -719,7 +719,7 @@ def test_an_image_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp
     qtbot.addWidget(view)
     view.refresh()
     view.follow_link("img")
-    slot = view._combine.panel.image_slot
+    zone = view._combine.widget.image_zone
     zone.set_item(str(tmp_path / "scene one.png"))
 
     qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
@@ -736,7 +736,7 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
     monkeypatch.setattr(combine_controller.act_settings, "most_used_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
     opened = []
-    monkeypatch.setattr(view._info_tabs, "open_config",
+    monkeypatch.setattr(view._generate_pane, "open_config",
                         lambda name, params: opened.append((name, params)))
 
     view._combine._open_category("img", "gamma")
@@ -814,14 +814,14 @@ def test_combine_slot_predicates_gate_by_kind(qtbot, tmp_path):
     assert view._combine._accepts_video("img") is False   # an image isn't an i2v video
 
 
-def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
+def test_combine_generate_button_launches_the_job(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._combine.panel.image_slot.set_item("img")
-    view._combine.panel.video_slot.set_item("vid")
+    view._combine.widget.image_zone.set_item("img")
+    view._combine.widget.video_zone.set_item("vid")
 
-    view._combine.panel._generate_btn.click()  # the panel's button, wired to the view
+    view._combine.widget._generate_btn.click()  # the combine's button, wired to the view
 
     assert len(view._live_jobs) == 1
     job = next(iter(view._live_jobs.values()))
@@ -839,20 +839,20 @@ def _combine_view(qtbot, tmp_path):
 def _pick_act(panel, act):
     """Choose an act in the combine panel's dropdown, as a click on its row would."""
     index = panel._category.findText(act)
-    panel._category.setCurrentIndex(index if index >= 1 else 0)
+    tab._category.setCurrentIndex(index if index >= 1 else 0)
 
 
-def _pick_lane(panel, intent):
-    """Click the combine panel's lane radio; the group releases the other."""
+def _pick_lane(tab, intent):
+    """Click the Combine's lane radio; the group releases the other."""
     radio = (panel._genau_radio if intent == act_settings.GENAU
-             else panel._video_radio)
+             else tab._video_radio)
     radio.setChecked(True)
 
 
 def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
-    view._combine.panel.image_slot.set_item("img")
-    view._combine.panel.video_slot.set_item("vid")
+    view._combine.widget.image_zone.set_item("img")
+    view._combine.widget.video_zone.set_item("vid")
 
     assert view.combine_selection() == {
         "image": "img", "videos": {act_settings.VIDEO: "vid"},
@@ -864,7 +864,7 @@ def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
     # All four are choices the user made, and none is recoverable from the
     # others: an act says nothing about which lane answers it.
     view = _combine_view(qtbot, tmp_path)
-    view._combine.panel.image_slot.set_item("img")
+    view._combine.widget.image_zone.set_item("img")
     _pick_lane(view._combine.panel, act_settings.GENAU)
     _pick_act(view._combine.panel, "beta")
 
@@ -879,16 +879,16 @@ def test_restore_combine_selection_refills_the_slots(qtbot, tmp_path):
 
     view.restore_combine_selection({"image": "img", "video": "vid"})
 
-    assert view._combine.panel.image_slot.current_id() == "img"
-    assert view._combine.panel.video_slot.current_id() == "vid"
+    assert view._combine.widget.image_zone.current_id() == "img"
+    assert view._combine.widget.video_zone.current_id() == "vid"
 
 
 def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_path):
     first = _combine_view(qtbot, tmp_path)
     _looping_video(first._db)
-    first._combine.panel.video_slot.set_item("vid")
+    first._combine.widget.video_zone.set_item("vid")
     _pick_lane(first._combine.panel, act_settings.GENAU)
-    first._combine.panel.video_slot.set_item("loop")
+    first._combine.widget.video_zone.set_item("loop")
     saved = first.combine_selection()
 
     restored = GalleryView(first._db, client=_reroll_client())
@@ -896,9 +896,9 @@ def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_
     restored.refresh()
     restored.restore_combine_selection(saved)
 
-    assert restored._combine.panel.video_slot.current_id() == "loop"
+    assert restored._combine.widget.video_zone.current_id() == "loop"
     _pick_lane(restored._combine.panel, act_settings.VIDEO)
-    assert restored._combine.panel.video_slot.current_id() == "vid"
+    assert restored._combine.widget.video_zone.current_id() == "vid"
 
 
 def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
@@ -908,8 +908,8 @@ def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
         {"image": "img", "intent": act_settings.GENAU, "category": "beta"})
 
     assert view._combine.panel.selected_intent() == act_settings.GENAU
-    assert view._combine.panel.selected_category() == "beta"
-    assert view._combine.panel._generate_btn.isEnabled()  # an image and settings: ready
+    assert view._combine.widget.selected_category() == "beta"
+    assert view._combine.widget._generate_btn.isEnabled()  # an image and settings: ready
 
 
 def test_restore_reads_the_video_lane_under_the_name_older_sessions_saved(qtbot, tmp_path):
@@ -932,7 +932,7 @@ def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
         {"image": "img", "intent": act_settings.GENAU, "category": "dancing"})
 
     assert view._combine.panel.selected_intent() == act_settings.GENAU
-    assert view._combine.panel.selected_category() == ""
+    assert view._combine.widget.selected_category() == ""
 
 
 def test_restore_combine_selection_reads_the_two_item_list_older_sessions_wrote(
@@ -941,8 +941,8 @@ def test_restore_combine_selection_reads_the_two_item_list_older_sessions_wrote(
 
     view.restore_combine_selection(["img", "vid"])
 
-    assert view._combine.panel.image_slot.current_id() == "img"
-    assert view._combine.panel.video_slot.current_id() == "vid"
+    assert view._combine.widget.image_zone.current_id() == "img"
+    assert view._combine.widget.video_zone.current_id() == "vid"
 
 
 def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_path):
@@ -951,8 +951,8 @@ def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_pat
     # image drop zone given a deleted id; video drop zone given an image (wrong kind)
     view.restore_combine_selection({"image": "ghost", "video": "img"})
 
-    assert view._combine.panel.image_slot.current_id() is None   # "ghost" no longer exists
-    assert view._combine.panel.video_slot.current_id() is None   # "img" isn't an i2v video
+    assert view._combine.widget.image_zone.current_id() is None   # "ghost" no longer exists
+    assert view._combine.widget.video_zone.current_id() is None   # "img" isn't an i2v video
 
 
 def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
@@ -986,14 +986,14 @@ def test_dragging_a_gallery_pane_thumbnail_lights_its_combine_slot(qtbot, tmp_pa
     view.refresh()
     tw = ItemTile("vid", None, "v")  # a video tile, wired like a real one
     qtbot.addWidget(tw)
-    panel = view._combine.panel
+    combine = view._combine.widget
     mime = generation_mime("vid")
 
     lit = _lit_while_dragging(monkeypatch, tw.drag_out, mime,
-                              {"video": panel.video_slot, "image": panel.image_slot})
+                              {"video": combine.video_zone, "image": combine.image_zone})
 
     assert lit == {"video": True, "image": False}
-    assert panel.video_slot._label.property("dragActive") is False  # put out at the end
+    assert combine.video_zone._label.property("dragActive") is False  # put out at the end
 
 
 def test_a_video_dragged_from_an_image_the_gallery_holds_lights_the_image_slot_too(
@@ -1008,21 +1008,21 @@ def test_a_video_dragged_from_an_image_the_gallery_holds_lights_the_image_slot_t
 
     under_way.started.emit(mime, None)
 
-    assert view._combine.panel.image_slot._label.property("dragActive") is True
-    assert view._combine.panel.video_slot._label.property("dragActive") is True
+    assert view._combine.widget.image_zone._label.property("dragActive") is True
+    assert view._combine.widget.video_zone._label.property("dragActive") is True
     under_way.ended.emit()
 
 
 def test_combines_generate_grays_while_the_pair_dropped_in_it_is_being_made(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
-    panel = view._combine.panel
-    panel.image_slot.set_item("img")
-    panel.video_slot.set_item("vid")
-    assert panel._generate_btn.isEnabled()
+    combine = view._combine.widget
+    combine.image_zone.set_item("img")
+    combine.video_zone.set_item("vid")
+    assert combine._generate_btn.isEnabled()
 
     view._combine._generate_combination("img", "vid")
 
-    assert not panel._generate_btn.isEnabled()
+    assert not combine._generate_btn.isEnabled()
 
 
 def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, monkeypatch):
@@ -1030,8 +1030,8 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, 
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    preview = view._info_tabs.current_config_panel()._preview
-    combine = view._combine.panel
+    preview = view._generate_pane.current_generate_tab()._preview
+    combine = view._combine.widget
     mime = generation_mime("vid")
 
     lit = _lit_while_dragging(monkeypatch, preview.drag_out, mime,
@@ -1046,7 +1046,7 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
     view = _combine_view(qtbot, tmp_path)
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     tile = view._gallery_pane._thumb_widgets["vid"]
-    slot = view._combine.panel.video_slot._label
+    zone = view._combine.widget.video_zone._label
     in_flight = {}
 
     def drag_loop_through_a_grid_redraw(drag, _action):

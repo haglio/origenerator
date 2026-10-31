@@ -59,7 +59,7 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
 def test_a_session_hands_over_each_funestras_own_channel():
     """Inside a session the Funestras are what shows the slides, so the launch
     names each one's channel: the list it plays, the verbs it answers, the
-    status it publishes, and the panel this app publishes for it."""
+    status it publishes, and the HUD this app publishes for it."""
     args = parse_app_args(hosted_launch(funestras=True, **{
         "--portrait-playlist": "st/portrait.tsv",
         "--portrait-cmd-file": "st/portrait_cmd.txt",

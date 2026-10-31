@@ -9,7 +9,7 @@ about it, and a convention spelled out twice is a convention that can be
 changed in one place only.
 
 Two functions rather than one, because the order the rows come back in is the
-order the Generate form shows and the gallery info pane groups by: the models
+order the Generate form shows and the gallery Generate pane groups by: the models
 sit together and the LoRAs sit together, and one workflow has a third model
 dropdown to fit in between them.
 """

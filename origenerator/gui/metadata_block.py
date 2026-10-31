@@ -1,6 +1,6 @@
 """Render a generation's read-only metadata as one compact titled block.
 
-Sits at the top of the info-pane tab's scroll, above the editable form, and
+Sits at the top of the Generate pane tab's scroll, above the editable form, and
 shows only what the form and the version list can't: the item's name, a file no
 version claims, when the run happened, and which workflow version made it. The
 model lives in :mod:`origenerator.generation_metadata`; this does the Qt rendering.

@@ -1,4 +1,4 @@
-"""The gallery's image + video combine panel, sitting under the TOC folder tree.
+"""The gallery's image + video Combine, sitting under the TOC folder tree.
 
 Drop an image into the top drop zone, then supply *settings* either by picking an act
 from the Action list, which sends the app looking for a fitting past video, or by
@@ -14,7 +14,7 @@ picks which videos the act is answered from, so the dropdown's usable acts chang
 with it: an act only the video lane can answer grays out under Genau, and acts that
 are no kind of cycle at all are not offered there.
 
-The panel is pure UI, reporting what was asked for as one :class:`CombineRequest` on
+Combine is pure UI, reporting what was asked for as one :class:`CombineRequest` on
 :attr:`combine_requested`; its controller
 (:mod:`origenerator.gui.combine_controller`) owns the database, what each drop zone is
 lent, the routing and both the generation and the generator tab.
@@ -91,7 +91,7 @@ class CombineRequest:
     edit_first: bool = False
 
 
-class CombinePanel(QWidget):
+class Combine(QWidget):
     """Image drop zone + settings (dropped video or picked act) + an intent + Generate."""
 
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
@@ -176,7 +176,7 @@ class CombinePanel(QWidget):
         video_row.addWidget(self.video_zone, 1)
 
         # What the result is for. Kino is the default because it is the long-
-        # standing behavior of this panel and by far the more common ask; Genau is
+        # standing behavior of Combine and by far the more common ask; Genau is
         # the deliberate detour. Under it the act list narrows, so the radio sits
         # directly beneath the dropdown it changes.
         self._video_radio = QRadioButton("Kino")
@@ -245,7 +245,7 @@ class CombinePanel(QWidget):
     def set_intent(self, intent: str):
         """Select the ``VIDEO``/``GENAU`` radio; anything else selects video.
 
-        For putting the panel back the way a session left it
+        For putting Combine back the way a session left it
         (:meth:`GalleryView.restore_combine_selection`) -- the lane decides which
         acts are answerable, so it goes in before the act does.
         """
@@ -308,7 +308,7 @@ class CombinePanel(QWidget):
             )
             # A grayed-out act must not stay selected under it — the buttons would be
             # live on a pick the lane cannot answer. Dropping to neutral is what the
-            # panel already means by "no act chosen".
+            # Combine already means by "no act chosen".
             if not usable and self._category.currentIndex() == index:
                 self._category.setCurrentIndex(0)
 

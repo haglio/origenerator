@@ -1,4 +1,4 @@
-"""The row on a config tab saying what the item it is showing shows: an image's,
+"""The row on a Generate tab saying what the item it is showing shows: an image's,
 into the column :mod:`origenerator.sort_images` fills in bulk, or a video's act."""
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def _as_listed(said: str, names: tuple[str, ...]) -> str:
 
 
 class ActionDropdown(QWidget):
-    """What the item on display shows, pickable, for a config tab."""
+    """What the item on display shows, pickable, for a Generate tab."""
 
     chosen = pyqtSignal(str, str)  # prompt_id, what it shows ("" once taken back)
 

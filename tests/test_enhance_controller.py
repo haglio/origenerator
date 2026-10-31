@@ -43,7 +43,7 @@ class FakeSignal:
 
 
 class FakePanel:
-    """The Enhance subpanel reduced to what the controller drives."""
+    """The Enhance pane reduced to what the controller drives."""
 
     def __init__(self, on_changed):
         self.on_changed = on_changed
@@ -186,7 +186,7 @@ class FakeSlideshows:
         self.frames = dict(frames or {})
 
 
-class FakeConfigPanel:
+class FakeGenerateTab:
     def __init__(self, row=None):
         self.row = row
         self.pending = "unset"
@@ -203,11 +203,11 @@ class FakeConfigPanel:
 
 
 class FakeTabs:
-    def __init__(self, panels=()):
-        self.panels = list(panels)
+    def __init__(self, tabs=()):
+        self.tabs = list(tabs)
 
-    def config_panels(self):
-        return self.panels
+    def generate_tabs(self):
+        return self.tabs
 
 
 class FakeGroup:
@@ -271,8 +271,8 @@ def _video(prompt_id="v1"):
 
 @pytest.fixture
 def enhance(monkeypatch):
-    """A controller whose panel and surfaces are all recorders."""
-    monkeypatch.setattr(module, "EnhancePanel", FakePanel)
+    """A controller whose pane and surfaces are all recorders."""
+    monkeypatch.setattr(module, "EnhancePane", FakePanel)
 
     def build(host=None, *, db=None, jobs=None, gallery_pane=None, slideshows=None,
               tabs=None):
@@ -503,7 +503,7 @@ def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance
     controller, _host = enhance(FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]),
                                 gallery_pane=FakeGalleryPane(["i1"]), jobs=jobs)
 
-    controller.panel.enhance_requested.emit()
+    controller.pane.enhance_requested.emit()
 
     assert [params for _key, params in jobs.prepared] == [{"input_image": "one.png"}]
 
@@ -521,14 +521,14 @@ def test_with_the_auto_tick_off_a_landing_enhances_nothing(enhance):
 
 
 def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance):
-    # The panel holds the settings and the tabs hold the images, so the tile can
+    # The pane holds the settings and the tabs hold the images, so the tile can
     # only know whether it would be a duplicate once the two meet.
-    tab = FakeConfigPanel()
+    tab = FakeGenerateTab()
     gallery_pane = FakeGalleryPane()
     controller, host = enhance(gallery_pane=gallery_pane, tabs=FakeTabs([tab]))
 
     settings = gallery.EnhanceSettings()
-    controller.panel.on_changed(settings)
+    controller.pane.on_changed(settings)
 
     assert tab.settings is settings
     assert host.offers == 1
@@ -549,7 +549,7 @@ def test_the_panel_lists_the_presets_a_library_starts_with(enhance):
 
     controller, _host = enhance(db=FakeDB([enhanced]))
 
-    assert [preset.name for preset in controller.panel.presets] == ["2x · 30 steps · 0.15 redraw"]
+    assert [preset.name for preset in controller.pane.presets] == ["2x · 30 steps · 0.15 redraw"]
 
 
 def _edited(enhance_steps):
@@ -559,21 +559,21 @@ def _edited(enhance_steps):
 
 def test_a_preset_named_on_the_panel_holds_the_settings_on_it_and_is_listed_last(enhance):
     controller, _host = enhance()
-    controller.panel.on_changed(_edited(44))
+    controller.pane.on_changed(_edited(44))
 
-    controller.panel.preset_saved.emit("Crisp")
+    controller.pane.preset_saved.emit("Crisp")
 
-    assert controller.panel.presets == [Preset("Crisp", _edited(44).params)]
+    assert controller.pane.presets == [Preset("Crisp", _edited(44).params)]
 
 
 def test_a_preset_renamed_on_the_panel_keeps_its_settings_under_the_new_name(enhance):
     controller, _host = enhance()
-    controller.panel.on_changed(_edited(44))
-    controller.panel.preset_saved.emit("Crisp")
+    controller.pane.on_changed(_edited(44))
+    controller.pane.preset_saved.emit("Crisp")
 
-    controller.panel.preset_renamed.emit(0, "Bright")
+    controller.pane.preset_renamed.emit(0, "Bright")
 
-    assert controller.panel.presets == [Preset("Bright", _edited(44).params)]
+    assert controller.pane.presets == [Preset("Bright", _edited(44).params)]
 
 
 def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatch):
@@ -583,9 +583,9 @@ def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatc
     controller, _host = enhance(FakeHost(picked=["v1"], rows=rows),
                                 gallery_pane=FakeGalleryPane(["v1"]))
 
-    controller.sync_panel(Offer(False, NO_VIDEO_ENHANCER))
+    controller.sync_pane(Offer(False, NO_VIDEO_ENHANCER))
 
-    assert controller.panel.applicable == (False, NO_VIDEO_ENHANCER)
+    assert controller.pane.applicable == (False, NO_VIDEO_ENHANCER)
 
 
 def test_a_mixed_folder_keeps_its_settings_live(enhance, monkeypatch):
@@ -595,17 +595,17 @@ def test_a_mixed_folder_keeps_its_settings_live(enhance, monkeypatch):
     controller, _host = enhance(FakeHost(picked=["v1", "i1"], rows=rows),
                                 gallery_pane=FakeGalleryPane(["v1", "i1"]))
 
-    controller.sync_panel(Offer(True, "Enhance 1 item"))
+    controller.sync_pane(Offer(True, "Enhance 1 item"))
 
-    assert controller.panel.applicable == (True, NO_VIDEO_ENHANCER)
+    assert controller.pane.applicable == (True, NO_VIDEO_ENHANCER)
 
 
 def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(enhance):
     controller, _host = enhance()
 
-    controller.sync_panel(Offer(False, "Nothing here to enhance"))
+    controller.sync_pane(Offer(False, "Nothing here to enhance"))
 
-    assert controller.panel.offer == (False, "Nothing here to enhance")
+    assert controller.pane.offer == (False, "Nothing here to enhance")
 
 
 def test_the_panel_hears_which_picked_thumbnails_are_in_front(enhance):
@@ -613,18 +613,18 @@ def test_the_panel_hears_which_picked_thumbnails_are_in_front(enhance):
     controller, _host = enhance(FakeHost(picked=["i1", "v1"], rows=rows),
                                 gallery_pane=FakeGalleryPane(["i1", "v1"]))
 
-    controller.sync_panel(Offer(True, "Enhance 1 item"))
+    controller.sync_pane(Offer(True, "Enhance 1 item"))
 
-    assert controller.panel.images_in_front == (["i1", "v1"], None)
+    assert controller.pane.images_in_front == (["i1", "v1"], None)
 
 
 def test_with_nothing_picked_the_panel_hears_the_folder_on_screen_is_in_front(enhance):
     folder = gallery.SettingsGroup("k", "S", [_image("i1"), _image("i2")])
     controller, _host = enhance(FakeHost(group=folder))
 
-    controller.sync_panel(Offer(True, "Enhance 2 not-yet-enhanced images in this folder"))
+    controller.sync_pane(Offer(True, "Enhance 2 not-yet-enhanced images in this folder"))
 
-    assert controller.panel.images_in_front == ([], folder)
+    assert controller.pane.images_in_front == ([], folder)
 
 
 # --- a run in flight, and where it shows -------------------------------------
@@ -665,7 +665,7 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
     monkeypatch.setattr(module.gallery, "describe_enhance_params",
                         lambda params: "upscale x2")
     row = _image("i1")
-    tab = FakeConfigPanel(row)
+    tab = FakeGenerateTab(row)
     gallery_pane, slideshows = FakeGalleryPane(), FakeSlideshows()
     controller, _host = enhance(
         FakeHost(rows=[row]), jobs=FakeReroll([FakeJob("run-a")]),
@@ -926,7 +926,7 @@ def test_train_with_no_photos_makes_the_fixs_folder_and_says_to_put_them_there(
                         lambda parent, title, text: told.append(text))
     controller, _host = enhance()
 
-    controller.panel.fix_training_requested.emit("hands")
+    controller.pane.fix_training_requested.emit("hands")
 
     assert (photos / "hands").is_dir()
     assert str(photos / "hands") in told[0]
@@ -938,7 +938,7 @@ def test_train_with_photos_in_the_shared_folder_alone_trains_that_fix(enhance, p
     (photos / "shared" / "everyone.jpg").write_bytes(b"")
     controller, _host = enhance()
 
-    controller.panel.fix_training_requested.emit("hands")
+    controller.pane.fix_training_requested.emit("hands")
 
     (run,) = _training_runs
     assert run.job["photos"] == [str(photos / "shared" / "everyone.jpg")]
@@ -950,7 +950,7 @@ def test_train_with_photos_trains_that_fix_for_the_enhancements_model(enhance, p
     controller, _host = enhance()
     controller.restore_settings(json.dumps({"params": {"checkpoint": "sample_xl.safetensors"}}))
 
-    controller.panel.fix_training_requested.emit("hands")
+    controller.pane.fix_training_requested.emit("hands")
 
     (run,) = _training_runs
     assert run.began
@@ -962,18 +962,18 @@ def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
     (photos / "hands").mkdir()
     (photos / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
-    controller.panel.fix_training_requested.emit("hands")
+    controller.pane.fix_training_requested.emit("hands")
     (run,) = _training_runs
 
     run.progress.emit("Training 40%")
-    assert controller.panel.training["hands"] == "Training 40%"
+    assert controller.pane.training["hands"] == "Training 40%"
     Path(run.job["work"]).mkdir(parents=True)
     Path(run.job["status"]).write_text(json.dumps(
         {"state": "done", "lora": "fixes\\hands 2026-10-19 0130.safetensors"}), encoding="utf-8")
     run.finished.emit("fixes\\hands 2026-10-19 0130.safetensors")
 
-    assert controller.panel.used == [("hands", "fixes\\hands 2026-10-19 0130.safetensors")]
-    assert controller.panel.training["hands"] is None
+    assert controller.pane.used == [("hands", "fixes\\hands 2026-10-19 0130.safetensors")]
+    assert controller.pane.training["hands"] is None
     assert module.lora_training.untaken_lora(run.job) is None
 
 
@@ -984,13 +984,13 @@ def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start
     (photos / "hands").mkdir()
     (photos / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
-    controller.panel.fix_training_requested.emit("hands")
+    controller.pane.fix_training_requested.emit("hands")
     (run,) = _training_runs
 
     run.canceled.emit()
-    controller.panel.fix_training_requested.emit("hands")
+    controller.pane.fix_training_requested.emit("hands")
 
-    assert controller.panel.training["hands"] is None
+    assert controller.pane.training["hands"] is None
     assert told == []
     assert len(_training_runs) == 2
 
@@ -999,12 +999,12 @@ def test_going_to_a_training_from_the_queue_opens_its_fixs_prompts(enhance, phot
     (photos / "hands").mkdir()
     (photos / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
-    controller.panel.fix_training_requested.emit("hands")
+    controller.pane.fix_training_requested.emit("hands")
     (run,) = _training_runs
 
     run.reveal()
 
-    assert controller.panel.opened == "hands"
+    assert controller.pane.opened == "hands"
 
 
 class _KeptTrainer:
@@ -1067,7 +1067,7 @@ def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(
     controller.take_up_trainings()
     controller.take_up_trainings()
 
-    assert controller.panel.used == [("hands", "fixes\\hands 2026-10-21 1500.safetensors")]
+    assert controller.pane.used == [("hands", "fixes\\hands 2026-10-21 1500.safetensors")]
     assert _training_runs == []
 
 
@@ -1092,4 +1092,4 @@ def test_a_lora_from_a_training_before_its_program_was_recorded_is_left_where_it
 
     controller.take_up_trainings()
 
-    assert controller.panel.used == []
+    assert controller.pane.used == []

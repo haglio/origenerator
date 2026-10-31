@@ -1,6 +1,6 @@
-"""The gallery's info pane as a tabbed workspace of editable generate tabs.
+"""The gallery's Generate pane as a tabbed workspace of editable generate tabs.
 
-Every tab is the same plain :class:`GenerateConfigPanel`, and the pane always
+Every tab is the same plain :class:`GenerateTab`, and the pane always
 holds at least one: closing the last opens a fresh blank one in its place, which
 is why this row carries no "+" of its own.
 
@@ -8,7 +8,7 @@ Tabs open the way an IDE opens files, so browsing does not pile up a row of
 them: one tab at a time is the *preview* tab, drawn in italic, and the next
 single click replaces it. A double-click pins it upright, and so does editing
 anything in it. What counts as an edit is what a person did, never what a load
-did (:attr:`GenerateConfigPanel.user_edited`), and what a tab's preview shows is
+did (:attr:`GenerateTab.user_edited`), and what a tab's preview shows is
 only ever that tab's own — nothing here paints "the tab in front" from outside.
 
 A tab's Generate runs nothing here: it emits :attr:`generate_requested` for the
@@ -33,7 +33,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.copy_names import offer_copy_names
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
-from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.item_names import ItemNames
@@ -80,10 +80,10 @@ def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
     return restored, current if isinstance(current, int) else 0
 
 
-class InfoPaneTabs(QTabWidget):
-    """A strip of editable config tabs; each tab's Generate becomes a gallery re-roll."""
+class GeneratePane(QTabWidget):
+    """A strip of editable Generate tabs; each tab's Generate becomes a gallery re-roll."""
 
-    tab_added = pyqtSignal(object)  # a fresh GenerateConfigPanel, for the view to wire
+    tab_added = pyqtSignal(object)  # a fresh GenerateTab, for the view to wire
     generate_requested = pyqtSignal(str, list)  # any tab's Generate: (workflow_name, each one's params)
     # A rewrite tab's Generate: (source folder key, workflow_name, params) — one
     # run per item in that folder rather than one run of these settings.
@@ -97,10 +97,10 @@ class InfoPaneTabs(QTabWidget):
                  previews: MovingPreviews | None = None):
         super().__init__(parent)
         self._previews = previews
-        self._heights = heights  # the window's prompt heights, for its panels
+        self._heights = heights  # the window's prompt heights, for its tabs
         self._client = client
         # The hosting session, or None standalone: a tab lays its preview out
-        # differently in Fun Time's upright column (GenerateConfigPanel).
+        # differently in Fun Time's upright column (GenerateTab).
         self._fun_time = fun_time
         # A tab coming to the front re-asks what shape its preview is: the
         # hosted layout depends on it, and nothing in the tab itself resized.
@@ -124,8 +124,8 @@ class InfoPaneTabs(QTabWidget):
         # A dragged tab lands at a new index, and the italic mark is drawn by index.
         bar.tabMoved.connect(lambda _from, _to: self._sync_preview_tab())
         # The tab a click opened and the next click may replace (see the module
-        # docstring). Tracked by panel rather than index, since tabs move.
-        self._preview_panel: GenerateConfigPanel | None = None
+        # docstring). Tracked by tab rather than index, since tabs move.
+        self._preview_tab: GenerateTab | None = None
         # A double-click on a tab's ✕ closes it, then the tabs shift and the
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a pin.
@@ -133,30 +133,30 @@ class InfoPaneTabs(QTabWidget):
         self._how_many = HOW_MANY[0]
         self._add_subtab()  # the pane's resting tab
 
-    # --- config tabs -------------------------------------------------------
+    # --- Generate tabs -------------------------------------------------------
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
         """Let the tab now in front lay itself out for the item it holds."""
-        panel = self.currentWidget()
-        refresh = getattr(panel, "refresh_media_layout", None)
+        tab = self.currentWidget()
+        refresh = getattr(tab, "refresh_media_layout", None)
         if callable(refresh):
             refresh()
 
     def become_hosted(self, session) -> None:
         self._fun_time = session
-        for panel in self.config_panels():
-            panel.become_hosted(session)
+        for tab in self.generate_tabs():
+            tab.become_hosted(session)
 
     def become_standalone(self) -> None:
         self._fun_time = None
-        for panel in self.config_panels():
-            panel.become_standalone()
+        for tab in self.generate_tabs():
+            tab.become_standalone()
 
-    def config_panels(self) -> list[GenerateConfigPanel]:
-        """Every open config panel, in tab order."""
+    def generate_tabs(self) -> list[GenerateTab]:
+        """Every open Generate tab, in tab order."""
         return [
             w for i in range(self.count())
-            if isinstance((w := self.widget(i)), GenerateConfigPanel)
+            if isinstance((w := self.widget(i)), GenerateTab)
         ]
 
     def how_many(self) -> int:
@@ -164,16 +164,16 @@ class InfoPaneTabs(QTabWidget):
 
     def set_how_many(self, count: int) -> None:
         self._how_many = count
-        for panel in self.config_panels():
-            panel.set_how_many(count)
+        for tab in self.generate_tabs():
+            tab.set_how_many(count)
 
-    def current_config_panel(self) -> GenerateConfigPanel | None:
-        """The config panel of the tab currently in front, or ``None``."""
+    def current_generate_tab(self) -> GenerateTab | None:
+        """The Generate tab of the tab currently in front, or ``None``."""
         widget = self.currentWidget()
-        return widget if isinstance(widget, GenerateConfigPanel) else None
+        return widget if isinstance(widget, GenerateTab) else None
 
-    def _add_subtab(self, *, preview: bool = False) -> GenerateConfigPanel:
-        """Build, add and select a fresh editable config tab.
+    def _add_subtab(self, *, preview: bool = False) -> GenerateTab:
+        """Build, add and select a fresh editable Generate tab.
 
         ``preview`` opens it as the italic tab a later open may replace — what
         every gesture that shows a generation gets, where the pane's resting tab
@@ -183,40 +183,40 @@ class InfoPaneTabs(QTabWidget):
         disabled. The tab's source-link / animation signals are wired so a click
         in either of them reaches the gallery.
         """
-        panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time,
+        tab = GenerateTab(self._client, self._db, fun_time=self._fun_time,
                                     heights=self._heights, library=self._library,
                                     names=self._names, previews=self._previews)
-        index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
-        panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
+        index = self.addTab(tab, tab_mark(tab.tab_icon()), tab.title())
+        tab.title_changed.connect(lambda _text, p=tab: self._update_tab(p))
         # Editing anything in a tab keeps it, the way a double-click on its name
         # would: it is being worked in now, not looked at.
-        panel.user_edited.connect(lambda p=panel: self._pin_panel(p))
-        panel.set_how_many(self._how_many)
-        panel.how_many_chosen.connect(self.set_how_many)
-        panel.generate_requested.connect(  # relay every tab's Generate
-            lambda name, batch, p=panel: self._on_panel_generate(p, name, batch)
+        tab.user_edited.connect(lambda p=tab: self._pin_tab(p))
+        tab.set_how_many(self._how_many)
+        tab.how_many_chosen.connect(self.set_how_many)
+        tab.generate_requested.connect(  # relay every tab's Generate
+            lambda name, batch, p=tab: self._on_tab_generate(p, name, batch)
         )
-        panel.modify_requested.connect(  # ...and a rewrite tab's, which asks for more
-            lambda key, name, params, p=panel: self._on_panel_changes(p, key, name, params)
+        tab.modify_requested.connect(  # ...and a rewrite tab's, which asks for more
+            lambda key, name, params, p=tab: self._on_tab_changes(p, key, name, params)
         )
         self.setCurrentIndex(index)
         if preview:
-            self._set_preview_panel(panel)
-        self.tab_added.emit(panel)  # let the view wire its source/animation links
-        return panel
+            self._set_preview_tab(tab)
+        self.tab_added.emit(tab)  # let the view wire its source/animation links
+        return tab
 
-    def _update_tab(self, panel: GenerateConfigPanel):
-        """Re-label a tab from its panel — name and mark together, since both say
+    def _update_tab(self, tab: GenerateTab):
+        """Re-label a tab from its tab — name and mark together, since both say
         the same thing about what the tab is showing."""
-        index = self.indexOf(panel)
+        index = self.indexOf(tab)
         if index >= 0:
-            self.setTabText(index, panel.title())
-            self.setTabIcon(index, tab_mark(panel.tab_icon()))
+            self.setTabText(index, tab.title())
+            self.setTabIcon(index, tab_mark(tab.tab_icon()))
         # Whatever renamed it may also have been what made it stop being blank.
         self._sync_preview_tab()
 
     def _closed_within_double_click(self) -> bool:
-        """Was a config tab closed within one double-click of now?
+        """Was a Generate tab closed within one double-click of now?
 
         The completing click of a double-click on a ✕ arrives this close, so a
         pin firing that soon after a close is that stray click, not a gesture.
@@ -237,19 +237,19 @@ class InfoPaneTabs(QTabWidget):
             return
         if self._closed_within_double_click():
             return  # a stray double-click left over from closing a tab, not a pin
-        panel = self.widget(index)
-        if isinstance(panel, GenerateConfigPanel):
-            self._pin_panel(panel)
+        tab = self.widget(index)
+        if isinstance(tab, GenerateTab):
+            self._pin_tab(tab)
 
     def _discard_subtab(self, index: int):
-        """Take one config tab out of the row and let go of it."""
-        panel = self.widget(index)
-        if not isinstance(panel, GenerateConfigPanel):
+        """Take one Generate tab out of the row and let go of it."""
+        tab = self.widget(index)
+        if not isinstance(tab, GenerateTab):
             return
-        if panel is self._preview_panel:
-            self._preview_panel = None
+        if tab is self._preview_tab:
+            self._preview_tab = None
         self.removeTab(index)
-        panel.deleteLater()
+        tab.deleteLater()
 
     def _close_subtab(self, index: int):
         self._last_close_at = time.monotonic()  # arm the stray-double-click guard
@@ -308,19 +308,19 @@ class InfoPaneTabs(QTabWidget):
 
         "Go to folder" is left off until they have made something, since until
         then the tree has no row to open
-        (:meth:`GenerateConfigPanel.settings_folder_key`). Only what this tab can
+        (:meth:`GenerateTab.settings_folder_key`). Only what this tab can
         actually do is listed: an entry that would close nothing is left out
         rather than listed dead.
         """
         menu = QMenu(self)
-        panel = self.widget(index)
-        if isinstance(panel, GenerateConfigPanel):
-            folder = panel.settings_folder_key()
+        tab = self.widget(index)
+        if isinstance(tab, GenerateTab):
+            folder = tab.settings_folder_key()
             if folder is not None:
                 menu.addAction("Go to folder").triggered.connect(
                     lambda: self.folder_requested.emit(folder)
                 )
-            offer_copy_names(menu, [panel.name()])
+            offer_copy_names(menu, [tab.name()])
         if self.count() > 1:
             if not menu.isEmpty():
                 menu.addSeparator()  # the acts above the line, the closes below it
@@ -350,41 +350,41 @@ class InfoPaneTabs(QTabWidget):
 
     # --- the preview tab ---------------------------------------------------
 
-    def _set_preview_panel(self, panel: GenerateConfigPanel | None):
-        """Make ``panel`` the one tab a later single click may replace."""
-        self._preview_panel = panel
+    def _set_preview_tab(self, tab: GenerateTab | None):
+        """Make ``tab`` the one tab a later single click may replace."""
+        self._preview_tab = tab
         self._sync_preview_tab()
 
-    def _italic_panel(self) -> GenerateConfigPanel | None:
+    def _italic_tab(self) -> GenerateTab | None:
         """The tab drawn slanted: the one an open would take over.
 
         The preview tab when there is one; else the pane's untouched resting tab,
         which makes the same promise. Read rather than stored, so a tab loses its
         slant the moment it becomes work — the resting tab when a workflow is
-        picked in it, the preview tab through :meth:`_pin_panel`.
+        picked in it, the preview tab through :meth:`_pin_tab`.
         """
-        if self._preview_panel is not None:
-            return self._preview_panel
-        return next((p for p in self.config_panels() if p.is_blank()), None)
+        if self._preview_tab is not None:
+            return self._preview_tab
+        return next((p for p in self.generate_tabs() if p.is_blank()), None)
 
     def _sync_preview_tab(self):
         """Tell the bar which tab to draw in italic, after anything that could
         have moved it — an open, a close, a drag along the row, or a tab that
         just stopped being blank."""
-        panel = self._italic_panel()
-        self.tabBar().set_preview_index(self.indexOf(panel) if panel is not None else -1)
+        tab = self._italic_tab()
+        self.tabBar().set_preview_index(self.indexOf(tab) if tab is not None else -1)
 
-    def _pin_panel(self, panel):
-        """Stop ``panel`` being the tab a later click replaces.
+    def _pin_tab(self, tab):
+        """Stop ``tab`` being the tab a later click replaces.
 
         A no-op on any other tab, which is what lets every "this tab is being
         worked in" cue — a double-click, a Generate, an edit to a field — call it
         without first asking whether the tab was the italic one.
         """
-        if self._preview_panel is panel:
-            self._set_preview_panel(None)
+        if self._preview_tab is tab:
+            self._set_preview_tab(None)
 
-    def _landing_panel(self) -> GenerateConfigPanel:
+    def _landing_tab(self) -> GenerateTab:
         """The tab an opened generation lands in, so opening one doesn't leave a
         trail of tabs.
 
@@ -393,15 +393,15 @@ class InfoPaneTabs(QTabWidget):
         beside real work; the preview tab, replaced where it stands; or a fresh
         preview tab when neither is there.
         """
-        cur = self.current_config_panel()
+        cur = self.current_generate_tab()
         blank = cur if cur is not None and cur.is_blank() else next(
-            (p for p in self.config_panels() if p.is_blank()), None
+            (p for p in self.generate_tabs() if p.is_blank()), None
         )
         if blank is not None:
-            self._set_preview_panel(blank)
+            self._set_preview_tab(blank)
             return blank
-        if self._preview_panel is not None:
-            return self._preview_panel  # replace the italic tab, don't fork
+        if self._preview_tab is not None:
+            return self._preview_tab  # replace the italic tab, don't fork
         return self._add_subtab(preview=True)
 
     def pin_current_tab(self):
@@ -411,10 +411,10 @@ class InfoPaneTabs(QTabWidget):
         generation opens beside it rather than over it. A no-op on a tab that was
         already pinned.
         """
-        self._pin_panel(self.currentWidget())
+        self._pin_tab(self.currentWidget())
 
-    def pin_tab(self, panel):
-        """Keep ``panel``, a run of the gallery's own being in flight in it.
+    def pin_tab(self, tab):
+        """Keep ``tab``, a run of the gallery's own being in flight in it.
 
         The tile's "+" is pressed outside every tab, so the run it starts is
         given to the tab standing on that folder or to one opened on it
@@ -422,9 +422,9 @@ class InfoPaneTabs(QTabWidget):
         way that tab holds the run's Cancel and its filling bar from then on,
         which a later click replacing the tab would take away mid-run.
         """
-        self._pin_panel(panel)
+        self._pin_tab(tab)
 
-    def _on_panel_generate(self, panel, workflow_name: str, batch: list[dict]):
+    def _on_tab_generate(self, tab, workflow_name: str, batch: list[dict]):
         """Relay a tab's Generate for the gallery to launch as a re-roll — and
         keep that tab.
 
@@ -432,15 +432,15 @@ class InfoPaneTabs(QTabWidget):
         filling progress bar belong to that run, and a later click replacing the
         tab would take both away while the job kept going.
         """
-        self._pin_panel(panel)
+        self._pin_tab(tab)
         self.generate_requested.emit(workflow_name, batch)
 
-    def _on_panel_changes(self, panel, folder_key: str, workflow_name: str,
+    def _on_tab_changes(self, tab, folder_key: str, workflow_name: str,
                            params: dict):
         """Relay a rewrite tab's Generate — and keep that tab, for the reason a
         launched tab is kept: the runs are its, and a later click replacing it
         would take their Cancel and their progress away mid-batch."""
-        self._pin_panel(panel)
+        self._pin_tab(tab)
         self.modify_requested.emit(folder_key, workflow_name, params)
 
     def tabInserted(self, index: int):  # Qt hook: every add path lands here
@@ -459,11 +459,11 @@ class InfoPaneTabs(QTabWidget):
                                                  image_index,
                                                  workflow_version=row.get("workflow_version"))
 
-    def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel | None:
-        """Open (and select) an editable config tab prefilled from a generation —
+    def open_config(self, workflow_name: str, params: dict) -> GenerateTab | None:
+        """Open (and select) an editable Generate tab prefilled from a generation —
         a history-strip click, a queue row, or "Edit…".
 
-        Lands where a browsed click lands (:meth:`_landing_panel`), and wears the
+        Lands where a browsed click lands (:meth:`_landing_tab`), and wears the
         same italic mark: naming a configuration is still "show me this", not a
         tab someone has settled into. Running it, or double-clicking its tab, pins
         it upright.
@@ -472,15 +472,15 @@ class InfoPaneTabs(QTabWidget):
         """
         if self._client is None:
             return None
-        panel = self._landing_panel()
-        panel.prefill(workflow_name, params)
-        self.setCurrentWidget(panel)
-        return panel
+        tab = self._landing_tab()
+        tab.prefill(workflow_name, params)
+        self.setCurrentWidget(tab)
+        return tab
 
     def open_folder_modify(self, folder_key: str, label: str, workflow_name: str,
-                      params: dict, thumbnails: list) -> GenerateConfigPanel | None:
+                      params: dict, thumbnails: list) -> GenerateTab | None:
         """Open a folder's prompt rewrite in a tab (see
-        :meth:`GenerateConfigPanel.open_folder_modify`).
+        :meth:`GenerateTab.open_folder_modify`).
 
         Lands where an open lands, then keeps the tab upright: a rewrite is
         something being written, not a generation being looked at, so the next
@@ -490,11 +490,11 @@ class InfoPaneTabs(QTabWidget):
         """
         if self._client is None:
             return None
-        panel = self._landing_panel()
-        panel.open_folder_modify(folder_key, label, workflow_name, params, thumbnails)
-        self._pin_panel(panel)
-        self.setCurrentWidget(panel)
-        return panel
+        tab = self._landing_tab()
+        tab.open_folder_modify(folder_key, label, workflow_name, params, thumbnails)
+        self._pin_tab(tab)
+        self.setCurrentWidget(tab)
+        return tab
 
     # --- loading the Gallery pane selection into a tab --------------------------
 
@@ -504,22 +504,22 @@ class InfoPaneTabs(QTabWidget):
 
         The front tab takes it when that tab is the clicked row's own settings
         folder already, pinned or not; anything else lands where an open lands
-        (:meth:`_landing_panel`). So a browse through a folder's items reuses one
+        (:meth:`_landing_tab`). So a browse through a folder's items reuses one
         italic tab however many are clicked.
         """
         image_index = build_image_config_index(
             [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
         key = self._row_settings_key(row, image_index)
-        cur = self.current_config_panel()
+        cur = self.current_generate_tab()
         if (cur is not None and not cur.is_blank()
                 and cur.workflow_and_signature(image_index) == key):
             target = cur  # already this generation's own tab, pinned or not
         else:
-            target = self._landing_panel()
+            target = self._landing_tab()
         target.show_saved_generation(row, image_rows)
         self.setCurrentWidget(target)
 
-    def panel_that_launched(self, origin: str | None):
+    def tab_that_launched(self, origin: str | None):
         """The tab that launched the run beginning at ``origin``, or ``None``.
 
         A run's result belongs to the tab that asked for it; every other tab is
@@ -533,53 +533,53 @@ class InfoPaneTabs(QTabWidget):
         """
         if not origin:
             return None
-        return next((panel for panel in self.config_panels()
-                     if origin in panel.launched_runs()), None)
+        return next((tab for tab in self.generate_tabs()
+                     if origin in tab.launched_runs()), None)
 
     # --- the tabs following a run in flight --------------------------------
 
-    def watchers_of(self, key: str) -> list[GenerateConfigPanel]:
+    def watchers_of(self, key: str) -> list[GenerateTab]:
         """Every tab whose preview follows the run leading folder ``key`` (see
-        :meth:`GenerateConfigPanel.watched_key`) — where that run's frames and
+        :meth:`GenerateTab.watched_key`) — where that run's frames and
         the item it lands as go, and nowhere else. Usually one tab; two when
         a Generate was pressed in one and the folder's live tile clicked into
         another, and both are the tab's own business to show."""
-        return [panel for panel in self.config_panels()
-                if panel.watched_key() == key]
+        return [tab for tab in self.generate_tabs()
+                if tab.watched_key() == key]
 
-    def panel_watching(self, key: str) -> GenerateConfigPanel | None:
+    def tab_watching(self, key: str) -> GenerateTab | None:
         """The first tab following folder ``key``'s run, or ``None``."""
         watching = self.watchers_of(key)
         return watching[0] if watching else None
 
-    def landing_panel(self) -> GenerateConfigPanel:
+    def landing_tab(self) -> GenerateTab:
         """The tab a "show me this" gesture lands in — a clicked thumbnail, a
         clicked live tile — so that opening things doesn't leave a trail of tabs
-        (see :meth:`_landing_panel`)."""
-        return self._landing_panel()
+        (see :meth:`_landing_tab`)."""
+        return self._landing_tab()
 
     def refresh_displayed(self, row: dict, image_rows: list[dict]):
         """A row has changed: re-show it in every tab displaying it.
 
         Every tab rather than the front one, and only the tabs actually on that
-        generation (:meth:`GenerateConfigPanel.refresh_displayed`) — a change to
+        generation (:meth:`GenerateTab.refresh_displayed`) — a change to
         one image must not touch a tab looking at another.
         """
-        for panel in self.config_panels():
-            panel.refresh_displayed(row, image_rows)
+        for tab in self.generate_tabs():
+            tab.refresh_displayed(row, image_rows)
 
     def reread_names(self):
-        for panel in self.config_panels():
-            self.setTabText(self.indexOf(panel), panel.title())
-            panel.reread_name()
+        for tab in self.generate_tabs():
+            self.setTabText(self.indexOf(tab), tab.title())
+            tab.reread_name()
 
     def reconcile_previews(self, live_ids):
-        for panel in self.config_panels():
-            panel.reconcile_preview(live_ids)
+        for tab in self.generate_tabs():
+            tab.reconcile_preview(live_ids)
 
     def reread_folder_buttons(self):
-        for panel in self.config_panels():
-            panel.reread_folder_buttons()
+        for tab in self.generate_tabs():
+            tab.reread_folder_buttons()
 
     def release_media(self, paths):
         """Let every tab go of any of ``paths`` it's showing — files about to be
@@ -589,8 +589,8 @@ class InfoPaneTabs(QTabWidget):
         generation spreads them across tabs, and a tab out of sight holds its
         video's file open exactly as firmly as the front one does.
         """
-        for panel in self.config_panels():
-            panel.release_media(paths)
+        for tab in self.generate_tabs():
+            tab.release_media(paths)
 
     def capture_state(self) -> dict:
         """Snapshot every open tab so the session can be restored next launch.
@@ -604,11 +604,11 @@ class InfoPaneTabs(QTabWidget):
         """
         tabs = [
             {
-                "config": panel.current_config().to_dict(),
-                "launched_runs": panel.launched_runs(),
-                "layout": panel.saved_layout(),
+                "config": tab.current_config().to_dict(),
+                "launched_runs": tab.launched_runs(),
+                "layout": tab.saved_layout(),
             }
-            for panel in self.config_panels()
+            for tab in self.generate_tabs()
         ]
         return {"tabs": tabs, "current": self.currentIndex()}
 
@@ -625,12 +625,12 @@ class InfoPaneTabs(QTabWidget):
             return  # keep the initial tab rather than leaving no tabs at all
         self._discard_all_subtabs()  # clear every tab before rebuilding from the snapshot
         for snapshot, launched, layout in restored:
-            panel = self._add_subtab()
-            panel.restore_config(snapshot)
-            panel.restore_layout(layout)
+            tab = self._add_subtab()
+            tab.restore_config(snapshot)
+            tab.restore_layout(layout)
             # Runs this tab started and the app was closed on: the gallery
             # reconnects them, and this is how the tab knows they are its own.
             for origin in launched:
-                panel.note_launched(origin)
+                tab.note_launched(origin)
         if 0 <= current < self.count():
             self.setCurrentIndex(current)

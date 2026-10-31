@@ -11,8 +11,8 @@ The on/off switch IS on it: the OSR2 controls' switch -- on driving, off
 parked -- is the app's one, and the Gallery pane buttons' separate one is gone.
 
 This is the surface with no slideshow under it.  A slideshow does not float one of these:
-it wears ONE panel (:mod:`origenerator.gui.slideshow_hud`), which carries the device
-rows, the OSR2 line and the readout itself -- two panels in one corner said the
+it wears ONE HUD (:mod:`origenerator.gui.slideshow_hud`), which carries the device
+rows, the OSR2 line and the readout itself -- two HUDs in one corner said the
 status twice, in two lines that disagreed, and drew prev/next/lock/trash on
 each.
 """
@@ -51,13 +51,13 @@ class Osr2Controls(PressableDrawing):
         self._motion = motion
         # The app's one OSR2 switch: the control-state group's four buttons
         # read which state it is in and ask it for another.  None where nobody
-        # handed one over, which is what a test's bare panel gets -- the group
+        # handed one over, which is what a test's bare OSR2 controls get -- the group
         # then draws as driving and its presses reach only the motion.
         self._control = control
         if control is not None:
             control.changed.connect(self.refresh)
             # And whenever the app re-aims the device: which driver has it moves
-            # with the video in front as much as with a press on this panel.
+            # with the video in front as much as with a press on these controls.
             control.settled.connect(self.refresh)
         # How to ask what the OSR2 reads as and why the Broker cannot hear it, or
         # None for the real reads: a test never reaches the machine's own stamps.
@@ -67,7 +67,7 @@ class Osr2Controls(PressableDrawing):
         self.setFixedSize(*osr2_controls_room(motion))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. Still OSR2 controls redrawn ten times a
-        # second is the same drawing at Pillow's price, and with the panel now
+        # second is the same drawing at Pillow's price, and with the controls now
         # always up that price would be paid for the whole session.
         self._repaint = QTimer(self)
         self._repaint.setInterval(REPAINT_MS)
@@ -98,7 +98,7 @@ class Osr2Controls(PressableDrawing):
         self.update()
 
     def _sync_repaint(self) -> None:
-        """Animate only what is moving: a shown panel with something driving.
+        """Animate only what is moving: shown controls with something driving.
 
         Either driver moves the line -- the motion's wave scrolls with its
         phase, the script's with the playhead -- and neither does while the

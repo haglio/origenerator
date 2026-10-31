@@ -1,6 +1,6 @@
 """A small gallery of the videos an image was animated into.
 
-Shown in the info pane when an image is selected: each video the image was used
+Shown in the Generate pane when an image is selected: each video the image was used
 as the input for appears as a looping WebP preview (or its static thumbnail when
 no animation is available), and clicking one navigates to that video. WebP +
 ``QMovie`` keeps many previews moving at once without a video player per tile.

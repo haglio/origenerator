@@ -4,7 +4,7 @@ An enhancement is a layer, not a replacement: the enhanced file leads the row's
 ``output_files`` and each earlier one stays listed, so an image can carry several
 levels at once — usually one, more when the same image is enhanced again at
 different settings to compare them. The preview opens on the most-enhanced
-version; this is where the rest are, sitting at the foot of the info pane
+version; this is where the rest are, sitting at the foot of the Generate pane
 beside the other cross-links (a video's source image, an image's animations).
 
 One level per row, because each is a file with a file's worth to say about it:
@@ -14,7 +14,7 @@ was written. That information used to sit in one ``Basic`` block at the top,
 pooled under labels naming levels you then had to go and find; it is per
 enhancement, so it lives with the enhancement.
 
-A row can also be dragged onto the Enhance subpanel, which absorbs the settings
+A row can also be dragged onto the Enhance pane, which absorbs the settings
 it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
@@ -67,7 +67,7 @@ from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 # A dragged enhancement level carries the params that produced it under this
-# type; the Enhance subpanel reads it to absorb those settings.
+# type; the Enhance pane reads it to absorb those settings.
 ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 
 _PLUS = THUMBNAIL_BOX.width() * 2 // 3
@@ -141,7 +141,7 @@ class RunningEnhancement(NamedTuple):
     """The enhancement in flight on the image on display, as its live row shows
     it: what the run is doing, its latest frame if one has streamed, and the
     settings it was launched with -- which name what is being made, since the
-    panel may have moved on since the press."""
+    pane may have moved on since the press."""
 
     status: str
     frame: bytes | None
@@ -295,7 +295,7 @@ class _LevelRow(_Row):
     that file was written.
 
     Clicking puts it in the preview and picks it; dragging it carries those
-    settings for the Enhance subpanel to absorb.
+    settings for the Enhance pane to absorb.
     """
 
     clicked = pyqtSignal(int, Qt.KeyboardModifier)
@@ -359,7 +359,7 @@ class _LevelRow(_Row):
 
     def mouseMoveEvent(self, event):
         # Only a level that knows its settings is worth dragging: the original
-        # was made by no enhancement, so there is nothing for the panel to take.
+        # was made by no enhancement, so there is nothing for the pane to take.
         if not self._params or not self.drag_out.should_start(event):
             return
         # The version's image trails the cursor.
@@ -414,7 +414,7 @@ class _PendingRow(_Row):
 class _AddRow(_Row):
     """The ``+ Enhance`` row that leads the list.
 
-    Live, it makes another version at whatever the Enhance panel currently says.
+    Live, it makes another version at whatever the Enhance pane currently says.
     Dimmed, the image already holds one made at exactly those settings, and
     hovering it lights that level rather than leaving you to compare numbers —
     the answer to "why can't I press this" is the row it points at.
@@ -468,7 +468,7 @@ class EnhanceVersions(QWidget):
     objects (as :func:`~origenerator.gallery.enhance.displayed_levels` produces
     them) paired with the on-disk file to draw, plus the ``(status, frame)`` of
     an enhancement still running on this image. Clicking a level's row emits
-    ``level_selected`` with its position in that list, for the panel to put in
+    ``level_selected`` with its position in that list, for the pane to put in
     the preview; picking rows and pressing Delete (or the right-click menu's
     Delete) emits ``delete_requested`` with those positions but the original's,
     and a row's trash can emits it with that row's alone.

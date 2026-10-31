@@ -1,7 +1,7 @@
 """Combine: a video's settings run again on a dropped image.
 
 The fifth of the gallery's screen concerns to come out of the view that used to
-hold all of them. What lives here is the whole act -- the panel with its two drop
+hold all of them. What lives here is the whole act -- Combine with its two drop
 drop zones, what a dropped item lends each and how it shows there, the lane and
 the act picked beside them, and every way settings are found and launched: the
 dropped video's own, the settings assigned for an act, the act's most-used past
@@ -36,7 +36,7 @@ from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.export_lane import GENAU as GENAU_LANE
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
-from origenerator.gui.combine_panel import CombinePanel
+from origenerator.gui.combine import Combine
 from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.message import ERROR, INFO, WARNING
@@ -90,7 +90,7 @@ class CombineHost(Protocol):
 
 
 class CombineController(QObject):
-    """The combine panel, and every way settings reach a dropped image."""
+    """The Combine, and every way settings reach a dropped image."""
 
     def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
                  info_tabs_of, slideshows, starting: StartingRows,
@@ -112,31 +112,31 @@ class CombineController(QObject):
         # The tabs are built by the window's own layout, after this: asked for
         # rather than held, so a prepared combination reaches whichever tabs
         # exist by then.
-        self._info_tabs_of = info_tabs_of
+        self._generate_pane_of = info_tabs_of
         self._slideshows = slideshows
         # Combine: drop an image + an i2v video, Generate re-runs that video's
         # settings on the image. Needs a client to generate, so it hides without one.
-        self.panel = CombinePanel(
+        self.widget = Combine(
             self._image_lent_by, self._video_lent_by, self._zone_preview,
             self._video_history, named=self._names.prompt_id_of, name_of=self._name_of,
             browse_image=self._browse_image, leads_to=self._item_held)
-        self.panel.video_used.connect(self._db.record_combine_video_use)
+        self.widget.video_used.connect(self._db.record_combine_video_use)
         # Both Generate paths go through a wrapper that puts a stand-in row in the
         # line first: the work between the press and a real job is seconds long,
         # and a button that seems to do nothing reads as an app that has died.
-        self.panel.combine_requested.connect(self._on_request)
+        self.widget.combine_requested.connect(self._on_request)
         self._animation_settings = None
-        self.panel.animation_settings_requested.connect(self._on_animation_settings)
-        self.panel.item_activated.connect(self._host.follow_link)
+        self.widget.animation_settings_requested.connect(self._on_animation_settings)
+        self.widget.item_activated.connect(self._host.follow_link)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
-        self.panel.intent_changed.connect(self._on_intent_changed)
+        self.widget.intent_changed.connect(self._on_intent_changed)
         # An image dropped in narrows the acts too, so the list is re-asked
         # for the moment one lands rather than only when the lane changes.
-        self.panel.image_zone.changed.connect(self.image_dropped)
-        self.panel.video_zone.changed.connect(self.reconcile_generating)
+        self.widget.image_zone.changed.connect(self.image_dropped)
+        self.widget.video_zone.changed.connect(self.reconcile_generating)
         if client is None:
-            self.panel.hide()
+            self.widget.hide()
 
     def _on_animation_settings(self) -> None:
         from origenerator.own_window import show_or_say  # noqa: PLC0415 -- Qt only
@@ -146,7 +146,7 @@ class CombineController(QObject):
             self._animation_settings.activateWindow()
             return
         built = the_animation_window()
-        if not show_or_say("Checking animations", built, parent=self.panel):
+        if not show_or_say("Checking animations", built, parent=self.widget):
             self._animation_settings = built
 
     # --- what the drop zones take, and what the session keeps ---------------------
@@ -180,9 +180,9 @@ class CombineController(QObject):
         return self._files.name_of(held)
 
     def _browse_image(self) -> None:
-        path = pick_a_file(self.panel, "Image", FILE_FILTERS[MediaType.IMAGE])
+        path = pick_a_file(self.widget, "Image", FILE_FILTERS[MediaType.IMAGE])
         if path:
-            self.panel.image_zone.set_item(path)
+            self.widget.image_zone.set_item(path)
 
     def _image_lent_by(self, prompt_id: str) -> str | None:
         lent = gallery.image_lent_by(prompt_id, self._db.get_generation,
@@ -218,18 +218,18 @@ class CombineController(QObject):
                              self._db.list_combine_video_uses())
 
     def reread_names(self) -> None:
-        self.panel.reread_names()
+        self.widget.reread_names()
 
     def selection(self) -> dict:
         return {
-            "image": self.panel.image_zone.current_id(),
-            "videos": self.panel.dropped_videos(),
-            "intent": self.panel.selected_intent(),
-            "category": self.panel.selected_category(),
+            "image": self.widget.image_zone.current_id(),
+            "videos": self.widget.dropped_videos(),
+            "intent": self.widget.selected_intent(),
+            "category": self.widget.selected_category(),
         }
 
     def restore(self, saved) -> None:
-        """Put the combine panel back the way a session left it, skipping an item
+        """Put the Combine back the way a session left it, skipping an item
         that has since been deleted or no longer fits its drop zone, and an act the
         lane can no longer answer.
 
@@ -246,14 +246,14 @@ class CombineController(QObject):
             return
         image_id = saved.get("image")
         if image_id and self._accepts_image(image_id):
-            self.panel.image_zone.set_item(image_id)
-        self.panel.set_intent(saved.get("intent") or act_settings.VIDEO)
+            self.widget.image_zone.set_item(image_id)
+        self.widget.set_intent(saved.get("intent") or act_settings.VIDEO)
         videos = saved.get("videos")
         if not isinstance(videos, dict):
-            videos = {self.panel.selected_intent(): saved.get("video")}
-        self.panel.set_dropped_videos({lane: video for lane, video in videos.items()
+            videos = {self.widget.selected_intent(): saved.get("video")}
+        self.widget.set_dropped_videos({lane: video for lane, video in videos.items()
                                        if video and self._accepts_video(video)})
-        self.panel.set_category(saved.get("category") or "")
+        self.widget.set_category(saved.get("category") or "")
 
     def rebuildable_videos(self, rows: list[dict]) -> list[dict]:
         """The completed, rebuildable i2v videos among ``rows`` — the pool an act's
@@ -267,13 +267,13 @@ class CombineController(QObject):
         mine settings from, and -- once an image is in the drop zone -- those
         :mod:`origenerator.animation_paths` says it cannot start from. An image
         nobody has sorted yet narrows nothing."""
-        lane = self.panel.selected_intent()
+        lane = self.widget.selected_intent()
         offered = act_settings.available_categories(
             self.rebuildable_videos(rows), lane)
-        state = self._state_of(self.panel.image_zone.current_id())
+        state = self._state_of(self.widget.image_zone.current_id())
         if state:
             offered &= set(animation_paths.acts_for(state, lane))
-        self.panel.set_available_categories(offered)
+        self.widget.set_available_categories(offered)
 
     def _state_of(self, image_id: str | None) -> str:
         """What the image in the drop zone was sorted as showing, ``""`` for an
@@ -292,17 +292,17 @@ class CombineController(QObject):
         self.reconcile_generating()
 
     def reconcile_generating(self) -> None:
-        image_id = self.panel.image_zone.current_id()
-        video_id = self.panel.video_zone.current_id()
-        built = (self._combined_params(image_id, video_id, self.panel.selected_intent())
+        image_id = self.widget.image_zone.current_id()
+        video_id = self.widget.video_zone.current_id()
+        built = (self._combined_params(image_id, video_id, self.widget.selected_intent())
                  if image_id and video_id else None)
-        self.panel.note_folder_generating(
+        self.widget.note_folder_generating(
             built is not None and self._jobs.job_for(self._folder_of(built)) is not None)
 
     # --- the line's answer to the press, before there is a job ---------------
 
     def _on_request(self, request) -> None:
-        """Answer one press of the panel: run the chosen settings now, or hand them to
+        """Answer one press of Combine: run the chosen settings now, or hand them to
         a generate tab to change first (:class:`CombineRequest`)."""
         if request.edit_first:
             if request.category:
@@ -316,7 +316,7 @@ class CombineController(QObject):
             self._on_generate(request.image_id, request.video_id, request.intent)
 
     def _on_generate(self, image_id: str, video_id: str, intent: str) -> None:
-        """The combine panel's Generate with a dropped video, with the line
+        """The Combine's Generate with a dropped video, with the line
         showing it at once.
 
         The launch itself is left for the next turn of the event loop: reading
@@ -336,7 +336,7 @@ class CombineController(QObject):
         self._after_painting(run)
 
     def _on_generate_category(self, image_id: str, category: str, intent: str) -> None:
-        """The combine panel's Generate with an act picked, with the line showing
+        """The Combine's Generate with an act picked, with the line showing
         it at once; :meth:`generate_category` drops the stand-in however the
         launch turns out."""
         key = self._show_starting(image_id, category=category)
@@ -416,7 +416,7 @@ class CombineController(QObject):
     def _open_combination(self, image_id: str, video_id: str,
                           intent: str = act_settings.VIDEO) -> None:
         """Open a dropped image + video's settings as an editable generate tab instead
-        of running it — the combine panel's "Edit individual…" path. The tab is
+        of running it — the Combine's "Edit individual…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
         and shows the pair it was opened with rather than an empty pane."""
         built = self._combined_params(image_id, video_id, intent)
@@ -437,11 +437,11 @@ class CombineController(QObject):
         tab pointed at nothing wears, with both things the tab is about on hand.
         A curated act has no ``video_row`` under it, and shows the frame alone.
         """
-        panel = self._info_tabs_of().open_config(workflow.name, params)
-        if panel is None:
+        Combine = self._generate_pane_of().open_config(workflow.name, params)
+        if Combine is None:
             return
-        panel.set_settings_source(category, video_id, intent)
-        panel.show_combination(Combination(
+        Combine.set_settings_source(category, video_id, intent)
+        Combine.show_combination(Combination(
             still, self._host.animated_preview(video_row) if video_row is not None else None))
 
     def _still_path(self, row: dict) -> str | None:

@@ -538,7 +538,7 @@ class VoiceRouter(QObject):
 
         The driver is app-wide, so this answers from the gallery and from a slideshow
         alike, and the bars read the same whether or not the device is running:
-        a motion can be set up before it is started, exactly as the panel allows.
+        a motion can be set up before it is started, exactly as the OSR2 controls allow.
         """
         move, argument = self._motion_moves[command]
         if move is None:

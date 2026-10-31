@@ -1,6 +1,6 @@
 """What else in the library a shown generation is tied to.
 
-The links under a config tab's settings form, a section per relation: Source,
+The links under a Generate tab's settings form, a section per relation: Source,
 the item this row was built from and the video whose settings Combine ran on
 it; Requests and Modifications, both ways; and the other ends of the Source
 links, Animations, Combine and Trims. Each link is drawn on both of its items.

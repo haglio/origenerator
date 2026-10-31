@@ -1,4 +1,4 @@
-"""The row on a config tab saying what the item it is showing shows.
+"""The row on a Generate tab saying what the item it is showing shows.
 
 States are the committed example overlay's own (see CLAUDE.md).
 """

@@ -65,7 +65,7 @@ def test_an_unconfigured_folder_reads_as_the_defaults_with_the_tick_off():
 
 @pytest.mark.parametrize("raw", ["", "not json", "[]", "null"])
 def test_unreadable_stored_settings_fall_back_to_the_defaults(raw):
-    # A folder's settings must never be able to break the panel that shows them.
+    # A folder's settings must never be able to break the pane that shows them.
     assert EnhanceSettings.parse(raw) == EnhanceSettings.parse(None)
 
 
@@ -83,7 +83,7 @@ def test_settings_round_trip_through_json():
 
 
 def test_stored_settings_cannot_smuggle_in_params_outside_the_panel():
-    # Only the settings the subpanel offers are honored: a stored blob naming, say,
+    # Only the settings the Enhance pane offers are honored: a stored blob naming, say,
     # the input image must not be able to redirect what an enhance runs on.
     back = EnhanceSettings.parse(json.dumps(
         {"auto": True, "params": {"input_image": "elsewhere.png", "enhance_steps": 12}}
@@ -113,7 +113,7 @@ def test_enhance_params_take_the_folders_settings_over_the_workflow_defaults():
 
 def test_the_detail_pass_is_one_of_the_settings_the_panel_sets():
     # It is part of what an enhancement IS, not a property of one image, so it
-    # is set once on the panel and every enhance launched from there carries it.
+    # is set once on the pane and every enhance launched from there carries it.
     settings = EnhanceSettings(params={"enhance_detail_fixes": {"teeth": 0.5}})
     params = enhance_params_for(_source_row(), settings)
     assert params["enhance_detail_fixes"] == {"teeth": 0.5}
@@ -124,7 +124,7 @@ def test_the_detail_pass_is_one_of_the_settings_the_panel_sets():
 
 
 def test_the_default_model_leaves_the_source_image_its_own_checkpoint():
-    # An enhanced image should stay in its own style, so the panel's default
+    # An enhanced image should stay in its own style, so the pane's default
     # defers to whichever checkpoint made the image rather than pinning one.
     params = enhance_params_for(_source_row(), EnhanceSettings())
     assert params["checkpoint"] == "anemone_v3.safetensors"
@@ -191,7 +191,7 @@ def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
     # Every image the yellow plus marks lists here — including the ones the
     # inline tail finished, which kept no original. There is one file and no
     # "before", so the list is that single enhancement, named by the settings the
-    # tail ran at so it can still be dragged onto the panel and reused.
+    # tail ran at so it can still be dragged onto the pane and reused.
     row = dict(_source_row(), params_json=json.dumps({
         "positive_prompt": "a lantern on a jetty",
         "enhance": True, "enhance_scale": 2.0, "enhance_steps": 20,
@@ -328,7 +328,7 @@ def test_describe_names_a_pinned_model_by_its_title_but_not_the_source_matching_
     assert describe_enhance_params({}) == ""
 
 
-# --- what the info pane lists, and what deleting a level leaves ------
+# --- what the Generate pane lists, and what deleting a level leaves ------
 
 
 def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():
@@ -356,7 +356,7 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video_itself(tmp_pa
     assert (evolved.label, original.label) == ("Evolved", "Original")
     assert gallery.output_file_path(evolved.file, OutputPlaces.in_one_folder(tmp_path / "output")) == upscale
     assert original.file["filename"] == "wan_00001.mp4"
-    assert evolved.params == {}  # nothing Evolver ran for the Enhance panel to take
+    assert evolved.params == {}  # nothing Evolver ran for the Enhance pane to take
 
 
 def _folded(tmp_path, count=1):
@@ -476,7 +476,7 @@ def test_a_spoken_fix_redoes_the_latest_enhancement_with_the_parts_pass(
     params = fix_params_for(row, _spoken("fix teeth"),
                             EnhanceSettings(params={"enhance_scale": 1.5}))
 
-    # Equivalent to the LATEST enhancement — not to whatever the panel says now.
+    # Equivalent to the LATEST enhancement — not to whatever the pane says now.
     assert params["enhance_scale"] == 3.0
     assert params["enhance_steps"] == 40
     assert params["checkpoint"] == "driftwood_v1.safetensors"
@@ -497,17 +497,17 @@ def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_ticks(
         monkeypatch):
     # The bug this is here for: a folder set to fix every part turned a spoken
     # "fix teeth" into a pass over all of them — a redraw of the whole image
-    # in answer to a command about one part of it. The panel's ticks configure
+    # in answer to a command about one part of it. The pane's ticks configure
     # what an *enhancement* fixes; a spoken fix says its own parts out loud.
     _install_detectors(monkeypatch, "teeth_yolov8n.pt", "face_yolov8m.pt",
                        "hand_yolov8s.pt", "eyes_yolov8n.pt")
-    panel = EnhanceSettings(params={"enhance_detail_fixes": {
+    pane = EnhanceSettings(params={"enhance_detail_fixes": {
         "faces": 0.4, "hands": 0.5, "teeth": 0.6, "eyes": 0.3}})
 
-    params = fix_params_for(_source_row(), _spoken("fix teeth"), panel)
+    params = fix_params_for(_source_row(), _spoken("fix teeth"), pane)
 
     # Its own number for that part, since nobody says a denoise out loud — and
-    # nothing else the panel happens to have checked.
+    # nothing else the pane happens to have checked.
     assert params["enhance_detail_fixes"] == {"teeth": 0.6}
 
 
@@ -531,8 +531,8 @@ def test_a_part_with_nothing_to_find_it_is_dropped_from_a_combination(monkeypatc
 
 
 def test_a_spoken_fix_runs_the_part_at_the_number_the_panel_gives_it(monkeypatch):
-    # Nobody says a denoise out loud, so the panel's own number for that part is
-    # what the command means — its default only where the panel leaves it alone.
+    # Nobody says a denoise out loud, so the pane's own number for that part is
+    # what the command means — its default only where the pane leaves it alone.
     _install_detectors(monkeypatch, "hand_yolov8s.pt")
     params = fix_params_for(
         _source_row(), _spoken("fix hands"),
@@ -642,10 +642,10 @@ def test_a_folders_prompts_for_a_fix_are_kept_with_its_settings():
 
 def test_a_spoken_fix_redraws_toward_the_prompts_the_panel_gives_that_part(monkeypatch):
     _install_detectors(monkeypatch, "hand_yolov8s.pt", "teeth_yolov8n.pt")
-    panel = EnhanceSettings(params={"enhance_fix_prompts": {
+    pane = EnhanceSettings(params={"enhance_fix_prompts": {
         "hands": {"prompt": "open palms", "avoid": "fists"},
         "teeth": {"prompt": "even teeth", "avoid": "gaps"}}})
 
-    params = fix_params_for(_source_row(), _spoken("fix hands"), panel)
+    params = fix_params_for(_source_row(), _spoken("fix hands"), pane)
 
     assert params["enhance_fix_prompts"] == {"hands": {"prompt": "open palms", "avoid": "fists"}}

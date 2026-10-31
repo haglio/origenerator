@@ -29,7 +29,7 @@ def link(href: str, text: str) -> str:
     """One link for a tip's html, colored so it reads as one.
 
     Qt's default anchor color is the desktop's, which against this app's dark
-    panels can come out all but unreadable — and a link nobody sees is the same
+    surfaces can come out all but unreadable — and a link nobody sees is the same
     as no link.
     """
     return f'<a href="{href}" style="color: {BLUE.name()};">{text}</a>'

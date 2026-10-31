@@ -55,7 +55,7 @@ def test_the_motion_bars_keep_fun_times_phrases():
 
 
 def test_human_inspired_motion_answers_a_flip_and_an_explicit_on_and_off():
-    # It is reached for without looking at the panel, so a speaker who wants it
+    # It is reached for without looking at the OSR2 controls, so a speaker who wants it
     # ON must not have to find out which way it is standing first.
     assert match_app_command("human inspired") is AppCommand.LEARNED
     assert match_app_command("human inspired on") is AppCommand.LEARNED_ON

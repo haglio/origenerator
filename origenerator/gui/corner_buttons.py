@@ -1,6 +1,6 @@
 """The controls a generation wears in the corners of its thumbnail or preview.
 
-A thumbnail in the Gallery pane and the preview in a config tab are showing the
+A thumbnail in the Gallery pane and the preview in a Generate tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
 favorite it (top right), trash it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
@@ -68,7 +68,7 @@ def enhance_state(row: dict, settings) -> str | None:
 
     The middle answer is the one worth having: an image that already holds an
     enhancement is not finished with the enhancer, it is finished with *these
-    settings*. So the corner says "you have this one" only while the panel would
+    settings*. So the corner says "you have this one" only while the pane would
     reproduce what is already there, and goes back to offering another the moment
     a setting moves — which is the same question the version list's ``+ Enhance``
     row and the Gallery pane buttons' Enhance both answer
@@ -167,7 +167,7 @@ class CornerButtons(QObject):
 
     def set_enhance(self, enhance: str | None):
         """Follow the enhance corner's reading changing under the item — which a
-        turn of the Enhance panel's settings does to every item on screen at
+        turn of the Enhance pane's settings does to every item on screen at
         once, without any of them being touched."""
         if enhance == self._enhance:
             return
@@ -216,7 +216,7 @@ class CornerButtons(QObject):
         self._trash.setVisible(self._available)
         self._enhance_button.setVisible(self._available and self._enhance is not None)
         # The solid plus is a finished statement rather than an offer: this image
-        # already holds the very version the panel describes, so pressing would
+        # already holds the very version the pane describes, so pressing would
         # spend a generation arriving at the image that is already there. Turn
         # any setting and it becomes an offer again.
         self._enhance_button.setEnabled(self._enhance != icons.ENHANCE_HELD)

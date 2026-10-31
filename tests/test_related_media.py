@@ -1,5 +1,5 @@
 """What else in the library a shown generation is tied to: the links under a
-config tab's settings form, fed one row at a time."""
+Generate tab's settings form, fed one row at a time."""
 from __future__ import annotations
 
 import pytest

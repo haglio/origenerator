@@ -193,7 +193,7 @@ class ElidingTabBar(QTabBar):
         button.setIconSize(QSize(mark, mark))
         button.setFixedSize(mark + _CLOSE_PADDING, mark)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setToolTip("Close this configuration")
+        button.setToolTip("Close this tab")
         button.clicked.connect(lambda _=False, b=button: self._close_clicked(b))
         return button
 

@@ -115,7 +115,7 @@ def test_a_file_the_trash_holds_is_not_followed(tmp_path):
 
 def test_the_pre_enhance_original_is_followed_as_well(tmp_path):
     """``original_files`` resolves through the same output dir — it is what the
-    Enhance panel's level 0 offers as "what this looked like before"."""
+    Enhance pane's level 0 offers as "what this looked like before"."""
     db, output_dir = _library(tmp_path, {"a": [_file("enhanced.png")]})
     db.update_generation("a", original_files=json.dumps([_file("before.png")]))
     (output_dir / "image").mkdir()

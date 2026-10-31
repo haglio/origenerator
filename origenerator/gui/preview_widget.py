@@ -486,7 +486,7 @@ class PreviewWidget(QWidget):
 
         Re-armed rather than remembered, because the answers move under the
         item — a star toggled from the menu, an enhancement landing, a setting
-        turned on the Enhance panel — and the owner is what hears about that.
+        turned on the Enhance pane — and the owner is what hears about that.
         """
         self._actions_id = prompt_id
         if prompt_id is None:

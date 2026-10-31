@@ -14,7 +14,7 @@ from origenerator.trigger_words import trigger_words_by_lora
 from tests.test_enhance_controller import FakeSignal
 
 
-class FakePanel:
+class FakeGenerateTab:
     def __init__(self, lora="example_look.safetensors"):
         self.train_requested = FakeSignal()
         self.lora = lora
@@ -69,9 +69,9 @@ def look(monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
     return folder
 
 
-def _controller(panels, shown=None):
-    return LookTrainingController(SimpleNamespace(), panels=lambda: panels,
-                                  show_panel=([] if shown is None else shown).append, parent=None)
+def _controller(tabs, shown=None):
+    return LookTrainingController(SimpleNamespace(), tabs=lambda: tabs,
+                                  show_tab=([] if shown is None else shown).append, parent=None)
 
 
 def _told(monkeypatch, kind="information") -> list:
@@ -83,11 +83,11 @@ def _told(monkeypatch, kind="information") -> list:
 def test_train_with_no_training_program_set_up_says_so(look, monkeypatch):
     monkeypatch.setattr(config, "KREA2_TRAINING_PYTHON", None)
     told = _told(monkeypatch)
-    panel = FakePanel()
-    controller = _controller([panel])
-    controller.wire(panel)
+    tab = FakeGenerateTab()
+    controller = _controller([tab])
+    controller.wire(tab)
 
-    panel.train_requested.emit("lora")
+    tab.train_requested.emit("lora")
 
     assert told == [module.NO_PROGRAM]
     assert _runs == []
@@ -95,12 +95,12 @@ def test_train_with_no_training_program_set_up_says_so(look, monkeypatch):
 
 def test_train_with_no_pictures_makes_the_folder_and_says_to_put_them_there(look, monkeypatch):
     told = _told(monkeypatch)
-    panel = FakePanel()
-    controller = _controller([panel])
-    controller.wire(panel)
+    tab = FakeGenerateTab()
+    controller = _controller([tab])
+    controller.wire(tab)
     look.rmdir()
 
-    panel.train_requested.emit("lora")
+    tab.train_requested.emit("lora")
 
     assert look.is_dir()
     assert str(look) in told[0]
@@ -110,13 +110,13 @@ def test_train_with_no_pictures_makes_the_folder_and_says_to_put_them_there(look
 
 def test_train_trains_the_next_version_of_the_picked_lora_and_one_at_a_time(look, monkeypatch):
     (look / "one.jpg").write_bytes(b"")
-    panel, other = FakePanel(), FakePanel(lora="None")
-    controller = _controller([panel, other])
-    for tab in (panel, other):
-        controller.wire(tab)
+    tab, other = FakeGenerateTab(), FakeGenerateTab(lora="None")
+    controller = _controller([tab, other])
+    for each in (tab, other):
+        controller.wire(each)
 
-    panel.train_requested.emit("lora")
-    panel.train_requested.emit("lora")
+    tab.train_requested.emit("lora")
+    tab.train_requested.emit("lora")
     other.train_requested.emit("lora")
 
     (run,) = _runs
@@ -124,17 +124,17 @@ def test_train_trains_the_next_version_of_the_picked_lora_and_one_at_a_time(look
     assert run.kind is look_training
     assert (run.job["base"], run.job["output_name"]) == ("Example Look", "Example Look 1.1")
     run.progress.emit("Training 10%")
-    assert panel.shown == [("Example Look", "Training 10%")]
+    assert tab.shown == [("Example Look", "Training 10%")]
     assert other.shown == [("Example Look", "Training 10%")]
 
 
 def test_a_finished_training_gives_the_version_its_title_and_word_and_picks_it_in_the_tab(
         look, monkeypatch):
     (look / "one.jpg").write_bytes(b"")
-    panel = FakePanel()
-    controller = _controller([panel])
-    controller.wire(panel)
-    panel.train_requested.emit("lora")
+    tab = FakeGenerateTab()
+    controller = _controller([tab])
+    controller.wire(tab)
+    tab.train_requested.emit("lora")
     (run,) = _runs
     Path(run.job["work"]).mkdir(parents=True)
     Path(run.job["status"]).write_text(json.dumps({"state": "done", "lora": run.job["lora"]}),
@@ -142,44 +142,44 @@ def test_a_finished_training_gives_the_version_its_title_and_word_and_picks_it_i
 
     run.finished.emit(run.job["lora"])
 
-    assert panel.picked == [("lora", "Example Look 1.1.safetensors")]
-    assert panel.shown[-1] == ("Example Look", None)
+    assert tab.picked == [("lora", "Example Look 1.1.safetensors")]
+    assert tab.shown[-1] == ("Example Look", None)
     assert model_title("Example Look 1.1.safetensors") == "Example Look 1.1"
     assert trigger_words_by_lora()["Example Look 1.1"] == ["zz"]
     assert lora_training.untaken_lora(run.job) is None
-    panel.train_requested.emit("lora")
+    tab.train_requested.emit("lora")
     assert len(_runs) == 2
 
 
 def test_a_failed_training_says_why_and_lets_another_start(look, monkeypatch):
     warned = _told(monkeypatch, "warning")
     (look / "one.jpg").write_bytes(b"")
-    panel = FakePanel()
-    controller = _controller([panel])
-    controller.wire(panel)
-    panel.train_requested.emit("lora")
+    tab = FakeGenerateTab()
+    controller = _controller([tab])
+    controller.wire(tab)
+    tab.train_requested.emit("lora")
     (run,) = _runs
 
     run.failed.emit("The graphics card ran out of memory while training.")
 
     assert warned == ["The graphics card ran out of memory while training."]
-    assert panel.picked == []
-    panel.train_requested.emit("lora")
+    assert tab.picked == []
+    tab.train_requested.emit("lora")
     assert len(_runs) == 2
 
 
 def test_going_to_a_training_from_the_queue_shows_the_tab_that_asked_for_it(look):
     (look / "one.jpg").write_bytes(b"")
-    panel = FakePanel()
+    tab = FakeGenerateTab()
     shown = []
-    controller = _controller([panel], shown)
-    controller.wire(panel)
-    panel.train_requested.emit("lora")
+    controller = _controller([tab], shown)
+    controller.wire(tab)
+    tab.train_requested.emit("lora")
     (run,) = _runs
 
     run.reveal()
 
-    assert shown == [panel]
+    assert shown == [tab]
 
 
 def _kept_training(tmp_path, **status) -> dict:

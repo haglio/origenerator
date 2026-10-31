@@ -2,7 +2,7 @@
 
 The sixth of the gallery's screen concerns to come out of the view that used to
 hold all of them. What lives here is an enhancement's whole life -- the settings
-panel and the app-wide settings it holds, which images the Enhance button would
+pane and the app-wide settings it holds, which images the Enhance button would
 act on and why a particular one is passed over, the launch of a batch under the
 folder its settings shape, and the run's appearance on every surface that shows
 the image it improves: the tile's scrim, the version list's live row, a tab's
@@ -29,7 +29,7 @@ from origenerator import config, enhance_presets, fix_training, gallery, lora_tr
 from origenerator.file_refs import frame_name
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource
-from origenerator.gui.enhance_panel import EnhancePanel
+from origenerator.gui.enhance_pane import EnhancePane
 from origenerator.gui.enhance_versions import RunningEnhancement
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import RunReading
@@ -41,7 +41,7 @@ from origenerator.workflows.detail_parts import detector_folder, name_parts, par
 
 logger = logging.getLogger(__name__)
 
-# Said the same way by the button and by the settings panel it would run, because
+# Said the same way by the button and by the Enhance pane it would run, because
 # both go dark together the moment what's in front of you is a video.
 NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
 ALREADY_AT_THESE_SETTINGS = (
@@ -140,8 +140,8 @@ class EnhanceController:
         self._slideshows = slideshows
         # The tabs are built by the window's own layout, after this: asked for
         # rather than held, so a live run reaches whichever tabs exist by then.
-        self._info_tabs_of = info_tabs_of
-        # What every enhance runs at, app-wide — the panel's value. Restored from
+        self._generate_pane_of = info_tabs_of
+        # What every enhance runs at, app-wide — the pane's value. Restored from
         # the session by :meth:`restore_settings`.
         self._settings = gallery.EnhanceSettings()
         # Which image each live enhance is of, by that image's prompt_id — the
@@ -155,14 +155,14 @@ class EnhanceController:
         # on every frame they stream.
         self._by_prompt: dict[str, object] = {}
         self._signature: tuple = ()
-        self.panel = EnhancePanel(self._on_settings_changed)
-        self.panel.enhance_requested.connect(self.enhance_the_selection)
-        self.panel.fix_training_requested.connect(self._train_fix)
-        self.panel.show_settings(self._settings)
-        self.panel.show_presets(enhance_presets.load(self._db.list_generations))
-        self.panel.preset_saved.connect(lambda name: self.panel.show_presets(
+        self.pane = EnhancePane(self._on_settings_changed)
+        self.pane.enhance_requested.connect(self.enhance_the_selection)
+        self.pane.fix_training_requested.connect(self._train_fix)
+        self.pane.show_settings(self._settings)
+        self.pane.show_presets(enhance_presets.load(self._db.list_generations))
+        self.pane.preset_saved.connect(lambda name: self.pane.show_presets(
             enhance_presets.save(name, self._settings.params)))
-        self.panel.preset_renamed.connect(lambda index, name: self.panel.show_presets(
+        self.pane.preset_renamed.connect(lambda index, name: self.pane.show_presets(
             enhance_presets.rename(index, name)))
         self._training: TrainingRun | None = None
 
@@ -175,12 +175,12 @@ class EnhanceController:
         folder = fix_training.photos_folder(part)
         folder.mkdir(parents=True, exist_ok=True)
         if not fix_training.training_photos(part):
-            QMessageBox.information(self.panel, "Train",
+            QMessageBox.information(self.pane, "Train",
                                     f"Put photos of {name} in {folder}, then press Train again.")
             return
         if config.LORA_TRAINING_PYTHON is None or config.LORA_TRAINING_SCRIPTS is None:
             QMessageBox.information(
-                self.panel, "Train", "No training program is set up: content.local.json "
+                self.pane, "Train", "No training program is set up: content.local.json "
                 "names no lora_training_python and lora_training_scripts.")
             return
         job = fix_training.training_job(part,
@@ -197,9 +197,9 @@ class EnhanceController:
     def _watch(self, job: dict) -> TrainingRun:
         name = job["part"]
         self._training = TrainingRun(job, self._jobs, fix_training,
-                                     reveal=lambda: self.panel.open_fix_prompts(name),
-                                     parent=self.panel)
-        self._training.progress.connect(lambda text: self.panel.show_fix_training(name, text))
+                                     reveal=lambda: self.pane.open_fix_prompts(name),
+                                     parent=self.pane)
+        self._training.progress.connect(lambda text: self.pane.show_fix_training(name, text))
         self._training.finished.connect(lambda lora: self._training_ended(job, lora))
         self._training.failed.connect(lambda why: self._training_ended(job, None, why))
         self._training.canceled.connect(lambda: self._training_ended(job, None))
@@ -207,14 +207,14 @@ class EnhanceController:
 
     def _training_ended(self, job: dict, lora: str | None, why: str = "") -> None:
         self._training = None
-        self.panel.show_fix_training(job["part"], None)
+        self.pane.show_fix_training(job["part"], None)
         if lora:
             self._take(job, lora)
         elif why:
-            QMessageBox.warning(self.panel, "Train", why)
+            QMessageBox.warning(self.pane, "Train", why)
 
     def _take(self, job: dict, lora: str) -> None:
-        self.panel.use_fix_lora(job["part"], lora)
+        self.pane.use_fix_lora(job["part"], lora)
         trainer = lora_training.trainer_of(job)
         if trainer is not None:
             fix_training.note_duration(lora_training.time_taken(job, trainer))
@@ -234,20 +234,20 @@ class EnhanceController:
     def restore_settings(self, raw: str | None) -> None:
         """Restore the enhancement settings a previous session left."""
         self._settings = gallery.EnhanceSettings.parse(raw)
-        self.panel.show_settings(self._settings)
+        self.pane.show_settings(self._settings)
         self._push_settings()
 
     def _push_settings(self) -> None:
-        """Tell every config tab what the ``+ Enhance`` row would run at.
+        """Tell every Generate tab what the ``+ Enhance`` row would run at.
 
-        The panel holds the settings and the tabs hold the images, so the row
+        The pane holds the settings and the tabs hold the images, so the row
         can only know whether it would be making a duplicate once the two meet —
         here, on every edit and every rebuild."""
-        for panel in self._info_tabs_of().config_panels():
-            panel.set_enhance_settings(self._settings)
+        for pane in self._generate_pane_of().generate_tabs():
+            pane.set_enhance_settings(self._settings)
 
     def _on_settings_changed(self, settings) -> None:
-        """Take an edit made in the Enhance subpanel.
+        """Take an edit made in the Enhance pane.
 
         Held app-wide rather than per folder: enhancement is whatever you are
         doing at the moment, not a property of where you happen to be standing,
@@ -262,11 +262,11 @@ class EnhanceController:
         # Every image on screen is answering it too, in its own corner.
         self._gallery_pane.refresh_corners()
 
-    def sync_panel(self, offer: Offer) -> None:
+    def sync_pane(self, offer: Offer) -> None:
         """Gray the Enhance settings out where nothing they say could ever run,
-        and aim the panel's own Enhance button with the Gallery pane button's ``offer``.
+        and aim the pane's own Enhance button with the Gallery pane button's ``offer``.
 
-        The panel is app-wide and follows you rather than the folder, which is
+        The pane is app-wide and follows you rather than the folder, which is
         why it shows in the collections as readily as on a settings folder — but a
         video is the one place with no enhancement to configure at all, and live
         settings there advertise an action that isn't on offer. A mixed folder
@@ -276,9 +276,9 @@ class EnhanceController:
                   if (row := self._host.row_for(pid)) is not None]
         folder = None if picked or self._gallery_pane.selected_ids else self._host.current_group()
         in_front = picked or list(getattr(folder, "rows", []) or [])
-        self.panel.set_applicable(not _all_video(in_front), NO_VIDEO_ENHANCER)
-        self.panel.show_offer(offer.available, offer.tip)
-        self.panel.show_images_in_front(picked, folder)
+        self.pane.set_applicable(not _all_video(in_front), NO_VIDEO_ENHANCER)
+        self.pane.show_offer(offer.available, offer.tip)
+        self.pane.show_images_in_front(picked, folder)
 
     # --- what it would run on -------------------------------------------------
 
@@ -322,11 +322,11 @@ class EnhanceController:
         to run rather than a run that fails.
 
         And an image that already holds a version made at exactly the settings
-        on the panel: running it again would spend a generation arriving at the
+        on the pane: running it again would spend a generation arriving at the
         image that is already there. Judged against what the run would *use*
         (:func:`~origenerator.gallery.enhance.level_matching_settings`), so a
         source-matched model resolves to this image's own checkpoint before the
-        comparison rather than the panel's raw value. Change any setting and the
+        comparison rather than the pane's raw value. Change any setting and the
         button comes back, which is what makes it read as "you have this one"
         rather than as "no".
         """
@@ -423,7 +423,7 @@ class EnhanceController:
     def enhance_when_wanted(self, row: dict | None) -> None:
         """Enhance a just-finished image while the Auto checkbox is on.
 
-        The subpanel's standing instruction, app-wide: with it checked the app
+        The Enhance pane's standing instruction, app-wide: with it checked the app
         turns out finished images rather than raw ones, without pressing Enhance
         All after every run. The gate is Enhance All's own —
         :func:`~origenerator.gallery.enhance.rows_awaiting_enhancement` — so a
@@ -445,7 +445,7 @@ class EnhanceController:
 
         Only an image that has received no enhancement gets one, the same gate a
         fullscreen lock's Down uses — spoken over a slideshow, this is a gesture made
-        with no view of the Enhance panel, and an image already carrying an
+        with no view of the Enhance pane, and an image already carrying an
         enhancement someone chose must not be re-derived at whatever the settings
         happen to say now. Re-enhancing stays a deliberate act made in front of
         the settings it will use (the thumbnail menu, the ``+ Enhance`` row).
@@ -601,22 +601,22 @@ class EnhanceController:
     def reconcile(self) -> None:
         """Show the enhancement being made wherever the image it improves is.
 
-        The info pane's version list leads with a live row while one is in flight,
+        The Generate pane's version list leads with a live row while one is in flight,
         the tab's own preview streams the same frames, and the image's tile in
         the middle column streams them under its "Enhancing…" scrim — the same
         in-flight treatment work gets everywhere else in the app. The jobs are
         the gallery's, so the match is made here: every running standalone
         enhance against every tab's displayed row. Cheap enough to re-run on
-        each frame; the panel updates its row in place.
+        each frame; the pane updates its row in place.
 
         Every job of every folder, for the same reason :meth:`run_of` reads them
         all: a batch of enhances shares one settings key, and a tab showing the
         third image of it must find its own run rather than the first.
         """
         running = self._enhances_in_flight()
-        for panel in self._info_tabs_of().config_panels():
-            row = panel.displayed_row()
-            panel.set_pending_enhancement(
+        for pane in self._generate_pane_of().generate_tabs():
+            row = pane.displayed_row()
+            pane.set_pending_enhancement(
                 self._pending_for(row, running) if row else None
             )
         self._reconcile_tiles(running)
@@ -678,7 +678,7 @@ class EnhanceController:
         ``row``'s own image, or ``None`` — the version list's live row.
 
         The settings ride along so the live row can name what is being made the
-        way a finished level names what made it: the panel may have moved on
+        way a finished level names what made it: the pane may have moved on
         since the run was launched, so the job's own params are the only honest
         answer. Everything else about which job it is, and why a queued one shows
         no frame, is :meth:`_job_for`'s and :meth:`_as_run`'s.
@@ -737,7 +737,7 @@ class EnhanceController:
         own: an auto-generating folder takes that as a discarded seed and
         launches the next one, and nobody asking to stop an enhancement is
         asking for a fresh variation. The redraw afterwards is what takes the
-        scrim off the tile and the pending row out of the info pane.
+        scrim off the tile and the pending row out of the Generate pane.
         """
         jobs = self.jobs_targeting(rows)
         for job in jobs:

@@ -86,7 +86,7 @@ from origenerator.gui.palette import (
 _CORNER = f"border-radius: {BUTTON_RADIUS}px;"
 
 # The resting dashed outline, versus the blue and white marking the tile as the item
-# driving the info pane — the same marks a selected thumbnail wears.
+# driving the Generate pane — the same marks a selected thumbnail wears.
 IDLE_FRAME_CSS = (
     "#{name} {{ border: 1px dashed " + as_hex(BORDER_SUBTLE) + "; " + _CORNER + " }}"
     "#{name}:hover {{ border-color: " + TILE_HOVER_BORDER + "; }}"

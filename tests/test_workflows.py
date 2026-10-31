@@ -183,7 +183,7 @@ def test_wan_video_workflows_expose_model_dropdowns(monkeypatch):
 def test_wan_video_workflows_group_all_models_then_all_loras():
     # Model and LoRA settings are grouped by kind, not by noise level: both UNET
     # dropdowns sit together, then every LoRA dropdown (each directly above its own
-    # strength). So the Generate form and the gallery info pane read as "all the
+    # strength). So the Generate form and the gallery Generate pane read as "all the
     # models, then all the LoRAs" rather than "everything high, then everything
     # low". This order is the single source both surfaces draw from.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
@@ -363,7 +363,7 @@ def test_image_workflows_carry_the_enhance_toggle_off_by_default():
     # The tail is still a bool param on every image workflow — an old run
     # reproduces exactly what it recorded — but nothing turns it on by hand any
     # more, and no form offers it. Enhancement is a layer the gallery applies
-    # afterward (its Enhance subpanel, per folder), which keeps the original and
+    # afterward (its Enhance pane, per folder), which keeps the original and
     # names every level; baking the tail in here would leave neither.
     for name in _ENHANCE_TOGGLE_WORKFLOWS:
         wf = WORKFLOW_REGISTRY[name]
@@ -901,7 +901,7 @@ def test_a_detector_comfyui_hasnt_got_drops_its_part_rather_than_failing_the_sub
 
 
 def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
-    # The panel greys those numbers for this, but settings stored while a
+    # The Enhance pane greys those numbers for this, but settings stored while a
     # detector was installed outlive it being removed, and that must not fail
     # every enhance.
     payload = _enhance_payload(installed=[],
@@ -912,7 +912,7 @@ def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
 
 
 def test_the_detail_passs_setting_is_defined_with_the_range_its_spinners_take():
-    # The Enhance panel builds its per-part spinners from this, so the range
+    # The Enhance pane builds its per-part spinners from this, so the range
     # lives with the workflow rather than being retyped beside it.
     defs = {pd.key: pd
             for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()}

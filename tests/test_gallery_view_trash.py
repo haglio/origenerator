@@ -467,7 +467,7 @@ def test_a_preview_offers_every_trashed_item_like_the_live_app(qtbot, monkeypatc
 
 def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     # Its row left the gallery, but the Trash kept it whole and its files are all
-    # in the trash — so it fills a config tab with the settings that made it,
+    # in the trash — so it fills a Generate tab with the settings that made it,
     # which is the whole point of being able to look before you decide.
     view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
@@ -477,7 +477,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     _click_tile(view, "d1")
 
     assert view._selected_row["prompt_id"] == "d1"
-    shown = view._info_tabs.current_config_panel().displayed_row()
+    shown = view._generate_pane.current_generate_tab().displayed_row()
     assert shown["prompt_id"] == "d1"
 
 
@@ -491,9 +491,9 @@ def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
 
     view._gallery_pane._thumbnail_double_clicked("d1")
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel.displayed_row()["prompt_id"] == "d1"
-    assert view._info_tabs._preview_panel is not panel  # pinned: it stays
+    tab = view._generate_pane.current_generate_tab()
+    assert tab.displayed_row()["prompt_id"] == "d1"
+    assert view._generate_pane._preview_tab is not tab  # pinned: it stays
 
 
 def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
@@ -1120,9 +1120,9 @@ def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_pa
     qtbot.addWidget(view)
     doomed = tmp_path / "doomed.png"
     doomed.write_bytes(b"x")
-    covered = view._info_tabs.current_config_panel()
+    covered = view._generate_pane.current_generate_tab()
     covered._preview.show_image(doomed)
-    view._info_tabs._add_subtab()  # a second tab takes the front
+    view._generate_pane._add_subtab()  # a second tab takes the front
 
     view._release_held_media([doomed])
 
@@ -1187,7 +1187,7 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     assert db.get_generation("i1") is None
 
 
-def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_path):
+def test_delete_after_a_click_in_the_generate_pane_wipes_no_thumbnail(qtbot, tmp_path):
     # The grid and an editable config form are visible together, so the app-wide
     # Delete/Undo filter must disarm while a config control has focus — its dropdowns
     # and buttons aren't text fields, so without this it would wipe a thumbnail.
@@ -1197,7 +1197,7 @@ def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_pat
         view.activateWindow()
     thumb = view._gallery_pane._thumb_widgets["i1"]
     gestures.click(thumb, thumb.rect().center())
-    form = view._info_tabs.current_config_panel()._param_form
+    form = view._generate_pane.current_generate_tab()._param_form
     header = next(iter(form._sections.values()))._header
     # The row saying what the image shows sits above the form, so in a window
     # this short the first section header hangs below the fold, where a click

@@ -53,7 +53,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     Like sdxl_t2i, the render is optionally finished by the shared
     upscale/enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`) via the
     ``enhance`` toggle — off by default, since enhancement is a layer the
-    gallery's Enhance subpanel applies per folder afterward. Its second
+    gallery's Enhance pane applies per folder afterward. Its second
     sampling pass reuses the ControlNet-applied conditioning, so the structure
     stays pinned while the checkpoint sharpens and re-textures the enlarged
     image.

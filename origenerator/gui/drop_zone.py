@@ -1,6 +1,6 @@
 """Drop targets for a dragged gallery generation: drop zones holding what it lends them.
 
-The gallery's combine panel pairs two drop zones — one for an image and one for a
+The gallery's Combine pairs two drop zones — one for an image and one for a
 video — with a span between them that drops into both. A drop zone holds whatever its ``lent_by``
 says a dropped generation lends it and turns away one that lends it nothing; it
 previews what it holds — a video loops, an image shows its still — names

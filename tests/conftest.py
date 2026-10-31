@@ -593,7 +593,7 @@ def _deliver_the_deletions_already_scheduled():
 @pytest.fixture(autouse=True, scope="session")
 def _the_live_widget_count_stays_flat():
     """The per-test reap's acceptance criterion, asserted: widgets from the
-    run's thousands of built-and-discarded panels must not accumulate.
+    run's thousands of built-and-discarded widgets must not accumulate.
 
     Sampled after the pending deletions are delivered and the cycles collected,
     so what it counts is what something still *holds* — a widget already
@@ -638,7 +638,7 @@ def _widgets_registered_this_test():
 def _collect_widgets_between_tests(_widgets_registered_this_test):
     """Reap each test's widgets before the next one builds its own.
 
-    The GUI widgets (a config panel's param form, the gallery's panes) form Python
+    The GUI widgets (a Generate tab's param form, the gallery's panes) form Python
     reference cycles — a widget owns a signal whose slot closes back over it — so
     their C++ objects linger until Python's cyclic collector runs. Left to chance,
     hundreds of galleries' worth pile up across a full run and eventually corrupt

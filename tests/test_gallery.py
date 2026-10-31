@@ -19,7 +19,6 @@ from origenerator.gallery import (
     build_gallery_tree,
     build_image_config_index,
     child_groups,
-    config_tab_title,
     enhance_params_for,
     enhanced_generations,
     favorite_folders,
@@ -29,6 +28,7 @@ from origenerator.gallery import (
     folder_key_at_level,
     folder_level,
     folder_names_by_row,
+    generate_tab_title,
     generation_of_file,
     group_level,
     is_enhanced_row,
@@ -110,17 +110,17 @@ def test_folder_level_names_the_folder_levels_and_nothing_else():
     assert folder_level(SettingsGroup("k", "S", [])) is None
 
 
-def test_config_tab_title_leads_with_model_then_prompt():
-    title = config_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
+def test_generate_tab_title_leads_with_model_then_prompt():
+    title = generate_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
     assert title == "SDXL T2I › a cat in a hat"
 
 
-def test_config_tab_title_is_just_the_model_without_a_prompt():
-    assert config_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL T2I"
+def test_generate_tab_title_is_just_the_model_without_a_prompt():
+    assert generate_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL T2I"
 
 
-def test_config_tab_title_handles_unknown_workflow():
-    assert config_tab_title("nope", {}) == "nope"
+def test_generate_tab_title_handles_unknown_workflow():
+    assert generate_tab_title("nope", {}) == "nope"
 
 
 def test_job_kind_separates_a_video_from_an_image():

@@ -1,4 +1,4 @@
-"""What the config tabs read off the whole library, once for each state of it."""
+"""What the Generate tabs read off the whole library, once for each state of it."""
 from __future__ import annotations
 
 from collections.abc import Callable

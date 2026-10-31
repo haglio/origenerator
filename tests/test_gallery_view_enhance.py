@@ -26,7 +26,7 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
 )
 from origenerator.gui import gallery_view as gallery_view_module
-from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.output_places import OutputPlaces
@@ -140,7 +140,7 @@ def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1  # the original
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
@@ -151,7 +151,7 @@ def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_pa
     assert len(rows) == 2       # the enhancement, and the original under it
     # The live row gave way to the level it was making, rather than to nothing.
     assert not panel._versions._host.findChildren(_PendingRow)
-    assert panel.displayed_row()["prompt_id"] == "g0"   # still the same image
+    assert tab.displayed_row()["prompt_id"] == "g0"   # still the same image
 
 
 def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_path):
@@ -163,13 +163,13 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g1")
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
 
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
-    assert panel.displayed_row()["prompt_id"] == "g1"
+    assert tab.displayed_row()["prompt_id"] == "g1"
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1
 
 
@@ -213,13 +213,13 @@ def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
     (output_dir / "image").mkdir(parents=True)
     image = output_dir / "image" / "sdxl_t2i_g0.png"
     image.write_bytes(_png_bytes())
-    monkeypatch.setattr(gcp_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     (plus,) = panel._versions._host.findChildren(_AddRow)
     qtbot.mouseClick(plus, Qt.MouseButton.LeftButton)
     (job,) = view._jobs.all_jobs
@@ -229,8 +229,8 @@ def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
 
     assert not panel._versions._host.findChildren(_PendingRow)
     assert panel._versions._host.findChildren(_AddRow)
-    assert not panel._preview._live
-    assert panel._preview.is_showing_any([image])
+    assert not tab._preview._live
+    assert tab._preview.is_showing_any([image])
 
 
 def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbot, tmp_path):
@@ -240,14 +240,14 @@ def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbo
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    first_tab = view._info_tabs.current_config_panel()
+    first_tab = view._generate_pane.current_generate_tab()
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
     assert len(first_tab._versions._host.findChildren(_LevelRow)) == 2
-    view._info_tabs.pin_current_tab()
-    view._info_tabs.open_config("sdxl_t2i", {"positive_prompt": "a dog"})
-    assert view._info_tabs.current_config_panel() is not first_tab
+    view._generate_pane.pin_current_tab()
+    view._generate_pane.open_config("sdxl_t2i", {"positive_prompt": "a dog"})
+    assert view._generate_pane.current_generate_tab() is not first_tab
     db.update_generation("g0", output_files=json.dumps(
         [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
 
@@ -270,12 +270,12 @@ def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
     assert {j.workflow.name for j in jobs} == {"image_enhance"}
 
 
-def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tmp_path):
+def test_the_enhance_panes_button_is_aimed_and_pressed_like_the_banks(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    button = view._enhance.panel._enhance_button
+    button = view._enhance.pane._enhance_button
 
     assert button.isEnabled()
     assert view._buttons.enhance.isEnabled()
@@ -287,20 +287,20 @@ def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tm
     assert {job.workflow.name for job in view._jobs.all_jobs} == {"image_enhance"}
 
 
-def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
+def test_enhance_pane_stays_up_wherever_you_are(qtbot, tmp_path):
     # The settings are the app's, not the folder's: they follow you, so they are
     # as available in the collections as inside a settings folder.
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._enhance.panel.isHidden()
+    assert not view._enhance.pane.isHidden()
 
     for item in (_image_workflow(view._tree), _collection(view, LATEST_KEY),
                  _collection(view, FAVORITES_KEY), _collection(view, EXPERIMENTS_KEY),
                  _collection(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
-        assert not view._enhance.panel.isHidden()
+        assert not view._enhance.pane.isHidden()
 
 
 def test_the_panel_opens_on_the_settings_the_session_left(qtbot, tmp_path):
@@ -309,7 +309,7 @@ def test_the_panel_opens_on_the_settings_the_session_left(qtbot, tmp_path):
     _set_enhance(view, auto=True, params={"enhance_scale": 3.0, "enhance_steps": 42,
                                           "enhance_denoise": 0.4})
 
-    shown = view._enhance.panel.settings()
+    shown = view._enhance.pane.settings()
     assert shown.auto is True
     assert shown.params["enhance_scale"] == 3.0
     assert shown.params["enhance_steps"] == 42
@@ -325,7 +325,7 @@ def test_editing_the_panel_takes_effect_at_once(qtbot, tmp_path):
 
     # No Apply button: an edit lands straight away, so the settings an enhance
     # launched a moment later runs at are the ones on screen.
-    view._enhance.panel._steps.setValue(33)
+    view._enhance.pane._steps.setValue(33)
 
     assert gallery.EnhanceSettings.parse(
         view.enhance_settings()
@@ -350,7 +350,7 @@ def test_enhance_all_runs_at_the_panels_settings(qtbot, tmp_path):
 
 
 def test_a_single_enhance_runs_at_the_same_settings_from_anywhere(qtbot, tmp_path):
-    # An image picked out of the Recents collection enhances at exactly what the panel
+    # An image picked out of the Latest collection enhances at exactly what the tab
     # says, the same as one picked inside its own folder — there is one setting.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -418,19 +418,19 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     row = db.get_generation("g0")
-    panel.show_saved_generation(row, view._image_rows)
+    tab.show_saved_generation(row, view._image_rows)
 
     view.enhance_items(["g0"])
 
     assert panel._versions._host.findChildren(_PendingRow)
     (job,) = view._live_jobs.values()
     view._client.preview_image.emit(job.prompt_id, b"a frame")
-    status, frame, settings = panel._pending_enhancement
+    status, frame, settings = tab._pending_enhancement
     assert (status, frame) == ("running", b"a frame")
     # The tile names what is being made, the way a finished level names what
-    # made it — read off the job, not the panel, which may have moved on since.
+    # made it — read off the job, not the tab, which may have moved on since.
     assert settings.startswith("2x · 20 steps · 0.15 redraw")
 
     # An enhance of a DIFFERENT image lands in the same settings folder (both
@@ -438,7 +438,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     # the newer one takes the machine, and this run reads as waiting again --
     # its own wait, not the other run's frame.
     view.enhance_items(["g1"])
-    assert panel._pending_enhancement == ("queued", None, settings)
+    assert tab._pending_enhancement == ("queued", None, settings)
 
 
 def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path):
@@ -450,9 +450,9 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    first = view._info_tabs.current_config_panel()
+    first = view._generate_pane.current_generate_tab()
     first.show_saved_generation(db.get_generation("g0"), view._image_rows)
-    second = view._info_tabs._add_subtab()
+    second = view._generate_pane._add_subtab()
     second.show_saved_generation(db.get_generation("g1"), view._image_rows)
 
     view.enhance_items(["g0", "g1"])
@@ -741,8 +741,8 @@ def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp
     qtbot.addWidget(view)
     row = _enhanced_in_place(db)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
-    panel.show_saved_generation(row, view._image_rows)
+    tab = view._generate_pane.current_generate_tab()
+    tab.show_saved_generation(row, view._image_rows)
 
     panel._versions.delete_requested.emit([0])   # the enhancement, not the original
 
@@ -762,8 +762,8 @@ def test_pressing_a_versions_trash_can_bins_that_level_and_the_last_one_has_none
     qtbot.addWidget(view)
     row = _enhanced_in_place(db)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
-    panel.show_saved_generation(row, view._image_rows)
+    tab = view._generate_pane.current_generate_tab()
+    tab.show_saved_generation(row, view._image_rows)
     enhancement = panel._versions._host.findChildren(_LevelRow)[0]
 
     enhancement.findChild(QPushButton, "deleteButton").click()
@@ -822,8 +822,8 @@ def test_the_add_tile_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
-    panel.show_saved_generation(db.get_generation("g0"), view._image_rows)
+    tab = view._generate_pane.current_generate_tab()
+    tab.show_saved_generation(db.get_generation("g0"), view._image_rows)
     _set_enhance(view, params={"enhance_steps": 29})
 
     panel._versions.enhance_requested.emit()

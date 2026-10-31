@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from origenerator import points_of_interest
-from origenerator.box_breaks import prompt_boxes, unboxed
+from origenerator.box_breaks import BOX_BREAK, prompt_boxes, unboxed
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
@@ -105,10 +105,10 @@ def _without_box_breaks(value):
 
 
 def prompt_conditioning(node_id: str, clip_ref, text: str, *, ahead: str = "") -> dict:
-    boxes = prompt_boxes(text)
-    if len(boxes) == 1:
+    if BOX_BREAK not in ahead + text:
         return {node_id: _text_encode(clip_ref, ahead_of(ahead, text))}
-    pieces = [piece for piece in (ahead, *boxes) if piece.strip()] or [""]
+    pieces = [piece for piece in (*prompt_boxes(ahead), *prompt_boxes(text))
+              if piece.strip()] or [""]
     if len(pieces) == 1:
         return {node_id: _text_encode(clip_ref, pieces[0])}
     nodes = {f"{node_id}_box{index}": _text_encode(clip_ref, piece)

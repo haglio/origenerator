@@ -17,7 +17,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import corner_controls, drag_thumbnail, icons, preview_widget
+from origenerator.gui import corner_buttons, drag_thumbnail, icons, preview_widget
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.frame_files import FrameFiles
@@ -519,7 +519,7 @@ def test_the_corners_keep_off_the_timeline_while_a_videos_size_is_unknown(qtbot,
     # A video's resolution arrives late, or never (a backend need not report it),
     # and until it does the item is taken to be the whole media area. That
     # is not the whole pane: the timeline along the foot is no part of the item, and a
-    # chip laid over it read as a dark tab hanging off the video's lower edge.
+    # corner button laid over it read as a dark tab hanging off the video's lower edge.
     w = _timeline_preview(qtbot)
     w.resize(320, 480)
     w.show()
@@ -555,7 +555,7 @@ def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp
     # The timeline appears with the video, a layout pass later, and takes its rows
     # from the media area. A video whose resolution is known is placed against
     # the video surface, so the corners have to be re-placed when that surface
-    # shrinks; placed once, against the pane as it was, the Trash chip stayed
+    # shrinks; placed once, against the pane as it was, the Trash corner button stayed
     # straddling the video's lower edge and the timeline.
 
     player = MagicMock()
@@ -1008,7 +1008,7 @@ def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path)
 
     assert w._stack.currentWidget() is w._image_label
     assert w._combination._movie is None
-# --- the corner controls over the item ------------------------------------
+# --- the corner buttons over the item ------------------------------------
 
 def _corners(w):
     """The preview's star, trash can and plus, in that order."""
@@ -1059,7 +1059,7 @@ def test_a_corner_of_the_preview_names_the_generation_it_is_about(make_preview,
 
     _corners(w)[0].click()
 
-    assert fired == [("p1", corner_controls.STAR)]
+    assert fired == [("p1", corner_buttons.STAR)]
 
 
 def test_right_clicking_the_item_asks_for_its_menu(make_preview, tmp_path):
@@ -1102,7 +1102,7 @@ def test_the_corners_follow_the_item_rather_than_the_pane(make_preview, tmp_path
 # --- putting the pane down before laying new content in it -------------------
 #
 # Every show_* opens by clearing what the pane was holding: the playback, the
-# notice, the corner controls, the media, the live follow and the generation.
+# notice, the corner buttons, the media, the live follow and the generation.
 # The set is the same six things each time, so these pin it as one list —
 # including the deliberate exception (a kept notice rides over the frames of the
 # item it is about) and the one that is a defect, held below.

@@ -9,12 +9,12 @@ from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
 from origenerator.gui import icons
-from origenerator.gui.corner_controls import (
+from origenerator.gui.corner_buttons import (
     CORNER_SIZE,
     ENHANCE,
     STAR,
     TRASH,
-    CornerControls,
+    CornerButtons,
     enhance_state,
 )
 
@@ -88,7 +88,7 @@ def _controls(qtbot):
     host = QWidget()
     host.resize(200, 200)
     qtbot.addWidget(host)
-    return host, CornerControls(host)
+    return host, CornerButtons(host)
 
 
 def test_nothing_shows_until_there_is_something_to_act_on(qtbot):
@@ -156,9 +156,9 @@ def test_the_star_says_which_way_it_would_go(qtbot):
     assert star.toolTip() == "Unfavorite this item"
 
 
-def test_a_chip_under_the_pointer_wears_its_armed_mark(qtbot):
+def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
     # test_icons pins that an armed mark is drawn differently from a resting one;
-    # nothing ever armed a real chip, so the step from a hover to that drawing ran
+    # nothing ever armed a real corner button, so the step from a hover to that drawing ran
     # in no test at all.
     host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=None)

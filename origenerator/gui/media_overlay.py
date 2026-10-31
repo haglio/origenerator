@@ -21,7 +21,7 @@ def float_over_media(widget, *, click_through: bool = True) -> None:
     ``click_through`` passes the mouse on to whatever is under the overlay,
     which is what a caption or a still wants and what a control does not. It is
     asked for per call rather than applied to everything, because a native
-    window per widget is real cost: the corner controls take it only where a
+    window per widget is real cost: the corner buttons take it only where a
     video can turn up, never on a wall of thumbnails.
     """
     if click_through:

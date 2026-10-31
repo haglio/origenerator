@@ -45,7 +45,7 @@ from origenerator.funscript import funscript_of
 from origenerator.gui import omnipause
 from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
-from origenerator.gui.corner_controls import CornerControls
+from origenerator.gui.corner_buttons import CornerButtons
 from origenerator.gui.drag_thumbnail import (
     DragOut,
     fit_thumbnail,
@@ -72,7 +72,7 @@ def _path_key(path) -> str:
 
 class PreviewWidget(QWidget):
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
-    action_triggered = pyqtSignal(str, str)  # a corner control: prompt_id, action
+    action_triggered = pyqtSignal(str, str)  # a corner button: prompt_id, action
     context_requested = pyqtSignal(str, QPoint)  # right-clicked: prompt_id, global pos
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
@@ -172,7 +172,7 @@ class PreviewWidget(QWidget):
         self._notice.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._notice.hide()
 
-        self._controls = CornerControls(self)
+        self._controls = CornerButtons(self)
         self._controls.triggered.connect(self._on_control)
 
         self._timeline = VideoTimeline() if show_timeline else None
@@ -201,7 +201,7 @@ class PreviewWidget(QWidget):
         This is what showing anything means, said once: the movie and the still
         are retired and the other pages put down (:meth:`_set_movie` clears the
         combination and the wall), the timeline drops, the playback stops,
-        the notice and the corner controls — both of which are about the item
+        the notice and the corner buttons — both of which are about the item
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
         anything that is not a file on disk).
@@ -304,7 +304,7 @@ class PreviewWidget(QWidget):
         the rewrite a folder's Modify (all seeds) opens. There is no one file on display, so
         nothing here is draggable, openable fullscreen, or scripted; the wall is
         the folder, and the folder is what the settings below it are about — and
-        no one of them is what the corner controls would act on, which is why
+        no one of them is what the corner buttons would act on, which is why
         they come down here as they do everywhere else.
         """
         self._take_the_pane(None)
@@ -405,7 +405,7 @@ class PreviewWidget(QWidget):
         Falls back to the whole media area whenever the drawn size isn't
         knowable yet -- a video whose resolution hasn't arrived, or nothing on
         screen at all -- and never to the timeline along the foot, which is no
-        part of the item: a corner chip laid over it, attached to the video's lower edge.
+        part of the item: a corner button laid over it, attached to the video's lower edge.
         """
         drawn = self._drawn_size()
         if drawn is None or drawn.isEmpty():
@@ -475,12 +475,12 @@ class PreviewWidget(QWidget):
 
     def set_actions(self, prompt_id: str | None, *, favorite: bool = False,
                     enhance: str | None = None) -> None:
-        """Arm the corner controls and the right-click menu over the shown media.
+        """Arm the corner buttons and the right-click menu over the shown media.
 
         ``prompt_id`` is the saved generation on screen — the row every act here
         lands on — with the state its corners report beside it: whether it is
         favorited, and what its enhance corner has to say
-        (:func:`~origenerator.gui.corner_controls.enhance_state`). ``None`` leaves
+        (:func:`~origenerator.gui.corner_buttons.enhance_state`). ``None`` leaves
         the item inert, which is what everything transient is: a live frame is
         a file that does not exist yet, and a message is not an item at all.
 
@@ -507,7 +507,7 @@ class PreviewWidget(QWidget):
             self.context_requested.emit(self._actions_id, self.mapToGlobal(pos))
 
     def _place_controls(self) -> None:
-        """Put the corner controls back in the corners of the item.
+        """Put the corner buttons back in the corners of the item.
 
         Re-run on every resize and every refit rather than once: what the corners
         are pinned to is the media's own rectangle, which moves whenever the pane

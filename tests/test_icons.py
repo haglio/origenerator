@@ -39,7 +39,7 @@ def test_tab_close_icon_is_the_familys_cross(qtbot):
 
 
 def test_level_badge_icons_render_for_each_level(qtbot):
-    # Every badged level maps to a rendered chip: the four folder levels,
+    # Every badged level maps to a rendered ground: the four folder levels,
     # workflow -> model -> LoRA -> source image.
     assert set(icons.LEVEL_LABELS) == {
         "workflow", "model", "lora", "source_image"}
@@ -57,7 +57,7 @@ def test_a_lora_folder_wears_an_l(qtbot):
 
 
 def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
-    # The chips sit in one slot down the tree, so no two levels may draw the
+    # The grounds sit in one slot down the tree, so no two levels may draw the
     # same mark — that slot is the whole of what says which level a row is.
     drawn = [icons.level_badge_icon(level).pixmap(48, 48).toImage()
              for level in icons.LEVEL_LABELS]
@@ -192,7 +192,7 @@ def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
     assert max(y for _x, y in ambers) > 24 + 12          # …and below
 
 
-def test_arming_a_corner_control_changes_its_mark(qtbot):
+def test_arming_a_corner_button_changes_its_icon(qtbot):
     # Hovering says "this is a button" — the trash can in the red every delete in
     # this app wears, the others in the light gray that only means "armed".
     rest = _corner_image(icons.corner_trash_icon(armed=False))

@@ -104,7 +104,7 @@ from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     combine_controller,
-    corner_controls,
+    corner_buttons,
     icons,
     off_thread,
     omnipause,
@@ -684,7 +684,7 @@ def test_tree_rows_carry_a_folder_level_badge(qtbot):
     source = _at(lora, 0)
     settings = _at(source, 0)
 
-    # Each level carries a chip as its row icon — right of the caret, reading as
+    # Each level carries a ground as its row icon — right of the caret, reading as
     # the first character of the folder's name — and names itself in the tooltip.
     assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
@@ -738,10 +738,10 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # lives in the window's narrowest column, so every wasted pixel per level is
     # six wasted at the foot. Each step is one indentation and no more.
     #
-    # Measured at the left edge of each row's *name block* — its chip when it has
-    # one, its text when it does not — because the chip reads as the first
+    # Measured at the left edge of each row's *name block* — its ground when it has
+    # one, its text when it does not — because the ground reads as the first
     # character of the name. Qt lays the text out after the icon, so the text
-    # alone would step unevenly wherever a chipped row meets an unchipped one.
+    # alone would step unevenly wherever a initialed row meets an uninitialed one.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     _on_screen(qtbot, view, 1200, 800)
@@ -2584,7 +2584,7 @@ def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    view._browser._thumb_widgets["d1"].corner_action_triggered.emit("d1", "restore")
+    view._browser._thumb_widgets["d1"].corner_button_triggered.emit("d1", "restore")
 
     assert actions.restored == [["d1"]]
 
@@ -2621,13 +2621,13 @@ def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     asked = []
     monkeypatch.setattr(view, "_confirm", lambda text: asked.append(text) or False)
 
-    view._browser._thumb_widgets["d1"].corner_action_triggered.emit("d1", "purge")
+    view._browser._thumb_widgets["d1"].corner_button_triggered.emit("d1", "purge")
 
     assert actions.purged == []                      # declined: nothing ended
     assert "cannot be undone" in asked[0]
 
     monkeypatch.setattr(view, "_confirm", lambda text: True)
-    view._browser._thumb_widgets["d1"].corner_action_triggered.emit("d1", "purge")
+    view._browser._thumb_widgets["d1"].corner_button_triggered.emit("d1", "purge")
     assert actions.purged == [["d1"]]
 
 
@@ -4672,7 +4672,7 @@ def test_a_star_pressed_on_one_tile_favorites_it_at_once_and_leaves_the_rest(qtb
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])  # both on screen
 
-    view._browser._thumb_widgets["i2"]._controls.triggered.emit(corner_controls.STAR)
+    view._browser._thumb_widgets["i2"]._controls.triggered.emit(corner_buttons.STAR)
 
     assert db.get_generation("i2")["starred"]
     assert view._browser._thumb_widgets["i2"]._favorite is True   # the tile takes the star at once
@@ -4687,7 +4687,7 @@ def test_a_favorite_tiles_favorite_corner_takes_the_favorite_away(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    view._browser._thumb_widgets["i1"]._controls.triggered.emit(corner_controls.STAR)
+    view._browser._thumb_widgets["i1"]._controls.triggered.emit(corner_buttons.STAR)
 
     assert not db.get_generation("i1")["starred"]
 
@@ -4733,7 +4733,7 @@ def test_unfavoriting_a_favorite_drops_it_from_the_collection_with_a_real_librar
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
     assert view.listed_prompt_ids() == ["g0"]
 
-    view._browser._thumb_widgets["g0"]._controls.triggered.emit(corner_controls.STAR)
+    view._browser._thumb_widgets["g0"]._controls.triggered.emit(corner_buttons.STAR)
 
     assert view.listed_prompt_ids() == []
 
@@ -4759,7 +4759,7 @@ def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])  # both on screen
 
-    view._browser._thumb_widgets["i2"]._controls.triggered.emit(corner_controls.TRASH)
+    view._browser._thumb_widgets["i2"]._controls.triggered.emit(corner_buttons.TRASH)
 
     assert [r["prompt_id"] for r in actions.deleted[0]] == ["i2"]
 
@@ -4776,7 +4776,7 @@ def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
     _click_tile(view, "i1")
     view._browser.selected_ids.add("i2")   # both picked, as a Ctrl-click
 
-    view._browser._thumb_widgets["i1"]._controls.triggered.emit(corner_controls.STAR)
+    view._browser._thumb_widgets["i1"]._controls.triggered.emit(corner_buttons.STAR)
 
     assert db.get_generation("i1")["starred"]
     assert not db.get_generation("i2").get("starred")
@@ -4788,7 +4788,7 @@ def test_a_tiles_plus_corner_queues_an_enhance_of_that_image(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
 
-    view._browser._thumb_widgets["g0"]._controls.triggered.emit(corner_controls.ENHANCE)
+    view._browser._thumb_widgets["g0"]._controls.triggered.emit(corner_buttons.ENHANCE)
 
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
@@ -17459,7 +17459,7 @@ def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
 
-    view._browser._thumb_widgets["e1"].corner_action_triggered.emit("e1", "keep")
+    view._browser._thumb_widgets["e1"].corner_button_triggered.emit("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
 
@@ -17472,7 +17472,7 @@ def test_a_tiles_star_corner_favorites_that_tile(qtbot):
     _select_first_leaf(view)
 
     view._browser._thumb_widgets["i1"].control_triggered.emit(
-        "i1", corner_controls.STAR)
+        "i1", corner_buttons.STAR)
 
     assert db.get_generation("i1")["starred"]
 
@@ -17501,7 +17501,7 @@ def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(
     leaf = view._leaf_by_id["vid"]
     view._tree.setCurrentItem(leaf)
 
-    view._browser._thumb_widgets["vid"].corner_action_triggered.emit("vid", "video")
+    view._browser._thumb_widgets["vid"].corner_button_triggered.emit("vid", "video")
 
     (job,) = [job for jobs in view._jobs.jobs_by_folder.values() for job in jobs]
     assert job.workflow.name == "wan22_i2v"

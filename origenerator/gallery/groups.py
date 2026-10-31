@@ -125,7 +125,7 @@ def folder_level(group) -> str | None:
     ``"lora"`` or ``"source_image"`` — ``None`` for the All row, Images and
     Videos, the settings leaves and a custom folder.
 
-    Powers the lettered chip the gallery draws on tree rows and browser tiles, so
+    Powers the TOC initial the gallery draws on tree rows and browser tiles, so
     a folder's place in the hierarchy reads at a glance rather than by counting
     indentation. A settings leaf is where the generations themselves live, and
     the All row is everything there is, so neither is a level anything needs

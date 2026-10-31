@@ -2381,7 +2381,7 @@ def test_the_enhancement_levels_sit_one_gap_under_the_settings_as_each_section_d
 
     gaps = _gaps_between_sections(panel)
 
-    assert "Enhancement levels" in gaps
+    assert "Enhancement Levels" in gaps
     assert gaps == dict.fromkeys(gaps, GAP_MEDIUM)
 
 

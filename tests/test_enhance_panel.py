@@ -1737,7 +1737,7 @@ def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
     versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x", None))
 
     (section,) = versions.findChildren(CollapsibleSection)
-    assert "Enhancement levels" in section._header.text()
+    assert section._header.text() == "Enhancement Levels"
     assert not versions.is_collapsed()
 
     versions.set_collapsed(True)

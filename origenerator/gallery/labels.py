@@ -74,10 +74,13 @@ def lora_label(workflow_name: str | None, params: dict) -> str:
     return _joined_file_label(keys, _named_loras(keys, params), "(no LoRA)")
 
 
+_HEADLINE_CHARS = 60
+
+
 def _prompt_headline(params: dict) -> str:
     """The positive prompt as a single trimmed line, or ``""`` if empty."""
     prompt = " ".join((params.get("positive_prompt") or "").split())
-    return prompt[:60] + ("…" if len(prompt) > 60 else "")
+    return prompt[:_HEADLINE_CHARS] + ("…" if len(prompt) > _HEADLINE_CHARS else "")
 
 
 def config_tab_title(workflow_name: str | None, params: dict) -> str:

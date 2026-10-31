@@ -111,7 +111,8 @@ def test_an_item_the_enhancer_cannot_take_grows_no_plus(qtbot):
     controls.show_for(favorite=False, enhance=None)
     star, trash, plus = controls.buttons()
 
-    assert not star.isHidden() and not trash.isHidden()
+    assert not star.isHidden()
+    assert not trash.isHidden()
     assert plus.isHidden()
 
 

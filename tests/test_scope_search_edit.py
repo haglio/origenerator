@@ -38,7 +38,8 @@ def test_a_path_too_long_for_the_field_keeps_its_tail(qtbot):
     shown = field.placeholderText()
     assert shown != f"Search {LONG}…"
     kept = shown.removeprefix("Search ").lstrip("…")
-    assert kept and LONG.endswith(kept)
+    assert kept
+    assert LONG.endswith(kept)
 
 
 def test_an_elided_path_drops_the_invitation_so_there_is_only_one_ellipsis(qtbot):

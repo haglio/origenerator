@@ -1011,7 +1011,8 @@ def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullsc
     assert made[0].closes == 1
     assert director.region_slideshow(PORTRAIT) is None
     assert director.showing is made[-1]
-    assert made[-1].shown.fullscreen == 1 and made[-1].shown.motion is motion
+    assert made[-1].shown.fullscreen == 1
+    assert made[-1].shown.motion is motion
 
 
 def test_a_landing_reaches_the_slideshow_whose_own_folder_holds_it(slideshows):
@@ -1804,7 +1805,8 @@ def test_a_region_slideshow_is_placed_muted_frameless_and_on_top(slideshows):
     window = made[0].shown
     assert window.audio_muted is True
     assert window.geometry == (1920, 0, 960, 540)
-    assert window.raised == 1 and window.activated == 1
+    assert window.raised == 1
+    assert window.activated == 1
     assert window.window_flags & Qt.WindowType.FramelessWindowHint
     assert window.window_flags & Qt.WindowType.WindowStaysOnTopHint
 
@@ -2096,7 +2098,8 @@ def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(sli
     assert [row.slide.prompt_id for row in around.column] == ["g2", "v1"]
     folder, act = (row.label for row in around.column)
     assert act == "alpha"
-    assert folder and folder not in ("alpha", "Source image")   # the tree's name for it
+    assert folder
+    assert folder not in ("alpha", "Source image")
 
 
 def test_a_video_sits_under_its_images_seed_with_the_image_down_its_column(slideshows, tmp_path):

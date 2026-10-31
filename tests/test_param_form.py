@@ -282,7 +282,8 @@ def test_a_setting_with_no_field_is_kept_for_the_rerun_but_never_shown(qtbot):
     form.set_values({"seed": 5, "vae": "example.vae.safetensors"})
 
     labels = {lbl.text() for lbl in form.findChildren(QLabel)}
-    assert "vae" not in labels and "example.vae.safetensors" not in labels
+    assert "vae" not in labels
+    assert "example.vae.safetensors" not in labels
     assert form.get_values()["vae"] == "example.vae.safetensors"
 
 
@@ -986,7 +987,8 @@ def test_locked_derived_dimensions_stay_out_of_the_values(qtbot):
     form = _sized_form(qtbot)
     form._widgets["input_image"].set_item("frame.png")
     values = form.get_values()
-    assert "width" not in values and "height" not in values
+    assert "width" not in values
+    assert "height" not in values
 
 
 def test_unlocking_lets_the_user_override_the_size(qtbot):
@@ -1002,7 +1004,8 @@ def test_unlocking_lets_the_user_override_the_size(qtbot):
     form._widgets["height"].setValue(576)
 
     values = form.get_values()
-    assert values["width"] == 1024 and values["height"] == 576
+    assert values["width"] == 1024
+    assert values["height"] == 576
 
 
 def test_relocking_drops_the_override_and_restores_the_derived_size(qtbot):
@@ -1912,8 +1915,10 @@ def test_a_shut_down_prompt_actually_renders_dim(qtbot):
     spoken = colors()
     primary = (TEXT_PRIMARY.red(), TEXT_PRIMARY.green(), TEXT_PRIMARY.blue())
     muted = (TEXT_MUTED.red(), TEXT_MUTED.green(), TEXT_MUTED.blue())
-    assert primary in written and muted not in written
-    assert muted in spoken and primary not in spoken
+    assert primary in written
+    assert muted not in written
+    assert muted in spoken
+    assert primary not in spoken
 
 
 def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
@@ -2120,9 +2125,11 @@ def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
     form = ParamForm(_scene_defs() + _voice_defs())
     qtbot.addWidget(form)
     form._widgets["scene_frames"].fields("scene_lines")[0].setPlainText("Come in.")
-    assert not _row_visible(form, "voice_sample") and not _row_visible(form, "voice_sample_text")
+    assert not _row_visible(form, "voice_sample")
+    assert not _row_visible(form, "voice_sample_text")
     form._widgets["voice"].setCurrentText(CUSTOM_VOICE)
-    assert _row_visible(form, "voice_sample") and _row_visible(form, "voice_sample_text")
+    assert _row_visible(form, "voice_sample")
+    assert _row_visible(form, "voice_sample_text")
     form.set_values({"voice": "Serena"})
     assert not _row_visible(form, "voice_sample")
     form.set_values({"voice": CUSTOM_VOICE, "voice_sample": "C:/v/her.wav", "voice_sample_text": "Hi."})
@@ -2142,7 +2149,8 @@ def test_a_voice_sample_is_picked_with_a_browse_button(qtbot, monkeypatch):
     qtbot.addWidget(form)
     form._browse_buttons["voice_sample"].click()
     assert form._widgets["voice_sample"].text() == "C:/v/her.wav"
-    assert "Voice Sample" in asked["caption"] and "*.wav" in asked["kinds"]
+    assert "Voice Sample" in asked["caption"]
+    assert "*.wav" in asked["kinds"]
     assert form.get_values()["voice_sample"] == "C:/v/her.wav"
 
 

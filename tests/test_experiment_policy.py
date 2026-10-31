@@ -131,7 +131,8 @@ def test_mutated_values_respect_the_dimension_contract():
     for _ in range(200):
         proposal = policy.propose([base])
         steps = proposal.params["steps"]
-        assert isinstance(steps, int) and 1 <= steps <= 50
+        assert isinstance(steps, int)
+        assert 1 <= steps <= 50
         assert proposal.params["sampler_name"] in ("euler", "dpmpp_2m", "uni_pc")
 
 
@@ -156,7 +157,8 @@ def test_prompt_crossover_draws_from_sibling_generations():
             crossed.add(proposal.params["positive_prompt"])
     # Prompts come only from finished siblings of the same workflow — never from
     # another workflow's rows, and never invented from thin air.
-    assert crossed and crossed <= {"a cat", "a dog"}
+    assert crossed
+    assert crossed <= {"a cat", "a dog"}
 
 
 def test_down_voted_values_are_sampled_less_than_up_voted_ones():
@@ -295,7 +297,8 @@ def test_an_experiment_leaves_a_videos_size_to_the_image_it_animates():
 
     proposal = policy.propose([base])
 
-    assert "width" not in proposal.params and "height" not in proposal.params
+    assert "width" not in proposal.params
+    assert "height" not in proposal.params
 
 
 class FakeTwoLoraWorkflow(FakeWorkflow):

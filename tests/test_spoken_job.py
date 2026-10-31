@@ -70,7 +70,8 @@ def test_started_with_no_window_to_answer_its_voice_a_story_is_spoken_there_then
     job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
     job.start()
     (params, done, _failed), = speaker.asked
-    assert params["scene_lines"] == ["Come in."] and done is None
+    assert params["scene_lines"] == ["Come in."]
+    assert done is None
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
     assert job.state == "queued"
 
@@ -124,7 +125,8 @@ def test_a_story_spoken_while_comfyui_is_down_says_so_and_can_be_sent_again(qtbo
 
     _spoken_file(params, tmp_path)
     done()
-    assert len(said) == 1 and "10061" in said[0]
+    assert len(said) == 1
+    assert "10061" in said[0]
     job.start(_from_a_window)
 
     assert job.state == "queued"

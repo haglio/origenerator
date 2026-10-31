@@ -102,7 +102,8 @@ def test_show_image_displays_scaled_pixmap(make_preview, tmp_path):
     w.show_image(_make_png(tmp_path / "p.png"))
     pm = w._image_label.pixmap()
     assert not pm.isNull()
-    assert pm.width() <= 200 and pm.height() <= 150
+    assert pm.width() <= 200
+    assert pm.height() <= 150
     assert w.is_showing_video() is False
 
 
@@ -114,7 +115,8 @@ def test_show_image_fits_the_pane_without_clipping(qtbot, tmp_path):
     w._image_label.resize(400, 300)
     w.show_image(_make_tall_png(tmp_path / "tall.png"))
     pm = w._image_label.pixmap()
-    assert pm.width() <= 400 and pm.height() <= 300           # nothing clipped off
+    assert pm.width() <= 400
+    assert pm.height() <= 300
     assert pm.width() == 400 or pm.height() == 300            # as large as it fits
 
 
@@ -130,7 +132,8 @@ def test_image_refits_when_the_pane_grows(qtbot, tmp_path):
     w._image_label.resize(600, 500)                           # pane grows to fullscreen
     QApplication.sendEvent(w._image_label, QResizeEvent(QSize(600, 500), old))
     pm = w._image_label.pixmap()
-    assert pm.width() <= 600 and pm.height() <= 500           # still nothing clipped
+    assert pm.width() <= 600
+    assert pm.height() <= 500
     assert pm.width() == 600 or pm.height() == 500            # refit as large as it fits
 
 
@@ -447,7 +450,8 @@ def test_a_live_frame_opens_fullscreen_over_the_generation(live_preview):
 def test_fullscreen_opens_over_the_wait_before_the_first_frame(live_preview):
     live_preview.show_message("Waiting for preview…", live=True)
     win = live_preview.open_fullscreen()
-    assert win is not None and win.media is None
+    assert win is not None
+    assert win.media is None
 
 
 def _slideshow_on_a_sessions_funestra(tmp_path):
@@ -527,7 +531,8 @@ def test_the_corners_keep_off_the_timeline_while_a_videos_size_is_unknown(qtbot,
     w.set_actions("gen-1")
     w.layout().activate()
     timeline_top = w._timeline.geometry().top()
-    assert not w._timeline.isHidden() and timeline_top > 0
+    assert not w._timeline.isHidden()
+    assert timeline_top > 0
     assert w.media_rect().bottomLeft().y() < timeline_top
     assert all(b.geometry().bottomLeft().y() < timeline_top
                for b in w._controls.buttons())
@@ -570,7 +575,8 @@ def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp
     w.set_actions("gen-1")     # placed before the timeline has its room...
     w.layout().activate()      # ...which it takes here
     timeline_top = w._timeline.geometry().top()
-    assert not w._timeline.isHidden() and timeline_top > 0
+    assert not w._timeline.isHidden()
+    assert timeline_top > 0
     assert w.media_rect().bottomLeft().y() < timeline_top
     assert all(b.geometry().bottomLeft().y() < timeline_top
                for b in w._controls.buttons())
@@ -720,7 +726,8 @@ def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, drag
     _drag_out(w)
 
     (drag,) = drags
-    assert drag.pixmap is not None and not drag.pixmap.isNull()
+    assert drag.pixmap is not None
+    assert not drag.pixmap.isNull()
     assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_MAX
 
 
@@ -1223,7 +1230,8 @@ def test_frames_of_the_item_itself_keep_its_corners(make_preview, tmp_path):
     w.show_frame(_png_bytes(), enhancing=True)
 
     assert w.actions_id() == "held"
-    assert not star.isHidden() and not trash.isHidden()
+    assert not star.isHidden()
+    assert not trash.isHidden()
 
 
 def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,

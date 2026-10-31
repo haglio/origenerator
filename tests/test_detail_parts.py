@@ -318,9 +318,12 @@ def test_skin_and_hair_are_redrawn_inside_their_outlines_toward_their_own_prompt
     # box around the skin is most of the image. And a redraw that only reuses
     # the image's prompt gives back the same smooth skin it started from.
     skin, hair = _part("skin"), _part("hair")
-    assert skin.outline and hair.outline
-    assert "pores" in skin.prompt and "strands" in hair.prompt
-    assert skin.avoid and hair.avoid
+    assert skin.outline
+    assert hair.outline
+    assert "pores" in skin.prompt
+    assert "strands" in hair.prompt
+    assert skin.avoid
+    assert hair.avoid
     assert not _part("faces").outline
 
 
@@ -341,7 +344,8 @@ def test_an_overlay_part_that_says_nothing_of_the_sort_is_a_box_on_the_images_pr
     _with_overlay(monkeypatch, [{"name": "zeta", "outline": "yes please", "prompt": 7}])
     (part,) = match_fix_command("fix zeta")
     assert part.outline is False
-    assert part.prompt == "" and part.avoid == ""
+    assert part.prompt == ""
+    assert part.avoid == ""
 
 
 def test_a_part_redrawn_inside_its_outline_is_found_among_the_outline_detectors(monkeypatch):

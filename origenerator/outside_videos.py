@@ -185,13 +185,16 @@ def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VID
     return brought_in
 
 
+_THE_IMAGE_AND_THE_VIDEO = 2
+
+
 def _brought_in(video: OutsideVideo, record: Record, places: Places, images: dict, grab,
                 kinds: dict[str, set[VideoKind]]) -> list[dict]:
     image = _image_of(video.source, record)
     made = rows_bringing_in(video, record, frames_dir=places.frames_dir,
                             thumb_dir=places.thumb_dir, grab=grab, image=images.get(image),
                             kind=_named_kind(record, kinds[video.source]))
-    if image is not None and image not in images and len(made) == 2:
+    if image is not None and image not in images and len(made) == _THE_IMAGE_AND_THE_VIDEO:
         images[image] = made[0]
     return made
 

@@ -71,8 +71,10 @@ def test_media_type_badges_render_for_image_and_video(qtbot):
     # both types must draw a non-blank pixmap so neither shows an empty square.
     image_badge = icons.media_type_badge(MediaType.IMAGE)
     video_badge = icons.media_type_badge(MediaType.VIDEO)
-    assert not image_badge.isNull() and image_badge.width() > 0
-    assert not video_badge.isNull() and video_badge.width() > 0
+    assert not image_badge.isNull()
+    assert image_badge.width() > 0
+    assert not video_badge.isNull()
+    assert video_badge.width() > 0
     # The two glyphs differ, so an image is never mistaken for a video.
     assert image_badge.toImage() != video_badge.toImage()
 

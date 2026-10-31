@@ -403,7 +403,7 @@ class WorkflowTemplate(ABC):
         the one clip length (see :meth:`scene_plan` for why a lone entry never
         overrules it)."""
         frames = [int(count) for count in (params.get("scene_frames") or [])]
-        if len(frames) < 2:
+        if len(frames) <= 1:
             frames = [int(params["frame_count"])]
         return frames
 

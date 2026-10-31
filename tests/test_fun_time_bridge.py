@@ -879,7 +879,8 @@ def test_a_run_alone_in_its_folder_double_clicked_goes_to_the_funestra_of_its_sh
                                  tall=True)
 
     shown = read_playlist(tmp_path / "portrait.tsv")[0].path
-    assert shown.is_file() and shown.read_bytes() == _png_bytes()
+    assert shown.is_file()
+    assert shown.read_bytes() == _png_bytes()
 
 
 def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made_still_moving(

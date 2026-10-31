@@ -250,7 +250,8 @@ def test_slideshow_lands_in_the_region_matching_its_orientation(qtbot, tmp_path,
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     slideshow = view._slideshows._region_slideshows["portrait"]
-    assert slideshow is not None and slideshow.shown.isVisible()
+    assert slideshow is not None
+    assert slideshow.shown.isVisible()
     assert slideshow.shown.windowTitle() == "Origenerator Portrait"
     assert slideshow.shown.windowFlags() & Qt.WindowType.FramelessWindowHint
     assert slideshow.shown.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
@@ -267,8 +268,10 @@ def test_both_regions_can_hold_a_slideshow_at_once(qtbot, tmp_path, monkeypatch)
     _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
     portrait = view._slideshows._region_slideshows["portrait"]
     landscape = view._slideshows._region_slideshows["landscape"]
-    assert portrait is not None and portrait.shown.isVisible()
-    assert landscape is not None and landscape.shown.isVisible()
+    assert portrait is not None
+    assert portrait.shown.isVisible()
+    assert landscape is not None
+    assert landscape.shown.isVisible()
     assert portrait is not landscape
     for slideshow in (portrait, landscape):
         qtbot.addWidget(slideshow.shown)
@@ -461,7 +464,8 @@ def test_a_preview_double_click_opens_the_slideshow_on_a_region(qtbot, tmp_path)
                                  panel._preview.height() // 2))
 
     slideshow = view.region_slideshow("landscape")
-    assert slideshow is not None and slideshow.shown.isVisible()
+    assert slideshow is not None
+    assert slideshow.shown.isVisible()
     geo = slideshow.shown.geometry()
     assert (geo.width(), geo.height()) == (1707, 1440)
     qtbot.addWidget(slideshow.shown)
@@ -589,10 +593,12 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     a_configuration, an_act = model.actions
     assert (a_configuration.path, an_act.path) == ("g3.png", "v1.png")
     assert an_act.label == "alpha"
-    assert a_configuration.label and a_configuration.label != "alpha"   # its folder
+    assert a_configuration.label
+    assert a_configuration.label != "alpha"
     assert model.current_action == "Source image"
     assert (model.seed_count, model.action_count) == (2, 3)
-    assert model.playing == ("corner", 0) and model.active_loop == ""
+    assert model.playing == ("corner", 0)
+    assert model.active_loop == ""
     assert model.title == "Unlocked · Shuffle"
     # And the mode pair leads the panel, with this mode lit: the way back to
     # the Funestra under the slideshow.
@@ -695,7 +701,8 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
     assert slideshow.hud_favorites_filter is True
     assert slideshow.pass_size() == 1  # narrowed to the one favorite
     model = slideshow_hud_model("portrait", slideshow)
-    assert _lit(model, "portrait_fmode") and "F-Mode" in model.title
+    assert _lit(model, "portrait_fmode")
+    assert "F-Mode" in model.title
 
     slideshow.shown.press("portrait_fmode")
     assert slideshow.pass_size() == 3  # widened back
@@ -773,7 +780,8 @@ def test_a_spoken_side_and_collection_plays_it_on_that_region(qtbot, tmp_path, m
     view._voice.on_command(CollectionCommand("__recents__", "landscape"))
 
     slideshow = view.region_slideshow("landscape")
-    assert slideshow is not None and slideshow.shown.isVisible()
+    assert slideshow is not None
+    assert slideshow.shown.isVisible()
     assert slideshow.hud_order_label == "Latest"   # the HUD says which order it plays
     assert view.region_slideshow("portrait") is None  # the other region is untouched
     qtbot.addWidget(slideshow.shown)
@@ -881,7 +889,8 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
 
     slideshow.close()                     # and it comes back under whatever ends
     later = view.region_slideshow("portrait")
-    assert later is not None and later is not slideshow
+    assert later is not None
+    assert later is not slideshow
     qtbot.addWidget(later.shown)
 
     view.close_the_slideshows()         # until the session says it is done with them
@@ -1080,7 +1089,8 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
 
     for side in ("portrait", "landscape"):
         slideshow = view.region_slideshow(side)
-        assert slideshow is not None and slideshow.shown.isVisible()
+        assert slideshow is not None
+        assert slideshow.shown.isVisible()
         assert slideshow.hud_order_label == "Shuffle"
         assert [str(item.path) for item in slideshow._set.playlist.items] == \
             [library[f"__all__::{side}"][0]["thumbnail_path"]]
@@ -1406,7 +1416,8 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
     built = _fun_time_view(qtbot)
     assert (view._bank.radio, view._bank.mic) == (None, None)
     assert (view._osr2_motion, view._osr2_driver, view._motion_panel) == (None, None, None)
-    assert not view.osr2_control.isEnabled() and not built.osr2_control.isEnabled()
+    assert not view.osr2_control.isEnabled()
+    assert not built.osr2_control.isEnabled()
     assert view._motion_pane.isHidden()
     stack = view._arrangement.stack
     assert stack.orientation() == Qt.Orientation.Vertical
@@ -1518,7 +1529,8 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
     view.osr2_control.setChecked(True)
 
     assert motion.active
-    assert view._motion_panel is not None and not view._motion_pane.isHidden()
+    assert view._motion_panel is not None
+    assert not view._motion_pane.isHidden()
 
 
 def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_again(qtbot):
@@ -1530,7 +1542,8 @@ def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_ag
     view.become_standalone()
     view._voice.on_command(AppCommand.RADIO_ON)
 
-    assert view._bank.radio.isChecked() and radio.starts == 1
+    assert view._bank.radio.isChecked()
+    assert radio.starts == 1
 
 
 def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_monitor(qtbot, tmp_path, monkeypatch):
@@ -1571,7 +1584,8 @@ def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qt
     view.osr2_control.setChecked(True)
     view._bank.mic.setChecked(True)
     listener = view._voice.listener
-    assert motion.active and listener.commands_on
+    assert motion.active
+    assert listener.commands_on
 
     view.become_hosted(_session())
 
@@ -1861,7 +1875,8 @@ def test_a_hosted_slideshows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot
     assert slideshow.hud_enhanced_mode is True
     assert slideshow.pass_size() == 1          # narrowed to the one enhanced
     model = slideshow_hud_model("portrait", slideshow)
-    assert _lit(model, "portrait_enhanced") and "Enhanceds" in model.title
+    assert _lit(model, "portrait_enhanced")
+    assert "Enhanceds" in model.title
     # Nothing went out on the session's channel: the switch is the slideshow's own.
     assert not (tmp_path / "dashboard_cmd.txt").exists()
 

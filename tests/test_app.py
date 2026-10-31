@@ -270,7 +270,8 @@ def test_resolve_client_id_replaces_a_non_string_value(tmp_path):
 
     client_id = resolve_comfyui_client_id(state)
 
-    assert isinstance(client_id, str) and client_id
+    assert isinstance(client_id, str)
+    assert client_id
 
 
 def test_client_id_is_stable_across_launches(tmp_path, qtbot):

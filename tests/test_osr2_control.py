@@ -117,7 +117,7 @@ def test_the_switch_announces_a_move_and_not_a_re_statement():
 
 
 def test_anything_that_changes_which_button_lights_says_so():
-    """The console redraws on this, and a hold moves no switch -- so a group
+    """The OSR2 controls redraw on this, and a hold moves no switch -- so a group
     following the switch alone would keep the wrong button lit."""
     control = _control()
     heard = []

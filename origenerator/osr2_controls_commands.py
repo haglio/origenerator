@@ -1,8 +1,8 @@
 """How a press on the Funestras' console or a slideshow's HUD is spelled.
 
 The console painter and the satellite HUD hand their presses back as bare
-strings, and three surfaces here decode them: the console under Core and under a fullscreen slideshow
-(:func:`~origenerator.gui.console.post_device_action`), a slideshow's own HUD
+strings, and three surfaces here decode them: the OSR2 controls under Core and under a fullscreen slideshow
+(:func:`~origenerator.gui.osr2_controls_state.post_device_action`), a slideshow's own HUD
 (:mod:`origenerator.gui.slideshow_hud`), and the channel a Fun Time session drives
 a hosted slideshow through (:mod:`origenerator.fun_time_bridge`).  Each used to
 hold its own slice index and its own way of gluing a side's name onto a verb,
@@ -10,7 +10,7 @@ so the spelling lived in three places and matched by coincidence.
 
 Nothing here knows Qt, and nothing here decides what a press *does* -- that is
 :func:`~origenerator.slideshow_buttons.answer` for a slideshow and
-:func:`~origenerator.gui.console.post_device_action` for the device.  This
+:func:`~origenerator.gui.osr2_controls_state.post_device_action` for the device.  This
 says only what a press IS.
 """
 
@@ -20,7 +20,7 @@ from typing import NamedTuple
 
 from funestra import drive_layout
 
-#: The prefix every Robot Hand verb carries.  `tests/test_console_commands.py`
+#: The prefix every Robot Hand verb carries.  `tests/test_osr2_controls_commands.py`
 #: holds it against the presses funestra itself builds, so a spelling
 #: changed there turns a test red instead of arriving as an unknown press.
 ROBOT_HAND = "robot_hand_"

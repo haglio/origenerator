@@ -141,7 +141,7 @@ def test_a_switch_takes_a_flip_and_an_explicit_way():
     "OSR2 off", "OSR 2 off", "O.S.R. 2 off", "OSR two off", "O S R two off",
 ])
 def test_the_osr2_is_let_go_of_in_fun_times_words(said):
-    """Fun Time's spoken word for the console's control-off button, heard here
+    """Fun Time's spoken word for the OSR2 controls' control-off button, heard here
     however the transcriber writes the letters and the number."""
     assert match_app_command(said) is AppCommand.DRIVE_OFF
 
@@ -170,7 +170,7 @@ def test_the_enhanced_filter_answers_to_upscales_as_well():
 
 
 def test_the_slideshow_filter_is_said_either_way_round_not_toggled():
-    # A speaker mid-show is not looking at the console to see which way it is
+    # A speaker mid-show is not looking at the OSR2 controls to see which way it is
     # set, so a single word that flipped it would do the opposite half the time.
     assert match_app_command("filter enhanced") is AppCommand.FILTER_ENHANCED
     assert match_app_command("enhanced only") is AppCommand.FILTER_ENHANCED

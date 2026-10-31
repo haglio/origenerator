@@ -39,7 +39,6 @@ from funestra.file_channel import (
 from PyQt6.QtCore import QCoreApplication, QObject, QTimer, pyqtSignal
 
 from origenerator.config import RADIO_DIR
-from origenerator.console_commands import side_press, side_spoken_to, spelled_for
 from origenerator.fun_time_mode import (
     CLOSE_SLIDESHOW,
     CLOSE_SLIDESHOWS,
@@ -56,6 +55,7 @@ from origenerator.fun_time_mode import (
     TAKE_BACK,
     FunTimeSession,
 )
+from origenerator.osr2_controls_commands import side_press, side_spoken_to, spelled_for
 from origenerator.radio import deal_to_the_funestras
 from origenerator.slideshow_buttons import (
     HUD_PLACES,

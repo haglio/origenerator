@@ -375,10 +375,10 @@ def test_stepping_away_releases_the_lock(qtbot):
     assert view.slideshow._set.playlist.current() == Slide("a.png", "image")
 
 
-def test_the_consoles_transport_releases_the_lock_too(qtbot):
+def test_the_osr2_controls_transport_releases_the_lock_too(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
-    view.slideshow.slideshow_step(1)                     # the console's transport, not the key
+    view.slideshow.slideshow_step(1)                     # the OSR2 controls' transport, not the key
     _settle(view)
     assert not view.slideshow.locked
     assert view.slideshow._set.playlist.current() == Slide("b.mp4", "video")
@@ -1424,7 +1424,7 @@ def test_closing_announces_itself(qtbot):
 # --- the Clip seconds: one number, app-wide ---------------------------------
 
 
-def test_the_consoles_clip_seconds_are_the_app_wide_ones(qtbot):
+def test_the_osr2_controls_clip_seconds_are_the_app_wide_ones(qtbot):
     pace = SlideshowPace(parent=None)
     view = _view(qtbot, pace=pace)
 

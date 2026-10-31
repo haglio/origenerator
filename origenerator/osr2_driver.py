@@ -113,7 +113,7 @@ class Osr2Driver(QObject):
     def trace(self, count: int, seconds: float) -> tuple[float, ...]:
         """The script's line from the playhead forward, as *count* heights 0-1
         spanning *seconds* -- the motion the device is about to be asked for,
-        which is what the console draws in the Robot Hand's place while a
+        which is what the OSR2 controls draw in the Robot Hand's place while a
         funscript has the device.
 
         Folded onto the script the same way the stream is (the preview loops),

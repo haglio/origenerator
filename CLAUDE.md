@@ -85,7 +85,7 @@ for one thing cost four. So:
   picture that was no image took a name of its own: the small one on a tile,
   a row or a card is a **thumbnail**, one frame of a video or of this window
   sent to the headset is a **frame**, his drawings on the sorting window's
-  buttons and the OSR2 console's drawing are **drawings**, and what a run is
+  buttons and the OSR2 controls' drawing are **drawings**, and what a run is
   making, in the help for its settings, is the **result**. Saved names keep
   the old word and are read under the new one in one place each, as the
   recipe ones are: the `picture_state` column is `image_state`
@@ -126,7 +126,7 @@ for one thing cost four. So:
   Job Queue (`JobQueueView` in Core and `gui/hud_queue.py` on a HUD, with
   `JobQueue` the controller behind both), `core` (`gui/core.py`, `Core`) and
   `standalone`, and "panel" is left to the Generate, Enhance and Combine
-  forms and the OSR2 console at Core's top left. So no agent reaches for
+  forms and the OSR2 controls at Core's top left. So no agent reaches for
   another word: an audit that called the HUD a "panel", the Job Queue
   "the list of pictures and videos being made or waiting" and Standalone
   "on its own" left him asking whether each meant his word.
@@ -353,7 +353,7 @@ claim in the production copy's `state/` as well, which is where every session
 writes one; a preview that read only its own went on driving beside Fun Time
 (2026-09-26).
 
-One-sided, none of them fails loudly. The console's enhanced-only switch shipped
+One-sided, none of them fails loudly. The OSR2 controls' enhanced-only switch shipped
 on the shared side with nothing on fun_time's side answering the verb it posts,
 so the button lit and the slideshows played on unchanged — a control that looks live
 and does nothing, found by an audit rather than by a red test (bug 90). Pointed
@@ -546,14 +546,14 @@ window's session, saved in `state/ui_state.json` through one table,
 on the way out, what it is told on the way back in. A control added without a
 line there is forgotten at every launch with nothing failing, which is how
 Separate and Together, Images / Videos / Both, the folders left open in the
-TOC, the console's Speed, Amp, Center, shape and Human inspired, every
+TOC, the OSR2 controls' Speed, Amp, Center, shape and Human inspired, every
 dragged border and each tab's folded sections went unremembered until the
 user noticed one of them.
 
 `tests/test_remembered_settings.py` holds the window to it the way Fun
 Time's `test_session_resume.py` holds the session: it builds the window,
 counts every control a person can set and every press and bar on the
-console, and fails on one that neither a key of the table nor its short list
+OSR2 controls, and fails on one that neither a key of the table nor its short list
 of things that are no setting accounts for. So a new control is finished
 when it has its key, or its line there saying why it is no setting -- what is
 being searched for, what one image shows, a nudge, and Auto-generate, which

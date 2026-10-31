@@ -136,11 +136,11 @@ from origenerator.gui.job_queue_view import JobQueueView
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.message import ERROR, HEARD_MARK, INFO
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.new_tile import NewTile
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
+from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
 from origenerator.gui.prompt_reveal import reveal_prompt
@@ -625,7 +625,7 @@ class GalleryView(QWidget):
                     and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
                     and apply_motion_key(self._osr2_motion, event.key(),
                                          on_drive_toggle=self.toggle_osr2_drive)):
-                self._motion_panel.refresh()
+                self._osr2_controls.refresh()
                 return True
         # Not the base class's answer, which is this one anyway: this filter is
         # on the whole application, so it is handed events about objects that
@@ -753,14 +753,14 @@ class GalleryView(QWidget):
         if self._combine.panel.isHidden():
             combining.hide()
         sections = [listening, finding, combining]
-        self._motion_panel = None
+        self._osr2_controls = None
         self._motion_pane = None
         if self._osr2_motion is not None:
-            self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
-            self._motion_panel.setToolTip(f"{self._motion_panel.toolTip()} · Esc pauses")
+            self._osr2_controls = Osr2Controls(self._osr2_motion, control=self.osr2_control)
+            self._osr2_controls.setToolTip(f"{self._osr2_controls.toolTip()} · Esc pauses")
             hud_scroll = QScrollArea()
             hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-            hud_scroll.setWidget(self._motion_panel)
+            hud_scroll.setWidget(self._osr2_controls)
             self._motion_pane, hud_column = pane()
             hud_column.addWidget(hud_scroll)
             sections.insert(0, self._motion_pane)
@@ -877,7 +877,7 @@ class GalleryView(QWidget):
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
         if self._osr2_driver is not None:
             omnipause.holds(self._osr2_driver)
-        # The switch answers "what is the OSR2 doing" for every console over it,
+        # The switch answers "what is the OSR2 doing" for every OSR2 controls drawing over it,
         # so it holds both drivers rather than only the motion.
         self.osr2_control.script = self._osr2_driver
         self._osr2_driving = None
@@ -925,8 +925,8 @@ class GalleryView(QWidget):
         self._buttons.become_hosted()
         if self._motion_pane is not None:
             self._motion_pane.hide()
-        self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
-        self._osr2_motion = self._osr2_driver = self._motion_panel = None
+        self._kept_device = (self._osr2_motion, self._osr2_driver, self._osr2_controls)
+        self._osr2_motion = self._osr2_driver = self._osr2_controls = None
         self.wear_the_room(session)
 
     def wear_the_room(self, session) -> None:
@@ -942,7 +942,7 @@ class GalleryView(QWidget):
 
     def become_standalone(self) -> None:
         self.set_room_paused(False)
-        self._osr2_motion, self._osr2_driver, self._motion_panel = self._kept_device
+        self._osr2_motion, self._osr2_driver, self._osr2_controls = self._kept_device
         self.osr2_control.drive_with(self._osr2_motion, self._osr2_driver)
         if self._motion_pane is not None:
             self._motion_pane.show()
@@ -1057,7 +1057,7 @@ class GalleryView(QWidget):
                     self._osr2_driving = driving
             if wants_motion and not self._osr2_motion.active:
                 self._osr2_motion.start()
-            # Said inside the guard, so a console redrawing on it cannot land
+            # Said inside the guard, so the OSR2 controls redrawing on it cannot land
             # back in here mid-flight.
             self.osr2_control.settled.emit()
         finally:

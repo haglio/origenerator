@@ -1,8 +1,8 @@
 """What this app tells the Funestras' console painter, and what a press on it means.
 
-The console is drawn in two places here — its OSR2 section alone at the top left
-of Core, and that section on the HUD a slideshow wears — so
-what goes ON the console and what a press takes OFF it are written once, here,
+The OSR2 controls are drawn in two places here — alone at the top left of Core,
+and on the HUD a slideshow wears — so what goes ON them and what a press takes
+OFF them are written once, here,
 rather than once per surface.
 
 Nothing is drawn here. :class:`funestra.console_hud.ConsolePainter` and the
@@ -39,9 +39,9 @@ from funestra.modes import MainMode, Osr2State
 from funestra.robot_hand import POSITION_MAX, control_limits
 
 from origenerator import motion_engine, osr2
-from origenerator.console_commands import level_asked_for, max_intensity_asked_for
+from origenerator.osr2_controls_commands import level_asked_for, max_intensity_asked_for
 
-# Which press on the console's OSR2 switch asks for which state, read off
+# Which press on the OSR2 controls' switch asks for which state, read off
 # funestra's own mapping so a press cannot drift from the button that lights.
 OSR2_CONTROL_BY_COMMAND = {verb: state for state, verb in OSR2_CONTROL_BUTTONS.items()}
 
@@ -94,10 +94,10 @@ def _bars_drawn(bars) -> dict:
                 **asdict(control_limits(bars)))
 
 
-def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2Trouble | None = None,
+def osr2_controls_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2Trouble | None = None,
                 control: str = OSR2_CONTROL_UNANSWERED, script=None,
                 broker_running: bool = True) -> ConsoleHud:
-    """The console's OSR2 section as Fun Time's painter takes it.
+    """The OSR2 controls as Fun Time's console painter takes them.
 
     ``mode`` is genau because that is what this is: a self-generated motion over
     what is on screen, with no Nau playlist under it.
@@ -107,7 +107,7 @@ def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2
     OSR2 row says FunScript -- the motion is stopped, and drawing it would be a
     drawing of something nobody is sending.
     """
-    shown = slideshow_device(motion, device=device, trouble=trouble, control=control, script=script,
+    shown = osr2_controls_state(motion, device=device, trouble=trouble, control=control, script=script,
                              broker_running=broker_running)
     return ConsoleHud(
         console=ConsoleModel(
@@ -121,13 +121,13 @@ def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2
 
 
 @dataclass(frozen=True)
-class SlideshowDevice:
-    """The device half of this app's console: the rows that aim the OSR2, who
-    has the device, and the motion being sent.
+class Osr2ControlsState:
+    """The OSR2 controls' state: the rows that aim the OSR2, who has the device,
+    and the motion being sent.
 
     Handed to the one HUD a slideshow wears (:mod:`origenerator.gui.slideshow_hud`) so
     it says all of it without a second HUD underneath, and used to build the
-    console's OSR2 section in Core.
+    OSR2 controls in Core.
     """
 
     osr2_rows: tuple
@@ -141,11 +141,11 @@ class SlideshowDevice:
     osr2_controls: tuple = ()
 
 
-def slideshow_device(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
+def osr2_controls_state(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
                      trouble: Osr2Trouble | None = None,
                      control: str = OSR2_CONTROL_UNANSWERED, script=None,
-                     broker_running: bool = True) -> SlideshowDevice:
-    """What the device is doing, as a HUD takes it — see :class:`SlideshowDevice`.
+                     broker_running: bool = True) -> Osr2ControlsState:
+    """What the device is doing, as a HUD takes it — see :class:`Osr2ControlsState`.
 
     ``script`` is the funscript driver, when this app has one: while it has the
     device the readout is the script's line rather than the motion's, and the
@@ -158,7 +158,7 @@ def slideshow_device(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
     on = device is not Osr2Mode.OFF
     scripted = script is not None and script.active and on
     driving = motion.active and on and not scripted
-    return SlideshowDevice(
+    return Osr2ControlsState(
         osr2_control=control,
         osr2_rows=(aim_row(learned=motion.state.learned.active,
                            shape=motion.state.state.shape.value, control=control),),
@@ -171,24 +171,24 @@ def slideshow_device(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
     )
 
 
-def panel_room(motion) -> tuple[int, int]:
+def osr2_controls_room(motion) -> tuple[int, int]:
     driving = SimpleNamespace(active=True, state=motion.state, parked_by_the_pause=False)
-    return ConsolePainter(device_only=True).rgba(console_hud(driving, control=OSR2_DRIVING))[1]
+    return ConsolePainter(device_only=True).rgba(osr2_controls_hud(driving, control=OSR2_DRIVING))[1]
 
 
 def post_device_action(action: str, *, motion, control=None) -> bool:
-    """Do what a press on the console's OSR2 section asks, wherever it was drawn.
+    """Do what a press on the OSR2 controls asks, wherever they were drawn.
 
-    The verbs are the console's own — the same strings Fun Time routes to
+    The verbs are the Funestras' console's own — the same strings Fun Time routes to
     whichever Funestra owns them — and this routes them to what this app has: the
     motion for everything about the motion, and the app's one OSR2 switch for
     the control-state group and the max intensity.
 
     *control* is that switch, or None where nobody handed one over — a HUD
-    outside the gallery, and a test's bare console.  The two holds still reach
+    outside the gallery, and a test's bare OSR2 controls.  The two holds still reach
     the motion there, which is what such a HUD can do about the device.
 
-    Answers whether this was one of the console's verbs at all, so a HUD
+    Answers whether this was one of the Funestras' console's verbs at all, so a HUD
     carrying other buttons beside them can go on routing the rest.
     """
     if not action:

@@ -658,7 +658,7 @@ class SlideshowDirector:
             cancel_all=self._host.cancel_all,
             core_window=self._host.window,
             # Space reaches the one OSR2 switch, like every other surface's,
-            # and the console's control group reads and sets that same one.
+            # and the OSR2 controls' control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,
             osr2_control=self._host.osr2_control,
             omnipause=self._ask_the_room_to_pause(),

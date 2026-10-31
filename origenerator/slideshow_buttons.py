@@ -24,7 +24,7 @@ from funestra.hud_marks import FMODE_ICON, LOCK_ICON, NEXT_ICON, PREVIOUS_ICON, 
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.console_commands import FILTER, spelled_for
+from origenerator.osr2_controls_commands import FILTER, spelled_for
 
 # The HUD's button row, in the order the Funestras put the same controls in.  The tuples are
 # the groups the wider gap opens between.

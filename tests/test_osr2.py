@@ -94,7 +94,7 @@ def test_an_app_that_does_not_want_the_osr2_sends_it_nothing(the_brokers_slot):
     assert slot.holder is None
 
 
-# --- is the device there: what the console reads to say "Off" ---------------
+# --- is the device there: what the OSR2 controls read to say "Off" ---------------
 
 def _rx(tmp_path, stamped=None):
     """The broker's directory, its stamp of when the OSR2 last spoke at whatever

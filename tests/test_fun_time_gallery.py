@@ -2,7 +2,7 @@
 
 Fun Time's Main Funestra owns the OSR2 for the whole session, so a hosted
 Origenerator must offer no way to reach the device — no toggle, no motion, no
-console — and its layout folds to fit the Random Favs Browser's upright rect.
+OSR2 controls — and its layout folds to fit the Random Favs Browser's upright rect.
 """
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     assert view._osr2_driver is None
     assert view.osr2_control.isEnabled() is False
     assert view.osr2_control.state() == OSR2_PARKED
-    assert view._motion_panel is None
+    assert view._osr2_controls is None
 
 
 def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
@@ -1415,7 +1415,7 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
 
     built = _fun_time_view(qtbot)
     assert (view._buttons.radio, view._buttons.mic) == (None, None)
-    assert (view._osr2_motion, view._osr2_driver, view._motion_panel) == (None, None, None)
+    assert (view._osr2_motion, view._osr2_driver, view._osr2_controls) == (None, None, None)
     assert not view.osr2_control.isEnabled()
     assert not built.osr2_control.isEnabled()
     assert view._motion_pane.isHidden()
@@ -1529,7 +1529,7 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
     view.osr2_control.setChecked(True)
 
     assert motion.active
-    assert view._motion_panel is not None
+    assert view._osr2_controls is not None
     assert not view._motion_pane.isHidden()
 
 

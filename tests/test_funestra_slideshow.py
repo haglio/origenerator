@@ -44,7 +44,7 @@ FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
 ROOT = Path(__file__).resolve().parent.parent
 DRIVERS = ("origenerator/gui/slideshow_hud.py", "origenerator/fun_time_bridge.py",
-           "origenerator/gui/console.py")
+           "origenerator/gui/osr2_controls_state.py")
 
 
 def _into(said: list):

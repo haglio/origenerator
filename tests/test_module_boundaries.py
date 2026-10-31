@@ -59,11 +59,11 @@ QT_FREE = (
     "origenerator.run_toast",
     # Out of the widget package with the rest of the app's machinery, and
     # needing no Qt once there: the orientation key scheme, the spin-arrow
-    # PNGs, the slideshow's press vocabulary and the console press grammar.
+    # PNGs, the slideshow's press vocabulary and the OSR2 controls' press grammar.
     "origenerator.orientation",
     "origenerator.spin_arrows",
     "origenerator.slideshow_buttons",
-    "origenerator.console_commands",
+    "origenerator.osr2_controls_commands",
     "origenerator.funestras_engine",
 )
 
@@ -114,7 +114,7 @@ def test_the_modules_that_do_need_qt_are_only_these(module):
 # inside the widget package to find it.
 OUTSIDE_THE_WIDGETS = (
     "radio",
-    "console_commands",
+    "osr2_controls_commands",
     "fun_time_bridge",
     "orientation",
     "osr2_driver",

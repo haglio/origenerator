@@ -624,7 +624,7 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
 
 def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
     # A slideshow used to float two: the Funestras' HUD over the set, and Genau's whole
-    # console under it for the device.  Between them the status was said twice
+    # OSR2 controls under it for the device.  Between them the status was said twice
     # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
     # now -- the HUD, carrying the device's line, the readout and the two rows
     # that aim them.

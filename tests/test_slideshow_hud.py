@@ -20,8 +20,8 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
-from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.osr2_control import Osr2Control
+from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -125,12 +125,12 @@ def test_the_hud_names_the_item_the_way_this_app_names_it(qtbot):
 
 class TestTheOneHudASlideshowWears:
     """A slideshow used to wear TWO HUDs: the Funestras' HUD for the set, and Genau's
-    whole console seated under it for the device.  Between them the status was
+    whole OSR2 controls seated under it for the device.  Between them the status was
     said twice and disagreed -- "Looping seeds · Shuffle" over "Unlocked · 4s" --
     and prev, next, lock and trash were drawn on both.
 
     One HUD now: the Funestras' HUD, carrying the device's line and the drive
-    readout out of the console's own code.
+    readout out of the OSR2 controls' own code.
     """
 
     @staticmethod
@@ -140,7 +140,7 @@ class TestTheOneHudASlideshowWears:
                           **kwargs)
 
     def test_the_slideshow_floats_no_second_hud(self, qtbot):
-        assert self._window(qtbot).findChildren(MotionPanel) == []
+        assert self._window(qtbot).findChildren(Osr2Controls) == []
 
     def _model(self, qtbot):
         window = self._window(qtbot)
@@ -210,7 +210,7 @@ class TestTheOneHudASlideshowWears:
         assert "robot_hand_release" in aiming
 
     def test_the_transport_is_drawn_once(self, qtbot):
-        """The console's own prev/next/lock/trash row is off it: the side's
+        """The Funestras' console's own prev/next/lock/trash row is off it: the side's
         four are already there, and they act on the very same slideshow."""
         posted = [button.command for row in self._model(qtbot).rows for button in row]
 

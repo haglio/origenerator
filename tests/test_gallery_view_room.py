@@ -87,7 +87,7 @@ class _FakeDriver:
         self.active = False
 
     def trace(self, count, seconds):
-        """What the console asks a driver for while it has the device. These
+        """What the OSR2 controls ask a driver for while they have the device. These
         cases carry no scripted video, so there is no line to draw — the same
         empty answer the real driver gives for one."""
         return ()
@@ -105,7 +105,7 @@ def _osr2_view(qtbot):
     return view, driver, view._info_tabs.current_config_panel()
 
 
-def test_the_consoles_control_group_is_the_apps_one_osr2_switch(qtbot):
+def test_the_osr2_controls_control_group_is_the_apps_one_osr2_switch(qtbot):
     """The whole point of the group: from a slideshow there was no way to reach
     the Gallery pane buttons' switch at all, and now there is no Gallery pane buttons' switch to reach."""
     view, driver, panel = _osr2_view(qtbot)
@@ -120,7 +120,7 @@ def test_the_consoles_control_group_is_the_apps_one_osr2_switch(qtbot):
     assert view.osr2_control.isChecked() is False
 
 
-def test_parking_from_the_console_stills_the_motion_at_home_and_keeps_the_device(qtbot):
+def test_parking_from_the_osr2_controls_stills_the_motion_at_home_and_keeps_the_device(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
 
     view.osr2_control.set_state(OSR2_PARKED)
@@ -132,7 +132,7 @@ def test_parking_from_the_console_stills_the_motion_at_home_and_keeps_the_device
 
 def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbot):
     """A script driving through a park is the device ignoring the hold, which is
-    what the console would be lying about.  The stilled motion is what takes the
+    what the OSR2 controls would be lying about.  The stilled motion is what takes the
     device to that end and keeps it there."""
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
@@ -203,7 +203,7 @@ def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
     assert log == ["script lets go", "motion takes"]
 
 
-def test_every_console_over_the_device_hears_that_it_was_re_aimed(qtbot):
+def test_every_osr2_controls_drawing_over_the_device_hears_that_it_was_re_aimed(qtbot):
     """The panel redraws on this: which driver has the device moves with the
     video in front, not only with a press."""
     view, _driver, panel = _osr2_view(qtbot)
@@ -820,7 +820,7 @@ def test_esc_in_a_text_field_is_the_fields_own_even_with_the_osr2_moving(
     assert omnipause.frozen() is paused
 
 
-def test_the_console_hints_that_esc_pauses_the_room(qtbot):
+def test_the_osr2_controls_hint_that_esc_pauses_the_room(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
     assert view._motion_panel.toolTip().endswith(" · Esc pauses")
 

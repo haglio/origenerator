@@ -1,6 +1,6 @@
 """The app's one OSR2 switch: on drives the device, off parks it.
 
-The switch itself has no widget: the console's button sets it, and so do Space,
+The switch itself has no widget: the OSR2 controls' button sets it, and so do Space,
 a spoken word and a resumed session.
 
 It holds both of the app's drivers, because "what is the OSR2 doing" is one
@@ -27,17 +27,17 @@ logger = logging.getLogger(__name__)
 
 class Osr2Control(QObject):
     # Anything that can change whether the switch is on, the park included:
-    # what re-aims the device, and what a console showing the switch redraws on.
+    # what re-aims the device, and what OSR2 controls showing the switch redraw on.
     changed = pyqtSignal()
     # The app has finished re-aiming the device, so what is driving it may be
-    # different: every console over it draws itself again.
+    # different: every OSR2 controls drawing over it draws itself again.
     settled = pyqtSignal()
 
     def __init__(self, motion=None, *, script=None, parent=None) -> None:
         super().__init__(parent)
         self._motion = motion
         # The funscript driver, set once the view has built it.  Held here
-        # rather than asked of the gallery so a slideshow's console, which never sees
+        # rather than asked of the gallery so a slideshow's OSR2 controls, which never see
         # the gallery, can still say what has the device.
         self.script = script
         self._engaged = False
@@ -102,7 +102,7 @@ class Osr2Control(QObject):
         return OSR2_DRIVING if self._engaged and held is None else OSR2_PARKED
 
     def set_state(self, state: str) -> None:
-        """Switch on (driving) or off (parked) -- what a press on the console is.
+        """Switch on (driving) or off (parked) -- what a press on the OSR2 controls is.
 
         The park moves first, so whatever reconciles on the switch already sees
         it; and a move that leaves the app holding the device still says so,

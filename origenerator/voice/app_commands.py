@@ -193,7 +193,7 @@ for _words, (_toggle, _on, _off) in (
         _say(_on, f"{_word} on")
         _say(_off, f"{_word} off")
 _say(AppCommand.MIC_OFF, "mic off", "voice off")
-# Fun Time's word for the console's control-off button, which is this switch
+# Fun Time's word for the OSR2 controls' control-off button, which is this switch
 # off -- the letters however whisper writes them.
 _say(AppCommand.DRIVE_OFF, "osr two off", "o s r two off")
 for _osr2 in ("osr two", "o s r two"):

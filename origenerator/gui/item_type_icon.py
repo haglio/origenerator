@@ -42,7 +42,7 @@ class ItemTypeIcon(QLabel):
         """Wear another type's glyph.
 
         For an item type icon over a drop zone whose subject changes kind rather than a tile's,
-        which is one thing forever: the config tab's source tile shows a video's
+        which is one thing forever: the Generate tab's source tile shows a video's
         start frame (an image) and the video a cycle was cut out of (a video) in
         the one place, and an item type icon that could not follow said "photo" over both.
         """

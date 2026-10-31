@@ -26,7 +26,7 @@ from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
-from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL
@@ -851,7 +851,7 @@ def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_f
         return str(tmp_path / f"{row['prompt_id']}.png"), "image"
 
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
-    monkeypatch.setattr(gcp_module, "resolve_preview", by_id)
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", by_id)
     db = _seeded_db(tmp_path)
     if tall:
         params = json.loads(db.get_generation("orig")["params_json"])

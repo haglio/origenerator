@@ -848,15 +848,15 @@ def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, 
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     first = _tab_with_prompts(view)
     first.prompt_fields()[0].setPlainText("a cat")
-    view._info_tabs._add_subtab()          # a second tab, its prompts still empty
+    view._generate_pane._add_subtab()          # a second tab, its prompts still empty
     second = _tab_with_prompts(view)
     second.prompt_fields()[0].setPlainText("a cat and a cat")
-    view._info_tabs.setCurrentWidget(first)
+    view._generate_pane.setCurrentWidget(first)
     _press_ctrl_f(view, monkeypatch)
     _find_query(view).setText("cat")
     assert _find_count(view) == "1 of 1"
 
-    view._info_tabs.setCurrentWidget(second)
+    view._generate_pane.setCurrentWidget(second)
 
     assert _find_count(view) == "1 of 2"
     assert not first.prompt_fields()[0].extraSelections()  # the old tab's paint is gone
@@ -870,7 +870,7 @@ def test_closing_the_searched_tab_puts_an_open_find_away(qtbot, tmp_path, monkey
     _press_ctrl_f(view, monkeypatch)
     assert view._find_bar.isVisible()
 
-    view._info_tabs._close_subtab(view._info_tabs.currentIndex())
+    view._generate_pane._close_subtab(view._generate_pane.currentIndex())
 
     assert not view._find_bar.isVisible()
 
@@ -881,7 +881,7 @@ def test_ctrl_f_after_the_searched_prompts_are_gone_opens_over_the_ones_in_front
     searched = _tab_with_prompts(view).prompt_fields()
     _press_ctrl_f(view, monkeypatch)
     view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
-    view._info_tabs._close_subtab(view._info_tabs.currentIndex())
+    view._generate_pane._close_subtab(view._generate_pane.currentIndex())
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(sip.isdeleted(field) for field in searched)
     in_front = _tab_with_prompts(view)
@@ -898,10 +898,10 @@ def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_
     searched = _tab_with_prompts(view).prompt_fields()
     _press_ctrl_f(view, monkeypatch)
 
-    panel = _tab_with_prompts(view, "flux_t2i_upscaled")
+    tab = _tab_with_prompts(view, "flux_t2i_upscaled")
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(sip.isdeleted(field) for field in searched)
-    panel.prompt_fields()[0].setPlainText("a cat and a cat")
+    tab.prompt_fields()[0].setPlainText("a cat and a cat")
 
     _find_query(view).setText("cat")
     _find_next(view)

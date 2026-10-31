@@ -244,7 +244,7 @@ class Osr2MotionDriver(QObject):
 
     @property
     def state(self) -> Motion:
-        """The live motion, for the drive panel to draw. Read-only by
+        """The live motion, for the OSR2 controls to draw. Read-only by
         convention — the setters below are how it changes."""
         return self._state
 

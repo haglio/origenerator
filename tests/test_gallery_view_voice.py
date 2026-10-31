@@ -776,7 +776,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    section = view._info_tabs.current_config_panel()._related._requests_section
+    section = view._generate_pane.current_generate_tab()._related._requests_section
     assert not section.isHidden()
     assert [(tile._heading.text(), tile._prompt_id) for tile in section._tiles] == [
         ("Requested from", "orig")]
@@ -807,7 +807,7 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    field = view._info_tabs.current_config_panel()._param_form.request_field()
+    field = view._generate_pane.current_generate_tab()._param_form.request_field()
     assert field._words.text() == "no hat"
 
 
@@ -1023,7 +1023,7 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
 
 
 def test_a_spoken_enhance_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
-    # Said over a slideshow, this is a gesture made with no view of the Enhance panel
+    # Said over a slideshow, this is a gesture made with no view of the Enhance pane
     # — the same reason a hold's Down leaves one alone — so it says so rather
     # than re-deriving the image at whatever the settings happen to read now.
     db = _enhanceable_db(tmp_path, count=1)
@@ -1365,7 +1365,7 @@ def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
 
     assert bars.amplitude == amplitude - 10
     assert bars.center == center + 5
-    # Answered with what the device now reads, which is the panel's own line.
+    # Answered with what the device now reads, which is the tab's own line.
     assert words(view._voice.status) == view._osr2_motion.status_text()
 
 

@@ -50,23 +50,23 @@ def _within(*containers: QWidget) -> list[QWidget]:
 
 
 def _tabs(view) -> list:
-    return view._info_tabs.config_panels()
+    return view._generate_pane.generate_tabs()
 
 
 REMEMBERED = {
     "generate_tabs": lambda view: [
-        widget for panel in _tabs(view) for widget in _within(panel)
-        if widget is not panel._how_many and not panel._action.isAncestorOf(widget)
-    ] + [view._info_tabs.tabBar()],
-    "how_many": lambda view: [panel._how_many for panel in _tabs(view)],
+        widget for tab in _tabs(view) for widget in _within(tab)
+        if widget is not tab._how_many and not tab._action.isAncestorOf(widget)
+    ] + [view._generate_pane.tabBar()],
+    "how_many": lambda view: [tab._how_many for tab in _tabs(view)],
     "toc_sides": lambda view: [view._tree.separate_button, view._tree.together_button],
     "open_folders": lambda view: view._tree.findChildren(QTreeView),
     "pane_sizes": lambda view: [splitter for splitter in view.findChildren(PaneSplitter)
                                 if splitter.remembered_as],
     "experiments_enabled": lambda view: [view._experiments_cb],
-    "enhance_settings": lambda view: _within(view._enhance.panel),
+    "enhance_settings": lambda view: _within(view._enhance.pane),
     "search_sort": lambda view: [view._search._sort_dropdown],
-    "gallery_combine": lambda view: _within(view._combine.panel),
+    "gallery_combine": lambda view: _within(view._combine.widget),
     "audio_enabled": lambda view: [view._buttons.radio],
     "mic_enabled": lambda view: [view._buttons.mic],
 }
@@ -75,7 +75,7 @@ NO_SETTING = {
     "what is being looked for, which is not a place to come back to": lambda view: [
         view._search.field, *_within(view._find_bar), *_within(view._folder_path)],
     "what one item shows, which the library keeps with the item": lambda view: [
-        widget for panel in _tabs(view) for widget in _within(panel._action)],
+        widget for tab in _tabs(view) for widget in _within(tab._action)],
     ("Auto-Generate, which a restart leaves off, since one that came back on by itself"
      " could run unnoticed"): lambda view: [view._buttons.auto],
 }
@@ -98,8 +98,8 @@ def _a_window_with_every_control_built(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, AppState(tmp_path / "ui.json"))
     view = win._gallery_view
     view.refresh()
-    view._info_tabs.currentWidget().prefill("sdxl_t2i", {})
-    view._info_tabs.open_config("wan22_i2v", {})
+    view._generate_pane.currentWidget().prefill("sdxl_t2i", {})
+    view._generate_pane.open_config("wan22_i2v", {})
     return win
 
 

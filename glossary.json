@@ -7,7 +7,7 @@
     "his_word": "the word the user says for it, from his own messages and the spoken commands, with the date he said it; null when he has none yet",
     "code_today": "the words the code says for it now; each has to be in the code, or the row is stale",
     "code_word": "the one word the code is to say for it; null while unruled",
-    "status": "ruled: his word, given where `ruled` says | his_word: a word he has used, not yet put to him as the code's | agreed: screen, user and code already say one word | unruled: no word of his yet, the row waits for him | kept: a name from outside this app, which keeps it",
+    "status": "ruled: his word, given where `ruled` says | his_word: a word he has used, not yet put to him as the code's | agreed: screen, user and code already say one word | unruled: no word of his yet, the row waits for him | kept: a name from outside this app, or a thing he has no word for, so the code keeps its own",
     "retired": "code words for it that are gone and stay gone; `keep` lists the tokens that may still carry the letters (another thing's name)"
   },
   "things": [
@@ -303,7 +303,8 @@
         "pane"
       ],
       "code_word": "gallery pane",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "generate_tab",
@@ -321,7 +322,8 @@
         "tab"
       ],
       "code_word": "generate tab",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "enhance_pane",
@@ -337,7 +339,8 @@
         "panel"
       ],
       "code_word": "enhance pane",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "combine",
@@ -347,13 +350,14 @@
         "Edit individual…",
         "Edit default…"
       ],
-      "his_word": "Combine widget (2026-10-21, 2026-10-24, 2026-10-25)",
+      "his_word": "Combine (2026-10-30); Combine widget (2026-10-21, 2026-10-24, 2026-10-25)",
       "code_today": [
         "combine panel",
         "panel"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "combine",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "drop_zone",
@@ -371,7 +375,8 @@
         "zone"
       ],
       "code_word": "drop zone",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "tile",
@@ -385,7 +390,8 @@
         "thumbnail widget"
       ],
       "code_word": "tile",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "folder_tile",
@@ -394,14 +400,15 @@
         "3 items",
         "empty"
       ],
-      "his_word": "folder square (2026-09-27)",
+      "his_word": "folder tile (2026-10-30); folder square (2026-09-27)",
       "code_today": [
         "folder tile",
         "collage",
         "card"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "folder tile",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "generating_tile",
@@ -420,26 +427,28 @@
       "screen": [
         "New (random seed)"
       ],
-      "his_word": "new ('when I click new', 2026-10-09); 'the tile for making a new one'",
+      "his_word": "New tile (2026-10-30); 'when I click new' (2026-10-09)",
       "code_today": [
         "reroll tile",
         "reroll"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "new tile",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "in_flight_card",
-      "thing": "on Latest, the square for a run still being made: its live frame and status",
+      "thing": "on Latest, the square for an image or video still being made: its live frame and status",
       "screen": null,
-      "his_word": "card (2026-08-19: 'when you do enhance a card, that card should still get bumped up to the top of the Recents')",
+      "his_word": "tile (2026-10-30); card (2026-08-19)",
       "code_today": [
         "in flight card",
         "card",
         "backdrop"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "tile",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "corner_button",
@@ -457,20 +466,22 @@
         "chip"
       ],
       "code_word": "corner button",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "media_icon",
       "thing": "the small picture at the top-left of a Latest tile saying whether it is an image or a video",
       "screen": null,
-      "his_word": "'an icon to indicate whether it's video or image' (2026-10-13)",
+      "his_word": "item type icon (2026-10-30)",
       "code_today": [
         "media badge",
         "badge",
         "chip"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "item type icon",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "level_letter",
@@ -480,20 +491,21 @@
         "M",
         "L"
       ],
-      "his_word": "'W, M, etc.' (2026-10-13)",
+      "his_word": "TOC initials (2026-10-30)",
       "code_today": [
         "level badge",
         "badge",
         "chip"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "toc initial",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "scrim",
-      "thing": "the dimmed cover with one line of words over a tile or a preview while something is being made of it",
+      "thing": "the dark band with one line of words over a thumbnail while something is being made: \"Generating…\" or \"Queued…\" over an image or video still being made, on Latest and at the front of its folder, and \"Enhancing…\" over an image while its enhancement runs",
       "screen": null,
-      "his_word": null,
+      "his_word": "none yet: he could not place it from two descriptions (2026-10-30)",
       "code_today": [
         "stage scrim",
         "scrim",
@@ -506,13 +518,14 @@
       "id": "plate",
       "thing": "the gray square a large faint icon sits on where a thumbnail would be (the '+' tile, an empty drop zone); also the small box floating a message at the top-left of a preview",
       "screen": null,
-      "his_word": null,
+      "his_word": "none: 'nothing' (2026-10-30)",
       "code_today": [
         "mark plate",
         "plate"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "mark plate",
+      "status": "kept",
+      "ruled": "2026-10-30: he has no word for it, so the code keeps its own"
     },
     {
       "id": "animations_row",
@@ -520,13 +533,14 @@
       "screen": [
         "Animations"
       ],
-      "his_word": null,
+      "his_word": "Animations (2026-10-30)",
       "code_today": [
         "animated video strip",
         "strip"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "animations",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list; the \"Animated in\" heading comes out"
     },
     {
       "id": "find_bar",
@@ -552,18 +566,20 @@
         "cell"
       ],
       "code_word": "cell",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "empty_cell",
       "thing": "a cell with nothing in it, drawn faint, on a Job Queue row or the '+ Enhance' row",
       "screen": null,
-      "his_word": null,
+      "his_word": "empty cell (2026-10-30)",
       "code_today": [
         "slot"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "empty cell",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "osr2_console",
@@ -571,14 +587,15 @@
       "screen": [
         "OSR2"
       ],
-      "his_word": "'the OSR2 part of the HUD' (2026-09-20)",
+      "his_word": "the OSR2 controls (2026-10-30)",
       "code_today": [
         "console",
         "motion panel",
         "panel"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "osr2 controls",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "nav_map",
@@ -592,7 +609,8 @@
         "gamma"
       ],
       "code_word": "nav map",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "message",
@@ -603,14 +621,15 @@
         "Loop off",
         "More seeds"
       ],
-      "his_word": "message (2026-10-24: 'those messages don't appear in a corner. they appear center top')",
+      "his_word": "message (2026-10-30, 2026-10-24)",
       "code_today": [
         "notice overlay",
         "notice",
         "flash"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "message",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "toast",
@@ -623,7 +642,8 @@
         "notification"
       ],
       "code_word": "toast",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "progress_bar",
@@ -635,13 +655,14 @@
         "bar"
       ],
       "code_word": "progress bar",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "pass_band",
       "thing": "the thin colored line along the foot of a progress bar saying which pass a two-pass video is on",
       "screen": null,
-      "his_word": null,
+      "his_word": "'overall progress bar' and 'substep progress bar' (2026-10-30), the two bars of a broken-down progress bar; which is which is open",
       "code_today": [
         "band"
       ],
@@ -652,12 +673,13 @@
       "id": "gutter",
       "thing": "a margin something floats in: left of the Size fields, where the swap-width-and-height button sits; left of the nav map, where a row's name sits",
       "screen": null,
-      "his_word": null,
+      "his_word": "margins (2026-10-30)",
       "code_today": [
         "gutter"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "margin",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "scrubber",
@@ -669,7 +691,8 @@
         "timeline"
       ],
       "code_word": "scrubber",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "folder_path",
@@ -682,7 +705,8 @@
         "header"
       ],
       "code_word": "folder path",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "toolbar",
@@ -690,14 +714,15 @@
       "screen": [
         "Listen: bare words for the collections and this bank"
       ],
-      "his_word": "'the buttons above the gallery' (2026-10-20); 'the buttons' (2026-10-10)",
+      "his_word": "Gallery pane buttons (2026-10-30)",
       "code_today": [
         "toolbar bank",
         "bank",
         "toolbar"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "gallery pane buttons",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "latest",
@@ -706,13 +731,14 @@
         "Latest",
         "No recent images yet."
       ],
-      "his_word": "Recents (2026-08-14, 2026-08-16, 2026-08-19)",
+      "his_word": "Latest (2026-10-30); Recents (2026-08)",
       "code_today": [
         "recents",
         "latest"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "latest",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "favorite",
@@ -729,7 +755,8 @@
         "bookmark"
       ],
       "code_word": "favorite",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "trash",
@@ -747,19 +774,21 @@
         "deletion"
       ],
       "code_word": "trash",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "collection",
       "thing": "Latest, Favorites, Enhanced, Experiments and Trash: the rows every TOC section leads with",
       "screen": null,
-      "his_word": "special folders (2026-08-14, 2026-08-16)",
+      "his_word": "collections (2026-10-30); special folders (2026-08)",
       "code_today": [
         "collection",
         "shelf"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "collection",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "custom_folder",
@@ -768,13 +797,14 @@
         "Group the selected folders into a folder of your own",
         "New folder…"
       ],
-      "his_word": null,
+      "his_word": "custom collection (2026-10-30)",
       "code_today": [
         "custom folder",
         "custom group"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "custom collection",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list; the screen's \"folder of your own\", \"New folder…\" and \"Remove folder…\" say collection"
     },
     {
       "id": "shape",
@@ -787,14 +817,15 @@
         "Together",
         "A list for each shape"
       ],
-      "his_word": "'next shape', 'previous shape' (spoken commands)",
+      "his_word": "shape (2026-10-30; the tooltips' and spoken commands' word)",
       "code_today": [
         "side",
         "orientation",
         "shape"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "shape",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "action",
@@ -803,16 +834,17 @@
         "Set image actions…",
         "Action"
       ],
-      "his_word": "action (2026-10-14: 'the grid of image actions'; 2026-10-26: 'action dropdown'; 2026-10-23: 'Action row')",
+      "his_word": "action (2026-10-30, 2026-10-14, 2026-10-23, 2026-10-26)",
       "code_today": [
         "act",
         "action"
       ],
-      "code_word": null,
-      "status": "his_word",
+      "code_word": "action",
+      "status": "ruled",
       "keep": [
         "recipe_category"
-      ]
+      ],
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "enhancement_level",
@@ -821,13 +853,14 @@
         "Enhancement levels",
         "Other versions of this one"
       ],
-      "his_word": "enhancement level (2026-10-25); versions (2026-10-21)",
+      "his_word": "versions (2026-10-30)",
       "code_today": [
         "level",
         "version"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "version",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list; the section's title becomes \"Enhancements\""
     },
     {
       "id": "basic",
@@ -835,13 +868,14 @@
       "screen": [
         "Basic"
       ],
-      "his_word": "'the basic section' (2026-10-29)",
+      "his_word": "Basic section (2026-10-30); 'the basic section' (2026-10-29)",
       "code_today": [
         "metadata block",
         "meta"
       ],
-      "code_word": null,
-      "status": "his_word"
+      "code_word": "basic section",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "section",
@@ -865,12 +899,13 @@
       "id": "contact_sheet",
       "thing": "the preview of a whole folder on a folder's tab: every thumbnail, edge to edge",
       "screen": null,
-      "his_word": null,
+      "his_word": "none: 'call it whatever' (2026-10-30)",
       "code_today": [
         "contact sheet"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "contact sheet",
+      "status": "kept",
+      "ruled": "2026-10-30: he has no word for it, so the code keeps its own"
     },
     {
       "id": "dropdown",
@@ -883,7 +918,8 @@
         "picker"
       ],
       "code_word": "dropdown",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "checkbox",
@@ -897,7 +933,8 @@
         "checkbox"
       ],
       "code_word": "checkbox",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "field",
@@ -1000,7 +1037,8 @@
         "pane splitter"
       ],
       "code_word": "pane",
-      "status": "his_word"
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
       "id": "panel",

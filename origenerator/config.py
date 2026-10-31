@@ -162,7 +162,7 @@ LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 _EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
 EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
-EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
+EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_shape"
 # A Genau flick goes to the same inbox under its own source name. Evolver routes by
 # that name, so the folder is the whole signal: it upscales the video on its usual
 # schedule and then delivers the result to Genau's flicks folder rather than leaving

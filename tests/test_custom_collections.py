@@ -7,7 +7,7 @@ import pytest
 
 from origenerator import gallery
 from origenerator.db import Database
-from origenerator.gallery.sides import PORTRAIT
+from origenerator.gallery.shapes import PORTRAIT
 from origenerator.gallery_actions import GalleryActions
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
@@ -189,7 +189,7 @@ def _db_with_folder(tmp_path, name="Favorites", folders=(("image", "media", "i1"
 def test_a_saved_folder_keeps_the_side_it_was_made_on(tmp_path):
     db = Database(tmp_path / "t.db")
 
-    folder_id = db.create_custom_collection("Mine", side=PORTRAIT)
+    folder_id = db.create_custom_collection("Mine", shape=PORTRAIT)
 
     assert db.list_custom_collections() == [
         {"id": folder_id, "name": "Mine", "side": PORTRAIT, "folders": [], "items": []}]

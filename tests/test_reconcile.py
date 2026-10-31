@@ -11,9 +11,9 @@ from origenerator.favorite_reconcile import (
     reconcile_custom_collections,
     reconcile_favorites,
     reconcile_folder_meta,
-    stamp_custom_collection_sides,
+    stamp_custom_collection_shapes,
 )
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.inflight import reconcile_in_flight
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.output_places import OutputPlaces
@@ -319,7 +319,7 @@ def test_reconcile_repoints_both_favorites_across_the_enhancement_merge(tmp_path
     # The enhancement split is the one formula change that MERGED folders: an
     # enhanced render and its unenhanced twin used to be two, and are now one. A
     # star on either of the old folders has to land on the merged one — including
-    # the enhanced side, whose row may not be the one the legacy key is
+    # the enhanced shape, whose row may not be the one the legacy key is
     # recomputed from.
     db = Database(tmp_path / "t.db")
     plain = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30,
@@ -493,7 +493,7 @@ def test_reconcile_with_no_custom_folders_is_a_noop(tmp_path):
     assert reconcile_custom_collections(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
 
 
-# --- the side a custom collection saved before folders had one is put on ----------
+# --- the shape a custom collection saved before folders had one is put on ----------
 
 def _shaped(db, pid, width, height):
     return _add_completed(db, pid, params={"positive_prompt": "a cat", "steps": 30, "seed": 1,
@@ -529,7 +529,7 @@ def test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_a
 def test_a_folder_that_has_a_side_keeps_it_whatever_it_gathers(tmp_path):
     db = Database(tmp_path / "t.db")
     tall = _shaped(db, "t1", 100, 200)
-    folder_id = db.create_custom_collection("Mine", side=LANDSCAPE)
+    folder_id = db.create_custom_collection("Mine", shape=LANDSCAPE)
     db.add_folders_to_custom_collection(folder_id, [(gallery.settings_folder_key(tall), None, None)])
 
     reconcile_favorites(db)
@@ -577,7 +577,7 @@ def test_reconciling_both_together_lands_where_reconciling_each_alone_does(tmp_p
     together = favorite_reconcile.reconcile_favorites(shared_db)
     apart = {"folder_meta": reconcile_folder_meta(apart_db),
              "custom_folders": reconcile_custom_collections(apart_db),
-             "custom_collection_sides": stamp_custom_collection_sides(apart_db)}
+             "custom_collection_shapes": stamp_custom_collection_shapes(apart_db)}
 
     assert together == apart
     assert shared_db.folder_meta_map() == apart_db.folder_meta_map()
@@ -625,4 +625,4 @@ def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
     assert builds == []
     assert summaries == {"folder_meta": {"refreshed": 0, "repointed": 0, "orphaned": 0},
                          "custom_folders": {"refreshed": 0, "repointed": 0, "orphaned": 0},
-                         "custom_collection_sides": 0}
+                         "custom_collection_shapes": 0}

@@ -1363,7 +1363,7 @@ def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, 
 
 
 def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
-    # The metadata block inserts zero-width spaces into displayed paths so long
+    # The Basic section inserts zero-width spaces into displayed paths so long
     # names wrap on screen. Pasting such a path back into the field would carry
     # those invisible characters (and any stray whitespace) into ComfyUI's
     # LoadImage, which then can't match the file. The form must return a clean

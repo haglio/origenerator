@@ -15,7 +15,7 @@ from origenerator.gui.prompt_boxes import Countdown, PromptBoxes, set_in_use
 from origenerator.gui.prompt_field import PromptHeights
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE, prompt_reading
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import ParamDef, story_of
 from tests.text_readers import clip_reader, word_reading
 
 
@@ -122,16 +122,16 @@ def test_the_countdown_sits_under_its_box_at_its_right_edge(prompt):
     assert countdown.alignment() & Qt.AlignmentFlag.AlignRight
 
 
-def test_each_scenes_prompts_count_down_too(qtbot):
+def test_each_scene_counts_down_its_own_prompts(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
     qtbot.addWidget(form)
     form.show_readings({"positive_prompt": word_reading(511, READ_WHOLE),
                         "negative_prompt": word_reading(511, READ_WHOLE)})
-    editor = form._scenes
 
-    editor.fields("positive_prompt")[0].setPlainText(_words(500))
+    form.set_values({"positive_prompt": story_of([_words(5), _words(500)])})
 
-    assert _shown(editor) == [("11 left", AMBER.name())]
+    assert [_shown(scene) for scene in form._scenes._scenes] == [
+        [], [("11 left", AMBER.name())]]
 
 
 @pytest.fixture

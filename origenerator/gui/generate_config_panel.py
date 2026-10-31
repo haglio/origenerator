@@ -945,12 +945,19 @@ class GenerateConfigPanel(DropZone):
             if self._folder_modify.is_unchanged(self.current_config()):
                 self._generate_btn.flash_guard(_MODIFY_GUARD)
                 return
+            self._mark_against_what_the_press_makes()
             self.modify_requested.emit(self._folder_modify.folder_key, key, params)
             return
         if self._would_remake_what_it_shows():
             self.use_random_seed()
+        if self.asked() is None:  # a request's runs stay marked against what it was asked of
+            self._mark_against_what_the_press_makes()
         self.generate_requested.emit(key, self._batch_of(self._how_many.how_many()))
         self._param_form.roll_random_seeds()
+
+    def _mark_against_what_the_press_makes(self) -> None:
+        with self._loading():  # marking the fields is no edit of them
+            self._param_form.track_prompt_rewrites()
 
     def _batch_of(self, how_many: int) -> list[dict]:
         batch = [self._param_form.get_values()]
@@ -1436,8 +1443,7 @@ class GenerateConfigPanel(DropZone):
         self._hide_footer()
         self._related.show_requests_and_modifications(row["prompt_id"])
         self._preview.clear()          # whatever was up is not this run's
-        self._set_displayed_row(None)  # a running generation isn't a saved one
-        self._note_displayed_config(being_made=row)  # ...so nothing for a notice to deviate from
+        self._note_displayed_config(being_made=row)  # nothing saved for a notice to deviate from
         self._emit_title()
 
     def _point_elsewhere(self, row: dict):
@@ -1453,6 +1459,7 @@ class GenerateConfigPanel(DropZone):
         self.forget_launched()
         self._forget_watch()
         self._forget_settings_source()
+        self._set_displayed_row(None)
         self._end_folder_modify()  # a workflow this tab cannot lay out never reaches prefill
         workflow_name = row.get("workflow_name", "")
         self._autoshow_held = True

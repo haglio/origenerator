@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from origenerator.gallery.enhance_graph import graph_level_params
+from origenerator.gallery.enhance_graph import graph_version_params
 
 _KEYS = ("checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
          "enhance_denoise", "enhance_detail_fixes")
@@ -45,7 +45,7 @@ def _detailer(graph, node_id, part_model, denoise):
 
 
 def test_a_graph_gives_up_every_setting_the_row_itself_is_vague_about():
-    found = graph_level_params(_row(_sampler_graph()), _KEYS)
+    found = graph_version_params(_row(_sampler_graph()), _KEYS)
 
     assert found["checkpoint"] == "example_model_v2.safetensors"
     assert found["upscale_model"] == "example_upscaler_4x.pth"
@@ -56,7 +56,7 @@ def test_a_graph_gives_up_every_setting_the_row_itself_is_vague_about():
 def test_the_scale_is_read_back_through_the_model_s_own_factor():
     # ImageScaleBy holds the fraction of the upscale model's 4x output the
     # result was taken back down to, so the number a reader wants is the product.
-    found = graph_level_params(_row(_sampler_graph()), _KEYS)
+    found = graph_version_params(_row(_sampler_graph()), _KEYS)
 
     assert found["enhance_scale"] == 2.0
 
@@ -66,7 +66,7 @@ def test_a_detail_pass_is_named_by_the_detector_two_nodes_back():
     # the regions — the pass itself carries nothing but a denoise.
     graph = _detailer(_sampler_graph(), 10, "bbox/face_yolov8m.pt", 0.4)
 
-    fixes = graph_level_params(_row(graph), _KEYS)["enhance_detail_fixes"]
+    fixes = graph_version_params(_row(graph), _KEYS)["enhance_detail_fixes"]
 
     assert list(fixes.values()) == [0.4]
     assert len(fixes) == 1
@@ -78,7 +78,7 @@ def test_the_passes_come_back_in_the_order_they_ran():
     graph = _detailer(_sampler_graph(), 20, "bbox/hand_yolov8s.pt", 0.3)
     graph = _detailer(graph, 10, "bbox/face_yolov8m.pt", 0.5)
 
-    fixes = graph_level_params(_row(graph), _KEYS)["enhance_detail_fixes"]
+    fixes = graph_version_params(_row(graph), _KEYS)["enhance_detail_fixes"]
 
     assert list(fixes.values()) == [0.5, 0.3]
 
@@ -89,7 +89,7 @@ def test_a_node_id_that_is_not_a_number_sorts_last_rather_than_raising():
     graph["late"] = {"class_type": "DetailerForEach",
                      "inputs": {"segs": ["11", 0], "denoise": 0.9}}
 
-    fixes = graph_level_params(_row(graph), _KEYS)["enhance_detail_fixes"]
+    fixes = graph_version_params(_row(graph), _KEYS)["enhance_detail_fixes"]
 
     assert list(fixes.values())[-1] == 0.9
 
@@ -101,12 +101,12 @@ def test_a_pass_whose_detector_cannot_be_followed_is_left_out():
     graph["10"] = {"class_type": "DetailerForEach",
                    "inputs": {"segs": "not a link", "denoise": 0.4}}
 
-    assert "enhance_detail_fixes" not in graph_level_params(_row(graph), _KEYS)
+    assert "enhance_detail_fixes" not in graph_version_params(_row(graph), _KEYS)
 
 
 def test_only_the_keys_asked_for_come_back():
-    # What a level records is the caller's business; this only reads the graph.
-    found = graph_level_params(_row(_sampler_graph()), ("enhance_steps",))
+    # What a version records is the caller's business; this only reads the graph.
+    found = graph_version_params(_row(_sampler_graph()), ("enhance_steps",))
 
     assert found == {"enhance_steps": 20}
 
@@ -115,7 +115,7 @@ def test_a_setting_the_graph_left_empty_is_absent_rather_than_none():
     graph = _sampler_graph()
     graph["4"]["inputs"] = {"steps": 20}   # a sampler with no denoise on it
 
-    found = graph_level_params(_row(graph), _KEYS)
+    found = graph_version_params(_row(graph), _KEYS)
 
     assert "enhance_denoise" not in found
     assert found["enhance_steps"] == 20
@@ -124,14 +124,14 @@ def test_a_setting_the_graph_left_empty_is_absent_rather_than_none():
 def test_a_graph_that_cannot_be_read_gives_up_nothing():
     # Guarded at every step, because this reads a graph off a stored row: an
     # older version of this app wrote some of them, and ComfyUI wrote others.
-    assert graph_level_params({"workflow_json": "not json"}, _KEYS) == {}
-    assert graph_level_params({"workflow_json": "[1, 2]"}, _KEYS) == {}
-    assert graph_level_params({"workflow_json": None}, _KEYS) == {}
-    assert graph_level_params({}, _KEYS) == {}
+    assert graph_version_params({"workflow_json": "not json"}, _KEYS) == {}
+    assert graph_version_params({"workflow_json": "[1, 2]"}, _KEYS) == {}
+    assert graph_version_params({"workflow_json": None}, _KEYS) == {}
+    assert graph_version_params({}, _KEYS) == {}
 
 
 def test_a_graph_of_things_that_are_not_nodes_gives_up_nothing():
-    assert graph_level_params(_row({"1": "not a node", "2": {"inputs": 7}}),
+    assert graph_version_params(_row({"1": "not a node", "2": {"inputs": 7}}),
                               _KEYS) == {}
 
 
@@ -146,6 +146,6 @@ def test_a_pass_redrawn_inside_an_outline_is_named_by_its_detector_too():
     graph["12"] = {"class_type": "DetailerForEach",
                    "inputs": {"segs": ["11", 0], "denoise": 0.4}}
 
-    fixes = graph_level_params(_row(graph), _KEYS)["enhance_detail_fixes"]
+    fixes = graph_version_params(_row(graph), _KEYS)["enhance_detail_fixes"]
 
     assert fixes == {"skin": 0.4}

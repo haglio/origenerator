@@ -46,8 +46,8 @@ from origenerator.box_breaks import BOX_BREAK
 from origenerator.enhance_presets import Preset
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
-    EnhanceLevel,
     EnhanceSettings,
+    EnhanceVersion,
     SettingsGroup,
     default_enhance_params,
     full_settings,
@@ -63,9 +63,9 @@ from origenerator.gui.enhance_versions import (
     EnhanceVersions,
     RunningEnhancement,
     _AddRow,
-    _LevelRow,
     _PendingRow,
-    enhance_level_mime,
+    _VersionRow,
+    enhance_version_mime,
     params_from_mime,
 )
 from origenerator.gui.stylesheet import build_stylesheet
@@ -91,24 +91,24 @@ def _panel(qtbot, detectors=_FOUND_DETECTORS):
     return pane, edits
 
 
-def _levels(count, params=None):
+def _versions(count, params=None):
     """``count`` enhancements over an original, newest first — the shape
-    :func:`~origenerator.gallery.enhance.enhance_levels` produces. ``0`` is an
+    :func:`~origenerator.gallery.enhance.enhancement_versions` produces. ``0`` is an
     image that has received none, which lists nothing at all (not even its own
     file: with no enhancement there is no version to compare)."""
     if not count:
         return []
     return [
-        EnhanceLevel(i, f"Enhancement {i}/{count}", {"filename": f"e{i}.png", "subfolder": "image"},
+        EnhanceVersion(i, f"Enhancement {i}/{count}", {"filename": f"e{i}.png", "subfolder": "image"},
                      dict(params or {}))
         for i in range(count, 0, -1)
-    ] + [EnhanceLevel(0, "Original", {"filename": "src.png", "subfolder": "image"})]
+    ] + [EnhanceVersion(0, "Original", {"filename": "src.png", "subfolder": "image"})]
 
 
-def _items(levels):
-    """Pair each level with the file the list would draw it from — nothing on
+def _items(versions):
+    """Pair each version with the file the list would draw it from — nothing on
     disk here, so the rows fall back to their labels."""
-    return [(level, None) for level in levels]
+    return [(version, None) for version in versions]
 
 
 # --- the Enhance pane ----------------------------------------------------------
@@ -660,11 +660,11 @@ def test_settings_survive_a_load_and_read_back(qtbot):
 
 
 def _rows(widget):
-    return widget._host.findChildren(_LevelRow)
+    return widget._host.findChildren(_VersionRow)
 
 
 def _labels(widget):
-    """Each row's title — the level it names."""
+    """Each row's title — the version it names."""
     return [row._title.text() for row in _rows(widget)]
 
 
@@ -678,37 +678,37 @@ def _facts(row):
 def test_an_unenhanced_image_shows_no_version_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(0)))
+    versions.show_versions(_items(_versions(0)))
     assert versions.isHidden()      # no enhancement, nothing to say
 
 
 def test_a_lone_enhancement_is_still_worth_showing(qtbot):
     # An image the inline tail finished kept no original, so it has exactly one
-    # level. The yellow plus says it was enhanced; this is where you see how.
+    # version. The yellow plus says it was enhanced; this is where you see how.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items([
-        EnhanceLevel(1, "Enhancement 1/1", {"filename": "img.png"},
+    versions.show_versions(_items([
+        EnhanceVersion(1, "Enhancement 1/1", {"filename": "img.png"},
                      {"enhance_scale": 2.0, "enhance_steps": 20}),
     ]))
     assert not versions.isHidden()
     assert len(_rows(versions)) == 1
 
 
-def test_levels_are_shown_newest_first(qtbot):
+def test_versions_are_shown_newest_first(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     assert not versions.isHidden()
     assert _labels(versions) == ["Enhancement 2/2", "Enhancement 1/2", "Original"]
 
 
-def test_clicking_a_level_reports_its_position(qtbot):
+def test_clicking_a_version_reports_its_position(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     picked = []
-    versions.level_selected.connect(picked.append)
+    versions.version_selected.connect(picked.append)
 
     row = _rows(versions)[2]      # the original
     qtbot.mousePress(row, Qt.MouseButton.LeftButton)
@@ -718,12 +718,12 @@ def test_clicking_a_level_reports_its_position(qtbot):
     assert versions.selected_positions() == [2]   # and it is the picked one
 
 
-def test_each_level_carries_its_own_file_and_created_rows(qtbot):
-    # The file information is per enhancement: it belongs with the level that
+def test_each_version_carries_its_own_file_and_created_rows(qtbot):
+    # The file information is per enhancement: it belongs with the version that
     # made the file, alongside the settings that made it.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1, {"enhance_scale": 2.0})),
+    versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0})),
                          created_fallback="2026-08-01")
 
     facts = _facts(_rows(versions)[0])
@@ -740,32 +740,32 @@ def test_each_level_carries_its_own_file_and_created_rows(qtbot):
 def test_a_file_row_can_be_copied_and_revealed(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)))
+    versions.show_versions(_items(_versions(1)))
 
     names = {b.objectName() for b in _rows(versions)[0].findChildren(QPushButton)}
     assert "copyButton" in names
     assert "revealButton" in names
 
 
-def test_a_levels_settings_caption_its_row(qtbot):
+def test_a_versions_settings_caption_its_row(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1, {"enhance_scale": 2.0, "enhance_steps": 20})))
+    versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0, "enhance_steps": 20})))
     facts = _facts(_rows(versions)[0])
     assert "2x" in facts
     assert "20 steps" in facts
 
 
 def test_rebuilding_for_another_image_drops_the_old_rows(qtbot):
-    # Switching selection must not stack one image's levels under another's.
+    # Switching selection must not stack one image's versions under another's.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
-    versions.show_levels(_items(_levels(1)))
+    versions.show_versions(_items(_versions(2)))
+    versions.show_versions(_items(_versions(1)))
     assert _labels(versions) == ["Enhancement 1/1", "Original"]
 
 
-# --- picking levels and binning them ---------------------------------------
+# --- picking versions and binning them ---------------------------------------
 
 
 def _click(qtbot, row, modifier=Qt.KeyboardModifier.NoModifier):
@@ -780,7 +780,7 @@ def test_clicking_anywhere_on_a_row_picks_it(qtbot):
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), created_fallback="2026-08-01")
+    versions.show_versions(_items(_versions(1)), created_fallback="2026-08-01")
     row = _rows(versions)[0]
 
     targets = [row._thumbnail, row._title]
@@ -796,7 +796,7 @@ def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)))
+    versions.show_versions(_items(_versions(1)))
     row = _rows(versions)[0]
 
     buttons = row.findChildren(QPushButton)
@@ -814,7 +814,7 @@ def test_a_rows_text_offers_no_copy_or_select_all_menu(qtbot):
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), created_fallback="2026-08-01")
+    versions.show_versions(_items(_versions(1)), created_fallback="2026-08-01")
     row = _rows(versions)[0]
 
     for label in row.findChildren(QLabel):
@@ -822,10 +822,10 @@ def test_a_rows_text_offers_no_copy_or_select_all_menu(qtbot):
     assert row.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
 
 
-def test_a_plain_click_picks_one_level_at_a_time(qtbot):
+def test_a_plain_click_picks_one_version_at_a_time(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
 
     _click(qtbot, _rows(versions)[0])
     _click(qtbot, _rows(versions)[2])
@@ -838,9 +838,9 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
     # doesn't swap the preview under each click either.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     shown = []
-    versions.level_selected.connect(shown.append)
+    versions.version_selected.connect(shown.append)
 
     _click(qtbot, _rows(versions)[0])
     _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ControlModifier)
@@ -851,13 +851,13 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
 
 @pytest.mark.parametrize(("clicked", "shift_clicked", "run"),
                          [(0, 2, [0, 1, 2]), (3, 1, [1, 2, 3])], ids=["down", "up"])
-def test_shift_click_picks_the_run_from_the_level_last_clicked(qtbot, clicked,
+def test_shift_click_picks_the_run_from_the_version_last_clicked(qtbot, clicked,
                                                                shift_clicked, run):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(3)))
+    versions.show_versions(_items(_versions(3)))
     shown = []
-    versions.level_selected.connect(shown.append)
+    versions.version_selected.connect(shown.append)
 
     _click(qtbot, _rows(versions)[clicked])
     _click(qtbot, _rows(versions)[shift_clicked], Qt.KeyboardModifier.ShiftModifier)
@@ -866,12 +866,12 @@ def test_shift_click_picks_the_run_from_the_level_last_clicked(qtbot, clicked,
     assert shown == [clicked]   # picked for the Delete, like a ctrl-click
 
 
-def test_an_arrow_after_a_shift_click_steps_on_from_the_level_shift_clicked(qtbot):
+def test_an_arrow_after_a_shift_click_steps_on_from_the_version_shift_clicked(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(3)))
+    versions.show_versions(_items(_versions(3)))
     shown = []
-    versions.level_selected.connect(shown.append)
+    versions.version_selected.connect(shown.append)
 
     _click(qtbot, _rows(versions)[0])
     _click(qtbot, _rows(versions)[2], Qt.KeyboardModifier.ShiftModifier)
@@ -884,15 +884,15 @@ def test_an_arrow_after_a_shift_click_steps_on_from_the_level_shift_clicked(qtbo
 def _clicked_into(qtbot, position, count=2):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(count)))
+    versions.show_versions(_items(_versions(count)))
     shown = []
-    versions.level_selected.connect(shown.append)
+    versions.version_selected.connect(shown.append)
     row = _rows(versions)[position]
     _click(qtbot, row)
     return versions, row, shown
 
 
-def test_a_shift_click_picks_the_run_from_the_level_the_arrows_reached(qtbot):
+def test_a_shift_click_picks_the_run_from_the_version_the_arrows_reached(qtbot):
     versions, row, _shown = _clicked_into(qtbot, 0, count=3)
 
     qtbot.keyClick(row, Qt.Key.Key_Down)
@@ -901,7 +901,7 @@ def test_a_shift_click_picks_the_run_from_the_level_the_arrows_reached(qtbot):
     assert versions.selected_positions() == [1, 2, 3]
 
 
-def test_down_and_right_pick_and_show_the_level_under_the_one_clicked(qtbot):
+def test_down_and_right_pick_and_show_the_version_under_the_one_clicked(qtbot):
     versions, row, shown = _clicked_into(qtbot, 0)
 
     qtbot.keyClick(row, Qt.Key.Key_Down)
@@ -911,7 +911,7 @@ def test_down_and_right_pick_and_show_the_level_under_the_one_clicked(qtbot):
     assert versions.selected_positions() == [2]
 
 
-def test_up_and_left_pick_and_show_the_level_over_the_one_clicked(qtbot):
+def test_up_and_left_pick_and_show_the_version_over_the_one_clicked(qtbot):
     versions, row, shown = _clicked_into(qtbot, 2)
 
     qtbot.keyClick(row, Qt.Key.Key_Up)
@@ -935,14 +935,14 @@ def test_an_arrow_off_either_end_of_the_list_stays_where_it_is(qtbot, clicked, a
 def _clicked_under_the_enhance_row(qtbot, duplicate_of=None):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x · 20 steps", duplicate_of))
+    versions.show_versions(_items(_versions(2)), add=EnhanceOffer("2x · 20 steps", duplicate_of))
     (enhance_row,) = versions._host.findChildren(_AddRow)
     row = _rows(versions)[0]
     _click(qtbot, row)
     return versions, row, enhance_row
 
 
-def test_up_from_the_top_level_takes_the_highlight_onto_the_enhance_row(qtbot):
+def test_up_from_the_top_version_takes_the_highlight_onto_the_enhance_row(qtbot):
     versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
 
     qtbot.keyClick(row, Qt.Key.Key_Up)
@@ -951,7 +951,7 @@ def test_up_from_the_top_level_takes_the_highlight_onto_the_enhance_row(qtbot):
     assert versions.selected_positions() == []
 
 
-def test_a_shift_click_with_the_arrows_on_the_enhance_row_picks_just_the_level_clicked(qtbot):
+def test_a_shift_click_with_the_arrows_on_the_enhance_row_picks_just_the_version_clicked(qtbot):
     # The Enhance row is no version, so a run has nowhere to start from there.
     versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
 
@@ -986,10 +986,10 @@ def test_enter_on_a_dimmed_enhance_row_enhances_nothing_as_a_click_would_not(qtb
     assert pressed == []
 
 
-def test_down_from_the_enhance_row_picks_and_shows_the_top_level_again(qtbot):
+def test_down_from_the_enhance_row_picks_and_shows_the_top_version_again(qtbot):
     versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
     shown = []
-    versions.level_selected.connect(shown.append)
+    versions.version_selected.connect(shown.append)
     qtbot.keyClick(row, Qt.Key.Key_Up)
 
     qtbot.keyClick(row, Qt.Key.Key_Down)
@@ -998,7 +998,7 @@ def test_down_from_the_enhance_row_picks_and_shows_the_top_level_again(qtbot):
     assert (enhance_row._selected, versions.selected_positions()) == (False, [0])
 
 
-def test_the_arrows_are_the_lists_only_while_a_level_was_the_last_thing_clicked(qtbot):
+def test_the_arrows_are_the_lists_only_while_a_version_was_the_last_thing_clicked(qtbot):
     window = QWidget()
     column = QVBoxLayout(window)
     field = QLineEdit()
@@ -1006,12 +1006,12 @@ def test_the_arrows_are_the_lists_only_while_a_level_was_the_last_thing_clicked(
     column.addWidget(field)
     column.addWidget(versions)
     qtbot.addWidget(window)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     window.show()
     window.activateWindow()
     QTest.qWaitForWindowActive(window)
     shown = []
-    versions.level_selected.connect(shown.append)
+    versions.version_selected.connect(shown.append)
     row = _rows(versions)[0]
 
     gestures.click(row, row.rect().center())
@@ -1022,14 +1022,14 @@ def test_the_arrows_are_the_lists_only_while_a_level_was_the_last_thing_clicked(
     assert shown == [0, 1]
 
 
-def test_a_picked_level_is_filled_with_the_familys_blue(qtbot):
+def test_a_picked_version_is_filled_with_the_familys_blue(qtbot):
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
     try:
         versions = EnhanceVersions()
         qtbot.addWidget(versions)
-        versions.show_levels(_items(_levels(1)))
+        versions.show_versions(_items(_versions(1)))
         with qtbot.waitExposed(versions):
             versions.show()
         row = _rows(versions)[0]
@@ -1046,10 +1046,10 @@ def _ink(label) -> str:
     return label.palette().color(label.foregroundRole()).name()
 
 
-def test_a_picked_levels_facts_are_written_in_white(qtbot):
+def test_a_picked_versions_facts_are_written_in_white(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1, {"enhance_scale": 2.0})))
+    versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0})))
     row = _rows(versions)[0]
     resting = {_ink(label) for label in row._fact_cells if isinstance(label, QLabel)}
 
@@ -1061,10 +1061,10 @@ def test_a_picked_levels_facts_are_written_in_white(qtbot):
     assert {_ink(label) for label in facts} == {TEXT_PRIMARY.name()}
 
 
-def test_a_level_let_go_of_has_its_facts_back_in_gray(qtbot):
+def test_a_version_let_go_of_has_its_facts_back_in_gray(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1, {"enhance_scale": 2.0})))
+    versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0})))
     first, second = _rows(versions)[:2]
     resting = [_ink(label) for label in first._fact_cells if isinstance(label, QLabel)]
 
@@ -1074,14 +1074,14 @@ def test_a_level_let_go_of_has_its_facts_back_in_gray(qtbot):
     assert [_ink(label) for label in first._fact_cells if isinstance(label, QLabel)] == resting
 
 
-def test_delete_and_backspace_trash_the_picked_levels(qtbot):
+def test_delete_and_backspace_trash_the_picked_versions(qtbot):
     # Sent to the row, not to the list: a click leaves the focus on the row it
     # picked (the rows take click focus), so the key has to reach the list from
     # there rather than only when the list itself happens to hold the focus.
     for key in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
         versions = EnhanceVersions()
         qtbot.addWidget(versions)
-        versions.show_levels(_items(_levels(2)))
+        versions.show_versions(_items(_versions(2)))
         asked = []
         versions.delete_requested.connect(asked.append)
 
@@ -1098,8 +1098,8 @@ def test_deleting_the_only_version_is_refused(qtbot):
     # gallery's own delete, reached from the thumbnail.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items([
-        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
+    versions.show_versions(_items([
+        EnhanceVersion(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
     ]))
     asked = []
     versions.delete_requested.connect(asked.append)
@@ -1113,7 +1113,7 @@ def test_deleting_the_only_version_is_refused(qtbot):
 def test_delete_with_only_the_original_picked_trashes_nothing(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     asked = []
     versions.delete_requested.connect(asked.append)
     original = _rows(versions)[2]
@@ -1127,7 +1127,7 @@ def test_delete_with_only_the_original_picked_trashes_nothing(qtbot):
 def test_delete_with_the_original_picked_trashes_only_the_other_picked_versions(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     asked = []
     versions.delete_requested.connect(asked.append)
     newest, _, original = _rows(versions)
@@ -1142,7 +1142,7 @@ def test_delete_with_the_original_picked_trashes_only_the_other_picked_versions(
 def test_a_list_shown_as_not_deletable_ignores_the_delete_key(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), deletable=False)
+    versions.show_versions(_items(_versions(1)), deletable=False)
     asked = []
     versions.delete_requested.connect(asked.append)
 
@@ -1159,7 +1159,7 @@ def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     asked = []
     versions.delete_requested.connect(asked.append)
     chosen = {}
@@ -1182,7 +1182,7 @@ def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
 def test_the_menu_over_picks_that_include_the_original_deletes_the_others(qtbot, monkeypatch):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     asked = []
     versions.delete_requested.connect(asked.append)
     chosen = {}
@@ -1206,7 +1206,7 @@ def test_the_menu_over_picks_that_include_the_original_deletes_the_others(qtbot,
 def test_right_clicking_the_original_opens_no_menu(qtbot, monkeypatch):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     opened = []
     monkeypatch.setattr(QMenu, "exec", lambda self, _pos: opened.append(self))
 
@@ -1218,8 +1218,8 @@ def test_right_clicking_the_original_opens_no_menu(qtbot, monkeypatch):
 def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeypatch):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items([
-        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
+    versions.show_versions(_items([
+        EnhanceVersion(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
     ]))
     asked = []
     versions.delete_requested.connect(asked.append)
@@ -1243,7 +1243,7 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
 def test_the_menu_says_a_videos_versions_are_not_deleted_from_here(qtbot, monkeypatch):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), deletable=False)
+    versions.show_versions(_items(_versions(1)), deletable=False)
     seen = {}
 
     def _exec(self, _pos):
@@ -1264,10 +1264,10 @@ def _trash(row):
     return row.findChild(QPushButton, "deleteButton")
 
 
-def test_pressing_a_versions_trash_can_deletes_that_version(qtbot):
+def test_pressing_a_versions_trash_can_deletes_that_level(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     with qtbot.waitExposed(versions):
         versions.show()
     asked = []
@@ -1281,7 +1281,7 @@ def test_pressing_a_versions_trash_can_deletes_that_version(qtbot):
 def test_a_versions_trash_can_deletes_only_its_own_version_whatever_is_picked(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
     asked = []
     versions.delete_requested.connect(asked.append)
     _click(qtbot, _rows(versions)[0])
@@ -1295,7 +1295,7 @@ def test_a_versions_trash_can_deletes_only_its_own_version_whatever_is_picked(qt
 def test_a_versions_trash_can_sits_beside_its_copy_button(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)))
+    versions.show_versions(_items(_versions(1)))
     versions.resize(600, 400)
     with qtbot.waitExposed(versions):
         versions.show()
@@ -1311,7 +1311,7 @@ def test_a_versions_trash_can_sits_beside_its_copy_button(qtbot):
 def test_a_versions_trash_can_is_the_button_banks_red_can_at_the_copys_size(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)))
+    versions.show_versions(_items(_versions(1)))
     row = _rows(versions)[0]
     trash, copy = _trash(row), row.findChild(QPushButton, "copyButton")
     side = QSize(int(CANVAS), int(CANVAS))
@@ -1322,10 +1322,10 @@ def test_a_versions_trash_can_is_the_button_banks_red_can_at_the_copys_size(qtbo
 
 def test_a_version_without_a_trash_can_keeps_the_gap_after_its_copy_button(qtbot):
     gaps = []
-    for levels in (_levels(1), _levels(1)[:1]):
+    for listed in (_versions(1), _versions(1)[:1]):
         versions = EnhanceVersions()
         qtbot.addWidget(versions)
-        versions.show_levels(_items(levels))
+        versions.show_versions(_items(listed))
         versions.resize(600, 400)
         with qtbot.waitExposed(versions):
             versions.show()
@@ -1340,8 +1340,8 @@ def test_a_version_without_a_trash_can_keeps_the_gap_after_its_copy_button(qtbot
 def test_an_images_only_version_has_no_trash_can(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items([
-        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
+    versions.show_versions(_items([
+        EnhanceVersion(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
     ]))
 
     assert _trash(_rows(versions)[0]) is None
@@ -1350,7 +1350,7 @@ def test_an_images_only_version_has_no_trash_can(qtbot):
 def test_a_videos_versions_have_no_trash_can(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), deletable=False)
+    versions.show_versions(_items(_versions(1)), deletable=False)
 
     assert [_trash(row) for row in _rows(versions)] == [None, None]
 
@@ -1358,7 +1358,7 @@ def test_a_videos_versions_have_no_trash_can(qtbot):
 def test_the_original_has_no_trash_can_beside_its_enhancements(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)))
+    versions.show_versions(_items(_versions(2)))
 
     assert [_trash(row) is not None for row in _rows(versions)] == [True, True, False]
 
@@ -1366,14 +1366,14 @@ def test_the_original_has_no_trash_can_beside_its_enhancements(qtbot):
 def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)))
+    versions.show_versions(_items(_versions(1)))
 
     trash = _trash(_rows(versions)[0])
     assert trash.isEnabled()
     assert trash.toolTip() == "Delete this version"
 
 
-# --- dragging a level onto the pane to reuse its settings -----------------
+# --- dragging a version onto the pane to reuse its settings -----------------
 
 
 # --- the "+ Enhance" row ----------------------------------------------------
@@ -1384,8 +1384,8 @@ def test_the_add_tile_leads_the_strip_and_reports_its_press(qtbot):
     # newest first.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
-    tiles = versions._host.findChildren((_LevelRow, _AddRow))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
+    tiles = versions._host.findChildren((_VersionRow, _AddRow))
     assert isinstance(tiles[0], _AddRow)
 
     pressed = []
@@ -1399,9 +1399,9 @@ def test_a_running_enhance_takes_the_add_tiles_slot_rather_than_sitting_beside_i
     # like from the other side.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), pending=RunningEnhancement("running", None, "2x"),
+    versions.show_versions(_items(_versions(1)), pending=RunningEnhancement("running", None, "2x"),
                          add=EnhanceOffer("2x", None))
-    tiles = versions._host.findChildren((_PendingRow, _AddRow, _LevelRow))
+    tiles = versions._host.findChildren((_PendingRow, _AddRow, _VersionRow))
     assert isinstance(tiles[0], _PendingRow)
     assert not versions._host.findChildren(_AddRow)
 
@@ -1415,7 +1415,7 @@ def _share_painted(image, color) -> float:
 def test_the_add_rows_thumbnail_is_the_yellow_press_and_the_row_beside_it_is_not(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
     versions.resize(420, 600)
     versions.show()
     QApplication.processEvents()
@@ -1433,7 +1433,7 @@ def test_the_add_rows_thumbnail_is_the_yellow_press_and_the_row_beside_it_is_not
 def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
     (add_row,) = versions._host.findChildren(_AddRow)
     plus = add_row._thumbnail.pixmap().toImage()  # drawn, like the Gallery pane buttons' plus, not typed
 
@@ -1445,15 +1445,15 @@ def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
 def test_an_image_with_nothing_yet_still_gets_the_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels([], add=EnhanceOffer("2x", None))
+    versions.show_versions([], add=EnhanceOffer("2x", None))
     assert not versions.isHidden()
     assert versions._host.findChildren(_AddRow)
 
 
-def test_the_tile_dims_when_it_would_only_duplicate_a_level(qtbot):
+def test_the_tile_dims_when_it_would_only_duplicate_a_version(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", 0))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", 0))
     (add_row,) = versions._host.findChildren(_AddRow)
 
     pressed = []
@@ -1463,10 +1463,10 @@ def test_the_tile_dims_when_it_would_only_duplicate_a_level(qtbot):
     assert "already has a version" in add_row.toolTip()
 
 
-def test_hovering_the_dimmed_tile_outlines_the_level_it_would_duplicate_in_white(qtbot):
+def test_hovering_the_dimmed_tile_outlines_the_version_it_would_duplicate_in_white(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x", 1))
+    versions.show_versions(_items(_versions(2)), add=EnhanceOffer("2x", 1))
     (add_row,) = versions._host.findChildren(_AddRow)
     duplicate = versions._rows[1]._thumbnail
     point = QPointF(add_row.rect().center())
@@ -1481,9 +1481,9 @@ def test_hovering_the_dimmed_tile_outlines_the_level_it_would_duplicate_in_white
     assert duplicate.styleSheet() == ""
 
 
-def test_a_level_carries_its_settings_as_a_drag_payload():
+def test_a_version_carries_its_settings_as_a_drag_payload():
     params = {"enhance_scale": 3.0, "enhance_steps": 40, "enhance_denoise": 0.35}
-    assert params_from_mime(enhance_level_mime(params)) == params
+    assert params_from_mime(enhance_version_mime(params)) == params
 
 
 def test_a_foreign_drag_carries_nothing_this_panel_wants():
@@ -1493,7 +1493,7 @@ def test_a_foreign_drag_carries_nothing_this_panel_wants():
 
 
 @pytest.fixture
-def level_drags(monkeypatch):
+def version_drags(monkeypatch):
     """The drags a version row begins, in the order it began them.
 
     QDrag stands aside so no test enters the real drag loop, which is modal and
@@ -1526,52 +1526,52 @@ def _an_image(path, size=(16, 16)):
     return path
 
 
-def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, level_drags):
+def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, version_drags):
     # The same gesture as dragging a gallery thumbnail onto Combine: the thumbnail
     # comes along under the cursor, so what is being dragged is never in doubt.
-    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+    thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "e1.png"))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(thumbnail, QPoint(90, 90))
 
-    (drag,) = level_drags
+    (drag,) = version_drags
     assert not drag.pixmap.isNull()
     assert params_from_mime(drag.mime) == {"enhance_scale": 2.0}
 
 
-def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, level_drags):
+def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, version_drags):
     # Both drag tests here move eighty pixels, well past the threshold that tells
     # a click from a drag — so removing it left them green, and a click that
     # wobbles a pixel would pick the row up instead of selecting it.
-    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+    thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "e1.png"))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(thumbnail, QPoint(3, 3))  # inside the start-drag distance
 
-    assert level_drags == []
+    assert version_drags == []
 
 
-def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, level_drags):
+def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, version_drags):
     # An enhancement is an upscale, so the file under a version can be huge; the
     # thumbnail under the cursor is the same thumbnail every other drag trails.
 
-    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+    thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "big.png", (1024, 768)))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(thumbnail, QPoint(90, 90))
 
-    (drag,) = level_drags
+    (drag,) = version_drags
     assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_MAX
 
 
 def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
-    # A level whose file is gone still carries its settings; there is simply no
+    # A version whose file is gone still carries its settings; there is simply no
     # image to trail, and that must not stop the drag.
     class _RecordingDrag:
         def __init__(self, source):
@@ -1588,7 +1588,7 @@ def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
 
     monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
 
-    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0, None)
+    thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0, None)
     qtbot.addWidget(thumbnail)
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(thumbnail, QPoint(90, 90))
@@ -1600,17 +1600,17 @@ def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
 def test_a_running_enhance_leads_the_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), RunningEnhancement("running", None, "2x"))
-    tiles = versions._host.findChildren((_PendingRow, _LevelRow))
+    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
+    tiles = versions._host.findChildren((_PendingRow, _VersionRow))
     assert isinstance(tiles[0], _PendingRow)   # newest first, and it's becoming that
 
 
 def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
-    # An image with only its original has no levels to choose between — but one
+    # An image with only its original has no versions to choose between — but one
     # being made for it is worth showing, so the strip appears for that alone.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(0)), RunningEnhancement("queued", None, "2x"))
+    versions.show_versions(_items(_versions(0)), RunningEnhancement("queued", None, "2x"))
     assert not versions.isHidden()
 
 
@@ -1620,7 +1620,7 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)),
+    versions.show_versions(_items(_versions(1)),
                          RunningEnhancement("queued", None, "3x · 40 steps · 0.35 redraw"))
     texts = [lbl.text().replace("\u200b", "")
              for lbl in versions._pending.findChildren(QLabel)]
@@ -1632,7 +1632,7 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
 def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), RunningEnhancement("running", None, "2x"))
+    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
     thumbnail = versions._pending
 
     assert versions.update_pending(RunningEnhancement("running", b"not a real png", "2x")) is True
@@ -1660,12 +1660,12 @@ def _dropped_on(pane, mime):
     QApplication.sendEvent(pane, QDropEvent(QPointF(5, 5), *_held(mime)))
 
 
-def test_dropping_a_level_absorbs_its_settings(qtbot):
+def test_dropping_a_version_absorbs_its_settings(qtbot):
     pane, edits = _panel(qtbot)
     pane._auto.setChecked(True)
     edits.clear()
     # Held in a local: a QMimeData freed mid-event takes the handler with it.
-    mime = enhance_level_mime({"enhance_scale": 3.0, "enhance_steps": 40,
+    mime = enhance_version_mime({"enhance_scale": 3.0, "enhance_steps": 40,
                                "enhance_denoise": 0.35})
 
     _dropped_on(pane, mime)
@@ -1680,13 +1680,13 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
     assert edits[-1] == settings
 
 
-def test_a_dropped_level_leaves_the_panel_at_exactly_what_that_level_ran_with(qtbot):
+def test_a_dropped_version_leaves_the_panel_at_exactly_what_that_version_ran_with(qtbot):
     pane, _edits = _panel(qtbot)
     pane.show_settings(EnhanceSettings(params={
         "enhance_scale": 3.0, "enhance_detail_fixes": {"hands": 0.3},
         "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}))
     ran = {"enhance_scale": 2.0, "enhance_detail_fixes": {"hands": 0.45}}
-    mime = enhance_level_mime(ran)
+    mime = enhance_version_mime(ran)
 
     _dropped_on(pane, mime)
 
@@ -1720,7 +1720,7 @@ def test_the_panel_lights_while_a_version_it_would_take_is_dragged(qtbot):
     pane = _in_the_app(qtbot, _panel(qtbot)[0])
     assert _drop_styles_worn(pane) == {None}
 
-    under_way.started.emit(enhance_level_mime({"enhance_scale": 3.0}), None)
+    under_way.started.emit(enhance_version_mime({"enhance_scale": 3.0}), None)
 
     assert _drop_styles_worn(pane) == {LIT}
     under_way.ended.emit()
@@ -1728,7 +1728,7 @@ def test_the_panel_lights_while_a_version_it_would_take_is_dragged(qtbot):
 
 def test_the_panel_under_the_drag_lights_one_step_lighter(qtbot):
     pane = _in_the_app(qtbot, _panel(qtbot)[0])
-    mime = enhance_level_mime({"enhance_scale": 3.0})
+    mime = enhance_version_mime({"enhance_scale": 3.0})
     under_way.started.emit(mime, None)
 
     _brought_over(pane, mime)
@@ -1755,10 +1755,10 @@ def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x", None))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x", None))
 
     (section,) = versions.findChildren(CollapsibleSection)
-    assert section._header.text() == "Enhancement Levels"
+    assert section._header.text() == "Enhancements"
     assert not versions.is_collapsed()
 
     versions.set_collapsed(True)
@@ -1770,7 +1770,7 @@ def test_folding_survives_a_rebuild_for_another_image(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.set_collapsed(True)
-    versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x", None))
+    versions.show_versions(_items(_versions(2)), add=EnhanceOffer("2x", None))
     assert versions.is_collapsed()
 
 
@@ -1783,8 +1783,8 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
     settings sideways. Stacked, the row asks for the wider of the two rather than
     their sum, and neither has to give.
     """
-    (level,) = _levels(1)[:1]
-    row = _LevelRow(level, 0, None)
+    (version,) = _versions(1)[:1]
+    row = _VersionRow(version, 0, None)
     host = QWidget()
     column = QVBoxLayout(host)
     column.setContentsMargins(0, 0, 0, 0)

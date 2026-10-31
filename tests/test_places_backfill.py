@@ -76,8 +76,8 @@ class FakeComfy:
 
 
 def _looked_over(db) -> list[tuple[str, str]]:
-    return [(row["prompt_id"], level.file["filename"])
-            for row, level in places_backfill.images_to_look_over(db.list_generations())]
+    return [(row["prompt_id"], version.file["filename"])
+            for row, version in places_backfill.images_to_look_over(db.list_generations())]
 
 
 def test_an_image_enhanced_before_its_places_were_kept_is_one_to_look_over(tmp_path):
@@ -108,9 +108,9 @@ def test_an_image_whose_eyes_were_kept_already_joined_is_looked_over_again(tmp_p
 def test_an_image_is_looked_over_by_its_own_enhancements_detectors_and_nothing_is_redrawn(tmp_path):
     db = Database(tmp_path / "t.db")
     _enhanced(db, "old", _file("enhanced_old.png"), settings={"enhance_detail_fixes": {"faces": 0.45, "eyes": 0.4}})
-    [(_row, level)] = places_backfill.images_to_look_over(db.list_generations())
+    [(_row, version)] = places_backfill.images_to_look_over(db.list_generations())
 
-    graph = places_backfill.finding_graph(level)
+    graph = places_backfill.finding_graph(version)
 
     kinds = [node["class_type"] for node in graph.values()]
     assert [node["inputs"]["image"] for node in graph.values() if node["class_type"] == "LoadImage"] == [

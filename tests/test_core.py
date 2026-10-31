@@ -1217,7 +1217,7 @@ def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path
     assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (True, False)
 
 
-def test_a_tabs_enhancement_levels_and_details_come_back_folded(qtbot, tmp_path):
+def test_a_tabs_enhancements_and_details_come_back_folded(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     tab = first._gallery_view._generate_pane.currentWidget()

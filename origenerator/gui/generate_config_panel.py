@@ -787,7 +787,8 @@ class GenerateConfigPanel(DropZone):
             definitions = form.definitions()
             workflow = workflow_named(self._form_workflow_key)
             lora_keys = workflow.lora_keys if workflow is not None else ()
-            form.set_warnings({**trigger_word_advice(values, lora_keys),
+            form.set_warnings({**trigger_word_advice(values, lora_keys,
+                                                     in_scenes=form.tells_a_story()),
                                **setting_advice(values, definitions),
                                **self._file_advice(values, definitions, workflow)})
             form.show_readings(prompt_readings(self._form_workflow_key, values))

@@ -345,6 +345,9 @@ class ParamForm(QWidget):
     def request_field(self) -> RequestField | None:
         return self._request_field
 
+    def tells_a_story(self) -> bool:
+        return self._scenes is not None
+
     def set_prompts(self, positive: str, negative: str, *, typed: bool = False) -> None:
         """Write a prompt pair into its fields, as typing it in would."""
         for pd in self._param_defs:

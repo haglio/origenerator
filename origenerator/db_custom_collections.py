@@ -30,7 +30,7 @@ class CustomCollectionStore(Store):
                                (folder_id, name, side))
             return int(cur.lastrowid)
 
-    def set_custom_collection_side(self, folder_id: int, side: str):
+    def set_custom_collection_shape(self, folder_id: int, side: str):
         with self._connect() as conn:
             conn.execute("UPDATE custom_folders SET side = ? WHERE id = ?",
                          (side, folder_id))

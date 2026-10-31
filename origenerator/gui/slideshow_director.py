@@ -31,7 +31,7 @@ from funestra.modes import read_mode
 from funestra.volume import VolumeHud
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QWidget
-from shared_ui.orientation import orientation_of_size
+from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery, points_of_interest
 from origenerator.config import (
@@ -54,10 +54,10 @@ from origenerator.gallery.collection import (
     LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import folder_collection
-from origenerator.gallery.sides import (
-    ORIENTATIONS as _ORIENTATIONS,
+from origenerator.gallery.shapes import (
+    SHAPES as _SHAPES,
 )
-from origenerator.gallery.sides import side_holds, the_one_shape_on, the_side_of
+from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
@@ -69,6 +69,14 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.gui.version_stepper import Version
 from origenerator.item_names import ItemNames
+from origenerator.item_shape import (
+    filter_rows,
+    row_shape,
+    shaped_key,
+)
+from origenerator.item_shape import (
+    split_key as _split_collection_key,
+)
 from origenerator.media import MediaType
 from origenerator.nav_map import (
     act_labels,
@@ -77,14 +85,6 @@ from origenerator.nav_map import (
     surroundings,
 )
 from origenerator.one_look import looking_once
-from origenerator.orientation import (
-    filter_rows,
-    oriented_key,
-    row_orientation,
-)
-from origenerator.orientation import (
-    split_key as _split_collection_key,
-)
 from origenerator.slideshow import (
     Slide,
     SlideshowFilters,
@@ -121,11 +121,11 @@ class SlideshowHost(Protocol):
     def slideshow_subject(self) -> str:
         """What such a slideshow would be *of*, named the way the gallery names it."""
 
-    def side_in_view(self) -> str:
-        """Which of the two sides the tree is standing on."""
+    def shape_in_view(self) -> str:
+        """Which of the two shapes the tree is standing on."""
 
     def group_for_key(self, key: str):
-        """The folder ``key`` names, as the side it is looked at from holds it."""
+        """The folder ``key`` names, as the shape it is looked at from holds it."""
 
     def row_for(self, prompt_id: str) -> dict | None:
         """The generation row ``prompt_id`` names, or ``None``."""
@@ -190,7 +190,7 @@ class SlideshowHost(Protocol):
 @dataclass(frozen=True)
 class HeldSlideshow:
     items: tuple
-    side: str | None
+    shape: str | None
     order_label: str
     state: SlideshowState
     filters: SlideshowFilters
@@ -234,7 +234,7 @@ def _screens():
 
 def _monitor_shaped(shape: str):
     return next((screen for screen in _screens()
-                 if orientation_of_size(screen.geometry().width(),
+                 if shape_of_size(screen.geometry().width(),
                                         screen.geometry().height()) == shape), None)
 
 
@@ -255,18 +255,18 @@ def _item_opened_on(items, start: int | None, resume: SlideshowState | None) -> 
 
 
 def _narrowed_to(held: HeldSlideshow, shape: str, ids) -> HeldSlideshow:
-    return replace(held, side=shape,
+    return replace(held, shape=shape,
                    items=tuple(slide for slide in held.items if slide.prompt_id in ids),
                    state=_place_among(ids, held.state))
 
 
 def _shapes_in(rows, items) -> list[str]:
     ids = {item[2] for item in items}
-    return [row_orientation(row) for row in rows if row["prompt_id"] in ids]
+    return [row_shape(row) for row in rows if row["prompt_id"] in ids]
 
 
-def _side_of_the_set(rows, items) -> str | None:
-    return the_side_of(_shapes_in(rows, items))
+def _one_shape_of_the_set(rows, items) -> str | None:
+    return the_shape_of(_shapes_in(rows, items))
 
 
 def _shape_of_the_set(rows, items) -> str:
@@ -274,10 +274,10 @@ def _shape_of_the_set(rows, items) -> str:
     return majority_shape(shapes) if shapes else region_for_items(items)
 
 
-def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
+def _shape_it_opens_on(shape: str, rows, items, opened_on: str | None) -> str:
     if (row := next((row for row in rows if row["prompt_id"] == opened_on), None)) is not None:
-        return row_orientation(row)
-    if (shape := the_one_shape_on(side)) is not None:
+        return row_shape(row)
+    if (shape := the_one_shape_on(shape)) is not None:
         return shape
     return _shape_of_the_set(rows, items)
 
@@ -304,8 +304,8 @@ class SlideshowDirector:
         # double-clicking an item (that folder in order). One place, because
         # it is one view.
         self._slideshow = None
-        self._standalone_side: str | None = None
         self._standalone_shape: str | None = None
+        self._standalone_window_shape: str | None = None
         self._standalone_showing: str | None = None
         self._hud_corners: dict[str, HudCorner] = {}
         self._hud_minimized: dict[str, bool] = {}
@@ -323,14 +323,14 @@ class SlideshowDirector:
         self._openings_kept_fresh = QTimer()
         self._openings_kept_fresh.setInterval(_OPENINGS_KEPT_FRESH_MS)
         self._openings_kept_fresh.timeout.connect(self.make_the_openings_ready)
-        # Slideshows asked for on a side the session has not handed over yet.
+        # Slideshows asked for on a shape the session has not handed over yet.
         self._asked_for: dict[str, partial] = {}
         # Inside Fun Time, what occupies each satellite region — a slideshow per
         # region, at most one each.  A slideshow is "open" while its window is
         # visible; a closed one just goes stale in its place until something
         # replaces it.
         self._region_slideshows: dict[str, QWidget | None] = (
-            dict.fromkeys(_ORIENTATIONS) if fun_time is not None else {}
+            dict.fromkeys(_SHAPES) if fun_time is not None else {}
         )
         # Whether the room is paused, remembered so a slideshow opened mid-pause
         # opens frozen (see :meth:`_present_surface`).
@@ -353,7 +353,7 @@ class SlideshowDirector:
             self._slideshow.close()
         self._fun_time = session
         self._motion = None
-        self._region_slideshows = dict.fromkeys(_ORIENTATIONS)
+        self._region_slideshows = dict.fromkeys(_SHAPES)
         self._region_paces = {}
         self.make_the_openings_ready()
 
@@ -393,28 +393,28 @@ class SlideshowDirector:
         return {slideshow.locked_on for slideshow in self.surfaces()
                 if slideshow.is_showing() and slideshow.locked_on is not None}
 
-    def surface_for(self, side: str | None):
-        """The slideshow a spoken command means: *side*'s region slideshow when it named
+    def surface_for(self, shape: str | None):
+        """The slideshow a spoken command means: *shape*'s region slideshow when it named
         one, else the slideshow that is up.
 
-        Hosted, a named side that holds nothing is an answer in itself —
+        Hosted, a named shape that holds nothing is an answer in itself —
         falling back to the other region's slideshow would act on the slide the
         speaker did not name."""
-        if side is not None and self._fun_time is not None:
-            return self.region_slideshow(side)
+        if shape is not None and self._fun_time is not None:
+            return self.region_slideshow(shape)
         return self._slideshow
 
-    def region_slideshow(self, side: str):
-        """The slideshow occupying satellite region *side*, or None — a closed
+    def region_slideshow(self, shape: str):
+        """The slideshow occupying satellite region *shape*, or None — a closed
         window is no occupant, however recently it was one."""
-        return _still_up(self._region_slideshows.get(side))
+        return _still_up(self._region_slideshows.get(shape))
 
-    def _pace_on(self, side: str) -> SlideshowPace:
+    def _pace_on(self, shape: str) -> SlideshowPace:
         if self._fun_time is None:
             return self._pace
-        if side not in self._region_paces:
-            self._region_paces[side] = SlideshowPace(self._pace.seconds)
-        return self._region_paces[side]
+        if shape not in self._region_paces:
+            self._region_paces[shape] = SlideshowPace(self._pace.seconds)
+        return self._region_paces[shape]
 
     def _window_up(self):
         """The fullscreen window this app has on the monitor, or None — asked
@@ -427,7 +427,7 @@ class SlideshowDirector:
 
     # --- opening one --------------------------------------------------------
 
-    def start(self, *, side: str | None = None):
+    def start(self, *, shape: str | None = None):
         """Open what's on screen — a folder, or the Latest/Favorites collection —
         as a fullscreen slideshow at its side's Clip seconds, standing on the
         one generation picked there, else where the last slideshow was left
@@ -435,14 +435,14 @@ class SlideshowDirector:
         location = self._host.slideshow_location()
         base, located_on = _split_collection_key(location)
         collection = folder_collection(base)
-        side = side or located_on
+        shape = shape or located_on
         # Favorites and Enhanced are not sets of their own: each is its folder
         # with its switch held down, so the switch can be let go to widen and
         # the order pair means the folder rather than what the collection lists.
         switch = _SWITCH_HELD_BY.get(collection.which) if collection is not None else None
         if switch is not None:
-            side = side or self._host.side_in_view()
-            location = oriented_key(collection.folder, side)
+            shape = shape or self._host.shape_in_view()
+            location = shaped_key(collection.folder, shape)
             rows = self.rows_at(location)
         else:
             rows = self._one_per_run_where_the_order_is_newest_first(
@@ -462,7 +462,7 @@ class SlideshowDirector:
         start = _place_of(one_picked, items) if one_picked is not None else None
         picked_elsewhere = (start is not None and resume is not None
                             and resume.current != one_picked)
-        self.open(items, rows=rows, location=location, side=side, start=start,
+        self.open(items, rows=rows, location=location, shape=shape, start=start,
                   resume=None if picked_elsewhere else resume,
                   filters=replace(self._filters, **{switch: True}) if switch else None,
                   **self._order(latest))
@@ -507,13 +507,13 @@ class SlideshowDirector:
             return self.open([(media[0], media[1], generation, None)], start=0, shuffle=in_order,
                              rows=[row for row in [self._host.row_for(generation)] if row],
                              hud=hud)
-        side = majority_shape(map(row_orientation, rows))
-        slideshow = self.open(items, rows=opened_on, start=0, side=side, shuffle=in_order,
+        shape = majority_shape(map(row_shape, rows))
+        slideshow = self.open(items, rows=opened_on, start=0, shape=shape, shuffle=in_order,
                               hud=hud)
         if slideshow is not None and len(rows) > 1:
             self._host.off_thread(
                 lambda: (self.items_of(rows), self.versions_of(rows)),
-                partial(self._fill_in, slideshow, rows, generation, side=side, hud=hud))
+                partial(self._fill_in, slideshow, rows, generation, shape=shape, hud=hud))
         return slideshow
 
     def _listed_rows(self) -> list[dict]:
@@ -523,24 +523,24 @@ class SlideshowDirector:
                 for prompt_id in self._host.listed_prompt_ids())
         return [row for row in rows if row is not None]
 
-    def _fill_in(self, slideshow, rows, generation, folder, *, side, hud) -> None:
+    def _fill_in(self, slideshow, rows, generation, folder, *, shape, hud) -> None:
         if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:
             return
         items, versions = folder
         start = _place_of(generation, items)
         if start is not None:
-            self.open(items, rows=rows, start=start, side=side, shuffle=in_order, hud=hud,
+            self.open(items, rows=rows, start=start, shape=shape, shuffle=in_order, hud=hud,
                       versions=versions)
 
     def _location_of(self, row: dict | None) -> str | None:
         if row is None:
             return None
         key = gallery.settings_folder_key(row, self._host.image_config_index())
-        return oriented_key(key, row_orientation(row))
+        return shaped_key(key, row_shape(row))
 
     @looking_once
     def open(self, items, *, rows=(), folder_items=None, location=None,
-             side=None, resume=None, filters=None, levels=None, **kwargs):
+             shape=None, resume=None, filters=None, versions=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
         The one place a slideshow is made, however it was asked for, so the Gallery pane buttons'
@@ -557,18 +557,18 @@ class SlideshowDirector:
         ``location`` is the collection or folder key the set came from, kept so the
         slideshow can be fed what lands there while it runs (:meth:`note_finished`) —
         a running slideshow has to keep up with the folder it is playing, and the
-        Gallery pane will have moved on by then.  ``side`` names the satellite region
-        to land it on inside Fun Time, for a slideshow asked for by side rather than
+        Gallery pane will have moved on by then.  ``shape`` names the satellite region
+        to land it on inside Fun Time, for a slideshow asked for by shape rather than
         routed by its own shape.
         """
-        # Which side this slideshow belongs to: the one asked for, else the shape of
+        # Which shape this slideshow belongs to: the one asked for, else the shape of
         # the run it is opened over, else the one its set's own shape belongs on.
         # Standalone it names nothing but the HUD's own verbs, since the monitor is
         # the whole screen.
         run = self._run_being_made_at(location) if not items else None
-        where = side or (row_orientation(run) if run is not None
+        where = shape or (row_shape(run) if run is not None
                          else _shape_of_the_set(rows, items or folder_items or []))
-        # And what that side IS: one of the session's Funestras, where the session
+        # And what that shape IS: one of the session's Funestras, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None
         follows_a_run = not items
@@ -578,7 +578,7 @@ class SlideshowDirector:
                 and self._session_channel is not None):
             self._asked_for[where] = partial(
                 self.open, items, rows=rows, folder_items=folder_items, location=location,
-                side=where, resume=resume, filters=filters, **kwargs)
+                shape=where, resume=resume, filters=filters, **kwargs)
             ask_for_the_funestra(self._session_channel, where)
             return None
         if follows_a_run:
@@ -602,10 +602,10 @@ class SlideshowDirector:
             shape = (_shape_it_opens_on(where, rows, items,
                                         _item_opened_on(items, kwargs.get("start"), resume))
                      if self._fun_time is None else where)
-            slideshow = self._open_a_window(items, where, shape=shape, actions=actions,
+            slideshow = self._open_a_window(items, where, window_shape=shape, actions=actions,
                                             hud=hud, versions=versions, **kwargs)
             if self._fun_time is None:
-                self._standalone_showing = _side_of_the_set(rows, items) or shape
+                self._standalone_showing = _one_shape_of_the_set(rows, items) or shape
         self._slideshow = slideshow
         self._picked_as_the_slideshow_up_opened = tuple(self._host.selected_prompt_ids())
         already_live = any(live is slideshow for live, _where in self._live_slideshows)
@@ -632,9 +632,9 @@ class SlideshowDirector:
         self._host.reconcile_osr2()
         return slideshow
 
-    def _slideshow_actions(self, side: str) -> SlideshowActions:
+    def _slideshow_actions(self, shape: str) -> SlideshowActions:
         """What a press on a slideshow asks the gallery to do on its behalf, and what
-        the gallery says about the library the slideshow on *side* is mapped
+        the gallery says about the library the slideshow on *shape* is mapped
         against — that side's own shape of it."""
         return SlideshowActions(
             queue_now=self._host.queue_now,
@@ -662,11 +662,11 @@ class SlideshowDirector:
             drive_toggle=self._host.toggle_osr2_drive,
             osr2_control=self._host.osr2_control,
             omnipause=self._ask_the_room_to_pause(),
-            neighbors=partial(self.neighbors_of, side=side),
-            widen=partial(self.beyond_the_row_of, side=side),
-            acts=partial(self.acts_of, side=side),
+            neighbors=partial(self.neighbors_of, shape=shape),
+            widen=partial(self.beyond_the_row_of, shape=shape),
+            acts=partial(self.acts_of, shape=shape),
             slides=self.slides_for,
-            move_hud=partial(self.move_the_hud, side=side),
+            move_hud=partial(self.move_the_hud, shape=shape),
             filters_changed=self._note_filters,
             volume_moved=self._volume_moved if self._fun_time is None else None,
         )
@@ -707,26 +707,26 @@ class SlideshowDirector:
         if self._window_up() is not None:
             self.pause_or_play_the_room()
 
-    def _hand_to_the_funestra(self, items, side: str, channel, *, actions, hud,
+    def _hand_to_the_funestra(self, items, shape: str, channel, *, actions, hud,
                             versions, opening=None, **kwargs):
         """A slideshow on one of the session's Funestras: the set goes to the Funestra
         and the HUD this app publishes goes with it — no window of ours."""
-        occupant = self.region_slideshow(side)
+        occupant = self.region_slideshow(shape)
         if occupant is not None:
             occupant.play(items, hud=hud, versions=versions, **kwargs)
             return occupant
-        slideshow = FunestraSlideshow(items, side=side, channel=channel,
-                          frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
-                          actions=actions, pace=self._pace_on(side), hud=hud,
+        slideshow = FunestraSlideshow(items, shape=shape, channel=channel,
+                          frames=FrameFiles(FRAMES_BEING_MADE_DIR / shape),
+                          actions=actions, pace=self._pace_on(shape), hud=hud,
                           versions=versions, say=self._host.say, opening=opening, **kwargs)
-        self._region_slideshows[side] = slideshow
+        self._region_slideshows[shape] = slideshow
         # A slideshow opened while the hosting session is frozen opens frozen, the
         # way a window one does.
         if self._room_paused:
             slideshow.set_paused(True)
         return slideshow
 
-    def _open_a_window(self, items, side: str, *, shape: str, actions, hud, versions,
+    def _open_a_window(self, items, shape: str, *, window_shape: str, actions, hud, versions,
                        **kwargs):
         """A slideshow in a window of this app's: over the whole monitor standalone,
         or over one of the session's regions.
@@ -740,24 +740,24 @@ class SlideshowDirector:
         up = self._window_up() if self._fun_time is None else None
         view = up.shown if up is not None else None
         if self._fun_time is None:
-            self._standalone_side = side
             self._standalone_shape = shape
+            self._standalone_window_shape = window_shape
         built = view is None
         if built:
-            view = SlideshowView(items, side=side, actions=actions,
-                                 pace=self._pace_on(side), motion=self._motion, hud=hud,
+            view = SlideshowView(items, shape=shape, actions=actions,
+                                 pace=self._pace_on(shape), motion=self._motion, hud=hud,
                                  versions=versions, **self._the_sound_standing_on_its_own(),
                                  **kwargs)
         else:
             view.slideshow.play(items, actions=actions, hud=hud, versions=versions, **kwargs)
         if built:
-            self._present_surface(view, side)
+            self._present_surface(view, shape)
         else:
             self._show_on_its_monitor(view, built=False)
         return view.slideshow
 
     def _show_on_its_monitor(self, view, *, built: bool) -> None:
-        monitor = _monitor_shaped(self._standalone_shape)
+        monitor = _monitor_shaped(self._standalone_window_shape)
         if monitor is not None and (built or view.screen().geometry() != monitor.geometry()):
             if view.isFullScreen():
                 view.showNormal()
@@ -809,19 +809,19 @@ class SlideshowDirector:
 
     # --- the map around the slide on screen ---------------------------------
 
-    def _library_of(self, side: str) -> list[dict]:
-        """The generations a slideshow on *side* is mapped against: the whole
+    def _library_of(self, shape: str) -> list[dict]:
+        """The generations a slideshow on *shape* is mapped against: the whole
         library of that side's shape — what the Satellite Funestras map their
         videos against too, each over its own sources."""
-        return self._library.get(side, lambda: filter_rows(
-            [row for row in self._db.list_generations() if in_sight(row)], side))
+        return self._library.get(shape, lambda: filter_rows(
+            [row for row in self._db.list_generations() if in_sight(row)], shape))
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))
 
-    def neighbors_of(self, prompt_id: str, *, side: str) -> NavMapNeighbors:
+    def neighbors_of(self, prompt_id: str, *, shape: str) -> NavMapNeighbors:
         """What the library says about one generation, for the map a slideshow on
-        *side* draws around it: its act under other seeds along the row, and
+        *shape* draws around it: its act under other seeds along the row, and
         down the column the same seed under other configurations, then what
         else was made of its image — the videos animated from it, and for a
         video the image itself (:mod:`origenerator.nav_map`).  A
@@ -832,7 +832,7 @@ class SlideshowDirector:
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
             return NavMapNeighbors()
-        around = surroundings(row, self._library_of(side),
+        around = surroundings(row, self._library_of(shape),
                               image_index=self._host.image_config_index())
         named = [(generation, self._folder_name(generation), True)
                  for generation in around.configs]
@@ -848,20 +848,20 @@ class SlideshowDirector:
             group=self._slides_of((*around.configs, *around.group)),
         )
 
-    def beyond_the_row_of(self, prompt_id: str, *, side: str) -> tuple[Slide, ...]:
+    def beyond_the_row_of(self, prompt_id: str, *, shape: str) -> tuple[Slide, ...]:
         """The slides "more seeds" adds to a slideshow's row around *prompt_id*, or
         nothing when nothing lies beyond it."""
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
             return ()
         return self._slides_of(beyond_the_row(
-            row, self._library_of(side), image_index=self._host.image_config_index()))
+            row, self._library_of(shape), image_index=self._host.image_config_index()))
 
-    def acts_of(self, prompt_ids, *, side: str) -> dict[str, str]:
+    def acts_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
         """What the map names each of *prompt_ids* for, among the library of
-        *side*'s shape — what an act filter matches a generation on.  One the
+        *shape*'s shape — what an act filter matches a generation on.  One the
         library does not hold is left out, and answers to no act."""
-        named_for = act_labels(self._library_of(side),
+        named_for = act_labels(self._library_of(shape),
                                image_index=self._host.image_config_index())
         return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
                 if prompt_id in named_for}
@@ -899,9 +899,9 @@ class SlideshowDirector:
 
     # --- putting one on screen ----------------------------------------------
 
-    def _present_surface(self, view, side: str):
+    def _present_surface(self, view, shape: str):
         """Put a full-screen surface on screen: over the whole monitor
-        standalone, or — inside Fun Time — on the satellite region *side*,
+        standalone, or — inside Fun Time — on the satellite region *shape*,
         replacing whatever slideshow currently holds it.
 
         A region slideshow is frameless (the region IS the window, like every
@@ -913,12 +913,12 @@ class SlideshowDirector:
         """
         if self._fun_time is None:
             self._show_on_its_monitor(view, built=True)
-            self._wear_the_hud(view, side)
+            self._wear_the_hud(view, shape)
             return
-        occupant = self._region_slideshows.get(side)
+        occupant = self._region_slideshows.get(shape)
         if occupant is not None and occupant.is_showing():
             occupant.close()
-        view.setWindowTitle(_REGION_CAPTIONS[side])
+        view.setWindowTitle(_REGION_CAPTIONS[shape])
         view.setWindowFlags(
             view.windowFlags()
             | Qt.WindowType.FramelessWindowHint
@@ -928,7 +928,7 @@ class SlideshowDirector:
         # room's audio, and this surface is landing on a satellite's region.
         # Standalone the same view is the deliberate foreground and plays sound.
         view.set_audio_muted(True)
-        rect = self._fun_time.region_rect(side)
+        rect = self._fun_time.region_rect(shape)
         # The rect as given, so the window opens at the right size and an
         # unscaled process is already correct here.
         view.setGeometry(rect.x, rect.y, rect.width, rect.height)
@@ -947,45 +947,45 @@ class SlideshowDirector:
         # window over the topmost Funestras it shares the region with.
         view.raise_()
         view.activateWindow()
-        self._region_slideshows[side] = view.slideshow
+        self._region_slideshows[shape] = view.slideshow
         # A slideshow opened while the hosting session is frozen opens frozen: the
         # room's OmniPause holds everything, this surface included, from its
         # first frame — not from whenever the flag next changes.
         if self._room_paused:
             view.slideshow.set_paused(True)
-        self._wear_the_hud(view, side)
+        self._wear_the_hud(view, shape)
 
-    def hud_place(self, side: str) -> tuple[HudCorner, bool]:
-        return (self._hud_corners.get(side, HudCorner.UPPER_LEFT),
-                self._hud_minimized.get(side, False))
+    def hud_place(self, shape: str) -> tuple[HudCorner, bool]:
+        return (self._hud_corners.get(shape, HudCorner.UPPER_LEFT),
+                self._hud_minimized.get(shape, False))
 
-    def place_a_hud(self, side: str, action: str, argument: str) -> None:
-        corner, minimized = self.hud_place(side)
+    def place_a_hud(self, shape: str, action: str, argument: str) -> None:
+        corner, minimized = self.hud_place(shape)
         if action == HUD_CORNER:
-            self._hud_corners[side] = read_mode(HudCorner, argument, corner)
+            self._hud_corners[shape] = read_mode(HudCorner, argument, corner)
         else:
-            self._hud_minimized[side] = argument == "1"
-        self._tell_the_slideshow_wearing_it(side)
+            self._hud_minimized[shape] = argument == "1"
+        self._tell_the_slideshow_wearing_it(shape)
 
-    def move_the_hud(self, direction: str, *, side: str) -> None:
-        self._hud_corners[side] = self.hud_place(side)[0].toward(direction)
-        self._tell_the_slideshow_wearing_it(side)
+    def move_the_hud(self, direction: str, *, shape: str) -> None:
+        self._hud_corners[shape] = self.hud_place(shape)[0].toward(direction)
+        self._tell_the_slideshow_wearing_it(shape)
 
-    def collapse_the_hud(self, minimized: bool, *, side: str) -> None:
-        self._hud_minimized[side] = minimized
-        self._tell_the_slideshow_wearing_it(side)
+    def collapse_the_hud(self, minimized: bool, *, shape: str) -> None:
+        self._hud_minimized[shape] = minimized
+        self._tell_the_slideshow_wearing_it(shape)
 
-    def open_the_hud_in(self, corner: HudCorner, *, side: str) -> None:
-        self._hud_corners[side] = corner
-        self._hud_minimized[side] = False
-        self._tell_the_slideshow_wearing_it(side)
+    def open_the_hud_in(self, corner: HudCorner, *, shape: str) -> None:
+        self._hud_corners[shape] = corner
+        self._hud_minimized[shape] = False
+        self._tell_the_slideshow_wearing_it(shape)
 
-    def _tell_the_slideshow_wearing_it(self, side: str) -> None:
+    def _tell_the_slideshow_wearing_it(self, shape: str) -> None:
         for surface in self.surfaces():
-            if getattr(surface.shown, "hud_side", "") == side:
-                surface.shown.set_hud_place(*self.hud_place(side))
+            if getattr(surface.shown, "hud_shape", "") == shape:
+                surface.shown.set_hud_place(*self.hud_place(shape))
 
-    def _wear_the_hud(self, view, side: str) -> None:
+    def _wear_the_hud(self, view, shape: str) -> None:
         """Put the Funestras' own HUD on *view* — the same HUD, rendered by the
         same shared code: the title, this side's transport, and the nav
         map speaking the set as a seed family.  The view's own furnishings come
@@ -997,11 +997,11 @@ class SlideshowDirector:
         those two — no channel to post on, so the transport lands on the slideshow
         itself, and no session to switch modes on, so no mode row.
         """
-        corner, minimized = self.hud_place(side)
-        view.wear_the_hud(side, dashboard_cmd_file=self._session_channel,
+        corner, minimized = self.hud_place(shape)
+        view.wear_the_hud(shape, dashboard_cmd_file=self._session_channel,
                           label_for=self._names.of, corner=corner, minimized=minimized,
-                          collapse=partial(self.collapse_the_hud, side=side),
-                          open_in=partial(self.open_the_hud_in, side=side))
+                          collapse=partial(self.collapse_the_hud, shape=shape),
+                          open_in=partial(self.open_the_hud_in, shape=shape))
 
     @property
     def _session_channel(self):
@@ -1036,17 +1036,17 @@ class SlideshowDirector:
             self._slideshow_state = self._where_it_stands(slideshow)
         self._live_slideshows = [entry for entry in self._live_slideshows
                             if entry[0] is not slideshow]
-        side = self._side_of(slideshow) if slideshow is not None else None
+        shape = self._shape_of(slideshow) if slideshow is not None else None
         if slideshow is None or self._slideshow is slideshow:
             self._slideshow = next((s for s, _loc in reversed(self._live_slideshows)), None)
         self._host.reconcile_osr2()
-        if side is not None:
+        if shape is not None:
             # Whatever ended it -- the loop button pressed off, a set culled
             # empty -- the region goes back to browsing its library.  The
             # Funestra under it is blacked for the whole mode, so an empty region
             # is a black rectangle, which is the one thing the base state is for.
-            self._region_slideshows[side] = None
-            self._refill_region(side)
+            self._region_slideshows[shape] = None
+            self._refill_region(shape)
 
     def _where_it_stands(self, slideshow) -> SlideshowState:
         return replace(slideshow.state(),
@@ -1066,9 +1066,9 @@ class SlideshowDirector:
     def remembered(self) -> dict:
         state = self._place_left()
         huds = {}
-        for side in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
-            corner, minimized = self.hud_place(side)
-            huds[side] = {"corner": corner, "minimized": minimized}
+        for shape in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
+            corner, minimized = self.hud_place(shape)
+            huds[shape] = {"corner": corner, "minimized": minimized}
         volume = self._volume_left_at
         return {"last_show": state.saved(), "filters": asdict(self._filters),
                 "panels": huds, "pace": self._pace.seconds,
@@ -1083,11 +1083,11 @@ class SlideshowDirector:
             self._pace.set_seconds(saved["pace"])
         self._volume_left_at = _volume_saved_as(saved.get("volume"))
         huds = saved.get("panels")
-        for side, place in (huds.items() if isinstance(huds, dict) else ()):
+        for shape, place in (huds.items() if isinstance(huds, dict) else ()):
             if isinstance(place, dict):
-                self._hud_corners[side] = read_mode(HudCorner, place.get("corner"),
+                self._hud_corners[shape] = read_mode(HudCorner, place.get("corner"),
                                                     HudCorner.UPPER_LEFT)
-                self._hud_minimized[side] = place.get("minimized") is True
+                self._hud_minimized[shape] = place.get("minimized") is True
 
     def slideshow_showing_on(self) -> str | None:
         return None if self._slideshow is None else self._standalone_showing
@@ -1097,7 +1097,7 @@ class SlideshowDirector:
         if slideshow is None:
             return None
         return HeldSlideshow(items=tuple(slideshow.whole_set()),
-                        side=self._base_side(slideshow), order_label=slideshow.hud_order_label,
+                        shape=self._base_side(slideshow), order_label=slideshow.hud_order_label,
                         state=self._where_it_stands(slideshow), filters=slideshow.filters)
 
     def _held_for_the_session(self) -> dict[str, HeldSlideshow]:
@@ -1106,7 +1106,7 @@ class SlideshowDirector:
             return {}
         rows = self._rows_of(held.items)
         parts = ((shape, {row["prompt_id"] for row in filter_rows(rows, shape)})
-                 for shape in _ORIENTATIONS if side_holds(self._standalone_showing, shape))
+                 for shape in _SHAPES if shape_holds(self._standalone_showing, shape))
         return {shape: _narrowed_to(held, shape, ids) for shape, ids in parts if ids}
 
     def _rows_of(self, slides) -> list[dict]:
@@ -1115,7 +1115,7 @@ class SlideshowDirector:
 
     def put_back(self, held: HeldSlideshow):
         return self.open(list(held.items), rows=self._rows_of(held.items),
-                         location=held.state.location, side=held.side, resume=held.state,
+                         location=held.state.location, shape=held.shape, resume=held.state,
                          filters=held.filters,
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,
                          hud=HudFacts(order_label=held.order_label,
@@ -1138,13 +1138,13 @@ class SlideshowDirector:
         finally:
             self._giving_them_back = False
 
-    def close_the_slideshow(self, side: str) -> None:
-        self._regions_wanted.discard(side)
-        self._asked_for.pop(side, None)
-        slideshow = self.region_slideshow(side)
+    def close_the_slideshow(self, shape: str) -> None:
+        self._regions_wanted.discard(shape)
+        self._asked_for.pop(shape, None)
+        slideshow = self.region_slideshow(shape)
         if slideshow is not None:
             slideshow.close()
-        self._make_ready_what_opens_next(side)
+        self._make_ready_what_opens_next(shape)
 
     def _pick_where_it_played(self, prompt_id: str):
         """A slideshow handed its slide over on the way out: pick that item where
@@ -1161,50 +1161,50 @@ class SlideshowDirector:
 
     # --- the satellite regions ----------------------------------------------
 
-    def base_location(self, side: str) -> str:
+    def base_location(self, shape: str) -> str:
         """Where a region plays from with nothing else asked for: the whole
         library, narrowed to that region's shape.
 
         The base state of origenerator mode, and what its reset goes back to.
         It is what the Satellite Funestras do in kino mode — each shuffles the
-        whole library of its own orientation — and this side is meant to read
+        whole library of its own shape — and this shape is meant to read
         the same way.
         """
-        return oriented_key(gallery.ALL_KEY, side)
+        return shaped_key(gallery.ALL_KEY, shape)
 
     def fill_the_wanted_regions(self) -> None:
-        for side in _ORIENTATIONS:
-            if side in self._regions_wanted:
-                self.fill_the_region(side)
+        for shape in _SHAPES:
+            if shape in self._regions_wanted:
+                self.fill_the_region(shape)
 
-    def fill_the_region(self, side: str) -> None:
-        self._regions_wanted.add(side)
-        asked = self._asked_for.pop(side, None)
+    def fill_the_region(self, shape: str) -> None:
+        self._regions_wanted.add(shape)
+        asked = self._asked_for.pop(shape, None)
         if asked is not None:
             asked()
             return
-        if self._put_back_what_was_taken_over(side) or self.region_slideshow(side) is not None:
+        if self._put_back_what_was_taken_over(shape) or self.region_slideshow(shape) is not None:
             return
-        if not self._fill_region(side):
+        if not self._fill_region(shape):
             # Not a dead end: the tree this reads is built by the first
             # refresh, and the session's open can arrive before it (the
             # launch races the boot).  A region owed its base state gets it
             # on the next refresh -- see ``GalleryView.refresh`` -- because a
             # black rectangle is what this mode's base state exists to not be.
-            logger.info("Nothing of %s shape to open on the %s region yet", side, side)
+            logger.info("Nothing of %s shape to open on the %s region yet", shape, shape)
 
-    def _put_back_what_was_taken_over(self, side: str) -> bool:
-        taken = self._taken_into_the_session.pop(side, None)
+    def _put_back_what_was_taken_over(self, shape: str) -> bool:
+        taken = self._taken_into_the_session.pop(shape, None)
         if taken is None:
             return False
         if self.put_back(taken) is None:
             return False
         logger.info("The %s region takes up the slideshow that was up when the "
-                    "session took this window over: %d items", side, len(taken.items))
+                    "session took this window over: %d items", shape, len(taken.items))
         return True
 
-    def _fill_region(self, side: str) -> bool:
-        """Put *side* on its base state, and say whether there was anything to
+    def _fill_region(self, shape: str) -> bool:
+        """Put *shape* on its base state, and say whether there was anything to
         put there.
 
         Timed, because what the owner judges this mode by is the wait between
@@ -1214,19 +1214,19 @@ class SlideshowDirector:
         library has grown.
         """
         began = time.perf_counter()
-        opening = self._openings.of(side) or self._opening_of(self._rows_of_the_base_state(side))
+        opening = self._openings.of(shape) or self._opening_of(self._rows_of_the_base_state(shape))
         if not opening.items:
             return False
-        self.open(opening.items, rows=opening.rows, location=self.base_location(side), side=side,
+        self.open(opening.items, rows=opening.rows, location=self.base_location(shape), shape=shape,
                   hud=HudFacts(favorite_ids=self._favorite_prompt_ids()),
                   versions=opening.versions, opening=opening)
         logger.info("The %s region opens on the library of its shape: "
                     "%d items, filled in %d ms",
-                    side, len(opening.items), (time.perf_counter() - began) * 1000)
+                    shape, len(opening.items), (time.perf_counter() - began) * 1000)
         return True
 
-    def _rows_of_the_base_state(self, side: str) -> list[dict]:
-        return self.rows_at(self.base_location(side))
+    def _rows_of_the_base_state(self, shape: str) -> list[dict]:
+        return self.rows_at(self.base_location(shape))
 
     @looking_once
     def _opening_of(self, rows: list[dict]) -> RegionOpening:
@@ -1238,9 +1238,9 @@ class SlideshowDirector:
                      for path, media_type, *_rest in items if media_type == MediaType.VIDEO},
             lead=randrange(len(items)) if items else 0)
 
-    def _with_its_lead_on_the_map(self, opening: RegionOpening, side: str) -> RegionOpening:
+    def _with_its_lead_on_the_map(self, opening: RegionOpening, shape: str) -> RegionOpening:
         return replace(opening, lead_neighbors=self.neighbors_of(
-            opening.items[opening.lead][2], side=side))
+            opening.items[opening.lead][2], shape=shape))
 
     def library_moved(self) -> None:
         self._openings.library_moved()
@@ -1248,29 +1248,29 @@ class SlideshowDirector:
         self._openings_kept_fresh.start()
 
     def make_the_openings_ready(self) -> None:
-        for side in _ORIENTATIONS:
-            self._make_ready_what_opens_next(side)
+        for shape in _SHAPES:
+            self._make_ready_what_opens_next(shape)
 
-    def _make_ready_what_opens_next(self, side: str) -> None:
-        if (self._fun_time is not None and self._fun_time.funestra(side) is not None
-                and self.region_slideshow(side) is None):
-            self._openings.make_ready(side)
+    def _make_ready_what_opens_next(self, shape: str) -> None:
+        if (self._fun_time is not None and self._fun_time.funestra(shape) is not None
+                and self.region_slideshow(shape) is None):
+            self._openings.make_ready(shape)
 
-    def _refill_region(self, side: str) -> None:
-        """Put *side* back on its base state, if the mode still wants it there.
+    def _refill_region(self, shape: str) -> None:
+        """Put *shape* back on its base state, if the mode still wants it there.
 
         What a region does when the slideshow covering it ends -- the loop button
         pressed off, a set culled empty.  In origenerator mode the
         Funestra underneath is blacked for the whole mode, so a region left empty
         is a black rectangle rather than a fallback.
         """
-        if side not in self._regions_wanted or self.region_slideshow(side) is not None:
+        if shape not in self._regions_wanted or self.region_slideshow(shape) is not None:
             return
-        self._fill_region(side)
+        self._fill_region(shape)
 
-    def _side_of(self, slideshow) -> str | None:
+    def _shape_of(self, slideshow) -> str | None:
         """Which satellite region *slideshow* is holding, if it holds one."""
-        return next((side for side, on_that_side in self._region_slideshows.items()
+        return next((shape for shape, on_that_side in self._region_slideshows.items()
                      if on_that_side is slideshow), None)
 
     def reset_region(self, slideshow) -> None:
@@ -1283,11 +1283,11 @@ class SlideshowDirector:
         with nothing to play there, and a slideshow holding no region at all, fall
         back to the slideshow's own reset rather than emptying the screen.
         """
-        side = self._side_of(slideshow)
-        if side is None:
+        shape = self._shape_of(slideshow)
+        if shape is None:
             slideshow.reset_in_place()
             return
-        key = self.base_location(side)
+        key = self.base_location(shape)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
@@ -1303,8 +1303,8 @@ class SlideshowDirector:
 
     def _base_side(self, slideshow) -> str | None:
         if self._fun_time is not None:
-            return self._side_of(slideshow)
-        return self._standalone_side if slideshow is self._slideshow else None
+            return self._shape_of(slideshow)
+        return self._standalone_shape if slideshow is self._slideshow else None
 
     def reorder_slideshow(self, slideshow, latest: bool) -> None:
         if not self._play_the_library(slideshow, latest=latest, keep_slide=False):
@@ -1319,8 +1319,8 @@ class SlideshowDirector:
             slideshow, latest=slideshow.hud_order_label == LATEST_LABEL, keep_slide=True)
 
     def _play_the_library(self, slideshow, *, latest: bool, keep_slide: bool) -> bool:
-        side = self._base_side(slideshow)
-        key = oriented_key(_LATEST_KEY, side) if latest else self.base_location(side)
+        shape = self._base_side(slideshow)
+        key = shaped_key(_LATEST_KEY, shape) if latest else self.base_location(shape)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
@@ -1448,7 +1448,7 @@ class SlideshowDirector:
             r["prompt_id"] for r in self.rows_at(location)))
 
     def _latest_would_take(self, row: dict, location) -> bool:
-        base, side = _split_collection_key(location)
+        base, shape = _split_collection_key(location)
         latest = folder_collection(base)
         if location:
             playing_latest = latest is not None and latest.which == _LATEST_KEY
@@ -1457,7 +1457,7 @@ class SlideshowDirector:
                                and not self._gallery_pane.showing_search())
         return bool(playing_latest
                     and source_of(row) == GenerationSource.GENERATED
-                    and filter_rows([row], side)
+                    and filter_rows([row], shape)
                     and (latest is None or latest.folder in gallery.folder_chain(
                         row, self._host.image_config_index())))
 
@@ -1553,11 +1553,11 @@ class SlideshowDirector:
         else:
             self._host.say(message)
 
-    def run_slideshow_command(self, command: SlideshowCommand, side: str | None):
+    def run_slideshow_command(self, command: SlideshowCommand, shape: str | None):
         """Get the slideshow going, pause the room, or close the slideshow — on
-        *side*'s region when the utterance named one, else on the slideshow that
+        *shape*'s region when the utterance named one, else on the slideshow that
         is up."""
-        slideshow = self.surface_for(side)
+        slideshow = self.surface_for(shape)
         if command is SlideshowCommand.STOP:
             if slideshow is None:
                 self._host.say("no slideshow to close")
@@ -1574,14 +1574,14 @@ class SlideshowDirector:
             return
         self._ask_for_the_room(paused=False)
         if slideshow is None:
-            self.start(side=side)
+            self.start(shape=shape)
             if self._slideshow is None:
                 self._host.say("nothing here to play")
             return
         slideshow.note_voice_command(f"slideshow at {slideshow.dwell_s}s")
 
     def play_collection(self, command) -> None:
-        """A spoken collection name, on the named side.
+        """A spoken collection name, on the named shape.
 
         "Favorites" is the exception, and it is the Funestras' own meaning: on a
         Funestra that word is F-mode — narrow what is playing to the favorites —
@@ -1589,47 +1589,47 @@ class SlideshowDirector:
         collection as a fresh slideshow instead would answer a word the HUD already has a
         button for with something else entirely.
 
-        The rest play: every collection belongs to one side, so a named side picks
+        The rest play: every collection belongs to one shape, so a named shape picks
         that side's copy and what lands on a region is homogeneous — exactly as
         it is when that collection's own slideshow button opens it — and Latest plays
         newest-first the way that collection's own slideshow does.  Standalone, and hosted
-        with no side named, it is the collection on the side being browsed, the one
+        with no shape named, it is the collection on the shape being browsed, the one
         the word meant.  The Gallery pane is left where it is: this starts a slideshow,
         it does not go browsing."""
         if command.collection_key == _FAVORITES_KEY:
-            self.toggle_favorites_filter(command.side)
+            self.toggle_favorites_filter(command.shape)
             return
-        side = (command.side if command.side and self._fun_time is not None
-                else self._host.side_in_view())
-        key = oriented_key(command.collection_key, side)
+        shape = (command.shape if command.shape and self._fun_time is not None
+                else self._host.shape_in_view())
+        key = shaped_key(command.collection_key, shape)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
             self._host.say("nothing there to play")
             return
-        self.open(items, rows=rows, location=key, side=command.side,
+        self.open(items, rows=rows, location=key, shape=command.shape,
                   **self._order(command.collection_key == _LATEST_KEY))
 
-    def toggle_favorites_filter(self, side) -> None:
+    def toggle_favorites_filter(self, shape) -> None:
         """The spoken "favorites": the slideshow's own F-mode switch, flipped.
 
         The same thing its HUD button does and the same thing the word does on
         a Funestra, so the readout — the lit button and the title — says so
         without anything here having to draw it."""
-        slideshow = self.surface_for(side)
+        slideshow = self.surface_for(shape)
         if slideshow is None:
             self._host.say("F-mode needs a slideshow to narrow")
             return
         slideshow.toggle_favorites_filter()
         self._host.say("F-mode on" if slideshow.hud_favorites_filter else "F-mode off")
 
-    def filter_enhanced(self, enhanced_only: bool, side: str | None = None):
+    def filter_enhanced(self, enhanced_only: bool, shape: str | None = None):
         """Narrow the slideshow in front of the speaker to its enhanced images, or
         put them all back — the switch beside F-mode on its HUD, spoken.
 
         The slideshow's own switch, like the spoken "favorites": a word that set
         some other filter would leave the HUD's button dark over a narrowed
-        slideshow. Hosted, a named side takes that region's slideshow, since two run at
+        slideshow. Hosted, a named shape takes that region's slideshow, since two run at
         once and neither is the active window. With no slideshow up there is nothing
         for the word to narrow, and it says so rather than arming something.
 
@@ -1642,7 +1642,7 @@ class SlideshowDirector:
         Turning it off takes F-mode and the act filter with it: said to a
         slideshow, "clear filter" is the way out of ALL of the narrowing.
         """
-        slideshow = self.surface_for(side)
+        slideshow = self.surface_for(shape)
         if slideshow is None:
             self._host.say("the filter needs a slideshow to narrow")
             return
@@ -1702,8 +1702,8 @@ class SlideshowDirector:
         """
         marked = {row["prompt_id"] for row in self._db.list_generations()
                   if row.get("starred")}
-        for side in _ORIENTATIONS:
-            key = oriented_key(_FAVORITES_KEY, side)
+        for shape in _SHAPES:
+            key = shaped_key(_FAVORITES_KEY, shape)
             marked.update(row["prompt_id"]
                           for row in (self._gallery_pane.rows_for_collection(key) or ()))
         return marked

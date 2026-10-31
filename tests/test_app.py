@@ -1702,7 +1702,7 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
 
 class TestWhenEvolverHasBeenRenamedUnderUs:
     """Four values decide where a sent video lands and whether Evolver picks it
-    up, and each is written down in both apps. A rename on either side used to
+    up, and each is written down in both apps. A rename on either shape used to
     leave videos arriving nowhere with both apps silent, and the test that holds
     the two together skips wherever there is no Evolver beside the checkout --
     which is every run of this repo's gate. So the app asks at startup.

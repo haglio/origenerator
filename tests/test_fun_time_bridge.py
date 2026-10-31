@@ -25,7 +25,7 @@ from origenerator import gallery
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import FAVORITES_KEY
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
@@ -46,7 +46,7 @@ from tests.gallery_view_support import (
     _seeded_db,
     _will_move_on,
 )
-from tests.slideshow_hud_support import funestra_of, open_both_sides
+from tests.slideshow_hud_support import funestra_of, open_both_shapes
 from tests.test_slideshow_hud import _inflight
 
 
@@ -228,7 +228,7 @@ class _SaidOverShow:
 def test_a_spoken_weird_goes_back_to_the_slide_it_was_said_over_first(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _SaidOverShow()
-    monkeypatch.setattr(view, "region_slideshow", lambda side: show)
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
     five_seconds_ago = time.time() - 5.0
 
     (tmp_path / "origenerator_cmd.txt").write_text(
@@ -242,7 +242,7 @@ def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, t
                                                                         monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _SaidOverShow()
-    monkeypatch.setattr(view, "region_slideshow", lambda side: show)
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         f"portrait_lock_on @{time.time() - 5.0:.3f}\n", encoding="utf-8")
@@ -262,12 +262,12 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
         "LANDSCAPE_SAY:favorites\n", encoding="utf-8")
     bridge._tick()
 
-    assert [(c.collection_key, c.side) for c in played] == [(FAVORITES_KEY, "landscape")]
+    assert [(c.collection_key, c.shape) for c in played] == [(FAVORITES_KEY, "landscape")]
 
 
 def test_a_side_handed_over_on_its_own_is_filled_on_its_own(qtbot, tmp_path, monkeypatch):
     """Each of the session's Satellite Funestras goes into Origenerator mode by
-    itself, so the session hands this app one side at a time."""
+    itself, so the session hands this app one shape at a time."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     filled = []
     monkeypatch.setattr(view, "fill_the_region", filled.append)
@@ -297,7 +297,7 @@ def test_a_released_bridge_answers_the_session_no_further(qtbot, tmp_path, monke
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     (tmp_path / "origenerator_cmd.txt").write_text("RELEASE\nportrait_open_slideshow\n",
                                                  encoding="utf-8")
-    monkeypatch.setattr(view, "fill_the_region", lambda side: paused.append("filled"))
+    monkeypatch.setattr(view, "fill_the_region", lambda shape: paused.append("filled"))
     bridge._tick()
 
     assert paused == []
@@ -349,8 +349,8 @@ def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
         {**(view.row_for(item[2]) or {}), **_row_of(item)}
         for item in library.get(key, [])])
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
-    open_both_sides(view)
-    slideshows = [view.region_slideshow(side) for side in ("portrait", "landscape")]
+    open_both_shapes(view)
+    slideshows = [view.region_slideshow(shape) for shape in ("portrait", "landscape")]
     for slideshow in slideshows:
         qtbot.addWidget(slideshow.shown)
     return slideshows
@@ -532,7 +532,7 @@ def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, mo
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     begun = []
     monkeypatch.setattr(view._voice, "_begin_request",
-                        lambda target, spoken, side=None: begun.append((spoken.text, side)))
+                        lambda target, spoken, shape=None: begun.append((spoken.text, shape)))
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "PORTRAIT_SAY:request no feet\n", encoding="utf-8")
@@ -543,7 +543,7 @@ def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, mo
         "PORTRAIT_SAY:over\n", encoding="utf-8")
     bridge._tick()
 
-    # The side is the region it was said to, not the first word of the request.
+    # The shape is the region it was said to, not the first word of the request.
     assert begun == [("no feet", "portrait")]
     assert slideshow is view.region_slideshow("portrait")
 
@@ -679,12 +679,12 @@ def test_a_press_no_slideshow_answers_is_dropped_on_the_log(qtbot, tmp_path, mon
 
 
 def _funestras_session(tmp_path):
-    def channel(side):
+    def channel(shape):
         return FunestraChannel(
-            playlist=tmp_path / f"{side}.tsv",
-            command_file=tmp_path / f"{side}_cmd.txt",
-            status_file=tmp_path / f"{side}_status.txt",
-            hud_file=tmp_path / f"origenerator_{side}_hud.json",
+            playlist=tmp_path / f"{shape}.tsv",
+            command_file=tmp_path / f"{shape}_cmd.txt",
+            status_file=tmp_path / f"{shape}_status.txt",
+            hud_file=tmp_path / f"origenerator_{shape}_hud.json",
         )
     session = _session(tmp_path)
     return FunTimeSession(
@@ -795,13 +795,13 @@ def _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
     _press(bridge, tmp_path, "portrait_open_slideshow")
     _press(bridge, tmp_path, "landscape_open_slideshow")
-    for side in ("landscape", "portrait"):
-        _told(tmp_path, side)
+    for shape in ("landscape", "portrait"):
+        _told(tmp_path, shape)
     return view
 
 
-def _told(tmp_path, side):
-    return consume_command_file(tmp_path / f"{side}_cmd.txt", uppercase=False)
+def _told(tmp_path, shape):
+    return consume_command_file(tmp_path / f"{shape}_cmd.txt", uppercase=False)
 
 
 def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
@@ -935,8 +935,8 @@ def test_the_maps_own_verbs_all_reach_the_slideshow(qtbot, tmp_path, monkeypatch
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     dropped = []
-    monkeypatch.setattr(bridge, "_apply_side", lambda side, action, argument, line, said_at:
-                        dropped.append(line) if not answer(view.region_slideshow(side), action, argument)
+    monkeypatch.setattr(bridge, "_apply_shape", lambda shape, action, argument, line, said_at:
+                        dropped.append(line) if not answer(view.region_slideshow(shape), action, argument)
                         else None)
 
     for verb in ("portrait_seed_loop", "portrait_action_loop", "portrait_no_loop",
@@ -948,8 +948,8 @@ def test_the_maps_own_verbs_all_reach_the_slideshow(qtbot, tmp_path, monkeypatch
 
 def test_a_rows_filter_press_is_spelled_the_other_way_round_and_still_reaches_the_slideshow(
         qtbot, tmp_path, monkeypatch):
-    """The HUD posts a row's filter button as ``filter_<side>_<row>`` —
-    the side in the middle — and a session hands it back verbatim."""
+    """The HUD posts a row's filter button as ``filter_<shape>_<row>`` —
+    the shape in the middle — and a session hands it back verbatim."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     asked = []
@@ -1112,8 +1112,8 @@ def _view_with_funestras_and_bridge(qtbot, tmp_path):
 
 
 def _stations_dealt(tmp_path) -> list[int]:
-    return [len(read_radio(radio_file_for(tmp_path / f"{side}.tsv")))
-            for side in ("portrait", "landscape")]
+    return [len(read_radio(radio_file_for(tmp_path / f"{shape}.tsv")))
+            for shape in ("portrait", "landscape")]
 
 
 def test_the_moment_this_app_is_up_each_funestra_it_was_handed_is_dealt_its_radio(

@@ -24,7 +24,7 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.new_tile import NewTile
-from origenerator.orientation import base_of
+from origenerator.item_shape import base_of
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
@@ -420,8 +420,8 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    # _tree_item_for: a folder has a row per side now, and this key has no
-    # side on it.
+    # _tree_item_for: a folder has a row per shape now, and this key has no
+    # shape on it.
     was = [row["seed"] for row in view._tree_item_for(key).data(0, _GROUP_ROLE).rows]
 
     _rewritten(view, key)

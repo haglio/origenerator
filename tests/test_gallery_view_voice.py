@@ -1113,7 +1113,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     # One matcher reaches the mic for everything that tolerates a filler word, so
     # a verb added to the vocabulary lands there without this module listing the
     # parts a second time and drifting from it.  It wraps what it matches with
-    # the side the utterance named, which is how a room with two slideshows in it
+    # the shape the utterance named, which is how a room with two slideshows in it
     # says which image is meant.
 
     assert match("enhance").command == gallery.ENHANCE_COMMAND
@@ -1264,7 +1264,7 @@ def test_a_spoken_favorite_over_a_slideshow_favorites_the_slide(qtbot, tmp_path)
 
 
 def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_path):
-    # The active side, with two sides: over a slideshow "back" is the slide before,
+    # The active shape, with two shapes: over a slideshow "back" is the slide before,
     # and in the gallery it is the stop before — both are the one before.
     view = _listening(qtbot, tmp_path)
     first = _select_first_leaf(view)

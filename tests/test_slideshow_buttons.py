@@ -26,9 +26,9 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
     button row posts, so the session routes a slideshow's press with no new verbs; and
     every glyph on this HUD is cryptic on purpose, so each one names itself
     on hover."""
-    for side in ("portrait", "landscape"):
-        for button in slideshow_rows(side)[-1]:
-            assert button.command.startswith(f"{side}_"), button.command
+    for shape in ("portrait", "landscape"):
+        for button in slideshow_rows(shape)[-1]:
+            assert button.command.startswith(f"{shape}_"), button.command
             assert button.tooltip, button.command
 
 

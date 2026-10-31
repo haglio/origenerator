@@ -66,7 +66,7 @@ def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
 
 
 def test_media_badge_shows_only_when_the_item_names_a_type(qtbot):
-    # An in-flight card in the Recents collection wears the same image/video badge as a
+    # An in-flight card in the Latest collection wears the same image/video badge as a
     # finished tile, so a queued video reads as a video before its first frame.
     plain = InFlightCard(_item())                    # no type known → no badge
     qtbot.addWidget(plain)

@@ -39,7 +39,7 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import (
-    RECENTS_KEY as _RECENTS_KEY,
+    LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
@@ -102,7 +102,7 @@ _WANTS_ANIMATING = "an animation"
 # The collection each spoken collection name stands you in. What to call it back is the
 # host's answer, so a row renamed is renamed in one place.
 _COLLECTIONS = {
-    AppCommand.RECENTS: _RECENTS_KEY,
+    AppCommand.LATEST: _LATEST_KEY,
     AppCommand.FAVORITES: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
     AppCommand.TRASH: _TRASH_KEY,
@@ -506,7 +506,7 @@ class VoiceRouter(QObject):
         key = _COLLECTIONS[command]
         label = self._host.collection_label(key)
         if not self._host.stand_in_collection(key, side):
-            # Recents and Favorites appear only once there is one
+            # Latest and Favorites appear only once there is one
             self._slideshows.answer(f"no {label} collection yet", kind=WARNING)
             return
         self._slideshows.answer(label)

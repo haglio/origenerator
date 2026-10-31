@@ -51,7 +51,7 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import (
-    RECENTS_KEY as _RECENTS_KEY,
+    LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import folder_collection
 from origenerator.gallery.sides import (
@@ -450,12 +450,12 @@ class SlideshowDirector:
         items = self.items_of(rows)
         if not items:
             return
-        # Recents is Latest, exactly as on a Fun Time Funestra: the collection lists
+        # Latest is Latest, exactly as on a Fun Time Funestra: the collection lists
         # newest first and its slideshow plays that order, where every other
         # set shuffles — and the slideshow's HUD title says which.  Latest
         # opens on the newest, whatever is picked or wherever the last Latest
         # slideshow stopped: the newest is what it is opened for.
-        latest = collection is not None and collection.which == _RECENTS_KEY
+        latest = collection is not None and collection.which == _LATEST_KEY
         picked = [] if latest else self._picked_since_the_slideshow_up_opened()
         one_picked = picked[0] if len(picked) == 1 else None
         resume = None if latest else self._place_coming_back_to(location, items)
@@ -893,7 +893,7 @@ class SlideshowDirector:
         the map's row reaches the rest.  Every other set is shuffled, where a
         run is not a run of anything."""
         collection = folder_collection(_split_collection_key(location)[0])
-        if collection is None or collection.which != _RECENTS_KEY:
+        if collection is None or collection.which != _LATEST_KEY:
             return rows
         return one_per_stretch(rows, image_index=self._host.image_config_index())
 
@@ -1320,7 +1320,7 @@ class SlideshowDirector:
 
     def _play_the_library(self, slideshow, *, latest: bool, keep_slide: bool) -> bool:
         side = self._base_side(slideshow)
-        key = oriented_key(_RECENTS_KEY, side) if latest else self.base_location(side)
+        key = oriented_key(_LATEST_KEY, side) if latest else self.base_location(side)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
@@ -1425,8 +1425,8 @@ class SlideshowDirector:
 
         A folder's slideshow answers off those rows as usual: the tree keeps a run in
         flight in the folder its settings put it in, so it is already among them.
-        A collection's cannot — Recents is a collection of results and a run has none yet —
-        so Recents answers for itself, by its own rule: every generation this app
+        A collection's cannot — Latest is a collection of results and a run has none yet —
+        so Latest answers for itself, by its own rule: every generation this app
         makes lands there, and this is one. The other collections are deliberate sets
         (favorited, requested, condemned) that nothing joins by being made, and a
         search's hits are a set that was already asked for.
@@ -1441,21 +1441,21 @@ class SlideshowDirector:
             return False
         held = (self._held_at_location(location) if location
                 else {r["prompt_id"] for r in self._host.rows_to_play()})
-        return prompt_id in held or self._recents_would_take(row, location)
+        return prompt_id in held or self._latest_would_take(row, location)
 
     def _held_at_location(self, location) -> frozenset[str]:
         return self._held_at.get(location, lambda: frozenset(
             r["prompt_id"] for r in self.rows_at(location)))
 
-    def _recents_would_take(self, row: dict, location) -> bool:
+    def _latest_would_take(self, row: dict, location) -> bool:
         base, side = _split_collection_key(location)
         latest = folder_collection(base)
         if location:
-            playing_recents = latest is not None and latest.which == _RECENTS_KEY
+            playing_latest = latest is not None and latest.which == _LATEST_KEY
         else:
-            playing_recents = (self._browser.showing_recents()
+            playing_latest = (self._browser.showing_latest()
                                and not self._browser.showing_search())
-        return bool(playing_recents
+        return bool(playing_latest
                     and source_of(row) == GenerationSource.GENERATED
                     and filter_rows([row], side)
                     and (latest is None or latest.folder in gallery.folder_chain(
@@ -1608,7 +1608,7 @@ class SlideshowDirector:
             self._host.say("nothing there to play")
             return
         self.open(items, rows=rows, location=key, side=command.side,
-                  **self._order(command.collection_key == _RECENTS_KEY))
+                  **self._order(command.collection_key == _LATEST_KEY))
 
     def toggle_favorites_filter(self, side) -> None:
         """The spoken "favorites": the slideshow's own F-mode switch, flipped.

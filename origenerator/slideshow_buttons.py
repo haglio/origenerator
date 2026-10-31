@@ -26,7 +26,7 @@ from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.console_commands import FILTER, spelled_for
 
-# The band, in the order the Funestras put the same controls in.  The tuples are
+# The HUD's button row, in the order the Funestras put the same controls in.  The tuples are
 # the groups the wider gap opens between.
 CONTROL_GROUPS = (
     ("prev", "next"),
@@ -110,14 +110,14 @@ def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = 
     names = [name for group in CONTROL_GROUPS for name in group]
     lit = {"lock": locked, "fmode": favorites_filter, "enhanced": enhanced,
            "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
-    band = tuple(
+    row = tuple(
         _control(side, name, hosted=hosted, lit=lit.get(name, False),
                  dim=name == "cycle_version" and not has_other_versions,
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
         for index, name in enumerate(names)
     )
     pace = () if clip_seconds is None else (clip_seconds_row(side, clip_seconds),)
-    return (_mode_row(), band, *pace) if mode_row else (band, *pace)
+    return (_mode_row(), row, *pace) if mode_row else (row, *pace)
 
 
 def clip_seconds_row(side: str, seconds: int) -> tuple[Button, ...]:
@@ -133,7 +133,7 @@ def clip_seconds_row(side: str, seconds: int) -> tuple[Button, ...]:
 _NEWER, _OLDER = -1, 1
 
 # What each press asks of a slideshow, by the name its verb carries after the side:
-# the band's buttons, the map's own chrome, the session's own keys and a window's
+# the button row's buttons, the map's own chrome, the session's own keys and a window's
 # shifted arrows, all in the Funestras' spelling.
 _PRESSES: dict[str, Callable[[Any], object]] = {
     "prev": lambda host: host.slideshow_step(-1),

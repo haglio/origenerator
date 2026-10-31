@@ -11,19 +11,19 @@ def _label_texts(tile):
     return [w.text() for w in tile.findChildren(QLabel)]
 
 
-def test_folder_tile_shows_its_breadcrumb_context(qtbot):
+def test_folder_tile_shows_its_folder_path_context(qtbot):
     # The Favorites collection captions each tile with where the folder lives, alongside
     # the folder's own name, so two same-named folders stay tellable apart.
     tile = FolderTile("k", "a dog", [], 3, context="Images › SDXL")
     qtbot.addWidget(tile)
 
     texts = _label_texts(tile)
-    assert any("SDXL" in t for t in texts)   # the breadcrumb line is shown
+    assert any("SDXL" in t for t in texts)   # the folder path line is shown
     assert "a dog" in texts                  # and the folder's own name
 
 
-def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
-    # A normal drill-down tile has no breadcrumb — its siblings share a parent.
+def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
+    # A normal drill-down tile has no folder path — its siblings share a parent.
     tile = FolderTile("k", "a dog", [], 3)
     qtbot.addWidget(tile)
 
@@ -65,13 +65,13 @@ def test_a_folder_tile_is_the_same_tile_as_the_ones_it_stands_beside(qtbot):
     assert tile_shape.idle_css("folderTile") in tile.styleSheet()
 
 
-def test_the_breadcrumb_line_is_the_whole_of_what_makes_a_collection_tile_taller(qtbot):
+def test_the_folder_path_line_is_the_whole_of_what_makes_a_collection_tile_taller(qtbot):
     # The Favorites collection's tiles carry one line the others do not, so their height
     # is the same tile plus exactly that line.
     tile = FolderTile("k", "a dog", [], 3, context="Images > SDXL")
     qtbot.addWidget(tile)
 
-    assert tile.height() == tile_shape.folder_tile_size(breadcrumb=True)[1]
+    assert tile.height() == tile_shape.folder_tile_size(folder_path=True)[1]
 
 
 def test_a_folder_square_wears_the_picked_frame_when_it_is_marked(qtbot):

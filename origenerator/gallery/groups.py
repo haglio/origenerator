@@ -9,7 +9,7 @@ types alone, so they live with the definitions rather than with the tree builder
 :class:`CustomGroup` sits alongside them as the one folder the *user* composes:
 it holds whichever folders they gathered into it rather than a slice of the
 hierarchy. It answers the same walkers, so everything built on them — the
-breadcrumb, the folder tiles, the slideshow's row list — treats it like any
+folder path, the folder tiles, the slideshow's row list — treats it like any
 other folder (see :mod:`origenerator.gallery.custom`).
 """
 from __future__ import annotations

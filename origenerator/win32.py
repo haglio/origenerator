@@ -15,6 +15,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from app_support.win32 import window_exists
+
 _user32 = ctypes.windll.user32  # type: ignore[attr-defined]
 # HWND/HANDLE argtypes declared so ctypes passes them as 64-bit pointers rather
 # than truncating to c_int -- the same rule fun_time/win32.py follows.
@@ -78,22 +80,6 @@ def register_link_handler(scheme: str, *, name: str, command: str,
     except OSError as exc:
         logging.getLogger(__name__).warning(
             "Could not register the link handler: %s", exc)
-
-
-# argtypes matter on 64-bit: without them ctypes marshals an HWND as a 32-bit
-# c_int and truncates the handle.
-_user32.IsWindow.argtypes = [ctypes.wintypes.HWND]
-_user32.IsWindow.restype = ctypes.wintypes.BOOL
-
-
-def window_exists(hwnd: int) -> bool:
-    """Whether *hwnd* still names a live window.
-
-    A handle outlives the window it named — closing the window does not retire
-    the number — so anything that must reach *that* window and no other asks
-    first.
-    """
-    return bool(hwnd) and bool(_user32.IsWindow(hwnd))
 
 
 def place_window_in_device_pixels(hwnd: int, x: int, y: int,

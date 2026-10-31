@@ -128,16 +128,16 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
 
     assert seen == [(405, 818), (446, 818)]   # continues past the first pass's end
     assert job.last_progress == (446, 818)
-    # And the pass in hand is reported alongside, for the band along the bar's
+    # And the pass in hand is reported alongside, for the substep progress bar along the bar's
     # foot: the whole-run reading above it is what must never restart, so the
     # restarting count has to live somewhere.
     assert job.last_pass_progress == (1, 10)
-    # …and named, since the band on its own says only that something restarted.
+    # …and named, since the substep progress bar on its own says only that something restarted.
     assert job.last_stage == "Second pass"
 
 
 def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
-    # One sampler end to end: a band under the bar would count the same steps
+    # One sampler end to end: a substep progress bar under the bar would count the same steps
     # the bar is already counting.
     wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
     client = _client()
@@ -459,7 +459,7 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", progress_state=state,
     )
     assert job.last_progress == (446, 818)   # bar resumes at its last spot immediately
-    # Its band comes back with it, so the bar isn't whole for a tick and then
+    # Its substep progress bar comes back with it, so the bar isn't whole for a tick and then
     # split. The snapshot predates the recorded pass count; the payload's own
     # (three, for this workflow) stands in.
     assert job.last_pass_progress == (3, 10)

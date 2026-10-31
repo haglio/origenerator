@@ -26,7 +26,7 @@ from origenerator.gallery.groups import CustomGroup, child_groups, rows_under
 
 CUSTOM_PREFIX = "__custom__/"
 # The throwaway folder a live multi-selection stands up: never saved, so it needs
-# no id — but it is a CustomGroup like any other, so the pane, the breadcrumb and
+# no id — but it is a CustomGroup like any other, so the pane, the folder path and
 # the slideshow treat a selection exactly as they treat a saved grouping.
 SELECTION_KEY = "__selection__"
 

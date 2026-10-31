@@ -16,8 +16,8 @@ WAN step denoises every frame of the video through a 14B model, and a foley step
 denoises a few seconds of audio through a small one — so the bar is budgeted in
 *seconds of sampling* instead, and each pass is sized by what a step of it
 actually costs (:data:`_VIDEO_STEP_SECONDS_PER_FRAME` and the constants beside
-it). Steps are still what the passes report, and still what the band along the
-bar's foot counts; they are simply not what the bar is measured in.
+it). Steps are still what the passes report, and still what the substep progress
+bar along the bar's foot counts; they are simply not what the bar is measured in.
 
 Two readings come out of that, and a bar shows both. :meth:`ProgressTracker.
 update` gives the whole run's ramp; :meth:`ProgressTracker.current_pass` gives
@@ -26,7 +26,7 @@ single bar used to be mistaken for. An enhancement that upscales an image and
 then fixes its faces and its hands is three passes — more, wherever a detector
 finds several regions — and one bar showing only the pass in hand empties and
 refills once per fix, which reads as a queue of separate jobs rather than one
-job's work. Kept apart, the restarting belongs to the lower band, where it is
+job's work. Kept apart, the restarting belongs to the substep progress bar, where it is
 the truth about the step being taken, and the reading above it only advances.
 
 The measuring is what has to be right. A pass left out of the up-front total
@@ -283,8 +283,8 @@ def expected_sampling_seconds(payload: dict) -> int:
 def expected_pass_count(payload: dict) -> int:
     """How many sampler passes a payload is budgeted for.
 
-    What decides whether a bar has a second band to show at all: a lone-sampler
-    image job is one pass end to end, and a band counting the same steps as the
+    What decides whether a bar has a substep progress bar to show at all: a lone-sampler
+    image job is one pass end to end, and one counting the same steps as the
     reading above it says nothing twice. A detailer counts once here however many
     regions it turns out to sample — the rest are found, not budgeted.
     """
@@ -375,7 +375,7 @@ class ProgressTracker:
         self._last_value = None if last_value is None else int(last_value)
         self._node = snapshot.get("node")
         self._passes = max(1, int(snapshot.get("passes", self._passes)))
-        # A snapshot taken before the band existed says nothing about which pass
+        # A snapshot taken before the substep progress bar existed says nothing about which pass
         # it was in, but the rest of it does: banked seconds mean a pass finished
         # and another began. Reading that back beats leaving a reconnected job's
         # bar whole until its next tick and then splitting it.
@@ -396,12 +396,12 @@ class ProgressTracker:
     def current_pass(self) -> tuple[int, int] | None:
         """The pass running right now, as its own ``(done, total)`` steps — or ``None``.
 
-        ``None`` wherever a second band would say nothing the reading above it
+        ``None`` wherever a substep progress bar would say nothing the reading above it
         doesn't: a run budgeted for one pass and still inside it, a run that has
         not reported a step, and a run with no recognized sampler (whose bar is
         already showing raw per-node numbers, which *are* this reading). A run
-        budgeted for several passes has its band from its first step, so the band
-        doesn't appear from nowhere partway through; an under-budgeted one grows
+        budgeted for several passes has its substep progress bar from its first step, so
+        it doesn't appear from nowhere partway through; an under-budgeted one grows
         one the moment a second pass proves there was more than the one.
         """
         if self._total <= 0 or self._pass_index == 0:

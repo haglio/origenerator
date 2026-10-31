@@ -1626,6 +1626,22 @@ def _row_texts(row):
     return [lbl.text().replace("\u200b", "") for lbl in row.findChildren(QLabel)]
 
 
+def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its_label(saved_panel):
+    panel, db = saved_panel
+    image = _enhanced_image_row(db)
+    panel.show_saved_generation(image, [image])
+    panel.resize(480, 1400)
+    panel.show()
+    panel.layout().activate()
+    facts = next(row for row in _level_rows(panel) if "Enhancement" in _row_texts(row))._facts
+    lines = [line for line in range(1, facts.rowCount()) if facts.itemAtPosition(line, 1)]
+    keys = [facts.itemAtPosition(line, 0).widget() for line in lines]
+    values = [facts.itemAtPosition(line, 1).widget() for line in lines]
+    longest = max(key.fontMetrics().horizontalAdvance(key.text()) for key in keys)
+
+    assert {value.x() - (key.x() + longest) for key, value in zip(keys, values)} == {GAP_MEDIUM}
+
+
 def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_panel):
     # This is where an image's versions live, so it has to be somewhere you can
     # already see before the first enhancement makes a second one — not least

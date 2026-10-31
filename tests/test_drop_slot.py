@@ -7,6 +7,7 @@ from PyQt6.QtCore import QMimeData, QPoint, QPointF, Qt
 from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import hovered
+from shared_ui.spacing import GAP_SMALL
 from shared_ui.testing import ground
 
 from origenerator.gui.drags import under_way
@@ -124,6 +125,17 @@ def test_a_filled_slot_names_its_item_under_its_image(qtbot):
     slot.clear()
 
     assert (named, slot._caption.text()) == ("Example Folder img1", "")
+
+
+def test_a_held_items_name_sits_as_close_under_its_image_as_under_a_source_thumbnail(qtbot):
+    slot = _slot(qtbot, name_of=lambda held: f"Example Folder {held}")
+    _drop(slot, "img1")
+    slot.resize(240, 240)
+    slot.show()
+    slot.layout().activate()
+    image, name = slot._label, slot._caption
+
+    assert name.y() - (image.y() + image.height()) == GAP_SMALL
 
 
 def test_clicking_a_filled_slot_goes_to_its_item_and_keeps_it(qtbot):

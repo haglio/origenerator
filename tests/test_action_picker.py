@@ -8,6 +8,7 @@ import json
 
 import pytest
 from PyQt6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QWidget
+from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.gui import action_picker
 from origenerator.gui.action_picker import (
@@ -43,6 +44,19 @@ def test_an_image_offers_every_state_and_opens_on_the_one_it_was_sorted_as(picke
     assert not picker.isHidden()
     assert picker.picked() == "state two"
     assert picker.offered() == ["", *_STATES]
+
+
+def test_the_list_sits_one_gap_from_its_name_and_its_button_as_a_forms_field_does(picker):
+    picker.show_row(_row())
+    picker.resize(600, 40)
+    picker.show()
+    picker.layout().activate()
+    name = next(label for label in picker.findChildren(QLabel) if label.text() == ACTION_LABEL)
+    listed = picker.findChild(QComboBox)
+    button = picker.findChild(QPushButton, SORT_BUTTON)
+
+    assert (listed.x() - (name.x() + name.width()),
+            button.x() - (listed.x() + listed.width())) == (GAP_MEDIUM, GAP_MEDIUM)
 
 
 def test_an_image_nobody_has_sorted_yet_opens_on_nothing(picker):

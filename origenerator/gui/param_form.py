@@ -972,7 +972,7 @@ class ParamForm(QWidget):
             return w.story(pd.key)
         return self._kind(pd).read(pd, w)
 
-    def _write_field(self, pd: ParamDef, value) -> None:
+    def _write_field(self, pd: ParamDef, value, *, carried: bool = False) -> None:
         w = self._widgets[pd.key]
         if w is self._scenes:
             if pd.key == "scene_frames":
@@ -981,6 +981,9 @@ class ParamForm(QWidget):
                 w.set_lines(value)
             elif pd.key != "frame_count":
                 w.set_story(pd.key, value)
+            return
+        if carried and isinstance(w, PromptBoxes):
+            w.carry(str(value))
             return
         self._kind(pd).write(pd, w, value)
         tick = self._randomize_checks.get(pd.key)
@@ -1008,7 +1011,7 @@ class ParamForm(QWidget):
     def replace_values(self, params: dict):
         self.set_values({**{pd.key: pd.default for pd in self._param_defs}, **params})
 
-    def set_values(self, params: dict):
+    def set_values(self, params: dict, *, carried: bool = False):
         # Retain any params without a field so they survive the read-back; the rest
         # are applied to their widgets. A hidden key is dropped entirely — never
         # absorbed — so the form keeps emitting the workflow's default for it.
@@ -1025,7 +1028,7 @@ class ParamForm(QWidget):
         # per-scene value is laid over the scenes it made.
         for pd in sorted(self._param_defs, key=lambda d: d.key != "positive_prompt"):
             if pd.key in params:
-                self._write_field(pd, params[pd.key])
+                self._write_field(pd, params[pd.key], carried=carried)
         for pd in self._seed_defs():
             if pd.key in params and self._randomize_checks[pd.key].isChecked():
                 self._draw(pd)

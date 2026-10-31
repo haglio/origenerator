@@ -725,13 +725,13 @@ class GenerateConfigPanel(DropZone):
                                          items=self._zone_items(), lora_keys=wf.lora_keys))
             self._form_workflow_key = key
             defaults = wf.default_params()
-            carried = {
+            carried_over = {
                 k: v for k, v in edited.items()
                 if k in defaults and v != defaults[k]
             }
-            if carried:
-                self._param_form.set_values(carried)
-                self._param_form.put_seeds(carried, is_random=False)
+            if carried_over:
+                self._param_form.set_values(carried_over, carried=True)
+                self._param_form.put_seeds(carried_over, is_random=False)
             checkpoint = self._param_form.get_values().get("checkpoint")
             if not self._loading_config:
                 self._rebase_on_the_model(None, checkpoint, keep=edited)

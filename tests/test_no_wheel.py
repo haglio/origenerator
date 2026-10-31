@@ -103,7 +103,7 @@ def test_a_dropdown_with_nothing_picked_shows_its_placeholder(qtbot):
     assert w.display_text(1000) == "Select a workflow…"
 
 
-def test_a_squeezed_value_elides_rather_than_clips(qtbot):
+def test_a_squeezed_value_elides_rather_than_cuts_off(qtbot):
     w = NoWheelComboBox()
     w.addItems(_MODELS)
     w.setCurrentIndex(0)

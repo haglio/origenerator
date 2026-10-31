@@ -86,7 +86,7 @@ def test_a_videos_own_script_is_found_before_those_older_versions_filed(tmp_path
 
 
 def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
-    """Hundreds sit beside their clips. A reader that knew only the new place
+    """Hundreds sit beside their videos. A reader that knew only the new place
     would drop the motion from every one of them, silently."""
     video = tmp_path / "video" / "clip.mp4"
     video.parent.mkdir()
@@ -190,7 +190,7 @@ def test_a_video_with_no_script_anywhere_has_none(tmp_path):
 
 
 def test_read_actions_passes_a_missing_script_through():
-    """``funscript_of`` answers ``None`` for a clip with no script, and that goes
+    """``funscript_of`` answers ``None`` for a video with no script, and that goes
     straight to ``read_actions`` at every call site."""
     assert read_actions(None) == []
 

@@ -80,19 +80,19 @@ def test_a_copy_waiting_under_the_name_a_second_send_gave_it_is_still_held(tmp_p
 
 class TestTheFunscriptThatGoesWithIt:
     def test_lands_beside_the_copy_under_its_name(self, tmp_path):
-        clip, script = tmp_path / "made_00001.mp4", tmp_path / "made_00001.funscript"
-        clip.write_bytes(b"video")
+        video, script = tmp_path / "made_00001.mp4", tmp_path / "made_00001.funscript"
+        video.write_bytes(b"video")
         script.write_text("{}", encoding="utf-8")
 
-        landed = export_video(clip, tmp_path / "inbox", funscript=script)
+        landed = export_video(video, tmp_path / "inbox", funscript=script)
 
         assert landed.with_suffix(".funscript").read_text(encoding="utf-8") == "{}"
         assert script.exists()
 
     def test_shows_up_only_after_its_clip_so_evolver_never_finds_it_alone(self, tmp_path,
                                                                            monkeypatch):
-        clip, script = tmp_path / "made_00004.mp4", tmp_path / "made_00004.funscript"
-        clip.write_bytes(b"video")
+        video, script = tmp_path / "made_00004.mp4", tmp_path / "made_00004.funscript"
+        video.write_bytes(b"video")
         script.write_text("{}", encoding="utf-8")
         shown = []
         real_replace = evolver_export.os.replace
@@ -104,14 +104,14 @@ class TestTheFunscriptThatGoesWithIt:
 
         monkeypatch.setattr(evolver_export.os, "replace", replace)
 
-        export_video(clip, tmp_path / "inbox", funscript=script)
+        export_video(video, tmp_path / "inbox", funscript=script)
 
         assert shown == [".mp4", ".funscript"]
 
     def test_a_funscript_that_will_not_copy_leaves_nothing_of_the_send_in_the_inbox(
             self, tmp_path, monkeypatch):
-        clip, script = tmp_path / "made_00002.mp4", tmp_path / "made_00002.funscript"
-        clip.write_bytes(b"video")
+        video, script = tmp_path / "made_00002.mp4", tmp_path / "made_00002.funscript"
+        video.write_bytes(b"video")
         script.write_text("{}", encoding="utf-8")
         inbox = tmp_path / "inbox"
         real_copy = evolver_export.shutil.copy2
@@ -124,19 +124,19 @@ class TestTheFunscriptThatGoesWithIt:
         monkeypatch.setattr(evolver_export.shutil, "copy2", copy_all_but_the_script)
 
         with pytest.raises(OSError, match="unreadable"):
-            export_video(clip, inbox, funscript=script)
+            export_video(video, inbox, funscript=script)
 
         assert list(inbox.iterdir()) == []
 
     def test_a_name_whose_funscript_is_still_waiting_moves_the_pair_along(self, tmp_path):
-        clip, script = tmp_path / "made_00003.mp4", tmp_path / "made_00003.funscript"
-        clip.write_bytes(b"video")
+        video, script = tmp_path / "made_00003.mp4", tmp_path / "made_00003.funscript"
+        video.write_bytes(b"video")
         script.write_text("{}", encoding="utf-8")
         inbox = tmp_path / "inbox"
         inbox.mkdir()
         (inbox / "made_00003.funscript").write_text("waiting", encoding="utf-8")
 
-        landed = export_video(clip, inbox, funscript=script)
+        landed = export_video(video, inbox, funscript=script)
 
         assert landed.name == "made_00003 (2).mp4"
         assert (inbox / "made_00003 (2).funscript").read_text(encoding="utf-8") == "{}"
@@ -144,7 +144,7 @@ class TestTheFunscriptThatGoesWithIt:
 
 
 class TestTheInbox:
-    """Where a clip is handed over used to be a config constant two Qt widgets
+    """Where a video is handed over used to be a config constant two Qt widgets
     reached for in the middle of a send, so the destination was written in no
     single place and the only way to point a test elsewhere was to patch the
     module each had imported it from. One of these is built where the app is put
@@ -152,34 +152,34 @@ class TestTheInbox:
 
     def test_a_clip_lands_in_the_folder_the_lane_is_routed_by(self, tmp_path):
         inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
-        clip = tmp_path / "clip.mp4"
-        clip.write_bytes(b"video")
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"video")
 
-        landed = inbox.hand_over(clip, "example-loop-clips")
+        landed = inbox.hand_over(video, "example-loop-clips")
 
         assert landed == tmp_path / "0_inbox" / "example-loop-clips" / "clip.mp4"
         assert landed.read_bytes() == b"video"
 
     def test_a_clip_handed_over_with_its_funscript_brings_it(self, tmp_path):
         inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
-        clip, script = tmp_path / "clip.mp4", tmp_path / "clip.funscript"
-        clip.write_bytes(b"video")
+        video, script = tmp_path / "clip.mp4", tmp_path / "clip.funscript"
+        video.write_bytes(b"video")
         script.write_text("{}", encoding="utf-8")
 
-        landed = inbox.hand_over(clip, "example-library-lane", funscript=script)
+        landed = inbox.hand_over(video, "example-library-lane", funscript=script)
 
         assert landed.with_suffix(".funscript").read_text(encoding="utf-8") == "{}"
 
     def test_a_lane_with_no_folder_is_refused_rather_than_dropped_in_the_root(
             self, tmp_path):
-        """An empty source name would put the clip beside every other lane's,
+        """An empty source name would put the video beside every other lane's,
         where Evolver routes by folder and would read it as none of them."""
         inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
-        clip = tmp_path / "clip.mp4"
-        clip.write_bytes(b"video")
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"video")
 
         with pytest.raises(ValueError, match="no folder"):
-            inbox.hand_over(clip, "")
+            inbox.hand_over(video, "")
 
     def test_the_app_s_own_inbox_is_the_one_config_names(self):
         assert evolver_export.default_inbox().inbox_dir == config.EVOLVER_INBOX_DIR

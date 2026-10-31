@@ -3,13 +3,13 @@
 The gallery's combine panel pairs two slots — an image slot and a video slot — with
 a zone between them that drops into both. A slot holds whatever its ``lent_by``
 says a dropped generation lends it and turns away one that lends it nothing; it
-previews what it holds — a video loops its clip, an image shows its still — names
+previews what it holds — a video loops, an image shows its still — names
 it underneath, and wears a corner badge of its own kind. What it holds means
 nothing to it; its owner supplies ``lent_by``, the preview and the name.
 
 A slot whose item is held only for its settings is built ``grayscale``, and draws
 whatever lands in it drained of color (:mod:`origenerator.gui.grayscale`) — the
-video slot's whole purpose being the clip's settings rather than the clip.
+video slot's whole purpose being the video's settings rather than the video.
 """
 from __future__ import annotations
 

@@ -841,7 +841,7 @@ class BrowserPane(QObject):
         """Draw on a page at a time until the tiles reach _REACH past the foot of
         what is seen — what makes a pane keep going instead of stopping at a fixed
         count, and fills a pane taller than a page — and play only the looping
-        clips within _REACH of it.
+        videos within _REACH of it.
 
         Measured off the tiles drawn rather than off the scroll bar, whose range
         trails the drawing until the pane is laid out again. Wired to the bar's

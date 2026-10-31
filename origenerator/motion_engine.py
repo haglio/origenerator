@@ -7,7 +7,7 @@ are :mod:`funestra.robot_hand` — the Robot Hand, genau's own, shared so both
 apps move the same way rather than two ways that look alike until they don't.
 
 What genau keeps elsewhere and this has to carry is the phase. Genau's engine
-advances it against the clip's beats; here there is no clip, so the motion
+advances it against the video's beats; here there is no video, so the motion
 free-runs on the driver's clock and the phase rides along with the bars, in
 :class:`Motion`.
 

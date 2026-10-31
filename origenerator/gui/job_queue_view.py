@@ -21,7 +21,7 @@ what kind of thing it is, and nothing else ("~2 min · Video · dancing · Auto 
 line of waiting work is read to find out how long the wait is, and the
 workflow-and-prompt name that used to be here is the same on every row of a
 folder being re-rolled. Beside that, a thumbnail — the frame an I2V
-animates, the gray clip a dropped-video combine takes its settings from, or a
+animates, the gray video a dropped-video combine takes its settings from, or a
 four-up of the folder the run will land in — because the one thumbnail a queued
 job cannot show is its own.
 Only a run that holds its place is fixed, a shielded one being made say: nothing

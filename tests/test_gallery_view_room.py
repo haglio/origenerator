@@ -88,7 +88,7 @@ class _FakeDriver:
 
     def trace(self, count, seconds):
         """What the console asks a driver for while it has the device. These
-        cases carry no scripted clip, so there is no line to draw — the same
+        cases carry no scripted video, so there is no line to draw — the same
         empty answer the real driver gives for one."""
         return ()
 
@@ -453,19 +453,19 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
 
 
 def test_stepping_a_double_clicked_slideshow_re_aims_the_osr2(qtbot):
-    # Stepping to another clip re-aims the one device at the newly shown video.
+    # Stepping to another video re-aims the one device at the newly shown video.
     view, driver, _panel = _osr2_view(qtbot)
     view.osr2_control.setChecked(True)
     slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
     assert driver.started[-1] == ("pA", "aA")
 
-    _aim_slideshow(view, slideshow, ("B.mp4", "pB", "aB"))  # Left/Right landed on another clip
+    _aim_slideshow(view, slideshow, ("B.mp4", "pB", "aB"))  # Left/Right landed on another video
     assert driver.started[-1] == ("pB", "aB")
     slideshow.close()
 
 
 def test_a_slideshow_opened_with_the_switch_off_drives_nothing(qtbot):
-    # Double-clicking a clip open once took the device whatever the switch said.
+    # Double-clicking a video open once took the device whatever the switch said.
     view, driver, _panel = _osr2_view(qtbot)
     slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
 
@@ -692,7 +692,7 @@ def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
-    # The toggle governs a slideshow as much as the tab preview: double-clicking a clip
+    # The toggle governs a slideshow as much as the tab preview: double-clicking a video
     # to watch it doesn't take the device on its own.
     view, driver, _panel = _osr2_view(qtbot)
     assert not view.osr2_control.isChecked()
@@ -738,7 +738,7 @@ def test_closing_the_slideshow_stops_driving_with_no_tab_video_behind_it(qtbot):
 
 
 def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot):
-    # With the toggle already driving the front-tab video, opening a clip fullscreen
+    # With the toggle already driving the front-tab video, opening a video fullscreen
     # re-aims the one device at the slideshow's player; closing hands it back.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
@@ -755,7 +755,7 @@ def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot)
 def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
     # The surface in front answers for the device alone: a slideshow opening on an
     # image hands the OSR2 to the motion, the way a Funestra hands back to it
-    # between scripted clips.  Falling through to the front tab left that tab's
+    # between scripted videos.  Falling through to the front tab left that tab's
     # funscript driving under a slideshow it has nothing to do with, until the slideshow
     # happened to reach a scripted video of its own.
     view, driver, panel = _osr2_view(qtbot)

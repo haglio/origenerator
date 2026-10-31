@@ -128,7 +128,7 @@ class PromptField(QPlainTextEdit):
         """One line of text plus the field's own furniture — where a drag upward
         stops. Measured rather than a constant: the form runs at the app's
         heading font and inside a stylesheet that pads the field, so a number
-        that leaves a line visible in one place clips it in another."""
+        that leaves a line visible in one place cuts it off in another."""
         # Frame and stylesheet padding both, whatever the style makes of them.
         chrome = max(self.height() - self.viewport().height(), 2 * self.frameWidth())
         return (self.fontMetrics().lineSpacing()

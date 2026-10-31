@@ -446,9 +446,9 @@ def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, 
 
 
 def test_omnipause_stops_the_gallerys_own_moving_thumbnails(qtbot, tmp_path):
-    """Every video tile loops a little clip of itself and the generate tabs
+    """Every video tile loops a little video of itself and the generate tabs
     play the real thing, so a paused room with the gallery in it was a wall of
-    clips still going. OmniPause stops the room, not only its slideshows, and one
+    videos still going. OmniPause stops the room, not only its slideshows, and one
     freeze covers every one of them — wherever drawn, and whenever built."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     assert omnipause.frozen() is False
@@ -918,7 +918,7 @@ def test_the_sessions_loop_key_reaches_the_slideshow_on_that_side(qtbot, tmp_pat
     """Home and E are the session's loop keys, one per satellite; in
     origenerator mode they arrive here as the side's loop verb and step the
     slideshow's loop.  A slideshow of items no library maps has nothing to loop, so the
-    press is the lock — and the next lets go, the way a lone clip's is."""
+    press is the lock — and the next lets go, the way a lone video's is."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
@@ -1057,7 +1057,7 @@ def test_a_clip_the_session_names_lands_the_gallery_on_the_generation_it_copies(
 
 
 def test_a_clip_this_app_did_not_make_leaves_the_gallery_where_it_stands(qtbot, tmp_path):
-    """Genau's folder holds the clips carved by hand as well: one of those is
+    """Genau's folder holds the videos carved by hand as well: one of those is
     none of this app's to show."""
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("i1", "a cat", 50, 1),
@@ -1096,18 +1096,18 @@ def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):
     assert view.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
 
 
-def _radio_clips(tmp_path, count=6):
-    clips = tmp_path / "radio"
-    clips.mkdir()
+def _radio_videos(tmp_path, count=6):
+    videos = tmp_path / "radio"
+    videos.mkdir()
     for index in range(count):
-        (clips / f"clip{index}.mp4").touch()
-    return clips
+        (videos / f"clip{index}.mp4").touch()
+    return videos
 
 
 def _view_with_funestras_and_bridge(qtbot, tmp_path):
     view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
-    bridge = FunTimeBridge(view._fun_time, view, parent=view, radio_dir=_radio_clips(tmp_path))
+    bridge = FunTimeBridge(view._fun_time, view, parent=view, radio_dir=_radio_videos(tmp_path))
     return view, bridge
 
 

@@ -70,9 +70,9 @@ def test_the_audio_pass_is_a_sliver_of_a_video_job_not_most_of_it():
     assert audio / (video + audio) < 0.02
 
 
-def test_a_video_step_is_costed_by_the_length_of_the_clip():
+def test_a_video_step_is_costed_by_the_length_of_the_video():
     # Doubling the frames doubles what a step of the same schedule costs, which
-    # is what makes one set of numbers fit a five-second clip and a ten-second
+    # is what makes one set of numbers fit a five-second video and a ten-second
     # one. A flat cost per step could only ever be right for one of them.
     short = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=81))["15"]
     long = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=161))["15"]
@@ -170,7 +170,7 @@ def test_two_passes_of_unequal_cost_are_told_apart_by_the_node_they_name():
 
 def test_each_sampler_pass_is_named_the_way_the_form_names_it():
     # A WAN pair splits one schedule between its experts, and the bar calls them
-    # what the form does ("Model (First Pass)"). The pass that scores the clip is
+    # what the form does ("Model (First Pass)"). The pass that scores the video is
     # the Sound the form's section is named for.
     names = stage_names(_payload("wan22_i2v", steps=20))
     assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound")

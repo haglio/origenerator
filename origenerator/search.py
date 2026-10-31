@@ -637,7 +637,7 @@ def expand_query(query: str, *, base_url: str, model: str, system_prompt: str,
     if not words:
         return {}
     try:
-        expansions = parse_expansion(local_llm.ask_json(
+        expansions = parse_expansion(local_llm.ask(
             build_expansion_messages(words, system_prompt),
             base_url=base_url, model=model, temperature=0.2, timeout=timeout), words)
     except Exception as exc:  # endpoint down / unparseable: the table tier stands

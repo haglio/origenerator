@@ -11,7 +11,14 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
-from PyQt6.QtGui import QColor, QDropEvent, QPixmap, QTextCursor, QTextDocumentFragment
+from PyQt6.QtGui import (
+    QColor,
+    QDropEvent,
+    QPixmap,
+    QTextCursor,
+    QTextDocument,
+    QTextDocumentFragment,
+)
 from PyQt6.QtWidgets import (
     QApplication,
     QFormLayout,
@@ -32,6 +39,7 @@ from origenerator.act_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
+from origenerator.db_requests import Turn
 from origenerator.funscript import (
     funscript_path_for,
     synthesize_actions,
@@ -2845,54 +2853,89 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
 # --- the Request section: words the image on display is asked to change by --
 
 
-def _request_made(db, prompt_id, source="src", asked="no hat"):
+def _request_made(db, prompt_id, source="src", asked="no hat", answered="Done."):
     """Record that a spoken request made ``prompt_id`` out of an image whose
-    prompts were "a cat, a hat" and "blurry"."""
+    prompts were "a cat, a hat" and "blurry", one turn of the exchange."""
     db.record_request(prompt_id=prompt_id, source_prompt_id=source,
                       heard=f"Request, {asked}, over.", asked=asked,
                       old_positive="a cat, a hat", old_negative="blurry",
                       new_positive="a cat", new_negative="blurry, hat")
+    db.record_turns(prompt_id, [Turn(asked, answered, "a cat, a hat", "blurry", "a cat",
+                                     "blurry, hat")])
+
+
+def _struck_and_lit_in(html: str) -> tuple[str, str]:
+    """What a tooltip's rich text shows struck through, and what it shows lit."""
+    document = QTextDocument()
+    document.setHtml(html)
+    cursor = QTextCursor(document)
+    struck = lit = ""
+    for position in range(len(document.toPlainText())):
+        cursor.setPosition(position)
+        cursor.setPosition(position + 1, QTextCursor.MoveMode.KeepAnchor)
+        fmt = cursor.charFormat()
+        if fmt.fontStrikeOut():
+            struck += cursor.selectedText()
+        elif fmt.background().style() != Qt.BrushStyle.NoBrush:
+            lit += cursor.selectedText()
+    return struck.strip(), lit.strip()
 
 
 def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
-    """Stand a rewrite in for the local LLM, answering ``answer`` and keeping
-    every prompt pair and words it was asked about."""
+    """Stand the model in for the local LLM, answering ``answer`` (one pair, or a
+    list of pairs taken in turn) and keeping every prompt pair and words it was
+    asked about."""
     calls = []
+    answers = list(answer) if isinstance(answer, list) else []
 
-    def rewrite(positive, negative, words, **_settings):
+    def ask_the_model(positive, negative, words, exchange, notes):
         calls.append((positive, negative, words))
-        if isinstance(answer, Exception):
-            raise answer
-        return answer
+        current = answers.pop(0) if answers else answer
+        if isinstance(current, Exception):
+            raise current
+        return (*current, "Done.")
 
-    monkeypatch.setattr(prompt_edit, "rewrite_prompt", rewrite)
+    monkeypatch.setattr(prompt_edit, "ask_the_model", ask_the_model)
     return calls
 
 
 def _ask(panel, qtbot, words):
-    field = panel._param_form.request_field()
-    field._words.clear()
-    qtbot.keyClicks(field._words, words)
-    return field
+    exchange = panel._param_form.request_exchange()
+    qtbot.keyClicks(exchange._line, words)
+    qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
+    return exchange
 
 
 def _positive(panel):
     return diff_text.live_text(panel._param_form._widgets["positive_prompt"])
 
 
-def test_an_image_a_request_made_shows_its_words_in_the_request_section(saved_panel):
+def test_an_image_a_request_made_shows_the_exchange_in_the_request_section(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
-    _request_made(db, "img1")
+    _request_made(db, "img1", answered="Took the hat off the cat.")
 
     panel.show_saved_generation(image, [image])
 
-    field = panel._param_form.request_field()
-    assert field._words.text() == "no hat"
-    assert field._words.isEnabled()
+    exchange = panel._param_form.request_exchange()
+    assert exchange.turns() == [("no hat", "Took the hat off the cat.")]
+    assert exchange._line.isEnabled()
 
 
-def test_an_image_a_request_is_still_making_shows_its_words_in_the_request_section(
+def test_the_exchange_runs_back_through_every_request_that_led_to_the_image(saved_panel):
+    panel, db = saved_panel
+    _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1", answered="Took the hat off.")
+    image = _image_row(db, "img2", prompt="a cat, a scarf")
+    _request_made(db, "img2", source="img1", asked="a scarf", answered="Gave the cat a scarf.")
+
+    panel.show_saved_generation(image, [image])
+
+    assert panel._param_form.request_exchange().turns() == [
+        ("no hat", "Took the hat off."), ("a scarf", "Gave the cat a scarf.")]
+
+
+def test_an_image_a_request_is_still_making_shows_the_exchange_in_the_request_section(
         saved_panel):
     panel, db = saved_panel
     running = _image_being_made(db, "img1", prompt="a cat")
@@ -2900,7 +2943,7 @@ def test_an_image_a_request_is_still_making_shows_its_words_in_the_request_secti
 
     panel.show_running_generation(running)
 
-    assert panel._param_form.request_field()._words.text() == "no hat"
+    assert panel._param_form.request_exchange().turns() == [("no hat", "Done.")]
 
 
 def test_an_image_still_being_made_is_asked_no_change_of_until_it_lands(saved_panel):
@@ -2908,28 +2951,29 @@ def test_an_image_still_being_made_is_asked_no_change_of_until_it_lands(saved_pa
     running = _image_being_made(db, "img1", prompt="a cat")
     _request_made(db, "img1")
     panel.show_running_generation(running)
-    field = panel._param_form.request_field()
-    assert not field._words.isEnabled()
+    exchange = panel._param_form.request_exchange()
+    assert not exchange._line.isEnabled()
 
     db.update_generation("img1", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_img1.png", "subfolder": "image"}]))
     landed = db.get_generation("img1")
     panel.show_completed_result(landed, [landed])
 
-    assert field._words.isEnabled()
-    assert field._words.text() == "no hat"
+    assert exchange._line.isEnabled()
+    assert exchange.turns() == [("no hat", "Done.")]
 
 
-def test_an_image_a_request_is_still_making_is_marked_against_the_one_it_was_asked_of(
-        saved_panel, qtbot):
+def test_an_image_a_request_is_still_making_shows_the_requests_change_on_its_entry(
+        saved_panel):
     panel, db = saved_panel
     running = _image_being_made(db, "img1", prompt="a cat")
     _request_made(db, "img1")
 
     panel.show_running_generation(running)
 
-    positive = panel._param_form._widgets["positive_prompt"]
-    qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
+    (entry,) = panel._param_form.request_exchange()._entries()
+    struck, lit = _struck_and_lit_in(entry.toolTip())
+    assert "a hat" in struck and "hat" in lit
     assert _positive(panel) == "a cat"
     assert _notice(panel) == ""
 
@@ -2948,7 +2992,22 @@ def test_an_image_a_request_is_still_making_links_to_the_one_it_was_asked_of(sav
             for tile in section.findChildren(SourceTile)] == [("Requested from", "src")]
 
 
-def test_an_image_a_request_made_is_marked_against_the_one_it_was_asked_of(
+def test_hovering_the_request_that_made_an_image_shows_the_whole_prompts_with_its_change(
+        saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1")
+
+    panel.show_saved_generation(image, [image])
+
+    (entry,) = panel._param_form.request_exchange()._entries()
+    tip = entry.toolTip()
+    struck, lit = _struck_and_lit_in(tip)
+    assert ("a cat" in tip and "blurry" in tip) and "Positive Prompt" in tip
+    assert "a hat" in struck and "hat" in lit
+
+
+def test_an_image_a_request_made_has_its_prompt_fields_marked_like_any_other_images(
         saved_panel, qtbot):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
@@ -2957,24 +3016,25 @@ def test_an_image_a_request_made_is_marked_against_the_one_it_was_asked_of(
     panel.show_saved_generation(image, [image])
 
     positive = panel._param_form._widgets["positive_prompt"]
-    qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
+    assert _struck_and_lit(positive) == ("", "")
     assert _positive(panel) == "a cat"
     assert _notice(panel) == ""
 
 
-def test_each_scene_of_a_requested_video_is_marked_against_the_scene_it_was_asked_of(
-        saved_panel, qtbot):
+def test_the_requests_change_to_each_scene_of_a_video_shows_on_its_entry(saved_panel):
     panel, db = saved_panel
-    video = _video_row(db, positive_prompt=story_of(["a dog running, grass", "a dog asleep, grass"]),
-                       scene_frames=[81, 81], frame_count=161)
+    before = story_of(["a dog running", "a dog asleep"])
+    after = story_of(["a dog running, grass", "a dog asleep, grass"])
+    video = _video_row(db, positive_prompt=after, scene_frames=[81, 81], frame_count=161)
     db.record_request(prompt_id="vid1", source_prompt_id="src", heard="", asked="more grass",
-                      old_positive=story_of(["a dog running", "a dog asleep"]), old_negative="")
+                      old_positive=before, old_negative="")
+    db.record_turns("vid1", [Turn("more grass", "Grass under both.", before, "", after, "")])
 
     panel.show_saved_generation(video, [])
 
-    scenes = panel._param_form._widgets["positive_prompt"].fields("positive_prompt")
-    qtbot.waitUntil(lambda: all("grass" in _struck_and_lit(field)[1] for field in scenes),
-                    timeout=5000)
+    (entry,) = panel._param_form.request_exchange()._entries()
+    _struck, lit = _struck_and_lit_in(entry.toolTip())
+    assert lit.count("grass") == 2
 
 
 def test_any_image_on_display_can_be_asked_a_change_of(saved_panel):
@@ -2983,73 +3043,84 @@ def test_any_image_on_display_can_be_asked_a_change_of(saved_panel):
 
     panel.show_saved_generation(image, [image])
 
-    field = panel._param_form.request_field()
-    assert field._words.text() == ""
-    assert field._words.isEnabled()
+    exchange = panel._param_form.request_exchange()
+    assert exchange.turns() == []
+    assert exchange._line.isEnabled()
 
 
 def test_a_tab_showing_nothing_has_nothing_to_ask_a_change_of(panel):
-    assert not panel._param_form.request_field()._words.isEnabled()
+    assert not panel._param_form.request_exchange()._line.isEnabled()
 
 
-def test_asking_rewrites_the_prompts_of_the_image_on_display(saved_panel, qtbot, monkeypatch):
+def test_asking_rewrites_the_prompts_of_the_image_on_display_and_shows_the_models_sentence(
+        saved_panel, qtbot, monkeypatch):
     calls = _rewriting(monkeypatch)
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a woman on a couch")
     panel.show_saved_generation(image, [image])
 
-    field = _ask(panel, qtbot, "two women")
+    exchange = _ask(panel, qtbot, "two women")
 
     qtbot.waitUntil(lambda: _positive(panel) == "two women on a couch", timeout=5000)
     assert [(positive, words) for positive, _negative, words in calls] == [
         ("a woman on a couch", "two women")]
-    assert field._status.isHidden()
+    assert exchange.turns() == [("two women", "Done.")]
+    assert exchange._status.isHidden()
+    assert exchange._line.text() == ""
     assert _notice(panel) == "(not yet generated with modifications)"
 
 
-def test_new_words_for_a_requested_image_redo_the_request_on_what_it_was_asked_of(
+def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
         saved_panel, qtbot, monkeypatch):
+    calls = _rewriting(monkeypatch, answer=[("two women on a couch", "blurry"),
+                                            ("two women on a beach", "blurry")])
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    panel.show_saved_generation(image, [image])
+    _ask(panel, qtbot, "two women")
+    qtbot.waitUntil(lambda: _positive(panel) == "two women on a couch", timeout=5000)
+
+    _ask(panel, qtbot, "on a beach")
+
+    qtbot.waitUntil(lambda: _positive(panel) == "two women on a beach", timeout=5000)
+    assert [(positive, words) for positive, _negative, words in calls] == [
+        ("a woman on a couch", "two women"), ("two women on a couch", "on a beach")]
+    asked = panel.asked()
+    assert [(turn.said, turn.answered) for turn in asked["turns"]] == [
+        ("two women", "Done."), ("on a beach", "Done.")]
+    assert asked["turns"][1].old_positive == "two women on a couch"
+    assert (asked["asked"], asked["source_prompt_id"], asked["old_positive"]) == (
+        "on a beach", "img1", "a woman on a couch")
+
+
+def test_the_line_waits_while_the_model_works_out_a_request(saved_panel, qtbot, monkeypatch):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    monkeypatch.setattr(panel._requests, "ask", lambda *args, **settings: None)
+
+    exchange = _ask(panel, qtbot, "a hat")
+
+    assert not exchange._line.isEnabled()
+    assert exchange._status.text() == "updating…"
+    assert panel.asked() is None  # nothing is recorded until the model has answered
+
+
+def test_words_that_ask_for_nothing_say_so_and_come_off_the_exchange(saved_panel, qtbot, monkeypatch):
     _rewriting(monkeypatch)
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
-    _request_made(db, "img1")
     panel.show_saved_generation(image, [image])
 
-    _ask(panel, qtbot, "no cap")
+    exchange = _ask(panel, qtbot, "please")
 
-    # Asked of "a cat, a hat" / "blurry", the image the hat was taken off.
-    qtbot.waitUntil(lambda: _positive(panel) == "a cat, a hat", timeout=5000)
-
-
-def test_the_words_that_made_the_image_put_its_own_prompts_back(
-        saved_panel, qtbot, monkeypatch):
-    calls = _rewriting(monkeypatch, answer=("a cat in a cap", "blurry"))
-    panel, db = saved_panel
-    image = _image_row(db, "img1", prompt="a cat")
-    _request_made(db, "img1")
-    panel.show_saved_generation(image, [image])
-    _ask(panel, qtbot, "a cap")
-    qtbot.waitUntil(lambda: _positive(panel) == "a cat in a cap", timeout=5000)
-
-    _ask(panel, qtbot, "no hat")
-
-    qtbot.waitUntil(lambda: _positive(panel) == "a cat", timeout=5000)
-    assert len(calls) == 1
-
-
-def test_words_that_ask_for_nothing_say_so_beside_them(saved_panel, qtbot, monkeypatch):
-    _rewriting(monkeypatch)
-    panel, db = saved_panel
-    image = _image_row(db, "img1", prompt="a cat")
-    panel.show_saved_generation(image, [image])
-
-    field = _ask(panel, qtbot, "please")
-
-    qtbot.waitUntil(lambda: "couldn't" in field._status.text(), timeout=5000)
+    qtbot.waitUntil(lambda: "couldn't" in exchange._status.text(), timeout=5000)
+    assert exchange.turns() == []
     assert _positive(panel) == "a cat"
+    assert panel.asked() is None
 
 
-def test_an_answer_to_words_since_changed_is_dropped(saved_panel, monkeypatch):
+def test_an_answer_to_a_request_since_superseded_is_dropped(saved_panel, monkeypatch):
     _rewriting(monkeypatch)
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")

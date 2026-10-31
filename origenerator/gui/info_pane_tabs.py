@@ -94,9 +94,10 @@ class InfoPaneTabs(QTabWidget):
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
                  *, fun_time=None, heights=None, names: ItemNames | None = None,
-                 previews: MovingPreviews | None = None):
+                 previews: MovingPreviews | None = None, requests=None):
         super().__init__(parent)
         self._previews = previews
+        self._requests = requests  # the one place every tab's Request is asked of the model
         self._heights = heights  # the window's prompt heights, for its panels
         self._client = client
         # The hosting session, or None standalone: a tab lays its preview out
@@ -185,7 +186,8 @@ class InfoPaneTabs(QTabWidget):
         """
         panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time,
                                     heights=self._heights, library=self._library,
-                                    names=self._names, previews=self._previews)
+                                    names=self._names, previews=self._previews,
+                                    requests=self._requests)
         index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
         # Editing anything in a tab keeps it, the way a double-click on its name

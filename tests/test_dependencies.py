@@ -28,7 +28,7 @@ TREES = [ROOT / "origenerator", ROOT / "tests", ROOT / "tools", ROOT / "vulture_
 
 def test_every_third_party_import_is_declared():
     assert_every_import_is_declared(
-        ROOT, [ROOT / "origenerator"], ROOT / "pyproject.toml", local=("origenerator",))
+        ROOT, [ROOT / "origenerator"], ROOT / "pyproject.toml", local=("origenerator", "tools"))
 
 
 def test_every_requirement_has_an_upper_bound():

@@ -3001,3 +3001,14 @@ def test_a_funestra_that_opens_after_the_pass_is_handed_over_takes_the_pace(qtbo
     view._pane._open_if_ready()
 
     assert engine.pace_s == 4
+
+
+def test_a_requests_line_stays_up_long_enough_to_be_read(qtbot):
+    view = _view(qtbot)
+
+    view.request_line("Request submitted")
+    assert view._note_timer.interval() == 3000
+
+    view.request_line("Moved her to a tropical beach at golden hour, the way your beach "
+                      "prompts usually have it, and kept the pose and the lighting as they were.")
+    assert view._note_timer.interval() > 3000

@@ -69,6 +69,7 @@ from pytestqt.qtbot import QtBot
 from origenerator import (
     config,
     enhance_presets,
+    graphics_card,
     notice_toast,
     osr2_driver,
     osr2_motion_driver,
@@ -78,6 +79,7 @@ from origenerator.gui import desktop_notices, job_queue, motion_panel, omnipause
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
+from tools import card_claim
 
 pytest_plugins = ("shared_ui.testing",)
 
@@ -342,6 +344,18 @@ def refuse_the_comfyui_on_this_machine(setattr) -> None:
 def _never_reach_the_comfyui_on_this_machine():
     with pytest.MonkeyPatch.context() as patch:
         refuse_the_comfyui_on_this_machine(patch.setattr)
+        yield
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _never_read_this_machines_graphics_card(tmp_path_factory):
+    """A wait for the card reads nothing off this machine's and claims a card of
+    the suite's own: with no reading the model is taken on trust, no test sleeps
+    on how full the card here is, and none touches the claim his trainers take."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(graphics_card, "NVIDIA_SMI", ("nvidia-smi-the-suite-never-runs",))
+        patch.setattr(card_claim, "CLAIM",
+                      tmp_path_factory.mktemp("card") / "graphics_card_claim.json")
         yield
 
 

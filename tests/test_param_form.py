@@ -70,7 +70,7 @@ def test_a_form_with_a_prompt_has_a_request_section_right_after_its_prompts(qtbo
 
     titles = _section_titles(form)
     assert titles[titles.index("Prompts") + 1] == "Request"
-    assert form.request_field() is not None
+    assert form.request_exchange() is not None
 
 
 def test_a_form_with_no_prompt_has_no_request_to_make(qtbot):
@@ -78,7 +78,7 @@ def test_a_form_with_no_prompt_has_no_request_to_make(qtbot):
     qtbot.addWidget(form)
 
     assert "Request" not in _section_titles(form)
-    assert form.request_field() is None
+    assert form.request_exchange() is None
 
 
 def test_prompts_a_request_rewrites_show_their_whole_change_at_once(qtbot):

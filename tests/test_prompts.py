@@ -1,17 +1,5 @@
-"""What the local LLM is told, and where that text is allowed to live.
-
-`config.py` is the highest-fan-in module in the repo — twenty-four importers —
-and 95 of its 242 lines, 39% of the file, were four multi-paragraph system
-prompts. Those are the part most likely to change often and the part least like
-configuration: they are behaviour, tuned by reading what the model does with
-them, so a prompt reworded for the search widener showed up in the blame of the
-same file as the UDP port the OSR2 broker pins.
-
-They live in `origenerator/prompts.py` now, and this holds the line: no
-assignment in config.py evaluates to prose.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
+"""What the local LLM is told lives in prompts.py, the module tuned by reading what
+the model does, and never in config.py beside the ports and paths."""
 from __future__ import annotations
 
 import ast
@@ -21,11 +9,10 @@ import pytest
 
 PACKAGE = Path(__file__).resolve().parents[1] / "origenerator"
 
-# The three, by name.
 SYSTEM_PROMPTS = (
-    "REQUEST_REWRITE_SYSTEM_PROMPT",
+    "REQUEST_SYSTEM_PROMPT",
     "SEARCH_EXPANSION_SYSTEM_PROMPT",
-    "VOICE_REQUEST_MATCH_SYSTEM_PROMPT",
+    "COLLECTION_NOTES_SYSTEM_PROMPT",
 )
 
 # Longer than any setting has cause to be. The shortest of the three prompts is

@@ -133,7 +133,6 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import DEFAULT_S
@@ -143,7 +142,7 @@ from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, key_holds, oriented_key
 from origenerator.output_places import OutputPlaces
-from origenerator.prompt_edit import apply_request
+from origenerator.prompt_edit import apply_request, work_out
 from origenerator.slideshow import LIVE
 from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
@@ -312,6 +311,9 @@ class FakeDB:
 
     def get_generation(self, prompt_id):
         return self._by_id.get(prompt_id)
+
+    def exchange_of(self, prompt_id):
+        return []
 
     def recent_durations(self, workflow_name, limit=10):
         return [
@@ -11377,7 +11379,13 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     view.refresh()
     view._on_thumbnail_clicked("orig")
     panel = view._info_tabs.current_config_panel()
-    panel._param_form.request_field()._words.setText("two cats")
+    view._request_answerer._wait_for_the_card = lambda comfyui, holder, **settings: True
+    view._request_answerer._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words, ask=lambda p, n, r, exchange, notes: ("two cats", n, "Two cats."))
+    exchange = panel._param_form.request_exchange()
+    qtbot.keyClicks(exchange._line, "two cats")
+    qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
+    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", "Two cats.")], timeout=5000)
 
     view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
 
@@ -11385,6 +11393,9 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     record = db.get_request(job.prompt_id)
     assert (record["asked"], record["heard"], record["source_prompt_id"]) == ("two cats", "", "orig")
     assert (record["old_positive"], record["new_positive"]) == ("a cat", "two cats")
+    (turn,) = db.exchange_of(job.prompt_id)
+    assert (turn.said, turn.answered, turn.old_positive, turn.new_positive) == (
+        "two cats", "Two cats.", "a cat", "two cats")
 
 
 def test_a_run_generated_with_no_request_records_none(qtbot, tmp_path):
@@ -16526,10 +16537,11 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
                         lambda row, places: ("orig.png", "image"))
     view = GalleryView(_requestable_db(tmp_path, **kw), client=_reroll_client())
     qtbot.addWidget(view)
-    # The words alone, with no smart matcher: these cover the policy and the
-    # plumbing, and a matcher would put a local LLM in the middle of both.
-    view._voice._revision = RevisionWorker(apply_request, parent=view)
-    view._voice._revision.revised.connect(view._voice._on_revised)
+    # The words alone, with no model: these cover the policy and the plumbing,
+    # and a model would put Ollama in the middle of both.
+    view._request_answerer._work_out = (
+        lambda positive, negative, words, **_: apply_request(positive, negative, words))
+    view._request_answerer._wait_for_the_card = lambda comfyui, holder, **settings: True
     view._bank.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()
     _select_first_leaf(view)
@@ -16590,6 +16602,23 @@ def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monke
     _speak_request(view, qtbot, "Request, no hat, over.")
 
     assert words(view._slideshows.showing.shown._note) == "Request submitted"
+
+
+def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    view._request_answerer._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words,
+        ask=lambda p, n, r, exchange, notes: ("a woman, soft light", n, "Took the hat off her."))
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    assert words(view._slideshows.showing.shown._note) == "Took the hat off her."
+    (job,) = view._live_jobs.values()
+    assert job.params["positive_prompt"] == "a woman, soft light"
+    (turn,) = view._db.exchange_of(job.prompt_id)
+    assert (turn.said, turn.answered) == ("no hat", "Took the hat off her.")
+    assert (turn.old_positive, turn.new_positive) == ("a woman, a hat, soft light", "a woman, soft light")
 
 
 def test_a_request_for_something_absent_goes_to_the_negative_prompt(
@@ -16730,8 +16759,8 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    field = view._info_tabs.current_config_panel()._param_form.request_field()
-    assert field._words.text() == "no hat"
+    exchange = view._info_tabs.current_config_panel()._param_form.request_exchange()
+    assert exchange.turns() == [("no hat", "")]
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(

@@ -5,12 +5,22 @@ import logging
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from app_support.logging_utils import configure_logging, install_exception_logging
 from shared_ui.preview import taskbar_identity
 
-from origenerator import config, fix_training, gallery, lora_training, places_backfill
+from origenerator import (
+    collection_notes,
+    config,
+    fix_training,
+    gallery,
+    graphics_card,
+    local_llm,
+    lora_training,
+    places_backfill,
+)
 from origenerator.app_state import AppState
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
@@ -29,6 +39,8 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
+NOTES_BUDGET_S = 5 * 60  # one sitting of the collection notes; Evolver gives a turn eight minutes
+
 
 @dataclass(frozen=True)
 class Turn:
@@ -38,7 +50,8 @@ class Turn:
 
 def take_a_turn(*, app_open: Callable[[], bool], training_running: Callable[[], bool],
                 comfyui_busy: Callable[[], bool], batches_due: Callable[[], bool],
-                queue_batches: Callable[[], None], queue_more_backfill: Callable[[], int],
+                queue_batches: Callable[[], None], notes_due: Callable[[], bool],
+                take_notes: Callable[[], None], queue_more_backfill: Callable[[], int],
                 fix_to_train: Callable[[], object], train: Callable[[object], None]) -> Turn:
     if app_open():
         return Turn("nothing: Origenerator is open", training_running())
@@ -49,6 +62,9 @@ def take_a_turn(*, app_open: Callable[[], bool], training_running: Callable[[], 
     if batches_due():
         queue_batches()
         return Turn("handed ComfyUI the work Origenerator left as it closed", training_running())
+    if notes_due():
+        take_notes()
+        return Turn("took notes on the collection", training_running())
     if queue_more_backfill():
         return Turn("handed ComfyUI the next videos the backfill remakes", training_running())
     if (fix := fix_to_train()) is not None:
@@ -167,6 +183,29 @@ def hand_comfyui_more_of_the_backfill(db, client, ui: AppState) -> int:
     return queued
 
 
+def _notes_due(db) -> bool:
+    return collection_notes.due(collection_notes.read(config.COLLECTION_NOTES_PATH),
+                                len(db.distinct_positive_prompts()))
+
+
+def _take_notes(db, client) -> None:
+    if not graphics_card.wait_for_the_card(client, "Origenerator's notes on the collection",
+                                           deadline_s=0):
+        return
+    model = {"base_url": config.LOCAL_LLM_BASE_URL, "model": config.LOCAL_LLM_MODEL}
+    try:
+        notes = collection_notes.take(
+            db.distinct_positive_prompts(), collection_notes.read(config.COLLECTION_NOTES_PATH),
+            ask=partial(local_llm.ask, **model), let_go=partial(local_llm.let_go, **model),
+            budget_s=NOTES_BUDGET_S)
+    except Exception as e:  # noqa: BLE001 -- Ollama down or refusing: the next turn tries again
+        logger.info("Collection notes: the model could not be asked (%s)", e)
+        return
+    finally:
+        graphics_card.let_go_of_the_card()
+    collection_notes.write(config.COLLECTION_NOTES_PATH, notes)
+
+
 def _train(client, part, ui: AppState) -> None:
     try:
         client.free_memory()
@@ -204,6 +243,7 @@ def main() -> int:
         training_running=lambda: bool(running_trainings()),
         comfyui_busy=lambda: _comfyui_busy(client), batches_due=work_left,
         queue_batches=lambda: hand_comfyui_the_work_left(db, client, ui),
+        notes_due=lambda: _notes_due(db), take_notes=lambda: _take_notes(db, client),
         queue_more_backfill=lambda: hand_comfyui_more_of_the_backfill(db, client, ui),
         fix_to_train=fix_training.fix_to_train, train=lambda part: _train(client, part, ui))
     print(json.dumps({"did": turn.did, "holds_the_graphics_card": turn.holds_the_graphics_card}))

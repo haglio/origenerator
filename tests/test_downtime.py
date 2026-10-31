@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import types
 from unittest.mock import MagicMock, patch
 
-from origenerator import downtime, gallery
+from origenerator import collection_notes, downtime, gallery, local_llm
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
@@ -19,8 +20,10 @@ _HANDS = types.SimpleNamespace(name="hands")
 
 class _Machine:
     def __init__(self, *, app_open=False, training=False, comfyui_busy=False, batches_due=False,
-                 fix=None, backfill_batches=0):
+                 fix=None, backfill_batches=0, notes_due=False):
         self.app_open = app_open
+        self.notes_due = notes_due
+        self.noted = 0
         self.training = training
         self.comfyui_busy = comfyui_busy
         self.batches_due = batches_due
@@ -34,8 +37,13 @@ class _Machine:
         return downtime.take_a_turn(
             app_open=lambda: self.app_open, training_running=lambda: self.training,
             comfyui_busy=lambda: self.comfyui_busy, batches_due=lambda: self.batches_due,
-            queue_batches=self._queue, queue_more_backfill=self._backfill,
+            queue_batches=self._queue, notes_due=lambda: self.notes_due,
+            take_notes=self._take_notes, queue_more_backfill=self._backfill,
             fix_to_train=lambda: self.fix, train=self._train)
+
+    def _take_notes(self) -> None:
+        self.noted += 1
+        self.notes_due = False
 
     def _queue(self) -> None:
         self.queued += 1
@@ -78,6 +86,24 @@ def test_while_origenerator_stays_closed_comfyui_gets_the_backfills_next_batch_o
     assert machine.backfilled == 2
     assert turns[:2] == ["handed ComfyUI the next videos the backfill remakes"] * 2
     assert machine.trained == [_HANDS]
+
+
+def test_notes_on_the_collection_are_taken_once_comfyui_is_idle_before_the_backfill_goes_on():
+    machine = _Machine(notes_due=True, backfill_batches=1, fix=_HANDS)
+
+    first, second = machine.turn(), machine.turn()
+
+    assert (first.did, machine.noted) == ("took notes on the collection", 1)
+    assert first.holds_the_graphics_card is False  # the model let go as the sitting ended
+    assert (second.did, machine.backfilled) == ("handed ComfyUI the next videos the backfill remakes", 1)
+
+
+def test_the_work_origenerator_left_as_it_closed_is_handed_over_before_any_notes():
+    machine = _Machine(batches_due=True, notes_due=True)
+
+    machine.turn()
+
+    assert (machine.queued, machine.noted) == (1, 0)
 
 
 def test_once_comfyui_has_nothing_left_a_fix_whose_photos_changed_is_trained():
@@ -255,3 +281,77 @@ def test_the_command_evolver_runs_holds_the_card_while_a_look_lora_trains(monkey
     assert downtime.main() == 0
 
     assert json.loads(capsys.readouterr().out)["holds_the_graphics_card"] is True
+
+
+def test_the_command_evolver_runs_takes_notes_on_the_collection_while_closed_and_idle(
+        monkeypatch, tmp_path, capsys):
+    for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
+                       ("UI_STATE_PATH", tmp_path / "ui_state.json"),
+                       ("FIX_TRAINING_DIR", tmp_path / "fix training")):
+        monkeypatch.setattr(downtime.config, name, path)
+    monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
+    monkeypatch.setattr(downtime, "announce_trainings_that_ended", lambda announce: None)
+    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
+        one_holds_the_library=lambda: False, one_is_closing=lambda: False))
+    monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
+    monkeypatch.setattr(downtime, "_notes_due", lambda db: True)
+    taken = []
+    monkeypatch.setattr(downtime, "_take_notes", lambda db, client: taken.append(db.path))
+
+    assert downtime.main() == 0
+
+    assert taken == [tmp_path / "origenerator.db"]
+    assert json.loads(capsys.readouterr().out) == {
+        "did": "took notes on the collection", "holds_the_graphics_card": False}
+
+
+def test_taking_the_notes_waits_for_the_card_reads_the_collection_and_writes_the_file(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(downtime.config, "COLLECTION_NOTES_PATH", tmp_path / "collection_notes.json")
+    db = Database(tmp_path / "t.db")
+    for pid, prompt in (("g1", "a baker waving, soft light"), ("g2", "a baker yawning, soft light")):
+        db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+                             positive_prompt=prompt, params_json="{}", workflow_json="{}")
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
+    waited = []
+    monkeypatch.setattr(downtime.graphics_card, "wait_for_the_card",
+                        lambda comfyui, holder, **settings: waited.append(comfyui) or True)
+    asked = []
+
+    def ask(messages, **settings):
+        asked.append((messages[-1]["content"], settings))
+        return {"message": {"content": "PATTERNS" if "PATTERNS" in messages[-1]["content"]
+                            else "a note"}, "prompt_eval_count": 50}
+
+    monkeypatch.setattr(local_llm, "ask", ask)
+    monkeypatch.setattr(local_llm, "let_go", lambda **settings: None)
+
+    downtime._take_notes(db, client)
+
+    assert waited == [client]
+    assert {settings["model"] for _text, settings in asked} == {downtime.config.LOCAL_LLM_MODEL}
+    notes = collection_notes.read(tmp_path / "collection_notes.json")
+    assert notes.complete and notes.prompt_count == 2
+    assert downtime._notes_due(db) is False
+
+
+def test_notes_the_model_could_not_be_asked_for_are_left_for_the_next_turn(
+        monkeypatch, tmp_path, caplog):
+    monkeypatch.setattr(downtime.config, "COLLECTION_NOTES_PATH", tmp_path / "collection_notes.json")
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v002",
+                         positive_prompt="a baker waving", params_json="{}", workflow_json="{}")
+    monkeypatch.setattr(downtime.graphics_card, "wait_for_the_card",
+                        lambda comfyui, holder, **settings: True)
+
+    def down(messages, **settings):
+        raise OSError("Ollama is not running")
+
+    monkeypatch.setattr(local_llm, "ask", down)
+
+    with caplog.at_level(logging.INFO, logger="origenerator.downtime"):
+        downtime._take_notes(db, ComfyUIClient(folders=SUITE_FOLDERS))
+
+    assert not (tmp_path / "collection_notes.json").exists()
+    assert any("Ollama is not running" in line for line in caplog.messages)
+    assert all("baker" not in line for line in caplog.messages)

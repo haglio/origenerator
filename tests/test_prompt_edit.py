@@ -1,16 +1,13 @@
-"""The policy that turns a spoken request into a prompt-pair edit.
-
-Every prompt here is invented — plain photographic vocabulary standing in for
-whatever the library's own prompts say, which never appears in this repo.
-"""
+"""The policy that turns a request into a prompt-pair edit, and the model that
+answers it knowing the collection. Every prompt here is invented."""
 from __future__ import annotations
 
-import json
 import logging
-from unittest.mock import MagicMock, patch
 
 import pytest
 
+from origenerator import local_llm
+from origenerator.collection_notes import CollectionNotes
 from origenerator.prompt_edit import (
     ADD,
     ADDED,
@@ -22,12 +19,10 @@ from origenerator.prompt_edit import (
     REMOVE,
     REWRITTEN,
     apply_request,
-    build_match_messages,
-    build_rewrite_messages,
-    parse_match,
+    ask_the_model,
+    build_request_messages,
     parse_request,
-    rewrite_prompt,
-    smart_match,
+    work_out,
 )
 from origenerator.workflows.base import story_of
 
@@ -67,7 +62,7 @@ def test_the_term_keeps_its_own_casing():
     assert parse_request("add a Dutch angle") == (ADD, "Dutch angle")
 
 
-# --- applying it ------------------------------------------------------------
+# --- the rules: what a request does to a prompt pair without a model --------
 
 
 def test_against_something_in_the_positive_prompt_takes_it_out():
@@ -113,101 +108,6 @@ def test_for_something_in_neither_prompt_adds_it():
 
     assert revision.positive == "a woman, soft light, freckles"
     assert revision.action == ADDED
-
-
-def test_something_in_neither_prompt_is_worked_into_the_whole_prompt_by_the_rewrite():
-    # "two women" over a prompt describing one woman: appended, the prompt would
-    # ask for both at once, so the local model rewrites what the words contradict.
-    asked = []
-
-    def rewrite(positive, negative, words):
-        asked.append((positive, negative, words))
-        return "two women on a couch", "blurry"
-
-    revision = apply_request("a woman on a couch", "blurry", "two women", rewrite=rewrite)
-
-    assert asked == [("a woman on a couch", "blurry", "two women")]
-    assert (revision.positive, revision.negative) == ("two women on a couch", "blurry")
-    assert revision.action == REWRITTEN
-    assert revision.changed
-
-
-def test_a_rewrite_that_fails_leaves_the_words_appended(caplog):
-    def rewrite(positive, negative, words):
-        raise OSError("the model is down")
-
-    with caplog.at_level(logging.WARNING):
-        revision = apply_request("a woman, soft light", "blurry", "freckles", rewrite=rewrite)
-
-    assert revision.positive == "a woman, soft light, freckles"
-    assert revision.action == ADDED
-
-
-def test_a_term_inside_a_longer_phrase_is_cut_out_of_it_by_the_rewrite():
-    # Dropped whole, "a woman wearing a straw hat" would take the woman with it.
-    asked = []
-
-    def rewrite(positive, negative, words):
-        asked.append(words)
-        return "a woman, freckles", "hat"
-
-    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat",
-                             rewrite=rewrite)
-
-    assert asked == ["no hat"]
-    assert (revision.positive, revision.negative) == ("a woman, freckles", "hat")
-
-
-def test_a_rewrite_that_changes_nothing_leaves_the_rules_own_edit():
-    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat",
-                             rewrite=lambda positive, negative, words: (positive, negative))
-
-    assert revision.positive == "freckles"
-    assert revision.action == DROPPED
-
-
-def test_a_term_the_rewrite_weights_at_nothing_is_taken_out():
-    revision = apply_request("a woman, natural makeup, beach", "blurry", "no makeup",
-                             rewrite=lambda positive, negative, words: (
-                                 "a woman, (makeup:0.0), beach", "blurry, (glare:0)"))
-
-    assert (revision.positive, revision.negative) == ("a woman, beach", "blurry")
-
-
-def test_a_rewrite_that_stands_dots_in_for_a_prompt_leaves_that_prompt_as_it_was():
-    revision = apply_request("A dog sits on a porch at sunset.", "", "bigger ears",
-                             rewrite=lambda positive, negative, words: (
-                                 "A dog with big ears sits on a porch at sunset.", "..."))
-
-    assert (revision.positive, revision.negative) == (
-        "A dog with big ears sits on a porch at sunset.", "")
-
-
-def test_a_rewrite_that_leaves_part_of_the_prompt_out_with_dots_is_no_answer():
-    revision = apply_request("A dog sits on a porch at sunset, warm light", "", "bigger ears",
-                             rewrite=lambda positive, negative, words: (
-                                 "A dog with bigger ears ... warm light", ""))
-
-    assert revision.positive == "A dog sits on a porch at sunset, warm light, bigger ears"
-
-
-def test_a_phrase_that_is_the_whole_term_is_dropped_by_the_rules_alone():
-    def rewrite(positive, negative, words):
-        raise AssertionError("not asked")
-
-    revision = apply_request("a woman, freckles, beach", "", "no freckles", rewrite=rewrite)
-
-    assert revision.positive == "a woman, beach"
-    assert revision.action == DROPPED
-
-
-def test_an_edit_the_rules_are_sure_of_never_asks_the_rewrite():
-    def rewrite(positive, negative, words):
-        raise AssertionError("not asked")
-
-    revision = apply_request("a woman", "blurry, freckles", "more freckles", rewrite=rewrite)
-
-    assert revision.action == ALLOWED
 
 
 def test_for_something_being_excluded_stops_excluding_it():
@@ -259,6 +159,14 @@ def test_a_revision_carries_the_prompts_it_started_from():
     assert revision.old_positive == "a woman, freckles"
     assert revision.old_negative == "blurry"
     assert revision.changed
+    assert revision.answer == ""  # the rules say nothing back
+
+
+def test_the_rules_take_a_phrase_that_says_more_than_the_term_out_whole():
+    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat")
+
+    assert revision.positive == "freckles"
+    assert revision.action == DROPPED
 
 
 # --- a video told in scenes: the story is one prompt per scene ---------------
@@ -292,188 +200,218 @@ def test_a_storys_revision_names_each_rule_its_scenes_used_once():
     assert revision.action == f"{DROPPED}, {EXCLUDED}"
 
 
-def test_the_model_rewrites_each_scene_from_that_scenes_own_prompts():
-    asked = []
-
-    def rewrite(positive, negative, words):
-        asked.append((positive, negative, words))
-        return f"two of {positive}", negative
-
-    revision = apply_request(story_of(["a man reading", "a man asleep"]), "blurry",
-                             "two men", rewrite=rewrite)
-
-    assert asked == [("a man reading", "blurry", "two men"),
-                     ("a man asleep", "blurry", "two men")]
-    assert revision.positive == story_of(["two of a man reading", "two of a man asleep"])
+# --- the model: every request goes to it first, with the notes and the exchange
 
 
-# --- catching a term the prompt names in its own words ----------------------
+NOTES = CollectionNotes(prompt_count=5, batches=1, batch_notes=["one note"],
+                        patterns="comma-separated parts, a subject first")
+EXCHANGE = [("a hat", "Gave her a straw hat, which your prompts favor at the beach."),
+            ("make it red", "The straw hat is red now.")]
 
 
-def _matcher(pairs):
-    """A stand-in for the model: maps a spoken term to the prompt term it means."""
-    def match(terms, term):
-        wanted = pairs.get(term)
-        return terms.index(wanted) if wanted in terms else None
-    return match
+class _Model:
+    def __init__(self, *answers):
+        self.answers = list(answers)
+        self.asked = []
+
+    def __call__(self, positive, negative, request, exchange, notes):
+        self.asked.append((positive, negative, request, exchange, notes))
+        answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
 
 
-def test_a_synonym_in_the_positive_prompt_is_dropped_like_the_words_themselves():
-    # The failure this exists for: the request said one thing, the prompt says
-    # the same thing in its own words, and excluding the spoken words would have
-    # changed nothing because the prompt still asks for it.
-    revision = apply_request(
-        "a woman, silver ear studs, soft light", "blurry", "no earrings",
-        match=_matcher({"earrings": "silver ear studs"}),
-    )
+def test_the_model_is_asked_first_with_the_prompts_the_exchange_and_the_notes():
+    model = _Model(("two women on a couch", "blurry", "Two women now."))
 
+    revision = work_out("a woman on a couch", "blurry", "two women", exchange=EXCHANGE,
+                        notes=NOTES, ask=model)
+
+    assert model.asked == [("a woman on a couch", "blurry", "two women", EXCHANGE, NOTES)]
+    assert (revision.positive, revision.negative) == ("two women on a couch", "blurry")
+    assert revision.answer == "Two women now."
+    assert revision.action == REWRITTEN
+    assert revision.changed
+
+
+def test_a_term_the_rules_are_sure_of_still_goes_to_the_model_which_knows_the_collection():
+    model = _Model(("a woman, soft light", "blurry", "Took the hat off."))
+
+    revision = work_out("a woman, a hat, soft light", "blurry", "no hat", ask=model)
+
+    assert len(model.asked) == 1
     assert revision.positive == "a woman, soft light"
+    assert revision.answer == "Took the hat off."
+
+
+def test_a_model_that_cannot_be_asked_leaves_the_rules_own_edit_and_nothing_said(caplog):
+    with caplog.at_level(logging.WARNING, logger="origenerator.prompt_edit"):
+        revision = work_out("a woman, soft light", "blurry", "freckles",
+                            ask=_Model(OSError("the model is down")))
+
+    assert revision.positive == "a woman, soft light, freckles"
+    assert revision.action == ADDED
+    assert revision.answer == ""
+    assert caplog.messages == ["prompt_edit: the model could not answer the request (OSError)"]
+
+
+def test_a_model_that_changes_nothing_and_says_nothing_leaves_the_rules_own_edit():
+    revision = work_out("a woman wearing a straw hat, freckles", "", "no hat",
+                        ask=_Model(("a woman wearing a straw hat, freckles", "", "")))
+
+    assert revision.positive == "freckles"
     assert revision.action == DROPPED
 
 
-def test_the_words_themselves_win_over_the_matcher():
-    # A prompt that says what the speaker said needs nothing decided, and a
-    # model asked anyway could talk itself out of the obvious answer.
-    called = []
+def test_a_model_that_changes_nothing_but_answers_is_an_answer_with_nothing_to_make():
+    revision = work_out("a woman, freckles", "", "more freckles",
+                        ask=_Model(("a woman, freckles", "", "The freckles are already there.")))
 
-    def match(terms, term):
-        called.append(term)
-        return 0
-
-    revision = apply_request("a woman, a hat, soft light", "", "no hat", match=match)
-
-    assert revision.positive == "a woman, soft light"
-    assert called == []
+    assert not revision.changed
+    assert revision.answer == "The freckles are already there."
 
 
-def test_a_matcher_that_finds_nothing_leaves_the_words_to_stand_alone():
-    revision = apply_request("a woman, soft light", "blurry", "no earrings",
-                             match=lambda terms, term: None)
+def test_a_term_the_model_weights_at_nothing_is_taken_out():
+    revision = work_out("a woman, natural makeup, beach", "blurry", "no makeup",
+                        ask=_Model(("a woman, (makeup:0.0), beach", "blurry, (glare:0)", "Done.")))
 
-    assert revision.negative == "blurry, earrings"
-    assert revision.action == EXCLUDED
+    assert (revision.positive, revision.negative) == ("a woman, beach", "blurry")
 
 
-def test_only_what_to_take_out_of_the_prompt_is_looked_for_by_meaning():
-    # Asked which of "blurry" meant "two women", a model once answered blurry,
-    # and the negative prompt lost it. A wish for something is only ever read
-    # in the words themselves.
-    revision = apply_request("a woman on a couch", "blurry", "two women",
-                             match=lambda terms, term: 0)
+def test_an_answer_that_stands_dots_in_for_a_prompt_leaves_that_prompt_as_it_was():
+    revision = work_out("A dog sits on a porch at sunset.", "", "bigger ears",
+                        ask=_Model(("A dog with big ears sits on a porch at sunset.", "...",
+                                    "Bigger ears.")))
+
+    assert (revision.positive, revision.negative) == (
+        "A dog with big ears sits on a porch at sunset.", "")
+
+
+def test_an_answer_that_leaves_part_of_the_prompt_out_with_dots_is_no_answer():
+    revision = work_out("A dog sits on a porch at sunset, warm light", "", "bigger ears",
+                        ask=_Model(("A dog with bigger ears ... warm light", "", "Bigger.")))
+
+    assert revision.positive == "A dog sits on a porch at sunset, warm light, bigger ears"
+    assert revision.answer == ""
+
+
+def test_an_answer_with_no_words_for_a_prompt_leaves_that_prompt_as_it_was():
+    revision = work_out("a woman", "blurry", "sharper",
+                        ask=_Model(("a woman, sharp focus", "", "Sharper.")))
 
     assert revision.negative == "blurry"
-    assert revision.action == ADDED
 
 
-def test_a_matcher_answering_out_of_range_is_ignored():
-    # A number the model invented is not a term the speaker meant, and acting on
-    # it would edit a part of the prompt nobody mentioned.
-    revision = apply_request("a woman, soft light", "", "no earrings",
-                             match=lambda terms, term: 99)
+def test_a_synonym_is_the_models_to_find_and_without_it_the_words_stand_alone():
+    # "no earrings" over a prompt that says "silver ear studs": the model reads
+    # the two as one thing; the rules, which read words, can only exclude it.
+    with_model = work_out("a woman, silver ear studs, soft light", "blurry", "no earrings",
+                          ask=_Model(("a woman, soft light", "blurry", "Took the studs out.")))
+    without = work_out("a woman, silver ear studs, soft light", "blurry", "no earrings",
+                       ask=_Model(OSError("down")))
 
-    assert revision.positive == "a woman, soft light"
-    assert revision.action == EXCLUDED
-
-
-def test_the_matcher_is_shown_the_prompts_own_terms_unweighted():
-    seen = []
-
-    def match(terms, term):
-        seen.append(list(terms))
-
-    apply_request("a woman, (silver ear studs:1.2), soft light", "", "no earrings",
-                  match=match)
-
-    assert seen[0] == ["a woman", "silver ear studs", "soft light"]
+    assert with_model.positive == "a woman, soft light"
+    assert (without.negative, without.action) == ("blurry, earrings", EXCLUDED)
 
 
-def test_a_completion_names_the_chosen_term():
-    assert parse_match({"choices": [{"message": {"content": '{"choice": 1}'}}]}, 3) == 1
+def test_a_request_naming_nothing_asks_the_model_nothing_and_yields_no_revision():
+    model = _Model(("x", "y", "z"))
+
+    assert work_out("a woman", "", "no, please", ask=model) is None
+    assert model.asked == []
 
 
-def test_a_completion_refusing_to_choose_reads_as_no_match():
-    assert parse_match({"choices": [{"message": {"content": '{"choice": -1}'}}]}, 3) is None
-    assert parse_match({"choices": [{"message": {"content": 'nope'}}]}, 3) is None
+def test_the_model_rewrites_each_scene_from_that_scenes_own_prompts():
+    model = _Model(("two men reading", "blurry", "Two of them."),
+                   ("two men asleep", "blurry", "Two of them."))
+
+    revision = work_out(story_of(["a man reading", "a man asleep"]), "blurry", "two men",
+                        exchange=EXCHANGE, notes=NOTES, ask=model)
+
+    assert [(positive, negative, request) for positive, negative, request, *_ in model.asked] == [
+        ("a man reading", "blurry", "two men"), ("a man asleep", "blurry", "two men")]
+    assert revision.positive == story_of(["two men reading", "two men asleep"])
+    assert revision.answer == "Two of them."
 
 
-def _model_answering(content):
-    response = MagicMock()
-    response.read.return_value = json.dumps(
-        {"choices": [{"message": {"content": content}}]}).encode()
-    response.__enter__ = lambda self: self
-    response.__exit__ = MagicMock(return_value=False)
-    return patch("urllib.request.urlopen", return_value=response)
+def test_a_storys_scenes_answered_differently_are_answered_scene_by_scene():
+    model = _Model(("a dog, grass", "blurry", "Grass under the dog."),
+                   ("a cat, grass", "blurry", "Grass under the cat."))
+
+    revision = work_out(story_of(["a dog", "a cat"]), "blurry", "grass", ask=model)
+
+    assert revision.answer == "Grass under the dog. Grass under the cat."
 
 
-def test_a_match_is_logged_by_where_the_term_stands_never_by_its_words(caplog):
-    with _model_answering('{"choice": 1}'), \
-            caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
-        chosen = smart_match(["gamma form", "an example lantern", "soft light"], "lamp",
-                             base_url="http://model.invalid", model="m",
-                             system_prompt="RULES")
+def test_a_story_the_model_answered_only_in_part_is_left_to_the_rules():
+    model = _Model(("two men reading", "blurry", "Two."), OSError("down"))
 
-    assert chosen == 1
-    assert caplog.messages == ["prompt_edit: the request matched index 1 of the prompt's 3 terms"]
+    revision = work_out(story_of(["a man reading", "a man asleep"]), "blurry", "two men",
+                        ask=model)
 
-
-def test_a_match_that_fails_says_why_and_never_what_was_asked(caplog):
-    with patch("urllib.request.urlopen", side_effect=OSError("model down")), \
-            caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
-        chosen = smart_match(["gamma form", "an example lantern"], "lamp",
-                             base_url="http://model.invalid", model="m",
-                             system_prompt="RULES")
-
-    assert chosen is None
-    assert caplog.messages == [
-        "prompt_edit: could not match the request against the prompt's 2 terms (model down)"]
+    assert revision.positive == story_of(["a man reading, two men", "a man asleep, two men"])
+    assert revision.answer == ""
 
 
-def test_the_match_request_offers_the_terms_numbered():
-    messages = build_match_messages(["a woman", "silver ear studs"], "earrings", "RULES")
-
-    assert messages[0]["content"] == "RULES"
-    assert "0. a woman" in messages[1]["content"]
-    assert "1. silver ear studs" in messages[1]["content"]
-    assert "earrings" in messages[1]["content"]
+# --- what the model is asked, and how its answer is read --------------------
 
 
-# --- the rewrite: a term in neither prompt worked into the whole pair ---------
+def test_the_request_messages_carry_the_notes_the_exchange_the_prompts_and_the_request():
+    messages = build_request_messages("a woman, tan", "blurry", "no tan lines", EXCHANGE, NOTES,
+                                      "SYSTEM")
 
-
-def test_build_rewrite_messages_carries_both_prompts_and_the_instruction():
-    messages = build_rewrite_messages("a woman, tan", "blurry", "no tan lines", "SYSTEM")
     assert messages[0] == {"role": "system", "content": "SYSTEM"}
     content = messages[1]["content"]
-    assert "a woman, tan" in content and "blurry" in content and "no tan lines" in content
+    assert content.index("comma-separated parts") < content.index("a hat") < content.index(
+        "The straw hat is red now.") < content.index("a woman, tan") < content.index("blurry")
+    assert content.rindex("no tan lines") > content.index("blurry")
+    assert "one note" in content
+
+
+def test_without_notes_or_an_exchange_the_messages_say_neither():
+    content = build_request_messages("a woman", "", "no hat", [], None, "S")[1]["content"]
+
+    assert "NOTES" not in content and "EXCHANGE" not in content
+    assert "a woman" in content and "no hat" in content
+
+
+def test_notes_still_being_taken_are_not_told_yet():
+    unfinished = CollectionNotes(prompt_count=5, batches=2, batch_notes=["a note"])
+
+    content = build_request_messages("a woman", "", "no hat", [], unfinished, "S")[1]["content"]
+
+    assert "a note" not in content
 
 
 def test_the_answer_asked_for_shows_no_dots_a_model_could_copy_back_as_a_prompt():
-    content = build_rewrite_messages("a woman, tan", "", "no tan lines", "SYSTEM")[1]["content"]
+    content = build_request_messages("a woman, tan", "", "no tan lines", [], None, "S")[1]["content"]
 
     assert "..." not in content and "…" not in content
 
 
-def test_a_rewrite_sends_both_prompts_and_answers_with_both():
-    with _model_answering('{"positive": "a woman", "negative": "tan lines"}') as urlopen:
-        result = rewrite_prompt(
-            "a woman, tan", "", "no tan lines",
-            base_url="http://localhost:11434/v1", model="dolphin", system_prompt="SYSTEM",
-        )
+def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_go(monkeypatch):
+    sent = {}
 
-    (request,), _ = urlopen.call_args
-    body = json.loads(request.data)
-    assert result == ("a woman", "tan lines")
-    assert request.full_url == "http://localhost:11434/v1/chat/completions"
-    assert body["model"] == "dolphin"
-    assert body["response_format"] == {"type": "json_object"}
-    assert "a woman, tan" in body["messages"][1]["content"]
+    def ask(messages, **settings):
+        sent["messages"], sent["settings"] = messages, settings
+        return {"message": {"content": '{"positive": "a woman", "negative": "tan lines", '
+                                       '"answer": "No tan lines now."}'}}
+
+    monkeypatch.setattr(local_llm, "ask", ask)
+
+    answered = ask_the_model("a woman, tan", "", "no tan lines", EXCHANGE, NOTES)
+
+    assert answered == ("a woman", "tan lines", "No tan lines now.")
+    assert "a woman, tan" in sent["messages"][1]["content"]
+    assert sent["settings"]["json_answer"] is True
+    assert sent["settings"]["reads_tokens"] > 16000
+    assert sent["settings"]["stays_loaded"] == "0"
 
 
-def test_rewrite_prompt_keeps_a_field_the_model_omits():
-    with _model_answering('{"positive": "a man"}'):
-        positive, negative = rewrite_prompt(
-            "a woman", "existing negative", "make her a man",
-            base_url="http://x/v1", model="m", system_prompt="S",
-        )
+def test_a_field_the_model_leaves_out_is_read_as_unchanged_or_unsaid(monkeypatch):
+    monkeypatch.setattr(local_llm, "ask", lambda messages, **settings: {
+        "message": {"content": '{"positive": "a man"}'}})
 
-    assert positive == "a man" and negative == "existing negative"  # negative preserved
+    assert ask_the_model("a woman", "existing negative", "make her a man", [], None) == (
+        "a man", "existing negative", "")

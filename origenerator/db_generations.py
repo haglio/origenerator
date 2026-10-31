@@ -368,6 +368,17 @@ class GenerationStore(Store):
             ).fetchall()
             return [as_read(r) for r in rows]
 
+    def distinct_positive_prompts(self) -> list[str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""SELECT positive_prompt FROM generations
+                   WHERE positive_prompt IS NOT NULL AND TRIM(positive_prompt) != ''
+                     AND {_MADE_HERE}
+                   GROUP BY positive_prompt ORDER BY MIN(id)""",
+                MADE_ELSEWHERE,
+            ).fetchall()
+            return [row[0] for row in rows]
+
     def highest_id_issued(self) -> int:
         """The largest id this table has ever handed out, deleted rows included.
 

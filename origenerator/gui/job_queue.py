@@ -211,11 +211,19 @@ class JobQueue(QObject):
         self._takes_over_on_landing: GenerationJob | None = None
         self._first: frozenset[str] = frozenset()
         self._training = None
+        self._model_holds = 0  # Requests the local model is answering, each with the card
         self._enhance = None
         self._closed = False
 
     def close(self) -> None:
         self._closed = True
+
+    def hold_for_the_model(self) -> None:
+        self._model_holds += 1
+
+    def the_model_let_go(self) -> None:
+        self._model_holds = max(0, self._model_holds - 1)
+        self._pump()
 
     def watch_training(self, training) -> None:
         self._training = training
@@ -527,7 +535,8 @@ class JobQueue(QObject):
 
     def _free_for_the_next_job(self) -> bool:
         return not (self._on_server or self._in_flight is not None
-                    or self._training_holds_the_line() or self._awaiting_comfyui)
+                    or self._training_holds_the_line() or self._model_holds
+                    or self._awaiting_comfyui)
 
     def _wait_at_the_front(self) -> float:
         since = (None if self._image_asked_at is None

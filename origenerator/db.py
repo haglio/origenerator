@@ -28,7 +28,7 @@ from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
 from origenerator.db_item_numbers import ItemNumberStore
-from origenerator.db_requests import RequestStore
+from origenerator.db_requests import RequestStore, Turn
 from origenerator.db_salvage import salvage_if_malformed
 from origenerator.db_schema import SCHEMA, create
 from origenerator.db_seed_uses import SeedUseStore
@@ -235,6 +235,9 @@ class Database:
     def forget_item_numbers(self, prompt_ids: list[str]):
         return self.item_numbers.forget_item_numbers(prompt_ids)
 
+    def distinct_positive_prompts(self) -> list[str]:
+        return self.generations.distinct_positive_prompts()
+
     # --- spoken requests (see origenerator.db_requests) ----------------------
 
     def record_request(self, *, prompt_id: str, source_prompt_id: str, heard: str,
@@ -256,6 +259,12 @@ class Database:
 
     def get_request(self, prompt_id: str) -> dict | None:
         return self.requests.get_request(prompt_id)
+
+    def record_turns(self, prompt_id: str, turns) -> None:
+        return self.requests.record_turns(prompt_id, turns)
+
+    def exchange_of(self, prompt_id: str) -> list[Turn]:
+        return self.requests.exchange_of(prompt_id)
 
 
     # --- folder metadata (see origenerator.db_folder_meta) ------------------

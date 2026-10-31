@@ -436,7 +436,19 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # Broker button and a Satellite's Clip seconds came to its HUDs.
 # 16071 when a story handed to ComfyUI with nobody left to answer its voice came
 # to be spoken where it is asked.
-MAX_PROSE_LINES = 16071
+# 16066 when the local model came to be asked through Ollama's own door and to take
+# notes on the collection while Origenerator is closed.
+# 16014 when every Request came to go to the model first, with the notes and the
+# exchange, and the step that matched one term went.
+# 15993 when a Request came to hand the graphics card to the model and say its
+# sentence back, and the request worker folded into the answerer.
+# 15989 when the Request section came to show the exchange, ask on Enter, and
+# show a request's change on its entry rather than in the prompt fields.
+# 15985 when the model came to take the one claim on the graphics card the
+# trainers take, measured on the branch rebased onto the trainers' change.
+# 15977 when the branch took main's renaming of the HUD, the Job Queue and Core,
+# measured on the rebased tree.
+MAX_PROSE_LINES = 15977
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

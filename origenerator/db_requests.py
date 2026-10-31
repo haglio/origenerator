@@ -16,7 +16,21 @@ holds -- so `heard` is empty there and `term`/`polarity`/`action` are unset.
 """
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from origenerator.db_connection import Store
+
+
+class Turn(NamedTuple):
+    """One turn of the exchange that led to an item: what was asked, what the
+    model answered, and the prompt pair before and after it."""
+
+    said: str
+    answered: str = ""
+    old_positive: str = ""
+    old_negative: str = ""
+    new_positive: str = ""
+    new_negative: str = ""
 
 
 class RequestStore(Store):
@@ -69,3 +83,32 @@ class RequestStore(Store):
                 "SELECT * FROM requests WHERE prompt_id = ?", (prompt_id,)
             ).fetchone()
             return dict(row) if row else None
+
+    def record_turns(self, prompt_id: str, turns) -> None:
+        with self._connect() as conn:
+            conn.executemany(
+                """INSERT INTO request_turns
+                       (prompt_id, said, answered, old_positive, old_negative,
+                        new_positive, new_negative)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                [(prompt_id, *Turn(*turn)) for turn in turns])
+
+    def _turns_of(self, prompt_id: str) -> list[Turn]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT said, answered, old_positive, old_negative, new_positive, new_negative
+                   FROM request_turns WHERE prompt_id = ? ORDER BY id""", (prompt_id,)).fetchall()
+            return [Turn(*row) for row in rows]
+
+    def exchange_of(self, prompt_id: str) -> list[Turn]:
+        """Every turn along the way to this item, oldest first: those of the item
+        it was requested from, and theirs before, then its own."""
+        exchange: list[Turn] = []
+        seen: set[str] = set()
+        current: str | None = prompt_id
+        while current and current not in seen:
+            seen.add(current)
+            exchange = self._turns_of(current) + exchange
+            request = self.get_request(current)
+            current = request["source_prompt_id"] if request else None
+        return exchange

@@ -1,17 +1,14 @@
 """The corner note while a spoken request is still being worked out.
 
-Working out what a request changes can mean asking the local LLM which of the
-prompt's own terms the speaker meant — which is what that path is for, and it
+Working out what a request changes means asking the local model, which
 routinely takes longer than a flash lasts.  Flashed, the note said the app was
 working and then left the corner blank while it still was, which in a view with
 no HUD is indistinguishable from the request having been dropped.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QRunnable
 from shared_ui.colors import AMBER, RED, TEXT_PRIMARY
 
-from origenerator.gui import voice_router
 from origenerator.gui.notice_overlay import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView
 from tests.funestra_fakes import FakeEngine
@@ -35,19 +32,12 @@ def _view(qtbot):
     return view
 
 
-class _NeverAnswers(QRunnable):
-    """A revision handed to the pool that never comes back — the app left in the
-    state it is in for as long as the working-out takes."""
-
-    def run(self):
-        pass
-
-
 def _mid_request(qtbot, tmp_path, monkeypatch, *, showing=True):
     """A gallery that has just been asked for a change, with the working-out
     still going on — over a slideshow, or in the window with none up."""
-    monkeypatch.setattr(voice_router, "ReviseTask", lambda *a, **kw: _NeverAnswers())
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    # The model never answers: the app stays as it is for as long as the working-out takes.
+    monkeypatch.setattr(view._request_answerer, "ask", lambda *a, **kw: None)
     if not showing:
         view._slideshows.showing.close()  # the request is then this pane's to answer,
         view.select_generation("orig")  # about the image picked in it

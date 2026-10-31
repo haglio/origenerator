@@ -53,6 +53,12 @@ def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
     label.setText(marked_text(mark, text, color=color, size=label.fontMetrics().height()))
 
 
+def time_to_read_ms(text: str) -> int:
+    """How long a line stays up: a short one its usual moment, a sentence or two
+    long enough to be read through."""
+    return max(3000, 1500 + 250 * len(text.split()))
+
+
 class NoticeOverlay(QLabel):
     """One line, centered across the top of the surface it belongs to."""
 

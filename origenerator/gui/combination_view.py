@@ -1,7 +1,7 @@
 """The two halves of a combination, shown as the sum they are: image + source video.
 
 Two renderings of one look. :class:`CombinationView` is the live one, for a pane
-with room to loop the clip; :func:`combination_pixmap` is the same arithmetic as
+with room to loop the video; :func:`combination_pixmap` is the same arithmetic as
 a still, for the surfaces that hold a pixmap rather than a widget — the Job Queue's corner and a folder's generating tile. They are together here because what
 they have to agree on is the look: a run in flight shows the same pair in all
 three places until ComfyUI streams a frame of the run itself, and three
@@ -13,7 +13,7 @@ past video's settings, and nothing has been made from them yet. The form below
 holds the settings, but the pane above it had nothing to show and said so, with
 the same "select a generation to preview" a tab that had been pointed at nothing
 says. So it shows the arithmetic instead: the frame that will be animated on the
-left, a plus sign, and on the right the clip whose settings the run will follow,
+left, a plus sign, and on the right the video whose settings the run will follow,
 looping in gray (:mod:`origenerator.gui.grayscale`) because it lends the settings and
 not the result.
 
@@ -55,7 +55,7 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
     run made from nothing, which is a plate the caller leaves alone.
 
     The same arithmetic :class:`CombinationView` lays out live: the frame, the
-    plus, and the clip whose settings go with it, drained of color because it is
+    plus, and the video whose settings go with it, drained of color because it is
     not what is being made. Either half alone still draws, and the plus shows
     only with both, since a lone image is not a sum.
 
@@ -100,7 +100,7 @@ def _readable(path) -> QPixmap | None:
 
 
 class CombinationView(QWidget):
-    """An image, a plus, and the gray clip whose settings go with it."""
+    """An image, a plus, and the gray video whose settings go with it."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -108,7 +108,7 @@ class CombinationView(QWidget):
         self._video_path: str | None = None
         self._movie: QMovie | None = None
         self._pixmap: QPixmap | None = None
-        self._has_clip = False
+        self._has_video = False
         self._enclosed = False
 
         layout = QHBoxLayout(self)
@@ -148,13 +148,13 @@ class CombinationView(QWidget):
         if self._pixmap is None:
             self.image_label.clear()
         self.image_label.setVisible(self._pixmap is not None)
-        self._has_clip = bool(self._video_path and Path(self._video_path).is_file())
-        if not self._has_clip:
+        self._has_video = bool(self._video_path and Path(self._video_path).is_file())
+        if not self._has_video:
             self.video_label.clear()  # no stale last frame under the next pair
-        self.video_label.setVisible(self._has_clip)
-        self.plus_label.setVisible(self._pixmap is not None and self._has_clip)
+        self.video_label.setVisible(self._has_video)
+        self.plus_label.setVisible(self._pixmap is not None and self._has_video)
         self._show_parentheses(combination.prompt_edited)
-        if self._has_clip:
+        if self._has_video:
             self._movie = looping_movie(self._video_path, self._side_size(),
                                         self.video_label)
             play_grayscale(self._movie, self.video_label)
@@ -165,7 +165,7 @@ class CombinationView(QWidget):
         self._rescale()
 
     def _show_parentheses(self, edited: bool) -> None:
-        self._enclosed = edited and self._has_clip
+        self._enclosed = edited and self._has_video
         for paren in self._parens:
             paren.setVisible(self._enclosed)
 
@@ -174,7 +174,7 @@ class CombinationView(QWidget):
         self._stop_movie()
         self._image_path = self._video_path = None
         self._pixmap = None
-        self._has_clip = self._enclosed = False
+        self._has_video = self._enclosed = False
         self.image_label.clear()
         self.video_label.clear()
 
@@ -185,7 +185,7 @@ class CombinationView(QWidget):
         and no wider than lets the pair, its plus and any parentheses fit across
         between the margins — the arithmetic :func:`combination_pixmap` draws by."""
         room = QSize(self.width() - 2 * _MARGIN, int(self.height() * _HEIGHT_SHARE))
-        return pair_side(room, self._pixmap is not None and self._has_clip, self._enclosed)
+        return pair_side(room, self._pixmap is not None and self._has_video, self._enclosed)
 
     def _side_size(self) -> QSize:
         side = self._side()

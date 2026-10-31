@@ -97,7 +97,7 @@ class CombinePanel(QWidget):
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
     animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
     intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the acts
-    item_activated = pyqtSignal(str)  # a slot's image or clip was clicked (prompt_id)
+    item_activated = pyqtSignal(str)  # a slot's image or video was clicked (prompt_id)
     video_used = pyqtSignal(str, str)  # (intent, prompt_id) a video put in the slot by hand
 
     def __init__(

@@ -63,7 +63,7 @@ _BAND_FILL = BLUE_LIGHT
 
 # How tall the bar is drawn wherever it is laid along a thumbnail's foot: a line of
 # its own font with room to read as a bar around it, and the height a Funestra's
-# own bar has, so work in flight and a clip being watched measure the same.
+# own bar has, so work in flight and a video being watched measure the same.
 BAR_HEIGHT = 26
 
 
@@ -254,9 +254,9 @@ class ProgressCaption(QProgressBar):
         if inner.height() <= _BAND_PX or inner.width() <= 0:
             return  # too short to give any of itself away
         painter.save()
-        clip = QPainterPath()
-        clip.addRoundedRect(QRectF(inner), _BAND_RADIUS, _BAND_RADIUS)
-        painter.setClipPath(clip)
+        rounded_inside = QPainterPath()
+        rounded_inside.addRoundedRect(QRectF(inner), _BAND_RADIUS, _BAND_RADIUS)
+        painter.setClipPath(rounded_inside)
         band = QRect(inner.x(), inner.bottomLeft().y() - _BAND_PX + 1,
                      inner.width(), _BAND_PX)
         painter.fillRect(band, _BAND_TROUGH)

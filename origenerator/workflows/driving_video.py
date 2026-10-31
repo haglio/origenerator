@@ -7,7 +7,7 @@ from origenerator.workflows.frame_rate import NATIVE_FPS
 def start_frame(start_seconds: float) -> int:
     return max(0, round(start_seconds * NATIVE_FPS))
 
-SHORTEST_CLIP_FRAMES = 5
+SHORTEST_VIDEO_FRAMES = 5
 
 
 def frames_within(frame_count: int, *, video_seconds: float | None, start: int) -> int:
@@ -17,7 +17,7 @@ def frames_within(frame_count: int, *, video_seconds: float | None, start: int) 
     available = int(video_seconds * NATIVE_FPS) - start
     if available >= frame_count:
         return frame_count
-    return max(SHORTEST_CLIP_FRAMES, (available - 1) // 4 * 4 + 1)
+    return max(SHORTEST_VIDEO_FRAMES, (available - 1) // 4 * 4 + 1)
 
 
 def driven_actions(actions: list[dict], *, start_ms: int, length_ms: int) -> list[dict]:

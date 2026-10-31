@@ -21,7 +21,7 @@ backstop for names already known; it cannot see the next one.
 So fabricate fully. Use `Jane Doe`, `Sample Studio`, `scene one`, the
 `alpha`/`beta`/`gamma` act placeholders the committed `content.example.json`
 already uses. The near miss that still counts: taking a real filename and
-changing a character or two — it is still that clip, still that performer. Make
+changing a character or two — it is still that video, still that performer. Make
 it up from scratch, don't lightly edit a real one.
 
 ## One word per thing, and the two that keep their second
@@ -71,9 +71,9 @@ for one thing cost four. So:
   audit's vocabulary pass above made each thing one word and never held the
   words against the screen, which is how "clip" passed it. Names that belong
   to something else keep theirs: CLIP the text model and its ComfyUI nodes,
-  and the clipboard. Genau's own videos are flicks in the code, and on
-  screen they take the word the settings all of Haglio share give them,
-  genau_flick_words.
+  the clipboard, and Fun Time's Clip seconds. Genau's own videos are flicks
+  in the code, and on screen they take the word the settings all of Haglio
+  share give them, genau_flick_words.
 - **An item is an image or a video, and neither is a picture or a record.**
   This code said "picture" all through it where it meant an image, and still
   says "record" where it means an item or the row behind one. Neither is the
@@ -411,7 +411,7 @@ would be lost. `tests/test_launcher_contract.py` holds both to that.
   as one thing only: the starting position the window offers for an animation
   nobody ever kept a video of, which is the last place `starting_point` looks.
 
-Neither can answer anything the other has not: an animation's samples are clips
+Neither can answer anything the other has not: an animation's samples are videos
 made from images already sorted, so the sorting window comes first and a fresh
 library shows every animation blank.
 

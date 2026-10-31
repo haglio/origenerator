@@ -22,7 +22,7 @@ say where the work has been.
 
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
 set) and dragged onto a *collecting* row — one carrying its key under
-``DROP_KEY_ROLE``: the Favorites collection, or a custom folder — and so can an
+``DROP_KEY_ROLE``: the Favorites collection, or a custom collection — and so can an
 item dragged from anywhere in the window, onto a row the view says takes it. A
 drop emits ``dropped`` and is never applied to the tree itself, so nothing is ever
 reparented; what a collecting row does with what lands on it is the view's
@@ -137,7 +137,7 @@ class FolderTree(QTreeWidget):
         self.setIndentation(_ICON)
         self.setMouseTracking(True)  # so hover is tracked without a button held
         # Several folders at once: Shift takes a run, Ctrl a scattered set — the
-        # gesture that composes a custom folder.
+        # gesture that composes a custom collection.
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         # Folders drag out; only a collecting row takes them (see landing_on).
         self.setDragEnabled(True)
@@ -337,7 +337,7 @@ class FolderTree(QTreeWidget):
         where the folders or the item can go."""
         super().dragMoveEvent(event)  # scrolls the tree while a drag is held at its foot
         if event.position().y() < self.autoScrollMargin():
-            self.scrollToTop()  # the folders of your own are there, where a drag nearly always goes
+            self.scrollToTop()  # the collections of your own are there, where a drag nearly always goes
         row, landing = self._row_and_landing(event)
         self._aim(row if landing is not None else None)
         if landing is None:

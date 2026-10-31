@@ -362,33 +362,33 @@ def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, 
 
 
 def test_a_library_that_named_the_folder_holdings_the_old_way_keeps_them(tmp_path):
-    """The table holding what each custom folder gathers was renamed with the
+    """The table holding what each custom collection gathers was renamed with the
     vocabulary sweep. Every user's database still has the old one, and it is the
     only record of the groupings they built by hand -- so it is renamed in
     place, rows and order intact, rather than left beside an empty new table
-    while the gallery reports no custom folders at all."""
+    while the gallery reports no custom collections at all."""
     path = tmp_path / "origenerator.db"
     with sqlite3.connect(path) as conn:
         conn.execute(
             "CREATE TABLE custom_folders (id INTEGER PRIMARY KEY AUTOINCREMENT, "
             "name TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
         conn.execute(
-            "CREATE TABLE custom_folder_members (folder_id INTEGER NOT NULL, "
+            "CREATE TABLE custom_collection_members (folder_id INTEGER NOT NULL, "
             "folder_key TEXT NOT NULL, level TEXT, ref_prompt_id TEXT, "
             "position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (folder_id, folder_key))")
         conn.execute("INSERT INTO custom_folders (id, name) VALUES (1, 'Favorites')")
         conn.executemany(
-            "INSERT INTO custom_folder_members VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO custom_collection_members VALUES (?, ?, ?, ?, ?)",
             [(1, "image/sdxl_t2i", "settings", "i1", 0),
              (1, "image/flux_t2i", "settings", "i2", 1)])
 
     db = Database(path)
 
-    assert db.list_custom_folders() == [
+    assert db.list_custom_collections() == [
         {"id": 1, "name": "Favorites", "side": None,
          "folders": ["image/sdxl_t2i", "image/flux_t2i"], "items": []}]
     with sqlite3.connect(path) as conn:
-        assert "custom_folder_members" not in _tables(conn)
+        assert "custom_collection_members" not in _tables(conn)
 
 
 def _row_with(params: dict) -> tuple:

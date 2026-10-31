@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
-from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_DIALOG, GAP_MEDIUM, GAP_SMALL
+from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import (
     BASIC_TITLE,
@@ -58,7 +58,6 @@ class MetadataBlock(QWidget):
         self._section: MetaSection | None = None
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
-        self._container: QWidget | None = None
         self._block: CollapsibleSection | None = None
         self._folded = False
 
@@ -86,24 +85,17 @@ class MetadataBlock(QWidget):
             self._go_to_folder is not None and self._go_to_folder.isVisible())
 
     def _render(self, section: MetaSection | None):
-        if self._container is not None:
+        if self._block is not None:
             # setParent(None) drops it from this block's children at once (so a
             # rebuild's findChildren/layout sees only the new rows); deleteLater
             # then frees it on the next loop turn.
-            self._container.setParent(None)
-            self._container.deleteLater()
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, GAP_SMALL)
-        layout.setSpacing(GAP_DIALOG)
-        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self._block = None
+            self._block.setParent(None)
+            self._block.deleteLater()
+            self._block = None
         if section is not None or self._go_to_folder is not None:
             self._block = _build_section(section, self._go_to_folder, collapsed=self._folded)
             self._block.toggled.connect(self._keep_the_fold)
-            layout.addWidget(self._block)
-        self._container = container
-        self._outer.addWidget(container)
+            self._outer.addWidget(self._block)
 
     def _keep_the_fold(self) -> None:
         self._folded = self._block.is_collapsed()

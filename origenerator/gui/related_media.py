@@ -87,7 +87,7 @@ class RelatedMedia(QWidget):
                  request_of: Callable[[str], dict | None],
                  requests_about: Callable[[str], list[dict]]):
         super().__init__(parent)
-        self._video_rows = video_rows or (list)
+        self._video_rows = video_rows or list
         self._row_of = row_of
         self._name_of = name_of
         self._held_rows = held_rows
@@ -119,6 +119,10 @@ class RelatedMedia(QWidget):
             section.activated.connect(self.link_clicked)
         for section in self._sections():
             layout.addWidget(section)
+        self._follow_the_sections()
+
+    def _follow_the_sections(self) -> None:
+        self.setVisible(any(not section.isHidden() for section in self._sections()))
 
     def _source_section_of(self, *tiles: SourceTile) -> CollapsibleSection:
         side_by_side = QWidget()
@@ -154,6 +158,7 @@ class RelatedMedia(QWidget):
         self._animated_strip.show_videos(items)
         self._animations_section.setVisible(not self._animated_strip.isHidden())
         self._show_videos_made_from(row.get("prompt_id"), videos)
+        self._follow_the_sections()
 
     def folds(self) -> dict[str, bool]:
         return {section.title(): section.is_collapsed() for section in self._sections()}
@@ -178,6 +183,7 @@ class RelatedMedia(QWidget):
         self._animated_strip.hide()
         self._animations_section.hide()
         self._show_videos_made_from(None, [])
+        self._follow_the_sections()
 
     def _show_source_tile(self, row: dict, start_image_of):
         """Reveal the source tile for whatever this row was built from, else hide
@@ -209,6 +215,7 @@ class RelatedMedia(QWidget):
                 + [(into_heading, made) for record, made in made_into
                    if _is_request(record) == is_request],
                 self._name_of)
+        self._follow_the_sections()
 
     def _show_videos_made_from(self, prompt_id: str | None, videos: list[dict]) -> None:
         for section, names_it, heading in (

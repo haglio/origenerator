@@ -36,8 +36,8 @@ from funestra.file_channel import append_command
 from funestra.playlist import write_playlist
 from shared_ui.orientation import orientation_of_size
 
-from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
+from origenerator.osr2_controls_commands import spelled_filter, spelled_for
 from origenerator.slideshow import Slide
 from origenerator.slideshow_buttons import (
     HUD_PLACES,

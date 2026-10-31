@@ -2575,7 +2575,7 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
     for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
         QApplication.processEvents()
 
-    for inside in (view._tree, view._scroll, view._motion_panel, view._enhance.panel):
+    for inside in (view._tree, view._scroll, view._osr2_controls, view._enhance.panel):
         pane = _pane_holding(inside)
         room = pane.rect().marginsRemoved(QMargins(*[MARGIN_STANDARD] * 4))
         for child in pane.findChildren(
@@ -2588,11 +2588,11 @@ def test_the_hud_sits_top_left_over_the_search_with_a_draggable_divider_between(
         qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    divider = _pane_holding(view._motion_panel).parentWidget()
+    divider = _pane_holding(view._osr2_controls).parentWidget()
 
     assert view._arrangement.folder_panes.widget(0) is divider
     assert divider.orientation() == Qt.Orientation.Vertical
-    assert divider.widget(0).isAncestorOf(view._motion_panel)
+    assert divider.widget(0).isAncestorOf(view._osr2_controls)
     assert any(divider.widget(n).isAncestorOf(view._search.field)
                for n in range(1, divider.count()))
     assert divider.handleWidth() == view._arrangement.panes.handleWidth()
@@ -2633,7 +2633,7 @@ def test_with_room_to_spare_the_hud_opens_whole_at_the_top_left_even_at_its_wide
     view.osr2_control.setChecked(True)  # the Robot Hand driving, its widest line
     for _ in range(4):
         QApplication.processEvents()
-    (hud,) = _pane_holding(view._motion_panel).findChildren(QScrollArea)
+    (hud,) = _pane_holding(view._osr2_controls).findChildren(QScrollArea)
 
     assert hud.horizontalScrollBar().maximum() == 0
     assert hud.verticalScrollBar().maximum() == 0
@@ -2654,7 +2654,7 @@ def test_squeezed_smaller_than_the_hud_its_pane_scrolls_rather_than_spilling(qtb
     view.resize(1500, 900)
     view.show()
     QApplication.processEvents()
-    over_the_search = _pane_holding(view._motion_panel).parentWidget()
+    over_the_search = _pane_holding(view._osr2_controls).parentWidget()
 
     view._arrangement.folder_panes.moveSplitter(60, 1)
     over_the_search.moveSplitter(90, 1)

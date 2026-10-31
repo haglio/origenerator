@@ -881,7 +881,8 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._bank.auto.isHidden() and view._bank.auto.isEnabled()
+    assert not view._bank.auto.isHidden()
+    assert view._bank.auto.isEnabled()
 
     view._tree.setCurrentItem(_image_workflow(view._tree))  # a workflow, not a leaf
 

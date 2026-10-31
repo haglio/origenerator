@@ -277,7 +277,8 @@ def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tm
     _select_first_leaf(view)
     button = view._enhance.panel._enhance_button
 
-    assert button.isEnabled() and view._bank.enhance.isEnabled()
+    assert button.isEnabled()
+    assert view._bank.enhance.isEnabled()
     assert button.toolTip() == view._bank.enhance.toolTip()
 
     button.click()
@@ -617,7 +618,8 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     view._client.preview_image.emit(leader.prompt_id, _png_bytes())
 
     tiles = view._browser._thumb_widgets
-    assert tiles["g0"]._enhancing is not None and tiles["g1"]._enhancing is not None
+    assert tiles["g0"]._enhancing is not None
+    assert tiles["g1"]._enhancing is not None
     assert not tiles["g0"]._image_label.pixmap().isNull()
     assert follower.state == "idle"  # waiting in the line for its turn
     assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame

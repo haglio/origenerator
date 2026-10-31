@@ -782,7 +782,8 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     _square_menu(view, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["id"] == folder_id and record["folders"] == [cat]
+    assert record["id"] == folder_id
+    assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
 
 
@@ -797,7 +798,8 @@ def test_an_item_can_be_taken_out_of_the_folder_of_your_own_showing_it(qtbot, mo
     view.generation_menu(["i2"], QPoint(0, 0))
 
     (record,) = view._db.list_custom_folders()
-    assert record["items"] == [] and record["folders"] == [cat]
+    assert record["items"] == []
+    assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # taken out of it, not deleted
 
 
@@ -812,7 +814,8 @@ def test_an_item_there_only_by_its_folder_offers_no_way_out_of_the_folder_of_you
 
     view.generation_menu(["i1"], QPoint(0, 0))
 
-    assert labels and "Remove from “Keepers”" not in labels
+    assert labels
+    assert "Remove from “Keepers”" not in labels
 
 
 def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
@@ -864,7 +867,8 @@ def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
     _tree_menu(view)  # no row under the cursor
 
     (record,) = view._db.list_custom_folders()
-    assert record["name"] == "Keepers" and record["folders"] == []
+    assert record["name"] == "Keepers"
+    assert record["folders"] == []
     assert _top_level(view._tree)["Keepers"] is view._tree.currentItem()
 
 

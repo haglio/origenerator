@@ -773,7 +773,8 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     client.preview_image.emit(job.prompt_id, frame)
     _generating_tile(view).selected.emit()
     panel = view._info_tabs.current_config_panel()
-    assert panel.watched_key() == key and _frame_shown(panel._preview, frame)
+    assert panel.watched_key() == key
+    assert _frame_shown(panel._preview, frame)
 
     view._poll()  # the rebuild the new running row triggers
 
@@ -781,7 +782,8 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     assert _generating_tile(view)._selected
     # The tab following the run kept its frame: a rebuild repaints no tab.
     assert view._info_tabs.current_config_panel() is panel
-    assert panel.watched_key() == key and _frame_shown(panel._preview, frame)
+    assert panel.watched_key() == key
+    assert _frame_shown(panel._preview, frame)
 
 
 def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp_path):
@@ -2277,9 +2279,9 @@ def test_a_row_standing_in_for_an_image_waits_in_front_of_the_videos(qtbot, tmp_
 class _QueueClient(ComfyUIClient):
     """A client whose ComfyUI queue holds ``foreign`` jobs of another app's."""
 
-    def __init__(self, foreign=ForeignQueue(running=[], pending=[]), fail=None):
+    def __init__(self, foreign=None, fail=None):
         super().__init__(folders=SUITE_FOLDERS)
-        self._foreign = foreign
+        self._foreign = foreign if foreign is not None else ForeignQueue(running=[], pending=[])
         self._fail = fail
         self.cleared = 0
 

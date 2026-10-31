@@ -376,7 +376,8 @@ def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     view.restore_from_trash([])
     view.purge_from_trash([])
 
-    assert actions.restored == [] and actions.purged == []
+    assert actions.restored == []
+    assert actions.purged == []
 
 
 def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
@@ -556,7 +557,8 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     assert resolved is not None
     path, media_type = resolved
     assert media_type == "video"
-    assert Path(path).exists() and Path(path).is_relative_to(tmp_path / "trash")
+    assert Path(path).exists()
+    assert Path(path).is_relative_to(tmp_path / "trash")
 
 
 def _scroll_into_view(widget):
@@ -1050,7 +1052,8 @@ def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
     assert "Delete" in view._bank.redo.toolTip()
     view._bank.redo.click()
     assert actions.redo_count == 1
-    assert not view._bank.redo.isEnabled() and view._bank.undo.isEnabled()
+    assert not view._bank.redo.isEnabled()
+    assert view._bank.undo.isEnabled()
 
 
 def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):

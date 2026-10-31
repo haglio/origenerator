@@ -711,7 +711,7 @@ class GalleryView(QWidget):
         # LoRA-less workflow and the source-image level showing only for an
         # image-conditioned one.
         # One tree per side, each under a standing label and each scrolling on
-        # its own: the table of contents exists once per side, and which one you
+        # its own: the tree of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
         self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_folder_takes,
                                      takes_folder=self._collecting_row_takes_folder)
@@ -1691,7 +1691,7 @@ class GalleryView(QWidget):
             panel.refresh_generate_caption()
 
     def _lists_for(self, rows, meta, sides):
-        """The start frames, every item's name and a table of contents for each
+        """The start frames, every item's name and a tree of contents for each
         of *sides*, kept against the library they were read off; only the drawn
         sides are built."""
         library = _fingerprint(rows, meta)
@@ -1709,7 +1709,7 @@ class GalleryView(QWidget):
     def _build_sides(self, trees):
         """The sides the pane is drawing, in the order it draws them.
 
-        A side is the whole table of contents over the rows it holds: its own
+        A side is the whole tree of contents over the rows it holds: its own
         hierarchy, its own copies of the folders the user composed, and collections
         whose counts are its own — a number covering more than the side draws
         would send you to a collection that then showed you nothing.

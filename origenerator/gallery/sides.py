@@ -1,4 +1,4 @@
-"""The sides the table of contents can be drawn over: the two shapes, and both.
+"""The sides the tree of contents can be drawn over: the two shapes, and both.
 
 A Fun Time session plays portrait media on one screen and landscape on the
 other, so every folder is looked at from one shape or the other. On its own this

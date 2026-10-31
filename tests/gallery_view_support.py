@@ -459,11 +459,11 @@ def _children_by_prompt(item):
 
 
 def _preview_of(view):
-    """The preview of the tab in front — reached through the panel that owns it,
+    """The preview of the tab in front — reached through the tab that owns it,
     since the gallery no longer keeps a handle on another class's private widget
     (C/design/004)."""
-    panel = view._info_tabs.current_config_panel()
-    return panel._preview if panel is not None else None
+    tab = view._generate_pane.current_generate_tab()
+    return tab._preview if tab is not None else None
 
 
 def _frame_shown(preview, frame: bytes) -> bool:
@@ -519,9 +519,9 @@ def _tab_with_prompts(view, key="sdxl_t2i"):
 
     The resting tab lays out no form until a workflow is chosen — and a find over
     no fields is the tree-find fallback, which has its own test below."""
-    panel = view._info_tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData(key))
-    return panel
+    tab = view._generate_pane.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData(key))
+    return tab
 
 
 def _click_beside_the_mark_of(qtbot, view, key, *, which):
@@ -737,13 +737,13 @@ def _seeded_db(tmp_path, seed=7):
 
 
 def _generate_in_current_tab(view, positive_prompt, seed):
-    """Prefill the front config tab with a full sdxl config and click Generate,
+    """Prefill the front Generate tab with a full sdxl config and click Generate,
     returning the settings folder the launched re-roll runs in."""
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     params = dict(_SDXL.default_params(), positive_prompt=positive_prompt, seed=seed)
-    panel.prefill("sdxl_t2i", params)
-    panel._param_form.set_seed_random(False)  # a fixed seed, so the config is concrete
-    panel._on_generate()
+    tab.prefill("sdxl_t2i", params)
+    tab._param_form.set_seed_random(False)  # a fixed seed, so the config is concrete
+    tab._on_generate()
     return gallery.settings_folder_key(
         {"workflow_name": "sdxl_t2i", "params_json": json.dumps(params)},
         gallery.build_image_config_index(view._image_rows),
@@ -911,7 +911,7 @@ def _combine_db(tmp_path, *, enhanced=True):
 
 
 def _front_panel(view):
-    return view._info_tabs.current_config_panel()
+    return view._generate_pane.current_generate_tab()
 
 
 _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
@@ -938,7 +938,7 @@ def _enhanceable_db(tmp_path, count=2):
 
 
 def _set_enhance(view, **fields):
-    """Put the panel where an edit would, the way the gallery stores it."""
+    """Put the tab where an edit would, the way the gallery stores it."""
     settings = gallery.EnhanceSettings(**fields)
     view.set_enhance_settings(settings.to_json())
     return settings

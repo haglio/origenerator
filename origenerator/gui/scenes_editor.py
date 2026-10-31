@@ -96,7 +96,7 @@ class _Scene(QFrame):
         column.setSpacing(GAP_SMALL)
         # Kept narrow: this row sits beside the form's label column, so it is
         # the row that would push the pane's floor past its cap (see
-        # GenerateConfigPanel.minimumSizeHint). The title gives way first, and
+        # GenerateTab.minimumSizeHint). The title gives way first, and
         # the x is the flat mark the tabs wear rather than a dressed button --
         # the same act, and a third of the width.
         header = QHBoxLayout()

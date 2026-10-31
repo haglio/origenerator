@@ -92,7 +92,7 @@ def test_the_cancel_button_emits_cancel_requested(qtbot):
 
 
 def test_a_click_on_the_tile_selects_it(qtbot):
-    # So the info pane can mirror its preview.
+    # So the Generate pane can mirror its preview.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     picks = []
@@ -184,7 +184,7 @@ def test_the_bar_says_which_pass_is_being_taken(qtbot):
 
 def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
     # It stood a blurred copy of the frame, where the Job Queue's corner stood a
-    # sharp pair and the config tab stood a blank — three surfaces, three ideas
+    # sharp pair and the Generate tab stood a blank — three surfaces, three ideas
     # of one wait. All three stand the sum now.
 
     frame = tmp_path / "frame.png"

@@ -48,7 +48,7 @@ for one thing cost four. So:
 - The **folder key** is the value; `gallery.keys.settings_key` builds one from
   its three parts and `gallery.tree.settings_folder_key` derives one from a
   row. Those are two questions with one answer, not two names for it. What was
-  a real collision -- `GenerateConfigPanel.settings_key()` returning the *pair*
+  a real collision -- `GenerateTab.settings_key()` returning the *pair*
   a folder key is built from, one word from its own `settings_folder_key()`
   returning the key -- is `workflow_and_signature()`.
 - **Settings** and **config** are two things and keep two words: the
@@ -125,8 +125,8 @@ for one thing cost four. So:
   The code says the same four: `hud` (`gui/slideshow_hud.py`, `Hud`), the
   Job Queue (`JobQueueView` in Core and `gui/hud_queue.py` on a HUD, with
   `JobQueue` the controller behind both), `core` (`gui/core.py`, `Core`) and
-  `standalone`, and "panel" is left to the Generate, Enhance and Combine
-  forms and the OSR2 controls at Core's top left. So no agent reaches for
+  `standalone`, and no part of this app is a panel: a Generate tab, the Enhance
+  pane, the Combine and the OSR2 controls each have their own word. So no agent reaches for
   another word: an audit that called the HUD a "panel", the Job Queue
   "the list of pictures and videos being made or waiting" and Standalone
   "on its own" left him asking whether each meant his word.

@@ -27,7 +27,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     (its default), the graph ends at the plain decode.
 
     The toggle defaults off because enhancement is now a *layer* the gallery
-    applies afterward — its Enhance subpanel, per folder, with the original
+    applies afterward — its Enhance pane, per folder, with the original
     kept and every level listed. Baking the tail in here would produce an
     enhanced image with no original to compare against and no level to name.
     The param stays (an old run reproduces exactly what it recorded), but

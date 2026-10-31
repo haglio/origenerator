@@ -96,7 +96,7 @@ def _trashed_output_files(record: dict, row: dict) -> str:
     """``row``'s output files with each one's current location stamped on it.
 
     The recorded ``filename``/``subfolder`` stay as they were — they say what the
-    generation produced and where it lived, which is what the info pane shows —
+    generation produced and where it lived, which is what the Generate pane shows —
     and a ``path`` alongside says where that file is right now. A file the batch
     never moved (a branch session's delete takes none) gets no ``path`` and is
     read from its own folder, as before.

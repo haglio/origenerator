@@ -134,7 +134,7 @@ def test_browse_button_fits_its_caption(qtbot):
     form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
-    form.resize(800, 200)  # a roomy panel, as the form has in the real window
+    form.resize(800, 200)  # a roomy tab, as the form has in the real window
     with qtbot.waitExposed(form):
         form.show()
 
@@ -829,7 +829,7 @@ def test_no_swap_button_when_workflow_has_no_dimensions(qtbot):
 
 
 def test_swapping_dimensions_emits_changed(qtbot):
-    # The panel refreshes its title from the form's ``changed`` signal, so a swap
+    # The tab refreshes its title from the form's ``changed`` signal, so a swap
     # must announce itself just as a manual edit does.
     form = ParamForm(_dimension_defs())
     qtbot.addWidget(form)
@@ -1363,7 +1363,7 @@ def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, 
 
 
 def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
-    # The metadata panel inserts zero-width spaces into displayed paths so long
+    # The metadata block inserts zero-width spaces into displayed paths so long
     # names wrap on screen. Pasting such a path back into the field would carry
     # those invisible characters (and any stray whitespace) into ComfyUI's
     # LoadImage, which then can't match the file. The form must return a clean
@@ -1498,7 +1498,7 @@ def test_a_pages_recommendation_takes_the_good_ranges_place_until_it_goes(qtbot)
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     # Loading an old enhanced run into a tab must not arm its enhancement for
-    # the next Generate: enhancement is the Enhance subpanel's, applied
+    # the next Generate: enhancement is the Enhance pane's, applied
     # deliberately, so the form pins these at the workflow's own defaults.
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())

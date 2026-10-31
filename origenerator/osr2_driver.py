@@ -135,7 +135,7 @@ class Osr2Driver(QObject):
         """Advance the device toward the action following the current playhead.
 
         Driven purely by ``position()`` — the driver doesn't gate on the player's
-        playback state (the info-pane preview auto-plays with no pause control; the
+        playback state (the Generate pane preview auto-plays with no pause control; the
         Drive OSR2 button is the on/off). A stalled playhead simply holds the device
         at the current target.
         """

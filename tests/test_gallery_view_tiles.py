@@ -83,7 +83,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _write_looping_webp,
 )
-from tests.test_enhance_panel import _dropped_on
+from tests.test_enhance_pane import _dropped_on
 from tests.test_folder_tree import _shown
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -98,9 +98,9 @@ def _two_images_on_screen(qtbot):
 
 def test_dragging_an_image_lights_the_tabs_start_image_until_it_is_let_go(qtbot, monkeypatch):
     view, tile = _two_images_on_screen(qtbot)
-    panel = view._info_tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("wan22_i2v"))
-    well = panel._param_form._widgets["input_image"]._label
+    tab = view._generate_pane.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("wan22_i2v"))
+    well = tab._param_form._widgets["input_image"]._label
     lit_while_dragged = []
     monkeypatch.setattr(QDrag, "exec", lambda drag, *args: lit_while_dragged.append(
         well.property(LIT)) or Qt.DropAction.IgnoreAction)
@@ -321,9 +321,9 @@ def test_ctrl_c_in_a_focused_text_field_is_left_to_the_field(qtbot, tmp_path, mo
 
 def _folder_buttons(view):
     """The "Go to folder" buttons the front tab is actually drawing."""
-    panel = view._info_tabs.current_config_panel()
-    return [button for button in panel.findChildren(QPushButton, "goToFolderButton")
-            if button.isVisibleTo(panel)]
+    tab = view._generate_pane.current_generate_tab()
+    return [button for button in tab.findChildren(QPushButton, "goToFolderButton")
+            if button.isVisibleTo(tab)]
 
 
 def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_click(qtbot):
@@ -554,7 +554,7 @@ def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
 
 
 def _source_tile(view):
-    return view._info_tabs.current_config_panel()._related._source_tile
+    return view._generate_pane.current_generate_tab()._related._source_tile
 
 
 def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
@@ -566,8 +566,8 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
     view = GalleryView(FakeDB([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs.config_panels():
-        panel._preview.show_media = MagicMock()  # don't start WMF playback
+    for tab in view._generate_pane.generate_tabs():
+        tab._preview.show_media = MagicMock()  # don't start WMF playback
 
     # Viewing the video shows a tile pointing back to the image it was built from.
     view._on_thumbnail_clicked("vid1")
@@ -711,18 +711,18 @@ def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
     assert "no video enhancer" in view._buttons.enhance.toolTip()
 
 
-def test_the_enhance_panel_grays_out_on_a_video_too(qtbot):
+def test_the_enhance_pane_grays_out_on_a_video_too(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
     _video_leaf(view)
-    assert not view._enhance.panel.isEnabled()
-    assert "no video enhancer" in view._enhance.panel.toolTip()
+    assert not view._enhance.pane.isEnabled()
+    assert "no video enhancer" in view._enhance.pane.toolTip()
 
     _select_first_leaf(view)   # back on images, and the settings come back
-    assert view._enhance.panel.isEnabled()
-    assert view._enhance.panel.toolTip() == ""
+    assert view._enhance.pane.isEnabled()
+    assert view._enhance.pane.toolTip() == ""
 
 
 def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
@@ -749,13 +749,13 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     assert not view._buttons.enhance.isEnabled()
     assert "these settings" in view._buttons.enhance.toolTip()
 
-    # The panel edited to something else: that enhancement doesn't exist yet.
+    # The Enhance pane edited to something else: that enhancement doesn't exist yet.
     view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
     assert view._buttons.enhance.isEnabled()
 
 
-def test_a_version_dragged_onto_the_enhance_panel_grays_the_enhance_that_would_repeat_it(
+def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_repeat_it(
         qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_finder.pt"])
     db = _enhanceable_db(tmp_path, count=1)
@@ -778,7 +778,7 @@ def test_a_version_dragged_onto_the_enhance_panel_grays_the_enhance_that_would_r
     version = next(row for row in versions._host.findChildren(_LevelRow) if row._params)
     mime = enhance_level_mime(version._params)
 
-    _dropped_on(view._enhance.panel, mime)
+    _dropped_on(view._enhance.pane, mime)
 
     assert not view._buttons.enhance.isEnabled()
     (tile,) = versions._host.findChildren(_AddRow)
@@ -923,7 +923,7 @@ def test_pressing_a_tabs_preview_star_turns_that_star_on(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
     _click_tile(view, "g0")
-    star = view._info_tabs.current_config_panel()._preview._controls.buttons()[0]
+    star = view._generate_pane.current_generate_tab()._preview._controls.buttons()[0]
 
     star.click()
 
@@ -936,7 +936,7 @@ def test_a_tabs_preview_plus_stops_offering_once_its_enhancement_lands(qtbot, tm
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    plus = view._info_tabs.current_config_panel()._preview._controls.buttons()[2]
+    plus = view._generate_pane.current_generate_tab()._preview._controls.buttons()[2]
     plus.click()
     (job,) = view._jobs.all_jobs
 
@@ -964,9 +964,9 @@ def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
 
 
 def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp_path):
-    # An image holding the very version the panel describes has nothing to gain
+    # An image holding the very version the tab describes has nothing to gain
     # from a press, so its plus is the solid yellow sign alone. Turn a setting and
-    # what it holds is one enhancement short of what the panel now describes, so
+    # what it holds is one enhancement short of what the Enhance pane now describes, so
     # the plus goes back to offering — with the one it has as a shadow under it.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -1004,7 +1004,7 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     view._enhance.enhance_items = queued.append
 
     assert view._buttons.enhance.isEnabled()
-    assert view._enhance.panel.isEnabled()
+    assert view._enhance.pane.isEnabled()
     view._buttons.enhance.click()
 
     assert queued == [["i1"]]

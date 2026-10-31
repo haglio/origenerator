@@ -232,7 +232,7 @@ def test_every_fix_the_recognizer_is_asked_to_hear_is_a_fix(monkeypatch):
 
 
 def test_a_part_at_zero_or_absent_asks_for_no_pass():
-    # Zero is how the panel says "leave this part alone", and a part it has
+    # Zero is how the Enhance pane says "leave this part alone", and a part it has
     # never been given a number for reads the same way.
     assert detail_fixes_of({"enhance_detail_fixes": {}}) == {}
     assert detail_fixes_of({"enhance_detail_fixes": {"teeth": 0}}) == {}

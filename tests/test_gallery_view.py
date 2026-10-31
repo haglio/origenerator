@@ -42,7 +42,7 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY,
 )
 from origenerator.gallery.labels import workflow_label
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, SIDE_LABELS
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
@@ -54,7 +54,7 @@ from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
-from origenerator.orientation import oriented_key
+from origenerator.item_shape import shaped_key
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 from tests import gestures
@@ -96,7 +96,7 @@ from tests.gallery_view_support import (
     _search_for,
     _select_first_leaf,
     _selected_folder,
-    _side,
+    _shape,
     _SignalMotion,
     _single_i2v_db,
     _subs,
@@ -180,7 +180,7 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     monkeypatch.setattr(gallery, "recently_worked_folders", fake)
     view.refresh()
 
-    # The sides drawn, and the listed rows. The marks belong to the one list of
+    # The shapes drawn, and the listed rows. The marks belong to the one list of
     # both shapes as much as to each shape's own, so choosing Together asks for
     # them again -- for that list, which is the only one on screen then.
     assert asked == [([LANDSCAPE, "portrait"], ["i1"])]
@@ -272,7 +272,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     _on_screen(qtbot, view, 1200, 800)
-    tree = _side(view._tree)  # one half; both are the same widget class
+    tree = _shape(view._tree)  # one half; both are the same widget class
     step = tree.indentation()
     assert step <= 16   # a caret's width, not the platform's roomy default
 
@@ -716,7 +716,7 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
     # real library — and the redraw scrolled the list to the folder that was open,
     # taking the row just favorited out from under the mouse.
     view, folders = _long_list_view(qtbot)
-    half = _side(view._tree)
+    half = _shape(view._tree)
     view._tree.setCurrentItem(folders[0])   # the folder that is open, up at the top
     half.scrollToItem(folders[-1])          # ...with the list scrolled away from it
     target, key = folders[-1], _key(folders[-1])
@@ -731,7 +731,7 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
 
 
 def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
-    # Each side draws the folder from a copy of its own, so a star set through
+    # Each shape draws the folder from a copy of its own, so a star set through
     # one row has to reach the other side's row too.
     shapes = {"i1": (1280, 720), "i2": (720, 1280)}
     view = GalleryView(FakeDB([
@@ -846,7 +846,7 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     key = _key(images)
     # The half that holds the row: the tree is two of them now, and the pixel
     # geometry belongs to whichever one the row is in.
-    half = _side(tree, LANDSCAPE)
+    half = _shape(tree, LANDSCAPE)
     row = half.visualRect(half.indexFromItem(images))
     caret = QPoint(row.left() - half.indentation() // 2, row.center().y())
 
@@ -1202,7 +1202,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
 
     assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._folder_path.display_text() == (
-        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
+        f"{SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
 
 
 def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(qtbot):
@@ -1214,7 +1214,7 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
     view._tree.setCurrentItem(workflow.child(0))
 
     assert view.slideshow_subject() == (
-        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
+        f"{SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
 
 
 def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
@@ -1223,7 +1223,7 @@ def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    # Latest leads its side, above Favorites and the media folders.
+    # Latest leads its shape, above Favorites and the media folders.
     assert list(_alls(view._tree))[0] == "Latest"
     # Selecting it lists every recently generated item, newest first — not folders.
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1778,7 +1778,7 @@ def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
     here = _first_leaf(view)
     view._tree.setCurrentItem(here)
 
-    side, *above, _here = view._tree_view.path_steps(here)
+    shape, *above, _here = view._tree_view.path_steps(here)
 
     assert list(_path_links(view)) == [step.name for step in above]
 
@@ -1794,7 +1794,7 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
     assert list(_path_links(view)) == ["All"]
     assert icon_then_text("star", "Favorites", color=TEXT_PRIMARY,
                           size=path.fontMetrics().height()) in path.text()
-    assert view._folder_path.display_text() == f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Favorites"
+    assert view._folder_path.display_text() == f"{SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Favorites"
 
 
 def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
@@ -2423,9 +2423,9 @@ def test_the_folder_the_gallery_is_showing_is_the_one_it_reports(qtbot):
     view.refresh()
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    # The row, side and all: reopening on the other side's copy of a folder is
+    # The row, shape and all: reopening on the other side's copy of a folder is
     # reopening somewhere else.
-    assert view.selected_folder() == oriented_key(_key(workflow), LANDSCAPE)
+    assert view.selected_folder() == shaped_key(_key(workflow), LANDSCAPE)
 
 
 def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):

@@ -19,13 +19,13 @@ def _video(tmp_path):
     return _file(tmp_path / "output" / "video" / "clip_00001_.mp4")
 
 
-def _upscale(tmp_path, orientation="landscape"):
-    return _file(tmp_path / "upscaled_by_orientation" / orientation / "origenerator"
+def _upscale(tmp_path, shape="landscape"):
+    return _file(tmp_path / "upscaled_by_shape" / shape / "origenerator"
                  / "clip_00001__topaz.mp4")
 
 
 def _upscales(tmp_path):
-    return EvolverUpscales.scan(tmp_path / "upscaled_by_orientation", "origenerator")
+    return EvolverUpscales.scan(tmp_path / "upscaled_by_shape", "origenerator")
 
 
 def test_a_video_is_matched_to_the_upscale_evolver_filed_for_it(tmp_path):

@@ -640,7 +640,7 @@ def test_releasing_the_lock_asks_for_nothing(qtbot):
 
 def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
     # It already has a version at these settings, or it is a video: the refusal
-    # comes from the side that holds the settings, and the corner stays quiet.
+    # comes from the shape that holds the settings, and the corner stays quiet.
     view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: False))
     _press(view, Qt.Key.Key_Down)
     assert view.slideshow.hud_item_note == ""

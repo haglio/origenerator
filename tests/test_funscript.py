@@ -102,7 +102,7 @@ def test_an_evolver_upscale_has_the_script_of_the_video_it_was_made_from(tmp_pat
     script = tmp_path / "output" / "funscript" / "clip.funscript"
     script.parent.mkdir(parents=True)
     script.write_text("{}", encoding="utf-8")
-    upscale = (tmp_path / "upscaled_by_orientation" / "portrait" / "origenerator"
+    upscale = (tmp_path / "upscaled_by_shape" / "portrait" / "origenerator"
                / "clip_topaz.mp4")
 
     assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output")) == script
@@ -117,7 +117,7 @@ def test_an_upscale_has_the_script_in_its_videos_own_place_before_one_under_its_
     write_funscript(own, synthesize_actions(5.0, hz=1.0))
     write_funscript(output / "funscript" / "clip.funscript",
                     synthesize_actions(2.0, hz=1.0))
-    upscale = (tmp_path / "upscaled_by_orientation" / "portrait" / "origenerator"
+    upscale = (tmp_path / "upscaled_by_shape" / "portrait" / "origenerator"
                / "clip_topaz.mp4")
 
     assert funscript_of(upscale, places=OutputPlaces.in_one_folder(output)) == own
@@ -130,7 +130,7 @@ def test_an_upscale_of_a_webm_has_the_script_in_that_videos_own_place(tmp_path):
     video.write_bytes(b"v")
     own = funscript_path_for(video, places=OutputPlaces.in_one_folder(output))
     write_funscript(own, synthesize_actions(5.0, hz=1.0))
-    upscale = (tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator"
+    upscale = (tmp_path / "upscaled_by_shape" / "landscape" / "origenerator"
                / "clip_topaz.mp4")
 
     assert funscript_of(upscale, places=OutputPlaces.in_one_folder(output)) == own
@@ -140,7 +140,7 @@ def test_an_upscale_finds_the_script_still_beside_the_video_it_was_made_from(tmp
     beside = tmp_path / "output" / "video" / "clip.funscript"
     beside.parent.mkdir(parents=True)
     beside.write_text("{}", encoding="utf-8")
-    upscale = (tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator"
+    upscale = (tmp_path / "upscaled_by_shape" / "landscape" / "origenerator"
                / "clip_topaz.mp4")
 
     assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output")) == beside

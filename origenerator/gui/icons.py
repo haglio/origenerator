@@ -59,7 +59,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.groups import MediaGroup, SettingsGroup, folder_level, rows_under
 from origenerator.gallery.labels import MEDIA_LABELS
 from origenerator.gallery.output import media_type_of_row
-from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
@@ -320,15 +320,15 @@ def media_type_icon(media_type: str) -> QIcon:
     return qt_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
-# --- the shape a side of the tree of contents holds ------------------------
+# --- the shape a shape of the tree of contents holds ------------------------
 
 MARK_BESIDE_A_WORD = 15  # on-screen size, for a mark that sits level with a word
 _SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}
 
 
 @cache
-def side_mark(side: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
-    return icon_pixmap(_SIDE_MARKS[side], size, TEXT_PRIMARY)
+def shape_mark(shape: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
+    return icon_pixmap(_SIDE_MARKS[shape], size, TEXT_PRIMARY)
 
 
 @cache

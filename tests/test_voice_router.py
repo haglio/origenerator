@@ -139,9 +139,9 @@ class FakeSlideshow:
 class FakeSlideshows:
     """The slideshows reduced to what a spoken word asks of them."""
 
-    def __init__(self, showing=None, by_side=None):
+    def __init__(self, showing=None, by_shape=None):
         self.showing = showing
-        self.by_side = by_side or {}
+        self.by_shape = by_shape or {}
         self.answers = []
         self.answer_kinds = []
         self.said = []
@@ -151,8 +151,8 @@ class FakeSlideshows:
         self.filters = []
         self.slide_words = []
 
-    def surface_for(self, side):
-        return self.by_side.get(side) if side is not None else self.showing
+    def surface_for(self, shape):
+        return self.by_shape.get(shape) if shape is not None else self.showing
 
     def answer(self, message, *, kind=INFO):
         self.answers.append(message)
@@ -165,11 +165,11 @@ class FakeSlideshows:
     def play_collection(self, command):
         self.collections_played.append(command)
 
-    def run_slideshow_command(self, command, side):
-        self.slideshow_commands.append((command, side))
+    def run_slideshow_command(self, command, shape):
+        self.slideshow_commands.append((command, shape))
 
-    def filter_enhanced(self, enhanced_only, side):
-        self.filters.append((enhanced_only, side))
+    def filter_enhanced(self, enhanced_only, shape):
+        self.filters.append((enhanced_only, shape))
 
     def run_on_slide(self, command, said_at=None):
         self.slide_words.append((command, said_at))
@@ -237,8 +237,8 @@ class FakeHost:
     def collection_label(self, key):
         return "Latest" if key == LATEST_KEY else key.strip("_").title()
 
-    def stand_in_collection(self, key, side):
-        self.stood_in.append((key, side))
+    def stand_in_collection(self, key, shape):
+        self.stood_in.append((key, shape))
         return key in self.collections
 
     def selected_generation(self):
@@ -726,7 +726,7 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
     begun = []
     # The working-out itself goes to a pool thread, whose answer would land
     # whenever it landed; what this is about is which image it is begun on.
-    voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
+    voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("no hat", listening=True))
     slideshow.target = "g2"
 
@@ -741,7 +741,7 @@ def test_a_request_is_about_the_image_it_was_opened_over_and_puts_it_back(router
     voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
                                        db=FakeDB([_row("g1"), _row("g2")]))
     begun = []
-    voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
+    voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
 
     voice.on_spoken_request(Spoken("no hat", opened_at=7.5))
 
@@ -755,7 +755,7 @@ def test_words_in_a_request_are_a_request_even_when_they_name_a_fix(router):
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
                                       db=FakeDB([_row("g1")]))
     begun = []
-    voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
+    voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("fix hands", listening=True))
 
     voice.on_spoken_request(Spoken("fix hands", heard="Request, fix hands, over."))
@@ -848,7 +848,7 @@ def test_a_real_revision_is_queued_and_answered_where_it_was_said(router):
         term = "hat"
 
     slideshow = FakeSlideshow()
-    voice, host, _slideshows = router(slideshows=FakeSlideshows(by_side={"portrait": slideshow}))
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(by_shape={"portrait": slideshow}))
 
     voice._on_revised(
         (_row("g1"), object(), {}, Spoken("no hat"), "portrait", None), Revision())
@@ -859,7 +859,7 @@ def test_a_real_revision_is_queued_and_answered_where_it_was_said(router):
 
 def test_a_request_with_nothing_to_act_on_is_answered_as_a_warning(router):
     slideshow = FakeSlideshow()
-    voice, host, _slideshows = router(slideshows=FakeSlideshows(by_side={"portrait": slideshow}))
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(by_shape={"portrait": slideshow}))
 
     voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), "portrait", None), None)
 

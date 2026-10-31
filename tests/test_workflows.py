@@ -12,7 +12,7 @@ import origenerator.workflows.lora_rows as lora_rows_module
 import origenerator.workflows.model_pickers as pickers
 from origenerator import config, points_of_interest
 from origenerator.box_breaks import BOX_BREAK
-from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params
+from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params, texts_read
 from origenerator.gui.param_fields import clamped_number
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
 from origenerator.media import MediaType
@@ -48,7 +48,6 @@ from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
 from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
-from tests.graph_reading import read_in_order
 
 
 def _find_node(payload: dict, class_type: str) -> dict | None:
@@ -2669,11 +2668,11 @@ def test_a_fix_reads_its_own_words_as_a_piece_ahead_of_a_boxed_prompts_boxes():
     )
 
     (detailer,) = _nodes_of(payload, "DetailerForEach")
-    assert read_in_order(payload, detailer["inputs"]["positive"][0]) == [
+    assert texts_read(payload, payload[detailer["inputs"]["positive"][0]]) == [
         "open palms", "a lantern ", "on a jetty"]
-    assert read_in_order(payload, detailer["inputs"]["negative"][0]) == ["fists, blurry"]
+    assert texts_read(payload, payload[detailer["inputs"]["negative"][0]]) == ["fists, blurry"]
     sampler = _find_node(payload, "KSampler")["inputs"]
-    assert read_in_order(payload, sampler["positive"][0]) == ["a lantern ", "on a jetty"]
+    assert texts_read(payload, payload[sampler["positive"][0]]) == ["a lantern ", "on a jetty"]
 
 
 @pytest.mark.parametrize(("name", "prompt_ids"), [
@@ -2684,7 +2683,7 @@ def test_an_sdxl_graph_reads_each_box_of_a_prompt_on_its_own(name, prompt_ids):
         wf.default_params(), input_image="pick.png",
         positive_prompt=f"a lantern {BOX_BREAK}on a jetty", negative_prompt=f"blurry {BOX_BREAK}dim"))
 
-    assert [read_in_order(payload, node_id) for node_id in prompt_ids] == [
+    assert [texts_read(payload, payload[node_id]) for node_id in prompt_ids] == [
         ["a lantern ", "on a jetty"], ["blurry ", "dim"]]
     assert BOX_BREAK not in json.dumps(payload)
 

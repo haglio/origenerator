@@ -319,7 +319,7 @@ def safetensors_metadata(path: Path) -> dict:
 
 
 # GGUF's metadata values are typed; every type but string and array is a fixed
-# width, so skipping the metadata block to reach the tensor index is a matter of
+# width, so skipping the GGUF metadata to reach the tensor index is a matter of
 # stepping over the right number of bytes per value.
 _GGUF_FIXED_WIDTHS = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
 _GGUF_STRING = 8
@@ -327,7 +327,7 @@ _GGUF_ARRAY = 9
 
 
 def _gguf_names(path: Path) -> list[str] | None:
-    """GGUF: magic and counts, then a metadata block, then the tensor index."""
+    """GGUF: magic and counts, then its metadata, then the tensor index."""
     with path.open("rb") as handle:
         if handle.read(4) != b"GGUF":
             return None

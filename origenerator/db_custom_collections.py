@@ -2,7 +2,7 @@
 
 `custom_folders` is the name, `custom_folder_items` the folders it gathers and
 `custom_folder_generations` the items it holds on their own (see
-origenerator.gallery.custom). A custom folder holds references, not copies -- what
+origenerator.gallery.custom). A custom collection holds references, not copies -- what
 it gathers outlives it.
 
 A gathered folder is stored by tree key, so it drifts when a key formula moves
@@ -15,36 +15,36 @@ from __future__ import annotations
 from origenerator.db_connection import Store
 
 
-class CustomFolderStore(Store):
+class CustomCollectionStore(Store):
     """The queries over `custom_folders` and `custom_folder_items`."""
 
-    def create_custom_folder(self, name: str, folder_id: int | None = None,
+    def create_custom_collection(self, name: str, folder_id: int | None = None,
                              side: str | None = None) -> int:
-        """Make an empty custom folder and return its id.
+        """Make an empty custom collection and return its id.
 
         ``folder_id`` re-creates one at the id it had, so an undone removal comes
         back under the very key the session was saved with (see
-        :meth:`GalleryActions.delete_custom_folder`)."""
+        :meth:`GalleryActions.delete_custom_collection`)."""
         with self._connect() as conn:
             cur = conn.execute("INSERT INTO custom_folders (id, name, side) VALUES (?, ?, ?)",
                                (folder_id, name, side))
             return int(cur.lastrowid)
 
-    def set_custom_folder_side(self, folder_id: int, side: str):
+    def set_custom_collection_side(self, folder_id: int, side: str):
         with self._connect() as conn:
             conn.execute("UPDATE custom_folders SET side = ? WHERE id = ?",
                          (side, folder_id))
 
-    def delete_custom_folder(self, folder_id: int):
-        """Drop a custom folder and everything it holds. The gathered folders and
+    def delete_custom_collection(self, folder_id: int):
+        """Drop a custom collection and everything it holds. The gathered folders and
         their generations are untouched — it holds references, not copies."""
         with self._connect() as conn:
             for table in ("custom_folder_items", "custom_folder_generations"):
                 conn.execute(f"DELETE FROM {table} WHERE folder_id = ?", (folder_id,))
             conn.execute("DELETE FROM custom_folders WHERE id = ?", (folder_id,))
 
-    def add_folders_to_custom_folder(self, folder_id: int, folders: list[tuple]):
-        """Add ``(folder_key, level, ref_prompt_id)`` folders to a custom folder,
+    def add_folders_to_custom_collection(self, folder_id: int, folders: list[tuple]):
+        """Add ``(folder_key, level, ref_prompt_id)`` folders to a custom collection,
         appended after whatever it already holds. A key already in the folder keeps
         its position and refreshes its identity, so re-dropping a folder is a no-op
         rather than a duplicate."""
@@ -68,7 +68,7 @@ class CustomFolderStore(Store):
                 )
                 position += 1
 
-    def add_items_to_custom_folder(self, folder_id: int, prompt_ids: list[str]):
+    def add_items_to_custom_collection(self, folder_id: int, prompt_ids: list[str]):
         with self._connect() as conn:
             (last,) = conn.execute(
                 "SELECT COALESCE(MAX(position), -1) FROM custom_folder_generations "
@@ -81,14 +81,14 @@ class CustomFolderStore(Store):
                     "VALUES (?, ?, ?)", (folder_id, prompt_id, position),
                 )
 
-    def remove_items_from_custom_folder(self, folder_id: int, prompt_ids: list[str]):
+    def remove_items_from_custom_collection(self, folder_id: int, prompt_ids: list[str]):
         with self._connect() as conn:
             conn.executemany(
                 "DELETE FROM custom_folder_generations WHERE folder_id = ? AND prompt_id = ?",
                 [(folder_id, prompt_id) for prompt_id in prompt_ids],
             )
 
-    def repoint_item_in_custom_folders(self, old_prompt_id: str, new_prompt_id: str):
+    def repoint_item_in_custom_collections(self, old_prompt_id: str, new_prompt_id: str):
         with self._connect() as conn:
             conn.execute(
                 "UPDATE OR IGNORE custom_folder_generations SET prompt_id = ? "
@@ -97,15 +97,15 @@ class CustomFolderStore(Store):
             conn.execute("DELETE FROM custom_folder_generations WHERE prompt_id = ?",
                          (old_prompt_id,))
 
-    def remove_folder_from_custom_folder(self, folder_id: int, folder_key: str):
+    def remove_folder_from_custom_collection(self, folder_id: int, folder_key: str):
         with self._connect() as conn:
             conn.execute(
                 "DELETE FROM custom_folder_items WHERE folder_id = ? AND folder_key = ?",
                 (folder_id, folder_key),
             )
 
-    def list_custom_folders(self) -> list[dict]:
-        """Every custom folder as ``{"id", "name", "side", "folders": [folder_key, ...]}``,
+    def list_custom_collections(self) -> list[dict]:
+        """Every custom collection as ``{"id", "name", "side", "folders": [folder_key, ...]}``,
         oldest first, each folder list in the order it was built up."""
         with self._connect() as conn:
             folders = [
@@ -132,7 +132,7 @@ class CustomFolderStore(Store):
                     folder["items"].append(r["prompt_id"])
             return folders
 
-    def folders_in_custom_folders(self) -> list[dict]:
+    def folders_in_custom_collections(self) -> list[dict]:
         """Every gathered folder with its stored identity, for the reconcile."""
         with self._connect() as conn:
             return [
@@ -144,7 +144,7 @@ class CustomFolderStore(Store):
                 )
             ]
 
-    def repoint_folder_in_custom_folder(self, folder_id: int, old_key: str, new_key: str,
+    def repoint_folder_in_custom_collection(self, folder_id: int, old_key: str, new_key: str,
                                         *, level: str | None, ref_prompt_id: str | None):
         """Move a gathered folder onto ``new_key``, keeping its place.
 
@@ -172,7 +172,7 @@ class CustomFolderStore(Store):
                 (folder_id, new_key, level, ref_prompt_id, position),
             )
 
-    def stamp_folder_in_custom_folder(self, folder_id: int, folder_key: str,
+    def stamp_folder_in_custom_collection(self, folder_id: int, folder_key: str,
                                       *, level: str | None, ref_prompt_id: str | None):
         """Refresh a gathered folder's stored identity, so a future key formula
         change can re-derive it from a generation under it."""

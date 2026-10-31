@@ -75,23 +75,23 @@ def test_a_favorite_folder_keyed_from_the_folded_record_stays_a_favorite(tmp_pat
 def test_a_folder_of_your_own_holding_the_folded_record_holds_the_one_that_stays(tmp_path):
     db = _two_records(tmp_path)
     _row(db, "other")
-    folder_id = db.create_custom_folder("Mine")
-    db.add_items_to_custom_folder(folder_id, ["repeat", "other"])
+    folder_id = db.create_custom_collection("Mine")
+    db.add_items_to_custom_collection(folder_id, ["repeat", "other"])
 
     _fold_repeat_into_first(db)
 
-    (record,) = db.list_custom_folders()
+    (record,) = db.list_custom_collections()
     assert record["items"] == ["first", "other"]
 
 
 def test_a_folder_of_your_own_holding_both_records_holds_the_one_that_stays_once(tmp_path):
     db = _two_records(tmp_path)
-    folder_id = db.create_custom_folder("Mine")
-    db.add_items_to_custom_folder(folder_id, ["first", "repeat"])
+    folder_id = db.create_custom_collection("Mine")
+    db.add_items_to_custom_collection(folder_id, ["first", "repeat"])
 
     _fold_repeat_into_first(db)
 
-    (record,) = db.list_custom_folders()
+    (record,) = db.list_custom_collections()
     assert record["items"] == ["first"]
 
 

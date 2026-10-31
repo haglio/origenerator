@@ -25,7 +25,7 @@ import origenerator.db_generations
 from origenerator.db import Database
 from origenerator.db_combine_video_uses import CombineVideoUseStore
 from origenerator.db_connection import SqliteFile, Store
-from origenerator.db_custom_folders import CustomFolderStore
+from origenerator.db_custom_collections import CustomCollectionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
 from origenerator.db_item_numbers import ItemNumberStore
@@ -41,7 +41,7 @@ STORES = {
     "deletions": (TrashStore, lambda s: s.list_trashed()),
     "requests": (RequestStore, lambda s: s.list_requests()),
     "folder_meta": (FolderMetaStore, lambda s: s.folder_meta_full()),
-    "custom_folders": (CustomFolderStore, lambda s: s.list_custom_folders()),
+    "custom_collections": (CustomCollectionStore, lambda s: s.list_custom_collections()),
     "seed_uses": (SeedUseStore, lambda s: s.list_seed_uses()),
     "combine_video_uses": (CombineVideoUseStore, lambda s: s.list_combine_video_uses()),
     "item_numbers": (ItemNumberStore, lambda s: s.list_item_numbers()),
@@ -102,7 +102,7 @@ def test_every_store_is_one(file):
 
 class TestTrashStore:
     """trash_collection.py and gallery_actions.py are its only readers, and neither has
-    any business with `generations` or the custom folders."""
+    any business with `generations` or the custom collections."""
 
     def test_what_it_records_it_can_read_back(self, file):
         row = {"prompt_id": "gen-alpha", "workflow_name": "sdxl_t2i",

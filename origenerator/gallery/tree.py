@@ -386,7 +386,7 @@ def _joined_the_library_at(row: dict) -> datetime:
     return moment_of(row.get("created_at") if found_on_disk else row.get("completed_at"))
 
 
-# How many folders the table of contents marks as lately worked in. A sitting
+# How many folders the tree of contents marks as lately worked in. A sitting
 # reaches a handful of folders; marks past that stop picking anything out, and
 # every folder marked is no folder marked.
 RECENTLY_WORKED_COUNT = 20
@@ -399,7 +399,7 @@ def recently_worked_folders(
     """The ``(side, folder key)`` pairs of the folders worked in most recently.
 
     A folder no longer moves when a generation lands in it — it is placed by the
-    row that made it, so the table of contents keeps the order the settings were
+    row that made it, so the tree of contents keeps the order the settings were
     tried in (:func:`build_gallery_tree`). That order says nothing about where
     the work has lately been, which is the other thing the tree is read for, so
     the freshest folders are marked where they stand instead of floating up.

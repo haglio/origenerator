@@ -273,30 +273,37 @@ def test_a_revision_carries_the_prompts_it_started_from():
 # --- a video told in scenes: the story is one prompt per scene ---------------
 
 
+def test_a_prompt_that_tells_no_story_is_asked_of_as_one_however_many_lines_of_dashes_it_holds():
+    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry", "grass")
+
+    assert revision.positive == story_of(["a dog running", "a dog asleep, grass"])
+
+
 def test_a_wish_for_something_new_reaches_every_scene_of_a_story():
     revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry",
-                             "more grass")
+                             "more grass", in_scenes=True)
 
     assert revision.positive == story_of(["a dog running, grass", "a dog asleep, grass"])
 
 
 def test_each_scene_answers_a_request_against_something_by_its_own_prompts():
     revision = apply_request(story_of(["a woman, beach", "a woman, sea"]), "blurry",
-                             "no beach")
+                             "no beach", in_scenes=True)
 
     assert revision.positive == story_of(["a woman", "a woman, sea"])
     assert revision.negative == story_of(["blurry", "blurry, beach"])
 
 
 def test_a_negative_every_scene_shares_stays_one_while_the_scenes_change_it_alike():
-    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry", "no hat")
+    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry", "no hat",
+                             in_scenes=True)
 
     assert revision.negative == "blurry, hat"
 
 
 def test_a_storys_revision_names_each_rule_its_scenes_used_once():
     revision = apply_request(story_of(["a woman, beach", "a woman, sea", "beach, dusk"]),
-                             "blurry", "no beach")
+                             "blurry", "no beach", in_scenes=True)
 
     assert revision.action == f"{DROPPED}, {EXCLUDED}"
 
@@ -309,7 +316,7 @@ def test_the_model_rewrites_each_scene_from_that_scenes_own_prompts():
         return f"two of {positive}", negative
 
     revision = apply_request(story_of(["a man reading", "a man asleep"]), "blurry",
-                             "two men", rewrite=rewrite)
+                             "two men", rewrite=rewrite, in_scenes=True)
 
     assert asked == [("a man reading", "blurry", "two men"),
                      ("a man asleep", "blurry", "two men")]

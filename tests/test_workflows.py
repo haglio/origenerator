@@ -2708,3 +2708,8 @@ def test_a_fix_is_redrawn_toward_the_prompts_its_settings_give_it():
     (detailer,) = _nodes_of(payload, "DetailerForEach")
     assert payload[detailer["inputs"]["positive"][0]]["inputs"]["text"] == "open palms, a lantern on a jetty"
     assert payload[detailer["inputs"]["negative"][0]]["inputs"]["text"] == "fists, blurry"
+
+
+def test_only_a_workflow_with_scenes_tells_a_story():
+    assert {name for name, workflow in WORKFLOW_REGISTRY.items() if workflow.tells_a_story()} == {
+        "wan22_i2v", "wan22_flf2v_loop"}

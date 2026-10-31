@@ -377,6 +377,9 @@ class WorkflowTemplate(ABC):
     def build_api_payload(self, params: dict) -> dict:
         """Build the ComfyUI API-format prompt dict from user params."""
 
+    def tells_a_story(self) -> bool:
+        return any(pd.type == ParamType.SCENES for pd in self.param_definitions())
+
     def payload_for_comfyui(self, params: dict) -> dict:
         return _without_box_breaks(self.build_api_payload(params))
 

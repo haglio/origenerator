@@ -296,7 +296,7 @@ def test_every_sdxl_t2i_setting_is_declared_as_a_paramdef():
 
 
 def test_a_setting_of_a_kind_no_form_can_edit_is_refused_where_it_is_declared():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="'integer' is not a valid ParamType"):
         ParamDef("steps", "Steps", "integer", 20)
 
 

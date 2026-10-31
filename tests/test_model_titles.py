@@ -65,8 +65,8 @@ def test_when_a_lora_was_trained_is_read_from_its_own_header(installed_models):
                                    metadata={"ss_training_started_at": "1792851228.2"})
     undated = installed_models.add("loras", "undated.safetensors", lora=True)
 
-    assert trained_when(finished) == datetime.fromtimestamp(1792851468.891)
-    assert trained_when(started) == datetime.fromtimestamp(1792851228.2)
+    assert trained_when(finished) == datetime.fromtimestamp(1792851468.891).astimezone()
+    assert trained_when(started) == datetime.fromtimestamp(1792851228.2).astimezone()
     assert trained_when(undated) is None
     assert trained_when(installed_models.root / "missing.safetensors") is None
 
@@ -79,7 +79,7 @@ def test_a_versioned_loras_training_date_reads_as_a_sentence_of_its_own(
                              metadata={"ss_training_finished_at": "1792851468.891"})
 
     assert trained_sentence("example_look.safetensors") == (
-        f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}.")
+        f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}.")
     assert trained_sentence("example_style.safetensors") == ""
     assert trained_sentence(r"fixes\hands 1.1.safetensors") == ""
 

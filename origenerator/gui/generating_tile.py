@@ -28,6 +28,7 @@ _RESTING_FRAME_CSS = grid_card.idle_css("generatingTile")
 _SELECTED_FRAME_CSS = grid_card.selected_css("generatingTile")
 
 _IMAGE_SIZE = grid_card.THUMBNAIL_SIZE
+_MADE_FROM_NOTHING = Combination()
 
 
 class GeneratingTile(QFrame):
@@ -36,7 +37,7 @@ class GeneratingTile(QFrame):
     context_requested = pyqtSignal(QPoint)  # global position
 
     def __init__(self, job, parent=None, *, auto_generating=False,
-                 typical_seconds=None, made_from=Combination()):
+                 typical_seconds=None, made_from=_MADE_FROM_NOTHING):
         """``typical_seconds`` is what this folder's workflow usually takes, so the
         bar can say how much of the run is left; ``None`` where there is no
         history to say it from. ``made_from`` stands in the plate until the run

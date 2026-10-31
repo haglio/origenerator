@@ -153,10 +153,9 @@ def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
         workflow_json="{}",
     )
 
-    with pytest.raises(ValueError) as refused:
+    with pytest.raises(ValueError, match="update_generation does not write workflow_name"):
         db.update_generation("upd-002", workflow_name="wan22_i2v")
 
-    assert "workflow_name" in str(refused.value)
     assert db.get_generation("upd-002")["workflow_name"] == "sdxl_t2i"
 
 

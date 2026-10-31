@@ -2508,7 +2508,7 @@ def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
         NO_LORA, "example_look.safetensors", "example_style.safetensors"])], lora_keys=("lora",))
     qtbot.addWidget(form)
     combo = form._widgets["lora"]
-    trained = f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}."
+    trained = f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}."
     assert combo.toolTip() == param_help("lora")
 
     combo.setCurrentIndex(combo.findData("example_look.safetensors"))

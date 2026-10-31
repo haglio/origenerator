@@ -40,6 +40,8 @@ from origenerator.voice.dictation import COMPLETED
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from tests.marked_words import words
 
+_A_CLIENT = object()
+
 
 class FakeSignal:
     def __init__(self):
@@ -299,7 +301,7 @@ def router(qtbot, monkeypatch, starting):
     monkeypatch.setattr(module, "QThreadPool", FakePool())
     built = []
 
-    def build(host=None, *, slideshows=None, db=None, client=object(), motion=None,
+    def build(host=None, *, slideshows=None, db=None, client=_A_CLIENT, motion=None,
               bank=None, mic_on=True):
         host = host or FakeHost()
         slideshows = slideshows or FakeSlideshows()

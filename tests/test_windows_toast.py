@@ -69,7 +69,7 @@ def test_windows_reads_what_a_toast_document_says():
 
 
 def test_a_document_windows_cannot_read_is_refused_rather_than_raised():
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match=r"call \d+ failed: 0x"):
         windows_toast.document_of("<toast>unclosed")
 
 
@@ -84,7 +84,7 @@ def test_a_toast_is_filed_under_a_tag_and_a_group_of_up_to_64_characters_each():
 
 @pytest.mark.parametrize("filing", [dict(tag="t" * 65, group="g"), dict(tag="t", group="g" * 65)])
 def test_a_name_longer_than_windows_files_under_is_refused_before_anything_is_raised(filing):
-    with pytest.raises(OSError), windows_toast.filed(_A_TOAST, **filing):
+    with pytest.raises(OSError, match=r"call \d+ failed: 0x"), windows_toast.filed(_A_TOAST, **filing):
         pass
 
 

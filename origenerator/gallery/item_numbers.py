@@ -65,7 +65,8 @@ def _numbered(key: str, prompt_ids: Sequence[str],
     last = max([last, *(number for number in kept if number is not None)])
     taken: set[int] = set()
     numbering = {}
-    for prompt_id, number in zip(prompt_ids, kept, strict=True):
+    for prompt_id, kept_number in zip(prompt_ids, kept, strict=True):
+        number = kept_number
         if number is None or number in taken:
             last = number = last + 1
         taken.add(number)

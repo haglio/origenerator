@@ -33,7 +33,7 @@ def _wearing_the_apps_own_chrome():
 
 def test_it_does_not_hold_a_pane_open_at_its_label(qtbot):
     # The failure this exists for: a button's own minimum is its whole label, so
-    # one sitting in a file row set a floor under the info pane and the settings
+    # one sitting in a file row set a floor under the Generate pane and the settings
     # scroll grew a horizontal bar rather than let the row shrink.
     stock = QPushButton(_LONG)
     qtbot.addWidget(stock)

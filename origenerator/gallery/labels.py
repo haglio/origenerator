@@ -83,7 +83,7 @@ def _prompt_headline(params: dict) -> str:
     return prompt[:_HEADLINE_CHARS] + ("…" if len(prompt) > _HEADLINE_CHARS else "")
 
 
-def config_tab_title(workflow_name: str | None, params: dict) -> str:
+def generate_tab_title(workflow_name: str | None, params: dict) -> str:
     """A Generate tab's default name: the model (workflow) it runs, followed by
     the gallery folder (the prompt) its output would land in when there is one.
 
@@ -103,7 +103,7 @@ def config_tab_title(workflow_name: str | None, params: dict) -> str:
 def config_folder_key(workflow_name: str, signature: str) -> str:
     """The key of the gallery folder a config would generate into.
 
-    Takes the ``(workflow, signature)`` pair a config tab holds rather than a
+    Takes the ``(workflow, signature)`` pair a Generate tab holds rather than a
     row, since a tab that has never run has no row to key off
     (:func:`~origenerator.gallery.tree.settings_folder_key` is the same question
     asked of one). It keys the same folder the tree does: a row with no file yet
@@ -117,7 +117,7 @@ def config_folder_key(workflow_name: str, signature: str) -> str:
 def config_folder_name(workflow_name: str, signature: str,
                        folder_meta: dict | None = None) -> str:
     """The gallery folder a config would generate into, by the name it wears
-    there: the one the user typed onto it, else its short code — so a config tab
+    there: the one the user typed onto it, else its short code — so a Generate tab
     and its folder read as one thing."""
     key = config_folder_key(workflow_name, signature)
     meta = (folder_meta or {}).get(key) or {}

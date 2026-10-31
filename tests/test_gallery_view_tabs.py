@@ -15,10 +15,10 @@ from origenerator import (
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
-from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.preview_widget import PreviewWidget
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
@@ -65,8 +65,8 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
     view = GalleryView(FakeDB([image, lonely, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs.config_panels():
-        panel._preview.show_media = MagicMock()  # don't start WMF playback
+    for tab in view._generate_pane.generate_tabs():
+        tab._preview.show_media = MagicMock()  # don't start WMF playback
 
     view._on_thumbnail_clicked("vid1")   # a video isn't "animated into" anything
     assert _animated_strip(view).isHidden()
@@ -82,7 +82,7 @@ def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
     view.refresh()
     _preview_of(view).show_media = MagicMock()
     resolved = (Path("C:/out/sdxl_t2i_i1.png"), "image")
-    monkeypatch.setattr(gcp_module, "resolve_preview", MagicMock(return_value=resolved))
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", MagicMock(return_value=resolved))
 
     view._on_thumbnail_clicked("i1")
 
@@ -97,7 +97,7 @@ def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
     view.refresh()
     _preview_of(view).clear = MagicMock()
     _preview_of(view).show_media = MagicMock()
-    monkeypatch.setattr(gcp_module, "resolve_preview", MagicMock(return_value=None))
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", MagicMock(return_value=None))
 
     view._on_thumbnail_clicked("i1")
 
@@ -124,7 +124,7 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert view._arrangement.folder_panes.count() == 2
     assert view._arrangement.folder_panes.widget(0).isAncestorOf(view._tree)
     assert view._arrangement.folder_panes.widget(1).isAncestorOf(view._scroll)
-    # ...with the Job Queue under both of them, and the info pane beside the
+    # ...with the Job Queue under both of them, and the Generate pane beside the
     # whole column at full height — the Job Queue is the folders' foot, not the
     # window's.
     assert view._arrangement.left_column.count() == 2
@@ -136,75 +136,75 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert not view._arrangement.panes.widget(1).isAncestorOf(view._queue)
 
 
-def test_the_info_panes_floor_is_the_tab_it_holds(qtbot):
+def test_the_generate_panes_floor_is_the_tab_it_holds(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     # Only the tab knows how narrow it can go — what its settings fit in — so the
-    # floor is its (GenerateConfigPanel.minimumSizeHint) and the pane carries none
+    # floor is its (GenerateTab.minimumSizeHint) and the pane carries none
     # of its own. An explicit minimum here would *replace* that number rather than
     # join it: too high and the drag stops while there is still room to give, too
     # low and the settings scroll sideways.
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     assert view._arrangement.panes.widget(1).minimumWidth() == 0
-    assert view._arrangement.panes.widget(1).minimumSizeHint().width() >= panel.minimumSizeHint().width()
-    assert panel.minimumSizeHint().width() == panel._contents_floor()
+    assert view._arrangement.panes.widget(1).minimumSizeHint().width() >= tab.minimumSizeHint().width()
+    assert tab.minimumSizeHint().width() == tab._contents_floor()
 
 
-def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
+def test_the_generate_pane_is_a_tab_widget_of_editable_generate_tabs(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    # The info pane is a tab widget of identical editable generate panels — no
+    # The Generate pane is a tab widget of identical editable Generate tabs — no
     # special or permanent tab. The first one opens on construction, hosting the
     # preview a selection lands in.
-    assert isinstance(view._info_tabs, QTabWidget)
+    assert isinstance(view._generate_pane, QTabWidget)
     # The pane is the tabs plus the find strip that searches them, so the splitter
     # holds a wrapper rather than the tab widget itself.
-    assert view._arrangement.panes.widget(1).isAncestorOf(view._info_tabs)
-    assert isinstance(view._info_tabs.widget(0), GenerateConfigPanel)
-    assert view._info_tabs.widget(0).isAncestorOf(_preview_of(view))
+    assert view._arrangement.panes.widget(1).isAncestorOf(view._generate_pane)
+    assert isinstance(view._generate_pane.widget(0), GenerateTab)
+    assert view._generate_pane.widget(0).isAncestorOf(_preview_of(view))
 
 
 def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
-    # Picking an item loads it into a config tab, brought to the front.
+    # Picking an item loads it into a Generate tab, brought to the front.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
     view._on_thumbnail_clicked("i1")
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel is view._info_tabs.currentWidget()
-    assert panel._displayed_row["prompt_id"] == "i1"
+    tab = view._generate_pane.current_generate_tab()
+    assert tab is view._generate_pane.currentWidget()
+    assert tab._displayed_row["prompt_id"] == "i1"
 
 
 def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
     # A poll/rebuild re-selects the current generation; that must not yank the
-    # user off a config tab they're editing, fork a new one, or paint the
+    # user off a Generate tab they're editing, fork a new one, or paint the
     # selection into the tab in front — the selection is the gallery's, and a
     # tab shows only what it is for.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])  # its folder on screen
-    editing = view._info_tabs._add_subtab()  # config tab at index 1, current
+    editing = view._generate_pane._add_subtab()  # Generate tab at index 1, current
     editing._preview.show_media = MagicMock()
-    count = view._info_tabs.count()
+    count = view._generate_pane.count()
 
     view._reselect_generation("i1")  # what a rebuild does with the selection
 
     assert view._selected_row["prompt_id"] == "i1"     # the gallery re-selected it
-    assert view._info_tabs.currentWidget() is editing  # stayed on the config tab
-    assert view._info_tabs.count() == count            # no new tab forked
+    assert view._generate_pane.currentWidget() is editing  # stayed on the Generate tab
+    assert view._generate_pane.count() == count            # no new tab forked
     assert editing._displayed_row is None              # its form/footer untouched
     editing._preview.show_media.assert_not_called()    # nor its preview
 
 
 def _current_form(view):
-    return view._info_tabs.current_config_panel()._param_form
+    return view._generate_pane.current_generate_tab()._param_form
 
 
 def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
-    # A tab is an editable generate panel: picking a generation seeds its form with
+    # A tab is an editable Generate tab: picking a generation seeds its form with
     # that generation's settings, ready to tweak and re-run.
     db = Database(tmp_path / "t.db")
     params = dict(_SDXL.default_params(), positive_prompt="a wizard", seed=123)
@@ -263,10 +263,10 @@ def test_selecting_an_unregistered_thumbnail_leaves_no_settings_from_before(qtbo
 
     view._on_thumbnail_clicked("unreg")
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel._displayed_row["prompt_id"] == "unreg"
-    assert panel._workflow_combo.currentIndex() == -1
-    assert panel._param_form is None
+    tab = view._generate_pane.current_generate_tab()
+    assert tab._displayed_row["prompt_id"] == "unreg"
+    assert tab._workflow_dropdown.currentIndex() == -1
+    assert tab._param_form is None
 
 
 def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
@@ -298,9 +298,9 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
     view.refresh()
 
     assert view.selected_generation() == "i2"  # the selection itself is restored
-    panel = view._info_tabs.current_config_panel()
-    assert panel.is_blank()  # ...into a tab still asking which workflow to run
-    panel._preview.show_media.assert_not_called()
+    tab = view._generate_pane.current_generate_tab()
+    assert tab.is_blank()  # ...into a tab still asking which workflow to run
+    tab._preview.show_media.assert_not_called()
 
 
 def _make_db(tmp_path):
@@ -325,9 +325,9 @@ def test_clicking_a_thumbnail_seeds_the_tab_with_its_parameters(qtbot, tmp_path)
 
     view._on_thumbnail_clicked("p1")
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel._workflow_combo.currentData() == "sdxl_t2i"
-    values = panel._param_form.get_values()
+    tab = view._generate_pane.current_generate_tab()
+    assert tab._workflow_dropdown.currentData() == "sdxl_t2i"
+    values = tab._param_form.get_values()
     assert (values["steps"], values["positive_prompt"], values["negative_prompt"],
             values["seed"]) == (20, "a cat", "blurry", 7)
 
@@ -339,13 +339,13 @@ def test_double_clicking_a_thumbnail_pins_the_tab_it_opened(qtbot, tmp_path):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view._on_thumbnail_clicked("p1")
-    assert view._info_tabs._preview_panel is view._info_tabs.current_config_panel()
+    assert view._generate_pane._preview_tab is view._generate_pane.current_generate_tab()
 
     view._gallery_pane._thumbnail_double_clicked("p1")
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel.displayed_row()["prompt_id"] == "p1"
-    assert view._info_tabs._preview_panel is None
+    tab = view._generate_pane.current_generate_tab()
+    assert tab.displayed_row()["prompt_id"] == "p1"
+    assert view._generate_pane._preview_tab is None
 
 
 def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
@@ -364,7 +364,7 @@ def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
     for i in range(1, 5):
         view._on_thumbnail_clicked(f"p{i}")
 
-    assert view._info_tabs.count() == 1
+    assert view._generate_pane.count() == 1
 
 
 def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
@@ -381,8 +381,8 @@ def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
     view._gallery_pane._thumbnail_double_clicked("p1")
     view._on_thumbnail_clicked("p2")
 
-    assert view._info_tabs.count() == 2
-    kept = view._info_tabs.widget(0)
+    assert view._generate_pane.count() == 2
+    kept = view._generate_pane.widget(0)
     assert kept.displayed_row()["prompt_id"] == "p1"  # untouched by the later click
 
 
@@ -399,11 +399,11 @@ def test_double_clicking_an_unregistered_thumbnail_still_pins_its_tab(qtbot, tmp
 
     view._gallery_pane._thumbnail_double_clicked("unreg")
 
-    assert view._info_tabs._preview_panel is None
+    assert view._generate_pane._preview_tab is None
 
 
 def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
-    # Loading a generation into a config tab seeds its form with the generation's
+    # Loading a generation into a Generate tab seeds its form with the generation's
     # workflow, whose estimate line then reads that workflow's typical time.
     rows = [
         _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
@@ -413,11 +413,11 @@ def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
     view = GalleryView(FakeDB(rows), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs.config_panels():
-        panel._preview.show_media = MagicMock()
+    for tab in view._generate_pane.generate_tabs():
+        tab._preview.show_media = MagicMock()
 
     view._on_thumbnail_clicked("v1")
-    estimate = view._info_tabs.current_config_panel()._estimate_label
+    estimate = view._generate_pane.current_generate_tab()._estimate_label
     assert estimate.text() == "Typical time: ~12 min (based on 3 runs)"
 
 

@@ -73,7 +73,7 @@ class InFlightItem:
     # under the wait, blurred (:mod:`origenerator.gui.blurred`). ``None``
     # where the run came from nothing, which is most images.
     source_file: str | None = None
-    # The act picked in the Combine panel's dropdown, for a run launched from
+    # The act picked in the Combine's dropdown, for a run launched from
     # there — "" for every other run, and for a combine that was given a dropped
     # video instead of a picked act. It is the one word saying what this video
     # will *do*, and nothing else on the row carries it.
@@ -108,7 +108,7 @@ def queue_lead_text(item: InFlightItem) -> str:
     added up out of, and because it is the one figure that makes a queue of four
     videos read differently from a queue of four images.
 
-    The act follows the kind, for a run the Combine panel launched from its
+    The act follows the kind, for a run the Combine launched from its
     dropdown: the kind says a video is being made, and the act says
     which video — the whole of what the user chose, and the one thing separating
     two runs on the same image. It rides through "Edit…" too, so a

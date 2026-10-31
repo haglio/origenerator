@@ -6,7 +6,7 @@ mirror — it keeps the seeds and changes the words, running the folder again wi
 the prompt rewritten, so what comes back is the same set of images said another
 way rather than a new set of images.
 
-Pressing it launches nothing: it opens a config tab where the folder's own
+Pressing it launches nothing: it opens a Generate tab where the folder's own
 prompt is there to be edited by hand, the folder's images filling the preview
 above it.
 """

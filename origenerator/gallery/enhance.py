@@ -13,7 +13,7 @@ shows its most-enhanced version by default while every level it has received
 stays listed and reachable.
 
 What an enhancement is configured with is a property of the FOLDER, not of any
-one image: :class:`EnhanceSettings` is what the gallery's Enhance subpanel edits
+one image: :class:`EnhanceSettings` is what the gallery's Enhance pane edits
 and stores per settings folder, and :func:`enhance_params_for` is where it meets
 a particular row. The tile's yellow plus, the folder's Enhance All button, and the
 selection's Enhance action all decide off the helpers here, so "enhanced" means
@@ -83,7 +83,7 @@ class EnhanceLevel:
     it — empty for the original, and for any level folded in before the settings
     were recorded — and ``settings`` is those settings as a line of text. Both:
     the string captions the tile, the dict is what a tile dragged onto the
-    Enhance subpanel hands over.
+    Enhance pane hands over.
     """
 
     index: int
@@ -138,7 +138,7 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     Each level names the settings that made it: a folded enhance recorded its
     own (``enhance_history``), an inline one is described by the row's params,
     which are the very settings its tail ran at. That is what makes a level worth
-    dragging onto the Enhance panel even when it stands alone.
+    dragging onto the Enhance pane even when it stands alone.
 
     A third shape appears once levels can be deleted (:func:`remove_enhance_levels`):
     the original trashed out from under two or more enhancements. There is no
@@ -223,7 +223,7 @@ def is_enhanced_row(row: dict) -> bool:
 
 
 def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLevel]:
-    """The versions the info pane lists for ``row`` — what :func:`enhance_levels`
+    """The versions the Generate pane lists for ``row`` — what :func:`enhance_levels`
     finds, or the row's one file as ``Original`` when it has received no
     enhancement yet.
 
@@ -362,7 +362,7 @@ def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int 
     holds at ``settings``, or ``None`` when it holds none.
 
     Compared against the params an enhance would actually run with
-    (:func:`enhance_params_for`), not against the panel's raw values, so the
+    (:func:`enhance_params_for`), not against the pane's raw values, so the
     source-matched model resolves to this row's own checkpoint before the
     comparison — otherwise "the same settings" would read as different for every
     image the default is left on.
@@ -402,10 +402,10 @@ def most_used_enhancements(rows, count: int) -> list[dict]:
 
 
 def _settings_as_offered(row: dict, params: dict) -> dict:
-    held_on_the_panel = full_settings(params)
-    if held_on_the_panel["checkpoint"] == model_matching_the_source(row):
-        held_on_the_panel["checkpoint"] = MATCH_SOURCE_MODEL
-    return full_settings(held_on_the_panel)
+    held_on_the_pane = full_settings(params)
+    if held_on_the_pane["checkpoint"] == model_matching_the_source(row):
+        held_on_the_pane["checkpoint"] = MATCH_SOURCE_MODEL
+    return full_settings(held_on_the_pane)
 
 
 def model_matching_the_source(row: dict) -> str:
@@ -529,10 +529,10 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     folder pins a model — the checkpoint that made the source (the SDXL
     workflows record one), so an enhanced image stays in its own style.
 
-    ``settings`` is the Enhance subpanel's current, app-wide configuration: the
+    ``settings`` is the Enhance pane's current, app-wide configuration: the
     settings it names (:data:`ENHANCE_SETTING_KEYS`) are laid over the workflow
     defaults, so Enhance All, a single enhance, and an auto-enhance of a newly
-    generated image all run at whatever the panel says. Omitted, the workflow's
+    generated image all run at whatever the pane says. Omitted, the workflow's
     own defaults apply.
 
     An already-enhanced row re-enhances from its ORIGINAL file, not the
@@ -570,11 +570,11 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
     ``settings`` the way any first enhance would.
 
     **The passes are what was asked for and what the image already carries —
-    never what the panel happens to have checked.** A spoken fix is a targeted
-    act made with no view of the Enhance panel, so a folder configured to fix
+    never what the pane happens to have checked.** A spoken fix is a targeted
+    act made with no view of the Enhance pane, so a folder configured to fix
     every part must not turn "fix teeth" into a pass over all of them: that is
     a redraw of the whole image in answer to a command about one part of it.
-    The panel is still read for the *number* each part runs at, since nobody
+    The pane is still read for the *number* each part runs at, since nobody
     says a denoise out loud —
     :data:`~origenerator.workflows.detail_parts.DEFAULT_FIX_DENOISE` where it
     has none.

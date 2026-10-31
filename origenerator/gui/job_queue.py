@@ -296,7 +296,7 @@ class JobQueue(QObject):
 
         A chained i2v re-roll is two prompts — the frame, then the video on it —
         but one run as far as whoever launched it is concerned, so both carry the
-        id of the first. That is what lets a config tab keep showing progress for
+        id of the first. That is what lets a Generate tab keep showing progress for
         its own Generate across the hand-off (see :meth:`_on_image_finished`).
         """
         if origin is None:

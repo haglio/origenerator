@@ -24,7 +24,7 @@ from typing import NamedTuple
 
 from PyQt6.QtWidgets import QToolButton, QWidget
 from shared_ui.colors import BG_PRIMARY
-from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.palette import AMBER, BLUE, as_hex
 from shared_ui.spacing import (
     BUTTON_GAP,
@@ -261,7 +261,7 @@ class ToolbarBank(QWidget):
         for gap, buttons in self._groups:
             gap.setFixedSize(_landing_at_the_huds_scale(BUTTON_GROUP_GAP, hosted=hosted), 1)
             for button in buttons:
-                fill_square_with_mark(button, size=square)
+                fill_square_with_icon(button, size=square)
 
     def become_hosted(self) -> None:
         self._draw_at_the_huds_scale(hosted=True)

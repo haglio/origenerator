@@ -73,7 +73,7 @@ def style_caption(label) -> None:
 
 
 from shared_ui import colors
-from shared_ui.icons import draw_glyph
+from shared_ui.icons import draw_icon
 from shared_ui.palette import BORDER_SUBTLE, TEXT_MUTED, as_hex
 
 from origenerator.gui.palette import (
@@ -121,6 +121,6 @@ class MarkPlate(QLabel):
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = QPainter(self)
-        draw_glyph(painter, self.mark, colors.TEXT_MUTED if self.isEnabled() else colors.BORDER_SUBTLE,
-                   size=self._side, x=(self.width() - self._side) / 2,
-                   y=(self.height() - self._side) / 2)
+        draw_icon(painter, self.mark, colors.TEXT_MUTED if self.isEnabled() else colors.BORDER_SUBTLE,
+                  size=self._side, x=(self.width() - self._side) / 2,
+                  y=(self.height() - self._side) / 2)

@@ -13,7 +13,7 @@ from PyQt6.QtCore import QRectF, Qt, QVariantAnimation
 from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QLineEdit, QToolButton
 from shared_ui.colors import TEXT_SECONDARY
-from shared_ui.icons import draw_glyph
+from shared_ui.icons import draw_icon
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
 _ONE_TURN_MS = 1000
@@ -77,7 +77,7 @@ class ScopeSearchEdit(QLineEdit):
         painter.translate(box.center())
         painter.rotate(self._turned)
         painter.translate(-box.center())
-        draw_glyph(painter, "working", TEXT_SECONDARY, size=box.width(), x=box.x(), y=box.y())
+        draw_icon(painter, "working", TEXT_SECONDARY, size=box.width(), x=box.x(), y=box.y())
         painter.end()
 
     def _circle_box(self) -> QRectF:

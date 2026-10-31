@@ -65,7 +65,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import AMBER, TEXT_PRIMARY
 from shared_ui.folder_path import FolderPath
-from shared_ui.icons import marked_text
+from shared_ui.icons import icon_then_text
 from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
@@ -4237,8 +4237,8 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
 
     path = view._folder_path.findChild(FolderPath)
     assert list(_path_links(view)) == ["All"]
-    assert marked_text("star", "Favorites", color=TEXT_PRIMARY,
-                       size=path.fontMetrics().height()) in path.text()
+    assert icon_then_text("star", "Favorites", color=TEXT_PRIMARY,
+                          size=path.fontMetrics().height()) in path.text()
     assert view._folder_path.display_text() == f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Favorites"
 
 
@@ -4250,8 +4250,8 @@ def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
     view._tree.setCurrentItem(_collection(view, ENHANCED_KEY))
 
     path = view._folder_path.findChild(FolderPath)
-    assert marked_text("plus", "Enhanced", color=TEXT_PRIMARY,
-                       size=path.fontMetrics().height()) in path.text()
+    assert icon_then_text("plus", "Enhanced", color=TEXT_PRIMARY,
+                          size=path.fontMetrics().height()) in path.text()
 
 
 def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtbot):

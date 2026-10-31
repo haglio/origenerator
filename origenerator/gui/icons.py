@@ -45,7 +45,7 @@ from shared_ui.colors import (
     TEXT_SECONDARY,
     WHITE,
 )
-from shared_ui.icons import CANVAS, draw_glyph, glyph_icon, glyph_pixmap
+from shared_ui.icons import CANVAS, draw_icon, icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.type_scale import FONT_UI, SIZE_TINY, in_pixels
 
@@ -109,44 +109,44 @@ _REROLL_MEDIA_AT = 1
 
 
 def back_icon() -> QIcon:
-    return glyph_icon("chevron_left", size=_SIZE)
+    return qt_icon("chevron_left", size=_SIZE)
 
 
 def forward_icon() -> QIcon:
-    return glyph_icon("chevron_right", size=_SIZE)
+    return qt_icon("chevron_right", size=_SIZE)
 
 
 def undo_icon() -> QIcon:
     """A circular arrow curling back, its head to the left — undo."""
-    return glyph_icon("undo_arrow", size=_SIZE)
+    return qt_icon("undo_arrow", size=_SIZE)
 
 
 def redo_icon() -> QIcon:
     """Undo's mirror image, head to the right — redo. The pair is a mirror on
     purpose: side by side in the bank, two arrowheads pointing opposite ways say
     which is which faster than any difference in the arc could."""
-    return glyph_icon("redo_arrow", size=_SIZE)
+    return qt_icon("redo_arrow", size=_SIZE)
 
 
 def auto_generate_icon() -> QIcon:
-    return glyph_icon("bolt", size=_SIZE)
+    return qt_icon("bolt", size=_SIZE)
 
 
 def shield_icon() -> QIcon:
-    return glyph_icon("shield", size=_SIZE)
+    return qt_icon("shield", size=_SIZE)
 
 
 def move_up_icon() -> QIcon:
-    return glyph_icon("chevron_up", size=_SIZE)
+    return qt_icon("chevron_up", size=_SIZE)
 
 
 def move_down_icon() -> QIcon:
-    return glyph_icon("chevron_down", size=_SIZE)
+    return qt_icon("chevron_down", size=_SIZE)
 
 
 def slideshow_icon() -> QIcon:
     """A play triangle in a frame — play this folder as a fullscreen slideshow."""
-    return glyph_icon("slideshow", size=_SIZE)
+    return qt_icon("slideshow", size=_SIZE)
 
 
 def enhance_icon() -> QIcon:
@@ -156,7 +156,7 @@ def enhance_icon() -> QIcon:
     (:func:`corner_enhance_icon`), so the button and the mark it leaves are
     one symbol in one color — and so it can't be read as a star, which is what
     green means across this family (:data:`_STAR_GLYPH`)."""
-    return glyph_icon("plus", color=AMBER, size=_SIZE)
+    return qt_icon("plus", color=AMBER, size=_SIZE)
 
 
 def mic_icon() -> QIcon:
@@ -165,15 +165,15 @@ def mic_icon() -> QIcon:
     The family's one microphone: Fun Time's dashboard paints this same drawing
     into its voice panel, so the two apps side by side show one control rather
     than two marks that merely mean the same thing."""
-    return glyph_icon("mic", size=_SIZE)
+    return qt_icon("mic", size=_SIZE)
 
 
 def radio_icon(*, lit_ink=None) -> QIcon:
     """A speaker sounding off — Origenerator Radio's on/off switch, drawn in
     *lit_ink* while it is on when the ground it is lit on wants another ink."""
-    icon = glyph_icon("speaker", size=_SIZE)
+    icon = qt_icon("speaker", size=_SIZE)
     if lit_ink is not None:
-        icon.addPixmap(glyph_pixmap("speaker", _SIZE, lit_ink), QIcon.Mode.Normal, QIcon.State.On)
+        icon.addPixmap(icon_pixmap("speaker", _SIZE, lit_ink), QIcon.Mode.Normal, QIcon.State.On)
     return icon
 
 
@@ -181,7 +181,7 @@ def trash_icon(*, color=None) -> QIcon:
     """A trash can — the Trash collection's mark, and the Delete button that fills
     it. One glyph for both ends of a deletion, so the collection reads as where that
     button's items go."""
-    return glyph_icon("trash", color=color, size=_SIZE)
+    return qt_icon("trash", color=color, size=_SIZE)
 
 
 def delete_icon() -> QIcon:
@@ -200,20 +200,20 @@ def star_icon(*, filled: bool) -> QIcon:
     button bank's Favorite wears the filled one, so the control and the mark it
     leaves on a tile are one symbol in one color."""
     if filled:
-        icon = glyph_icon("star", color=_STAR_GLYPH, size=_SIZE)
+        icon = qt_icon("star", color=_STAR_GLYPH, size=_SIZE)
         icon.addPixmap(_painted(_ringed_star), QIcon.Mode.Selected)
         return icon
-    return glyph_icon("star_outline", size=_SIZE)
+    return qt_icon("star_outline", size=_SIZE)
 
 
 def _ringed_star(painter: QPainter):
-    draw_glyph(painter, "star_ring", TEXT_PRIMARY, size=_SIZE)
-    draw_glyph(painter, "star", _STAR_GLYPH, size=_SIZE)
+    draw_icon(painter, "star_ring", TEXT_PRIMARY, size=_SIZE)
+    draw_icon(painter, "star", _STAR_GLYPH, size=_SIZE)
 
 
 @cache
 def thumbs_up_icon() -> QIcon:
-    return glyph_icon("thumbs_up", size=_SIZE)
+    return qt_icon("thumbs_up", size=_SIZE)
 
 
 @cache
@@ -224,11 +224,11 @@ def unmarked_icon() -> QIcon:
 
 
 def latest_icon() -> QIcon:
-    return glyph_icon("latest", size=_SIZE)
+    return qt_icon("latest", size=_SIZE)
 
 
 def flask_icon() -> QIcon:
-    return glyph_icon("flask", size=_SIZE)
+    return qt_icon("flask", size=_SIZE)
 
 
 @cache
@@ -244,13 +244,13 @@ def collection_badge(collection: str) -> tuple[QIcon, str]:
 
 
 def all_icon() -> QIcon:
-    return glyph_icon("database", size=_SIZE)
+    return qt_icon("database", size=_SIZE)
 
 
 def custom_folder_icon() -> QIcon:
     """A folder — the mark on a folder the user composed, and the toolbar button
     that composes one out of the picked folders."""
-    return glyph_icon("folder", size=_SIZE)
+    return qt_icon("folder", size=_SIZE)
 
 
 
@@ -272,7 +272,7 @@ def recent_mark_icon() -> QIcon:
 
 def _disc(color):
     def draw(painter: QPainter):
-        draw_glyph(painter, "disc", color, size=_SIZE)
+        draw_icon(painter, "disc", color, size=_SIZE)
 
     return draw
 
@@ -283,8 +283,8 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
     joins the gallery) or a cross ("down" — reject it and teach the experimenter
     what to avoid). White line art on the buttons' own translucent chip, like the
     per-seed re-roll controls."""
-    return QIcon(glyph_pixmap("check" if verdict == "up" else "cross",
-                              _SIZE, _REROLL_GLYPH))
+    return QIcon(icon_pixmap("check" if verdict == "up" else "cross",
+                             _SIZE, _REROLL_GLYPH))
 
 
 @cache
@@ -294,7 +294,7 @@ def recovery_action_icon(action: str) -> QIcon:
     ("purge" — end it for good; nothing else empties the bin). White line art on
     the buttons' own translucent chip, like the experiment verdict controls."""
     name = "undo_arrow" if action == "restore" else "trash"
-    return QIcon(glyph_pixmap(name, _SIZE, _REROLL_GLYPH))
+    return QIcon(icon_pixmap(name, _SIZE, _REROLL_GLYPH))
 
 
 @cache
@@ -318,7 +318,7 @@ def media_type_icon(media_type: str) -> QIcon:
     stands in for the thumbnail a tab has no result to show yet, or the row of a
     folder of images or videos — so the chip would be a black square among words.
     """
-    return glyph_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
+    return qt_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
 # --- the shape a side of the table of contents holds ------------------------
@@ -329,12 +329,12 @@ _SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_lan
 
 @cache
 def side_mark(side: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
-    return glyph_pixmap(_SIDE_MARKS[side], size, TEXT_PRIMARY)
+    return icon_pixmap(_SIDE_MARKS[side], size, TEXT_PRIMARY)
 
 
 @cache
 def separate_mark(size: int) -> QPixmap:
-    return glyph_pixmap("portrait_beside_landscape", size, TEXT_PRIMARY)
+    return icon_pixmap("portrait_beside_landscape", size, TEXT_PRIMARY)
 
 
 # --- the controls an item wears in its corners --------------------------
@@ -411,7 +411,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
 
     def draw(painter: QPainter):
         if state == ENHANCE_MORE:
-            draw_glyph(painter, "plus", AMBER, size=_CORNER_MARK, x=shifted, y=shifted)
+            draw_icon(painter, "plus", AMBER, size=_CORNER_MARK, x=shifted, y=shifted)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
             _mark(painter, "plus", AMBER)  # the color is spent: a clear ignores it
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
@@ -430,8 +430,8 @@ def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
 
 def _mark(painter: QPainter, glyph: str, ink):
     """Paint one corner control's glyph where every corner control's glyph goes."""
-    draw_glyph(painter, glyph, ink, size=_CORNER_MARK,
-               x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
+    draw_icon(painter, glyph, ink, size=_CORNER_MARK,
+              x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
 
 
 def _painted(draw, size: int = _SIZE) -> QPixmap:
@@ -482,9 +482,9 @@ def reroll_seed_icon(media_type: str) -> QIcon:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     # The media identity, drawn large so video vs image reads at a glance...
-    draw_glyph(painter, "play" if media_type == MediaType.VIDEO else "photo", _REROLL_GLYPH,
-               size=_REROLL_MEDIA, x=_REROLL_MEDIA_AT, y=_REROLL_MEDIA_AT)
-    draw_glyph(painter, "regenerate_corner", _REROLL_GLYPH, size=_SIZE)
+    draw_icon(painter, "play" if media_type == MediaType.VIDEO else "photo", _REROLL_GLYPH,
+              size=_REROLL_MEDIA, x=_REROLL_MEDIA_AT, y=_REROLL_MEDIA_AT)
+    draw_icon(painter, "regenerate_corner", _REROLL_GLYPH, size=_SIZE)
     painter.end()
     return QIcon(pixmap)
 
@@ -492,7 +492,7 @@ def reroll_seed_icon(media_type: str) -> QIcon:
 def tab_close_icon() -> QIcon:
     """The family's cross, so every control that closes a tab wears one mark --
     the tabs' own, and the config pane's "All" beside them."""
-    return glyph_icon("cross", size=_SIZE)
+    return qt_icon("cross", size=_SIZE)
 
 
 def folder_badge(group) -> tuple[QIcon, str] | None:
@@ -522,7 +522,7 @@ def level_badge_icon(level: str) -> QIcon:
 
 def _render_chip(chip, glyph: str, ink) -> QPixmap:
     """A rounded chip filled with *chip*, carrying *glyph* in *ink*."""
-    return _chip_pixmap(chip, lambda painter: draw_glyph(
+    return _chip_pixmap(chip, lambda painter: draw_icon(
         painter, glyph, ink, size=_CHIP_GLYPH, x=_CHIP_INSET, y=_CHIP_INSET))
 
 

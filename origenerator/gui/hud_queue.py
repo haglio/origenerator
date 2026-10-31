@@ -39,7 +39,7 @@ from funestra.satellite_hud import (
     map_block_width,
 )
 from PIL import Image, ImageDraw
-from shared_ui.icons_pil import paste_glyph
+from shared_ui.icons_pil import paste_icon
 from shared_ui.lettering import fit_text
 from shared_ui.palette import (
     BG_BUTTON,
@@ -50,7 +50,7 @@ from shared_ui.palette import (
     TEXT_PRIMARY,
 )
 from shared_ui.spacing import (
-    BUTTON_MARK_INSET,
+    BUTTON_ICON_INSET,
     BUTTON_PAD_H_TIGHT,
     BUTTON_RADIUS_HUD,
     GAP_MEDIUM,
@@ -131,7 +131,7 @@ _PAREN_W = 5            # the marks around a source video whose prompt was edite
 _MARK_H = 8             # the slot the "…" takes when the line runs on past the rows
 _MARK_SIDE = 12         # the frame the family's three dots are drawn in, as on the satellite's map
 _DROP_W = 2             # the mark showing where a dragged row would land
-_SHIELD_MARK = CTRL_BTN - 2 * BUTTON_MARK_INSET  # a row's shield's own size
+_SHIELD_MARK = CTRL_BTN - 2 * BUTTON_ICON_INSET  # a row's shield's own size
 _MARK_TO_WORD = 3       # between Shield All's shield and its word
 _HEIGHT = _FRAME + BLOCK_GAP + 2 * _MARK_H + ROWS * _ROW_H
 
@@ -399,8 +399,8 @@ class QueueSection:
         if not more:
             return
         middle_x, middle_y = x + width / 2, y + _MARK_H / 2
-        paste_glyph(image, "more", (round(middle_x - _MARK_SIDE / 2), round(middle_y - _MARK_SIDE / 2),
-                                    _MARK_SIDE, _MARK_SIDE), TEXT_PRIMARY)
+        paste_icon(image, "more", (round(middle_x - _MARK_SIDE / 2), round(middle_y - _MARK_SIDE / 2),
+                                   _MARK_SIDE, _MARK_SIDE), TEXT_PRIMARY)
 
 
 def _for_all_width() -> int:
@@ -416,7 +416,7 @@ def _paint_shield_all(image, draw, rect, pointer, targets, *, dim: bool) -> None
     x, y, width, height = rect
     ink = button_ground(draw, rect, BG_BUTTON, hovered=_on(rect, pointer), dim=dim)
     left = x + (width - _shield_all_width()) // 2 + _WORD_PAD
-    draw_mark(image, "shield", (left - BUTTON_MARK_INSET, y, height, height), ink)
+    draw_mark(image, "shield", (left - BUTTON_ICON_INSET, y, height, height), ink)
     draw.text((left + _SHIELD_MARK + _MARK_TO_WORD, y + height / 2), SHIELD_ALL_TEXT,
               font=_tiny(), anchor="lm", fill=ink)
     targets.append((rect, Button(SHIELD_ALL, SHIELD_ALL_TEXT, SHIELD_ALL_TIP, width=width,

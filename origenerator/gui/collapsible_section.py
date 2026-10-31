@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.icons import draw_glyph
+from shared_ui.icons import draw_icon
 from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL, MARGIN_DIALOG
 
 from origenerator.gui.eliding import ElidingButton
@@ -88,8 +88,8 @@ class FoldHeader(ElidingButton):
         opt.rect = self._title_rect(opt)
         painter.drawControl(QStyle.ControlElement.CE_PushButtonLabel, opt)
         fold = self.fold_rect()
-        draw_glyph(painter, self.fold, self.palette().buttonText().color(),
-                   size=fold.width(), x=fold.left(), y=fold.top())
+        draw_icon(painter, self.fold, self.palette().buttonText().color(),
+                  size=fold.width(), x=fold.left(), y=fold.top())
         if self._mark is not None:
             painter.drawPixmap(self._mark_rect(), self._mark)
 

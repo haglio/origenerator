@@ -6,7 +6,7 @@ import json
 from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem
 from shared_ui.colors import TEXT_PRIMARY
-from shared_ui.icons import glyph_pixmap
+from shared_ui.icons import icon_pixmap
 
 from origenerator import gallery
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, SIDE_LABELS
@@ -130,7 +130,7 @@ def test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_n
 
 def _wears(item, mark: str) -> bool:
     drawn = item.icon(0).pixmap(QSize(48, 48)).toImage()
-    return drawn == glyph_pixmap(mark, 48, TEXT_PRIMARY).toImage()
+    return drawn == icon_pixmap(mark, 48, TEXT_PRIMARY).toImage()
 
 
 def test_all_wears_the_database_and_its_latest_the_calendar(qtbot):

@@ -18,7 +18,7 @@ from shared_ui.colors import (
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
 from shared_ui.spacing import (
-    BUTTON_MARK_INSET,
+    BUTTON_ICON_INSET,
     BUTTON_PAD_H_TIGHT,
     BUTTON_PAD_V,
     BUTTON_RADIUS,
@@ -270,7 +270,7 @@ def build_stylesheet() -> str:
     /* The derived-size padlock: a compact toggle floating between the width and
        height rows. Its own blue comes from the rule below. */
     QToolButton#dimensionUnlock {{
-        padding: {BUTTON_MARK_INSET}px {GAP_SMALL}px;
+        padding: {BUTTON_ICON_INSET}px {GAP_SMALL}px;
     }}
     /* The one exception to the on-ground rule above: a control whose ON state
        means a choice has been made wears the blue every other selection does,

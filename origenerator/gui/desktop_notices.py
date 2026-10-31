@@ -22,7 +22,7 @@ from app_support.win32 import seconds_since_input
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtGui import QGuiApplication, QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon
-from shared_ui.alert import Level, mark_pixmap
+from shared_ui.alert import Level, icon_pixmap_for
 from shared_ui.preview import Preview, taskbar_identity, window_title
 from shared_ui.preview_icon_pil import in_preview_ink
 
@@ -96,7 +96,7 @@ def _the_marks_beside_a_notice() -> dict[bool, Path | None]:
         mark = _where_marks_live() / name
         try:
             mark.parent.mkdir(parents=True, exist_ok=True)
-            drawn = mark_pixmap(level, _MARK_PX)
+            drawn = icon_pixmap_for(level, _MARK_PX)
             marks[landed] = mark if drawn.save(str(mark)) else None
         except Exception as e:
             # Broad on purpose, as for the identity below: a notice with no

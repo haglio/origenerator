@@ -20,7 +20,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 from shared_ui.colors import TEXT_PRIMARY
-from shared_ui.icons import glyph_pixmap
+from shared_ui.icons import icon_pixmap
 
 from origenerator.gui import grid_card
 from origenerator.gui.drags import under_way
@@ -204,8 +204,8 @@ class DropSlot(DropZone):
             self._label.setPixmap(grayscale_pixmap(thumbnail) if self._grayscale else thumbnail)
         else:
             self._label.setText("")  # held, but no thumbnail to show
-            self._label.setPixmap(glyph_pixmap("check", 2 * self._label.fontMetrics().height(),
-                                               TEXT_PRIMARY))
+            self._label.setPixmap(icon_pixmap("check", 2 * self._label.fontMetrics().height(),
+                                              TEXT_PRIMARY))
         self._badge.setVisible(True)
         self._badge.raise_()  # keep the kind chip above the preview
 

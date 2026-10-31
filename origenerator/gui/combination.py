@@ -5,7 +5,7 @@ from typing import NamedTuple
 from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QFont, QPainter, QPixmap
 from shared_ui.colors import TEXT_MUTED
-from shared_ui.icons import draw_glyph
+from shared_ui.icons import draw_icon
 
 # The plus, as a fraction of a cell's side — big enough to read as the operator
 # joining them rather than as a mark on one of the cells.
@@ -43,7 +43,7 @@ def paren_font(font: QFont, side: int) -> QFont:
 
 def draw_plus(painter: QPainter, x: int, side: int) -> None:
     width = plus_width(side)
-    draw_glyph(painter, "plus", TEXT_MUTED, size=width, x=x, y=(side - width) / 2)
+    draw_icon(painter, "plus", TEXT_MUTED, size=width, x=x, y=(side - width) / 2)
 
 
 def draw_source_video(painter: QPainter, x: int, source_video: QPixmap, prompt_edited: bool) -> None:

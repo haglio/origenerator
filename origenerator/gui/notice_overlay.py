@@ -24,7 +24,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui.colors import AMBER, BG_SECONDARY, GREEN, RED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, make_font
-from shared_ui.icons import marked_text
+from shared_ui.icons import icon_then_text
 from shared_ui.notice_shape import (
     NOTICE_PAD_H,
     NOTICE_PAD_V,
@@ -50,7 +50,7 @@ def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
         label.setText(text)
         return
     label.setTextFormat(Qt.TextFormat.RichText)
-    label.setText(marked_text(mark, text, color=color, size=label.fontMetrics().height()))
+    label.setText(icon_then_text(mark, text, color=color, size=label.fontMetrics().height()))
 
 
 class NoticeOverlay(QLabel):

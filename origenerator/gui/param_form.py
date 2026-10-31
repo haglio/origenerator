@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.icons import glyph_icon
+from shared_ui.icons import qt_icon
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
@@ -594,7 +594,7 @@ class ParamForm(QWidget):
             return
         content = self._sections["Size"].content()
         btn = QPushButton(content)
-        btn.setIcon(glyph_icon("flip_ends"))
+        btn.setIcon(qt_icon("flip_ends"))
         btn.setToolTip("Swap width and height")
         btn.clicked.connect(self.swap_dimensions)
         btn.adjustSize()
@@ -715,7 +715,7 @@ class ParamForm(QWidget):
         btn.setObjectName("dimensionUnlock")
         btn.setProperty(CHOSEN, True)
         btn.setCheckable(True)
-        btn.setIcon(glyph_icon(_PADLOCK[False]))
+        btn.setIcon(qt_icon(_PADLOCK[False]))
         btn.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
         btn.setToolTip(self._unlock_tip(unlocked=False))
         btn.toggled.connect(self._on_dimensions_unlock_toggled)
@@ -750,7 +750,7 @@ class ParamForm(QWidget):
         """Flip the padlock and swap each dimension between its plain locked value
         and its editable spinner, re-locking back onto the derived size. Announces
         the change so the panel refreshes with it."""
-        self._unlock_btn.setIcon(glyph_icon(_PADLOCK[unlocked]))
+        self._unlock_btn.setIcon(qt_icon(_PADLOCK[unlocked]))
         self._unlock_btn.setToolTip(self._unlock_tip(unlocked))
         for stack in self._dim_stacks.values():
             stack.setCurrentIndex(1 if unlocked else 0)

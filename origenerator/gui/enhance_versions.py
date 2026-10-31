@@ -53,7 +53,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import AMBER, BG_PRIMARY, TEXT_PRIMARY
-from shared_ui.icons import glyph_pixmap
+from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
@@ -427,7 +427,7 @@ class _AddRow(_Row):
         super().__init__("Enhance", parent)
         self._enabled = duplicate_of is None
         self._thumbnail.setStyleSheet(_ADD_TILE_CSS)
-        self._thumbnail.setPixmap(glyph_pixmap("plus", _PLUS, BG_PRIMARY))
+        self._thumbnail.setPixmap(icon_pixmap("plus", _PLUS, BG_PRIMARY))
         if settings:
             self._show_facts([MetaItem("Enhancement", settings)])
         # Dimmed by opacity rather than by setEnabled: Qt delivers no mouse

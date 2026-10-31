@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
-from shared_ui.icons import glyph_icon
+from shared_ui.icons import qt_icon
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.tick_control import TickControl
 
@@ -924,7 +924,7 @@ def test_unlock_toggle_carries_a_padlock_icon_that_flips(qtbot):
     assert form._unlock_btn.isCheckable()
     def wears(mark: str) -> bool:
         return (form._unlock_btn.icon().pixmap(BUTTON_ICON).toImage()
-                == glyph_icon(mark).pixmap(BUTTON_ICON).toImage())
+                == qt_icon(mark).pixmap(BUTTON_ICON).toImage())
 
     assert wears("lock")     # locked: a closed padlock
     form._unlock_btn.setChecked(True)

@@ -67,17 +67,37 @@ voice = ["faster-whisper>=1,<2"]
 # gc over a run that built thousands of Qt panels. --timeout-method=thread is
 # the half that pays for itself: it dumps the stack of the test that stopped,
 # which turns a stalled required check into a one-line diagnosis.
-# app_support.clocks holds all three halves of it.
-addopts = "-p app_support.sanitize.pytest_plugin -p app_support.clocks.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread --durations=30"
+# app_support.gates holds all three halves of it.
+addopts = "-p app_support.sanitize.pytest_plugin -p app_support.gates.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread --durations=30"
 testpaths = ["tests"]
 qt_api = "pyqt6"
 
 # The family checkouts this one is installed beside. All three were imported and
 # named nowhere in this file, so the only record of what a checkout needs was
 # the CI workflow. None is published, so none can go in [project.dependencies];
-# tests/test_dependencies.py holds this list against the tree instead.
+# the family's dependency gate holds this list against the tree instead.
 [tool.haglio]
 siblings = ["app_support", "funestra", "shared_ui", "voice_core"]
+
+# What the family's gates (app_support.gates) let stand here, each for the
+# reason beside it, from the day this repo first ran the seven dead-code checks
+# its own copy left out. An entry nothing is reported for any more fails the gate.
+[tool.haglio.dead-code]
+# Each chained workflow hands its chaining helper a segment builder called with
+# the same arguments; these three builders ignore the ones they do not need.
+unread-arguments = ["origenerator/workflows/wan22_animate.py: scene",
+                    "origenerator/workflows/wan22_animate.py: last",
+                    "origenerator/workflows/wan22_animate.py: previous",
+                    "origenerator/workflows/wan22_flf2v_loop.py: previous",
+                    "origenerator/workflows/wan22_i2v.py: last"]
+# The gallery's search timings, which nothing in the tree reads any more.
+unread-constants = ["_SEARCH_EXPAND_DELAY_MS", "_SEARCH_DELAY_MS", "_SEARCH_MIN_CHARS"]
+# A search result's score, which nothing reads back.
+unread-dataclass-fields = ["SearchResult.score"]
+# Test helpers no test calls.
+unread-test-helpers = ["end_outright", "let_go_over", "double_click", "click", "move",
+                       "press", "release", "press_key", "right_click", "_enhance_row",
+                       "_as_items"]
 
 # Declared, so that every launcher here brings this checkout up to what has
 # shipped, and waits out an update of it already under way, before it starts

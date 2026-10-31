@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import AMBER, RED, TEXT_MUTED
+from shared_ui.fonts import FONT_UI, SIZE_BODY
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator import config
@@ -120,6 +121,13 @@ def test_the_countdown_sits_under_its_box_at_its_right_edge(prompt):
     assert countdown.geometry().top() > box.geometry().bottom()
     assert countdown.geometry().right() == box.geometry().right()
     assert countdown.alignment() & Qt.AlignmentFlag.AlignRight
+
+
+def test_the_countdown_is_lettered_at_shared_uis_body_size(prompt):
+    prompt.set_value(_words(70))
+
+    (countdown,) = prompt.findChildren(Countdown)
+    assert (countdown.font().family(), countdown.font().pointSize()) == (FONT_UI, SIZE_BODY)
 
 
 def test_each_scene_counts_down_its_own_prompts(qtbot):

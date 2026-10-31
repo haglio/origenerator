@@ -17,7 +17,7 @@ def test_sections_are_in_the_canonical_display_order():
 def test_enhance_has_no_section_because_it_is_not_a_folder_setting():
     # Every section here holds params that decide which gallery folder a run
     # lands in. An enhancement doesn't — it's a finish applied afterward — so it
-    # is deliberately absent, and the gallery's Enhance subpanel owns it instead.
+    # is deliberately absent, and the gallery's Enhance pane owns it instead.
     assert "Enhance" not in [s.title for s in ps.SECTIONS]
     for key in ("enhance", "enhance_scale", "enhance_steps", "enhance_denoise"):
         assert ps.section_title(key) == ps.OTHER_TITLE

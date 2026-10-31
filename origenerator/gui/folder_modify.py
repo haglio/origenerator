@@ -1,7 +1,7 @@
-"""A config tab that is one folder's prompt rewrite rather than one generation.
+"""A Generate tab that is one folder's prompt rewrite rather than one generation.
 
 :class:`FolderModify` is that state, and the words the tab wears while it is in
-it. Kept out of the panel because the panel has a dozen other things to be about
+it. Kept out of the tab because the tab has a dozen other things to be about
 and this has four questions and no Qt in it.
 """
 

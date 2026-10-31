@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 # The order is the restore order and is load-bearing: the tabs before the folder
 # before the generation, each later one needing what the earlier ones put up.
 SESSION_UI_STATE = (
-    ("generate_tabs", GalleryView.capture_config_tabs, GalleryView.restore_config_tabs),
+    ("generate_tabs", GalleryView.capture_generate_tabs, GalleryView.restore_generate_tabs),
     ("toc_sides", GalleryView.toc_sides, GalleryView.set_toc_sides),
     ("open_folders", GalleryView.open_folders, GalleryView.set_open_folders),
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
@@ -72,7 +72,7 @@ SESSION_UI_STATE = (
     # The mic switch. Absent from a session saved before it was persisted — and
     # from a first launch — which is the app's default of on (see set_mic_enabled).
     ("mic_enabled", GalleryView.mic_enabled, GalleryView.set_mic_enabled),
-    # The Enhance subpanel's settings. App-wide, so they belong to the session
+    # The Enhance pane's settings. App-wide, so they belong to the session
     # rather than to any folder's row in the database.
     ("enhance_settings", GalleryView.enhance_settings, GalleryView.set_enhance_settings),
     # How the gallery search lays its results out (newest first, or banded by
@@ -133,9 +133,9 @@ class Core(QMainWindow):
         if fun_time is not None:
             self._wear_the_session(fun_time)
 
-        # One unified view: the gallery, whose info pane now holds the editable
-        # config tabs that used to be a separate Generate tab. A clicked
-        # thumbnail, the New tile, and the combine panel all feed it.
+        # One unified view: the gallery, whose Generate pane now holds the editable
+        # Generate tabs that used to be a separate Generate tab. A clicked
+        # thumbnail, the New tile, and the Combine all feed it.
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
                                          prompt_heights=PROMPT_HEIGHTS)
         self.setCentralWidget(self._gallery_view)
@@ -187,7 +187,7 @@ class Core(QMainWindow):
 
     def _restore_session(self):
         """Put the window back where it was — same monitor, size, and maximized
-        state — and reopen the last session's config tabs, gallery folder, and
+        state — and reopen the last session's Generate tabs, gallery folder, and
         selected generation.  Inside a Fun Time session the geometry is the
         session's to dictate, so the saved one is neither restored nor (see
         ``closeEvent``) overwritten -- except in a headset, which names no rect."""

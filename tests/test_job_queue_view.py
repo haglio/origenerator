@@ -273,7 +273,7 @@ def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
 def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_path):
     # The complaint this answers: a WAN run spends over a minute loading models
     # before ComfyUI streams a preview, and this corner was blank for all of it.
-    # It shows what the config tab shows for the same job — the frame being
+    # It shows what the Generate tab shows for the same job — the frame being
     # animated — until there is a frame of the run itself.
 
     frame = _image(tmp_path / "frame.png")
@@ -288,7 +288,7 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
 
 def test_the_corner_stands_the_source_video_beside_the_frame_where_there_is_one(queue, tmp_path):
     # A combine's job is an image and a past video's settings, and that is what
-    # the config tab shows above the form. The corner says the same thing, the
+    # the Generate tab shows above the form. The corner says the same thing, the
     # video drawn gray beside the frame — so it needs the room for two.
 
     frame = _image(tmp_path / "frame.png")

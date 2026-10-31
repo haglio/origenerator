@@ -12,10 +12,10 @@ lands. It follows you rather than the folder, so it shows in the collections
 Editing writes straight back through ``on_change`` — there is no Apply button —
 and the settings persist with the rest of the session state. Auto-enhance is a
 bare switch on the title row rather than a labeled checkbox among the settings: it
-is the panel's power, not one of its settings.
+is the pane's power, not one of its settings.
 
-An enhancement level dragged in from the info pane's version strip is absorbed:
-the settings that made that version become the ones on the panel, so "do that
+An enhancement level dragged in from the Generate pane's version strip is absorbed:
+the settings that made that version become the ones on the pane, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
 
 Each part the detail pass can redraw is a tick and a denoise to run it
@@ -125,11 +125,11 @@ _FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 16
 _NUMBER_FIELD_CHROME = 50
 # Disabling a widget is not the same as it looking disabled: the app's sheet
 # colors every label, dropdown and spinner outright and names no disabled state,
-# so a panel switched off went on reading exactly as live as before. These mute
-# this panel's own fields — set on the panel, so nothing outside it is touched.
+# so a pane switched off went on reading exactly as live as before. These mute
+# this pane's own fields — set on the pane, so nothing outside it is touched.
 # (The auto switch is the exception: it paints itself, and dims itself.)
 _FIX_FIELD_CSS = f"""
-    #enhancePanel QDoubleSpinBox#fixField {{
+    #enhancePane QDoubleSpinBox#fixField {{
         /* The app sheet holds 18px on the right of every spinner for the step
            buttons. These have none, and seven fields' worth of held-back space
            is the difference between one line of parts and two. */
@@ -137,15 +137,15 @@ _FIX_FIELD_CSS = f"""
     }}
 """
 _DISABLED_CSS = f"""
-    #enhancePanel QLabel:disabled,
-    #enhancePanel QComboBox:disabled,
-    #enhancePanel QSpinBox:disabled,
-    #enhancePanel QDoubleSpinBox:disabled {{
+    #enhancePane QLabel:disabled,
+    #enhancePane QComboBox:disabled,
+    #enhancePane QSpinBox:disabled,
+    #enhancePane QDoubleSpinBox:disabled {{
         color: {TEXT_MUTED.name()};
     }}
-    #enhancePanel QComboBox:disabled,
-    #enhancePanel QSpinBox:disabled,
-    #enhancePanel QDoubleSpinBox:disabled {{
+    #enhancePane QComboBox:disabled,
+    #enhancePane QSpinBox:disabled,
+    #enhancePane QDoubleSpinBox:disabled {{
         background-color: {BG_PRIMARY.name()};
         border: 1px solid {BORDER_SUBTLE.name()};
     }}
@@ -153,12 +153,12 @@ _DISABLED_CSS = f"""
 
 
 _ENHANCE_BUTTON_CSS = f"""
-    #enhancePanel QPushButton#enhanceButton {{
+    #enhancePane QPushButton#enhanceButton {{
         color: {BG_PRIMARY.name()};
         border: 1px solid {YELLOW.name()};
         font-weight: bold;
-    }}{control_ground(palette.YELLOW, "#enhancePanel QPushButton#enhanceButton")}
-    #enhancePanel QPushButton#enhanceButton:disabled {{
+    }}{control_ground(palette.YELLOW, "#enhancePane QPushButton#enhanceButton")}
+    #enhancePane QPushButton#enhanceButton:disabled {{
         background-color: {BG_SECONDARY.name()};
         color: {TEXT_MUTED.name()};
         border: 1px solid {BORDER_SUBTLE.name()};
@@ -185,9 +185,9 @@ def _fill(widget, value) -> None:
 
 def _enhancer_param_defs() -> dict:
     """The standalone enhancer's own setting definitions, keyed by param — so this
-    panel's ranges, steps and option lists can't drift from the workflow's.
+    pane's ranges, steps and option lists can't drift from the workflow's.
 
-    Read once per panel: ``param_definitions`` scans the model directories, and
+    Read once per pane: ``param_definitions`` scans the model directories, and
     every field here would otherwise pay for that scan again.
     """
     return {
@@ -286,7 +286,7 @@ def _settings_dragged(mime, _source) -> tuple[dict] | None:
 
 
 class _SettingsScroll(QScrollArea):
-    """The settings, scrolling down once the panel is squeezed shorter than they
+    """The settings, scrolling down once the pane is squeezed shorter than they
     are, and sideways once it is squeezed narrower.
 
     Asks for their whole height at the width it has: Qt's own scroll area asks
@@ -315,12 +315,12 @@ class _SettingsScroll(QScrollArea):
             self.updateGeometry()
 
 
-class EnhancePanel(QWidget):
-    """The Enhance subpanel: an Auto checkbox over the settings an enhancement runs at.
+class EnhancePane(QWidget):
+    """The Enhance pane: an Auto checkbox over the settings an enhancement runs at.
 
     ``show_settings`` loads a stored configuration (or the defaults, before
     anything has been set); every edit calls back with the new
-    :class:`~origenerator.gallery.enhance.EnhanceSettings`. The panel holds no
+    :class:`~origenerator.gallery.enhance.EnhanceSettings`. The pane holds no
     state of its own beyond its fields — the gallery keeps the value and routes
     it where it's needed — so it stays a plain editor.
     """
@@ -340,14 +340,14 @@ class EnhancePanel(QWidget):
         self._loading = False  # suppress the write-back while filling the fields
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
-        self.setObjectName("enhancePanel")
+        self.setObjectName("enhancePane")
         self.setStyleSheet(_DISABLED_CSS + _FIX_FIELD_CSS + _ENHANCE_BUTTON_CSS)
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_SMALL)
         # The title row, with the auto switch at its far right — a bare switch,
-        # the way a panel's power is a switch on its corner rather than a line
+        # the way a pane's power is a switch on its corner rather than a line
         # of prose among its settings. What it does is in its tooltip; the
         # settings below are what it does it with.
         title_row = QHBoxLayout()
@@ -554,7 +554,7 @@ class EnhancePanel(QWidget):
 
     def _fix_toggled(self, name: str) -> None:
         """A part switched on or off: gray its name and number to match, and
-        report the settings the panel now reads as."""
+        report the settings the pane now reads as."""
         self._show_fix_on(name)
         self._emit()
 
@@ -571,7 +571,7 @@ class EnhancePanel(QWidget):
     def _fix_number(self) -> NoWheelDoubleSpinBox:
         """One part's denoise spinner, ranged from the enhancer's own ParamDef so a
         floor of zero — the value that means "leave this part alone" — stays the
-        workflow's answer rather than this panel's.
+        workflow's answer rather than this pane's.
 
         Sized to the digits it shows: Qt's own hint for a spinner is two and a
         half times ``0.00``, and seven of those hints is the difference between
@@ -626,9 +626,9 @@ class EnhancePanel(QWidget):
         self._preset_button.setToolTip(tip)
 
     def set_applicable(self, applicable: bool, reason: str = "") -> None:
-        """Switch the whole panel on or off, and look it.
+        """Switch the whole pane on or off, and look it.
 
-        Off, every field is disabled *and* muted, so the panel reads as what it
+        Off, every field is disabled *and* muted, so the pane reads as what it
         is where it can't apply — settings for an action that isn't on offer —
         rather than as live settings that quietly do nothing. Back on, each field
         returns to whatever it was in its own right: a part stays grayed if
@@ -692,7 +692,7 @@ class EnhancePanel(QWidget):
         return widget
 
     def show_settings(self, settings: EnhanceSettings) -> None:
-        """Fill the panel from one folder's stored settings, writing nothing back.
+        """Fill the pane from one folder's stored settings, writing nothing back.
 
         A part the settings don't name is a part left alone, so it reads zero —
         filling only what is named would leave the last folder's fixes standing
@@ -751,7 +751,7 @@ class EnhancePanel(QWidget):
             _fill(self._model, found.fixed(self._model.currentData()))
 
     def settings(self) -> EnhanceSettings:
-        """What the panel currently reads as."""
+        """What the pane currently reads as."""
         params = {}
         for key in ENHANCE_SETTING_KEYS:
             widget = self._widgets.get(key)

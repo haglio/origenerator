@@ -419,11 +419,11 @@ def test_opening_a_folder_lands_on_its_first_item(qtbot):
     assert view.listed_prompt_ids()[0] == "i1"
     assert view.selected_generation() == "i1"
     assert view.selected_prompt_ids() == ["i1"]   # the tile itself, highlighted
-    panel = view._info_tabs.current_config_panel()
-    assert panel.displayed_row()["prompt_id"] == "i1"
+    tab = view._generate_pane.current_generate_tab()
+    assert tab.displayed_row()["prompt_id"] == "i1"
     # Italic, so the next thing opened takes it over rather than piling up
     # a tab per folder walked through.
-    assert view._info_tabs._preview_panel is panel
+    assert view._generate_pane._preview_tab is tab
 
 
 def _first_leaf(view):
@@ -1253,7 +1253,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _click_tile(view, "i2")  # click the recent tile for the dog
-    # Its details fill the info pane, but the collection stays put — no navigation, so
+    # Its details fill the Generate pane, but the collection stays put — no navigation, so
     # every recent item is still listed.
     assert view.selected_generation() == "i2"
     assert view._gallery_pane.showing_latest()
@@ -1287,11 +1287,11 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _click_tile(view, "i2")  # a plain click borrows the italic tab
-    assert view._info_tabs._preview_panel is not None
+    assert view._generate_pane._preview_tab is not None
 
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
 
-    assert view._info_tabs._preview_panel is None
+    assert view._generate_pane._preview_tab is None
 
 
 def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
@@ -1850,29 +1850,29 @@ def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
     view = GalleryView(FakeDB([newer, older]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs.config_panels():
-        panel._preview.show_media = MagicMock()
+    for tab in view._generate_pane.generate_tabs():
+        tab._preview.show_media = MagicMock()
     _select_first_leaf(view)
 
     view._on_thumbnail_clicked("g2")
 
     name = f"{gallery.folder_id(gallery.settings_folder_key(newer))} 001"
     assert view._gallery_pane._thumb_widgets["g2"]._text_label.text() == name
-    assert view._info_tabs.tabText(view._info_tabs.currentIndex()) == name
+    assert view._generate_pane.tabText(view._generate_pane.currentIndex()) == name
 
 
 def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then(qtbot):
     row = _image("g1", "a cat", 50, 1)
     view = GalleryView(FakeDB([row]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
-    for panel in view._info_tabs.config_panels():
-        panel._preview.show_media = MagicMock()
-    view._info_tabs.load_selection(row, [row])
+    for tab in view._generate_pane.generate_tabs():
+        tab._preview.show_media = MagicMock()
+    view._generate_pane.load_selection(row, [row])
 
     view.refresh()
 
     name = f"{gallery.folder_id(gallery.settings_folder_key(row))} 000"
-    assert view._info_tabs.tabText(view._info_tabs.currentIndex()) == name
+    assert view._generate_pane.tabText(view._generate_pane.currentIndex()) == name
 
 
 def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):
@@ -1881,7 +1881,7 @@ def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current
     The pane can be showing something other than the row the tree has current —
     a search's hits, a collection — and setting a row Qt already holds current fires
     no signal to draw anything. The move draws it itself in that case rather than
-    trusting the signal, which is how a click came to fill the info pane while
+    trusting the signal, which is how a click came to fill the Generate pane while
     the middle pane under it stood still.
     """
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
@@ -1902,7 +1902,7 @@ def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
     """A generation that failed with no file has no row of its own in the tree —
     a terminal file-less row is dropped from it — so the move falls back to the
     row its settings key names. Opening no folder at all is what left the middle
-    pane where it was while the item filled the info pane beside it."""
+    pane where it was while the item filled the Generate pane beside it."""
     done = _image("i1", "a cat", 50, 1)
     failed = dict(done, prompt_id="x1", status="error", output_files="[]",
                   thumbnail_path=None)
@@ -1929,16 +1929,16 @@ def test_following_a_link_lands_in_one_tab(qtbot):
     view = GalleryView(FakeDB([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs.config_panels():
-        panel._preview.show_media = MagicMock()  # don't start WMF playback
+    for tab in view._generate_pane.generate_tabs():
+        tab._preview.show_media = MagicMock()  # don't start WMF playback
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     _click_tile(view, "vid1")
-    tabs = view._info_tabs.count()
+    tabs = view._generate_pane.count()
 
     view.follow_link("img1")
 
-    assert view._info_tabs.count() == tabs
-    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == "img1"
+    assert view._generate_pane.count() == tabs
+    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "img1"
 
 
 def test_back_and_forward_walk_the_viewed_generations(qtbot):
@@ -2275,7 +2275,7 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
 
 def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
     # Landing means landing: the item previewed and its tile lit, so which of the
-    # collection's items Back returned to is visible in the pane and not just the panel.
+    # collection's items Back returned to is visible in the pane and not just the tab.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2564,7 +2564,7 @@ def test_select_generation_missing_id_is_dropped(qtbot):
     assert view.selected_generation() != "ghost"
 
 
-# --- the Enhance subpanel: the app's enhancement settings -------------------
+# --- the Enhance pane: the app's enhancement settings -------------------
 
 
 def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot, tmp_path):
@@ -2575,7 +2575,7 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
     for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
         QApplication.processEvents()
 
-    for inside in (view._tree, view._scroll, view._osr2_controls, view._enhance.panel):
+    for inside in (view._tree, view._scroll, view._osr2_controls, view._enhance.pane):
         pane = _pane_holding(inside)
         room = pane.rect().marginsRemoved(QMargins(*[MARGIN_STANDARD] * 4))
         for child in pane.findChildren(
@@ -2606,7 +2606,7 @@ def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, t
     assert isinstance(divider, QSplitter)
     assert divider.orientation() == Qt.Orientation.Vertical
     assert divider.widget(0).isAncestorOf(view._scroll)
-    assert divider.widget(1).isAncestorOf(view._enhance.panel)
+    assert divider.widget(1).isAncestorOf(view._enhance.pane)
     assert divider.handleWidth() == view._arrangement.panes.handleWidth()
 
 
@@ -2618,7 +2618,7 @@ def test_with_room_to_spare_the_enhance_settings_under_the_thumbnails_open_whole
     view.show()
     for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
         QApplication.processEvents()
-    (settings,) = view._enhance.panel.findChildren(QScrollArea)
+    (settings,) = view._enhance.pane.findChildren(QScrollArea)
 
     assert settings.verticalScrollBar().maximum() == 0
 
@@ -2644,7 +2644,7 @@ def test_the_enhance_settings_take_the_whole_foot_under_the_thumbnails(qtbot, tm
     qtbot.addWidget(view)
     divider = _pane_holding(view._scroll).parentWidget()
 
-    assert divider.widget(1) is _pane_holding(view._enhance.panel)
+    assert divider.widget(1) is _pane_holding(view._enhance.pane)
 
 
 def test_squeezed_smaller_than_the_hud_its_pane_scrolls_rather_than_spilling(qtbot,

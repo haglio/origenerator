@@ -18,10 +18,10 @@ _SEED_MAX = (1 << 63) - 1
 
 @dataclass
 class ConfigSnapshot:
-    """A generate panel's live settings, captured for comparison.
+    """A Generate tab's live settings, captured for comparison.
 
     ``seed_is_random`` records whether the seed's "Random" checkbox is checked (in
-    which case the panel can never match a concrete past generation), so a
+    which case the tab can never match a concrete past generation), so a
     reopened tab comes back the way it was left.
     """
 
@@ -202,9 +202,9 @@ def filled_params(row: dict, workflow) -> dict:
     The enhance layer is taken from the workflow's defaults rather than the row,
     so a new run never inherits an enhancement from the one it varies. Every
     other param is part of the settings, and a variation reproduces them; enhancement is not
-    — it is what the gallery's Enhance subpanel applies, deliberately and
+    — it is what the gallery's Enhance pane applies, deliberately and
     app-wide. Inheriting it silently is what made a re-roll come out enhanced
-    with the subpanel's checkbox unchecked.
+    with the Enhance pane's checkbox unchecked.
     """
     defaults = workflow.default_params()
     params = merge_denormalized(row)

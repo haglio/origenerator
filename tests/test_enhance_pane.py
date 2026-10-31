@@ -1,6 +1,6 @@
-"""The Enhance subpanel and the version list beside it.
+"""The Enhance pane and the version list beside it.
 
-Two small widgets for the two halves of "enhancement is a layer": the subpanel
+Two small widgets for the two halves of "enhancement is a layer": the Enhance pane
 edits what a folder enhances at, and the version list shows what an image has
 already received.
 """
@@ -38,7 +38,7 @@ from shared_ui.icons import CANVAS
 from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.toggle_switch import ToggleSwitch
 
-import origenerator.gui.enhance_panel as enhance_panel_module
+import origenerator.gui.enhance_pane as enhance_pane_module
 import origenerator.gui.training_controls as training_controls_module
 import origenerator.workflows.detail_parts as parts
 from origenerator import config, fix_training
@@ -57,7 +57,7 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
-from origenerator.gui.enhance_panel import EnhancePanel
+from origenerator.gui.enhance_pane import EnhancePane
 from origenerator.gui.enhance_versions import (
     EnhanceOffer,
     EnhanceVersions,
@@ -79,16 +79,16 @@ _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
 
 def _panel(qtbot, detectors=_FOUND_DETECTORS):
-    """A panel built against a stated set of installed detectors — the one thing
+    """A pane built against a stated set of installed detectors — the one thing
     on it that can be missing, and so the one thing a test must not read off
     whatever this machine happens to have in its ComfyUI."""
     edits = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parts, "list_detector_files", lambda: list(detectors))
         mp.setattr(parts, "list_outline_detector_files", list)
-        panel = EnhancePanel(edits.append)
-    qtbot.addWidget(panel)
-    return panel, edits
+        pane = EnhancePane(edits.append)
+    qtbot.addWidget(pane)
+    return pane, edits
 
 
 def _levels(count, params=None):
@@ -111,29 +111,29 @@ def _items(levels):
     return [(level, None) for level in levels]
 
 
-# --- the subpanel ----------------------------------------------------------
+# --- the Enhance pane ----------------------------------------------------------
 
 
 def test_a_fresh_panel_reads_as_the_workflow_defaults_tick_off(qtbot):
-    panel, _ = _panel(qtbot)
-    settings = panel.settings()
+    pane, _ = _panel(qtbot)
+    settings = pane.settings()
     assert settings.auto is False
     assert settings.params["enhance_scale"] == default_enhance_params()["enhance_scale"]
     assert settings.params["checkpoint"] == MATCH_SOURCE_MODEL
 
 
 def test_auto_enhance_is_a_bare_switch_at_the_top_right(qtbot):
-    # The panel's power, not one of its settings: a bare switch on the title row,
+    # The pane's power, not one of its settings: a bare switch on the title row,
     # at the far end from the heading. What it does lives in its tooltip.
-    panel, _ = _panel(qtbot)
-    assert isinstance(panel._auto, ToggleSwitch)
-    assert panel._auto.isCheckable()
-    assert panel._auto.text() == ""
-    assert panel._auto.toolTip()
+    pane, _ = _panel(qtbot)
+    assert isinstance(pane._auto, ToggleSwitch)
+    assert pane._auto.isCheckable()
+    assert pane._auto.text() == ""
+    assert pane._auto.toolTip()
 
-    title_row = panel.layout().itemAt(0).layout()
+    title_row = pane.layout().itemAt(0).layout()
     assert title_row.itemAt(0).widget().text() == "Enhance"      # the heading leads
-    assert title_row.itemAt(title_row.count() - 1).widget() is panel._auto
+    assert title_row.itemAt(title_row.count() - 1).widget() is pane._auto
     assert title_row.itemAt(1).spacerItem() is not None          # pushed to the right
 
 
@@ -164,21 +164,21 @@ def test_the_switch_draws_at_both_states(qtbot):
 
 
 def test_loading_a_folders_settings_writes_nothing_back(qtbot):
-    # Opening a folder fills the panel; that is not an edit, and must not
+    # Opening a folder fills the pane; that is not an edit, and must not
     # re-persist (which would stamp defaults over settings it failed to load).
-    panel, edits = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(auto=True, params={"enhance_steps": 40}))
+    pane, edits = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(auto=True, params={"enhance_steps": 40}))
     assert edits == []
-    assert panel.settings().auto is True
-    assert panel.settings().params["enhance_steps"] == 40
+    assert pane.settings().auto is True
+    assert pane.settings().params["enhance_steps"] == 40
 
 
 def test_every_setting_reports_its_edit(qtbot):
-    panel, edits = _panel(qtbot)
-    panel._auto.setChecked(True)
-    panel._scale.setValue(3.0)
-    panel._steps.setValue(35)
-    panel._denoise.setValue(0.4)
+    pane, edits = _panel(qtbot)
+    pane._auto.setChecked(True)
+    pane._scale.setValue(3.0)
+    pane._steps.setValue(35)
+    pane._denoise.setValue(0.4)
 
     assert len(edits) == 4          # each edit writes through on its own
     latest = edits[-1]
@@ -192,21 +192,21 @@ def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
     # One of each per part the app can aim a detail pass at: the tick says
     # whether that part is fixed, the number how hard — a mouth wants a harder
     # redraw than a face, and one shared number could never say so.
-    panel, edits = _panel(qtbot)
-    assert list(panel._fixes) == [part.name for part in part_table()]
+    pane, edits = _panel(qtbot)
+    assert list(pane._fixes) == [part.name for part in part_table()]
     # Nothing checked, so nothing pays for a pass it didn't ask for — while the
     # numbers already read as what a fix runs at.
-    assert panel.settings().params["enhance_detail_fixes"] == {}
-    assert panel._fixes["faces"].value() == DEFAULT_FIX_DENOISE
+    assert pane.settings().params["enhance_detail_fixes"] == {}
+    assert pane._fixes["faces"].value() == DEFAULT_FIX_DENOISE
 
-    panel._fix_checks["faces"].setChecked(True)
-    panel._fix_checks["hands"].setChecked(True)
-    panel._fixes["hands"].setValue(0.6)
+    pane._fix_checks["faces"].setChecked(True)
+    pane._fix_checks["hands"].setChecked(True)
+    pane._fixes["hands"].setValue(0.6)
 
     assert edits[-1].params["enhance_detail_fixes"] == {
         "faces": DEFAULT_FIX_DENOISE, "hands": 0.6}
-    assert panel._fixes["faces"].toolTip()
-    assert panel._fix_checks["faces"].toolTip()
+    assert pane._fixes["faces"].toolTip()
+    assert pane._fix_checks["faces"].toolTip()
 
 
 def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
@@ -214,8 +214,8 @@ def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
     # hint for a spinner is far wider than "0.00", and a field given a floor
     # and a share of the slack (as the three numbers above have) costs another
     # part its place on the line.
-    panel, _ = _panel(qtbot)
-    spinner = panel._fixes["faces"]
+    pane, _ = _panel(qtbot)
+    spinner = pane._fixes["faces"]
     digits = spinner.fontMetrics().horizontalAdvance("0.00")
 
     assert digits < spinner.minimumWidth() <= digits + 30   # its own chrome, no more
@@ -227,8 +227,8 @@ def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
     # The window tiles into a third of a monitor, so no row of fields may set
     # the floor for it — and a line too long to fit has to wrap, since a
     # clipped part is a setting that silently isn't there.
-    panel, _ = _panel(qtbot)
-    host = panel._fixes["faces"].parent().parent()
+    pane, _ = _panel(qtbot)
+    host = pane._fixes["faces"].parent().parent()
     flow = host.layout()
     pairs = [flow.itemAt(i).widget() for i in range(flow.count())]
 
@@ -239,40 +239,40 @@ def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
         pair.sizeHint().width() for pair in pairs) + 8
 
 
-def _laid_out_at(panel, width, height=900):
-    panel.show()
-    panel.resize(width, height)
+def _laid_out_at(pane, width, height=900):
+    pane.show()
+    pane.resize(width, height)
     for _ in range(3):  # each reflow posts the layout pass that follows it
         QApplication.processEvents()
 
 
-def _numbers(panel):
-    return (panel._scale, panel._steps, panel._denoise)
+def _numbers(pane):
+    return (pane._scale, pane._steps, pane._denoise)
 
 
 def test_the_numbers_share_a_line_while_they_fit_and_take_a_line_each_when_not(qtbot):
-    panel, _ = _panel(qtbot)
-    (fixes_heading,) = [label for label in panel.findChildren(QLabel)
+    pane, _ = _panel(qtbot)
+    (fixes_heading,) = [label for label in pane.findChildren(QLabel)
                         if label.text() == "Fixes"]
 
     def top(widget):
-        return widget.mapTo(panel, QPoint(0, 0)).y()
+        return widget.mapTo(pane, QPoint(0, 0)).y()
 
-    _laid_out_at(panel, 2000)
-    assert len({top(field) for field in _numbers(panel)}) == 1
+    _laid_out_at(pane, 2000)
+    assert len({top(field) for field in _numbers(pane)}) == 1
 
-    _laid_out_at(panel, panel.minimumSizeHint().width())
-    rows = [top(field) for field in _numbers(panel)]
+    _laid_out_at(pane, pane.minimumSizeHint().width())
+    rows = [top(field) for field in _numbers(pane)]
     assert rows == sorted(set(rows))
     assert len(rows) == 3
-    assert top(fixes_heading) >= rows[-1] + panel._denoise.height()
+    assert top(fixes_heading) >= rows[-1] + pane._denoise.height()
 
 
 def test_squeezed_shorter_than_its_settings_the_panel_scrolls_down_to_them(qtbot):
-    panel, _ = _panel(qtbot)
-    _laid_out_at(panel, 600, panel.minimumSizeHint().height())
-    (scroll,) = panel.findChildren(QScrollArea)
-    last_part = list(panel._fixes.values())[-1]
+    pane, _ = _panel(qtbot)
+    _laid_out_at(pane, 600, pane.minimumSizeHint().height())
+    (scroll,) = pane.findChildren(QScrollArea)
+    last_part = list(pane._fixes.values())[-1]
 
     assert scroll.verticalScrollBar().maximum() > 0
     scroll.ensureWidgetVisible(last_part)
@@ -281,32 +281,32 @@ def test_squeezed_shorter_than_its_settings_the_panel_scrolls_down_to_them(qtbot
 
 
 def test_squeezed_narrower_than_its_settings_the_panel_scrolls_sideways_to_them(qtbot):
-    panel, _ = _panel(qtbot)
-    (scroll,) = panel.findChildren(QScrollArea)
-    _laid_out_at(panel, 2000)
+    pane, _ = _panel(qtbot)
+    (scroll,) = pane.findChildren(QScrollArea)
+    _laid_out_at(pane, 2000)
     narrowest_settings = scroll.widget().minimumSizeHint().width()
 
-    _laid_out_at(panel, narrowest_settings // 2)
+    _laid_out_at(pane, narrowest_settings // 2)
 
-    assert panel.width() < narrowest_settings
+    assert pane.width() < narrowest_settings
     assert scroll.horizontalScrollBar().maximum() > 0
 
 
 def test_given_the_height_it_asks_for_the_panel_shows_its_settings_unscrolled(qtbot):
-    panel, _ = _panel(qtbot)
-    (scroll,) = panel.findChildren(QScrollArea)
-    for width in (2000, 700, panel.minimumSizeHint().width()):
-        _laid_out_at(panel, width)
-        _laid_out_at(panel, width, panel.sizeHint().height())
+    pane, _ = _panel(qtbot)
+    (scroll,) = pane.findChildren(QScrollArea)
+    for width in (2000, 700, pane.minimumSizeHint().width()):
+        _laid_out_at(pane, width)
+        _laid_out_at(pane, width, pane.sizeHint().height())
         assert scroll.verticalScrollBar().maximum() == 0, width
 
 
 def test_the_enhance_button_asks_for_an_enhance_from_outside_the_scroll(qtbot):
-    panel, _ = _panel(qtbot)
-    (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
-    (scroll,) = panel.findChildren(QScrollArea)
+    pane, _ = _panel(qtbot)
+    (button,) = [b for b in pane.findChildren(QPushButton) if b.text() == "Enhance"]
+    (scroll,) = pane.findChildren(QScrollArea)
     asked = []
-    panel.enhance_requested.connect(lambda: asked.append(True))
+    pane.enhance_requested.connect(lambda: asked.append(True))
 
     qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
 
@@ -315,41 +315,41 @@ def test_the_enhance_button_asks_for_an_enhance_from_outside_the_scroll(qtbot):
 
 
 def test_the_enhance_button_is_yellow_with_dark_words_until_it_goes_dark(qtbot):
-    panel, _ = _panel(qtbot)
-    panel.show()
+    pane, _ = _panel(qtbot)
+    pane.show()
     QApplication.processEvents()
-    (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
+    (button,) = [b for b in pane.findChildren(QPushButton) if b.text() == "Enhance"]
     image = button.grab().toImage()
 
     assert _share_painted(image, YELLOW) > 0.5
     assert not any(min(image.pixelColor(x, y).getRgb()[:3]) > 200
                    for y in range(image.height()) for x in range(image.width()))
 
-    panel.show_offer(False, "Nothing here to enhance")
+    pane.show_offer(False, "Nothing here to enhance")
     assert _share_painted(button.grab().toImage(), YELLOW) == 0
 
 
 def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_do(qtbot):
-    panel, _ = _panel(qtbot)
-    (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
+    pane, _ = _panel(qtbot)
+    (button,) = [b for b in pane.findChildren(QPushButton) if b.text() == "Enhance"]
 
-    panel.show_offer(True, "Enhance 2 items")
+    pane.show_offer(True, "Enhance 2 items")
     assert button.isEnabled()
     assert button.toolTip() == "Enhance 2 items"
 
-    panel.show_offer(False, "Nothing here to enhance")
+    pane.show_offer(False, "Nothing here to enhance")
     assert not button.isEnabled()
     assert button.toolTip() == "Nothing here to enhance"
 
 
 def test_the_presets_and_save_sit_left_of_the_enhance_button_on_its_line(qtbot):
-    panel, _ = _panel(qtbot)
-    line = (panel._preset_dropdown, panel._preset_button, panel._enhance_button)
+    pane, _ = _panel(qtbot)
+    line = (pane._preset_dropdown, pane._preset_button, pane._enhance_button)
 
-    for width in (2000, panel.minimumSizeHint().width()):
-        _laid_out_at(panel, width)
-        lefts = [widget.mapTo(panel, QPoint(0, 0)).x() for widget in line]
-        middles = {widget.mapTo(panel, QPoint(0, widget.height() // 2)).y() for widget in line}
+    for width in (2000, pane.minimumSizeHint().width()):
+        _laid_out_at(pane, width)
+        lefts = [widget.mapTo(pane, QPoint(0, 0)).x() for widget in line]
+        middles = {widget.mapTo(pane, QPoint(0, widget.height() // 2)).y() for widget in line}
         assert lefts == sorted(lefts), width
         assert len(middles) == 1, width
 
@@ -365,61 +365,61 @@ def _listed(dropdown):
 
 def test_the_dropdown_lists_the_presets_and_reads_custom_while_the_settings_are_none_of_them(
         qtbot):
-    panel, _ = _panel(qtbot)
+    pane, _ = _panel(qtbot)
 
-    panel.show_presets(_presets())
+    pane.show_presets(_presets())
 
-    assert _listed(panel._preset_dropdown) == ["Crisp", "Soft"]
-    assert panel._preset_dropdown.currentIndex() == -1
-    assert panel._preset_dropdown.placeholderText() == "(custom)"
-    assert panel._preset_button.text() == "Save…"
+    assert _listed(pane._preset_dropdown) == ["Crisp", "Soft"]
+    assert pane._preset_dropdown.currentIndex() == -1
+    assert pane._preset_dropdown.placeholderText() == "(custom)"
+    assert pane._preset_button.text() == "Save…"
 
 
 def test_the_presets_and_their_button_say_what_each_does(qtbot):
-    panel, _ = _panel(qtbot)
-    panel.show_presets(_presets())
-    assert panel._preset_dropdown.toolTip() == "Pick a preset to use its settings"
-    assert panel._preset_button.toolTip() == "Save these settings as a preset"
+    pane, _ = _panel(qtbot)
+    pane.show_presets(_presets())
+    assert pane._preset_dropdown.toolTip() == "Pick a preset to use its settings"
+    assert pane._preset_button.toolTip() == "Save these settings as a preset"
 
-    panel._steps.setValue(30)
+    pane._steps.setValue(30)
 
-    assert panel._preset_button.toolTip() == "Rename this preset"
+    assert pane._preset_button.toolTip() == "Rename this preset"
 
 
 def test_the_open_list_shows_each_preset_s_whole_name_however_narrow_the_box(qtbot):
-    panel, _ = _panel(qtbot)
+    pane, _ = _panel(qtbot)
     long_name = "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6 · driftwood_v1.safetensors"
 
-    panel.show_presets([Preset(long_name, default_enhance_params())])
+    pane.show_presets([Preset(long_name, default_enhance_params())])
 
-    dropdown = panel._preset_dropdown
+    dropdown = pane._preset_dropdown
     assert dropdown.view().minimumWidth() > dropdown.fontMetrics().horizontalAdvance(long_name)
 
 
 def test_the_dropdown_shows_the_preset_the_settings_are_and_the_button_offers_to_rename_it(
         qtbot):
-    panel, _ = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 30}))
+    pane, _ = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 30}))
 
-    panel.show_presets(_presets())
+    pane.show_presets(_presets())
 
-    assert panel._preset_dropdown.currentText() == "Soft"
-    assert panel._preset_button.text() == "Rename…"
+    assert pane._preset_dropdown.currentText() == "Soft"
+    assert pane._preset_button.text() == "Rename…"
 
 
 def test_settings_turned_or_loaded_onto_a_preset_show_it_and_off_one_read_custom_again(qtbot):
-    panel, _ = _panel(qtbot)
-    panel.show_presets(_presets())
+    pane, _ = _panel(qtbot)
+    pane.show_presets(_presets())
 
-    panel._steps.setValue(30)
-    assert panel._preset_dropdown.currentText() == "Soft"
+    pane._steps.setValue(30)
+    assert pane._preset_dropdown.currentText() == "Soft"
 
-    panel._steps.setValue(31)
-    assert panel._preset_dropdown.currentIndex() == -1
-    assert panel._preset_button.text() == "Save…"
+    pane._steps.setValue(31)
+    assert pane._preset_dropdown.currentIndex() == -1
+    assert pane._preset_button.text() == "Save…"
 
-    panel.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 40}))
-    assert panel._preset_dropdown.currentText() == "Crisp"
+    pane.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 40}))
+    assert pane._preset_dropdown.currentText() == "Crisp"
 
 
 def _pick(dropdown, index):
@@ -430,17 +430,17 @@ def _pick(dropdown, index):
 
 
 def test_picking_a_preset_puts_its_settings_on_the_panel_and_leaves_the_switch_alone(qtbot):
-    panel, edits = _panel(qtbot)
-    panel._auto.setChecked(True)
-    panel.show_presets(_presets())
+    pane, edits = _panel(qtbot)
+    pane._auto.setChecked(True)
+    pane.show_presets(_presets())
 
-    _pick(panel._preset_dropdown, 1)
+    _pick(pane._preset_dropdown, 1)
 
-    assert panel._steps.value() == 30
+    assert pane._steps.value() == 30
     assert edits[-1].params["enhance_steps"] == 30
     assert edits[-1].auto is True
-    assert panel._preset_dropdown.currentText() == "Soft"
-    assert panel._preset_button.text() == "Rename…"
+    assert pane._preset_dropdown.currentText() == "Soft"
+    assert pane._preset_button.text() == "Rename…"
 
 
 def _answering_the_name_box(monkeypatch, name, ok=True):
@@ -450,32 +450,32 @@ def _answering_the_name_box(monkeypatch, name, ok=True):
         asked.append((title, label, kwargs.get("text", "")))
         return name, ok
 
-    monkeypatch.setattr(enhance_panel_module.QInputDialog, "getText", staticmethod(answer))
+    monkeypatch.setattr(enhance_pane_module.QInputDialog, "getText", staticmethod(answer))
     return asked
 
 
 def test_save_asks_for_a_name_and_saves_the_settings_on_the_panel_under_it(qtbot, monkeypatch):
-    panel, _ = _panel(qtbot)
-    panel.show_presets(_presets())
+    pane, _ = _panel(qtbot)
+    pane.show_presets(_presets())
     asked = _answering_the_name_box(monkeypatch, "  Bright  ")
     saved = []
-    panel.preset_saved.connect(saved.append)
+    pane.preset_saved.connect(saved.append)
 
-    qtbot.mouseClick(panel._preset_button, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(pane._preset_button, Qt.MouseButton.LeftButton)
 
     assert asked == [("Save Preset", "Preset name:", "")]
     assert saved == ["Bright"]
 
 
 def test_rename_asks_with_the_presets_own_name_and_renames_that_preset(qtbot, monkeypatch):
-    panel, _ = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 30}))
-    panel.show_presets(_presets())
+    pane, _ = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 30}))
+    pane.show_presets(_presets())
     asked = _answering_the_name_box(monkeypatch, "Gentle")
     renamed = []
-    panel.preset_renamed.connect(lambda index, name: renamed.append((index, name)))
+    pane.preset_renamed.connect(lambda index, name: renamed.append((index, name)))
 
-    qtbot.mouseClick(panel._preset_button, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(pane._preset_button, Qt.MouseButton.LeftButton)
 
     assert asked == [("Rename Preset", "Preset name:", "Soft")]
     assert renamed == [(1, "Gentle")]
@@ -483,35 +483,35 @@ def test_rename_asks_with_the_presets_own_name_and_renames_that_preset(qtbot, mo
 
 @pytest.mark.parametrize(("name", "ok"), [("   ", True), ("Bright", False)])
 def test_a_blank_name_or_a_cancel_names_nothing(qtbot, monkeypatch, name, ok):
-    panel, _ = _panel(qtbot)
-    panel.show_presets(_presets())
+    pane, _ = _panel(qtbot)
+    pane.show_presets(_presets())
     _answering_the_name_box(monkeypatch, name, ok)
     named = []
-    panel.preset_saved.connect(named.append)
+    pane.preset_saved.connect(named.append)
 
-    qtbot.mouseClick(panel._preset_button, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(pane._preset_button, Qt.MouseButton.LeftButton)
 
     assert named == []
 
 
 def test_the_fields_line_up_down_the_panel_either_way_the_numbers_lie(qtbot):
-    panel, _ = _panel(qtbot)
+    pane, _ = _panel(qtbot)
 
     def left(widget):
-        return widget.mapTo(panel, QPoint(0, 0)).x()
+        return widget.mapTo(pane, QPoint(0, 0)).x()
 
-    for width in (2000, panel.minimumSizeHint().width()):
-        _laid_out_at(panel, width)
-        assert left(panel._model) == left(panel._upscaler) == left(panel._scale), width
-    assert len({left(field) for field in _numbers(panel)}) == 1
+    for width in (2000, pane.minimumSizeHint().width()):
+        _laid_out_at(pane, width)
+        assert left(pane._model) == left(pane._upscaler) == left(pane._scale), width
+    assert len({left(field) for field in _numbers(pane)}) == 1
 
 
 def test_a_number_is_never_squeezed_narrower_than_its_widest_value(qtbot):
-    panel, _ = _panel(qtbot)
-    panel.setStyleSheet(build_stylesheet() + panel.styleSheet())  # the app's own chrome
-    for width in range(panel.minimumSizeHint().width(), 1201, 20):
-        _laid_out_at(panel, width)
-        for field in _numbers(panel):
+    pane, _ = _panel(qtbot)
+    pane.setStyleSheet(build_stylesheet() + pane.styleSheet())  # the app's own chrome
+    for width in range(pane.minimumSizeHint().width(), 1201, 20):
+        _laid_out_at(pane, width)
+        for field in _numbers(pane):
             widest = max(field.textFromValue(field.minimum()),
                          field.textFromValue(field.maximum()), key=len)
             digits = field.fontMetrics().horizontalAdvance(widest)
@@ -522,31 +522,31 @@ def test_a_number_is_never_squeezed_narrower_than_its_widest_value(qtbot):
 def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
     # The tick is the on/off, so unticking must leave the settings — and leave
     # the number where it was, since the next tick means the same fix again.
-    panel, edits = _panel(qtbot)
-    panel._fix_checks["faces"].setChecked(True)
-    panel._fixes["faces"].setValue(0.7)
+    pane, edits = _panel(qtbot)
+    pane._fix_checks["faces"].setChecked(True)
+    pane._fixes["faces"].setValue(0.7)
 
-    panel._fix_checks["faces"].setChecked(False)
+    pane._fix_checks["faces"].setChecked(False)
 
     assert edits[-1].params["enhance_detail_fixes"] == {}
-    assert panel._fixes["faces"].value() == 0.7
+    assert pane._fixes["faces"].value() == 0.7
     # And off, the part reads as off rather than as a live setting.
-    assert not panel._fixes["faces"].isEnabled()
+    assert not pane._fixes["faces"].isEnabled()
 
 
 def test_an_unticked_parts_name_and_number_gray_out(qtbot):
     # Which parts are on has to be readable down the line at a glance, not
     # worked out checkbox by checkbox.
-    panel, _ = _panel(qtbot)
-    label = panel._label_for(panel._fixes["faces"])
+    pane, _ = _panel(qtbot)
+    label = pane._label_for(pane._fixes["faces"])
 
     assert not label.isEnabled()
-    assert not panel._fixes["faces"].isEnabled()
+    assert not pane._fixes["faces"].isEnabled()
 
-    panel._fix_checks["faces"].setChecked(True)
+    pane._fix_checks["faces"].setChecked(True)
 
     assert label.isEnabled()
-    assert panel._fixes["faces"].isEnabled()
+    assert pane._fixes["faces"].isEnabled()
 
 
 def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
@@ -554,25 +554,25 @@ def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
     # model that finds a part is a separate install, and a run naming one
     # ComfyUI hasn't got is rejected on submit. Better a tick that says why than
     # one that quietly fails.
-    panel, _ = _panel(qtbot, detectors=("face_finder.pt",))
-    assert panel._fix_checks["faces"].isEnabled()
-    assert not panel._fix_checks["hands"].isEnabled()
+    pane, _ = _panel(qtbot, detectors=("face_finder.pt",))
+    assert pane._fix_checks["faces"].isEnabled()
+    assert not pane._fix_checks["hands"].isEnabled()
     # The whole setup, in the one place someone reads carefully: the node pack
     # that runs the detectors, the folder the models go in, and what the file
     # this part needs is called.
-    tooltip = panel._fix_checks["hands"].toolTip()
+    tooltip = pane._fix_checks["hands"].toolTip()
     assert "models/ultralytics/bbox" in tooltip
-    assert "models/ultralytics/segm" in panel._fix_checks["skin"].toolTip()
+    assert "models/ultralytics/segm" in pane._fix_checks["skin"].toolTip()
     assert "Impact Subpack" in tooltip
     assert "hand" in tooltip
-    assert panel._label_for(panel._fixes["hands"]).toolTip() == tooltip
+    assert pane._label_for(pane._fixes["hands"]).toolTip() == tooltip
 
 
 def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
     # Some other detector sitting in that folder would leave every part tickable
     # and every pass finding nothing. Unavailable says which file to add.
-    panel, _ = _panel(qtbot, detectors=("cat_finder.pt",))
-    assert not any(checkbox.isEnabled() for checkbox in panel._fix_checks.values())
+    pane, _ = _panel(qtbot, detectors=("cat_finder.pt",))
+    assert not any(checkbox.isEnabled() for checkbox in pane._fix_checks.values())
 
 
 def _mean_ink(widget) -> float:
@@ -598,62 +598,62 @@ def _mean_ink(widget) -> float:
 
 def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
     # setEnabled alone changed nothing here: the app's sheet colors every label,
-    # dropdown and spinner outright and names no disabled state, so a panel that
+    # dropdown and spinner outright and names no disabled state, so a pane that
     # could not apply went on reading exactly as live as one that could.
-    panel, _ = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(auto=True, params={}))
-    panel.resize(360, 150)
-    with qtbot.waitExposed(panel):
-        panel.show()
-    live = _mean_ink(panel)
+    pane, _ = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(auto=True, params={}))
+    pane.resize(360, 150)
+    with qtbot.waitExposed(pane):
+        pane.show()
+    live = _mean_ink(pane)
 
-    panel.set_applicable(False, "no video enhancer")
+    pane.set_applicable(False, "no video enhancer")
 
-    assert not panel.isEnabled()
-    assert panel.toolTip() == "no video enhancer"
-    assert _mean_ink(panel) < live      # visibly dimmer, not merely inert
+    assert not pane.isEnabled()
+    assert pane.toolTip() == "no video enhancer"
+    assert _mean_ink(pane) < live      # visibly dimmer, not merely inert
 
-    panel.set_applicable(True)
-    assert panel.isEnabled()
-    assert panel.toolTip() == ""
+    pane.set_applicable(True)
+    assert pane.isEnabled()
+    assert pane.toolTip() == ""
 
 
 def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
-    # Switching the panel off and on again must not hand back a setting that was
+    # Switching the pane off and on again must not hand back a setting that was
     # grayed in its own right: the part still has no model to find it.
-    panel, _ = _panel(qtbot, detectors=())
-    panel.set_applicable(False, "nope")
-    panel.set_applicable(True)
-    assert panel.isEnabled()
-    assert not panel._fix_checks["faces"].isEnabled()
+    pane, _ = _panel(qtbot, detectors=())
+    pane.set_applicable(False, "nope")
+    pane.set_applicable(True)
+    assert pane.isEnabled()
+    assert not pane._fix_checks["faces"].isEnabled()
 
 
 def test_a_model_no_longer_installed_is_still_shown(qtbot):
     # A folder configured against a checkpoint since removed must come back
     # reading as that checkpoint, not silently snap to whatever sorts first.
-    panel, _ = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(params={"checkpoint": "retired_v1.safetensors"}))
-    assert panel.settings().params["checkpoint"] == "retired_v1.safetensors"
+    pane, _ = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(params={"checkpoint": "retired_v1.safetensors"}))
+    assert pane.settings().params["checkpoint"] == "retired_v1.safetensors"
 
 
-def test_the_model_picker_shows_a_files_title_and_keeps_its_name(qtbot, titled_models):
+def test_the_model_dropdown_shows_a_files_title_and_keeps_its_name(qtbot, titled_models):
     titled_models({"example_model": "Example Model v2"})
-    panel, _ = _panel(qtbot)
+    pane, _ = _panel(qtbot)
 
-    panel.show_settings(EnhanceSettings(params={"checkpoint": "example_model.safetensors"}))
+    pane.show_settings(EnhanceSettings(params={"checkpoint": "example_model.safetensors"}))
 
-    assert panel._model.currentText() == "Example Model v2"
-    assert panel.settings().params["checkpoint"] == "example_model.safetensors"
+    assert pane._model.currentText() == "Example Model v2"
+    assert pane.settings().params["checkpoint"] == "example_model.safetensors"
 
 
 def test_settings_survive_a_load_and_read_back(qtbot):
-    panel, _ = _panel(qtbot)
+    pane, _ = _panel(qtbot)
     original = EnhanceSettings(auto=True, params=dict(default_enhance_params(),
                                                       enhance_scale=2.5,
                                                       enhance_steps=31,
                                                       enhance_denoise=0.22))
-    panel.show_settings(original)
-    assert panel.settings() == original
+    pane.show_settings(original)
+    assert pane.settings() == original
 
 
 # --- the version list ------------------------------------------------------
@@ -1373,7 +1373,7 @@ def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):
     assert trash.toolTip() == "Delete this version"
 
 
-# --- dragging a level onto the panel to reuse its settings -----------------
+# --- dragging a level onto the pane to reuse its settings -----------------
 
 
 # --- the "+ Enhance" row ----------------------------------------------------
@@ -1648,29 +1648,29 @@ def _held(mime) -> tuple:
             Qt.KeyboardModifier.NoModifier)
 
 
-def _brought_over(panel, mime):
-    """A drag of ``mime`` brought over ``panel`` and held there. Qt hands a
+def _brought_over(pane, mime):
+    """A drag of ``mime`` brought over ``pane`` and held there. Qt hands a
     drag's later events to the widget that took its first."""
-    QApplication.sendEvent(panel, QDragEnterEvent(QPoint(5, 5), *_held(mime)))
-    QApplication.sendEvent(panel, QDragMoveEvent(QPoint(5, 5), *_held(mime)))
+    QApplication.sendEvent(pane, QDragEnterEvent(QPoint(5, 5), *_held(mime)))
+    QApplication.sendEvent(pane, QDragMoveEvent(QPoint(5, 5), *_held(mime)))
 
 
-def _dropped_on(panel, mime):
-    _brought_over(panel, mime)
-    QApplication.sendEvent(panel, QDropEvent(QPointF(5, 5), *_held(mime)))
+def _dropped_on(pane, mime):
+    _brought_over(pane, mime)
+    QApplication.sendEvent(pane, QDropEvent(QPointF(5, 5), *_held(mime)))
 
 
 def test_dropping_a_level_absorbs_its_settings(qtbot):
-    panel, edits = _panel(qtbot)
-    panel._auto.setChecked(True)
+    pane, edits = _panel(qtbot)
+    pane._auto.setChecked(True)
     edits.clear()
     # Held in a local: a QMimeData freed mid-event takes the handler with it.
     mime = enhance_level_mime({"enhance_scale": 3.0, "enhance_steps": 40,
                                "enhance_denoise": 0.35})
 
-    _dropped_on(panel, mime)
+    _dropped_on(pane, mime)
 
-    settings = panel.settings()
+    settings = pane.settings()
     assert settings.params["enhance_scale"] == 3.0
     assert settings.params["enhance_steps"] == 40
     assert settings.params["enhance_denoise"] == 0.35
@@ -1681,71 +1681,71 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
 
 
 def test_a_dropped_level_leaves_the_panel_at_exactly_what_that_level_ran_with(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(params={
+    pane, _edits = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(params={
         "enhance_scale": 3.0, "enhance_detail_fixes": {"hands": 0.3},
         "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}))
     ran = {"enhance_scale": 2.0, "enhance_detail_fixes": {"hands": 0.45}}
     mime = enhance_level_mime(ran)
 
-    _dropped_on(panel, mime)
+    _dropped_on(pane, mime)
 
-    assert full_settings(panel.settings().params) == full_settings(ran)
+    assert full_settings(pane.settings().params) == full_settings(ran)
 
 
-def _in_the_app(qtbot, panel):
-    """``panel`` shown in a pane of the window, dressed as the app dresses it."""
+def _in_the_app(qtbot, pane):
+    """``pane`` shown in a pane of the window, dressed as the app dresses it."""
     host = QWidget()
-    QVBoxLayout(host).addWidget(panel)
+    QVBoxLayout(host).addWidget(pane)
     host.setStyleSheet(build_stylesheet())
     qtbot.addWidget(host)
     host.resize(420, 700)
     with qtbot.waitExposed(host):
         host.show()
-    return panel
+    return pane
 
 
-def _drop_styles_worn(panel) -> set:
-    """The drop style the panel wears, read off its ground in the title row and
+def _drop_styles_worn(pane) -> set:
+    """The drop style the pane wears, read off its ground in the title row and
     under the settings, where nothing is drawn."""
-    heading = next(label for label in panel.findChildren(QLabel) if label.text() == "Enhance")
-    settings = panel.findChild(QScrollArea).geometry()
-    image = panel.grab().toImage()
-    return {worn(image, panel.rect(), spot) for spot in (
+    heading = next(label for label in pane.findChildren(QLabel) if label.text() == "Enhance")
+    settings = pane.findChild(QScrollArea).geometry()
+    image = pane.grab().toImage()
+    return {worn(image, pane.rect(), spot) for spot in (
         QPoint(heading.geometry().right() + 10, heading.geometry().center().y()),
         QPoint(settings.left() + 5, settings.bottom() - 5))}
 
 
 def test_the_panel_lights_while_a_version_it_would_take_is_dragged(qtbot):
-    panel = _in_the_app(qtbot, _panel(qtbot)[0])
-    assert _drop_styles_worn(panel) == {None}
+    pane = _in_the_app(qtbot, _panel(qtbot)[0])
+    assert _drop_styles_worn(pane) == {None}
 
     under_way.started.emit(enhance_level_mime({"enhance_scale": 3.0}), None)
 
-    assert _drop_styles_worn(panel) == {LIT}
+    assert _drop_styles_worn(pane) == {LIT}
     under_way.ended.emit()
 
 
 def test_the_panel_under_the_drag_lights_one_step_lighter(qtbot):
-    panel = _in_the_app(qtbot, _panel(qtbot)[0])
+    pane = _in_the_app(qtbot, _panel(qtbot)[0])
     mime = enhance_level_mime({"enhance_scale": 3.0})
     under_way.started.emit(mime, None)
 
-    _brought_over(panel, mime)
+    _brought_over(pane, mime)
 
-    assert _drop_styles_worn(panel) == {AIMED}
-    QApplication.sendEvent(panel, QDragLeaveEvent())
+    assert _drop_styles_worn(pane) == {AIMED}
+    QApplication.sendEvent(pane, QDragLeaveEvent())
     under_way.ended.emit()
 
 
 def test_the_panel_stays_as_it_is_while_anything_else_is_dragged(qtbot):
-    panel = _in_the_app(qtbot, _panel(qtbot)[0])
+    pane = _in_the_app(qtbot, _panel(qtbot)[0])
     mime = QMimeData()
     mime.setText("just some text")
 
     under_way.started.emit(mime, None)
 
-    assert _drop_styles_worn(panel) == {None}
+    assert _drop_styles_worn(pane) == {None}
     under_way.ended.emit()
 
 
@@ -1778,7 +1778,7 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
     """The widest thing in the tab wraps rather than set the pane's floor.
 
     A thumbnail beside a file's facts and buttons wants some 450px side by side,
-    which is wider than a tiling-narrow info pane can be — so the pane would have
+    which is wider than a tiling-narrow Generate pane can be — so the pane would have
     had to choose between refusing to fit a monitor third and scrolling its
     settings sideways. Stacked, the row asks for the wider of the two rather than
     their sum, and neither has to give.
@@ -1808,100 +1808,100 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
 def test_the_panels_captions_use_plain_words(qtbot):
     # The graph's word for the third number is denoise; the caption says what
     # it does, and the tooltip keeps the graph's word.
-    panel, _edits = _panel(qtbot)
-    captions = [w.text() for w in panel.findChildren(QLabel)]
+    pane, _edits = _panel(qtbot)
+    captions = [w.text() for w in pane.findChildren(QLabel)]
     assert {"Model", "Upscaler", "Scale", "Steps", "Redraw Amount"} <= set(captions)
     assert not any("Denoise" in caption or caption.endswith(":") for caption in captions)
 
 
 def test_a_number_on_the_panel_says_its_good_range(qtbot):
-    panel, _edits = _panel(qtbot)
-    assert "Good range: 0.1–0.2." in panel._denoise.toolTip()
-    assert "Good range: 1.5–2." in panel._scale.toolTip()
+    pane, _edits = _panel(qtbot)
+    assert "Good range: 0.1–0.2." in pane._denoise.toolTip()
+    assert "Good range: 1.5–2." in pane._scale.toolTip()
 
 
-def test_each_fixs_button_opens_its_prompts_over_the_enhance_panel_alone_leaving_the_window_usable(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel.show()
+def test_each_fixs_button_opens_its_prompts_over_the_enhance_pane_alone_leaving_the_window_usable(qtbot):
+    pane, _edits = _panel(qtbot)
+    pane.show()
     hands = next(part for part in part_table() if part.name == "hands")
 
-    panel._fix_prompt_buttons["hands"].click()
+    pane._fix_prompt_buttons["hands"].click()
 
-    window = panel._fix_prompt_windows["hands"]
+    window = pane._fix_prompt_windows["hands"]
     assert window.isVisible()
     assert window.windowModality() == Qt.WindowModality.NonModal
     assert window.windowFlags() & Qt.WindowType.FramelessWindowHint
-    assert window.geometry() == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size())
+    assert window.geometry() == QRect(pane.mapToGlobal(QPoint(0, 0)), pane.size())
     assert "Hands fix prompts" in [label.text() for label in window.findChildren(QLabel)]
     assert (window.prompts()["prompt"], window.prompts()["avoid"]) == (hands.prompt, hands.avoid)
 
 
-def test_a_fixs_prompts_stay_over_the_enhance_panel_as_the_window_moves_and_its_border_is_dragged(qtbot):
+def test_a_fixs_prompts_stay_over_the_enhance_pane_as_the_window_moves_and_its_border_is_dragged(qtbot):
     host = QWidget()
     qtbot.addWidget(host)
     column = QVBoxLayout(host)
-    panel, _edits = _panel(qtbot)
+    pane, _edits = _panel(qtbot)
     column.addWidget(QWidget(), 1)
-    column.addWidget(panel)
+    column.addWidget(pane)
     host.resize(900, 900)
     host.show()
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
 
     host.move(host.pos() + QPoint(40, 30))
-    panel.setFixedHeight(panel.height() + 50)
+    pane.setFixedHeight(pane.height() + 50)
 
     qtbot.waitUntil(lambda: window.geometry()
-                    == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size()))
+                    == QRect(pane.mapToGlobal(QPoint(0, 0)), pane.size()))
 
 
-def test_a_fixs_prompts_fit_an_enhance_panel_dragged_as_short_as_it_goes(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel.setStyleSheet(build_stylesheet() + panel.styleSheet())
-    panel.resize(700, panel.minimumSizeHint().height())
-    panel.show()
+def test_a_fixs_prompts_fit_an_enhance_pane_dragged_as_short_as_it_goes(qtbot):
+    pane, _edits = _panel(qtbot)
+    pane.setStyleSheet(build_stylesheet() + pane.styleSheet())
+    pane.resize(700, pane.minimumSizeHint().height())
+    pane.show()
 
-    panel._fix_prompt_buttons["hands"].click()
+    pane._fix_prompt_buttons["hands"].click()
 
-    window = panel._fix_prompt_windows["hands"]
-    assert window.geometry() == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size())
+    window = pane._fix_prompt_windows["hands"]
+    assert window.geometry() == QRect(pane.mapToGlobal(QPoint(0, 0)), pane.size())
     for field in (*window.positive.boxes(), *window.negative.boxes()):
         assert field.height() >= 2 * field.fontMetrics().lineSpacing()
 
 
 def test_each_fixs_edit_button_is_the_square_the_buttons_above_the_gallery_are(qtbot):
-    panel, _edits = _panel(qtbot)
+    pane, _edits = _panel(qtbot)
 
-    for button in panel._fix_prompt_buttons.values():
+    for button in pane._fix_prompt_buttons.values():
         assert button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)
 
 
 def test_each_fixs_edit_button_checkbox_name_and_value_sit_inside_one_thin_gray_border(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel.setStyleSheet(build_stylesheet() + panel.styleSheet())
-    panel.resize(700, panel.sizeHint().height())
-    panel.show()
-    drawn = panel.grab().toImage()
+    pane, _edits = _panel(qtbot)
+    pane.setStyleSheet(build_stylesheet() + pane.styleSheet())
+    pane.resize(700, pane.sizeHint().height())
+    pane.show()
+    drawn = pane.grab().toImage()
 
     frames = set()
-    for name, button in panel._fix_prompt_buttons.items():
+    for name, button in pane._fix_prompt_buttons.items():
         frame = button.parentWidget()
-        assert frame.isAncestorOf(panel._fix_checks[name])
-        assert frame.isAncestorOf(panel._fixes[name])
-        top_edge = frame.mapTo(panel, QPoint(frame.width() // 2, 0))
+        assert frame.isAncestorOf(pane._fix_checks[name])
+        assert frame.isAncestorOf(pane._fixes[name])
+        top_edge = frame.mapTo(pane, QPoint(frame.width() // 2, 0))
         assert drawn.pixelColor(top_edge).name() == BORDER_SUBTLE.name()
         frames.add(frame)
-    assert len(frames) == len(panel._fix_prompt_buttons)
+    assert len(frames) == len(pane._fix_prompt_buttons)
 
 
 def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, monkeypatch,
                                                                     titled_models):
-    monkeypatch.setattr(enhance_panel_module, "list_lora_files",
+    monkeypatch.setattr(enhance_pane_module, "list_lora_files",
                         lambda fallback, **terms: ["None", "my_hands.safetensors"])
     titled_models({"my_hands": "My Hands v1"})
-    panel, edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
 
     assert [window.lora.itemText(i) for i in range(window.lora.count())] == [
         "None", "My Hands v1"]
@@ -1917,8 +1917,8 @@ def test_a_fixs_prompts_offer_only_the_loras_the_enhance_model_can_run(qtbot, in
     installed_models.add("loras", "an_xl_fix.safetensors", arch="sdxl", lora=True)
     installed_models.add("loras", "a_15_fix.safetensors", arch="sd15", lora=True)
     panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    lora = panel._fix_prompt_windows["hands"].lora
+    pane._fix_prompt_buttons["hands"].click()
+    lora = pane._fix_prompt_windows["hands"].lora
 
     offered = {lora.itemData(row) for row in range(lora.count())}
     assert {"an_xl_fix.safetensors", "a_15_fix.safetensors"} & offered == {
@@ -1931,8 +1931,8 @@ def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, instal
                  os.path.join("fixes", "faces 2026-10-20 0910.safetensors")):
         installed_models.add("loras", name, arch="sdxl", lora=True)
     panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    lora = panel._fix_prompt_windows["hands"].lora
+    pane._fix_prompt_buttons["hands"].click()
+    lora = pane._fix_prompt_windows["hands"].lora
 
     assert {lora.itemData(row) for row in range(lora.count())} == {
         "None", "an_xl_look.safetensors", hands}
@@ -1953,13 +1953,13 @@ def hands_trained_on(qtbot, monkeypatch, tmp_path, installed_models):
         "part": "hands", "output_name": "hands 2026-10-19 1444",
         "base_model": str(installed_models.root / "models" / "checkpoints"
                           / "trained_on.safetensors")}), encoding="utf-8")
-    panel, edits = _panel(qtbot)
+    pane, edits = _panel(qtbot)
 
     def shown(fixes, model="picked.safetensors"):
-        panel.show_settings(EnhanceSettings(auto=False, params={
+        pane.show_settings(EnhanceSettings(auto=False, params={
             "checkpoint": model, "enhance_detail_fixes": fixes,
             "enhance_fix_prompts": {"hands": {"lora": _HANDS_LORA}}}))
-        return panel, edits
+        return pane, edits
 
     return shown
 
@@ -1967,18 +1967,18 @@ def hands_trained_on(qtbot, monkeypatch, tmp_path, installed_models):
 def test_a_ticked_fixs_lora_trained_on_another_model_warns_beside_the_model(hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45})
 
-    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+    assert (pane._model_warning.isHidden(), pane._model_warning.toolTip()) == (
         False, _TRAINED_ON_SAID)
 
 
 def test_clicking_the_models_warning_picks_the_model_the_fixs_lora_was_trained_on(
         qtbot, hands_trained_on):
-    panel, edits = hands_trained_on({"hands": 0.45})
+    pane, edits = hands_trained_on({"hands": 0.45})
 
-    qtbot.mouseClick(panel._model_warning, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(pane._model_warning, Qt.MouseButton.LeftButton)
 
     assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
-    assert panel._model_warning.isHidden()
+    assert pane._model_warning.isHidden()
 
 
 def test_no_model_warning_while_the_fix_is_off_or_the_model_is_the_one_it_was_trained_on(
@@ -1997,20 +1997,20 @@ def test_matching_the_source_warns_not_while_the_images_in_front_were_made_by_th
         hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
-    panel.show_images_in_front([_made_by("trained_on.safetensors"),
+    pane.show_images_in_front([_made_by("trained_on.safetensors"),
                                 _made_by("picked.safetensors", file="two.mp4")])
 
-    assert panel._model_warning.isHidden()
+    assert pane._model_warning.isHidden()
 
 
 def test_matching_the_source_warns_while_a_picked_image_is_made_by_another_model(
         hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
-    panel.show_images_in_front([_made_by("trained_on.safetensors"),
+    pane.show_images_in_front([_made_by("trained_on.safetensors"),
                                 _made_by("picked.safetensors", file="two.png")])
 
-    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+    assert (pane._model_warning.isHidden(), pane._model_warning.toolTip()) == (
         False, _TRAINED_ON_SAID)
 
 
@@ -2026,10 +2026,10 @@ def test_matching_the_source_holds_the_fixs_model_against_the_folders_own(
         hands_trained_on, folder, hidden):
     panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
-    panel.show_images_in_front([], folder)
+    pane.show_images_in_front([], folder)
 
-    assert panel._model_warning.isHidden() is hidden
-    assert hidden or panel._model_warning.toolTip() == _TRAINED_ON_SAID
+    assert pane._model_warning.isHidden() is hidden
+    assert hidden or pane._model_warning.toolTip() == _TRAINED_ON_SAID
 
 
 _NO_GUARANTEE_SAID = ("There's no guarantee the images here were made by trained_on, which the "
@@ -2043,18 +2043,18 @@ def test_matching_the_source_in_a_folder_of_several_models_or_a_collection_says_
         hands_trained_on, folder):
     panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
-    panel.show_images_in_front([], folder)
+    pane.show_images_in_front([], folder)
 
-    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+    assert (pane._model_warning.isHidden(), pane._model_warning.toolTip()) == (
         False, _NO_GUARANTEE_SAID)
 
 
 def test_clicking_the_no_guarantee_warning_picks_the_model_the_fixs_lora_was_trained_on(
         qtbot, hands_trained_on):
-    panel, edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
-    panel.show_images_in_front([])
+    pane, edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+    pane.show_images_in_front([])
 
-    qtbot.mouseClick(panel._model_warning, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(pane._model_warning, Qt.MouseButton.LeftButton)
 
     assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
 
@@ -2062,42 +2062,42 @@ def test_clicking_the_no_guarantee_warning_picks_the_model_the_fixs_lora_was_tra
 _CAPTIONS = ("Model", "Upscaler", "Scale", "Steps", "Redraw Amount")
 
 
-def _caption_lefts(panel) -> dict[str, int]:
-    return {label.text(): label.mapTo(panel, QPoint()).x()
-            for label in panel.findChildren(QLabel) if label.text() in _CAPTIONS}
+def _caption_lefts(pane) -> dict[str, int]:
+    return {label.text(): label.mapTo(pane, QPoint()).x()
+            for label in pane.findChildren(QLabel) if label.text() in _CAPTIONS}
 
 
 def test_the_models_warning_sits_left_of_its_caption_with_the_captions_in_line(
         hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45})
-    _laid_out_at(panel, 2000)
+    _laid_out_at(pane, 2000)
 
-    lefts = _caption_lefts(panel)
-    caption = next(label for label in panel.findChildren(QLabel) if label.text() == "Model")
-    mark = panel._model_warning
-    assert mark.mapTo(panel, QPoint()).x() + mark.width() <= lefts["Model"]
-    assert _rows_of(panel, mark) & _rows_of(panel, caption)
+    lefts = _caption_lefts(pane)
+    caption = next(label for label in pane.findChildren(QLabel) if label.text() == "Model")
+    mark = pane._model_warning
+    assert mark.mapTo(pane, QPoint()).x() + mark.width() <= lefts["Model"]
+    assert _rows_of(pane, mark) & _rows_of(pane, caption)
     assert lefts["Model"] == lefts["Upscaler"] == lefts["Scale"]
 
 
 def test_the_captions_stay_where_they_are_while_the_models_warning_is_hidden(hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45})
-    _laid_out_at(panel, 2000)
-    warned = _caption_lefts(panel)
+    _laid_out_at(pane, 2000)
+    warned = _caption_lefts(pane)
 
     hands_trained_on({})
-    _laid_out_at(panel, 2000)
+    _laid_out_at(pane, 2000)
 
-    assert panel._model_warning.isHidden()
-    assert _caption_lefts(panel) == warned
+    assert pane._model_warning.isHidden()
+    assert _caption_lefts(pane) == warned
 
 
 def test_a_caption_moved_onto_a_line_of_its_own_keeps_in_line_with_the_others(hands_trained_on):
     panel, _edits = hands_trained_on({"hands": 0.45})
 
-    _laid_out_at(panel, panel.minimumSizeHint().width())
+    _laid_out_at(pane, pane.minimumSizeHint().width())
 
-    assert len(set(_caption_lefts(panel).values())) == 1
+    assert len(set(_caption_lefts(pane).values())) == 1
 
 
 _STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
@@ -2106,13 +2106,13 @@ _STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Posit
 
 @pytest.fixture
 def worded_fix(qtbot, monkeypatch, worded_loras, titled_models):
-    monkeypatch.setattr(enhance_panel_module, "list_lora_files",
+    monkeypatch.setattr(enhance_pane_module, "list_lora_files",
                         lambda fallback, **terms: ["None", "example_style.safetensors"])
     worded_loras({"example_style": ["exmplstyle"]})
     titled_models({"example_style": "Example Style 1.0"})
     panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
     window.positive.boxes()[0].setPlainText("a close-up")
     window.lora.setCurrentIndex(window.lora.findData("example_style.safetensors"))
     return window
@@ -2163,9 +2163,9 @@ def test_a_fixs_trigger_word_warnings_sit_left_of_the_prompt_and_lora_captions(w
 
 
 def test_a_fixs_lora_strength_says_what_range_works_well_as_every_forms_does(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
 
     assert "Good range: 0.6–1.2." in window.strength.toolTip()
     assert window.strength.toolTip().startswith("How hard the LoRA pulls.")
@@ -2186,9 +2186,9 @@ def _rows_of(window, widget) -> set[int]:
 
 
 def test_a_fixs_lora_controls_take_a_row_of_their_own_rather_than_squeeze_any_button(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
 
     wide = _fix_window_laid_out_at(window, 1600)
     assert _rows_of(window, wide["ok"]) & _rows_of(window, wide["train"])
@@ -2202,11 +2202,11 @@ def test_a_fixs_lora_controls_take_a_row_of_their_own_rather_than_squeeze_any_bu
 
 
 def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
 
-    with qtbot.waitSignal(panel.fix_training_requested) as asked:
+    with qtbot.waitSignal(pane.fix_training_requested) as asked:
         window.training.train.click()
 
     assert asked.args == ["hands"]
@@ -2225,11 +2225,11 @@ def _fix_photos(monkeypatch, tmp_path, *names):
 def test_beside_train_a_fixs_prompts_say_how_many_photos_its_folder_holds(
         qtbot, monkeypatch, tmp_path):
     folder = _fix_photos(monkeypatch, tmp_path, "one.jpg", "two.png", "notes.txt")
-    panel, _edits = _panel(qtbot)
+    pane, _edits = _panel(qtbot)
 
-    panel._fix_prompt_buttons["hands"].click()
+    pane._fix_prompt_buttons["hands"].click()
 
-    window = panel._fix_prompt_windows["hands"]
+    window = pane._fix_prompt_windows["hands"]
     assert window.training.pictures.text() == "2 photos"
     assert window.training.pictures.toolTip() == str(folder)
 
@@ -2237,9 +2237,9 @@ def test_beside_train_a_fixs_prompts_say_how_many_photos_its_folder_holds(
 def test_a_fixs_photos_are_counted_again_each_time_its_prompts_come_to_the_front(
         qtbot, monkeypatch, tmp_path):
     folder = _fix_photos(monkeypatch, tmp_path, "one.jpg")
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
     assert window.training.pictures.text() == "1 photo"
 
     (folder / "two.jpg").write_bytes(b"")
@@ -2253,9 +2253,9 @@ def test_show_in_explorer_opens_a_fixs_photos_folder_making_it_first_if_need_be(
     folder = _fix_photos(monkeypatch, tmp_path)
     opened = []
     monkeypatch.setattr(training_controls_module, "open_in_explorer", opened.append)
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
     assert window.training.pictures.text() == "0 photos"
 
     window.training.folder.click()
@@ -2265,13 +2265,13 @@ def test_show_in_explorer_opens_a_fixs_photos_folder_making_it_first_if_need_be(
 
 
 def test_a_fixs_train_button_says_how_its_training_is_going_until_it_ends(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel.show_fix_training("hands", "Training 40%")
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane.show_fix_training("hands", "Training 40%")
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
     assert (window.training.train.text(), window.training.train.isEnabled()) == ("Training 40%", False)
 
-    panel.show_fix_training("hands", None)
+    pane.show_fix_training("hands", None)
 
     assert (window.training.train.text(), window.training.train.isEnabled()) == ("Train", True)
 
@@ -2283,9 +2283,9 @@ def test_a_trained_fixs_button_says_retrain_grayed_until_its_photos_change(
     record.parent.mkdir(parents=True)
     record.write_text(json.dumps({"photo_stamps": fix_training.photo_stamps(
         parts.part_named("hands"))}), encoding="utf-8")
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
     assert (window.training.train.text(), window.training.train.isEnabled()) == ("Retrain", False)
 
     (folder / "two.jpg").write_bytes(b"")
@@ -2297,27 +2297,27 @@ def test_a_trained_fixs_button_says_retrain_grayed_until_its_photos_change(
 def test_train_says_it_draws_on_the_shared_folder_only_for_a_fix_that_does(qtbot, monkeypatch):
     monkeypatch.setattr(parts, "_overlay_parts", lambda content=None: (
         parts.DetailPart("alpha", ("alpha",), ("alpha",), shared_photos=False),))
-    panel, _edits = _panel(qtbot)
+    pane, _edits = _panel(qtbot)
     for name in ("hands", "alpha"):
-        panel.open_fix_prompts(name)
+        pane.open_fix_prompts(name)
 
-    assert "fixes\\shared" in panel._fix_prompt_windows["hands"].training.train.toolTip()
-    assert "shared" not in panel._fix_prompt_windows["alpha"].training.train.toolTip()
+    assert "fixes\\shared" in pane._fix_prompt_windows["hands"].training.train.toolTip()
+    assert "shared" not in pane._fix_prompt_windows["alpha"].training.train.toolTip()
 
 
 def test_a_trained_lora_is_put_on_its_fix(qtbot):
-    panel, edits = _panel(qtbot)
+    pane, edits = _panel(qtbot)
 
-    panel.use_fix_lora("hands", "fixes\\hands 2026-10-19 0130.safetensors")
+    pane.use_fix_lora("hands", "fixes\\hands 2026-10-19 0130.safetensors")
 
     assert edits[-1].params["enhance_fix_prompts"]["hands"]["lora"] == (
         "fixes\\hands 2026-10-19 0130.safetensors")
 
 
 def test_ok_on_a_fixs_prompts_keeps_them_and_cancel_keeps_nothing(qtbot):
-    panel, edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
     window.positive.boxes()[0].setPlainText("open palms")
     window.negative.boxes()[0].setPlainText("fists")
 
@@ -2326,8 +2326,8 @@ def test_ok_on_a_fixs_prompts_keeps_them_and_cancel_keeps_nothing(qtbot):
     assert edits[-1].params["enhance_fix_prompts"] == {
         "hands": {"prompt": "open palms", "avoid": "fists", "lora": "", "strength": 1.0}}
     kept = len(edits)
-    panel._fix_prompt_buttons["hands"].click()
-    again = panel._fix_prompt_windows["hands"]
+    pane._fix_prompt_buttons["hands"].click()
+    again = pane._fix_prompt_windows["hands"]
     assert (again.prompts()["prompt"], again.prompts()["avoid"]) == ("open palms", "fists")
     again.positive.boxes()[0].setPlainText("something else")
     again.reject()
@@ -2342,12 +2342,12 @@ def clip_installed(monkeypatch, tmp_path):
 
 @pytest.fixture
 def boxed_fix(qtbot, clip_installed):
-    panel, edits = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(params={
+    pane, edits = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(params={
         **default_enhance_params(),
         "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}))
-    panel._fix_prompt_buttons["hands"].click()
-    return panel._fix_prompt_windows["hands"], edits
+    pane._fix_prompt_buttons["hands"].click()
+    return pane._fix_prompt_windows["hands"], edits
 
 
 def _cats(count: int) -> str:
@@ -2385,22 +2385,22 @@ def test_a_fixs_trigger_word_clicked_in_goes_at_the_start_of_its_first_box_and_f
 
 
 def test_a_fixs_prompts_already_open_are_brought_forward_rather_than_opened_twice(qtbot):
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    first = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    first = pane._fix_prompt_windows["hands"]
 
-    panel._fix_prompt_buttons["hands"].click()
+    pane._fix_prompt_buttons["hands"].click()
 
-    assert panel._fix_prompt_windows["hands"] is first
+    assert pane._fix_prompt_windows["hands"] is first
 
 
 def test_a_fix_windows_lora_dropdown_says_when_its_picked_lora_was_trained(
         qtbot, installed_models, titled_models):
     installed_models.add("loras", "fixes/hands 1.1.safetensors", arch="sdxl", lora=True,
                          metadata={"ss_training_finished_at": "1792851468.891"})
-    panel, _edits = _panel(qtbot)
-    panel._fix_prompt_buttons["hands"].click()
-    window = panel._fix_prompt_windows["hands"]
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
     assert window.lora.toolTip() == ""
 
     window.lora.setCurrentIndex(window.lora.findData(r"fixes\hands 1.1.safetensors"))

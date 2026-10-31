@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS generations (
     -- current output_files). Presence marks the row enhanced-in-place.
     original_files  TEXT,
     -- One entry per enhancement folded into this row, newest first: the file it
-    -- produced and the settings that produced it. What lets the info pane list
+    -- produced and the settings that produced it. What lets the Generate pane list
     -- every level an image has received rather than just "enhanced".
     enhance_history TEXT,
     thumbnail_path  TEXT,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS generations (
     -- which must stay put until Send-to-Genau is pressed.
     genau_requested_at TEXT,
     -- Where a combine launch got its settings: the act picked in the Combine
-    -- panel's dropdown, and the video whose settings the run re-uses. Either can
+    -- Combine's dropdown, and the video whose settings the run re-uses. Either can
     -- stand alone — a dropped video names no act, and an act the overlay pins
     -- settings for is answered from no past video. Nothing else about the run
     -- records it: the params carry the settings' values, never which video they

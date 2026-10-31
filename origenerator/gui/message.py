@@ -1,8 +1,8 @@
 """What a slideshow has to say, in the message Fun Time says it in.
 
 Fun Time flashes its messages — "Clip saved", "No other seeds", "Next seed" — at
-the top center of the Funestra they are about, in one shape everywhere: the panel
-gray, a hairline of the text's own color, a bold heading face, rounded corners
+the top center of the Funestra they are about, in one shape everywhere: the
+secondary gray, a hairline of the text's own color, a bold heading face, rounded corners
 (Fun Time's own message, in its ``notice_overlay``). This is that message, worn by
 Origenerator's own: the request being spoken, and what a press or a
 spoken word just did. A plate of its own down at the foot of the slideshow would be

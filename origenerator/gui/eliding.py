@@ -146,11 +146,11 @@ class ElidingLabel(QLabel):
         )
 
 
-def open_the_list_in_full(combo) -> None:
-    """Let ``combo`` open its list wide enough for every entry, whole: the closed
+def open_the_list_in_full(dropdown) -> None:
+    """Let ``dropdown`` open its list wide enough for every entry, whole: the closed
     field gives its width up to the pane, and the open list must not."""
-    view = combo.view()
-    advance = combo.fontMetrics().horizontalAdvance
-    widest = max((advance(combo.itemText(i)) for i in range(combo.count())), default=0)
+    view = dropdown.view()
+    advance = dropdown.fontMetrics().horizontalAdvance
+    widest = max((advance(dropdown.itemText(i)) for i in range(dropdown.count())), default=0)
     view.setMinimumWidth(widest + view.verticalScrollBar().sizeHint().width()
                          + 2 * view.frameWidth() + 2 * MARGIN_STANDARD)

@@ -4,7 +4,7 @@ from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import FLUX
-from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.prompt_readers import T5
 
 
@@ -75,7 +75,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         defaults = self.default_params()
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            model_picker("unet", "Model", defaults["unet"], "diffusion_models",
+            model_dropdown("unet", "Model", defaults["unet"], "diffusion_models",
                          accepts=(FLUX,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(FLUX,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),

@@ -507,7 +507,7 @@ def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_ticks(
     params = fix_params_for(_source_row(), _spoken("fix teeth"), panel)
 
     # Its own number for that part, since nobody says a denoise out loud — and
-    # nothing else the panel happens to have ticked.
+    # nothing else the panel happens to have checked.
     assert params["enhance_detail_fixes"] == {"teeth": 0.6}
 
 

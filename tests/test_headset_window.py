@@ -374,21 +374,21 @@ class TestWhatOpensOverTheWindow:
 
     def test_a_list_dropped_from_the_room_is_chosen_from_in_the_room(self, tmp_path, qtbot):
         window = self._window(qtbot)
-        combo = QComboBox(window)
-        combo.addItems(["alpha", "beta", "gamma"])
-        combo.setGeometry(20, 20, 120, 24)
-        combo.show()
+        dropdown = QComboBox(window)
+        dropdown.addItems(["alpha", "beta", "gamma"])
+        dropdown.setGeometry(20, 20, 120, 24)
+        dropdown.show()
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset.publish(now=1.0)
             headset._heard("press 30 30")
             headset._heard("release")
-            qtbot.waitUntil(combo.view().isVisible)
+            qtbot.waitUntil(dropdown.view().isVisible)
             # A list ignores a release as soon after it opens as a double-click:
             # it takes it for the release of the press that opened it.
             qtbot.wait(QApplication.doubleClickInterval() + 100)
-            view = combo.view()
-            item = view.visualRect(combo.model().index(2, 0)).center()
+            view = dropdown.view()
+            item = view.visualRect(dropdown.model().index(2, 0)).center()
             at = window.mapFromGlobal(view.viewport().mapToGlobal(item))
             headset._heard(f"hover {at.x()} {at.y()}")
             headset._heard(f"press {at.x()} {at.y()}")
@@ -396,7 +396,7 @@ class TestWhatOpensOverTheWindow:
         finally:
             headset.close()
 
-        assert combo.currentText() == "gamma"
+        assert dropdown.currentText() == "gamma"
 
     def test_a_menu_open_over_the_window_is_in_its_frame(self, tmp_path, qtbot):
         window = self._window(qtbot)

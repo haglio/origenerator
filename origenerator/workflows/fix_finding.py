@@ -18,7 +18,7 @@ def finding_nodes(index: int, fix: DetailFixPass, image_ref, original_ref) -> tu
     nodes = {
         provider_id: {
             "class_type": "UltralyticsDetectorProvider",
-            # The provider's own picker prefixes its detector models
+            # The provider's own dropdown prefixes its detector models
             # this way, and hands out an outline only for a segm/ one.
             "inputs": {"model_name": f"{finder}/{fix.detector}"},
         },

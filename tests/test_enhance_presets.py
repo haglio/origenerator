@@ -184,5 +184,5 @@ def test_a_preset_saved_in_the_window_is_the_one_its_dropdown_shows_after_a_rest
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    picker = reopened._gallery_view._enhance.panel._preset_picker
-    assert picker.currentText() == "Crisp"
+    dropdown = reopened._gallery_view._enhance.panel._preset_dropdown
+    assert dropdown.currentText() == "Crisp"

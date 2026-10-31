@@ -515,7 +515,7 @@ def _press_ctrl_f(view, monkeypatch):
 
 
 def _tab_with_prompts(view, key="sdxl_t2i"):
-    """Answer the front tab's workflow picker, so it has prompt fields to find in.
+    """Answer the front tab's workflow dropdown, so it has prompt fields to find in.
 
     The resting tab lays out no form until a workflow is chosen — and a find over
     no fields is the tree-find fallback, which has its own test below."""

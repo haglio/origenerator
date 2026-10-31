@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path, PurePosixPath
 
 from origenerator.one_look import entries_in
@@ -56,14 +57,7 @@ class OutputPlaces:
         return self.folder("/".join(folders)) / name
 
     def subfolder_of(self, folder: Path) -> str | None:
-        for kind, home in self._named().items():
-            inside = _parts_within(folder, home)
-            if inside is not None:
-                return "/".join((kind, *inside))
-        inside = _parts_within(folder, self.videos)
-        if inside:
-            return "/".join(inside)
-        return "" if _parts_within(folder, self.comfyui) == () else None
+        return _subfolder_of(self, Path(folder))
 
     def video_folders(self) -> list[Path]:
         named = self._named().values()
@@ -90,6 +84,18 @@ class OutputPlaces:
 
     def _named(self) -> dict[str, Path]:
         return {IMAGES: self.images, SCRIPTS: self.scripts, AUDIO: self.audio}
+
+
+@lru_cache(maxsize=1024)
+def _subfolder_of(places: OutputPlaces, folder: Path) -> str | None:
+    for kind, home in places._named().items():
+        inside = _parts_within(folder, home)
+        if inside is not None:
+            return "/".join((kind, *inside))
+    inside = _parts_within(folder, places.videos)
+    if inside:
+        return "/".join(inside)
+    return "" if _parts_within(folder, places.comfyui) == () else None
 
 
 def _parts_within(folder: Path, home: Path) -> tuple[str, ...] | None:

@@ -1,7 +1,7 @@
 import _winapi
 from pathlib import Path
 
-from origenerator import config
+from origenerator import config, output_places
 from origenerator.output_places import OutputPlaces
 
 
@@ -130,3 +130,21 @@ def test_outputs_count_as_kept_in_comfyuis_folder_only_when_a_place_lies_inside_
     assert OutputPlaces.in_one_folder(tmp_path).keeps_outputs_in_comfyuis_folder()
     assert not OutputPlaces.from_settings(
         _library(tmp_path), comfyui_dir=tmp_path / "ComfyUI").keeps_outputs_in_comfyuis_folder()
+
+
+def test_which_kind_of_output_a_folder_holds_is_worked_out_once_for_that_folder(
+        tmp_path, monkeypatch):
+    # Worked out again for every video handed to a slideshow, the folder each
+    # video's script is filed under cost a double-click on Latest a second.
+    places = OutputPlaces.from_settings(_library(tmp_path), comfyui_dir=tmp_path / "ComfyUI")
+    worked = []
+    parts_within = output_places._parts_within
+    monkeypatch.setattr(output_places, "_parts_within",
+                        lambda folder, home: worked.append(folder) or parts_within(folder, home))
+    videos = places.folder("video")
+    places.subfolder_of(videos)
+    once = len(worked)
+
+    answers = {places.subfolder_of(videos) for _ in range(3)}
+
+    assert (answers, len(worked)) == ({"video"}, once)

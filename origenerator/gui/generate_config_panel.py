@@ -60,7 +60,7 @@ from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.gui import icons
 from origenerator.gui.action_picker import ActionPicker
 from origenerator.gui.combination import Combination
-from origenerator.gui.corner_controls import enhance_state
+from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_slot import DropSlot, DropZone
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement

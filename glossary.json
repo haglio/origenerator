@@ -505,14 +505,17 @@
       ],
       "his_word": "'have the corners of middle pane cards be buttons' (2026-08-19); 'trash icon' (2026-10-18)",
       "code_today": [
-        "corner controls",
-        "corner button",
-        "corner action",
-        "chip"
+        "corner button"
       ],
       "code_word": "corner button",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "corner controls",
+        "corner control",
+        "corner action",
+        "chip"
+      ]
     },
     {
       "id": "media_icon",
@@ -521,8 +524,7 @@
       "his_word": "item type icon (2026-10-30)",
       "code_today": [
         "media badge",
-        "badge",
-        "chip"
+        "badge"
       ],
       "code_word": "item type icon",
       "status": "ruled",
@@ -539,8 +541,7 @@
       "his_word": "TOC initials (2026-10-30)",
       "code_today": [
         "level badge",
-        "badge",
-        "chip"
+        "badge"
       ],
       "code_word": "toc initial",
       "status": "ruled",

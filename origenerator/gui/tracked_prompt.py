@@ -97,6 +97,10 @@ class UndoHistory(QObject):
         self._undone.append(before)
         self._redone.clear()
 
+    def clear(self) -> None:
+        self._undone.clear()
+        self._redone.clear()
+
     def watch(self, edit: QPlainTextEdit) -> None:
         edit.installEventFilter(self)
 
@@ -126,7 +130,7 @@ class _Tracker(QObject):
     """Keeps one field's marks — and the prompt under them — in step with what is
     typed into it."""
 
-    def __init__(self, edit: QPlainTextEdit, baseline: str):
+    def __init__(self, edit: QPlainTextEdit, baseline: str, undo: bool):
         super().__init__(edit)
         self._edit = edit
         self._baseline = baseline
@@ -136,7 +140,8 @@ class _Tracker(QObject):
         # rests on.
         self._layout: list = [(SAME, self._value)] if self._value else []
         self._writing = False  # our own rewrites, which must not re-enter
-        self._history = UndoHistory(self, lambda: self._value, self._show_whole)
+        self._history = (UndoHistory(self, lambda: self._value, self._show_whole) if undo
+                         else None)
         self._settle = QTimer(self)
         self._settle.setSingleShot(True)
         self._settle.setInterval(SETTLE_MS)
@@ -147,14 +152,16 @@ class _Tracker(QObject):
         self._redraw.timeout.connect(self._show_prompt_only)
         edit.setUndoRedoEnabled(False)  # see the module docstring
         edit.installEventFilter(self)
-        self._history.watch(edit)
+        if self._history is not None:
+            self._history.watch(edit)
         edit.document().contentsChange.connect(self._on_contents_change)
 
     def detach(self) -> None:
         self._settle.stop()
         self._redraw.stop()
         self._edit.removeEventFilter(self)
-        self._history.unwatch(self._edit)
+        if self._history is not None:
+            self._history.unwatch(self._edit)
         self._edit.document().contentsChange.disconnect(self._on_contents_change)
         self._edit.setUndoRedoEnabled(True)
         self.setParent(None)
@@ -170,7 +177,7 @@ class _Tracker(QObject):
 
     # --- translating between the document and the prompt --------------------
 
-    def _prompt_offset(self, doc_offset: int) -> int:
+    def prompt_offset(self, doc_offset: int) -> int:
         """Where a position in the document falls in the prompt.
 
         A position inside a struck-through run is the point that run sits at:
@@ -185,7 +192,7 @@ class _Tracker(QObject):
                 prompt += len(text)
         return prompt
 
-    def _document_offset(self, prompt_offset: int) -> int:
+    def document_offset(self, prompt_offset: int) -> int:
         """Where a position in the prompt falls in the document — the earliest
         such position, so a caret at the end of a word lands before the struck
         run that follows it rather than after it."""
@@ -222,7 +229,7 @@ class _Tracker(QObject):
                                            else diff_text.removed_format())
                 cursor.setPosition(end)
             place = QTextCursor(self._edit.document())
-            place.setPosition(min(self._document_offset(caret), len(text)))
+            place.setPosition(min(self.document_offset(caret), len(text)))
             self._edit.setTextCursor(place)
 
     def _light(self, spans: list) -> None:
@@ -251,7 +258,7 @@ class _Tracker(QObject):
         ones that arrived. What a settled field shows."""
         self._settle.stop()
         self._redraw.stop()
-        caret = self._prompt_offset(self._edit.textCursor().position())
+        caret = self.prompt_offset(self._edit.textCursor().position())
         spans = diff_spans(self._baseline, self._value)
         if (any(kind == REMOVED for kind, _piece in spans)
                 or self._edit.toPlainText() != self._value):
@@ -286,10 +293,10 @@ class _Tracker(QObject):
         if self._writing:
             return
         inserted = self._edit.toPlainText()[position:position + added]
-        if not self._settle.isActive():  # the first keystroke of a burst
+        if self._history is not None and not self._settle.isActive():  # a burst's first keystroke
             self._history.took(self._value)
-        start = self._prompt_offset(position)
-        end = self._prompt_offset(position + removed)
+        start = self.prompt_offset(position)
+        end = self.prompt_offset(position + removed)
         self._value = self._value[:start] + inserted + self._value[end:]
         self._layout = _spliced(self._layout, position, removed, inserted)
         diff_text.hold_value(self._edit,
@@ -299,7 +306,8 @@ class _Tracker(QObject):
         self._settle.start()  # ...and the strikes come back once the typing stops
 
     def take(self, value: str) -> None:
-        self._history.took(self._value)
+        if self._history is not None:
+            self._history.took(self._value)
         self._show_whole(value)
 
     def _show_whole(self, value: str) -> None:
@@ -319,13 +327,13 @@ def _tracker_of(edit: QPlainTextEdit) -> _Tracker | None:
     return next(iter(edit.findChildren(_Tracker)), None)
 
 
-def track(edit: QPlainTextEdit, baseline: str) -> None:
+def track(edit: QPlainTextEdit, baseline: str, *, undo: bool = True) -> None:
     """Show ``edit`` as a rewrite of ``baseline``, now and as it is typed in."""
     tracker = _tracker_of(edit)
     if tracker is not None:
         tracker.measure_against(baseline)
     else:
-        _Tracker(edit, baseline).show_whole_change()
+        _Tracker(edit, baseline, undo).show_whole_change()
 
 
 def write(edit: QPlainTextEdit, value: str) -> None:
@@ -335,6 +343,20 @@ def write(edit: QPlainTextEdit, value: str) -> None:
     else:
         diff_text.forget(edit)
         edit.setPlainText(value)
+
+
+def caret_in_prompt(edit: QPlainTextEdit) -> int:
+    position = edit.textCursor().position()
+    trackers = edit.findChildren(_Tracker)
+    return trackers[0].prompt_offset(position) if trackers else position
+
+
+def put_caret_in_prompt(edit: QPlainTextEdit, offset: int) -> None:
+    trackers = edit.findChildren(_Tracker)
+    position = trackers[0].document_offset(offset) if trackers else offset
+    cursor = QTextCursor(edit.document())
+    cursor.setPosition(min(position, len(edit.toPlainText())))
+    edit.setTextCursor(cursor)
 
 
 def untrack(edit: QPlainTextEdit) -> None:

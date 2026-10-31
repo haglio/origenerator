@@ -3614,14 +3614,14 @@ def test_showing_a_generation_ends_the_modify(modifying, tmp_path):
     assert modifying._generate_btn.text() == "Generate"
 
 
-def test_ending_the_modify_gives_the_prompts_their_undo_back(modifying):
-    # Undo is off while a field is tracked, since the document is rewritten under
-    # the typist; a field left over must not keep that.
-    assert not _positive_field(modifying).isUndoRedoEnabled()
-
+def test_ending_the_modify_leaves_the_prompts_their_undo(modifying, qtbot):
     modifying._end_folder_modify()
+    field = _positive_field(modifying)
 
-    assert _positive_field(modifying).isUndoRedoEnabled()
+    field.setPlainText("a dog on a couch")
+    qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    assert modifying._param_form._widgets["positive_prompt"].value() == "a cat on a couch"
 
 
 def test_picking_another_workflow_ends_the_modify(modifying):

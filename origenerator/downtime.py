@@ -20,10 +20,10 @@ from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.generation_state import GenerationSource
 from origenerator.inflight import reconcile_the_backfill
-from origenerator.landed_while_away import running_trainings, training_notice
+from origenerator.landed_while_away import running_trainings, training_toast
 from origenerator.media import MediaType
-from origenerator.notice_toast import raise_notice
 from origenerator.single_instance import Copies
+from origenerator.toast_raising import raise_toast
 from origenerator.win32 import APP_USER_MODEL_ID
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -91,8 +91,8 @@ def announce_trainings_that_ended(announce) -> None:
         status = lora_training.read_status(job) or {}
         if (job.get("automatic") and status.get("state") in ("done", "failed")
                 and not status.get("taken") and not status.get("announced")):
-            if (notice := training_notice(job)) is not None:
-                announce(notice)
+            if (toast := training_toast(job)) is not None:
+                announce(toast)
             lora_training.mark_announced(job)
 
 
@@ -198,7 +198,7 @@ def main() -> int:
 
     if not app_open():
         identity = taskbar_identity(APP_USER_MODEL_ID, None)
-        announce_trainings_that_ended(lambda notice: raise_notice(identity, notice))
+        announce_trainings_that_ended(lambda toast: raise_toast(identity, toast))
     turn = take_a_turn(
         app_open=app_open,
         training_running=lambda: bool(running_trainings()),

@@ -58,10 +58,10 @@ from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
 
-_NOTICE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
+_MESSAGE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
                  f" padding: {NOTICE_PAD_V}px {NOTICE_PAD_H}px;"
                  f" border-radius: {NOTICE_RADIUS}px;")
-_NOTICE_MARGIN = NOTICE_TOP_MARGIN  # how far the plate floats from the media's top-left corner
+_MESSAGE_MARGIN = NOTICE_TOP_MARGIN  # how far the plate floats from the media's top-left corner
 
 
 def _path_key(path) -> str:
@@ -166,11 +166,11 @@ class PreviewWidget(QWidget):
 
         self._stack.setCurrentWidget(self._image_label)
 
-        self._notice = QLabel(media_host)
-        self._notice.setStyleSheet(_NOTICE_PLATE)
-        self._notice.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self._notice.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._notice.hide()
+        self._message = QLabel(media_host)
+        self._message.setStyleSheet(_MESSAGE_PLATE)
+        self._message.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._message.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._message.hide()
 
         self._controls = CornerButtons(self)
         self._controls.triggered.connect(self._on_control)
@@ -201,7 +201,7 @@ class PreviewWidget(QWidget):
         This is what showing anything means, said once: the movie and the still
         are retired and the other pages put down (:meth:`_set_movie` clears the
         combination and the wall), the timeline drops, the playback stops,
-        the notice and the corner buttons — both of which are about the item
+        the message and the corner buttons — both of which are about the item
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
         anything that is not a file on disk).
@@ -209,7 +209,7 @@ class PreviewWidget(QWidget):
         The two switches are the deliberate exceptions, one caller each.
         ``stop_player`` — a video does not stop the player it is about to hand a
         new source to. ``enhancing`` — frames of an enhancement of the item
-        on screen are the coming state of that item, so its notice and its
+        on screen are the coming state of that item, so its message and its
         corners are as true of them and stay.
         """
         self._set_movie(None)
@@ -218,7 +218,7 @@ class PreviewWidget(QWidget):
         if stop_player:
             self._stop_playback()
         if not enhancing:
-            self.set_notice(None)
+            self.set_message(None)
             self.set_actions(None)
         self._media, self._generation = media, generation
         self._live = live
@@ -266,7 +266,7 @@ class PreviewWidget(QWidget):
 
         ``enhancing`` marks the frames as the coming state of the item
         already on display — an enhancement of it — rather than a run of the
-        settings beside it. Whatever a notice says about that item is just as
+        settings beside it. Whatever a message says about that item is just as
         true of the version being made, so it stays where it is: cleared by each
         frame and re-asserted by each keystroke, it flickers at the rate the run
         streams while the form is being typed in. The corners stay for the same
@@ -277,7 +277,7 @@ class PreviewWidget(QWidget):
             return
         self._take_the_pane(None, enhancing=enhancing, live=True)
         self._show_image(pixmap)
-        self._raise_notice()  # a kept notice, back over the frame that just landed
+        self._raise_message()  # a kept message, back over the frame that just landed
 
     def show_combination(self, combination) -> None:
         """Show a combination waiting to be run: the frame on the left, a plus,
@@ -326,26 +326,26 @@ class PreviewWidget(QWidget):
         self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
 
-    def set_notice(self, text: str | None) -> None:
-        """Write ``text`` over the media, or take the notice away (``None``).
+    def set_message(self, text: str | None) -> None:
+        """Write ``text`` over the media, or take the message away (``None``).
 
         For a pane whose item no longer answers the settings beside it: the
         media stays on screen — it is still the last thing generated — but is
         plainly marked as not what those settings would now make. Anything that
-        changes what's on screen clears it, so a notice can never outlive the
+        changes what's on screen clears it, so a message can never outlive the
         item it was about; the owner re-asserts it if it still applies.
         """
         if not text:
-            self._notice.hide()
+            self._message.hide()
             return
-        if not self._notice.isHidden() and self._notice.text() == text:
+        if not self._message.isHidden() and self._message.text() == text:
             return  # already saying exactly this — don't re-raise it mid-typing
-        self._notice.setText(text)
-        self._notice.show()
-        self._place_notice()
-        self._raise_notice()
+        self._message.setText(text)
+        self._message.show()
+        self._place_message()
+        self._raise_message()
 
-    def _place_notice(self) -> None:
+    def _place_message(self) -> None:
         """Float the message plate in the media's top-left corner.
 
         The plate stays one line wherever the pane is wide enough for it, and
@@ -353,18 +353,18 @@ class PreviewWidget(QWidget):
         squarish block instead, which turns a one-line message into a slab.
         """
         host = self._media_host
-        limit = max(1, host.width() - 2 * _NOTICE_MARGIN)
-        self._notice.setWordWrap(False)
-        self._notice.adjustSize()
-        if self._notice.width() > limit:
-            self._notice.setWordWrap(True)
-            self._notice.resize(limit, self._notice.heightForWidth(limit))
-        self._notice.move(_NOTICE_MARGIN, _NOTICE_MARGIN)
+        limit = max(1, host.width() - 2 * _MESSAGE_MARGIN)
+        self._message.setWordWrap(False)
+        self._message.adjustSize()
+        if self._message.width() > limit:
+            self._message.setWordWrap(True)
+            self._message.resize(limit, self._message.heightForWidth(limit))
+        self._message.move(_MESSAGE_MARGIN, _MESSAGE_MARGIN)
 
-    def _raise_notice(self) -> None:
+    def _raise_message(self) -> None:
         """A stacked layout raises the widget it switches to above every sibling
-        it has, the notice included."""
-        self._notice.raise_()
+        it has, the message included."""
+        self._message.raise_()
 
     def clear(self) -> None:
         self.show_message(_PLACEHOLDER)
@@ -657,14 +657,14 @@ class PreviewWidget(QWidget):
                 self._scale_movie()
             elif self._pixmap is not None:
                 self._rescale()
-            if not self._notice.isHidden():
-                self._place_notice()
+            if not self._message.isHidden():
+                self._place_message()
             # The label lags this widget going fullscreen, so anything placed
             # against the media's rect has to re-place when the refit lands.
             self._place_controls()
             self.media_resized.emit()
         elif obj is self._media_host and event.type() == QEvent.Type.Resize:
-            if not self._notice.isHidden():
-                self._place_notice()
+            if not self._message.isHidden():
+                self._place_message()
             self._place_controls()
         return super().eventFilter(obj, event)

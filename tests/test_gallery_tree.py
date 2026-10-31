@@ -50,34 +50,34 @@ def _video(prompt_id, lora):
 
 
 def _folder_of_your_own(folder_id, name, holding=()):
-    return gallery.CustomGroup(gallery.custom_folder_key(folder_id), name, list(holding),
+    return gallery.CustomCollection(gallery.custom_collection_key(folder_id), name, list(holding),
                                folder_id=folder_id)
 
 
-def _gallery_tree(qtbot, rows, folders_of_your_own=(), folder_meta=None):
-    pane, tree, _model = _gathered_tree(qtbot, rows, lambda _model: folders_of_your_own,
+def _gallery_tree(qtbot, rows, collections_of_your_own=(), folder_meta=None):
+    pane, tree, _model = _gathered_tree(qtbot, rows, lambda _model: collections_of_your_own,
                                         folder_meta)
     return pane, tree
 
 
-def _gathered_tree(qtbot, rows, folders_of_your_own, folder_meta=None, recently_worked=()):
-    """The list built from ``rows``, with the folders of your own that
-    ``folders_of_your_own`` makes out of the Landscape side's folders."""
+def _gathered_tree(qtbot, rows, collections_of_your_own, folder_meta=None, recently_worked=()):
+    """The list built from ``rows``, with the collections of your own that
+    ``collections_of_your_own`` makes out of the Landscape side's folders."""
     model = gallery.build_gallery_tree(rows, folder_meta)
     pane = SplitFolderTree(GROUP_ROLE)
     qtbot.addWidget(pane)
     tree = GalleryTree(pane)
     tree.populate(
-        [SideModel(LANDSCAPE, model, custom_folders=list(folders_of_your_own(model)),
+        [SideModel(LANDSCAPE, model, custom_collections=list(collections_of_your_own(model)),
                    show_latest=True),
          SideModel(PORTRAIT, [])],
         folder_meta=folder_meta, recently_worked=recently_worked)
     return pane, tree, model
 
 
-def _table_of_contents(qtbot, rows, folders_of_your_own=(), folder_meta=None):
+def _table_of_contents(qtbot, rows, collections_of_your_own=(), folder_meta=None):
     """The Landscape half, built from ``rows`` and opened all the way down."""
-    pane, _tree = _gallery_tree(qtbot, rows, folders_of_your_own, folder_meta)
+    pane, _tree = _gallery_tree(qtbot, rows, collections_of_your_own, folder_meta)
     pane.resize(500, 1600)
     with qtbot.waitExposed(pane):
         pane.show()
@@ -316,7 +316,7 @@ def test_a_folder_of_your_own_inside_another_shows_under_it_with_what_it_holds(q
     images = next(row for row in _children(all_row) if row.data(0, GROUP_ROLE) is model[0])
 
     assert [_drawn_down(row) for row in _children(inner)] == [_drawn_down(images)]
-    assert inner.data(0, DROP_KEY_ROLE) == gallery.custom_folder_key(2)
+    assert inner.data(0, DROP_KEY_ROLE) == gallery.custom_collection_key(2)
 
 
 def test_a_folder_drawn_again_inside_a_folder_of_your_own_is_found_first_in_its_own_place(qtbot):
@@ -345,7 +345,7 @@ def test_a_folder_left_open_inside_a_folder_of_your_own_is_open_again_after_a_re
     own, again = tree.keys_for_folder(model[0].key)
     tree.item_by_key[again].setExpanded(True)
 
-    tree.populate([SideModel(LANDSCAPE, model, custom_folders=_keepers_holding_the_images(model)),
+    tree.populate([SideModel(LANDSCAPE, model, custom_collections=_keepers_holding_the_images(model)),
                    SideModel(PORTRAIT, [])])
 
     assert tree.item_by_key[again].isExpanded()

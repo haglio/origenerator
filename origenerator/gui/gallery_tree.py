@@ -8,7 +8,7 @@ play (see :mod:`origenerator.orientation`).
 
 A row's key in the tree is therefore its folder's own key with the side
 appended, and the two maps kept here — key→item and prompt-id→item — are keyed
-that way; a folder drawn again under a folder of your own adds the folders it is
+that way; a folder drawn again under a collection of your own adds the folders it is
 drawn inside. The folder's own key is what a star, a name and a place in a custom
 folder hang off, and it is untouched: ``keys_by_folder`` maps one back to
 the rows drawing it, its own place first, which is how a navigation that knows
@@ -111,7 +111,7 @@ class SideModel:
 
     side: str
     tree_model: list                       # the media roots this side holds
-    custom_folders: list = field(default_factory=list)
+    custom_collections: list = field(default_factory=list)
     show_latest: bool = False             # anything at all to list yet
     collection_counts: dict[str, int] = field(default_factory=dict)
 
@@ -174,8 +174,8 @@ class GalleryTree:
         for is still somewhere you can stand and somewhere its first generation
         can appear.
         """
-        customs = [(custom, self._add_custom_folder(custom, root, side))
-                   for custom in side.custom_folders]
+        customs = [(custom, self._add_custom_collection(custom, root, side))
+                   for custom in side.custom_collections]
         all_row = self._add_node(gallery.all_group(side.tree_model, folder_meta), root, side)
         all_row.setIcon(0, icons.all_icon())
         for custom, row in customs:
@@ -228,14 +228,14 @@ class GalleryTree:
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
 
-    def _add_custom_folder(self, group, parent_item, side, inside=()) -> QTreeWidgetItem:
+    def _add_custom_collection(self, group, parent_item, side, inside=()) -> QTreeWidgetItem:
         """Add a row for one of the user's own folders: a collection-shaped row carrying
         its group (so the view's folder machinery — folder path, tiles, slideshow —
         treats it like any other folder), and collecting the folders dropped onto
         it."""
         count = len(gallery.rows_under(group))
         item = QTreeWidgetItem([group.label])
-        item.setIcon(0, icons.custom_folder_icon())
+        item.setIcon(0, icons.custom_collection_icon())
         item.setToolTip(0, f"{group.label} — {count} item{'s' if count != 1 else ''} "
                            "in a folder you made; drop folders or items here to add them")
         item.setData(0, GROUP_ROLE, group)
@@ -245,8 +245,8 @@ class GalleryTree:
                               folder_key=group.key)
 
     def _add_node(self, group, parent_item, side, inside=()) -> QTreeWidgetItem:
-        if isinstance(group, gallery.CustomGroup):
-            item = self._add_custom_folder(group, parent_item, side, inside)
+        if isinstance(group, gallery.CustomCollection):
+            item = self._add_custom_collection(group, parent_item, side, inside)
         else:
             item = self._add_folder(group, parent_item, side, inside)
         self._add_children(group, item, side, _inside(group, inside))

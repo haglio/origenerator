@@ -93,7 +93,7 @@ def test_undoing_a_delete_says_which_generation_came_back(tmp_path):
 
 def test_undoing_a_folder_made_by_hand_moves_the_selection_nowhere(tmp_path):
     actions, _db, _out = _actions(tmp_path)
-    actions.custom_folders.create("Keepers", [])
+    actions.custom_collections.create("Keepers", [])
     assert actions.undo() is None
 
 
@@ -166,7 +166,7 @@ def test_undo_label_describes_the_most_recent_action(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     assert actions.undo_label() is None
 
-    actions.custom_folders.create("Keepers", [])
+    actions.custom_collections.create("Keepers", [])
     assert "create folder" in actions.undo_label().lower()
 
     rows = [_completed_row(db, output_dir, "p1", "a.png"),
@@ -235,7 +235,7 @@ def test_a_new_action_forks_history_and_drops_the_redo(tmp_path):
     actions.undo()
     assert actions.can_redo()
 
-    actions.custom_folders.create("Keepers", [])
+    actions.custom_collections.create("Keepers", [])
 
     assert not actions.can_redo()  # the branch that redo led to is gone
 
@@ -244,7 +244,7 @@ def test_redo_label_names_the_step_it_would_re_apply(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     assert actions.redo_label() is None
     assert not actions.can_redo()
-    actions.custom_folders.create("Keepers", [])
+    actions.custom_collections.create("Keepers", [])
     actions.undo()
     assert "create folder" in actions.redo_label().lower()
 

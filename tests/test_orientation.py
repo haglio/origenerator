@@ -301,7 +301,7 @@ def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
 def test_a_folder_composed_on_one_side_is_drawn_on_each_side_covering_it(
         qtbot, tmp_path, side):
     db = FakeDB([_shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)])
-    db.create_custom_folder("Keepers", side=PORTRAIT)
+    db.create_custom_collection("Keepers", side=PORTRAIT)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()

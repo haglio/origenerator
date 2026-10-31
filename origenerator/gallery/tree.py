@@ -304,7 +304,7 @@ def favorite_folders(tree: list[MediaGroup]) -> list:
 
 
 def folder_names_by_row(
-    tree: list, folder_meta: dict[str, dict] | None = None, custom_folders=()
+    tree: list, folder_meta: dict[str, dict] | None = None, custom_collections=()
 ) -> dict[str, list[str]]:
     names: dict[str, list[str]] = {}
     folder_meta = folder_meta or {}
@@ -323,7 +323,7 @@ def folder_names_by_row(
             walk(child_groups(group))
 
     walk(tree)
-    for folder in custom_folders:
+    for folder in custom_collections:
         credit(folder, folder.label)
     return names
 

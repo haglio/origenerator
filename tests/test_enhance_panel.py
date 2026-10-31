@@ -154,7 +154,8 @@ def test_the_switch_draws_at_both_states(qtbot):
     off = switch.grab().toImage()
     switch.setChecked(True)
     on = switch.grab().toImage()
-    assert not off.isNull() and not on.isNull()
+    assert not off.isNull()
+    assert not on.isNull()
     assert off != on            # the setting and the track visibly moved
 
 
@@ -200,7 +201,8 @@ def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
 
     assert edits[-1].params["enhance_detail_fixes"] == {
         "faces": DEFAULT_FIX_DENOISE, "hands": 0.6}
-    assert panel._fixes["faces"].toolTip() and panel._fix_checks["faces"].toolTip()
+    assert panel._fixes["faces"].toolTip()
+    assert panel._fix_checks["faces"].toolTip()
 
 
 def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
@@ -257,7 +259,8 @@ def test_the_numbers_share_a_line_while_they_fit_and_take_a_line_each_when_not(q
 
     _laid_out_at(panel, panel.minimumSizeHint().width())
     rows = [top(field) for field in _numbers(panel)]
-    assert rows == sorted(set(rows)) and len(rows) == 3
+    assert rows == sorted(set(rows))
+    assert len(rows) == 3
     assert top(fixes_heading) >= rows[-1] + panel._denoise.height()
 
 
@@ -327,10 +330,12 @@ def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_
     (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
 
     panel.show_offer(True, "Enhance 2 items")
-    assert button.isEnabled() and button.toolTip() == "Enhance 2 items"
+    assert button.isEnabled()
+    assert button.toolTip() == "Enhance 2 items"
 
     panel.show_offer(False, "Nothing here to enhance")
-    assert not button.isEnabled() and button.toolTip() == "Nothing here to enhance"
+    assert not button.isEnabled()
+    assert button.toolTip() == "Nothing here to enhance"
 
 
 def test_the_presets_and_save_sit_left_of_the_enhance_button_on_its_line(qtbot):
@@ -341,7 +346,8 @@ def test_the_presets_and_save_sit_left_of_the_enhance_button_on_its_line(qtbot):
         _laid_out_at(panel, width)
         lefts = [widget.mapTo(panel, QPoint(0, 0)).x() for widget in line]
         middles = {widget.mapTo(panel, QPoint(0, widget.height() // 2)).y() for widget in line}
-        assert lefts == sorted(lefts) and len(middles) == 1, width
+        assert lefts == sorted(lefts), width
+        assert len(middles) == 1, width
 
 
 def _presets():
@@ -427,7 +433,8 @@ def test_picking_a_preset_puts_its_settings_on_the_panel_and_leaves_the_switch_a
     _pick(panel._preset_picker, 1)
 
     assert panel._steps.value() == 30
-    assert edits[-1].params["enhance_steps"] == 30 and edits[-1].auto is True
+    assert edits[-1].params["enhance_steps"] == 30
+    assert edits[-1].auto is True
     assert panel._preset_picker.currentText() == "Soft"
     assert panel._preset_button.text() == "Rename…"
 
@@ -529,11 +536,13 @@ def test_an_unticked_parts_name_and_number_gray_out(qtbot):
     panel, _ = _panel(qtbot)
     label = panel._label_for(panel._fixes["faces"])
 
-    assert not label.isEnabled() and not panel._fixes["faces"].isEnabled()
+    assert not label.isEnabled()
+    assert not panel._fixes["faces"].isEnabled()
 
     panel._fix_checks["faces"].setChecked(True)
 
-    assert label.isEnabled() and panel._fixes["faces"].isEnabled()
+    assert label.isEnabled()
+    assert panel._fixes["faces"].isEnabled()
 
 
 def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
@@ -601,7 +610,8 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
     assert _mean_ink(panel) < live      # visibly dimmer, not merely inert
 
     panel.set_applicable(True)
-    assert panel.isEnabled() and panel.toolTip() == ""
+    assert panel.isEnabled()
+    assert panel.toolTip() == ""
 
 
 def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
@@ -610,7 +620,8 @@ def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
     panel, _ = _panel(qtbot, detectors=())
     panel.set_applicable(False, "nope")
     panel.set_applicable(True)
-    assert panel.isEnabled() and not panel._fix_checks["faces"].isEnabled()
+    assert panel.isEnabled()
+    assert not panel._fix_checks["faces"].isEnabled()
 
 
 def test_a_model_no_longer_installed_is_still_shown(qtbot):
@@ -712,11 +723,14 @@ def test_each_level_carries_its_own_file_and_created_rows(qtbot):
                          created_fallback="2026-08-01")
 
     facts = _facts(_rows(versions)[0])
-    assert "Enhancement" in facts and "2x" in facts
-    assert "File" in facts and "image/e1.png" in facts
+    assert "Enhancement" in facts
+    assert "2x" in facts
+    assert "File" in facts
+    assert "image/e1.png" in facts
     # The file isn't on disk here, so its own write time can't be read — the
     # row's timestamp is the closest true answer left.
-    assert "Created" in facts and "2026-08-01" in facts
+    assert "Created" in facts
+    assert "2026-08-01" in facts
 
 
 def test_a_file_row_can_be_copied_and_revealed(qtbot):
@@ -725,7 +739,8 @@ def test_a_file_row_can_be_copied_and_revealed(qtbot):
     versions.show_levels(_items(_levels(1)))
 
     names = {b.objectName() for b in _rows(versions)[0].findChildren(QPushButton)}
-    assert "copyButton" in names and "revealButton" in names
+    assert "copyButton" in names
+    assert "revealButton" in names
 
 
 def test_a_levels_settings_caption_its_row(qtbot):
@@ -1038,7 +1053,8 @@ def test_a_picked_levels_facts_are_written_in_white(qtbot):
 
     facts = [label for label in row._fact_cells if isinstance(label, QLabel)]
     assert TEXT_PRIMARY.name() not in resting
-    assert facts and {_ink(label) for label in facts} == {TEXT_PRIMARY.name()}
+    assert facts
+    assert {_ink(label) for label in facts} == {TEXT_PRIMARY.name()}
 
 
 def test_a_level_let_go_of_has_its_facts_back_in_gray(qtbot):
@@ -1656,7 +1672,8 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
     assert settings.params["enhance_denoise"] == 0.35
     # The drop says what to enhance at, not whether to keep enhancing.
     assert settings.auto is True
-    assert edits and edits[-1] == settings
+    assert edits
+    assert edits[-1] == settings
 
 
 def test_a_dropped_level_leaves_the_panel_at_exactly_what_that_level_ran_with(qtbot):

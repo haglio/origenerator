@@ -51,12 +51,14 @@ def test_a_request_spoken_across_pauses_is_collected_whole():
     dictation = RequestDictation()
 
     opened = dictation.push("Request.")
-    assert opened.state == OPENED and dictation.listening
+    assert opened.state == OPENED
+    assert dictation.listening
     middle = dictation.push("no silver earrings")
     done = dictation.push("and more freckles. Over.")
 
     assert middle.state == COLLECTING
-    assert done.state == COMPLETED and not dictation.listening
+    assert done.state == COMPLETED
+    assert not dictation.listening
     assert done.text == "no silver earrings and more freckles"
     assert done.heard == "Request. no silver earrings and more freckles. Over."
 
@@ -74,7 +76,8 @@ def test_a_request_keeps_the_time_its_first_step_was_spoken():
 def test_a_request_said_in_one_breath_keeps_the_time_it_was_spoken():
     done = RequestDictation().push("Request, no hat, over", spoken_at=7.5)
 
-    assert done.state == COMPLETED and done.opened_at == 7.5
+    assert done.state == COMPLETED
+    assert done.opened_at == 7.5
 
 
 def test_every_utterance_of_an_open_request_is_swallowed():
@@ -169,4 +172,5 @@ def test_the_bias_names_both_markers():
     # Whisper only lands the marker words off a quiet mic when told to expect
     # them, and the whole feature hangs on hearing exactly these two.
     bias = request_bias().lower()
-    assert "request" in bias and "over" in bias
+    assert "request" in bias
+    assert "over" in bias

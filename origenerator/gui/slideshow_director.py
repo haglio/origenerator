@@ -786,7 +786,7 @@ class SlideshowDirector:
                         if media_type == MediaType.VIDEO else None)
             upscale = upscales.upscale_of(resolved[0]) if resolved is not None else None
             levels = gallery.displayed_levels(row, upscale)
-            if len(levels) < 2:
+            if len(levels) <= 1:
                 continue
             entries = [Version(gallery.output_file_path(level.file, OUTPUT_PLACES),
                                media_type, level.label,

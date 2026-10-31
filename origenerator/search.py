@@ -159,6 +159,7 @@ _POSITIVE_WEIGHT = 1.0
 _FOLDER_WEIGHT = 1.0
 _MADE_WITH_WEIGHT = 0.7
 _SHORTEST_NAME_START = 4
+_LONGEST_UNSTEMMED = 3
 
 
 def _words(text) -> list[str]:
@@ -179,7 +180,7 @@ def _stem(word: str) -> str:
     """
     word = _IRREGULAR_PLURALS.get(word, word)
     word = _NUMBER_WORDS.get(word, word)
-    if len(word) > 3:
+    if len(word) > _LONGEST_UNSTEMMED:
         if word.endswith("ies"):
             return word[:-3] + "y"
         if word.endswith(("sses", "shes", "ches", "xes")):
@@ -226,7 +227,7 @@ def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
             words = _words(entry)
             if len(words) == 1:
                 stems.add(_stem(words[0]))
-        if len(stems) < 2:
+        if len(stems) <= 1:
             continue  # a group of one widens nothing
         overlapping = [g for g in merged if g & stems]
         for existing in overlapping:

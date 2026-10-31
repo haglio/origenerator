@@ -646,7 +646,8 @@ def test_import_same_stem_image_and_video_get_distinct_thumbnails(tmp_path):
     assert import_comfyui_output(OutputPlaces.in_one_folder(output_dir), db, thumb_dir) == 2
 
     thumbs = [r["thumbnail_path"] for r in db.list_generations()]
-    assert all(thumbs) and len(set(thumbs)) == 2          # two distinct thumbnails
+    assert all(thumbs)
+    assert len(set(thumbs)) == 2
     assert all(Path(t).exists() for t in thumbs)          # neither overwritten away
 
 
@@ -947,7 +948,8 @@ def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
     vid_thumb = db.get_generation("vid")["thumbnail_path"]
     assert img_thumb != vid_thumb
     assert Path(img_thumb).name == "img.jpg"   # named by prompt_id now
-    assert Path(img_thumb).exists() and Path(vid_thumb).exists()
+    assert Path(img_thumb).exists()
+    assert Path(vid_thumb).exists()
     # The image row's thumbnail reflects its own portrait still, not the clip.
     assert Image.open(img_thumb).size[0] < Image.open(img_thumb).size[1]
 

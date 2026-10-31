@@ -72,7 +72,8 @@ def test_a_combine_draws_the_frame_then_its_source_video_in_gray(qapp, tmp_path)
     block = source_pixmap(Combination(frame, video), CELL)
 
     lead = _color_at(block, _middle_of_cell(0), CELL // 2)
-    assert lead.red() > 200 and lead.blue() < 60         # the frame, still itself
+    assert lead.red() > 200
+    assert lead.blue() < 60
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
     assert follow.red() == follow.green() == follow.blue()  # the source video, drained
 
@@ -102,7 +103,8 @@ def test_a_source_video_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp
 
     assert _color_at(block, _middle_of_cell(0), CELL // 2).alpha() == 0
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
-    assert follow.blue() > 0 and follow.red() == follow.blue()
+    assert follow.blue() > 0
+    assert follow.red() == follow.blue()
 
 
 def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses_on_its_row(qapp, tmp_path):
@@ -141,7 +143,8 @@ def test_the_thumbnails_lie_across_the_row_not_stacked(qapp, tmp_path):
     assert _color_at(block, _middle_of_cell(1), CELL // 2).green() > 200
     assert _color_at(block, _middle_of_cell(2), CELL // 2).blue() > 200
     fourth = _color_at(block, _middle_of_cell(3), CELL // 2)
-    assert fourth.red() > 200 and fourth.green() > 200
+    assert fourth.red() > 200
+    assert fourth.green() > 200
 
 
 def test_a_folder_view_keeps_its_empty_slots(qapp, tmp_path):

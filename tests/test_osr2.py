@@ -90,7 +90,8 @@ def test_an_app_that_does_not_want_the_osr2_sends_it_nothing(the_brokers_slot):
     finally:
         broker.close()
 
-    assert lines.empty() and slot.holder is None
+    assert lines.empty()
+    assert slot.holder is None
 
 
 # --- is the device there: what the console reads to say "Off" ---------------

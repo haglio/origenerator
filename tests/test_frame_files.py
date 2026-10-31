@@ -53,7 +53,8 @@ def test_a_forgotten_runs_files_go_once_the_funestra_lets_go_of_them(tmp_path, m
     monkeypatch.setattr(Path, "unlink", unlink_unless_open)
     frames.forget("run-1")
     assert frames.first_of("run-1") is None
-    assert held.exists() and not newer.exists()
+    assert held.exists()
+    assert not newer.exists()
 
     still_open.clear()
     frames.write("run-2", PNG)

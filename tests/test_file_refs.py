@@ -57,7 +57,8 @@ def test_reference_path_routes_the_way_comfyuis_loadimage_does(tmp_path):
     assert resolve("image/gen.png") is None                    # not in the input dir
     assert resolve(str(in_dir / "frame.png")) == in_dir / "frame.png"  # absolute, as-is
     assert resolve("missing.png [output]") is None
-    assert resolve("") is None and resolve(None) is None
+    assert resolve("") is None
+    assert resolve(None) is None
     assert isinstance(resolve("frame.png"), Path)
 
 

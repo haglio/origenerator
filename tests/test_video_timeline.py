@@ -44,7 +44,8 @@ def test_the_cursor_rides_the_videos_own_length(qtbot):
     assert abs(_cursor_x(timeline) - 50) <= 3
     image, y = timeline.grab().toImage(), timeline.height() // 2
     white = QColor(255, 255, 255)
-    assert image.pixelColor(25, y) != white and image.pixelColor(75, y) != white
+    assert image.pixelColor(25, y) != white
+    assert image.pixelColor(75, y) != white
 
 
 def test_an_unscripted_video_carries_the_cursor_too(qtbot):

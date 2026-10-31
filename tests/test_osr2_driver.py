@@ -143,7 +143,8 @@ def test_a_frozen_room_stops_a_script_at_once_and_asks_the_broker_to_park_it(qap
     driver.set_frozen(True)
     driver.poll()
 
-    assert broker.positions == [] and broker.asked == [RESUME, PARK]
+    assert broker.positions == []
+    assert broker.asked == [RESUME, PARK]
     assert driver.active
 
 

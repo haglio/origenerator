@@ -339,7 +339,8 @@ def test_the_heatmap_has_one_color_for_every_bucket_it_draws():
     colors = heatmap_colors(synthesize_actions(2.0, hz=1.0), 8)
     assert len(colors) == 8
     for c in colors:
-        assert len(c) == 3 and all(0 <= ch <= 255 for ch in c)
+        assert len(c) == 3
+        assert all(0 <= ch <= 255 for ch in c)
 
 
 def test_the_heatmap_is_the_one_the_funestras_scrubber_paints():

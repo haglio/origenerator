@@ -169,7 +169,8 @@ def test_a_request_and_the_lock_each_let_go_only_of_themselves(qtbot, tmp_path):
 
     slideshow.pause_for_request(True, "🎤 listening…")
     slideshow.pause_for_request(False)
-    assert slideshow.locked is True and "LOCK_OFF" not in _sent(slideshow)
+    assert slideshow.locked is True
+    assert "LOCK_OFF" not in _sent(slideshow)
 
     slideshow.pause_for_request(True, "🎤 listening…")
     _sent(slideshow)
@@ -555,7 +556,8 @@ def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot
     slideshow.slideshow_cull()
 
     mark, line = said[-1]
-    assert mark == "trash" and "couldn't delete" in line
+    assert mark == "trash"
+    assert "couldn't delete" in line
 
 
 def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):

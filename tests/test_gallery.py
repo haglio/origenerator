@@ -81,7 +81,8 @@ def test_the_all_group_gathers_images_and_videos_and_walks_to_every_row():
         "w", "wf", "WF", [ModelGroup("m", "M", [LoraGroup("l", "L", [leaf])])])])
     group = all_group([images])
 
-    assert group.key == ALL_KEY and group.label == "All"
+    assert group.key == ALL_KEY
+    assert group.label == "All"
     assert child_groups(group) == [images]
     assert rows_under(group) == [{"prompt_id": "g1"}]
     assert folder_level(group) is None   # everything is not a level of anything
@@ -1848,7 +1849,8 @@ def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
     (leaf,) = lora.children
 
     assert leaf.label == folder_id(leaf.key)
-    assert leaf.label.isalnum() and leaf.label == leaf.label.upper()
+    assert leaf.label.isalnum()
+    assert leaf.label == leaf.label.upper()
     assert "cat" not in leaf.label.lower()
 
 
@@ -1864,7 +1866,8 @@ def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
     grown = build_gallery_tree([_img("i3", "a bird", 50, 1), *rows])
     again = {leaf.key: leaf.label
              for leaf in _workflows(grown)[0].children[0].children[0].children}
-    assert again[cat.key] == cat.label and again[dog.key] == dog.label
+    assert again[cat.key] == cat.label
+    assert again[dog.key] == dog.label
 
 
 def test_a_custom_name_replaces_the_code():

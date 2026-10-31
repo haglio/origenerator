@@ -656,7 +656,8 @@ def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot
     view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: asked.append(pid) or True))
 
     _press(view, Qt.Key.Key_E)
-    assert view.slideshow.locked and asked == ["id-a"]
+    assert view.slideshow.locked
+    assert asked == ["id-a"]
     assert words(view._note) == "Locked"
 
     _press(view, Qt.Key.Key_Home)
@@ -1243,11 +1244,13 @@ def test_asking_for_a_lock_locks_and_asking_again_changes_nothing(qtbot):
 
     assert view.slideshow.set_locked(True) is True
     _settle(view)
-    assert view.slideshow.locked and favorite == ["gen-a"]
+    assert view.slideshow.locked
+    assert favorite == ["gen-a"]
 
     assert view.slideshow.set_locked(True) is False   # already locked: nothing moved
     _settle(view)
-    assert view.slideshow.locked and favorite == ["gen-a"]
+    assert view.slideshow.locked
+    assert favorite == ["gen-a"]
 
 
 def test_a_spoken_lock_favorites_the_slide_like_a_pressed_one(qtbot):
@@ -2070,7 +2073,9 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     path, tgt_player, actions = target
     # The pane itself is what the drive follows: it is what knows where the
     # clip has got to, the way the config panel's media Funestra is there.
-    assert path == str(vid) and tgt_player is view._pane and actions
+    assert path == str(vid)
+    assert tgt_player is view._pane
+    assert actions
 
 
 def test_osr2_drive_target_is_none_for_an_image(qtbot, tmp_path):

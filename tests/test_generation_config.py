@@ -142,7 +142,8 @@ def test_randomize_seeds_sets_missing_seed_keys():
     # A workflow's seed key absent from a sparse row is still given a value so
     # the rebuilt payload has a seed to use.
     out = randomize_seeds({"steps": 20}, ["seed"])
-    assert "seed" in out and isinstance(out["seed"], int)
+    assert "seed" in out
+    assert isinstance(out["seed"], int)
 
 
 def test_a_request_already_generated_is_found_rather_than_run_again():

@@ -159,7 +159,8 @@ def test_a_video_comes_in_with_its_starting_frame_as_the_image_it_starts_from(tm
                                                                  "style": "Video Style"}
     assert file == {"filename": "c1_topaz.mp4", "library_path": str(video.path)}
     assert params["input_image"] == frame_file["path"]
-    assert Path(frame_file["path"]).is_file() and Path(shown["thumbnail_path"]).is_file()
+    assert Path(frame_file["path"]).is_file()
+    assert Path(shown["thumbnail_path"]).is_file()
 
 
 _VIDEO_PARAMS = {"positive_prompt": "a slow walk on the shore", "seed": "11",

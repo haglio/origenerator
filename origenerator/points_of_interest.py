@@ -72,7 +72,7 @@ def _region(text):
         region = json.loads(text)
     except (TypeError, ValueError):
         return None
-    if (isinstance(region, list) and len(region) == 4
+    if (isinstance(region, list) and len(region) == len(_EDGES)
             and all(isinstance(edge, (int, float)) for edge in region)):
         return region
     return None

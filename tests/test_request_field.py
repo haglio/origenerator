@@ -26,7 +26,8 @@ def test_it_says_updating_from_the_first_letter_until_the_prompts_catch_up(qtbot
     field.asked.connect(lambda _words: None)
 
     qtbot.keyClicks(field._words, "two women")
-    assert field._status.text() == "updating…" and not field._status.isHidden()
+    assert field._status.text() == "updating…"
+    assert not field._status.isHidden()
 
     qtbot.waitUntil(lambda: not field._pause.isActive(), timeout=5000)
     field.done()

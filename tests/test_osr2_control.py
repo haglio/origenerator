@@ -183,7 +183,8 @@ def test_a_switch_handed_no_drivers_lets_go_and_cannot_be_turned_on():
     control.setChecked(True)
 
     assert heard == [OSR2_PARKED]
-    assert not control.isEnabled() and control.state() == OSR2_PARKED
+    assert not control.isEnabled()
+    assert control.state() == OSR2_PARKED
 
 
 def test_a_switch_handed_its_drivers_back_drives_them_again():
@@ -194,7 +195,8 @@ def test_a_switch_handed_its_drivers_back_drives_them_again():
     control.drive_with(motion, script)
     control.set_state(OSR2_DRIVING)
 
-    assert control.state() == OSR2_DRIVING and control.source() == "funscript"
+    assert control.state() == OSR2_DRIVING
+    assert control.source() == "funscript"
 
 
 def test_the_max_intensity_reaches_both_drivers():

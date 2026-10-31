@@ -355,10 +355,12 @@ def test_a_video_over_the_room_between_the_slots_lights_both(qtbot):
     panel = _panel(qtbot, start_images={"vid1": "img1"})
 
     assert _drag_over(panel._between, "vid1").isAccepted()
-    assert _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
+    assert _under_the_drag(panel.image_slot)
+    assert _under_the_drag(panel.video_slot)
 
     panel._between.dragLeaveEvent(QDragLeaveEvent())
-    assert not _under_the_drag(panel.image_slot) and not _under_the_drag(panel.video_slot)
+    assert not _under_the_drag(panel.image_slot)
+    assert not _under_the_drag(panel.video_slot)
 
 
 def test_both_slots_stay_lit_while_the_drag_moves_about_between_them(qtbot):
@@ -371,7 +373,8 @@ def test_both_slots_stay_lit_while_the_drag_moves_about_between_them(qtbot):
     panel._between.dragMoveEvent(event)
 
     assert event.isAccepted()
-    assert _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
+    assert _under_the_drag(panel.image_slot)
+    assert _under_the_drag(panel.video_slot)
 
 
 def test_letting_go_between_the_slots_puts_both_out(qtbot):
@@ -380,14 +383,16 @@ def test_letting_go_between_the_slots_puts_both_out(qtbot):
 
     _let_go_over(panel._between, "vid1")
 
-    assert not _under_the_drag(panel.image_slot) and not _under_the_drag(panel.video_slot)
+    assert not _under_the_drag(panel.image_slot)
+    assert not _under_the_drag(panel.video_slot)
 
 
 def test_between_the_slots_a_video_lands_only_where_it_lends_something(qtbot):
     panel = _panel(qtbot)  # the gallery holds no image vid7 was made from
 
     _drag_over(panel._between, "vid7")
-    assert not _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
+    assert not _under_the_drag(panel.image_slot)
+    assert _under_the_drag(panel.video_slot)
 
     _let_go_over(panel._between, "vid7")
     assert panel.image_slot.current_id() is None
@@ -452,7 +457,8 @@ def test_acts_with_no_video_to_mine_are_grayed_out(qtbot):
 
     panel.set_available_categories({"beta", "epsilon"})
 
-    assert _enabled(panel, "beta") and _enabled(panel, "epsilon")
+    assert _enabled(panel, "beta")
+    assert _enabled(panel, "epsilon")
     assert not _enabled(panel, "gamma")  # nothing in the gallery to take settings from
     assert not _enabled(panel, "dancing")
     assert _enabled(panel, "(custom)")     # the neutral option always stays pickable

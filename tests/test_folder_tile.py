@@ -40,7 +40,8 @@ def test_folder_tile_shows_its_folder_level_badge(qtbot):
     qtbot.addWidget(tile)
 
     badges = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]
-    assert badges and not badges[0].pixmap().isNull()
+    assert badges
+    assert not badges[0].pixmap().isNull()
 
 
 def test_folder_tile_without_a_level_shows_no_badge(qtbot):

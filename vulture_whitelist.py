@@ -18,41 +18,41 @@ belong.
 from __future__ import annotations
 
 # --- Qt event handlers and layout hooks -- called by the C++ event loop, never from here ---
-_.dragEnterEvent  # noqa  # origenerator/gui/drop_slot.py:64, origenerator/gui/folder_tree.py:304, origenerator/gui/job_queue_view.py:743
-_.dropEvent  # noqa  # origenerator/gui/drop_slot.py:73, origenerator/gui/folder_tree.py:329, origenerator/gui/job_queue_view.py:757
-_.contextMenuEvent  # noqa  # origenerator/gui/drop_slot.py:238
-_.takeAt  # noqa  # origenerator/gui/flow_layout.py:46
-_.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
-_.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
-_.mouseDoubleClickEvent  # noqa  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/thumbnail_widget.py:392
-_.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
-_.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:290, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
+_.dragEnterEvent  # origenerator/gui/drop_slot.py:64, origenerator/gui/folder_tree.py:304, origenerator/gui/job_queue_view.py:743
+_.dropEvent  # origenerator/gui/drop_slot.py:73, origenerator/gui/folder_tree.py:329, origenerator/gui/job_queue_view.py:757
+_.contextMenuEvent  # origenerator/gui/drop_slot.py:238
+_.takeAt  # origenerator/gui/flow_layout.py:46
+_.expandingDirections  # origenerator/gui/flow_layout.py:51
+_.hasHeightForWidth  # origenerator/gui/flow_layout.py:54
+_.mouseDoubleClickEvent  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/thumbnail_widget.py:392
+_.startDrag  # origenerator/gui/folder_tree.py:219
+_.wheelEvent  # origenerator/gui/funestra_pane.py:290, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
-supported_actions  # noqa  # origenerator/gui/folder_tree.py:219
+supported_actions  # origenerator/gui/folder_tree.py:219
 
 # --- funestra's Funestra asks these of what runs on it, through its User protocol ---
-_.apply_command  # noqa  # origenerator/gui/slideshow_view.py:498
-_.top_block  # noqa  # origenerator/gui/slideshow_view.py:507
-_.set_showing  # noqa  # origenerator/gui/slideshow_view.py:510
-_.own_frame  # noqa  # origenerator/gui/slideshow_view.py:513
+_.apply_command  # origenerator/gui/slideshow_view.py:498
+_.top_block  # origenerator/gui/slideshow_view.py:507
+_.set_showing  # origenerator/gui/slideshow_view.py:510
+_.own_frame  # origenerator/gui/slideshow_view.py:513
 
 # --- reached by name, from the table a spoken word is dispatched through ---
 # `voice_router._MOTION` maps the spoken on and off words for human inspired to
 # "set_learned", which `_hold_the_motion` hands to getattr.
-_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:269
+_.set_learned  # origenerator/osr2_motion_driver.py:269
 
 # --- sqlite3 reads this off the connection it was set on ---
-_.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231
+_.row_factory  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231
 
 # --- sqlite3 hands this back on rows nothing writes any more, which the listing keeps for every source the enum names ---
-_.STROKE_TRIM  # noqa  # origenerator/generation_state.py:25, the source on a Genau-lane cut, read through _KNOWN_SOURCES in origenerator/db_generations.py
+_.STROKE_TRIM  # origenerator/generation_state.py:25, the source on a Genau-lane cut, read through _KNOWN_SOURCES in origenerator/db_generations.py
 
 # --- style-option fields written for Qt's painter to read, never read back here ---
-_.textVisible  # noqa  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
-_.features  # noqa  # origenerator/gui/thumbnail_dropdown.py:144, the QStyleOptionViewItem the item delegate paints from
-_.decorationSize  # noqa  # origenerator/gui/thumbnail_dropdown.py:145, the same option
-_.showDecorationSelected  # noqa  # origenerator/gui/thumbnail_dropdown.py:185, the option a row's ground is drawn from
+_.textVisible  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
+_.features  # origenerator/gui/thumbnail_dropdown.py:144, the QStyleOptionViewItem the item delegate paints from
+_.decorationSize  # origenerator/gui/thumbnail_dropdown.py:145, the same option
+_.showDecorationSelected  # origenerator/gui/thumbnail_dropdown.py:185, the option a row's ground is drawn from
 
 # --- reachable from nothing yet ---
-_.to_logical_rect  # noqa  # origenerator/ui_scale.py:91, added in 23ee359 for the hosted app with only its tests calling it; the caller it waits for is that work's to land, not this landing's to decide
+_.to_logical_rect  # origenerator/ui_scale.py:91, added in 23ee359 for the hosted app with only its tests calling it; the caller it waits for is that work's to land, not this landing's to decide

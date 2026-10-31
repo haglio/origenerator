@@ -6,7 +6,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 from shared_ui.spacing import GAP_SMALL
 
-from origenerator.gui.metadata_block import reveal_button
+from origenerator.gui.basic_section import reveal_button
 from origenerator.lora_training import TrainingOffer
 from origenerator.reveal import open_in_explorer
 

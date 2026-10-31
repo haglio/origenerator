@@ -177,7 +177,7 @@ EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
 GENAU_SOURCE = haglio_settings.value("genau_source")
 
 # The curated pose references the SDXL Pose Transfer workflow is steered by. Its
-# Structure Image picker opens here rather than in ComfyUI's input folder, which
+# Structure Image file dialog opens here rather than in ComfyUI's input folder, which
 # collects generated frames instead. Built from the library root because that
 # root is private and must stay out of source.
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"

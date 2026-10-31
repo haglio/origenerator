@@ -293,7 +293,7 @@ def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):
 
     assert tabs.count() == 1  # taken over, not opened beside
     panel = tabs.currentWidget()
-    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._workflow_dropdown.currentData() == "wan22_i2v"
     assert panel._param_form.get_values()["positive_prompt"] == "hi"
 
 
@@ -307,7 +307,7 @@ def test_restores_config_tabs_from_app_state(qtbot, tmp_path):
 
     panels = win._gallery_view._info_tabs.config_panels()
     assert len(panels) == 2
-    assert panels[1]._workflow_combo.currentData() == "wan22_i2v"
+    assert panels[1]._workflow_dropdown.currentData() == "wan22_i2v"
 
 
 @pytest.mark.parametrize("saved", [OSR2_PARKED, OSR2_DRIVING])
@@ -1020,7 +1020,7 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     2560px monitor (~853px) or a half of a 1440px portrait monitor (~720px). The
     window, frame included (~+16px), must fit the smallest of those, so its
     effective minimum width has to stay under ~704px. Guards against a large
-    minimum — explicit or content-driven (a non-wrapping label, a combo sized to
+    minimum — explicit or content-driven (a non-wrapping label, a dropdown sized to
     its longest item) — that makes the window refuse to fit and breaks
     monitor-to-monitor tiling."""
     win = _window(qtbot, tmp_path)
@@ -1080,7 +1080,7 @@ def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_pat
     tabs._client.submit_job = lambda payload, prompt_id: prompt_id
     tabs._client.fetch_history = lambda prompt_id: {}  # reconcile finds nothing done
     panel = tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
+    panel._workflow_dropdown.setCurrentIndex(panel._workflow_dropdown.findData("sdxl_t2i"))
     panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
     panel._on_generate()               # emits generate_requested -> a folder re-roll
     (folder_key,) = list(gv._live_jobs)

@@ -10,7 +10,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 
 from origenerator import act_settings, animation_paths
-from origenerator.gui.action_picker import ACTION_LABEL
+from origenerator.gui.action_dropdown import ACTION_LABEL
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
@@ -876,11 +876,11 @@ def test_the_act_list_is_labelled_the_way_an_images_own_action_is(qtbot):
 def test_the_act_list_opens_wide_enough_for_the_longest_act(qtbot):
     """The field is squeezed by the pane it sits in; the open list is not, or the
     acts arrive cut short where they are read."""
-    combo = _panel(qtbot)._category
-    longest = max(combo.fontMetrics().horizontalAdvance(combo.itemText(i))
-                  for i in range(combo.count()))
+    dropdown = _panel(qtbot)._category
+    longest = max(dropdown.fontMetrics().horizontalAdvance(dropdown.itemText(i))
+                  for i in range(dropdown.count()))
 
-    assert combo.view().minimumWidth() > longest
+    assert dropdown.view().minimumWidth() > longest
 
 
 def test_the_word_action_keeps_its_own_height_under_the_dropdown(qtbot):

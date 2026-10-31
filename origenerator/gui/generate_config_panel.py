@@ -58,7 +58,7 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.gui import icons
-from origenerator.gui.action_picker import ActionPicker
+from origenerator.gui.action_dropdown import ActionDropdown
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_zone import DropZone, DropZones
@@ -71,13 +71,13 @@ from origenerator.gui.generate_button import (
     RANDOM_SEED_CAPTION,
     GenerateButton,
 )
-from origenerator.gui.how_many import GenerateWithHowMany, HowManyPicker
+from origenerator.gui.how_many import GenerateWithHowMany, HowManyDropdown
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
 from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.message import set_marked_text
 from origenerator.gui.metadata_block import MetadataBlock, wrappable
 from origenerator.gui.moving_previews import MovingPreviews
-from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
@@ -222,7 +222,7 @@ class GenerateConfigPanel(DropZones):
 
     title_changed = pyqtSignal(str)     # current tab name (its mark moves with it)
     form_edited = pyqtSignal()          # any field changed — every keystroke
-    # A field changed because someone changed it — the workflow picker included,
+    # A field changed because someone changed it — the workflow dropdown included,
     # and never the seeding a load does. What tells the tab strip this tab is
     # being worked in rather than looked at (see _loading_config).
     user_edited = pyqtSignal()
@@ -355,9 +355,9 @@ class GenerateConfigPanel(DropZones):
         Each region below builds itself and says why it is the way it is; this
         is only their order, which is the one thing about them a reader has to
         take in at once. Two orderings inside them are load-bearing and are
-        noted where they happen: the picker takes its index before its signal is
+        noted where they happen: the dropdown takes its index before its signal is
         connected, and _on_workflow_changed runs last, once everything it lays
-        out below the picker exists.
+        out below the dropdown exists.
         """
         layout = QVBoxLayout(self)
         # Top and foot only: the splitter below spans the tab, so its handle
@@ -381,7 +381,7 @@ class GenerateConfigPanel(DropZones):
         self._media_side_by_side = False
         self._media_border: list[int] | None = None
         # Lays out the empty state on a fresh panel — no form, no estimate, and a
-        # Generate with nothing to run — and everything below the picker once a
+        # Generate with nothing to run — and everything below the dropdown once a
         # workflow is chosen. Last, because everything it lays out has to exist.
         self._on_workflow_changed()
 
@@ -448,7 +448,7 @@ class GenerateConfigPanel(DropZones):
         self._metadata_block = MetadataBlock(go_to_folder=self._go_to_folder)
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
-        self._action = ActionPicker(state_names(), act_settings.CATEGORIES, header)
+        self._action = ActionDropdown(state_names(), act_settings.CATEGORIES, header)
         self._action.chosen.connect(self._on_action_chosen)
 
     def _on_action_chosen(self, prompt_id: str, said: str) -> None:
@@ -463,7 +463,7 @@ class GenerateConfigPanel(DropZones):
             self._db.set_act(prompt_id, said or None)
 
     def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
-        """The editable half: the workflow picker, its typical-time estimate, and
+        """The editable half: the workflow dropdown, its typical-time estimate, and
         the host the param form is swapped into whenever the workflow changes."""
         self._form_workflow_key = None  # which workflow the installed form belongs to
         header.setContentsMargins(0, 0, 0, 0)
@@ -471,21 +471,21 @@ class GenerateConfigPanel(DropZones):
         header.setLabelAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
-        self._workflow_combo = NoWheelComboBox()
-        self._workflow_combo.setPlaceholderText("Select a workflow…")
+        self._workflow_dropdown = NoWheelDropdown()
+        self._workflow_dropdown.setPlaceholderText("Select a workflow…")
         self._offer_workflows(makes=None, holding=None)
-        self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
+        self._workflow_dropdown.currentIndexChanged.connect(self._on_workflow_changed)
         # Picking a workflow is an edit as much as typing in a field is, and on a
         # form with nothing to carry over it is the only signal there is.
-        self._workflow_combo.currentIndexChanged.connect(self._note_user_edit)
+        self._workflow_dropdown.currentIndexChanged.connect(self._note_user_edit)
         self._workflow_warning = WarningMark()
         self._workflow_warning.pressed.connect(self._resolve_every_warning)
         # It shrinks to a short floor when the pane is narrow rather than holding
-        # the width of the longest workflow name — see NoWheelComboBox, which every
-        # picker in the app inherits that from. It still expands to fill the row.
+        # the width of the longest workflow name — see NoWheelDropdown, which every
+        # dropdown in the app inherits that from. It still expands to fill the row.
         header.addRow(LabelCell(self._workflow_warning, ElidingLabel("Workflow"),
                                 header.label_column),
-                      self._workflow_combo)
+                      self._workflow_dropdown)
         body.addLayout(header)
         self._cannot_remake_note = QLabel()
         self._cannot_remake_note.setObjectName("cannotRemakeNote")
@@ -571,7 +571,7 @@ class GenerateConfigPanel(DropZones):
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._on_generate)
-        self._how_many = HowManyPicker()
+        self._how_many = HowManyDropdown()
         self._how_many.chosen.connect(self.how_many_chosen)
         btn_row.addWidget(self._cancel_btn)
         self._generate_pair = GenerateWithHowMany(self._generate_btn, self._how_many)
@@ -619,7 +619,7 @@ class GenerateConfigPanel(DropZones):
 
     def _can_generate(self) -> bool:
         return (self._client is not None
-                and workflow_named(self._workflow_combo.currentData()) is not None
+                and workflow_named(self._workflow_dropdown.currentData()) is not None
                 and self._why_generate_is_blocked() is None)
 
     def _sync_generate(self) -> None:
@@ -633,7 +633,7 @@ class GenerateConfigPanel(DropZones):
         self._cannot_remake_note.setVisible(note is not None)
 
     def _why_generate_is_blocked(self) -> str | None:
-        workflow = workflow_named(self._workflow_combo.currentData())
+        workflow = workflow_named(self._workflow_dropdown.currentData())
         if workflow is not None and not workflow.generates_here:
             return _MADE_ELSEWHERE_TIP
         lost = self._lost_workflow()
@@ -650,14 +650,14 @@ class GenerateConfigPanel(DropZones):
         if lost is not None:
             return _lost_workflow_note(lost)
         shown = self._displayed_row
-        if shown is None or shown.get("workflow_name") != self._workflow_combo.currentData():
+        if shown is None or shown.get("workflow_name") != self._workflow_dropdown.currentData():
             return None
         models = list(self._models_not_installed().values())
         return _not_installed_note(models) if models else None
 
     def _lost_workflow(self) -> str | None:
         shown = self._displayed_row
-        if shown is None or self._workflow_combo.currentData() is not None:
+        if shown is None or self._workflow_dropdown.currentData() is not None:
             return None
         workflow_name = shown.get("workflow_name") or ""
         return None if workflow_named(workflow_name) is not None else workflow_name
@@ -683,7 +683,7 @@ class GenerateConfigPanel(DropZones):
         return self._making_one is not None and self._making_one(self.current_config())
 
     def _missing_inputs(self) -> list[str]:
-        wf = workflow_named(self._workflow_combo.currentData())
+        wf = workflow_named(self._workflow_dropdown.currentData())
         if wf is None or self._param_form is None:
             return []
         return wf.missing_inputs(self._param_form.get_values())
@@ -700,7 +700,7 @@ class GenerateConfigPanel(DropZones):
         # of anything.
         self._end_folder_modify()
         self._fresh_form = False
-        key = self._workflow_combo.currentData()
+        key = self._workflow_dropdown.currentData()
         wf = workflow_named(key)
         if wf is not None:
             self._offer_workflows(makes=wf.output_type, holding=key)
@@ -822,7 +822,7 @@ class GenerateConfigPanel(DropZones):
         self._param_form = None
 
     def _clear_form(self):
-        """Leave the panel with no form at all — the state of a tab whose picker
+        """Leave the panel with no form at all — the state of a tab whose dropdown
         is still on its placeholder. Which params exist is the workflow's answer,
         so until one is chosen there is nothing truthful to lay out."""
         had_form = self._param_form is not None
@@ -902,10 +902,10 @@ class GenerateConfigPanel(DropZones):
         """Show how long this workflow typically takes, from its recent runs.
 
         Hidden entirely with no workflow picked: a typical time belongs to a
-        workflow, and "no runs yet" over an unanswered picker reads as a fact
+        workflow, and "no runs yet" over an unanswered dropdown reads as a fact
         about the app rather than about the question still being asked.
         """
-        wf = workflow_named(self._workflow_combo.currentData())
+        wf = workflow_named(self._workflow_dropdown.currentData())
         self._estimate_label.setVisible(wf is not None and wf.generates_here)
         if wf is not None and wf.generates_here:
             self._estimate_label.setText(
@@ -929,7 +929,7 @@ class GenerateConfigPanel(DropZones):
             self._generate_btn.set_caption(self._folder_modify.caption())
             self._generate_btn.setToolTip(self._folder_modify.tooltip())
             return
-        wf = workflow_named(self._workflow_combo.currentData())
+        wf = workflow_named(self._workflow_dropdown.currentData())
         config = self.current_config()
         duplicate = (
             wf is not None and self._can_generate()
@@ -951,7 +951,7 @@ class GenerateConfigPanel(DropZones):
         as many times as the dropdown beside the button says."""
         if not self._can_generate():
             return  # no server, no workflow picked yet, or no image to start from
-        key = self._workflow_combo.currentData()
+        key = self._workflow_dropdown.currentData()
         params = self._param_form.get_values()
         if self._folder_modify is not None:
             # A request that asked for nothing would re-run every seed in the
@@ -999,7 +999,7 @@ class GenerateConfigPanel(DropZones):
         self._related.show_row(self._the_row_generate_would_make(), self._image_rows())
 
     def _the_row_generate_would_make(self) -> dict:
-        return {"workflow_name": self._workflow_combo.currentData(),
+        return {"workflow_name": self._workflow_dropdown.currentData(),
                 "params_json": json.dumps(self._param_form.get_values()),
                 "source_video": self._settings_source[1]}
 
@@ -1009,7 +1009,7 @@ class GenerateConfigPanel(DropZones):
         return self._settings_source
 
     def _prompts_differ_from_source(self) -> bool:
-        workflow = workflow_named(self._workflow_combo.currentData())
+        workflow = workflow_named(self._workflow_dropdown.currentData())
         return (self._source_video_row is not None and workflow is not None
                 and self._param_form is not None
                 and prompts_differ_from(self._param_form.get_values(),
@@ -1078,7 +1078,7 @@ class GenerateConfigPanel(DropZones):
         seed that was already generated.
         """
         if self._param_form is not None:
-            with self._loading():  # the gallery ticked this, not the user
+            with self._loading():  # the gallery checked this, not the user
                 self._param_form.set_seed_random(True)
 
     def _set_displayed_row(self, row: dict | None) -> None:
@@ -1106,7 +1106,7 @@ class GenerateConfigPanel(DropZones):
                                  media_type=self._makes(), width=width, height=height)
 
     def _makes(self) -> MediaType | None:
-        return workflow_output_type(self._workflow_combo.currentData())
+        return workflow_output_type(self._workflow_dropdown.currentData())
 
     def _image_rows(self):
         return self._library.now().image_rows
@@ -1120,7 +1120,7 @@ class GenerateConfigPanel(DropZones):
         in and groups reruns that differ only by per-instance keys.
         ``None`` when no workflow is selected.
         """
-        key = self._workflow_combo.currentData()
+        key = self._workflow_dropdown.currentData()
         wf = workflow_named(key)
         if wf is None or self._param_form is None:
             return None
@@ -1136,7 +1136,7 @@ class GenerateConfigPanel(DropZones):
         """The saved generation on display while the form still holds its
         settings, else ``None`` — the seeds left out of the question."""
         row = self._displayed_row
-        workflow_name = self._workflow_combo.currentData()
+        workflow_name = self._workflow_dropdown.currentData()
         if row is None or self._param_form is None or not workflow_name:
             return None
         if (row.get("workflow_name") or "") != workflow_name:
@@ -1241,9 +1241,9 @@ class GenerateConfigPanel(DropZones):
 
     def current_config(self) -> ConfigSnapshot:
         if self._param_form is None:
-            return ConfigSnapshot(self._workflow_combo.currentData(), {}, False)
+            return ConfigSnapshot(self._workflow_dropdown.currentData(), {}, False)
         return ConfigSnapshot(
-            self._workflow_combo.currentData(),
+            self._workflow_dropdown.currentData(),
             self._param_form.get_values(),
             self._param_form.seed_is_random(),
         )
@@ -1251,12 +1251,12 @@ class GenerateConfigPanel(DropZones):
     def is_blank(self) -> bool:
         """Has this tab been used for anything yet?
 
-        True only for a panel still on the picker's placeholder with nothing on
+        True only for a panel still on the dropdown's placeholder with nothing on
         display — the pane's resting tab. Such a tab is what a clicked generation
         loads into rather than opening beside; a tab whose workflow has been
         picked holds a choice someone made, so it is left alone.
         """
-        return self._workflow_combo.currentData() is None and self._displayed_row is None
+        return self._workflow_dropdown.currentData() is None and self._displayed_row is None
 
     def title(self) -> str:
         """This tab's name: the item on display, else the gallery folder this
@@ -1314,7 +1314,7 @@ class GenerateConfigPanel(DropZones):
         # these settings just put up. (A tab pointed at a run is re-seeded first
         # and told to follow afterwards, so that is not undoing itself either.)
         #
-        # The whole of it under _loading: this writes the workflow picker and
+        # The whole of it under _loading: this writes the workflow dropdown and
         # every field, exactly as a person would, and a tab filled by an open is
         # not a tab someone has worked in.
         with self._loading():
@@ -1324,7 +1324,7 @@ class GenerateConfigPanel(DropZones):
             workflow = workflow_named(workflow_name)
             if workflow is not None:
                 self._offer_workflows(makes=workflow.output_type, holding=workflow_name)
-                self._workflow_combo.setCurrentIndex(self._workflow_combo.findData(workflow_name))
+                self._workflow_dropdown.setCurrentIndex(self._workflow_dropdown.findData(workflow_name))
             if self._param_form:
                 self._param_form.clear_prompt_rewrites()
                 self._param_form.replace_values(params)
@@ -1333,21 +1333,21 @@ class GenerateConfigPanel(DropZones):
             self.show_recent_preview()
 
     def _offer_workflows(self, *, makes: MediaType | None, holding: str | None) -> None:
-        combo = self._workflow_combo
-        current = combo.currentData()
+        dropdown = self._workflow_dropdown
+        current = dropdown.currentData()
         listed = [workflow.name for workflow in offered_workflows(makes=makes)]
         if holding is not None and holding not in listed:
             listed.append(holding)
-        if listed == [combo.itemData(index) for index in range(combo.count())]:
+        if listed == [dropdown.itemData(index) for index in range(dropdown.count())]:
             return
-        blocked = combo.blockSignals(True)
+        blocked = dropdown.blockSignals(True)
         try:
-            combo.clear()
+            dropdown.clear()
             for name in listed:
-                combo.addItem(workflow_named(name).display_name, name)
-            combo.setCurrentIndex(combo.findData(current) if current is not None else -1)
+                dropdown.addItem(workflow_named(name).display_name, name)
+            dropdown.setCurrentIndex(dropdown.findData(current) if current is not None else -1)
         finally:
-            combo.blockSignals(blocked)
+            dropdown.blockSignals(blocked)
 
     def restore_config(self, snapshot: ConfigSnapshot):
         """Reapply a snapshot captured by :meth:`current_config`.
@@ -1483,7 +1483,7 @@ class GenerateConfigPanel(DropZones):
                 self.prefill(workflow_name, merge_denormalized(row))
             else:
                 with self._loading():
-                    self._workflow_combo.setCurrentIndex(-1)
+                    self._workflow_dropdown.setCurrentIndex(-1)
                     self._offer_workflows(makes=media_type_of_row(row), holding=None)
         finally:
             self._autoshow_held = False
@@ -1607,7 +1607,7 @@ class GenerateConfigPanel(DropZones):
         self._forget_watch()
         if self._displayed_row is not None:
             self._restore_preview()
-        elif self._workflow_combo.currentData() is not None:
+        elif self._workflow_dropdown.currentData() is not None:
             self.show_recent_preview()
         else:
             self._preview.clear()

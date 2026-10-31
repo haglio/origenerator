@@ -857,7 +857,7 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
     assert view._other_window_owns_keys() is True
 
-    # And a dialog or a combo's dropdown with no window of its own under it: the
+    # And a dialog or a dropdown's list with no window of its own under it: the
     # filter is installed on the application, so without this it eats the keys the
     # popup was opened to take.
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))

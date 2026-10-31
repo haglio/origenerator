@@ -65,7 +65,7 @@ def test_an_ai_video_shows_its_own_settings_under_its_site(library):
 
     panel.show_saved_generation(video, [image])
 
-    assert panel._workflow_combo.currentText() == "a-site"
+    assert panel._workflow_dropdown.currentText() == "a-site"
     assert _shown(panel, ("positive_prompt", "model", "style", "resolution", "aspect_ratio",
                           "quality", "creativity")) == {key: value for key, value in _VIDEO.items()
                                                         if key != "seed"}
@@ -84,7 +84,7 @@ def test_an_ai_video_from_a_site_of_both_kinds_shows_its_settings_under_its_site
 
     panel.show_saved_generation(video, [image])
 
-    assert panel._workflow_combo.currentText() == "a-site I2V"
+    assert panel._workflow_dropdown.currentText() == "a-site I2V"
 
 
 def test_the_image_an_ai_video_was_made_from_shows_its_own_settings(library):
@@ -92,7 +92,7 @@ def test_the_image_an_ai_video_was_made_from_shows_its_own_settings(library):
 
     panel.show_saved_generation(image, [image])
 
-    assert panel._workflow_combo.currentText() == "a-site"
+    assert panel._workflow_dropdown.currentText() == "a-site"
     assert _shown(panel, ("positive_prompt", "negative_prompt", "model", "style")) == {
         "positive_prompt": "a quiet shore", "negative_prompt": "rain",
         "model": "Image Model", "style": "Image Style"}

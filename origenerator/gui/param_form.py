@@ -41,7 +41,7 @@ from origenerator.gui.param_help import (
     param_help,
     with_training_date,
 )
-from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes, set_in_use
 from origenerator.gui.request_field import RequestField
 from origenerator.gui.scenes_editor import ScenesEditor
@@ -133,12 +133,12 @@ class ParamForm(QWidget):
     every other setting decides which gallery folder a run lands in. They belong
     to the Enhance subpanel, which applies enhancement as a separate layer — and
     pinning them is what stops a Generate seeded from an old enhanced run coming
-    out enhanced again with the subpanel's tick unticked.
+    out enhanced again with the subpanel's checkbox unchecked.
 
     ``pins_reused_seed`` is the workflow's answer to
     :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
-    whether a seed written in by :meth:`set_values` also clears its Random tick.
-    False (video) leaves the tick ticked and a fresh seed in the field, so the
+    whether a seed written in by :meth:`set_values` also clears its Random checkbox.
+    False (video) leaves the checkbox checked and a fresh seed in the field, so the
     settings of a video loaded into a tab don't quietly pin every later run to its
     seed.
     """
@@ -321,7 +321,7 @@ class ParamForm(QWidget):
                 if pd.type == ParamType.SCENES:  # the editor's one row, under the scenes' own key
                     self._add_row(pd.key, pd.label, widget)
                 continue
-            if isinstance(widget, PresetComboBox):
+            if isinstance(widget, PresetDropdown):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, widget, self._make_extras(pd))
         for pd in self._param_defs:
@@ -451,11 +451,11 @@ class ParamForm(QWidget):
     def _field_cell(self, field: QWidget, extras: Sequence[QWidget]) -> QHBoxLayout:
         """The input, then its trailing controls.
 
-        The copy button leads (just right of the input), then the Random tick
+        The copy button leads (just right of the input), then the Random checkbox
         (seed) or the Browse button (image). Each sits in a shared cell so the
         label column stays aligned across every row. Next to a tall multiline
         prompt the copy button hugs the top corner; next to a single-line seed
-        it centers so it lines up with the tick beside it.
+        it centers so it lines up with the checkbox beside it.
         """
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
@@ -893,14 +893,14 @@ class ParamForm(QWidget):
                 self._sections[title].set_collapsed(collapsed)
 
     def seed_is_random(self) -> bool:
-        """True if any seed param's Random tick is checked."""
+        """True if any seed param's Random checkbox is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())
 
     def set_seed_random(self, is_random: bool):
         for pd in self._seed_defs():
-            tick = self._randomize_checks[pd.key]
-            if tick.isChecked() != is_random:
-                tick.setChecked(is_random)
+            checkbox = self._randomize_checks[pd.key]
+            if checkbox.isChecked() != is_random:
+                checkbox.setChecked(is_random)
                 self._follow_random(pd, is_random)
 
     def put_seeds(self, params: dict, *, is_random: bool) -> None:
@@ -921,7 +921,7 @@ class ParamForm(QWidget):
         return (int(width), int(height)) if width and height else None
 
     def random_seed_keys(self) -> set[str]:
-        return {key for key, tick in self._randomize_checks.items() if tick.isChecked()}
+        return {key for key, checkbox in self._randomize_checks.items() if checkbox.isChecked()}
 
     def _seed_defs(self) -> list[ParamDef]:
         return [pd for pd in self._param_defs if pd.key in self._randomize_checks]
@@ -986,9 +986,9 @@ class ParamForm(QWidget):
             w.carry(str(value))
             return
         self._kind(pd).write(pd, w, value)
-        tick = self._randomize_checks.get(pd.key)
-        if tick is not None and self._pins_reused_seed:
-            tick.setChecked(False)
+        checkbox = self._randomize_checks.get(pd.key)
+        if checkbox is not None and self._pins_reused_seed:
+            checkbox.setChecked(False)
 
     def _settle(self, pd: ParamDef) -> None:
         """Show a field the value it will emit, once an edit of it has ended."""

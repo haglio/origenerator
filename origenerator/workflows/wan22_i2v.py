@@ -16,7 +16,7 @@ from origenerator.workflows.base import (
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import picked_loras
 from origenerator.workflows.model_arch import WAN_S2V
-from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import (
@@ -136,7 +136,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
             ParamDef("audio_prompt", "Positive Prompt", ParamType.STR, defaults["audio_prompt"], multiline=True),
             ParamDef("audio_negative_prompt", "Negative Prompt", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
-            ParamDef("voice", "Voice", ParamType.COMBO, defaults["voice"], options=list(VOICE_OPTIONS)),
+            ParamDef("voice", "Voice", ParamType.DROPDOWN, defaults["voice"], options=list(VOICE_OPTIONS)),
             ParamDef("voice_sample", "Voice Sample", ParamType.AUDIO, defaults["voice_sample"], browse_dir=Path.home()),
             ParamDef("voice_sample_text", "Words in the Voice Sample", ParamType.STR, defaults["voice_sample_text"], multiline=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
@@ -151,7 +151,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             *wan_expert_model_params(defaults),
             # The speaking model's place takes only the speech model: an expert there
             # would render deaf, and the experts' places never offer it.
-            model_picker("unet_s2v", "Speaking Model", defaults["unet_s2v"], "diffusion_models",
+            model_dropdown("unet_s2v", "Speaking Model", defaults["unet_s2v"], "diffusion_models",
                          accepts=(WAN_S2V,)),
             *wan_expert_lora_params(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],

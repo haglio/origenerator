@@ -18,7 +18,7 @@ from origenerator.seed_history import SeedUse
 _TALLEST_ROW_A_LIST_LAYS_OUT = 32767
 
 
-class SeedComboBox(ThumbnailDropdown):
+class SeedDropdown(ThumbnailDropdown):
     def __init__(self, history: Callable[[], list[SeedUse]],
                  looping_preview: Callable[[str], str | None], parent=None):
         super().__init__(parent, looping_preview=looping_preview)

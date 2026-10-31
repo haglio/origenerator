@@ -174,7 +174,7 @@ them as choices the user is being asked to make. That is exactly how the SDXL
 T2I form came to show WAN 2.2's high/low expert pairs, with nothing to
 say which one to pick or that neither belonged.
 
-So every picker states what its graph runs: `model_picker(key, label, default,
+So every picker states what its graph runs: `model_dropdown(key, label, default,
 folder, accepts=…)`, which lists that folder with `list_model_files(category,
 fallback, accepts=…)` and keeps it on the picker, and `list_lora_files(fallback,
 accepts=…)`, with `accepts` a family

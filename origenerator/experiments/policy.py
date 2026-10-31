@@ -3,7 +3,7 @@
 The policy hill-climbs the user's actual work: it picks a past generation as a
 base (favoring favorited items and up-voted experiments), mutates one or two of
 its workflow's declared dimensions — a numeric nudged within its form range, a
-combo swapped for another installed option, or the prompt pair crossed over from
+dropdown swapped for another installed option, or the prompt pair crossed over from
 a sibling generation — and re-rolls every seed. Review verdicts feed back in:
 values that appeared in up-voted experiments are sampled more, values from
 down-voted ones less, so the search concentrates where the user's taste points
@@ -177,7 +177,7 @@ class ExperimentPolicy:
     @staticmethod
     def _mutable_dims(definitions):
         """The dimensions an experiment may vary: the prompt pair, any bounded
-        numeric, and any multi-option combo — per the workflow's own form.
+        numeric, and any multi-option dropdown — per the workflow's own form.
         Batch size is exempt: varying it re-runs the same settings in bulk, which
         explores nothing and multiplies the GPU bill."""
         dims = []
@@ -185,7 +185,7 @@ class ExperimentPolicy:
             if pd.key == "batch_size":
                 continue
             if pd.key == "positive_prompt" or (pd.type in (ParamType.INT, ParamType.FLOAT) and pd.min_val is not None \
-                    and pd.max_val is not None and pd.max_val > pd.min_val) or (pd.type == ParamType.COMBO and pd.options and len(pd.options) > 1):
+                    and pd.max_val is not None and pd.max_val > pd.min_val) or (pd.type == ParamType.DROPDOWN and pd.options and len(pd.options) > 1):
                 dims.append(pd)
         return dims
 
@@ -196,8 +196,8 @@ class ExperimentPolicy:
             return self._crossover_prompts(params, workflow, rows)
         if strength_without_its_lora(pd.key, params):
             return False
-        if pd.type == ParamType.COMBO:
-            return self._swap_combo(params, pd, definitions, workflow, rows)
+        if pd.type == ParamType.DROPDOWN:
+            return self._swap_dropdown(params, pd, definitions, workflow, rows)
         return self._jitter_numeric(params, pd, workflow, rows)
 
     def _crossover_prompts(self, params, workflow, rows):
@@ -230,7 +230,7 @@ class ExperimentPolicy:
         params["positive_prompt"], params["negative_prompt"] = choice
         return True
 
-    def _swap_combo(self, params, pd, definitions, workflow, rows):
+    def _swap_dropdown(self, params, pd, definitions, workflow, rows):
         candidates = [o for o in pd.options if o != params.get(pd.key)
                       and not a_lora_filed_apart_from_its_model({**params, pd.key: o},
                                                                 definitions)]

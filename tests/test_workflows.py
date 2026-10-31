@@ -9,7 +9,7 @@ from PIL import Image
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.detail_parts as detail_module
 import origenerator.workflows.lora_rows as lora_rows_module
-import origenerator.workflows.model_pickers as pickers
+import origenerator.workflows.model_dropdowns as dropdowns
 from origenerator import config, points_of_interest
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params, texts_read
@@ -104,10 +104,10 @@ def test_only_the_flf2v_workflow_declares_itself_looping():
 
 def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # The WAN video workflows pick their LoRA from the installed files, like the
-    # SDXL Model dropdown: a combo per high/low LoRA, its options led by "None"
+    # SDXL Model dropdown: a dropdown per high/low LoRA, its options led by "None"
     # (so a run can opt out of a LoRA) then the loras scan, and its default
     # matching the persisted default — not a hidden param the form silently reset
-    # to default. Where the pickers sit is asserted separately, by
+    # to default. Where the dropdowns sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
 
     options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
@@ -116,11 +116,11 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         for level in ("high", "low"):
-            picker = by_key[f"lora_{level}"]
-            assert picker.type == "combo"
-            assert picker.options == options
-            assert picker.options[0] == NO_LORA  # a run can bypass the LoRA
-            assert picker.default == wf.default_params()[f"lora_{level}"]
+            dropdown = by_key[f"lora_{level}"]
+            assert dropdown.type == "dropdown"
+            assert dropdown.options == options
+            assert dropdown.options[0] == NO_LORA  # a run can bypass the LoRA
+            assert dropdown.default == wf.default_params()[f"lora_{level}"]
 
 
 def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
@@ -158,31 +158,31 @@ def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
         assert read["unet_low"] == base["unet_low"]
 
 
-def test_wan_video_workflows_expose_model_pickers(monkeypatch):
-    # The base diffusion model (high/low UNET) is a combo too, drawn from the
+def test_wan_video_workflows_expose_model_dropdowns(monkeypatch):
+    # The base diffusion model (high/low UNET) is a dropdown too, drawn from the
     # installed diffusion_models — selectable, not a hidden default the form
-    # silently reset. Where the pickers sit is asserted separately, by
+    # silently reset. Where the dropdowns sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
 
     installed = {
         "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
         "loras": ["l.safetensors"],
     }
-    picker = lambda category, fallback, **terms: installed[category]
-    monkeypatch.setattr(pickers, "list_model_files", picker)
+    dropdown = lambda category, fallback, **terms: installed[category]
+    monkeypatch.setattr(dropdowns, "list_model_files", dropdown)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         for level in ("high", "low"):
             model = by_key[f"unet_{level}"]
-            assert model.type == "combo"
+            assert model.type == "dropdown"
             assert model.options == installed["diffusion_models"]
             assert model.default == wf.default_params()[f"unet_{level}"]
 
 
 def test_wan_video_workflows_group_all_models_then_all_loras():
     # Model and LoRA settings are grouped by kind, not by noise level: both UNET
-    # pickers sit together, then every LoRA picker (each directly above its own
+    # dropdowns sit together, then every LoRA dropdown (each directly above its own
     # strength). So the Generate form and the gallery info pane read as "all the
     # models, then all the LoRAs" rather than "everything high, then everything
     # low". This order is the single source both surfaces draw from.
@@ -193,7 +193,7 @@ def test_wan_video_workflows_group_all_models_then_all_loras():
         # Each kind is one contiguous run, in the listed order...
         assert model_block == list(range(model_block[0], model_block[0] + 2))
         assert lora_block == list(range(lora_block[0], lora_block[0] + len(lora_block)))
-        # ...with every model picker above every LoRA picker.
+        # ...with every model dropdown above every LoRA dropdown.
         assert model_block[-1] < lora_block[0]
 
 
@@ -554,7 +554,7 @@ def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
 
 def test_krea2_runs_its_lora_on_the_model_alone():
     # A Krea 2 LoRA trains the diffusion model; its prompt reader is left as it
-    # is, and a picker set to "None" builds the graph with no LoRA node at all.
+    # is, and a dropdown set to "None" builds the graph with no LoRA node at all.
     wf = Krea2T2iWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), lora="a_lora.safetensors",
                                         lora_strength=0.8))
@@ -573,7 +573,7 @@ def test_krea2_runs_its_lora_on_the_model_alone():
 
 
 def test_krea2_offers_only_what_a_krea2_graph_can_run(installed_models):
-    # diffusion_models and loras hold every family at once; Krea 2's pickers
+    # diffusion_models and loras hold every family at once; Krea 2's dropdowns
     # keep its own files and the ones nobody could read, and drop the rest.
     for family in ("krea2", "flux", "wan"):
         installed_models.add("diffusion_models", f"fam_{family}.safetensors", arch=family)
@@ -740,7 +740,7 @@ def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
 
     providers = {nid: n for nid, n in payload.items()
                  if n["class_type"] == "UltralyticsDetectorProvider"}
-    # The provider names its model the way its own picker does, bbox/ and all.
+    # The provider names its model the way its own dropdown does, bbox/ and all.
     assert sorted(n["inputs"]["model_name"] for n in providers.values()) == [
         "bbox/face_finder.pt", "bbox/hand_finder.pt",
     ]
@@ -988,18 +988,18 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
 def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
     # The enhance tail's look-affecting settings are ordinary form fields: the
     # upscale model picked from the installed upscale_models files like every
-    # other model picker, and the scale/steps/denoise numerics — not hidden
+    # other model dropdown, and the scale/steps/denoise numerics — not hidden
     # defaults the form would silently reset.
 
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
-    picker = lambda category, fallback, **terms: installed.get(category, list(fallback))
-    monkeypatch.setattr(pickers, "list_model_files", picker)
+    dropdown = lambda category, fallback, **terms: installed.get(category, list(fallback))
+    monkeypatch.setattr(dropdowns, "list_model_files", dropdown)
 
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         model = by_key["upscale_model"]
-        assert model.type == "combo"
+        assert model.type == "dropdown"
         assert model.options == ["4x_crisp.pt", "4x_soft.pth"]
         assert model.default == wf.default_params()["upscale_model"]
         scale = by_key["enhance_scale"]
@@ -1017,7 +1017,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
 _FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_t2v", "wan_fun_control",
              "wan_animate", "ltx", "krea2")
 # The categories that hold more than one architecture. upscale_models is left
-# out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
+# out on purpose: the ESRGAN upscalers are architecture-neutral, and a dropdown
 # over them is meant to list everything.
 _MIXED_CATEGORIES = ("checkpoints", "diffusion_models", "controlnet", "loras")
 
@@ -1026,7 +1026,7 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
     # The standing rule, checked across the whole registry rather than a list of
     # workflow names — a workflow added later is covered the day it is added.
     # Every mixed category is stocked with one model of every architecture, so a
-    # picker that offers all of them did not filter at all.
+    # dropdown that offers all of them did not filter at all.
     for category in _MIXED_CATEGORIES:
         for family in _FAMILIES:
             installed_models.add(
@@ -1039,14 +1039,14 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
     checked = 0
     for name, wf in WORKFLOW_REGISTRY.items():
         for pd in wf.param_definitions():
-            if pd.type != "combo" or not pd.options:
+            if pd.type != "dropdown" or not pd.options:
                 continue
             offered = planted.intersection(pd.options)
             if not offered:
-                continue   # not a picker over a mixed category
+                continue   # not a dropdown over a mixed category
             checked += 1
             assert offered < planted, f"{name}.{pd.key} offers every architecture"
-    assert checked, "no model pickers were exercised — the fixture stopped matching"
+    assert checked, "no model dropdowns were exercised — the fixture stopped matching"
 
 
 def test_an_image_to_video_form_offers_no_model_that_makes_video_from_text_or_a_control_video(
@@ -1074,10 +1074,10 @@ def test_an_image_to_video_form_offers_no_lora_civitai_files_under_text_to_video
 
     for workflow in ("wan22_i2v", "wan22_flf2v_loop", "wan22_animate"):
         lora_keys = WORKFLOW_REGISTRY[workflow].lora_keys
-        pickers = [pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
+        dropdowns = [pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
                    if pd.key in lora_keys]
-        assert pickers, workflow
-        for pd in pickers:
+        assert dropdowns, workflow
+        for pd in dropdowns:
             assert looks.intersection(pd.options) == looks - {"a_t2v_look.safetensors"}, (
                 f"{workflow}.{pd.key}")
 
@@ -1107,7 +1107,7 @@ def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
     checked = 0
     for name, wf in WORKFLOW_REGISTRY.items():
         for pd in wf.param_definitions():
-            if pd.type != "combo" or not pd.options:
+            if pd.type != "dropdown" or not pd.options:
                 continue
             for half, other in (("high", "low"), ("low", "high")):
                 if not pd.key.endswith(f"_{half}"):
@@ -1623,7 +1623,7 @@ def test_sdxl_pose_transfer_is_registered_as_an_image_workflow():
 
 def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
     # The pose references this workflow is steered by are a curated folder of the
-    # library, not ComfyUI's input dump, so its Structure Image picker opens
+    # library, not ComfyUI's input dump, so its Structure Image dropdown opens
     # there. The path is built from the (private) library root, never spelled out
     # in source.
 
@@ -1983,21 +1983,21 @@ def test_flux_t2i_upscaled_default_params_has_required_keys():
     assert params["unet"].endswith(".gguf")
 
 
-def test_flux_t2i_upscaled_exposes_a_gguf_model_picker(monkeypatch):
-    # The GGUF diffusion model is a combo drawn from the installed diffusion
-    # models, like SDXL's checkpoint picker — the one thing a user varies most.
+def test_flux_t2i_upscaled_exposes_a_gguf_model_dropdown(monkeypatch):
+    # The GGUF diffusion model is a dropdown drawn from the installed diffusion
+    # models, like SDXL's checkpoint dropdown — the one thing a user varies most.
 
     installed = ["a_flux.gguf", "b_flux.gguf"]
-    monkeypatch.setattr(pickers, "list_model_files",
+    monkeypatch.setattr(dropdowns, "list_model_files",
                         lambda category, fallback, **terms: installed)
 
     wf = FluxT2iUpscaledWorkflow()
     by_key = {pd.key: pd for pd in wf.param_definitions()}
     assert "unet" in by_key
-    picker = by_key["unet"]
-    assert picker.type == "combo"
-    assert picker.options == installed
-    assert picker.default == wf.default_params()["unet"]
+    dropdown = by_key["unet"]
+    assert dropdown.type == "dropdown"
+    assert dropdown.options == installed
+    assert dropdown.default == wf.default_params()["unet"]
 
 
 def test_flux_t2i_upscaled_build_api_payload_structure():

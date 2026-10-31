@@ -835,7 +835,7 @@ class GalleryView(QWidget):
         browser_column.addWidget(self._scroll, 1)
         # The foot of the center (browser) pane, under a handle of its own: what
         # an enhancement runs at — the Enhance All button, a single image's
-        # Enhance, and (with its tick on) each image the app newly generates.
+        # Enhance, and (with its checkbox on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
         # moment, not a property of the folder you happen to be standing in, so
         # it shows in the collections as readily as on a settings folder. Deliberately

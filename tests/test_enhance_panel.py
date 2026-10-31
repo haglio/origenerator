@@ -194,7 +194,7 @@ def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
     # redraw than a face, and one shared number could never say so.
     panel, edits = _panel(qtbot)
     assert list(panel._fixes) == [part.name for part in part_table()]
-    # Nothing ticked, so nothing pays for a pass it didn't ask for — while the
+    # Nothing checked, so nothing pays for a pass it didn't ask for — while the
     # numbers already read as what a fix runs at.
     assert panel.settings().params["enhance_detail_fixes"] == {}
     assert panel._fixes["faces"].value() == DEFAULT_FIX_DENOISE
@@ -344,7 +344,7 @@ def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_
 
 def test_the_presets_and_save_sit_left_of_the_enhance_button_on_its_line(qtbot):
     panel, _ = _panel(qtbot)
-    line = (panel._preset_picker, panel._preset_button, panel._enhance_button)
+    line = (panel._preset_dropdown, panel._preset_button, panel._enhance_button)
 
     for width in (2000, panel.minimumSizeHint().width()):
         _laid_out_at(panel, width)
@@ -359,8 +359,8 @@ def _presets():
             Preset("Soft", {**default_enhance_params(), "enhance_steps": 30})]
 
 
-def _listed(picker):
-    return [picker.itemText(index) for index in range(picker.count())]
+def _listed(dropdown):
+    return [dropdown.itemText(index) for index in range(dropdown.count())]
 
 
 def test_the_dropdown_lists_the_presets_and_reads_custom_while_the_settings_are_none_of_them(
@@ -369,16 +369,16 @@ def test_the_dropdown_lists_the_presets_and_reads_custom_while_the_settings_are_
 
     panel.show_presets(_presets())
 
-    assert _listed(panel._preset_picker) == ["Crisp", "Soft"]
-    assert panel._preset_picker.currentIndex() == -1
-    assert panel._preset_picker.placeholderText() == "(custom)"
+    assert _listed(panel._preset_dropdown) == ["Crisp", "Soft"]
+    assert panel._preset_dropdown.currentIndex() == -1
+    assert panel._preset_dropdown.placeholderText() == "(custom)"
     assert panel._preset_button.text() == "Save…"
 
 
 def test_the_presets_and_their_button_say_what_each_does(qtbot):
     panel, _ = _panel(qtbot)
     panel.show_presets(_presets())
-    assert panel._preset_picker.toolTip() == "Pick a preset to use its settings"
+    assert panel._preset_dropdown.toolTip() == "Pick a preset to use its settings"
     assert panel._preset_button.toolTip() == "Save these settings as a preset"
 
     panel._steps.setValue(30)
@@ -392,8 +392,8 @@ def test_the_open_list_shows_each_preset_s_whole_name_however_narrow_the_box(qtb
 
     panel.show_presets([Preset(long_name, default_enhance_params())])
 
-    picker = panel._preset_picker
-    assert picker.view().minimumWidth() > picker.fontMetrics().horizontalAdvance(long_name)
+    dropdown = panel._preset_dropdown
+    assert dropdown.view().minimumWidth() > dropdown.fontMetrics().horizontalAdvance(long_name)
 
 
 def test_the_dropdown_shows_the_preset_the_settings_are_and_the_button_offers_to_rename_it(
@@ -403,7 +403,7 @@ def test_the_dropdown_shows_the_preset_the_settings_are_and_the_button_offers_to
 
     panel.show_presets(_presets())
 
-    assert panel._preset_picker.currentText() == "Soft"
+    assert panel._preset_dropdown.currentText() == "Soft"
     assert panel._preset_button.text() == "Rename…"
 
 
@@ -412,21 +412,21 @@ def test_settings_turned_or_loaded_onto_a_preset_show_it_and_off_one_read_custom
     panel.show_presets(_presets())
 
     panel._steps.setValue(30)
-    assert panel._preset_picker.currentText() == "Soft"
+    assert panel._preset_dropdown.currentText() == "Soft"
 
     panel._steps.setValue(31)
-    assert panel._preset_picker.currentIndex() == -1
+    assert panel._preset_dropdown.currentIndex() == -1
     assert panel._preset_button.text() == "Save…"
 
     panel.show_settings(EnhanceSettings(params={**default_enhance_params(), "enhance_steps": 40}))
-    assert panel._preset_picker.currentText() == "Crisp"
+    assert panel._preset_dropdown.currentText() == "Crisp"
 
 
-def _pick(picker, index):
+def _pick(dropdown, index):
     """What a choice from the open list does: the box moves to it, then says it
     was picked."""
-    picker.setCurrentIndex(index)
-    picker.activated.emit(index)
+    dropdown.setCurrentIndex(index)
+    dropdown.activated.emit(index)
 
 
 def test_picking_a_preset_puts_its_settings_on_the_panel_and_leaves_the_switch_alone(qtbot):
@@ -434,12 +434,12 @@ def test_picking_a_preset_puts_its_settings_on_the_panel_and_leaves_the_switch_a
     panel._auto.setChecked(True)
     panel.show_presets(_presets())
 
-    _pick(panel._preset_picker, 1)
+    _pick(panel._preset_dropdown, 1)
 
     assert panel._steps.value() == 30
     assert edits[-1].params["enhance_steps"] == 30
     assert edits[-1].auto is True
-    assert panel._preset_picker.currentText() == "Soft"
+    assert panel._preset_dropdown.currentText() == "Soft"
     assert panel._preset_button.text() == "Rename…"
 
 
@@ -536,7 +536,7 @@ def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
 
 def test_an_unticked_parts_name_and_number_gray_out(qtbot):
     # Which parts are on has to be readable down the line at a glance, not
-    # worked out tick by tick.
+    # worked out checkbox by checkbox.
     panel, _ = _panel(qtbot)
     label = panel._label_for(panel._fixes["faces"])
 
@@ -572,7 +572,7 @@ def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
     # Some other detector sitting in that folder would leave every part tickable
     # and every pass finding nothing. Unavailable says which file to add.
     panel, _ = _panel(qtbot, detectors=("cat_finder.pt",))
-    assert not any(tick.isEnabled() for tick in panel._fix_checks.values())
+    assert not any(checkbox.isEnabled() for checkbox in panel._fix_checks.values())
 
 
 def _mean_ink(widget) -> float:
@@ -598,7 +598,7 @@ def _mean_ink(widget) -> float:
 
 def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
     # setEnabled alone changed nothing here: the app's sheet colors every label,
-    # picker and spinner outright and names no disabled state, so a panel that
+    # dropdown and spinner outright and names no disabled state, so a panel that
     # could not apply went on reading exactly as live as one that could.
     panel, _ = _panel(qtbot)
     panel.show_settings(EnhanceSettings(auto=True, params={}))

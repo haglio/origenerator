@@ -193,7 +193,7 @@ def test_the_tab_edit_individual_opens_lists_only_the_video_workflows(qtbot, tmp
     view._combine._open_combination("img", "vid")
 
     combo = view._info_tabs.current_config_panel()._workflow_combo
-    assert [combo.itemData(i) for i in range(combo.count())] == [
+    assert [dropdown.itemData(i) for i in range(dropdown.count())] == [
         workflow.name for workflow in offered_workflows(makes=MediaType.VIDEO)]
 
 
@@ -351,8 +351,8 @@ def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
     view.refresh()
 
     combo = view._combine.panel._category
-    enabled = {combo.itemText(i) for i in range(1, combo.count())
-               if combo.model().item(i).isEnabled()}
+    enabled = {dropdown.itemText(i) for i in range(1, dropdown.count())
+               if dropdown.model().item(i).isEnabled()}
     # "dancing" has a video to mine; "gamma" needs none — the example overlay
     # pins settings for it.
     assert enabled == {"dancing", "gamma"}

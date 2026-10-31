@@ -1044,13 +1044,23 @@
       "screen": null,
       "his_word": "dropdown (2026-09-26, 2026-10-24, 2026-10-26, 2026-10-29)",
       "code_today": [
-        "combo",
-        "dropdown",
-        "picker"
+        "dropdown"
       ],
       "code_word": "dropdown",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "combo",
+        "picker"
+      ],
+      "keep": [
+        "QComboBox",
+        "QStyleOptionComboBox",
+        "CC_ComboBox",
+        "SC_ComboBoxEditField",
+        "CE_ComboBoxLabel",
+        "CT_ComboBox"
+      ]
     },
     {
       "id": "checkbox",
@@ -1060,12 +1070,15 @@
       ],
       "his_word": "checkbox (2026-10-19, 2026-10-20)",
       "code_today": [
-        "tick",
         "checkbox"
       ],
       "code_word": "checkbox",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list; shared_ui's TickControl keeps its name, and the timer's tick is another word",
+      "retired": [
+        "ticked",
+        "unticked"
+      ]
     },
     {
       "id": "field",

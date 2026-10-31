@@ -4,7 +4,7 @@ from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import KREA2
-from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.prompt_readers import QWEN3VL
 
 
@@ -62,7 +62,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            model_picker("unet", "Model", defaults["unet"], "diffusion_models",
+            model_dropdown("unet", "Model", defaults["unet"], "diffusion_models",
                          accepts=(KREA2,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(KREA2,), beside_model="unet"),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),

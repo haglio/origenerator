@@ -163,7 +163,7 @@ def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeyp
 def test_a_header_remembered_by_an_older_reader_is_read_again(tmp_path, monkeypatch):
     # What a file was taken for is only as good as the reader that took it, so a
     # launch whose reader has changed reads every header again: the fix LoRAs
-    # stayed unrecognized in every picker after the reader learned their shape.
+    # stayed unrecognized in every dropdown after the reader learned their shape.
     monkeypatch.setattr(model_arch, "_HEADERS_PATH", tmp_path / "headers.json")
     model_arch._remembered.cache_clear()
     path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
@@ -191,7 +191,7 @@ def test_a_model_file_written_over_is_read_again(tmp_path):
 
 
 def test_an_unrecognized_file_reads_as_unknown_rather_than_wrong(tmp_path):
-    # "We could not tell" is its own answer, and every picker keeps those: a
+    # "We could not tell" is its own answer, and every dropdown keeps those: a
     # listed option that errors costs one submit, where a working model missing
     # from the dropdown gives the user no symptom to act on.
     unknown = _write(tmp_path / "future.safetensors", ["some.brand.new.layout.weight"])
@@ -245,7 +245,7 @@ def test_reads_the_wan_expert_off_the_filename(tmp_path):
 def test_a_word_merely_containing_high_or_low_is_not_a_marker(tmp_path):
     # Ordinary words swallow these letters — "yellow", "slow", "flow" — and a
     # plain substring search would file every one of them under low-noise and
-    # drop them from the High picker. Installed LoRAs really are named this way.
+    # drop them from the High dropdown. Installed LoRAs really are named this way.
     def expert(name):
         return model_arch.describe(_write(tmp_path / name, ["blocks.0.x"])).expert
 

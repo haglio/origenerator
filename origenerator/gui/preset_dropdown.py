@@ -1,4 +1,4 @@
-"""An editable picker of common numeric values that still takes any typed one."""
+"""An editable dropdown of common numeric values that still takes any typed one."""
 from __future__ import annotations
 
 import re
@@ -7,14 +7,14 @@ from PyQt6.QtCore import QRegularExpression, QSize, pyqtSignal
 from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtWidgets import QComboBox, QStyle, QStyleOptionComboBox
 
-from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.no_wheel import NoWheelDropdown
 
 # What the line edit inside the box keeps for itself: a couple of pixels either
 # side of the text, and one more for the cursor at its end.
 _FIELD_MARGINS = 5
 
 
-class PresetComboBox(NoWheelComboBox):
+class PresetDropdown(NoWheelDropdown):
     edited = pyqtSignal()
 
     def __init__(self, presets, unit: str = "", parent=None):
@@ -26,7 +26,7 @@ class PresetComboBox(NoWheelComboBox):
         unit_pattern = rf"(?:{re.escape(unit)})?\s*" if unit else ""
         self.lineEdit().setValidator(QRegularExpressionValidator(
             QRegularExpression(rf"^\s*\d*\.?\d*\s*{unit_pattern}$"), self))
-        # Return in an editable combo reaches the line edit twice (the combo
+        # Return in an editable dropdown reaches the line edit twice (the dropdown
         # hands the key it ignored back to it), so each end of an edit is
         # announced once, by its text.
         self._announced = self.currentText()

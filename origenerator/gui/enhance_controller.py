@@ -421,9 +421,9 @@ class EnhanceController:
         return False
 
     def enhance_when_wanted(self, row: dict | None) -> None:
-        """Enhance a just-finished image while the Auto tick is on.
+        """Enhance a just-finished image while the Auto checkbox is on.
 
-        The subpanel's standing instruction, app-wide: with it ticked the app
+        The subpanel's standing instruction, app-wide: with it checked the app
         turns out finished images rather than raw ones, without pressing Enhance
         All after every run. The gate is Enhance All's own —
         :func:`~origenerator.gallery.enhance.rows_awaiting_enhancement` — so a

@@ -28,7 +28,7 @@ from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.looping_preview import looping_movie
-from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.queue_thumbs import fitted_thumbnail
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
 
@@ -193,7 +193,7 @@ def _thumbnail_places(rect: QRect, shapes: list[QSize], *, worded: bool) -> list
     return places
 
 
-class ThumbnailDropdown(NoWheelComboBox):
+class ThumbnailDropdown(NoWheelDropdown):
     floor_chars = 1
 
     def __init__(self, parent=None, *, gray: bool = False,

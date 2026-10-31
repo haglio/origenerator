@@ -80,7 +80,7 @@ from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail
 
 @pytest.fixture
 def blank_panel(qtbot, tmp_path):
-    """A panel as it opens: the picker on its placeholder, nothing chosen yet."""
+    """A panel as it opens: the dropdown on its placeholder, nothing chosen yet."""
     db = Database(tmp_path / "test.db")
     p = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(p)
@@ -107,16 +107,16 @@ def app_chrome():
 @pytest.fixture
 def panel(blank_panel):
     """A panel with its workflow answered — the state most of these tests are
-    about, where there is a form below the picker to poke at."""
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    about, where there is a form below the dropdown to poke at."""
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     return blank_panel
 
 
-def _combo_index(panel, key):
-    for i in range(panel._workflow_combo.count()):
-        if panel._workflow_combo.itemData(i) == key:
+def _dropdown_index(panel, key):
+    for i in range(panel._workflow_dropdown.count()):
+        if panel._workflow_dropdown.itemData(i) == key:
             return i
-    raise AssertionError(f"workflow {key} not in combo")
+    raise AssertionError(f"workflow {key} not in the dropdown")
 
 
 def _is_descendant(widget, ancestor) -> bool:
@@ -221,11 +221,11 @@ def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(panel):
 
 def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):
     """The settings scroll never grows a horizontal bar: squeezed, the form gives
-    up width — the pickers and the labels shorten — rather than push the whole
+    up width — the dropdowns and the labels shorten — rather than push the whole
     column out of view sideways.
 
-    The failure this exists for: a model picker asked for its longest file name,
-    a section header for its whole title and the workflow picker for its
+    The failure this exists for: a model dropdown asked for its longest file name,
+    a section header for its whole title and the workflow dropdown for its
     placeholder, so the pane could not be narrowed without a sideways scroll.
     """
     for section in panel._param_form._sections.values():
@@ -248,7 +248,7 @@ def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel)
     bar, which stayed away because the layout's stated minimum still fit.
     """
     panel = blank_panel
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     for section in panel._param_form._sections.values():
         section.set_collapsed(False)
     panel.show()
@@ -293,7 +293,7 @@ def test_a_narrow_pane_shortens_its_labels_rather_than_dropping_them(
     """
     panel = blank_panel
     if workflow is not None:
-        panel._workflow_combo.setCurrentIndex(_combo_index(panel, workflow))
+        panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, workflow))
         for section in panel._param_form._sections.values():
             section.set_collapsed(False)
     panel.show()
@@ -317,11 +317,11 @@ def test_a_narrow_pane_shortens_a_label_before_it_squeezes_a_field(
 
     The failure this exists for: QFormLayout kept a section's labels whole while
     any one of its fields still fit beside them, and squeezed the rest, so the
-    Random tick beside a sound's seed was drawn at under half the width its word
+    Random checkbox beside a sound's seed was drawn at under half the width its word
     needs (2026-10-28).
     """
     panel = blank_panel
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, workflow))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, workflow))
     sections = panel._param_form._sections.values()
     for section in sections:
         section.set_collapsed(False)
@@ -357,7 +357,7 @@ def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, bl
     """
     panel = blank_panel
     blank_floor = panel._contents_floor()
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     for section in panel._param_form._sections.values():
         section.set_collapsed(False)
     panel.show()
@@ -437,10 +437,10 @@ def test_generate_and_the_top_setting_keep_clear_of_the_borders_round_them(panel
     _, line_foot = span(panel._media_split.handle(1))
     generate_top, generate_foot = span(panel._generate_btn.parentWidget())
     border_top, border_foot = span(panel._settings_border)
-    picker_top, _ = span(panel._workflow_combo)
+    dropdown_top, _ = span(panel._workflow_dropdown)
     assert generate_top - line_foot >= 8
     assert border_top - generate_foot >= 8
-    assert picker_top - border_foot >= 8
+    assert dropdown_top - border_foot >= 8
 
 
 def test_the_settings_handle_reaches_the_panes_own_border(panel):
@@ -499,7 +499,7 @@ def test_switching_workflow_detaches_the_old_form_at_once(panel):
     # Changing workflow must remove the previous form from the host immediately, not
     # leave it parented (and painting) under the new form until deleteLater runs.
     old_form = panel._param_form
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "flux_t2i_upscaled"))
 
     assert panel._param_form is not old_form   # a new form is installed
     assert old_form.parent() is None           # the old one is detached at once
@@ -515,7 +515,7 @@ def test_switching_workflow_carries_over_the_users_edits(blank_panel):
     # old defaults don't leak — flf2v's 4-step lightning default must not
     # follow the user into a workflow tuned for 20.
     panel = blank_panel
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_flf2v_loop"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_flf2v_loop"))
     panel._param_form.set_values({
         "positive_prompt": "slow beta",
         "input_image": "start.png",
@@ -523,7 +523,7 @@ def test_switching_workflow_carries_over_the_users_edits(blank_panel):
         "steps": 7,  # an edit — flf2v's default is 4
     })
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
 
     values = panel._param_form.get_values()
     assert values["positive_prompt"] == "slow beta"
@@ -540,7 +540,7 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(blank_panel):
     # Selecting an i2v workflow hands its form the size deriver, so the Dimensions
     # section shows the input-image size in a locked, unlockable field.
     panel = blank_panel
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     form = panel._param_form
     assert form._size_deriver is not None
     assert "width" in form._present_keys["Size"]
@@ -556,7 +556,7 @@ def test_i2v_form_shows_the_measured_size_of_a_real_input_image(blank_panel, tmp
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     Image.new("RGB", (1920, 1080), (128, 128, 128)).save(tmp_path / "wide.png")
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     panel._param_form._widgets["input_image"].set_item("wide.png")
 
     width, height = scale_to_total_pixels(1920, 1080)
@@ -567,7 +567,7 @@ def test_i2v_form_shows_the_measured_size_of_a_real_input_image(blank_panel, tmp
 def test_manual_size_workflow_form_has_no_deriver(panel):
     # A T2I workflow sizes by hand, so its form gets no deriver and keeps
     # its own editable width/height (and the swap button), nothing to unlock.
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "sdxl_t2i"))
     form = panel._param_form
     assert form._size_deriver is None
     assert form._unlock_btn is None
@@ -656,7 +656,7 @@ def test_a_tabs_seed_dropdown_lists_only_the_seeds_of_the_kind_it_makes(panel, q
     _video_row(panel._db, noise_seed=30)
     video_tab = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), panel._db)
     qtbot.addWidget(video_tab)
-    video_tab._workflow_combo.setCurrentIndex(_combo_index(video_tab, "wan22_i2v"))
+    video_tab._workflow_dropdown.setCurrentIndex(_dropdown_index(video_tab, "wan22_i2v"))
 
     assert _seeds_listed(panel, "seed") == ["1"]
     assert _seeds_listed(video_tab, "noise_seed") == ["30"]
@@ -669,7 +669,7 @@ def test_a_video_tabs_seed_dropdown_plays_the_videos_it_lists(blank_panel, qtbot
     video = looping_video(tmp_path)
     monkeypatch.setattr(gallery, "animated_preview_if_made",
                         lambda row, *_folders: video if row["prompt_id"] == "vid1" else None)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     field = panel._param_form._widgets["noise_seed"]
     field.showPopup()
     first = painted_row(field, 0)
@@ -901,7 +901,7 @@ def _start_image_tab(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     panel = GenerateConfigPanel(MagicMock(), db)
     qtbot.addWidget(panel)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     return panel, db, panel._param_form._widgets["input_image"]
 
 
@@ -965,7 +965,7 @@ def test_an_image_let_go_anywhere_on_the_tab_becomes_its_start_image(qtbot, tmp_
     panel, db, start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
     _image_row(db, filename="sdxl_img1.png")
 
-    taken = drops.let_go_over(panel._workflow_combo, "img1")
+    taken = drops.let_go_over(panel._workflow_dropdown, "img1")
 
     assert taken.isAccepted()
     assert start_image.current_id() == "image/sdxl_img1.png [output]"
@@ -974,17 +974,17 @@ def test_an_image_let_go_anywhere_on_the_tab_becomes_its_start_image(qtbot, tmp_
 def test_an_image_let_go_on_settings_with_no_image_box_is_turned_away(panel):
     _image_row(panel._db)
 
-    assert not drops.let_go_over(panel._workflow_combo, "img1").isAccepted()
+    assert not drops.let_go_over(panel._workflow_dropdown, "img1").isAccepted()
 
 
 def test_a_video_let_go_anywhere_on_the_tab_fills_every_box_it_lends_something(
         qtbot, tmp_path, monkeypatch):
     panel, db, _start_image = _start_image_tab(qtbot, tmp_path, monkeypatch)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_animate"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_animate"))
     _image_row(db, filename="sdxl_img1.png")
     _video_row(db, input_image="image/sdxl_img1.png [output]")
 
-    taken = drops.let_go_over(panel._workflow_combo, "vid1")
+    taken = drops.let_go_over(panel._workflow_dropdown, "vid1")
 
     values = panel._param_form.get_values()
     assert taken.isAccepted()
@@ -1011,7 +1011,7 @@ def test_a_start_image_from_outside_the_gallery_is_named_by_its_file_and_goes_no
 def test_a_fresh_tab_generates_nothing_until_its_start_image_is_picked(qtbot, tmp_path):
     panel = GenerateConfigPanel(MagicMock(), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     requested = []
     panel.generate_requested.connect(lambda wf, batch: requested.append(wf))
 
@@ -1031,18 +1031,18 @@ def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
     # its rows still lands on its form — the entry is added on demand.
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
-    combo = panel._workflow_combo
-    keys = {combo.itemData(i) for i in range(combo.count())}
+    dropdown = panel._workflow_dropdown
+    keys = {dropdown.itemData(i) for i in range(dropdown.count())}
     assert "image_enhance" not in keys
     assert "sdxl_t2i" in keys
 
     panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
-    assert combo.currentData() == "image_enhance"
+    assert dropdown.currentData() == "image_enhance"
 
 
 def _listed_workflows(panel):
-    combo = panel._workflow_combo
-    return [combo.itemData(i) for i in range(combo.count())]
+    dropdown = panel._workflow_dropdown
+    return [dropdown.itemData(i) for i in range(dropdown.count())]
 
 
 def _offered(kind):
@@ -1058,15 +1058,15 @@ def test_a_new_generation_tab_lists_the_workflows_of_both_kinds(blank_panel):
                                           ("sdxl_t2i", MediaType.IMAGE)])
 def test_a_workflow_picked_in_a_new_generation_tab_leaves_only_its_kind_listed(
         blank_panel, qtbot, picked, kind):
-    combo = blank_panel._workflow_combo
-    combo.showPopup()
-    view = combo.view()
-    row = combo.model().index(_combo_index(blank_panel, picked), 0)
+    dropdown = blank_panel._workflow_dropdown
+    dropdown.showPopup()
+    view = dropdown.view()
+    row = dropdown.model().index(_dropdown_index(blank_panel, picked), 0)
 
     qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
                      pos=view.visualRect(row).center())
 
-    assert combo.currentData() == picked
+    assert dropdown.currentData() == picked
     assert _listed_workflows(blank_panel) == _offered(kind)
 
 
@@ -1087,7 +1087,7 @@ def test_a_tab_that_showed_a_video_lists_only_the_image_workflows_once_it_shows_
     panel.show_saved_generation(image, [image])
 
     assert _listed_workflows(panel) == _offered(MediaType.IMAGE)
-    assert panel._workflow_combo.currentData() == "sdxl_t2i"
+    assert panel._workflow_dropdown.currentData() == "sdxl_t2i"
 
 
 def _wiz_params():
@@ -1195,7 +1195,7 @@ def test_current_config_does_not_randomize_and_reports_random_flag(panel):
 
 def test_prefill_selects_workflow_and_sets_values(panel):
     panel.prefill("wan22_i2v", {"positive_prompt": "a fox"})
-    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._workflow_dropdown.currentData() == "wan22_i2v"
     assert panel._param_form.get_values()["positive_prompt"] == "a fox"
 
 
@@ -1252,7 +1252,7 @@ def test_a_tab_showing_a_still_wears_its_thumbnail_in_the_seed_field(saved_panel
 
 
 def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "flux_t2i_upscaled"))
 
     assert panel._param_form.seed_is_random() is True
 
@@ -1288,7 +1288,7 @@ def test_a_pinned_seed_stays_pinned_across_a_switch_between_video_workflows(pane
     panel.prefill("wan22_flf2v_loop", {})
     panel._param_form.put_seeds({"noise_seed": 99}, is_random=False)
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
 
     assert panel._param_form.get_values()["noise_seed"] == 99
     assert "noise_seed" not in panel._param_form.random_seed_keys()
@@ -1297,7 +1297,7 @@ def test_a_pinned_seed_stays_pinned_across_a_switch_between_video_workflows(pane
 def test_restore_config_reapplies_workflow_params_and_random_seed(panel):
     snap = ConfigSnapshot("wan22_i2v", {"positive_prompt": "a fox"}, seed_is_random=True)
     panel.restore_config(snap)
-    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._workflow_dropdown.currentData() == "wan22_i2v"
     assert panel._param_form.get_values()["positive_prompt"] == "a fox"
     # A tab that was on Random comes back random, not frozen on a stale seed.
     assert panel._param_form.seed_is_random() is True
@@ -1322,14 +1322,14 @@ def test_restore_config_pins_concrete_seed_when_not_random(panel):
 def test_a_fresh_panel_picks_no_workflow(blank_panel):
     # The pane's resting tab asks which workflow to run rather than presenting
     # whichever is registered first as a choice already made.
-    assert blank_panel._workflow_combo.currentIndex() == -1
-    assert blank_panel._workflow_combo.currentData() is None
-    assert blank_panel._workflow_combo.placeholderText()
+    assert blank_panel._workflow_dropdown.currentIndex() == -1
+    assert blank_panel._workflow_dropdown.currentData() is None
+    assert blank_panel._workflow_dropdown.placeholderText()
 
 
 def test_a_fresh_panel_lays_out_nothing_the_workflow_decides(blank_panel):
     # Which params exist is the workflow's answer, and so is its typical time —
-    # neither can be shown before the picker is answered.
+    # neither can be shown before the dropdown is answered.
     assert blank_panel._param_form is None
     assert blank_panel._estimate_label.isHidden()
 
@@ -1340,7 +1340,7 @@ def test_a_fresh_panel_cannot_generate(blank_panel):
 
 
 def test_picking_a_workflow_fills_in_everything_below(blank_panel):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     assert blank_panel._param_form is not None
     assert not blank_panel._estimate_label.isHidden()
     assert blank_panel._generate_btn.isEnabled() is True
@@ -1349,7 +1349,7 @@ def test_picking_a_workflow_fills_in_everything_below(blank_panel):
 def test_a_fresh_panel_is_blank_and_a_used_one_is_not(blank_panel):
     # What load_selection reads to decide whether a tab is free to be clicked into.
     assert blank_panel.is_blank() is True
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     assert blank_panel.is_blank() is False
 
 
@@ -1488,7 +1488,7 @@ class SpyDB:
 def _spy_panel(qtbot, db):
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "sdxl_t2i"))
     return panel
 
 
@@ -1590,7 +1590,7 @@ def saved_panel(qtbot, tmp_path, installed_models):
     db = Database(tmp_path / "t.db")
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(panel)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "sdxl_t2i"))
     panel._preview.show_media = MagicMock()  # don't start real WMF playback
     return panel, db
 
@@ -2299,7 +2299,7 @@ def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch
 
     panel.show_saved_generation(video, [])
 
-    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._workflow_dropdown.currentData() == "wan22_i2v"
     assert panel._param_form.get_values()["positive_prompt"] == "dance"
 
 
@@ -2560,7 +2560,7 @@ def test_a_retired_workflows_video_leaves_no_settings_from_before(saved_panel):
 
     panel.show_saved_generation(video, [image])
 
-    assert panel._workflow_combo.currentIndex() == -1
+    assert panel._workflow_dropdown.currentIndex() == -1
     assert panel._param_form is None
 
 
@@ -2615,7 +2615,7 @@ def test_selecting_a_workflow_after_such_a_video_clears_the_note_and_brings_gene
     video = _video_of_a_workflow_the_app_lacks(db, "wan21_ati_i2v")
     panel.show_saved_generation(video, [])
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     panel._param_form.set_values({"input_image": "frame.png [output]"})
 
     assert _note(panel) == ""
@@ -2660,7 +2660,7 @@ def test_the_note_sits_between_the_workflow_dropdown_and_the_settings_under_it(
         top = widget.mapTo(panel, QPoint(0, 0)).y()
         return top, top + widget.height()
 
-    _, dropdown_foot = span(panel._workflow_combo)
+    _, dropdown_foot = span(panel._workflow_dropdown)
     note_top, note_foot = span(panel._cannot_remake_note)
     typical_time_top, _ = span(panel._estimate_label)
     assert dropdown_foot <= note_top
@@ -2984,7 +2984,7 @@ def test_switching_workflow_leaves_no_stale_mark(saved_panel):
     _set_prompt(panel, "a dog")
     assert _message(panel) != ""
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "flux_t2i_upscaled"))
 
     assert _message(panel) == ""
 
@@ -3675,7 +3675,7 @@ def test_ending_the_modify_leaves_the_prompts_their_undo(modifying, qtbot):
 
 
 def test_picking_another_workflow_ends_the_modify(modifying):
-    modifying._workflow_combo.setCurrentIndex(_combo_index(modifying, "flux_t2i_upscaled"))
+    modifying._workflow_dropdown.setCurrentIndex(_dropdown_index(modifying, "flux_t2i_upscaled"))
 
     assert modifying._generate_btn.text() == "Generate"
 
@@ -4148,14 +4148,14 @@ def _drawing_settings(panel):
 
 
 def test_a_fresh_image_starts_on_its_models_recommended_settings(blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
     assert _drawing_settings(blank_panel) == ("euler_ancestral", "normal", 30, 4.0)
 
 
 def test_picking_another_model_for_a_fresh_image_takes_that_models_settings(
         blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
     _pick_model(blank_panel, "example_other.safetensors")
 
@@ -4174,9 +4174,9 @@ def test_picking_another_model_for_a_shown_image_keeps_its_settings(recommended,
 
 
 def test_a_models_recommended_settings_stay_with_its_workflow(blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "wan22_t2i"))
 
     values = blank_panel._param_form.get_values()
     defaults = WORKFLOW_REGISTRY["wan22_t2i"].default_params()
@@ -4184,7 +4184,7 @@ def test_a_models_recommended_settings_stay_with_its_workflow(blank_panel, recom
 
 
 def test_a_setting_off_its_models_recommendation_shows_its_warning(blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     mark = blank_panel._param_form._warning_marks["steps"]
     assert mark.isHidden()
 
@@ -4205,7 +4205,7 @@ def test_a_number_outside_its_good_range_shows_its_warning_with_no_page_to_judge
 
 
 def test_a_settings_tooltip_says_the_range_its_models_page_holds_it_to(blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
     tip = blank_panel._param_form._widgets["cfg"].toolTip()
 
@@ -4213,7 +4213,7 @@ def test_a_settings_tooltip_says_the_range_its_models_page_holds_it_to(blank_pan
 
 
 def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
     _pick_model(blank_panel, "example_other.safetensors")
 
@@ -4223,7 +4223,7 @@ def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recomm
 
 
 def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
     form = blank_panel._param_form
 
     form._widgets["cfg"].setValue(1.0)
@@ -4266,7 +4266,7 @@ def _on_screen(qtbot, panel):
 
 
 def test_clicking_a_sections_warning_leaves_no_warning_in_it(qtbot, blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     form = _on_screen(qtbot, blank_panel)._param_form
     form.set_values({"sampler_name": "dpmpp_2m", "scheduler": "normal", "steps": 80})
     calibration = form._sections["Calibration"].warning
@@ -4279,7 +4279,7 @@ def test_clicking_a_sections_warning_leaves_no_warning_in_it(qtbot, blank_panel,
 
 def test_the_workflows_warning_carries_every_warning_and_resolves_them_all(
         qtbot, blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     form = _on_screen(qtbot, blank_panel)._param_form
     warning = blank_panel._workflow_warning
     assert warning.isHidden()
@@ -4295,7 +4295,7 @@ def test_the_workflows_warning_carries_every_warning_and_resolves_them_all(
 
 
 def test_a_story_too_long_for_its_good_range_is_among_the_workflows_warnings(qtbot, blank_panel):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "wan22_i2v"))
     form = _on_screen(qtbot, blank_panel)._param_form
 
     form.set_values({"scene_frames": [241], "frame_count": 241})
@@ -4396,7 +4396,7 @@ def test_a_shown_image_whose_prompt_left_off_its_loras_trigger_word_wears_the_wa
 
 
 def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtbot, blank_panel):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "wan22_i2v"))
     panel = _on_screen(qtbot, blank_panel)
 
     def left(widget):
@@ -4408,7 +4408,7 @@ def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtb
 
 
 def test_a_fresh_images_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
     form = blank_panel._param_form
     marked = {key: {form._widgets[key].itemText(i) for i in range(form._widgets[key].count())
@@ -4471,7 +4471,7 @@ def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_pat
     _image_row(db, "img1", filename="sdxl_img1.png")
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db, names=ItemNames.from_library(db))
     qtbot.addWidget(panel)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "wan22_i2v"))
     zone = panel._param_form._widgets["input_image"]
     led_to = []
     panel.link_clicked.connect(led_to.append)
@@ -4493,7 +4493,7 @@ def test_a_second_lora_picked_on_a_tab_lowers_each_picked_strengths_good_range(
     panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS),
                                 Database(tmp_path / "test.db"))
     qtbot.addWidget(panel)
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "krea2_t2i"))
+    panel._workflow_dropdown.setCurrentIndex(_dropdown_index(panel, "krea2_t2i"))
     form = panel._param_form
     mark = form._warning_marks["lora_strength"]
 
@@ -4512,7 +4512,7 @@ def test_a_tabs_lora_dropdown_says_when_its_picked_lora_was_trained(
     titled_models({"example_look": "Example Look 1.0"})
     installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True,
                          metadata={"ss_training_finished_at": "1792851468.891"})
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
 
     blank_panel._param_form.set_values({"lora": "example_look.safetensors"})
 
@@ -4531,7 +4531,7 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
     monkeypatch.setattr(config, "LOOK_TRAINING_DIR", tmp_path / "lora training")
     titled_models({"example_look": "Example Look 1.0"})
     installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True)
-    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
     controls = blank_panel._param_form._training_controls["lora"]
     assert controls.isHidden()
     asked = []

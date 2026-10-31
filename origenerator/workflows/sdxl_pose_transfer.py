@@ -12,8 +12,8 @@ from origenerator.workflows.base import (
 from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import SDXL
+from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.model_files import ANY
-from origenerator.workflows.model_pickers import model_picker
 from origenerator.workflows.prompt_readers import CLIP
 
 # The pixel budget the output is scaled to. SDXL is trained at ~1 megapixel, so
@@ -113,12 +113,12 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Structure Image", ParamType.IMAGE, defaults["input_image"],
                      browse_dir=CUSTOM_POSES_DIR),
-            model_picker("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
+            model_dropdown("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
                          accepts=(SDXL,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(SDXL,)),
-            ParamDef("control_mode", "Structure From", ParamType.COMBO, defaults["control_mode"],
+            ParamDef("control_mode", "Structure From", ParamType.DROPDOWN, defaults["control_mode"],
                      options=["depth", "pose"]),
-            model_picker("controlnet", "Structure Model", defaults["controlnet"], "controlnet",
+            model_dropdown("controlnet", "Structure Model", defaults["controlnet"], "controlnet",
                          accepts=(SDXL,)),
             ParamDef("controlnet_strength", "Structure Strength", ParamType.FLOAT, defaults["controlnet_strength"],
                      min_val=0.0, max_val=2.0, step=0.05, good=(0.5, 0.9)),
@@ -129,7 +129,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5, good=(3, 8)),
             *sampler_params(defaults),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
-            model_picker("upscale_model", "Upscaler", defaults["upscale_model"],
+            model_dropdown("upscale_model", "Upscaler", defaults["upscale_model"],
                          "upscale_models", accepts=ANY),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),

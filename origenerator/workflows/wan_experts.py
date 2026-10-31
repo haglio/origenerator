@@ -11,14 +11,14 @@ changed in one place only.
 Two functions rather than one, because the order the rows come back in is the
 order the Generate form shows and the gallery info pane groups by: the models
 sit together and the LoRAs sit together, and one workflow has a third model
-picker to fit in between them.
+dropdown to fit in between them.
 """
 from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.lora_rows import lora_defaults, lora_rows, numbered_lora_keys
 from origenerator.workflows.model_arch import WAN
-from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.model_dropdowns import model_dropdown
 
 FIRST_PASS_LORA_KEYS = numbered_lora_keys("_high")
 SECOND_PASS_LORA_KEYS = numbered_lora_keys("_low")
@@ -31,13 +31,13 @@ def wan_expert_lora_defaults() -> dict:
 
 
 def wan_expert_model_params(defaults: dict) -> list[ParamDef]:
-    """The high/low UNET pickers, each offering only WAN and only its own
+    """The high/low UNET dropdowns, each offering only WAN and only its own
     expert. Names claiming neither half stay in both, since nothing inside a
     WAN 2.2 file distinguishes the two."""
     return [
-        model_picker("unet_high", "Model (First Pass)", defaults["unet_high"],
+        model_dropdown("unet_high", "Model (First Pass)", defaults["unet_high"],
                      "diffusion_models", accepts=(WAN,), expert="high"),
-        model_picker("unet_low", "Model (Second Pass)", defaults["unet_low"],
+        model_dropdown("unet_low", "Model (Second Pass)", defaults["unet_low"],
                      "diffusion_models", accepts=(WAN,), expert="low"),
     ]
 
@@ -50,7 +50,7 @@ def wan_expert_shift_param(defaults: dict) -> ParamDef:
 
 
 def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
-    """Each pass's LoRA pickers, each directly above its own strength — the
+    """Each pass's LoRA dropdowns, each directly above its own strength — the
     same expert filter as the models, over the LoRA folder."""
     return [
         *lora_rows(defaults, FIRST_PASS_LORA_KEYS, accepts=(WAN,), expert="high",

@@ -1,6 +1,6 @@
-"""Read what a model file *is* off its own header, so a picker can offer only
+"""Read what a model file *is* off its own header, so a dropdown can offer only
 the files the graph under it can actually run -- never off its name, and never
-guessing: an unrecognized file reads as ``None``, which every picker keeps.
+guessing: an unrecognized file reads as ``None``, which every dropdown keeps.
 """
 from __future__ import annotations
 

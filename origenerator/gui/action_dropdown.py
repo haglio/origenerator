@@ -10,7 +10,7 @@ from shared_ui.spacing import GAP_MEDIUM
 from origenerator.gallery import media_type_of_row
 from origenerator.gui.eliding import ElidingLabel, open_the_list_in_full
 from origenerator.gui.label_cells import LabelCell, LabelForm
-from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.media import MediaType
 from origenerator.own_window import show_or_say
@@ -31,7 +31,7 @@ def _as_listed(said: str, names: tuple[str, ...]) -> str:
     return next((name for name in names if normalized_text(name) == normalized_text(said)), said)
 
 
-class ActionPicker(QWidget):
+class ActionDropdown(QWidget):
     """What the item on display shows, pickable, for a config tab."""
 
     chosen = pyqtSignal(str, str)  # prompt_id, what it shows ("" once taken back)
@@ -43,11 +43,11 @@ class ActionPicker(QWidget):
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_MEDIUM)
-        self._combo = NoWheelComboBox()
+        self._dropdown = NoWheelDropdown()
         self._offer(self._states)
-        self._combo.setToolTip(_IMAGES_TIP)
-        self._combo.currentIndexChanged.connect(self._on_picked)
-        row.addWidget(self._combo, 1)
+        self._dropdown.setToolTip(_IMAGES_TIP)
+        self._dropdown.currentIndexChanged.connect(self._on_picked)
+        row.addWidget(self._dropdown, 1)
         self._sorting = None
         self._sort = QPushButton("Set image actions…", objectName=SORT_BUTTON)
         self._sort.setToolTip("Set this image's action, then every image nobody "
@@ -59,13 +59,13 @@ class ActionPicker(QWidget):
         form.setRowVisible(self, False)
 
     def offered(self) -> list[str]:
-        return [self._combo.itemData(i) for i in range(self._combo.count())]
+        return [self._dropdown.itemData(i) for i in range(self._dropdown.count())]
 
     def picked(self) -> str:
-        return self._combo.currentData() or ""
+        return self._dropdown.currentData() or ""
 
     def pick(self, state: str) -> None:
-        self._combo.setCurrentIndex(max(0, self._combo.findData(state)))
+        self._dropdown.setCurrentIndex(max(0, self._dropdown.findData(state)))
 
 
     def show_row(self, row: dict) -> None:
@@ -80,16 +80,16 @@ class ActionPicker(QWidget):
         self._offer(names if is_image or not said or said in names else (*names, said))
         self.pick(said)
         self._sort.setVisible(is_image)
-        self._combo.setToolTip(_IMAGES_TIP if is_image else _VIDEOS_TIP)
+        self._dropdown.setToolTip(_IMAGES_TIP if is_image else _VIDEOS_TIP)
         self._prompt_id = row.get("prompt_id") or ""
         self._form.setRowVisible(self, True)
 
     def _offer(self, names: tuple[str, ...]) -> None:
-        self._combo.clear()
-        self._combo.addItem(UNSAID, "")
+        self._dropdown.clear()
+        self._dropdown.addItem(UNSAID, "")
         for name in names:
-            self._combo.addItem(name, name)
-        open_the_list_in_full(self._combo)
+            self._dropdown.addItem(name, name)
+        open_the_list_in_full(self._dropdown)
 
     def clear(self) -> None:
         self._prompt_id = ""

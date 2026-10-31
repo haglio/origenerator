@@ -2,8 +2,8 @@
 
 Three things can be said, and any of them may be led by a side: a command about
 the image on screen (:mod:`origenerator.gallery.voice_commands`), one of the
-show's own controls (:mod:`origenerator.voice.show_commands`), or a shelf name,
-which plays that shelf the way its slideshow button would.
+show's own controls (:mod:`origenerator.voice.show_commands`), or a collection's name,
+which plays that collection the way its slideshow button would.
 
 * a command about the image on screen — ``fix <part>``, ``animate as <lane>
   <act>`` or ``enhance`` (:mod:`origenerator.gallery.voice_commands` owns all

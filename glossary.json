@@ -833,12 +833,14 @@
       "screen": null,
       "his_word": "collections (2026-10-30); special folders (2026-08)",
       "code_today": [
-        "collection",
-        "shelf"
+        "collection"
       ],
       "code_word": "collection",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "shelf"
+      ]
     },
     {
       "id": "custom_folder",

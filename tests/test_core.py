@@ -1087,9 +1087,9 @@ def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_pat
     pid = gv._live_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
-    assert pid in gv._browser._inflight_tiles   # the running generation shows as a tile
+    assert pid in gv._gallery_pane._inflight_tiles   # the running generation shows as a tile
 
-    gv._browser._on_inflight_clicked(pid)       # click that tile
+    gv._gallery_pane._on_inflight_clicked(pid)       # click that tile
     assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
@@ -1117,7 +1117,7 @@ def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
     gv = win._gallery_view
     gv.refresh()
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
-    assert "vid_run" in gv._browser._inflight_tiles
+    assert "vid_run" in gv._gallery_pane._inflight_tiles
 
 
 def _seed_combine_db(tmp_path, videos=("vid",)):

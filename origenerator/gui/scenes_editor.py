@@ -48,7 +48,7 @@ from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.icons import tab_close_icon
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import param_help
-from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import Countdown, count_down, set_in_use
 from origenerator.gui.prompt_field import PromptField
 from origenerator.prompt_tokens import PromptReading
@@ -86,7 +86,7 @@ class _Scene(QFrame):
     changed = pyqtSignal()
     remove_requested = pyqtSignal(object)
 
-    def __init__(self, pd: ParamDef, prepare_length: Callable[[PresetComboBox], None],
+    def __init__(self, pd: ParamDef, prepare_length: Callable[[PresetDropdown], None],
                  shut_down: dict[str, str], lines: bool = True, parent=None):
         super().__init__(parent)
         self._pd = pd
@@ -103,7 +103,7 @@ class _Scene(QFrame):
         self.title = ElidingLabel("")
         self.title.setObjectName("sceneTitle")
         header.addWidget(self.title, 1)
-        self.length = PresetComboBox(pd.options, unit=pd.unit)
+        self.length = PresetDropdown(pd.options, unit=pd.unit)
         self.length.setToolTip(param_help("scene_frames"))
         prepare_length(self.length)
         header.addWidget(self.length)
@@ -191,7 +191,7 @@ class ScenesEditor(QWidget):
     changed = pyqtSignal()
 
     def __init__(self, frames_def: ParamDef,
-                 prepare_length: Callable[[PresetComboBox], None], shut_down: dict[str, str],
+                 prepare_length: Callable[[PresetDropdown], None], shut_down: dict[str, str],
                  lines: bool = True, parent=None):
         super().__init__(parent)
         self._pd = frames_def

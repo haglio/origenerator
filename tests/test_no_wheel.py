@@ -5,12 +5,12 @@ from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QComboBox
 
 from origenerator.gui.no_wheel import (
-    NoWheelComboBox,
     NoWheelDoubleSpinBox,
+    NoWheelDropdown,
     NoWheelSpinBox,
 )
 
-# Two model files as a picker holds them: long, and alike until near the end.
+# Two model files as a dropdown holds them: long, and alike until near the end.
 _MODELS = [
     "split_files/diffusion_models/example_i2v_high_noise_14B_fp8.safetensors",
     "split_files/diffusion_models/example_i2v_low_noise_14B_fp8.safetensors",
@@ -27,7 +27,7 @@ def _wheel():
 
 
 def test_a_dropdown_ignores_the_wheel(qtbot):
-    w = NoWheelComboBox()
+    w = NoWheelDropdown()
     w.addItems(["a", "b", "c"])
     w.setCurrentIndex(1)
     qtbot.addWidget(w)
@@ -65,13 +65,13 @@ def test_a_double_spinner_ignores_the_wheel(qtbot):
     assert not event.isAccepted()
 
 
-# --- shrinking: a picker doesn't set the width of the form it sits in ---------
+# --- shrinking: a dropdown doesn't set the width of the form it sits in ---------
 
 def test_a_long_item_does_not_hold_the_form_open(qtbot):
-    # The failure this exists for: a combo's own minimum is its longest item, so a
-    # model picker put a several-hundred-pixel floor under the settings form and a
+    # The failure this exists for: a dropdown's own minimum is its longest item, so a
+    # model dropdown put a several-hundred-pixel floor under the settings form and a
     # narrow pane grew a horizontal scroll bar instead of squeezing the field.
-    w = NoWheelComboBox()
+    w = NoWheelDropdown()
     w.addItems(_MODELS)
     qtbot.addWidget(w)
 
@@ -80,12 +80,12 @@ def test_a_long_item_does_not_hold_the_form_open(qtbot):
 
 def test_a_placeholder_does_not_hold_the_form_open_either(qtbot):
     # Qt widens both hints to hold the placeholder — and keeps that width after a
-    # choice is made — so the workflow picker propped the pane open at the phrase
+    # choice is made — so the workflow dropdown propped the pane open at the phrase
     # "Select a workflow…" for the rest of the session.
-    bare = NoWheelComboBox()
+    bare = NoWheelDropdown()
     bare.addItems(_MODELS)
     qtbot.addWidget(bare)
-    w = NoWheelComboBox()
+    w = NoWheelDropdown()
     w.addItems(_MODELS)
     w.setPlaceholderText("Select a workflow…")
     qtbot.addWidget(w)
@@ -94,7 +94,7 @@ def test_a_placeholder_does_not_hold_the_form_open_either(qtbot):
 
 
 def test_a_dropdown_with_nothing_picked_shows_its_placeholder(qtbot):
-    w = NoWheelComboBox()
+    w = NoWheelDropdown()
     w.addItems(_MODELS)
     w.setPlaceholderText("Select a workflow…")
     w.setCurrentIndex(-1)
@@ -104,7 +104,7 @@ def test_a_dropdown_with_nothing_picked_shows_its_placeholder(qtbot):
 
 
 def test_a_squeezed_value_elides_rather_than_cuts_off(qtbot):
-    w = NoWheelComboBox()
+    w = NoWheelDropdown()
     w.addItems(_MODELS)
     w.setCurrentIndex(0)
     qtbot.addWidget(w)
@@ -117,14 +117,14 @@ def test_a_squeezed_value_elides_rather_than_cuts_off(qtbot):
 
 
 def test_it_still_asks_for_its_longest_item(qtbot):
-    # Only the floor moves. A combo laid out at its own hint rather than stretched
-    # to fill a row — the sort picker over the search results — must still come out
+    # Only the floor moves. A dropdown laid out at its own hint rather than stretched
+    # to fill a row — the sort dropdown over the search results — must still come out
     # wide enough to read, so this can't be done by shrinking what it asks for.
     labels = ["Newest first", "Model + LoRA bands"]
     stock = QComboBox()
     stock.addItems(labels)
     qtbot.addWidget(stock)
-    w = NoWheelComboBox()
+    w = NoWheelDropdown()
     w.addItems(labels)
     qtbot.addWidget(w)
 

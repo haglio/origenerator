@@ -42,7 +42,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
 from origenerator import animation_paths
 from origenerator.act_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.content import genau_flick_word
-from origenerator.gui.action_picker import ACTION_LABEL
+from origenerator.gui.action_dropdown import ACTION_LABEL
 from origenerator.gui.drop_zone import DROP_A_VIDEO, DROP_AN_IMAGE, DropZone, DropZones
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.generate_button import (
@@ -61,14 +61,14 @@ _NEEDS_ACT_OR_VIDEO = "Pick an act or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
 
 
-def _text_inset(combo: QComboBox) -> int:
+def _text_inset(dropdown: QComboBox) -> int:
     """How far in from a dropdown's left edge its own text starts, so a label
     under it lines up with the words rather than with the frame."""
     opt = QStyleOptionComboBox()
-    combo.initStyleOption(opt)
-    field = combo.style().subControlRect(
+    dropdown.initStyleOption(opt)
+    field = dropdown.style().subControlRect(
         QStyle.ComplexControl.CC_ComboBox, opt,
-        QStyle.SubControl.SC_ComboBoxEditField, combo)
+        QStyle.SubControl.SC_ComboBoxEditField, dropdown)
     return field.x() + 1  # the style insets the text a pixel before drawing it
 
 

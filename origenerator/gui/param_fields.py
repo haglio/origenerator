@@ -16,12 +16,12 @@ from shared_ui.tick_control import TickControl
 
 from origenerator.gui.drop_zone import DropZone, placeholder_for
 from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
-from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
+from origenerator.gui.no_wheel import NoWheelDoubleSpinBox, NoWheelDropdown, NoWheelSpinBox
 from origenerator.gui.param_help import option_help
-from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
-from origenerator.gui.seed_combo import SeedComboBox
+from origenerator.gui.seed_dropdown import SeedDropdown
 from origenerator.media import MediaType
 from origenerator.model_titles import option_title
 from origenerator.seed_history import SeedHistory
@@ -74,7 +74,7 @@ class _Seed(FieldKind):
         self._history = history or SeedHistory(lambda key: [], lambda item: None)
 
     def make(self, pd):
-        widget = SeedComboBox(lambda: self._history.uses(pd.key), self._history.looping_preview)
+        widget = SeedDropdown(lambda: self._history.uses(pd.key), self._history.looping_preview)
         widget.lineEdit().setPlaceholderText("64-bit integer seed")
         self.write(pd, widget, pd.default)
         return widget
@@ -162,7 +162,7 @@ class _Prompt(FieldKind):
         widget.set_value(str(value))
 
 
-class _Tick(FieldKind):
+class _Checkbox(FieldKind):
     def make(self, pd):
         widget = TickControl("")
         widget.setChecked(bool(pd.default))
@@ -218,7 +218,7 @@ class _Presets(FieldKind):
     count among them is shown, and edited, as seconds at its ``rate``."""
 
     def make(self, pd):
-        widget = PresetComboBox(pd.options, unit=pd.unit)
+        widget = PresetDropdown(pd.options, unit=pd.unit)
         grey_out_of_reach(pd, widget)
         if not pd.rate:
             widget.set_value(pd.default)
@@ -240,7 +240,7 @@ class _Presets(FieldKind):
 
 class _Choice(FieldKind):
     def make(self, pd):
-        widget = NoWheelComboBox()
+        widget = NoWheelDropdown()
         _offer_choices(pd, widget, pd.options or [])
         choose_option(widget, str(pd.default))
         return widget
@@ -256,11 +256,11 @@ class _Choice(FieldKind):
 
 
 _KINDS: dict[ParamType, FieldKind] = {
-    ParamType.BOOL: _Tick(),
+    ParamType.BOOL: _Checkbox(),
     ParamType.STR: _Line(),
     ParamType.INT: _WholeSpinner(),
     ParamType.FLOAT: _DecimalSpinner(),
-    ParamType.COMBO: _Choice(),
+    ParamType.DROPDOWN: _Choice(),
     ParamType.AUDIO: _AudioPath(),
 }
 _PROMPT = _Prompt()
@@ -283,40 +283,40 @@ def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = No
     return _KINDS[pd.type]
 
 
-def offer_options(combo: QComboBox, options, tip=lambda _option: None) -> None:
+def offer_options(dropdown: QComboBox, options, tip=lambda _option: None) -> None:
     for option in options:
-        combo.addItem(option_title(option), option)
-        combo.setItemData(combo.count() - 1, tip(option) or None, Qt.ItemDataRole.ToolTipRole)
+        dropdown.addItem(option_title(option), option)
+        dropdown.setItemData(dropdown.count() - 1, tip(option) or None, Qt.ItemDataRole.ToolTipRole)
 
 
-def offer_only(pd: ParamDef, combo: QComboBox, options: list) -> None:
-    held = combo.currentData()
+def offer_only(pd: ParamDef, dropdown: QComboBox, options: list) -> None:
+    held = dropdown.currentData()
     shown = options if held in options else [*options, held]
-    if [combo.itemData(row) for row in range(combo.count())] == shown:
+    if [dropdown.itemData(row) for row in range(dropdown.count())] == shown:
         return
-    with QSignalBlocker(combo):
-        combo.clear()
-        _offer_choices(pd, combo, options)
-        choose_option(combo, str(held))
+    with QSignalBlocker(dropdown):
+        dropdown.clear()
+        _offer_choices(pd, dropdown, options)
+        choose_option(dropdown, str(held))
 
 
-def _offer_choices(pd: ParamDef, combo: QComboBox, options: list) -> None:
-    offer_options(combo, options, lambda option: option_help(pd.key, option))
+def _offer_choices(pd: ParamDef, dropdown: QComboBox, options: list) -> None:
+    offer_options(dropdown, options, lambda option: option_help(pd.key, option))
 
 
-def choose_option(combo: QComboBox, value: str):
-    """Show ``value`` in ``combo``, offering it as a new option if it isn't one.
+def choose_option(dropdown: QComboBox, value: str):
+    """Show ``value`` in ``dropdown``, offering it as a new option if it isn't one.
 
     A workflow default or a reused choice (e.g. a LoRA whose file is gone) may
-    not be among the scanned options; adding it keeps the combo faithful to the
+    not be among the scanned options; adding it keeps the dropdown faithful to the
     value it was given instead of snapping to whatever sorts first.
     """
-    if combo.findData(value) < 0:
-        offer_options(combo, [value])
-    combo.setCurrentIndex(combo.findData(value))
+    if dropdown.findData(value) < 0:
+        offer_options(dropdown, [value])
+    dropdown.setCurrentIndex(dropdown.findData(value))
 
 
-def grey_out_of_reach(pd: ParamDef, widget: PresetComboBox) -> None:
+def grey_out_of_reach(pd: ParamDef, widget: PresetDropdown) -> None:
     """Disable the presets this workflow can't actually produce.
 
     Out of reach means the value doesn't survive the round trip the field

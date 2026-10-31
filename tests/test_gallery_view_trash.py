@@ -1189,7 +1189,7 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
 
 def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_path):
     # The grid and an editable config form are visible together, so the app-wide
-    # Delete/Undo filter must disarm while a config control has focus — its combos
+    # Delete/Undo filter must disarm while a config control has focus — its dropdowns
     # and buttons aren't text fields, so without this it would wipe a thumbnail.
     view, db, _file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)

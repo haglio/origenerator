@@ -404,6 +404,20 @@ def test_a_prompt_not_in_use_hides_its_countdown_and_shows_it_again_once_used(qt
     assert _shown(prompt) == [("1 left", AMBER.name())]
 
 
+def test_a_prompt_not_in_use_hides_its_yellow_and_shows_it_again_once_used(qtbot):
+    prompt = _prompt_fields("positive_prompt")
+    qtbot.addWidget(prompt)
+    prompt.set_reading(word_reading(3, READ_WHOLE))
+    prompt.set_value("a b c d")
+    (box,) = prompt.boxes()
+
+    prompt.set_in_use(False, "not used")
+    assert _past_the_limit(box) == []
+
+    prompt.set_in_use(True, "")
+    assert _past_the_limit(box) == [("d", AMBER.name(), BG_PRIMARY.name())]
+
+
 def test_a_scene_that_speaks_hides_its_prompts_countdowns(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
     qtbot.addWidget(form)

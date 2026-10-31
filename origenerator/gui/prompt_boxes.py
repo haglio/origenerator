@@ -43,7 +43,8 @@ def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReadi
     text = diff_text.live_text(field)
     countdown.show_left(None if reading is None or not in_use
                         else reading.reads_well - reading.tokens(text))
-    mark_past_the_limit(field, None if reading is None else reading.past_limit_at(text),
+    mark_past_the_limit(field, None if reading is None or not in_use
+                        else reading.past_limit_at(text),
                         unread=reading is not None and reading.past_it == CUT_OFF)
 
 

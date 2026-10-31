@@ -84,7 +84,7 @@ def app_chrome():
     """The pane dressed the way the app dresses it.
 
     A floor is a width against a width, and the app's sheet moves every one of
-    them -- a scene card's bare ✕ is 61 px in stock dress and 39 under it. Read
+    them -- a scene tile's bare ✕ is 61 px in stock dress and 39 under it. Read
     bare, a floor test passes on its own and fails in a forward run, after some
     launch has left the sheet on the application; read under the sheet it says
     what the pane does in the app.
@@ -343,7 +343,7 @@ def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, bl
     Squeezing a form and scrolling it sideways is a bad trade for the drag it
     allows, so the pane refuses to go there at all: the floor is read live off the
     scroll's contents, which is why it rises when a wider workflow is chosen. The
-    workflow here tells a story in scenes, whose cards carry a header of their
+    workflow here tells a story in scenes, whose tiles carry a header of their
     own beside the form's label column -- the row most able to push the floor
     past its cap, where the drag would stop with room still to give.
     """
@@ -1623,7 +1623,7 @@ def _row_texts(row):
     return [lbl.text().replace("\u200b", "") for lbl in row.findChildren(QLabel)]
 
 
-def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_panel):
+def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_panel):
     # This is where an image's versions live, so it has to be somewhere you can
     # already see before the first enhancement makes a second one — not least
     # because the enhance you just launched replaces the list's only other
@@ -1955,7 +1955,7 @@ def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, m
 def test_the_tab_watches_no_run_of_its_own(panel):
     # Generate submits and is done with it. It used to fill with the tracked run's
     # steps, which took a third telling of one run — differently worded from the
-    # Job Queue and the collection's card — and wired the control that starts work
+    # Job Queue and the collection's tile — and wired the control that starts work
     # to the state of work already going.
     panel.set_generating(True)
     assert panel._generate_btn.text() == "Generate"

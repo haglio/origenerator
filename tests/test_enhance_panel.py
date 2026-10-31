@@ -1356,10 +1356,10 @@ def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):
 # --- dragging a level onto the panel to reuse its settings -----------------
 
 
-# --- the "+ Enhance" card ---------------------------------------------------
+# --- the "+ Enhance" row ----------------------------------------------------
 
 
-def test_the_add_card_leads_the_strip_and_reports_its_press(qtbot):
+def test_the_add_tile_leads_the_strip_and_reports_its_press(qtbot):
     # Leftmost, because that is where a new version arrives: the strip runs
     # newest first.
     versions = EnhanceVersions()
@@ -1374,8 +1374,8 @@ def test_the_add_card_leads_the_strip_and_reports_its_press(qtbot):
     assert pressed == [True]
 
 
-def test_a_running_enhance_takes_the_add_cards_slot_rather_than_sitting_beside_it(qtbot):
-    # The card becomes the thing it asked for, which is what the press looks
+def test_a_running_enhance_takes_the_add_tiles_slot_rather_than_sitting_beside_it(qtbot):
+    # The row becomes the thing it asked for, which is what the press looks
     # like from the other side.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -1392,37 +1392,37 @@ def _share_painted(image, color) -> float:
     return painted / max(1, image.width() * image.height())
 
 
-def test_the_add_cards_tile_is_the_yellow_press_and_the_row_beside_it_is_not(qtbot):
+def test_the_add_rows_thumbnail_is_the_yellow_press_and_the_row_beside_it_is_not(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
     versions.resize(420, 600)
     versions.show()
     QApplication.processEvents()
-    (card,) = versions._host.findChildren(_AddRow)
-    image = card.grab().toImage()
-    tile = card._thumbnail.geometry()
-    beside = image.copy(tile.right() + 1, 0, image.width() - tile.right() - 1,
+    (add_row,) = versions._host.findChildren(_AddRow)
+    image = add_row.grab().toImage()
+    thumbnail = add_row._thumbnail.geometry()
+    beside = image.copy(thumbnail.right() + 1, 0, image.width() - thumbnail.right() - 1,
                         image.height())
 
-    assert card._thumbnail.size() == versions._rows[0]._thumbnail.size()
-    assert _share_painted(image.copy(tile), AMBER) > 0.5
+    assert add_row._thumbnail.size() == versions._rows[0]._thumbnail.size()
+    assert _share_painted(image.copy(thumbnail), AMBER) > 0.5
     assert _share_painted(beside, AMBER) == 0
 
 
-def test_the_add_cards_plus_is_drawn_big_in_its_tile(qtbot):
+def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
-    (card,) = versions._host.findChildren(_AddRow)
-    plus = card._thumbnail.pixmap().toImage()  # drawn, like the bank's plus, not typed
+    (add_row,) = versions._host.findChildren(_AddRow)
+    plus = add_row._thumbnail.pixmap().toImage()  # drawn, like the bank's plus, not typed
 
     inked = sum(1 for y in range(plus.height()) for x in range(plus.width())
                 if plus.pixelColor(x, y).alpha() > 128)
-    assert inked >= card._thumbnail.width() * card._thumbnail.height() // 12
+    assert inked >= add_row._thumbnail.width() * add_row._thumbnail.height() // 12
 
 
-def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):
+def test_an_image_with_nothing_yet_still_gets_the_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels([], add=EnhanceOffer("2x", None))
@@ -1430,31 +1430,31 @@ def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):
     assert versions._host.findChildren(_AddRow)
 
 
-def test_the_card_dims_when_it_would_only_duplicate_a_level(qtbot):
+def test_the_tile_dims_when_it_would_only_duplicate_a_level(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", 0))
-    (card,) = versions._host.findChildren(_AddRow)
+    (add_row,) = versions._host.findChildren(_AddRow)
 
     pressed = []
     versions.enhance_requested.connect(lambda: pressed.append(True))
-    qtbot.mouseRelease(card, Qt.MouseButton.LeftButton)
+    qtbot.mouseRelease(add_row, Qt.MouseButton.LeftButton)
     assert pressed == []                       # it makes nothing new, so it does nothing
-    assert "already has a version" in card.toolTip()
+    assert "already has a version" in add_row.toolTip()
 
 
-def test_hovering_the_dimmed_card_outlines_the_level_it_would_duplicate_in_white(qtbot):
+def test_hovering_the_dimmed_tile_outlines_the_level_it_would_duplicate_in_white(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x", 1))
-    (card,) = versions._host.findChildren(_AddRow)
+    (add_row,) = versions._host.findChildren(_AddRow)
     duplicate = versions._rows[1]._thumbnail
-    point = QPointF(card.rect().center())
+    point = QPointF(add_row.rect().center())
     resting = duplicate.styleSheet()
 
-    QApplication.sendEvent(card, QEnterEvent(point, point, QPointF(card.mapToGlobal(point))))
+    QApplication.sendEvent(add_row, QEnterEvent(point, point, QPointF(add_row.mapToGlobal(point))))
     outline = duplicate.grab().toImage().pixelColor(0, duplicate.height() // 2).name()
-    QApplication.sendEvent(card, QEvent(QEvent.Type.Leave))
+    QApplication.sendEvent(add_row, QEvent(QEvent.Type.Leave))
 
     assert resting == ""
     assert outline == TEXT_PRIMARY.name()
@@ -1509,12 +1509,12 @@ def _an_image(path, size=(16, 16)):
 def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, level_drags):
     # The same gesture as dragging a gallery thumbnail onto Combine: the thumbnail
     # comes along under the cursor, so what is being dragged is never in doubt.
-    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "e1.png"))
-    qtbot.addWidget(tile)
+    qtbot.addWidget(thumbnail)
 
-    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
-    qtbot.mouseMove(tile, QPoint(90, 90))
+    qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(thumbnail, QPoint(90, 90))
 
     (drag,) = level_drags
     assert not drag.pixmap.isNull()
@@ -1525,12 +1525,12 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, level_
     # Both drag tests here move eighty pixels, well past the threshold that tells
     # a click from a drag — so removing it left them green, and a click that
     # wobbles a pixel would pick the row up instead of selecting it.
-    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "e1.png"))
-    qtbot.addWidget(tile)
+    qtbot.addWidget(thumbnail)
 
-    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
-    qtbot.mouseMove(tile, QPoint(3, 3))  # inside the start-drag distance
+    qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(thumbnail, QPoint(3, 3))  # inside the start-drag distance
 
     assert level_drags == []
 
@@ -1539,12 +1539,12 @@ def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, leve
     # An enhancement is an upscale, so the file under a version can be huge; the
     # thumbnail under the cursor is the same thumbnail every other drag trails.
 
-    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "big.png", (1024, 768)))
-    qtbot.addWidget(tile)
+    qtbot.addWidget(thumbnail)
 
-    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
-    qtbot.mouseMove(tile, QPoint(90, 90))
+    qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(thumbnail, QPoint(90, 90))
 
     (drag,) = level_drags
     assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_MAX
@@ -1568,10 +1568,10 @@ def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
 
     monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
 
-    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0, None)
-    qtbot.addWidget(tile)
-    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
-    qtbot.mouseMove(tile, QPoint(90, 90))
+    thumbnail = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0, None)
+    qtbot.addWidget(thumbnail)
+    qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(thumbnail, QPoint(90, 90))
 
 
 # --- the enhancement being generated right now -----------------------------
@@ -1613,10 +1613,10 @@ def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), RunningEnhancement("running", None, "2x"))
-    tile = versions._pending
+    thumbnail = versions._pending
 
     assert versions.update_pending(RunningEnhancement("running", b"not a real png", "2x")) is True
-    assert versions._pending is tile          # the same widget, fed in place
+    assert versions._pending is thumbnail          # the same widget, fed in place
 
     # A run starting or ending changes the strip's shape, which only a rebuild
     # can do — the caller is told so rather than left with a stale strip.

@@ -22,7 +22,7 @@ DESCRIBER = "florence-community/Florence-2-large"
 DESCRIBING_TASK = "<MORE_DETAILED_CAPTION>"
 IDLE_CHECKS = 6
 IDLE_CHECK_SECONDS = 20
-CARD_FREE_MIB = 3000
+GRAPHICS_CARD_FREE_MIB = 3000
 POLL_SECONDS = 5
 ROUNDS = 12
 _STEPS = re.compile(rb"steps:\s+\d+%\|[^|]*\|\s*(\d+)/(\d+)")
@@ -138,7 +138,7 @@ def describe(job: dict, describer=None, wait_for_idle=None) -> int:
     _status(job, state="describing", done=0, total=len(images))
     missing = [image for image in images if not (captions / f"{image.stem}.txt").exists()]
     if missing:
-        (wait_for_idle or _wait_for_the_card)(job)
+        (wait_for_idle or _wait_for_the_graphics_card)(job)
         describer = describer or _florence()
     for index, image in enumerate(images, 1):
         if image in missing:
@@ -169,7 +169,7 @@ def _musubi(job: dict, program: str) -> str:
 
 
 def cache(job: dict, wait_for_idle=None) -> None:
-    (wait_for_idle or _wait_for_the_card)(job)
+    (wait_for_idle or _wait_for_the_graphics_card)(job)
     _status(job, state="caching")
     settings = str(Path(job["work"], "dataset.toml"))
     for command in (
@@ -188,13 +188,13 @@ class Machine:
         self._comfyui = comfyui
         self._holder = holder
 
-    def card_held_by_another(self) -> bool:
+    def graphics_card_held_by_another(self) -> bool:
         return card_claim.held_by_another(os.getpid())
 
-    def claim_card(self) -> bool:
+    def claim_graphics_card(self) -> bool:
         return card_claim.take(self._holder, os.getpid())
 
-    def release_card(self) -> None:
+    def release_graphics_card(self) -> None:
         card_claim.release(os.getpid())
 
     def jobs_waiting(self) -> int | None:
@@ -216,7 +216,7 @@ class Machine:
             return
         time.sleep(5)
 
-    def card_memory_mib(self) -> int | None:
+    def graphics_card_memory_mib(self) -> int | None:
         try:
             said = subprocess.run(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
                                   capture_output=True, text=True, timeout=30,
@@ -234,21 +234,21 @@ def wait_for_idle(job: dict, machine) -> None:
     while True:
         quiet = 0
         while quiet < IDLE_CHECKS:
-            free = machine.jobs_waiting() in (0, None) and not machine.card_held_by_another()
+            free = machine.jobs_waiting() in (0, None) and not machine.graphics_card_held_by_another()
             quiet = quiet + 1 if free else 0
             machine.sleep(IDLE_CHECK_SECONDS)
-        memory = machine.card_memory_mib()
-        if memory is not None and memory >= CARD_FREE_MIB:
+        memory = machine.graphics_card_memory_mib()
+        if memory is not None and memory >= GRAPHICS_CARD_FREE_MIB:
             machine.unload_comfyui()
             machine.sleep(10)
-            memory = machine.card_memory_mib()
-        if memory is not None and memory >= CARD_FREE_MIB:
-            print(f"== the card still holds {memory} MiB with ComfyUI's line empty; waiting on",
+            memory = machine.graphics_card_memory_mib()
+        if memory is not None and memory >= GRAPHICS_CARD_FREE_MIB:
+            print(f"== the graphics card still holds {memory} MiB with ComfyUI's line empty; waiting on",
                   flush=True)
-        elif machine.claim_card():
+        elif machine.claim_graphics_card():
             return
         else:
-            print("== another trainer took the card first; waiting on", flush=True)
+            print("== another trainer took the graphics card first; waiting on", flush=True)
         machine.sleep(60)
 
 
@@ -256,7 +256,7 @@ def _machine(job: dict) -> Machine:
     return Machine(job["comfyui"], f"{job['display_name']} training")
 
 
-def _wait_for_the_card(job: dict) -> None:
+def _wait_for_the_graphics_card(job: dict) -> None:
     wait_for_idle(job, _machine(job))
 
 
@@ -349,7 +349,7 @@ def train(job: dict, machine, popen=subprocess.Popen, kill=_end) -> None:
         while process.poll() is None:
             machine.sleep(POLL_SECONDS)
             if machine.jobs_waiting() not in (0, None):
-                print("== ComfyUI has a job; stopping the trainer until the card is idle again",
+                print("== ComfyUI has a job; stopping the trainer until the graphics card is idle again",
                       flush=True)
                 kill(process)
                 stopped_for_comfyui = True
@@ -364,7 +364,7 @@ def train(job: dict, machine, popen=subprocess.Popen, kill=_end) -> None:
             done += step
             tally.write_text(str(done), encoding="utf-8")
             print(f"== progress kept: {done} of {job['steps']} steps saved", flush=True)
-        machine.release_card()
+        machine.release_graphics_card()
         if stopped_for_comfyui:
             machine.sleep(10)
             continue
@@ -415,7 +415,7 @@ def run(job: dict) -> None:
             raise Stopped("Describing the pictures quit without saying why. An agent can read "
                           f"what it printed in {job['log']}.")
         dataset(job)
-        cache(job, wait_for_idle=_wait_for_the_card)
+        cache(job, wait_for_idle=_wait_for_the_graphics_card)
         train(job, _machine(job))
         install(job)
     finally:

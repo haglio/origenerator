@@ -277,7 +277,7 @@ class GenerateConfigPanel(DropZone):
         # (status, frame, settings) of an enhancement running on the displayed
         # image, fed from outside (the gallery owns the jobs); None when nothing
         # is in flight. Beside it, the app-wide enhance settings the "+ Enhance"
-        # card would run at — also the gallery's, pushed in the same way.
+        # row would run at — also the gallery's, pushed in the same way.
         self._pending_enhancement: RunningEnhancement | None = None
         self._enhance_settings = EnhanceSettings()
         # The settings the preview's generation went on display under, captured
@@ -1860,9 +1860,9 @@ class GenerateConfigPanel(DropZone):
         self._preview.set_fullscreen_factory(make)
 
     def set_enhance_settings(self, settings: EnhanceSettings):
-        """The app-wide enhance settings the ``+ Enhance`` card would run at.
+        """The app-wide enhance settings the ``+ Enhance`` row would run at.
 
-        Pushed in by the gallery whenever the Enhance panel changes, so the card
+        Pushed in by the gallery whenever the Enhance panel changes, so the row
         names the current settings and knows whether they would only duplicate a
         version this image already holds.
         """
@@ -1936,7 +1936,7 @@ class GenerateConfigPanel(DropZone):
         # like rather than the row's one shared thumbnail.
         self._versions.show_levels(
             [(level, self._level_path(level)) for level in self._listed_levels],
-            self._pending_enhancement, self._add_card_for(row),
+            self._pending_enhancement, self._add_row_for(row),
             str(row.get("created_at", "")), row.get("days_in_trash"),
         )
 
@@ -1949,7 +1949,7 @@ class GenerateConfigPanel(DropZone):
             return None
         return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE).upscale_of(preview[0])
 
-    def _add_card_for(self, row: dict) -> EnhanceOffer:
+    def _add_row_for(self, row: dict) -> EnhanceOffer:
         """What the ``+ Enhance`` row on ``row`` would run, and what it repeats."""
         params = enhance_params_for(row, self._enhance_settings)
         return EnhanceOffer(describe_enhance_params(params or {}),

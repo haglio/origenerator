@@ -888,7 +888,7 @@ def test_a_queue_held_for_a_training_hands_comfyui_nothing_until_it_ends(qtbot, 
     assert queue.training is None
 
 
-def test_a_queue_watching_a_training_that_yields_the_card_hands_comfyui_its_jobs_as_ever(
+def test_a_queue_watching_a_training_that_yields_the_tile_hands_comfyui_its_jobs_as_ever(
         qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)

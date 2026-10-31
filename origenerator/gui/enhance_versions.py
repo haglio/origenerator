@@ -25,7 +25,7 @@ the delete is undoable. Never deleted here: the original, and the last version,
 since an image with no file left is a deleted generation, the gallery's own.
 
 An enhancement still in flight takes the ``+ Enhance`` row's own slot at the head
-of the list, mirroring the run's streamed frames the way the in-flight cards do
+of the list, mirroring the run's streamed frames the way the in-flight tiles do
 everywhere else — the row becomes the thing it asked for, and the level being
 made appears where the level will be.
 
@@ -71,7 +71,7 @@ from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 
 _PLUS = THUMBNAIL_BOX.width() * 2 // 3
-# The in-flight edge the Latest collection's cards wear, so work in progress reads
+# The in-flight edge the Latest collection's tiles wear, so work in progress reads
 # the same wherever it shows.
 _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
 # The lit edge a level wears while the row that would duplicate it is hovered.
@@ -160,7 +160,7 @@ class _Row(QWidget):
     """The shape every entry in the list shares: a thumbnail, then a bold title
     over a column of ``label: value`` facts.
 
-    One shape for the finished levels, the one being made, and the card that
+    One shape for the finished levels, the one being made, and the row that
     would make another — so a run in flight sits in the list reading like the
     level it is about to become rather than like a different kind of thing."""
 
@@ -375,7 +375,7 @@ class _PendingRow(_Row):
     """The enhancement being made right now: its live frame, or the stage it's at.
 
     Wears the same blue "in progress" edge as the Latest collection's in-flight
-    cards, so a level under construction reads the same here as work in flight
+    tiles, so a level under construction reads the same here as work in flight
     reads anywhere else in the app.
     """
 

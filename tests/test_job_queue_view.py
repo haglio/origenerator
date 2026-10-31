@@ -213,7 +213,7 @@ def test_a_queue_of_any_length_is_one_progress_bar_tall(queue):
 
 def test_the_clock_is_written_across_the_bar_it_measures(queue):
     # One object, not a line of text with a separate stripe under it: the numbers
-    # are read off the face of the bar they measure, the way an in-flight card's
+    # are read off the face of the bar they measure, the way an in-flight tile's
     # are.
 
     queue.set_items([_item(status="running", progress=(10, 20),

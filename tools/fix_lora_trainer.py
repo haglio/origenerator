@@ -203,7 +203,7 @@ def _said_why(job: dict) -> bool:
         return False
 
 
-def _take_the_card(job: dict) -> None:
+def _take_the_graphics_card(job: dict) -> None:
     while not card_claim.take(f"{job['part'].capitalize()} fix training", os.getpid()):
         _status(job, state="waiting")
         time.sleep(20)
@@ -211,7 +211,7 @@ def _take_the_card(job: dict) -> None:
 
 def run(job: dict) -> None:
     try:
-        _take_the_card(job)
+        _take_the_graphics_card(job)
         cropping = subprocess.run([job["comfyui_python"], str(Path(__file__).resolve()), "crop",
                                    job["job_file"]], creationflags=_IN_THE_BACKGROUND)
         if cropping.returncode != 0:

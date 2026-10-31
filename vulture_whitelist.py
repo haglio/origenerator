@@ -24,7 +24,7 @@ _.contextMenuEvent  # noqa  # origenerator/gui/drop_slot.py:238
 _.takeAt  # noqa  # origenerator/gui/flow_layout.py:46
 _.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
-_.mouseDoubleClickEvent  # noqa  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/thumbnail_widget.py:392
+_.mouseDoubleClickEvent  # noqa  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/item_tile.py:392
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
 _.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:290, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
 

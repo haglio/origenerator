@@ -100,7 +100,7 @@ def build_stylesheet() -> str:
     QLabel {{
         color: {_h(TEXT_SECONDARY)};
     }}
-    /* A scene card's heading: set off from the form's keys around it, the way
+    /* A scene's heading: set off from the form's keys around it, the way
        a section's header is, so a story reads as scenes and not as more keys. */
     QLabel#sceneTitle {{
         color: {_h(TEXT_PRIMARY)};
@@ -325,7 +325,7 @@ def build_stylesheet() -> str:
     QTabBar::tab:hover {{
         color: {_h(TEXT_PRIMARY)};
     }}
-    /* A tab's close button, and a scene card's remove. Flat and bare, because
+    /* A tab's close button, and a scene's remove. Flat and bare, because
        all it is is the family's cross sitting on the tab: the default QToolButton
        look would wrap it in a raised, rounded, bordered frame that looks nothing
        like a tab's mark. */

@@ -37,7 +37,7 @@ DURATION_OPTIONS = [1, 5, 10, 15, 30, 60]
 # The longest of those, in frames at the native rate on the models' 4k+1 grid.
 LONGEST_VIDEO_FRAMES = 961
 # Sampled as one window, a video's activations grow with its length: measured
-# on the 16 GB card, 165 frames at the video pixel budget is 10.5 GB and 481
+# on the 16 GB graphics card, 165 frames at the video pixel budget is 10.5 GB and 481
 # is 31 GB, which Windows pages through system RAM at a crawl rather than
 # refusing. A longer video is rendered as a chain of videos this long, each
 # started from the last frame of the one before -- :meth:`WorkflowTemplate.

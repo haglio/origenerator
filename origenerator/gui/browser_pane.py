@@ -3,7 +3,7 @@
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
 settings leaf's thumbnail grid (with its re-roll tile), or the Latest / Favorites /
 Enhanced / Experiments / Trash collection overviews. Owns the thumbnail multi-selection
-and the live in-flight cards.
+and the live in-flight tiles.
 
 One thing it renders comes from no tree row at all: the gallery search's results,
 which take the pane over while a query is running and hand it back when it clears.
@@ -62,8 +62,9 @@ from origenerator.gui.inflight import (
     stop_auto_generate_text,
     stop_auto_generate_tooltip,
 )
-from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.inflight_items import InFlightItems
+from origenerator.gui.inflight_tile import InFlightTile
+from origenerator.gui.item_tile import CornerAction, ItemTile
 from origenerator.gui.pane_place import (
     PanePlace,
     bring_into_view,
@@ -72,7 +73,6 @@ from origenerator.gui.pane_place import (
     stand_at,
 )
 from origenerator.gui.picking import Picking
-from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
 from origenerator.orientation import base_of, filter_rows, key_holds, split_key
 
@@ -271,7 +271,7 @@ def _back_of_the_line_first(items, keys) -> list:
 
 def _inflight_signature(items) -> tuple:
     """The in-flight runs in the order drawn, so a frame-only change refreshes
-    cards in place while a run added, taken away or moved forces a re-render."""
+    tiles in place while a run added, taken away or moved forces a re-render."""
     return tuple(it.key for it in items)
 
 
@@ -382,7 +382,7 @@ class PaneCollection:
 
 class BrowserPane(QObject):
     """Fills the middle scroll area (folder tiles / thumbnail grid / collections) and
-    owns the thumbnail multi-selection and in-flight cards. Held by the GalleryView,
+    owns the thumbnail multi-selection and in-flight tiles. Held by the GalleryView,
     which connects the signals below to its own handlers — a gesture on a tile is
     the pane's to notice and the view's to answer."""
 
@@ -406,12 +406,12 @@ class BrowserPane(QObject):
                  host: PaneHost):
         super().__init__()
         self._scroll = scroll  # the pane's canvas: the middle scroll area it fills
-        self._db = db          # the generations the cards and corners re-read
+        self._db = db          # the generations the tiles and corners re-read
         self._jobs = jobs  # the live jobs and the queue's own line
-        self._auto = auto      # whether a folder is auto-generating (its card says)
+        self._auto = auto      # whether a folder is auto-generating (its tile says)
         self._tree = tree      # the three questions the pane may ask the tree
         self._host = host      # the rest of what it asks the gallery (see PaneHost)
-        # The queue's cards are a join over four sources and no rendering at all,
+        # The queue's tiles are a join over four sources and no rendering at all,
         # so they are built outside the pane and handed the same collaborators.
         self._queue_model = InFlightItems(
             db=db, jobs=jobs, auto=auto, tree=tree,
@@ -451,10 +451,10 @@ class BrowserPane(QObject):
         # (:mod:`origenerator.gui.picking`).
         self._selection = Picking()
         self._listed_folders: list[str] = []  # the folders it lists, as tiles
-        self._thumb_widgets: dict[str, ThumbnailWidget] = {}
+        self._thumb_widgets: dict[str, ItemTile] = {}
         self._wired: dict[str, str] = {}      # how each drawn tile is wired
         self._kept = _KeptTiles()             # the last pane's tiles, while a new one draws
-        self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
+        self._inflight_tiles: dict[str, InFlightTile] = {}   # live in-flight tiles, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn in the collection
         self._recent_rows = _Listing()      # every generated row, newest first
@@ -550,21 +550,21 @@ class BrowserPane(QObject):
     def _reset_pane_state(self):
         """Forget what the outgoing pane held, before the incoming one fills it.
 
-        Every renderer here starts by calling this (through :meth:`_new_tile_pane`
+        Every renderer here starts by calling this (through :meth:`_fresh_tile_pane`
         or directly), so no renderer has to remember to clear the state of the one
         it is replacing — which is how a stale selection or a stale search flag
         would otherwise outlive the tiles it referred to.
         """
         self.clear_selection()
         self.pane_reset.emit()  # the view drops its generating tile with the old pane
-        self._inflight_cards = {}    # ...as are the live cards, by whichever pane draws them
+        self._inflight_tiles = {}    # ...as are the live tiles, by whichever pane draws them
         self._inflight_by_key = {}
         self._selection.forget_what_was_shown()
         self._listed_folders = []
         self._search_rows = []
         self._showing_search = False
 
-    def _new_tile_pane(self):
+    def _fresh_tile_pane(self):
         """A fresh container whose tiles flow to fill the pane's width."""
         container = QWidget()
         flow = FlowLayout(container, spacing=_TILE_SPACING)
@@ -607,7 +607,7 @@ class BrowserPane(QObject):
                 tile.set_favorite(favorite)
 
     def show_folder_tiles(self, groups, collections=()):
-        container, flow = self._new_tile_pane()
+        container, flow = self._fresh_tile_pane()
         for key in collections:
             self._add_collection_tile(flow, key)
         if collections and groups:
@@ -643,7 +643,7 @@ class BrowserPane(QObject):
         folders that are both called "30 steps" from opposite corners of the tree,
         so the bare label the hierarchy relies on isn't enough here.
         """
-        container, flow = self._new_tile_pane()
+        container, flow = self._fresh_tile_pane()
         if not (rows or groups):
             self.show_widget(self._empty_state(empty))
             return
@@ -804,26 +804,26 @@ class BrowserPane(QObject):
         self._collections[collection.which].render()
 
     def _render_latest(self):
-        """The Latest collection: a card for every in-flight generation (queued or
+        """The Latest collection: a tile for every in-flight generation (queued or
         running, from a Generate tab or a gallery re-roll) atop the recently
-        finished items. Clicking an in-flight card reveals where its job runs; a
+        finished items. Clicking an in-flight tile reveals where its job runs; a
         finished one previews in the info pane, right here in the collection, the way
         a thumbnail does inside a folder — and double-clicking it jumps to its
         own folder.
 
-        In-flight cards first (the newest work, still in flight), then the
+        In-flight tiles first (the newest work, still in flight), then the
         finished thumbnails; a hint when there is neither.
         """
-        container, flow = self._new_tile_pane()
+        container, flow = self._fresh_tile_pane()
         rows = self._open_collection_rows(LATEST_KEY)
         items = self._latest_inflight_items()
         self._inflight_signature = _inflight_signature(items)
-        self._inflight_cards = {}
+        self._inflight_tiles = {}
         self._inflight_by_key = {}
 
         def draw_leading():
             for item in items:
-                self._add_inflight_card(flow, item)
+                self._add_inflight_tile(flow, item)
 
         headings = gallery.section_headings(rows)
         _open_sections(flow, headings,
@@ -892,7 +892,7 @@ class BrowserPane(QObject):
         )
 
     def _draw_tile(self, flow, row, wiring: str, wire, *, caption: str | None = None,
-                   **appearance) -> ThumbnailWidget:
+                   **appearance) -> ItemTile:
         """The last pane's tile for *row*, when it would be built again the same and
         wired the same way, else a new one *wire* connects."""
         prompt_id = row["prompt_id"]
@@ -900,10 +900,10 @@ class BrowserPane(QObject):
         if caption is None:
             caption = self._host.item_name(prompt_id)
         tile = self._kept.take(
-            prompt_id, ThumbnailWidget.look_of(prompt_id, thumb_path, caption, **appearance),
+            prompt_id, ItemTile.look_of(prompt_id, thumb_path, caption, **appearance),
             wiring)
         if tile is None:
-            tile = ThumbnailWidget(prompt_id, thumb_path, caption, **appearance)
+            tile = ItemTile(prompt_id, thumb_path, caption, **appearance)
             wire(tile)
         else:
             tile.set_favorite(appearance.get("favorite", False))
@@ -915,21 +915,21 @@ class BrowserPane(QObject):
         self._wired[prompt_id] = wiring
         return tile
 
-    def _card_items(self, rows=None, requests=None) -> list[InFlightItem]:
-        """The runs in flight that get a card: all but the enhancements, each of
+    def _tile_items(self, rows=None, requests=None) -> list[InFlightItem]:
+        """The runs in flight that get a tile: all but the enhancements, each of
         which shows on the tile of the image it upgrades instead."""
         return [item for item in self.inflight_items(rows, requests)
                 if item.job_kind != gallery.JobKind.ENHANCE]
 
     def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
-        """The open Latest's cards: the runs it will list once they land, held to
+        """The open Latest's tiles: the runs it will list once they land, held to
         its side and its folder exactly as its finished items are."""
         if rows is None:
             rows = self._db.list_generations()
         held = {row["prompt_id"] for row in self._in_folder(
             _Listing(row for row in rows if gallery.is_in_progress(row)),
             self._collection_side, self._collection_folder)}
-        return _back_of_the_line_first(self._card_items(rows, requests), held)
+        return _back_of_the_line_first(self._tile_items(rows, requests), held)
 
     def _latest_empty_hint(self) -> str:
         """The teaching hint for an empty collection, worded for the kind its
@@ -943,8 +943,8 @@ class BrowserPane(QObject):
         return base_of(self._tree.selected_folder_key()) == LATEST_KEY
 
     def refresh_inflight(self, rows=None, requests=None):
-        """Between rebuilds, keep the in-flight cards live: push each tracked
-        re-roll's latest frame into its card. The poll passes the listing it
+        """Between rebuilds, keep the in-flight tiles live: push each tracked
+        re-roll's latest frame into its tile. The poll passes the listing it
         already read (``rows``/``requests``); left off, they are read here.
 
         Whichever pane drew them — the Latest collection, or a settings folder with
@@ -952,12 +952,12 @@ class BrowserPane(QObject):
         *set* of jobs (a defensive guard — a started or finished re-roll
         normally moves the DB fingerprint and forces a full rebuild anyway); a
         folder is rebuilt by that same fingerprint and must not be redrawn as
-        the collection. A pane holding no cards asks the database nothing.
+        the collection. A pane holding no tiles asks the database nothing.
         """
-        if not self._inflight_cards and not self.showing_latest():
+        if not self._inflight_tiles and not self.showing_latest():
             return
         items = (self._latest_inflight_items(rows, requests) if self.showing_latest()
-                 else self._card_items(rows, requests))
+                 else self._tile_items(rows, requests))
         if (self.showing_latest()
                 and _inflight_signature(items) != self._inflight_signature):
             place = self.place()
@@ -966,12 +966,12 @@ class BrowserPane(QObject):
             return
         for item in items:
             self._inflight_by_key[item.key] = item  # keep the reveal current
-            card = self._inflight_cards.get(item.key)
-            if card is not None:
-                card.update_item(item)
+            tile = self._inflight_tiles.get(item.key)
+            if tile is not None:
+                tile.update_item(item)
 
     def inflight_items(self, rows=None, requests=None) -> list:
-        """Every queued/running generation as a card model, in the order the
+        """Every queued/running generation as a tile model, in the order the
         queue will work through them
         (:class:`~origenerator.gui.inflight_items.InFlightItems`)."""
         return self._queue_model.build(rows=rows, requests=requests)
@@ -982,16 +982,16 @@ class BrowserPane(QObject):
             item.reveal()
 
     def _inflight_context_menu(self, key: str, global_pos):
-        """Right-click a card of work still being made: throw that run away.
+        """Right-click a tile of work still being made: throw that run away.
 
-        The one act a queued or running card has, and until now the one act it
+        The one act a queued or running tile has, and until now the one act it
         offered nowhere: a finished tile answers a right-click with its own menu,
-        and a card answered with nothing, so stopping a run meant finding it again
+        and a tile answered with nothing, so stopping a run meant finding it again
         among the Job Queue's rows. The wording is the Job Queue's Cancel, which
         while the folder is auto-generating starts another seed rather than
         stopping anything.
 
-        Which is exactly why an auto-generating folder's card gets a second entry
+        Which is exactly why an auto-generating folder's tile gets a second entry
         (:func:`inflight.stop_auto_generate_text`): a menu, unlike the one button those
         surfaces have room for, can carry both the discard and a real stop, so a
         run made while Auto-Generate is on can be ended without going to the header
@@ -1039,7 +1039,7 @@ class BrowserPane(QObject):
         been in its own folder since it ran; a rejected one is trashed and
         teaches the policy what to avoid. Clicking previews the item right here
         and double-clicking opens its folder, like the other collections."""
-        container, flow = self._new_tile_pane()
+        container, flow = self._fresh_tile_pane()
         actions = [
             CornerAction("keep", icons.experiment_verdict_icon("up"),
                          "Keep — add it to the gallery"),
@@ -1079,7 +1079,7 @@ class BrowserPane(QObject):
         returns to its own folder, files and all; a purged one is gone for good,
         which is what the whole collection exists to make deliberate rather than
         automatic."""
-        container, flow = self._new_tile_pane()
+        container, flow = self._fresh_tile_pane()
         actions = [
             CornerAction("restore", icons.trash_action_icon("restore"),
                          "Restore — put it and its files back where they were"),
@@ -1240,7 +1240,7 @@ class BrowserPane(QObject):
     # --- the thumbnail grid: a settings leaf's generations ------------------
 
     def show_thumbnails(self, group):
-        container, flow = self._new_tile_pane()
+        container, flow = self._fresh_tile_pane()
         # An i2v folder's items carry per-seed re-roll hover controls; its rows
         # all share the one workflow, so the kind is decided once. Media-gated
         # because the enhancer is image-conditioned too, but its items have no
@@ -1274,8 +1274,8 @@ class BrowserPane(QObject):
         finished = [row for row in group.rows if gallery.produced_output(row)]
         headings = gallery.section_headings(finished)
         lead = self._host.lead_tiles(group)
-        cards = self._folder_inflight_items(group)
-        opens_now = ((lead.reroll is not None or bool(cards))
+        tiles = self._folder_inflight_items(group)
+        opens_now = ((lead.reroll is not None or bool(tiles))
                      and gallery.new_work_opens_a_section(finished))
         sections = opens_now + sum(1 for heading in headings if heading)
         modify_above = lead.modify is not None and sections > 1
@@ -1286,8 +1286,8 @@ class BrowserPane(QObject):
             for tile in (lead.reroll, None if modify_above else lead.modify):
                 if tile is not None:
                     flow.addWidget(tile)
-            for item in cards:
-                self._add_inflight_card(flow, item)
+            for item in tiles:
+                self._add_inflight_tile(flow, item)
             if lead.generating is not None:
                 flow.addWidget(lead.generating)
 
@@ -1295,11 +1295,11 @@ class BrowserPane(QObject):
         self._show_paged(container, _between_headings(flow, finished, headings, draw))
 
     def _folder_inflight_items(self, group) -> list[InFlightItem]:
-        """Every other run of this folder still in flight, for a card each.
+        """Every other run of this folder still in flight, for a tile each.
 
         The generating tile shows the one in front, and used to be the whole of
         what a folder said about work in flight — so a request over a folder,
-        which queues a run per image at once, showed up as a single card the
+        which queues a run per image at once, showed up as a single tile the
         images then arrived through one at a time. They are all being made;
         the folder shows them all, each on the image it was asked of
         (:mod:`origenerator.gui.blurred`), and each turns into its own
@@ -1309,14 +1309,14 @@ class BrowserPane(QObject):
         in_front = leading.prompt_id if leading is not None else None
         waiting = {row["prompt_id"] for row in group.rows
                    if not gallery.produced_output(row) and row["prompt_id"] != in_front}
-        return _back_of_the_line_first(self._card_items(), waiting) if waiting else []
+        return _back_of_the_line_first(self._tile_items(), waiting) if waiting else []
 
-    def _add_inflight_card(self, flow, item):
-        card = InFlightCard(item)
-        card.clicked.connect(self._on_inflight_clicked)
-        card.context_requested.connect(self._inflight_context_menu)
-        flow.addWidget(card)
-        self._inflight_cards[item.key] = card
+    def _add_inflight_tile(self, flow, item):
+        tile = InFlightTile(item)
+        tile.clicked.connect(self._on_inflight_clicked)
+        tile.context_requested.connect(self._inflight_context_menu)
+        flow.addWidget(tile)
+        self._inflight_tiles[item.key] = tile
         self._inflight_by_key[item.key] = item
 
     def _seed_reroll_actions(self, row) -> list:

@@ -372,7 +372,7 @@ def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int 
     default — so it still matches settings that leave it there, and turning the
     new setting on correctly reads as a different enhancement.
 
-    What tells the ``+ Enhance`` card it would only be making a duplicate.
+    What tells the ``+ Enhance`` row it would only be making a duplicate.
     """
     return level_matching_params(row, enhance_params_for(row, settings))
 

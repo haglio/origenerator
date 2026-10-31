@@ -131,7 +131,7 @@ def test_job_kind_separates_a_video_from_an_image():
 
 def test_every_video_workflow_is_one_kind_of_job():
     # Each of them animates a start image, so the queue has one kind of video to
-    # name, and names it in a word rather than the model card's shorthand.
+    # name, and names it in a word rather than the model tile's shorthand.
     videos = ("wan22_i2v", "wan22_flf2v_loop")
     assert {job_kind_label(name) for name in videos} == {"Video"}
 
@@ -1387,7 +1387,7 @@ def test_build_gallery_tree_includes_in_progress_rows_so_a_new_folder_appears():
     # A running (or pending) generation has no output yet, but its folder must
     # appear at once — a tab's Generate into a brand-new settings folder needs a
     # node to navigate to while it runs. The output-less running row gives that
-    # folder its node; its live card/tile stands in for the missing thumbnail.
+    # folder its node; its live tile/tile stands in for the missing thumbnail.
     rows = [
         _img("i1", "a cat", 50, 1),                          # a finished image
         _row(prompt_id="run", workflow_name="wan22_i2v",
@@ -1726,7 +1726,7 @@ def _enhance_run(prompt_id, source_file, row_id, *, done=None):
 
 
 def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
-    # An enhancement gets no card of its own in the collection — it is a version of an
+    # An enhancement gets no tile of its own in the collection — it is a version of an
     # image, not an item beside one — so the image itself has to move, or the run
     # is listed nowhere and the image being worked on stays buried under
     # everything made since.

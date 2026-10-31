@@ -223,7 +223,7 @@ class RunTiming:
         """The one line every surface writes across a running job's bar:
         ``"First pass · 45% · 1:23 elapsed · ~4:10 left"``.
 
-        One wording, shared by the Job Queue, the collection's in-flight cards
+        One wording, shared by the Job Queue, the collection's in-flight tiles
         and a folder's generating tile, so the same run reads the same wherever it is
         being watched, rather than three surfaces each saying a different half of
         it in different words.

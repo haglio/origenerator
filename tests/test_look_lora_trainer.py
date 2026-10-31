@@ -187,7 +187,7 @@ def test_a_lora_trained_on_no_word_gets_the_bare_descriptions(tmp_path):
 
 # --- cache ------------------------------------------------------------------------
 
-def test_caching_runs_musubis_two_cache_programs_on_the_dataset_while_the_card_is_idle(
+def test_caching_runs_musubis_two_cache_programs_on_the_dataset_while_the_tile_is_idle(
         tmp_path, monkeypatch):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
@@ -221,7 +221,7 @@ def test_a_cache_program_that_fails_stops_the_training_and_names_the_log(tmp_pat
     assert job["log"] in str(stopped.value)
 
 
-# --- waiting for the card ---------------------------------------------------------
+# --- waiting for the graphics card ------------------------------------------------
 
 class _Machine:
     def __init__(self, waiting=(), memory=(), held=(False,), claims=(True,)):
@@ -232,14 +232,14 @@ class _Machine:
         self.unloaded = self.claimed = self.released = 0
         self.slept: list[float] = []
 
-    def card_held_by_another(self):
+    def graphics_card_held_by_another(self):
         return self.held.pop(0) if len(self.held) > 1 else self.held[0]
 
-    def claim_card(self):
+    def claim_graphics_card(self):
         self.claimed += 1
         return self.claims.pop(0) if len(self.claims) > 1 else self.claims[0]
 
-    def release_card(self):
+    def release_graphics_card(self):
         self.released += 1
 
     def jobs_waiting(self):
@@ -248,14 +248,14 @@ class _Machine:
     def unload_comfyui(self):
         self.unloaded += 1
 
-    def card_memory_mib(self):
+    def graphics_card_memory_mib(self):
         return self.memory.pop(0) if len(self.memory) > 1 else self.memory[0]
 
     def sleep(self, seconds):
         self.slept.append(seconds)
 
 
-def test_the_card_is_idle_once_comfyuis_line_has_been_empty_two_minutes_and_its_memory_is_back(
+def test_the_tile_is_idle_once_comfyuis_line_has_been_empty_two_minutes_and_its_memory_is_back(
         tmp_path):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
@@ -269,7 +269,7 @@ def test_the_card_is_idle_once_comfyuis_line_has_been_empty_two_minutes_and_its_
     assert _status(job)["state"] == "waiting"
 
 
-def test_the_card_is_not_idle_while_another_trainer_holds_it(tmp_path):
+def test_the_tile_is_not_idle_while_another_trainer_holds_it(tmp_path):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
     machine = _Machine(waiting=[0], memory=[100], held=[True, True, False])
@@ -280,7 +280,7 @@ def test_the_card_is_not_idle_while_another_trainer_holds_it(tmp_path):
     assert machine.claimed == 1
 
 
-def test_a_card_another_trainer_took_first_is_waited_for_again(tmp_path):
+def test_a_tile_another_trainer_took_first_is_waited_for_again(tmp_path):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
     machine = _Machine(waiting=[0], memory=[100], claims=[False, True])
@@ -355,7 +355,7 @@ open(os.path.join(out, 'Example Look 1.1.safetensors'), 'wb').write(b'lora')
     assert Path(job["work"], "steps_done.txt").read_text() == "50"
 
 
-def test_a_training_whose_card_ran_out_of_memory_says_so(tmp_path):
+def test_a_training_whose_tile_ran_out_of_memory_says_so(tmp_path):
     job = _training_job(tmp_path, "import sys\nprint('torch.OutOfMemoryError: CUDA out of memory')\nsys.exit(1)\n")
 
     with pytest.raises(look_lora_trainer.Stopped) as stopped:
@@ -448,7 +448,7 @@ def test_a_whole_run_takes_the_steps_in_order_and_describes_in_a_program_of_its_
     assert done == ["prepare", ("describe", ["describe", job["job_file"]]), "dataset", "cache", "train", "install"]
 
 
-def test_a_run_lets_go_of_the_card_however_it_ends(tmp_path, monkeypatch):
+def test_a_run_lets_go_of_the_tile_however_it_ends(tmp_path, monkeypatch):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
     monkeypatch.setattr(look_lora_trainer, "prepare",
@@ -461,7 +461,7 @@ def test_a_run_lets_go_of_the_card_however_it_ends(tmp_path, monkeypatch):
     assert not card_claim.CLAIM.exists()
 
 
-def test_a_step_run_on_its_own_lets_go_of_the_card_too(tmp_path, monkeypatch):
+def test_a_step_run_on_its_own_lets_go_of_the_tile_too(tmp_path, monkeypatch):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
     Path(job["job_file"]).write_text(json.dumps(job), encoding="utf-8")

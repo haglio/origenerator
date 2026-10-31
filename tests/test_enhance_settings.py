@@ -283,7 +283,7 @@ def test_enhance_history_survives_capture_and_restore(tmp_path):
 def test_a_level_recorded_before_a_setting_existed_still_reads_as_a_duplicate(tmp_path):
     # The setting list grows, and a level recorded before one existed was made with
     # it at its default — so it still matches settings that leave it there, and
-    # the + Enhance card still knows it would only be making the same thing
+    # the + Enhance row still knows it would only be making the same thing
     # twice. Turning the new setting on is a different enhancement, and does not.
     db = Database(tmp_path / "t.db")
     _seed_source(db)

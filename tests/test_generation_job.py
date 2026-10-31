@@ -702,7 +702,7 @@ def test_a_first_send_forgets_nothing_on_a_server_with_no_record_of_it(qtbot, tm
 
 def test_a_row_waiting_to_be_sent_is_called_queued_on_screen():
     # The database calls it pending and the line calls it queued, and that
-    # translation was a ternary buried in the card builder.
+    # translation was a ternary buried in the tile builder.
 
     assert display_status(GenerationStatus.PENDING) == JobState.QUEUED
     assert display_status(GenerationStatus.RUNNING) == JobState.RUNNING

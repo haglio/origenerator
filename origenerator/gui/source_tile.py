@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
-from origenerator.gui import grid_card
+from origenerator.gui import tile_shape
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.link_heading import link_heading
 from origenerator.gui.media_badge import MediaBadge
@@ -65,7 +65,7 @@ class SourceTile(QWidget):
 
         self._name = QLabel()
         self._name.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        grid_card.style_caption(self._name)
+        tile_shape.style_caption(self._name)
         column.addWidget(self._name, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.hide()

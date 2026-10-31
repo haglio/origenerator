@@ -237,9 +237,9 @@ class EnhanceController:
         self._push_settings()
 
     def _push_settings(self) -> None:
-        """Tell every config tab what the ``+ Enhance`` card would run at.
+        """Tell every config tab what the ``+ Enhance`` row would run at.
 
-        The panel holds the settings and the tabs hold the images, so the card
+        The panel holds the settings and the tabs hold the images, so the row
         can only know whether it would be making a duplicate once the two meet —
         here, on every edit and every rebuild."""
         for panel in self._info_tabs_of().config_panels():
@@ -453,7 +453,7 @@ class EnhanceController:
         with no view of the Enhance panel, and an image already carrying an
         enhancement someone chose must not be re-derived at whatever the settings
         happen to say now. Re-enhancing stays a deliberate act made in front of
-        the settings it will use (the thumbnail menu, the ``+ Enhance`` card).
+        the settings it will use (the thumbnail menu, the ``+ Enhance`` row).
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):

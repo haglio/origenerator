@@ -411,14 +411,21 @@
       "screen": null,
       "his_word": "tile (2026-10-09: 'that tile', 'the generating tile'); card (2026-08-19: 'middle pane cards')",
       "code_today": [
-        "tile",
+        "tile"
+      ],
+      "code_word": "tile",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
         "card",
         "grid card",
         "thumbnail widget"
       ],
-      "code_word": "tile",
-      "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "keep": [
+        "card_claim",
+        "graphics_card",
+        "graphics card"
+      ]
     },
     {
       "id": "folder_tile",
@@ -429,13 +436,14 @@
       ],
       "his_word": "folder tile (2026-10-30); folder square (2026-09-27)",
       "code_today": [
-        "folder tile",
-        "collage",
-        "card"
+        "folder tile"
       ],
       "code_word": "folder tile",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "collage"
+      ]
     },
     {
       "id": "generating_tile",
@@ -456,12 +464,14 @@
       ],
       "his_word": "New tile (2026-10-30); 'when I click new' (2026-10-09)",
       "code_today": [
-        "reroll tile",
-        "reroll"
+        "new tile"
       ],
       "code_word": "new tile",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "reroll tile"
+      ]
     },
     {
       "id": "in_flight_card",
@@ -469,13 +479,15 @@
       "screen": null,
       "his_word": "tile (2026-10-30); card (2026-08-19)",
       "code_today": [
-        "in flight card",
-        "card",
+        "in flight tile",
         "backdrop"
       ],
       "code_word": "tile",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "in flight card"
+      ]
     },
     {
       "id": "corner_button",

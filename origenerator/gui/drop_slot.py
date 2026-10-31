@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
 
-from origenerator.gui import grid_card
+from origenerator.gui import tile_shape
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT, light
 from origenerator.gui.generation_drag import dragged_generation
@@ -143,7 +143,7 @@ class DropSlot(DropZone):
         self._caption = QLabel()
         self._caption.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         self._caption.setWordWrap(True)
-        grid_card.style_caption(self._caption)
+        tile_shape.style_caption(self._caption)
         layout.addWidget(self._caption)
         # A corner chip naming this slot's kind, shown only once something's dropped.
         self._badge = MediaBadge(kind, self)

@@ -93,7 +93,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     tables stopped naming their handlers as strings. 371 → 372: one folder-key
     derivation replaced the five that were written inline, and it takes a row as
     readily as a config. 372 → 371: the gallery's handle on the config tab's
-    private preview widget is gone, and its two remaining drivers ask the panel. 80 → 77: the queue's cards are a join over four
+    private preview widget is gone, and its two remaining drivers ask the panel. 80 → 77: the queue's tiles are a join over four
     sources and no rendering at all, so they are built outside the pane now
     (`gui/inflight_items.py`) and it keeps a one-line delegation. 77 -> 74: what
     the selected collection gathers is asked of its own key, so the five answers
@@ -102,9 +102,9 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     tiles are picked, the anchor a Shift-click measures from and the order they
     are shown are a `Picking` now, so what stays are delegations, and the
     five collections are one `PaneCollection` record apiece rather than a branch in each of two
-    chains. 74 -> 75: the card for a run still in flight was built by hand on
+    chains. 74 -> 75: the tile for a run still in flight was built by hand on
     Latest, in a folder and on Requests, and is one method now, so Requests can
-    draw its cards between the time headings that split the collection into batches.
+    draw its tiles between the time headings that split the collection into batches.
     371 -> 341:
     the fullscreen slideshows came out as `SlideshowDirector` -- thirty-two methods out,
     sixteen of what stays renamed to the host contract they now answer, and two
@@ -159,7 +159,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     `_drop_reroll` wrapped for its one caller are that caller's own lines. And the
     pane 77 -> 83: every folder of folders has its own five collections, so a collection's
     rows are asked for a folder as well as a side -- a side's placement of its
-    rows, a folder's share of a list, the open collection's rows, a folder's own cards
+    rows, a folder's share of a list, the open collection's rows, a folder's own tiles
     in flight, its favorited images, the counts every folder's collections wear and
     the square each of them shows among the folder's own are seven methods, and
     the lister of Latest's rows they replace went. 267 -> 266: a combination

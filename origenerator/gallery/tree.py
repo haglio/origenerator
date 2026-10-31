@@ -347,7 +347,7 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
     An image being enhanced, or lately enhanced, sits where the *enhancement*
     falls in that order rather than where its own generation does
     (:func:`~origenerator.gallery.enhance.enhancement_recency`). An enhancement
-    has no card of its own here — it is a version of an image, not an item beside
+    has no tile of its own here — it is a version of an image, not an item beside
     one — so if it did not move the image, the work would be listed nowhere and
     the image being worked on could sit a thousand tiles down, unfindable. What
     an image is having done to it is the newest thing about it.
@@ -456,7 +456,7 @@ def enhanced_generations(rows: list[dict]) -> list[dict]:
 def unreviewed_experiments(rows: list[dict]) -> list[dict]:
     """The finished experiments awaiting the user's verdict, newest first — the
     Experiments collection's review queue. Only completed results qualify: a failed
-    experiment has nothing to judge, and an in-flight one shows as a live card."""
+    experiment has nothing to judge, and an in-flight one shows as a live tile."""
     return [
         row for row in rows
         if row.get("source") == GenerationSource.EXPERIMENT
@@ -593,7 +593,7 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
     into the image it upgrades, so its transient row must not grow an "Image
     Enhance" folder while it cooks (its progress shows on the tile of the image
     it is upgrading, under that tile's "Enhancing…" scrim — the Latest collection
-    gives it no card of its own either). A completed one still in the DB — its
+    gives it no tile of its own either). A completed one still in the DB — its
     source image deleted before it could fold — stays visible, so it can be found
     and deleted rather than haunting the disk invisibly. A re-derived base render
     is a repair of an existing image, not an image of its own: it folds into its

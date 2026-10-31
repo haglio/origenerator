@@ -517,7 +517,7 @@ def test_with_the_auto_tick_off_a_landing_enhances_nothing(enhance):
 
 
 def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance):
-    # The panel holds the settings and the tabs hold the images, so the card can
+    # The panel holds the settings and the tabs hold the images, so the tile can
     # only know whether it would be a duplicate once the two meet.
     tab = FakeConfigPanel()
     browser = FakeBrowser()

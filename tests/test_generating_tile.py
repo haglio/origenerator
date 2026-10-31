@@ -64,7 +64,7 @@ def _has_image(tile):
 
 
 def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
-    # The stage is read on the scrim over the thumbnail, the way an in-flight card
+    # The stage is read on the scrim over the thumbnail, the way an in-flight tile
     # and an enhancing thumbnail say theirs.
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
@@ -116,7 +116,7 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
 
 
 def _picked_tile_drawn(qtbot):
-    """A picked tile, and the pixels of the card it sits in, drawn under the app
+    """A picked tile, and the pixels of the tile it sits in, drawn under the app
     stylesheet."""
     app = QApplication.instance()
     prior = app.styleSheet()
@@ -251,7 +251,7 @@ def test_preview_signal_renders_image(qtbot):
 
 def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
     # Overlaid rather than laid out beneath, so the thumbnail keeps the full
-    # height every card in the grid gives it.
+    # height every tile in the grid gives it.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     thumbnail, bar = tile._image.geometry(), tile._bar.geometry()
@@ -273,7 +273,7 @@ def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
 
 
 def test_right_clicking_the_tile_asks_for_its_menu(qtbot):
-    # The tile is a card in the grid like any other, and every other one answers
+    # The tile is a tile in the grid like any other, and every other one answers
     # a right-click. It hands the gesture up for the gallery to answer with the
     # run's own menu.
     tile = GeneratingTile(FakeJob(state="running"))

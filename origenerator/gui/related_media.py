@@ -14,7 +14,6 @@ themselves.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 
 from PyQt6.QtCore import pyqtSignal
@@ -24,7 +23,7 @@ from shared_ui.spacing import GAP_MEDIUM
 from origenerator.config import OUTPUT_PLACES, THUMB_DIR
 from origenerator.gallery import (
     media_type_of_row,
-    source_image_of,
+    start_images_among,
     videos_from_source_image,
     was_made_from,
 )
@@ -35,12 +34,6 @@ from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
 from origenerator.voice.dictation import words_of
-
-logger = logging.getLogger(__name__)
-
-# Most animation previews shown for one image at once. A prolific image can have
-# dozens, and a strip of dozens is a wall rather than a set of links.
-ANIMATED_STRIP_LIMIT = 8
 
 
 def _is_request(record: dict | None) -> bool:
@@ -99,10 +92,9 @@ class RelatedMedia(QWidget):
                  request_of: Callable[[str], dict | None],
                  requests_about: Callable[[str], list[dict]]):
         """``video_rows`` answers the library's videos, and is asked only for a
-        row that could have animations, or is a cycle cut out of one of them —
-        which is why it is a call rather than a list. Reading it is a whole-table
-        read and a parse per row, and every video shown would otherwise pay for
-        it to be told it has none.
+        row that could have animations — which is why it is a call rather than
+        a list. Reading it is a whole-table read and a parse per row, and every
+        video shown would otherwise pay for it to be told it has none.
         """
         super().__init__(parent)
         self._video_rows = video_rows or (list)
@@ -156,14 +148,15 @@ class RelatedMedia(QWidget):
         ``image_rows`` is the pool a video's start frame is matched against —
         the owner's, because the owner is what holds the library.
         """
-        self._show_source_tile(row, image_rows)
+        start_image_of = start_images_among([*image_rows, *self._held_of_kind(MediaType.IMAGE)])
+        self._show_source_tile(row, start_image_of)
         self._show_source_video_tile(row)
         self._source_section.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         self.show_requests_and_modifications(row.get("prompt_id"))
         # Hides itself when empty, which for anything but an animated image it is.
-        self._shown = row
-        items = self._animated_items(row)
+        self._shown = (row, start_image_of)
+        items = self._animated_items(row, start_image_of)
         self._in_strip = {item[0] for item in items}
         self._animated_strip.show_videos(items)
         self._animations_section.setVisible(not self._animated_strip.isHidden())
@@ -191,12 +184,12 @@ class RelatedMedia(QWidget):
         self._animated_strip.hide()
         self._animations_section.hide()
 
-    def _show_source_tile(self, row: dict, image_rows: list[dict]):
+    def _show_source_tile(self, row: dict, start_image_of):
         """Reveal the source tile for whatever this row was built from, else hide
         it. The tile shows that item's thumbnail and name and names it on
         click, for the owner to navigate to.
         """
-        source_row, heading, media_type = self._built_from(row, image_rows)
+        source_row, heading, media_type = self._built_from(row, start_image_of)
         if not source_row:
             self._source_tile.clear()
             return
@@ -208,10 +201,10 @@ class RelatedMedia(QWidget):
 
     def show_requests_and_modifications(self, prompt_id: str | None) -> None:
         request = self._request_of(prompt_id) if prompt_id else None
-        made_from = self._row_of(request["source_prompt_id"]) if request else None
+        made_from = self._item(request["source_prompt_id"]) if request else None
         made_into = [(record, made)
                      for record in (self._requests_about(prompt_id) if prompt_id else [])
-                     if (made := self._row_of(record["prompt_id"])) is not None]
+                     if (made := self._item(record["prompt_id"])) is not None]
         for section, is_request in ((self._requests_section, True),
                                     (self._modifications_section, False)):
             section.show_links(
@@ -221,7 +214,7 @@ class RelatedMedia(QWidget):
 
     def _show_source_video_tile(self, row: dict) -> None:
         video_id = row.get("source_video")
-        video = self._row_of(video_id) or self._held_row(video_id) if video_id else None
+        video = self._item(video_id) if video_id else None
         if video is None:
             self._source_video_tile.clear()
             return
@@ -231,17 +224,13 @@ class RelatedMedia(QWidget):
             heading="From source video", media_type=MediaType.VIDEO, gray=True,
         )
 
-    def _built_from(self, row: dict, image_rows: list[dict]):
+    def _built_from(self, row: dict, start_image_of):
         """``(the row this was built from, what to head the tile, its kind)``:
         the clip a cut was cut out of, else a video's start frame."""
-        cut_from = row.get("trimmed_from")
-        if cut_from:
-            clip = next((v for v in self._video_rows()
-                         if v.get("prompt_id") == cut_from), None) or self._held_row(cut_from)
-            if clip is not None:
-                return clip, "Trimmed from", MediaType.VIDEO
-        frame = source_image_of(row, image_rows) or source_image_of(
-            row, self._held_of_kind(MediaType.IMAGE))
+        clip = self._item(row["trimmed_from"]) if row.get("trimmed_from") else None
+        if clip is not None:
+            return clip, "Trimmed from", MediaType.VIDEO
+        frame = start_image_of(row)
         if frame is not None and was_made_from(row, frame):
             return frame, None, MediaType.IMAGE
         return None, None, None
@@ -249,27 +238,26 @@ class RelatedMedia(QWidget):
     def _held_of_kind(self, kind: MediaType) -> list[dict]:
         return [held for held in self._held_rows() if media_type_of_row(held) == kind]
 
-    def _held_row(self, prompt_id: str) -> dict | None:
-        return next((held for held in self._held_rows() if held["prompt_id"] == prompt_id), None)
+    def _item(self, prompt_id: str) -> dict | None:
+        return self._row_of(prompt_id) or next(
+            (held for held in self._held_rows() if held["prompt_id"] == prompt_id), None)
 
-    def _animated_items(self, row: dict) -> list[tuple]:
-        """(prompt_id, looping-preview path, still path) for each video an image
-        was animated into — empty for anything but an image with animations.
+    def _animated_items(self, row: dict, start_image_of) -> list[tuple]:
+        """(prompt_id, looping-preview path, still path) for each video whose own
+        link names this image — empty for anything but an image with animations.
 
         The library's videos are asked for only past that first test, so showing
         a video costs no read at all.
         """
         if media_type_of_row(row) != MediaType.IMAGE:
             return []
-        videos = videos_from_source_image(row, self._video_rows())
-        if len(videos) > ANIMATED_STRIP_LIMIT:
-            logger.info("Image %s has %d animations; showing the first %d",
-                        row["prompt_id"], len(videos), ANIMATED_STRIP_LIMIT)
-        return [
-            (v["prompt_id"], self._previews.of(v), v.get("thumbnail_path"))
-            for v in videos[:ANIMATED_STRIP_LIMIT]
-        ]
+        could_name_it = videos_from_source_image(
+            row, [*self._video_rows(), *self._held_of_kind(MediaType.VIDEO)])
+        return [(video["prompt_id"], self._previews.of(video), video.get("thumbnail_path"))
+                for video in could_name_it
+                if (self._built_from(video, start_image_of)[0] or {}).get("prompt_id")
+                == row["prompt_id"]]
 
     def _show_made_preview(self, prompt_id: str, _path: str) -> None:
         if prompt_id in self._in_strip:
-            self._animated_strip.show_videos(self._animated_items(self._shown))
+            self._animated_strip.show_videos(self._animated_items(*self._shown))

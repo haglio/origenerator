@@ -61,7 +61,7 @@ PUBLISHED = {
     "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
     "rows_under", "same_enhancement", "section_headings", "selection_group",
     "settings_folder_key", "settings_signature", "source_image_id_for",
-    "source_image_id_in", "source_image_id_of", "source_image_of",
+    "source_image_id_in", "source_image_id_of", "source_image_of", "start_images_among",
     "enhanced_generations", "favorite_folders", "favorite_generations", "start_frame_index",
     "cycle_shaped",
     "unreviewed_experiments",

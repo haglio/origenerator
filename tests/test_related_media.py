@@ -7,8 +7,6 @@ other things to be about; here they are one widget answering one question.
 """
 from __future__ import annotations
 
-import logging
-
 import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor, QMouseEvent, QPixmap
@@ -166,6 +164,80 @@ def test_an_image_lists_the_videos_it_was_animated_into(make_related):
     assert related._source_tile.isHidden()      # an image has no start frame
 
 
+def _animated(related):
+    """The prompt id of each video in the image's Animated in strip, in its order."""
+    return [tile._prompt_id for tile in related._animated_strip._host.findChildren(_VideoTile)]
+
+
+def _drawn_links(related, row, image_rows):
+    """(made from, made into) for each link the pane draws on *row*."""
+    related.show_row(row, image_rows)
+    shown = row["prompt_id"]
+    source = related._source_tile
+    drawn = ({(source._prompt_id, shown)} if not source.isHidden()
+             and source._heading.text() == "From source image" else set())
+    drawn |= {(shown, video) for video in _animated(related)}
+    for section in (related._requests_section, related._modifications_section):
+        drawn |= {(other, shown) if heading.endswith(" from") else (shown, other)
+                  for heading, other in _links(section)}
+    return drawn
+
+
+def test_every_link_is_drawn_on_both_of_the_items_it_ties(make_related):
+    image, twin = _image_row("img1"), _image_row("twin")
+    kept, trashed = _video_row("vid1"), _video_row("vid2")
+    cut = _trim_row("cut1", trimmed_from="vid1")
+    requested = _image_row("img2", "sdxl_t2i_img2.png")
+    modified = _image_row("img3", "sdxl_t2i_img3.png")
+    asked_of_trash = _image_row("img4", "sdxl_t2i_img4.png")
+    related = make_related(kept, cut, rows=[image, twin, requested, asked_of_trash],
+                           held=[trashed, modified],
+                           requests=[_request("img2", "img1", asked="two dogs"),
+                                     _request("img3", "img1"),
+                                     _request("img4", "img3", asked="two cats")])
+    items = [image, twin, kept, trashed, cut, requested, modified, asked_of_trash]
+    image_rows = [image, twin, requested, asked_of_trash]
+
+    drawn = {item["prompt_id"]: _drawn_links(related, item, image_rows) for item in items}
+
+    one_ended = [(made_from, made_into) for shown, links in drawn.items()
+                 for made_from, made_into in links
+                 if (made_from, made_into) not in drawn[made_into if made_from == shown
+                                                          else made_from]]
+    assert one_ended == []
+    assert sum(map(len, drawn.values())) == 2 * 5
+
+
+def test_an_image_lists_the_videos_in_the_trash_it_was_animated_into(make_related):
+    image = _image_row()
+    related = make_related(held=[_video_row()])
+
+    related.show_row(image, [image])
+
+    assert _animated(related) == ["vid1"]
+
+
+def test_a_cut_is_not_among_the_animations_of_the_image_its_clip_was_made_from(make_related):
+    # The cut's own link goes to its clip, so the image has no link to give back.
+    image = _image_row()
+    related = make_related(_video_row(), _trim_row())
+
+    related.show_row(image, [image])
+
+    assert _animated(related) == ["vid1"]
+
+
+def test_of_two_images_listing_one_file_only_the_one_the_video_names_lists_it(make_related):
+    first, twin = _image_row("img1"), _image_row("img2")
+    related = make_related(_video_row())
+
+    related.show_row(_video_row(), [first, twin])
+    assert related._source_tile._prompt_id == "img1"
+    related.show_row(twin, [first, twin])
+
+    assert related._animations_section.isHidden()
+
+
 def test_a_hidden_starting_frame_lists_only_the_videos_made_from_it_here(make_related):
     frame = _hidden_frame()
     taken_out_of = {**_video_row("vid1", input_image="frame1.jpg"),
@@ -174,8 +246,7 @@ def test_a_hidden_starting_frame_lists_only_the_videos_made_from_it_here(make_re
 
     related.show_row(frame, [frame])
 
-    assert [tile._prompt_id for tile in related._animated_strip.findChildren(_VideoTile)] == [
-        "vid2"]
+    assert _animated(related) == ["vid2"]
 
 
 def test_a_requested_row_points_at_the_item_it_was_asked_about_under_requests(make_related):
@@ -212,6 +283,24 @@ def test_an_image_points_at_what_a_folders_modify_made_of_it_under_modifications
 
     assert _links(related._modifications_section) == [("Modified into", "img2")]
     assert related._requests_section.isHidden()
+
+
+def test_a_requested_row_points_at_the_item_it_was_asked_about_in_the_trash(make_related):
+    related = make_related(held=[_image_row()],
+                           requests=[_request("img2", "img1", asked="two dogs")])
+
+    related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [])
+
+    assert _links(related._requests_section) == [("Requested from", "img1")]
+
+
+def test_an_image_points_at_what_was_requested_of_it_from_the_trash_too(make_related):
+    related = make_related(held=[_image_row("img2", "sdxl_t2i_img2.png")],
+                           requests=[_request("img2", "img1", asked="two dogs")])
+
+    related.show_row(_image_row(), [])
+
+    assert _links(related._requests_section) == [("Requested into", "img2")]
 
 
 def test_a_request_whose_image_is_gone_leaves_no_link_to_it(make_related):
@@ -494,20 +583,15 @@ def test_a_source_video_in_the_trash_keeps_its_link(make_related):
     assert related._source_video_tile._prompt_id == "vid0"
 
 
-def test_a_long_list_of_animations_is_capped_and_says_so(make_related, caplog):
-    # A prolific image can have dozens; the strip shows a readable few and the
-    # log says how many there were, rather than the tab quietly showing a
-    # different number from the folder.
+def test_an_image_lists_every_video_it_was_animated_into_however_many(make_related):
+    # Each of them links back to the image, so each is linked from it.
     image = _image_row()
     videos = [_video_row(f"vid{n}") for n in range(20)]
     related = make_related(*videos)
 
-    with caplog.at_level(logging.INFO):
-        related.show_row(image, [image])
+    related.show_row(image, [image])
 
-    tiles = related._animated_strip.findChildren(_VideoTile)
-    assert 0 < len(tiles) < 20
-    assert f"{len(videos)} animations" in caplog.text
+    assert _animated(related) == [f"vid{n}" for n in range(20)]
 
 
 def test_a_video_costs_no_read_of_the_library_s_videos(related):

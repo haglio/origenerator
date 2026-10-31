@@ -466,9 +466,8 @@ class FakeHost:
     def image_config_index(self):
         return {}
 
-    def listed_rows(self):
-        return [row for prompt_id in self.visible for row in self.rows
-                if row["prompt_id"] == prompt_id]
+    def listed_prompt_ids(self):
+        return list(self.visible)
 
     def selected_prompt_ids(self):
         return list(self.picked)
@@ -685,10 +684,12 @@ def test_a_double_clicked_item_plays_the_rows_the_browser_listed_without_reading
         slideshows):
     # Asked of the library one at a time, the rows of Latest kept a double-click
     # waiting eleven seconds before its slideshow could open.
-    host = FakeHost(rows=[_row("a2"), _row("a1")])
+    rows = [_row("a2"), _row("a1")]
+    host = FakeHost(rows=rows)
     asked = []
     host.row_for = asked.append
-    director, _host, made = slideshows(host)
+    db = FakeDB(rows)
+    director, _host, made = slideshows(host, db=db)
 
     director.open_on_preview(("a2.png", "image"), "a2")
 

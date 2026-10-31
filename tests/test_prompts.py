@@ -72,3 +72,10 @@ def test_a_complaint_that_something_asked_for_is_missing_is_taught_as_make_it_st
     assert "weight" in rule.lower()
     example = prompt[prompt.rindex("didn't appear"):]
     assert ":1." in example.split("->")[1].split("negative")[0]
+
+
+def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_asks():
+    rule = _request_prompt()[_request_prompt().index("PROMPTS OF HIS"):].split("\n")[0]
+
+    assert "the way those prompts" in rule.lower() or "the way they" in rule.lower()
+    assert "never" in rule.lower() and "end" in rule.lower()

@@ -1,10 +1,9 @@
 """Turning a request into an edit of a prompt pair.
 
 A request is a wish about the image on screen — "no silver earrings", "change to
-a tropical beach" — and the local model answers it first, knowing the collection
-from the notes on it and the exchange so far about this image, and saying back
-in a sentence what it changed. When the model cannot answer, a fixed policy makes
-the smallest edit the words themselves allow:
+a tropical beach" — and the local model answers it first, knowing the collection,
+the exchange so far about this image and his own prompts that touch the request.
+When the model cannot answer, a fixed policy makes the smallest edit the words allow:
 
 * A request AGAINST something. In the positive prompt? Take it out. Otherwise
   put it in the negative prompt — unless it is already there, in which case
@@ -141,7 +140,7 @@ def parse_request(request: str) -> tuple | None:
     while end > index and tokens[end - 1][0] in _TRAILING:
         end -= 1
     if index >= end:
-        return None  # all wish words and filler — nothing named to act on
+        return None
     term = request[tokens[index][1]:tokens[end - 1][2]].strip()
     return (polarity or ADD), term
 
@@ -373,10 +372,10 @@ def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
 
 
 def work_out(positive: str, negative: str, request: str, *, exchange=(),
-             notes: CollectionNotes | None = None, ask=None) -> PromptRevision | None:
+             notes: CollectionNotes | None = None, examples=(), ask=None) -> PromptRevision | None:
     """``request`` applied as every request is, spoken or typed: the local model
-    first, knowing the collection and the exchange, and the rules when the
-    model cannot answer."""
+    first, knowing the collection, the exchange and his own prompts that touch
+    the request, and the rules when the model cannot answer."""
     parsed = parse_request(request)
     if parsed is None:
         return None
@@ -384,7 +383,7 @@ def work_out(positive: str, negative: str, request: str, *, exchange=(),
     scenes, each_negative = _scenes_of(positive, negative)
     revisions = []
     for scene, scene_negative in zip(scenes, each_negative):
-        revision = _answered(scene, scene_negative, request, parsed, exchange, notes,
+        revision = _answered(scene, scene_negative, request, parsed, exchange, notes, examples,
                              ask or ask_the_model)
         if revision is None:
             return apply_request(positive, negative, request)
@@ -393,10 +392,11 @@ def work_out(positive: str, negative: str, request: str, *, exchange=(),
 
 
 def _answered(positive: str, negative: str, request: str, parsed: tuple, exchange, notes,
-              ask) -> PromptRevision | None:
+              examples, ask) -> PromptRevision | None:
     polarity, term = parsed
     try:
-        new_positive, new_negative, answer = ask(positive, negative, request, exchange, notes)
+        new_positive, new_negative, answer = ask(positive, negative, request, exchange, notes,
+                                                 examples)
     except Exception as exc:  # noqa: BLE001 -- model down or unreadable: the rules' own edit stands
         logger.warning("prompt_edit: the model could not answer the request (%s)",
                        type(exc).__name__)
@@ -406,22 +406,82 @@ def _answered(positive: str, negative: str, request: str, parsed: tuple, exchang
     if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
         return None
     if (new_positive, new_negative) == (positive, negative) and not answer:
-        return None  # it did nothing and said nothing, which is no answer to a request
+        return None
     return PromptRevision(positive, negative, new_positive, new_negative, term, polarity,
                           REWRITTEN, answer)
+
+
+# --- his own prompts that touch the request, shown to the model as examples --
+
+
+_NAMING_NOTHING = _FILLER | _ADD_WORDS | _REMOVE_WORDS | _TRAILING | _both_spellings({
+    "she", "he", "him", "they", "in", "into", "at", "for", "from", "by", "to", "is", "are",
+    "was", "isn't", "wasn't", "aren't", "did", "didn't", "does", "do", "doing", "get", "gets",
+    "getting", "gives", "giving", "gave", "appear", "appears", "appeared", "show", "shows",
+    "showed", "showing", "up", "still", "see", "missing", "again", "one", "same", "other",
+})
+
+
+def _roots(word: str) -> set[str]:
+    roots = {word}
+    for ending in ("s", "es", "ing", "ed"):
+        if word.endswith(ending) and len(word) - len(ending) >= 3:
+            root = word[:-len(ending)]
+            roots |= {root, root + "e"}
+    return roots
+
+
+def _forms(word: str) -> set[str]:
+    forms = set()
+    for root in _roots(word):
+        stem = root.removesuffix("e")
+        forms |= {root, root + "s", root + "es", root + "d", stem + "ing", stem + "ed",
+                  stem + stem[-1] + "ing", stem + stem[-1] + "ed"}
+    return forms
+
+
+def _asked_about(request: str) -> list[set[str]]:
+    words = dict.fromkeys(word for word, *_ in _tokens(request))
+    return [_forms(word) for word in words
+            if len(word) >= 3 and word not in _NAMING_NOTHING]
+
+
+def _touches(asked: list[set[str]], prompt: str) -> int:
+    words = {word for word, *_ in _tokens(prompt)}
+    return sum(1 for forms in asked if forms & words)
+
+
+def prompts_touching(request: str, prompts, *, limit: int = 8,
+                     limit_chars: int = 6000) -> list[str]:
+    asked = _asked_about(request)
+    scored = sorted((-_touches(asked, prompt), position, prompt)
+                    for position, prompt in enumerate(prompts))
+    chosen, used = [], 0
+    for score, _position, prompt in scored:
+        if score == 0 or len(chosen) == limit:
+            break
+        if used + len(prompt) <= limit_chars:
+            chosen.append(prompt)
+            used += len(prompt)
+    return chosen
 
 
 # --- the I/O boundary: the model, with the notes and the exchange ------------
 
 
 def build_request_messages(positive: str, negative: str, request: str, exchange,
-                           notes: CollectionNotes | None, system_prompt: str) -> list[dict]:
+                           notes: CollectionNotes | None, system_prompt: str,
+                           examples=()) -> list[dict]:
     parts = []
     if notes is not None and notes.complete:
         parts.append(notes.as_told())
     if exchange:
         turns = "\n".join(f"Artist: {turn[0]}\nYou: {turn[1]}" for turn in exchange)
         parts.append(f"THE EXCHANGE SO FAR about this image, oldest first:\n{turns}")
+    if examples:
+        numbered = "\n".join(f"{number}. {prompt}" for number, prompt in enumerate(examples, 1))
+        parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
+                     f"carry over the details that go with them):\n{numbered}")
     parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
     parts.append(f"THE ARTIST NOW ASKS:\n{request}")
     parts.append(
@@ -434,12 +494,12 @@ def build_request_messages(positive: str, negative: str, request: str, exchange,
 
 
 def ask_the_model(positive: str, negative: str, request: str, exchange,
-                  notes: CollectionNotes | None) -> tuple[str, str, str]:
+                  notes: CollectionNotes | None, examples=()) -> tuple[str, str, str]:
     """The revised pair and the model's sentence; raises when the model cannot be
     reached or read, which the caller answers with the rules' own edit."""
     obj = local_llm.answer_of(local_llm.ask(
         build_request_messages(positive, negative, request, exchange, notes,
-                               REQUEST_SYSTEM_PROMPT),
+                               REQUEST_SYSTEM_PROMPT, examples),
         base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL, temperature=0.4,
         timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
         stays_loaded="0"))

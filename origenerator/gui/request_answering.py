@@ -42,8 +42,11 @@ class RequestAnswerer(QObject):
                     and not self._wait_for_the_card(self._client, HOLDER,
                                                     deadline_s=CARD_DEADLINE_S)):
                 return prompt_edit.apply_request(positive, negative, words)
+            examples = prompt_edit.prompts_touching(
+                words, reversed(self._db.distinct_positive_prompts()))
             return self._work_out(positive, negative, words, exchange=exchange,
-                                  notes=collection_notes.read(self._notes_path))
+                                  notes=collection_notes.read(self._notes_path),
+                                  examples=examples)
         except Exception as exc:  # noqa: BLE001 -- answered with nothing, never raised off-thread
             logger.warning("Could not work out a request (%s)", type(exc).__name__)
             return None

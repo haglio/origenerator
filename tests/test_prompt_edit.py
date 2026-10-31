@@ -22,6 +22,7 @@ from origenerator.prompt_edit import (
     ask_the_model,
     build_request_messages,
     parse_request,
+    prompts_touching,
     work_out,
 )
 from origenerator.workflows.base import story_of
@@ -214,8 +215,9 @@ class _Model:
         self.answers = list(answers)
         self.asked = []
 
-    def __call__(self, positive, negative, request, exchange, notes):
+    def __call__(self, positive, negative, request, exchange, notes, examples=()):
         self.asked.append((positive, negative, request, exchange, notes))
+        self.examples = examples
         answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
         if isinstance(answer, Exception):
             raise answer
@@ -233,6 +235,14 @@ def test_the_model_is_asked_first_with_the_prompts_the_exchange_and_the_notes():
     assert revision.answer == "Two women now."
     assert revision.action == REWRITTEN
     assert revision.changed
+
+
+def test_his_prompts_that_touch_the_request_go_to_the_model_with_the_rest():
+    model = _Model(("a woman, a dog, wagging tail", "blurry", "A dog, tail wagging."))
+
+    work_out("a woman", "blurry", "add a dog", examples=("a dog, wagging tail",), ask=model)
+
+    assert model.examples == ("a dog, wagging tail",)
 
 
 def test_a_term_the_rules_are_sure_of_still_goes_to_the_model_which_knows_the_collection():
@@ -354,6 +364,53 @@ def test_a_story_the_model_answered_only_in_part_is_left_to_the_rules():
     assert revision.answer == ""
 
 
+# --- his own prompts that touch the request, shown to the model as examples --
+
+
+HIS_PROMPTS = [
+    "a woman in a yellow raincoat on a pier at noon, photo",
+    "a dog on a park bench, wagging tail, autumn leaves",
+    "two dogs chasing a stick, wagging tails, a park bench in the back",
+    "a cat asleep on a windowsill, soft light",
+]
+
+
+def test_the_prompts_sharing_the_most_of_the_requests_words_come_first_and_the_rest_not_at_all():
+    assert prompts_touching("add a dog on a bench", HIS_PROMPTS) == [
+        "a dog on a park bench, wagging tail, autumn leaves",
+        "two dogs chasing a stick, wagging tails, a park bench in the back",
+    ]
+
+
+def test_the_words_of_a_request_that_name_nothing_touch_no_prompt():
+    assert prompts_touching("make it more", HIS_PROMPTS) == []
+    assert prompts_touching("she gives him the stick", HIS_PROMPTS) == [
+        "two dogs chasing a stick, wagging tails, a park bench in the back"]
+
+
+@pytest.mark.parametrize("request_text", ["a dog chased, tails", "dogs chase, a tail"])
+def test_a_word_touches_its_plural_and_its_verb_forms(request_text):
+    assert prompts_touching(request_text, HIS_PROMPTS) == [
+        "two dogs chasing a stick, wagging tails, a park bench in the back",
+        "a dog on a park bench, wagging tail, autumn leaves",
+    ]
+
+
+def test_a_word_said_twice_in_a_request_counts_once():
+    assert prompts_touching("a dog, a dog on a bench", HIS_PROMPTS) == [
+        "a dog on a park bench, wagging tail, autumn leaves",
+        "two dogs chasing a stick, wagging tails, a park bench in the back",
+    ]
+
+
+def test_the_prompts_handed_over_stop_at_the_limit_and_at_the_characters_allowed():
+    assert prompts_touching("a dog", HIS_PROMPTS, limit=1) == [
+        "a dog on a park bench, wagging tail, autumn leaves"]
+    assert prompts_touching("a dog", HIS_PROMPTS, limit_chars=60) == [
+        "a dog on a park bench, wagging tail, autumn leaves"]
+    assert prompts_touching("a dog", HIS_PROMPTS, limit_chars=10) == []
+
+
 # --- what the model is asked, and how its answer is read --------------------
 
 
@@ -369,10 +426,21 @@ def test_the_request_messages_carry_the_notes_the_exchange_the_prompts_and_the_r
     assert "one note" in content
 
 
+def test_the_messages_show_his_prompts_that_touch_the_request_numbered_before_the_current_pair():
+    content = build_request_messages("a woman", "", "add a dog", [], None, "S", examples=(
+        "a dog on a park bench, wagging tail", "two dogs, wagging tails"))[1]["content"]
+
+    heading = "PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR"
+    assert "carry over the details" in content
+    assert content.index(heading) < content.index(
+        "1. a dog on a park bench, wagging tail\n2. two dogs, wagging tails") < content.index(
+        "CURRENT POSITIVE PROMPT")
+
+
 def test_without_notes_or_an_exchange_the_messages_say_neither():
     content = build_request_messages("a woman", "", "no hat", [], None, "S")[1]["content"]
 
-    assert "NOTES" not in content and "EXCHANGE" not in content
+    assert "NOTES" not in content and "EXCHANGE" not in content and "PROMPTS OF HIS" not in content
     assert "a woman" in content and "no hat" in content
 
 
@@ -407,6 +475,20 @@ def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_
     assert sent["settings"]["json_answer"] is True
     assert sent["settings"]["reads_tokens"] > 16000
     assert sent["settings"]["stays_loaded"] == "0"
+
+
+def test_asking_the_model_shows_it_his_prompts_that_touch_the_request(monkeypatch):
+    sent = {}
+
+    def ask(messages, **settings):
+        sent["messages"] = messages
+        return {"message": {"content": '{"positive": "a woman, a dog, wagging tail"}'}}
+
+    monkeypatch.setattr(local_llm, "ask", ask)
+
+    ask_the_model("a woman", "", "add a dog", [], None, examples=("a dog, wagging tail",))
+
+    assert "1. a dog, wagging tail" in sent["messages"][1]["content"]
 
 
 def test_a_field_the_model_leaves_out_is_read_as_unchanged_or_unsaid(monkeypatch):

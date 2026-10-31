@@ -2888,7 +2888,7 @@ def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
     calls = []
     answers = list(answer) if isinstance(answer, list) else []
 
-    def ask_the_model(positive, negative, words, exchange, notes):
+    def ask_the_model(positive, negative, words, exchange, notes, examples=()):
         calls.append((positive, negative, words))
         current = answers.pop(0) if answers else answer
         if isinstance(current, Exception):

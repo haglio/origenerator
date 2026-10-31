@@ -41,7 +41,7 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
         qtbot, tmp_path):
     seen = {}
 
-    def work_out(positive, negative, words, *, exchange, notes):
+    def work_out(positive, negative, words, *, exchange, notes, examples):
         seen.update(thread=threading.current_thread(), exchange=exchange, notes=notes,
                     asked=(positive, negative, words))
         return "the revision"
@@ -67,8 +67,8 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
 def test_an_item_nothing_was_asked_of_starts_with_no_exchange(qtbot, tmp_path):
     seen = {}
 
-    def work_out(positive, negative, words, *, exchange, notes):
-        seen.update(exchange=exchange, notes=notes)
+    def work_out(positive, negative, words, *, exchange, notes, examples):
+        seen.update(exchange=exchange, notes=notes, examples=examples)
         return "the revision"
 
     answerer, _db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
@@ -77,7 +77,31 @@ def test_an_item_nothing_was_asked_of_starts_with_no_exchange(qtbot, tmp_path):
     answerer.ask("fresh", "a woman", "", "a hat", owner=parent, then=answers.append)
 
     qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
-    assert seen == {"exchange": [], "notes": None}
+    assert seen == {"exchange": [], "notes": None, "examples": []}
+
+
+def test_his_own_prompts_that_touch_the_request_are_gathered_newest_first_for_the_model(
+        qtbot, tmp_path):
+    seen = {}
+
+    def work_out(positive, negative, words, *, exchange, notes, examples):
+        seen["examples"] = examples
+        return "the revision"
+
+    answerer, db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
+    for pid, prompt in (("g1", "a dog on a park bench, wagging tail"),
+                        ("g2", "a cat on a windowsill"),
+                        ("g3", "two dogs chasing a stick, wagging tails")):
+        db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+                             positive_prompt=prompt, params_json="{}", workflow_json="{}",
+                             source="generated")
+    answers = []
+
+    answerer.ask("fresh", "a woman", "", "add a dog", owner=parent, then=answers.append)
+
+    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    assert seen["examples"] == ["two dogs chasing a stick, wagging tails",
+                                "a dog on a park bench, wagging tail"]
 
 
 def test_the_line_is_let_go_even_when_the_one_who_asked_is_gone(qtbot, tmp_path):

@@ -11381,7 +11381,7 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     panel = view._info_tabs.current_config_panel()
     view._request_answerer._wait_for_the_card = lambda comfyui, holder, **settings: True
     view._request_answerer._work_out = lambda positive, negative, words, **_: work_out(
-        positive, negative, words, ask=lambda p, n, r, exchange, notes: ("two cats", n, "Two cats."))
+        positive, negative, words, ask=lambda p, n, r, exchange, notes, examples: ("two cats", n, "Two cats."))
     exchange = panel._param_form.request_exchange()
     qtbot.keyClicks(exchange._line, "two cats")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
@@ -16609,7 +16609,7 @@ def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._request_answerer._work_out = lambda positive, negative, words, **_: work_out(
         positive, negative, words,
-        ask=lambda p, n, r, exchange, notes: ("a woman, soft light", n, "Took the hat off her."))
+        ask=lambda p, n, r, exchange, notes, examples: ("a woman, soft light", n, "Took the hat off her."))
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 

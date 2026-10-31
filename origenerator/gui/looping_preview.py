@@ -1,14 +1,14 @@
 """Play a looping WebP preview inside a QLabel via ``QMovie``.
 
 Video thumbnails across the gallery — the grid tiles, the Latest collection, the
-"Animated in" strip and a Combine drop zone — all show a short looping WebP rather
+Animations and a Combine drop zone — all show a short looping WebP rather
 than a static frame. ``QMovie`` plays them cheaply, with no video player per
 tile.
 
 Every one of them is built here, which is why every one of them is put under
 the session's freeze here too (:mod:`origenerator.gui.omnipause`): wiring each
 widget to it separately is how all but the grid tiles were missed once, and a
-strip nobody remembered kept playing through a stopped room.
+row nobody remembered kept playing through a stopped room.
 """
 
 from __future__ import annotations

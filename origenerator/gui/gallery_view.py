@@ -852,7 +852,7 @@ class GalleryView(QWidget):
 
     def _build_generate_pane(self):
         """The right pane: the tabbed workspace of Generate tabs, with the
-        find strip riding under it.
+        find bar riding under it.
         """
         # Generate pane: a tabbed workspace of identical editable Generate tabs
         # (form + Generate). No special or permanent tab — the first opens on
@@ -1775,7 +1775,7 @@ class GalleryView(QWidget):
     # --- find in the open tab's prompts (Ctrl+F) ------------------------------
 
     def _open_find(self):
-        """Ctrl+F: open the find strip over the front tab's prompt fields, its
+        """Ctrl+F: open the find bar over the front tab's prompt fields, its
         standing query re-run against them.
 
         With no prompts in front — the resting tab, whose form waits on a workflow
@@ -3570,7 +3570,7 @@ class GalleryView(QWidget):
 
     def capture_generate_tabs(self) -> dict:
         """Snapshot the open editable Generate tabs (and which is active), for the
-        session. Delegates to the Generate pane's tab strip."""
+        session. Delegates to the Generate pane's tab row."""
         return self._generate_pane.capture_state()
 
     def restore_generate_tabs(self, state):
@@ -4129,7 +4129,7 @@ class GalleryView(QWidget):
         """The looping-WebP preview for a video ``row`` once one is made — until then
         ``None``, and the tile shows its still while one is made off the window's
         thread and starts playing it when it is. Feeds the grid tiles, the Latest
-        collection and Combine's drop zones; the Generate pane's strip asks the same maker."""
+        collection and Combine's drop zones; the Generate pane's Animations ask the same maker."""
         return self._moving_previews.of(row)
 
     def follow_link(self, prompt_id: str):

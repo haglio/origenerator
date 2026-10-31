@@ -604,19 +604,28 @@
       "ruled": "2026-10-30: he has no word for it, so the code keeps its own"
     },
     {
-      "id": "animations_row",
+      "id": "animations",
       "thing": "under 'Animations' on an image's tab, the row of looping previews of the videos made from it",
       "screen": [
         "Animations"
       ],
       "his_word": "Animations (2026-10-30)",
       "code_today": [
-        "animated video strip",
-        "strip"
+        "animations"
       ],
       "code_word": "animations",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list; the \"Animated in\" heading comes out"
+      "ruled": "2026-10-30, his words on the glossary's list; the \"Animated in\" heading is gone, so the previews sit right under the section's title",
+      "retired": [
+        "animated video strip",
+        "animated strip",
+        "strip"
+      ],
+      "keep": [
+        ".strip(",
+        "rstrip",
+        "lstrip"
+      ]
     },
     {
       "id": "find_bar",
@@ -626,7 +635,7 @@
       ],
       "his_word": null,
       "code_today": [
-        "find strip",
+        "find bar",
         "find bar"
       ],
       "code_word": "find bar",

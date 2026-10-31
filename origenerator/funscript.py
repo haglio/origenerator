@@ -122,7 +122,7 @@ def _span_seconds(actions: list[dict]) -> int:
 
 
 def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, int]]:
-    """The heat strip the Funestras' scrubber paints, over ``[0, last action]``:
+    """The heat map the Funestras' scrubber paints, over ``[0, last action]``:
     empty with no actions, no span or no buckets, so the caller can treat
     "nothing to draw" and "no script" alike."""
     if not actions or buckets <= 0 or actions[-1]["at"] <= 0:

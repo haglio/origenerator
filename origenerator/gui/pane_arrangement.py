@@ -52,7 +52,7 @@ class PaneArrangement:
         self.panes.addWidget(self._generate_column)
         # The TOC pane holds its width; the Gallery pane and Generate pane both grow
         # with the window (the Gallery pane faster), so the Generate pane stays
-        # comfortably wide instead of a thin strip on a large screen. Long
+        # comfortably wide instead of a thin sliver on a large screen. Long
         # metadata values wrap rather than scroll sideways, so these floors
         # only need to keep the panes readable — kept low enough that the
         # window can still tile into a monitor third or a portrait-monitor

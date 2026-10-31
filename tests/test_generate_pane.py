@@ -1060,7 +1060,7 @@ def test_capture_state_lists_every_tab_and_current(tabs):
 
 
 def test_generate_requested_surfaces_from_the_initial_tab(tabs):
-    # The tab strip re-emits each tab's Generate so the gallery can launch it as a
+    # The tab row re-emits each tab's Generate so the gallery can launch it as a
     # re-roll — here from the initial tab. It carries the workflow and form params.
     requested = []
     tabs.generate_requested.connect(lambda wf, batch: requested.append((wf, batch)))

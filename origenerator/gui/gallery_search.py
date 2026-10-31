@@ -109,7 +109,7 @@ class GallerySearchController(QObject):
         # folder name — a short code — is not. Matching is by meaning rather than
         # by letters, so "two women" reaches "a pair of dolls" and "two tall
         # ladies" alike; a model name, a LoRA's name and a seed are searchable too.
-        # Its counterpart is the find strip below the Generate pane, which searches
+        # Its counterpart is the find bar below the Generate pane, which searches
         # *inside* the open tab's prompts.
         self.field = ScopeSearchEdit()
         # Its placeholder names the scope — the whole path down to the selected

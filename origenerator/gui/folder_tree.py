@@ -133,7 +133,7 @@ class FolderTree(QTreeWidget):
         # tree is six levels deep by the time it reaches a settings folder and it
         # lives in the window's narrowest column, so the platform default spends
         # most of that column on empty margin: at Qt's 20px a leaf's label starts
-        # 120px in, leaving a thin strip for the label itself.
+        # 120px in, leaving a thin sliver for the label itself.
         self.setIndentation(_ICON)
         self.setMouseTracking(True)  # so hover is tracked without a button held
         # Several folders at once: Shift takes a run, Ctrl a scattered set — the

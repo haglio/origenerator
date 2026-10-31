@@ -1,7 +1,7 @@
 """Pure helpers for reasoning about a generation's configuration.
 
 Qt-free so the logic stays unit-testable without a widget toolkit. Shared by
-the gallery (reuse) and the generate view (subtab prefill + strip-click compare).
+the gallery (reuse) and the generate view (subtab prefill + version-list-click compare).
 """
 from __future__ import annotations
 

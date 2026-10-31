@@ -742,7 +742,7 @@ class GalleryPane(QObject):
         """The section's foldable header: the family's chevron, the model and LoRA, and how
         many are in it.
 
-        A flat, full-width button rather than a label — the whole strip is the
+        A flat, full-width button rather than a label — the whole row is the
         target, which is what a fold control has to be when the sections are tall
         enough that you are aiming at it after a scroll.
         """

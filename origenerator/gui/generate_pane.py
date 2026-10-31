@@ -49,7 +49,7 @@ class SavedTab(NamedTuple):
 
 
 def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
-    """What survives a saved tab strip: each tab's config with the runs it
+    """What survives a saved tab row: each tab's config with the runs it
     started, and which tab was in front.
 
     The state file is written by an earlier run of the app and edited by nobody,
@@ -81,7 +81,7 @@ def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
 
 
 class GeneratePane(QTabWidget):
-    """A strip of editable Generate tabs; each tab's Generate becomes a gallery re-roll."""
+    """A row of editable Generate tabs; each tab's Generate becomes a gallery re-roll."""
 
     tab_added = pyqtSignal(object)  # a fresh GenerateTab, for the view to wire
     generate_requested = pyqtSignal(str, list)  # any tab's Generate: (workflow_name, each one's params)
@@ -461,7 +461,7 @@ class GeneratePane(QTabWidget):
 
     def open_config(self, workflow_name: str, params: dict) -> GenerateTab | None:
         """Open (and select) an editable Generate tab prefilled from a generation —
-        a history-strip click, a queue row, or "Edit…".
+        a version list click, a queue row, or "Edit…".
 
         Lands where a browsed click lands (:meth:`_landing_tab`), and wears the
         same italic mark: naming a configuration is still "show me this", not a

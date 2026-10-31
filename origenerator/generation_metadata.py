@@ -11,7 +11,7 @@ the output file, its timestamp and the workflow version, shown as a compact
 
 An image's files are not one of those things any more: each is a version of the
 image, made by its own enhancement at its own settings and at its own moment, so
-each is listed down in the version strip beside the level that produced it —
+each is listed down in the version list beside the level that produced it —
 where the settings that made it already are — rather than pooled in one block at
 the top under a label naming a level you then have to go and find. What stays
 here is what no level claims: a video's file, and the siblings of a batch (which
@@ -94,7 +94,7 @@ def file_item(file: dict, label: str = "File", *,
     ``held_days`` is set only for a deleted item, and puts how long it has been
     in the trash in front of the path.
 
-    Shared with the version strip, which puts this exact row beside the level it
+    Shared with the version list, which puts this exact row beside the level it
     belongs to — the same file information, wherever the file is listed."""
     filename = file.get("filename") or ""
     full = gallery.output_file_path(file, _places(places))

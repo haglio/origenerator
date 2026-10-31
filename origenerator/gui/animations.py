@@ -35,12 +35,12 @@ class _VideoTile(QLabel):
             self.clicked.emit(self._prompt_id)
 
 
-class AnimatedVideoStrip(QWidget):
+class Animations(QWidget):
     """Preview tiles for the videos an image was animated into.
 
     ``show_videos`` takes ``(prompt_id, movie_path, still_path)`` triples — a
     looping WebP when ``movie_path`` is set, else the static ``still_path`` — and
-    hides the whole strip when there are none. Clicking a tile emits
+    hides the whole row when there are none. Clicking a tile emits
     ``video_activated`` with that video's prompt_id.
     """
 
@@ -51,7 +51,8 @@ class AnimatedVideoStrip(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_SMALL)
-        self._heading = link_heading("Animated in")
+        self._heading = link_heading("")
+        self._heading.hide()
         column.addWidget(self._heading)
         self._host = QWidget()
         FlowLayout(self._host, spacing=6)
@@ -61,6 +62,7 @@ class AnimatedVideoStrip(QWidget):
 
     def set_heading(self, heading: str) -> None:
         self._heading.setText(heading)
+        self._heading.setVisible(bool(heading))
 
     def show_videos(self, items: list[tuple[str, object, object]]):
         # Rebuild the tile host wholesale — deleting it stops and frees the old

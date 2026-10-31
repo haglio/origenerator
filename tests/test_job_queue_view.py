@@ -15,7 +15,7 @@ from shared_ui.colors import BLUE, BORDER_SUBTLE
 from origenerator.gui.combination import Combination
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 from origenerator.gui.job_queue_view import (
-    _STRIP_HEIGHT,
+    _ROW_HEIGHT,
     QUEUE_ROW_MIME,
     JobQueueView,
     QueueRow,
@@ -250,13 +250,13 @@ def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
     queue.resize(800, 400)
     QApplication.processEvents()
 
-    assert queue._running._frame.height() == _STRIP_HEIGHT
-    assert queue._scroll.height() > _STRIP_HEIGHT
+    assert queue._running._frame.height() == _ROW_HEIGHT
+    assert queue._scroll.height() > _ROW_HEIGHT
 
 
 def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):
-    assert queue.minimumHeight() == _STRIP_HEIGHT
-    assert queue.maximumHeight() > _STRIP_HEIGHT  # not pinned to its opening height
+    assert queue.minimumHeight() == _ROW_HEIGHT
+    assert queue.maximumHeight() > _ROW_HEIGHT  # not pinned to its opening height
 
 
 def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):

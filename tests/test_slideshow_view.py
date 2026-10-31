@@ -29,7 +29,7 @@ from origenerator.funscript import (
 )
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.notice_overlay import ERROR, FAVORITE, HEARD_MARK, WARNING, NoticeOverlay
+from origenerator.gui.message import ERROR, FAVORITE, HEARD_MARK, WARNING, Message
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -1088,7 +1088,7 @@ def test_a_slideshow_with_no_enhancer_still_locks_on_down(qtbot):
     assert view.slideshow.hud_item_note == ""
 
 
-def test_a_spoken_answer_is_a_notice_across_the_top(qtbot):
+def test_a_spoken_answer_is_a_message_across_the_top(qtbot):
     view = _view(qtbot, _KEYED)
     view.resize(800, 600)
 
@@ -1110,7 +1110,7 @@ def test_a_press_is_answered_plain_and_a_spoken_word_after_the_mic(qtbot):
                                                size=view._note.fontMetrics().height())
 
 
-def test_what_is_being_made_of_the_slide_is_no_notice_across_the_top(qtbot):
+def test_what_is_being_made_of_the_slide_is_no_message_across_the_top(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)
     _fade(view)
@@ -1121,22 +1121,22 @@ def test_what_is_being_made_of_the_slide_is_no_notice_across_the_top(qtbot):
     assert view._note.isHidden()
 
 
-def test_the_notice_wears_the_color_of_what_it_says(qtbot):
+def test_the_message_wears_the_color_of_what_it_says(qtbot):
     # Red only for an error, yellow for a warning, green for the favorites, white
-    # for the rest: the colors Fun Time's own notices read in, since this is
+    # for the rest: the colors Fun Time's own messages read in, since this is
     # the same overlay.
     host = QWidget()
     qtbot.addWidget(host)
-    notice = NoticeOverlay(host)
+    message = Message(host)
 
-    notice.say("a plain line")
-    assert TEXT_PRIMARY.name() in notice.styleSheet()
-    notice.say("nothing to do", kind=WARNING)
-    assert YELLOW.name() in notice.styleSheet()
-    notice.say("it broke", kind=ERROR)
-    assert RED.name() in notice.styleSheet()
-    notice.say("starred", kind=FAVORITE)
-    assert GREEN.name() in notice.styleSheet()
+    message.say("a plain line")
+    assert TEXT_PRIMARY.name() in message.styleSheet()
+    message.say("nothing to do", kind=WARNING)
+    assert YELLOW.name() in message.styleSheet()
+    message.say("it broke", kind=ERROR)
+    assert RED.name() in message.styleSheet()
+    message.say("starred", kind=FAVORITE)
+    assert GREEN.name() in message.styleSheet()
 
 
 # --- the queue, which rides on the one HUD this view wears -----------------

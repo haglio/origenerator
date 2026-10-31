@@ -20,13 +20,13 @@ from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
-from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
+from origenerator.gui.toasts import Toasts
 from origenerator.gui.window_monitor import GEOMETRY_KEY, the_window_on
 from origenerator.win32 import (
     bring_back_into_sight,
@@ -141,9 +141,9 @@ class Core(QMainWindow):
         self.setCentralWidget(self._gallery_view)
         # Where a run that outlasted the user's attention reports itself: the
         # window's own icon, on a tray icon that lives as long as the app does.
-        self._notices = DesktopNotices(self.windowIcon(), parent=self, shown_as=preview,
+        self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)
-        self._gallery_view.run_ended.connect(self._notices.note)
+        self._gallery_view.run_ended.connect(self._toasts.note)
         if fun_time is not None:
             # The session's channels: its verbs onto the region slideshows, the
             # paused flag over them, and the occupancy status back. Built here
@@ -242,7 +242,7 @@ class Core(QMainWindow):
     def go_to_generation(self, prompt_id: str) -> None:
         """Put a generation in front of the user, from outside this window.
 
-        What a clicked notification comes to (:mod:`origenerator.app_link`).
+        What a clicked toast comes to (:mod:`origenerator.app_link`).
         Standalone that means this window over whatever they had moved on to;
         hosted, the window is the session's to show and taking the foreground
         for it would put it over the room instead, so the gallery asks the room

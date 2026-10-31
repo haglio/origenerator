@@ -1,9 +1,9 @@
-"""Windows' own notification, raised by an app nothing ever installed.
+"""Windows' own toast, raised by an app nothing ever installed.
 
 A toast carries a link Windows follows on a click, hours later and with the app
 closed (:mod:`origenerator.app_link`), where the tray icon's balloon this app
 used first died with the app and had nowhere to send a click. The
-AppUserModelId entry that gives a notice its heading and its mark is also what
+AppUserModelId entry that gives a toast its heading and its mark is also what
 makes a toast raisable at all, measured on 2026-09-21 against a docstring that
 said this route needs a Start menu shortcut.
 
@@ -54,7 +54,7 @@ class _GUID(ctypes.Structure):
 
 
 def toast_xml(title: str, body: str, *, link: str | None, mark: Path | None = None) -> str:
-    """What Windows draws for one notice, and where a click on it goes."""
+    """What Windows draws for one toast, and where a click on it goes."""
     glyph = (f"<image placement=\"appLogoOverride\" src={quoteattr(mark.as_uri())}/>"
              if mark is not None else "")
     goes = f" activationType=\"protocol\" launch={quoteattr(link)}" if link else ""
@@ -67,7 +67,7 @@ def toast_xml(title: str, body: str, *, link: str | None, mark: Path | None = No
 
 
 def show(app_id: str, xml: str, *, tag: str, group: str) -> None:
-    """Raise the notification *xml* describes, as the app *app_id* names, filed
+    """Raise the toast *xml* describes, as the app *app_id* names, filed
     under *tag* and *group* for :func:`take_back` to find."""
     notifier = _notifier_for(app_id)
     try:
@@ -96,7 +96,7 @@ def filed(xml: str, *, tag: str, group: str):
 
 
 def take_back(app_id: str, *, tag: str, group: str) -> None:
-    """Take the notification filed under *tag* and *group* out of the list
+    """Take the toast filed under *tag* and *group* out of the list
     Windows keeps of *app_id*'s, if it is still there."""
     statics = _factory(_TOAST_MANAGER, _MANAGER_HISTORY_STATICS)
     history = ctypes.c_void_p()
@@ -114,10 +114,10 @@ def take_back(app_id: str, *, tag: str, group: str) -> None:
 
 
 def document_of(xml: str):
-    """*xml* as the document Windows reads a notification out of.
+    """*xml* as the document Windows reads a toast out of.
 
     Raises ``OSError`` where Windows cannot read it — a toast it cannot parse
-    is a notification that never appears, with nothing on screen to say so.
+    is a toast that never appears, with nothing on screen to say so.
     """
     document = _activate(_XML_DOCUMENT)
     reader = _as(document, _XML_DOCUMENT_IO)
@@ -130,7 +130,7 @@ def document_of(xml: str):
 
 
 def _toast_of(document):
-    """The notification *document* describes. The document stays the caller's."""
+    """The toast *document* describes. The document stays the caller's."""
     factory = _factory(_TOAST, _TOAST_FACTORY)
     read_as_a_document = _as(document, _XML_DOCUMENT_IID)
     toast = ctypes.c_void_p()
@@ -207,7 +207,7 @@ def _as(interface, iid: str):
 
 def _release(interface) -> None:
     """Let go of one of these objects. Everything here creates and lets go
-    itself: they are reference-counted, and a notification every few minutes
+    itself: they are reference-counted, and a toast every few minutes
     holding four of them for the life of the app would be a leak with no end."""
     _call(interface, _RELEASE, restype=ctypes.c_uint32)
 

@@ -457,7 +457,7 @@ class EnhancePanel(QWidget):
 
         Every part the app knows is here, installed detector or not: one with
         nothing to find it can't be ticked, and says which file to add — which
-        tells you more than an absent field (nothing at all to notice) and far
+        tells you more than an absent field (nothing at all to see) and far
         more than a live one that would be rejected on submit.
         """
         host = QWidget()

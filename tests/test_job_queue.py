@@ -20,7 +20,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
 from origenerator.media import MediaType
-from origenerator.run_notice import RunOutcome
+from origenerator.run_toast import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.story_voices import voices_asked_for
@@ -1417,7 +1417,7 @@ def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_pat
 def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
     # What the window's own surfaces can't carry: the run is over, so there is no
     # tile left to write on, and whoever tells the user needs the whole of it in
-    # one record (see origenerator.run_notice).
+    # one record (see origenerator.run_toast).
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1436,7 +1436,7 @@ def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
 
 def test_an_enhance_reports_the_image_it_improved_rather_than_itself(qtbot, tmp_path):
     # An enhance is an upgrade of an image already in the gallery: its own row is
-    # folded into that image and deleted the moment it lands, so a notice
+    # folded into that image and deleted the moment it lands, so a toast
     # pointing at the run's own id would point at nothing by the time it is read.
     client = _client()
     db = Database(tmp_path / "test.db")

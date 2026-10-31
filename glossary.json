@@ -689,13 +689,25 @@
       ],
       "his_word": "message (2026-10-30, 2026-10-24)",
       "code_today": [
-        "notice overlay",
-        "notice",
+        "message",
         "flash"
       ],
       "code_word": "message",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "notice overlay",
+        "notice"
+      ],
+      "keep": [
+        "notice_shape",
+        "NOTICE_PAD_H",
+        "NOTICE_PAD_V",
+        "NOTICE_RADIUS",
+        "NOTICE_TOP_MARGIN",
+        "NOTICE_TYPE_SIZE",
+        "notice_overlay"
+      ]
     },
     {
       "id": "toast",
@@ -703,13 +715,22 @@
       "screen": null,
       "his_word": "toast (2026-10-17, 2026-10-18, 2026-10-25: 'what's a notice? you mean a Windows toast?')",
       "code_today": [
-        "notice",
-        "toast",
-        "notification"
+        "toast"
       ],
       "code_word": "toast",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "notification"
+      ],
+      "keep": [
+        "ToastNotification",
+        "ToastNotificationManager",
+        "Windows.UI.Notifications",
+        "windows.ui.notifications.h",
+        "Notifications\n# settings",
+        "its Notifications"
+      ]
     },
     {
       "id": "progress_bar",

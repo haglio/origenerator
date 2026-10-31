@@ -131,7 +131,7 @@ def test_a_fix_training_waits_for_the_card_while_another_trainer_holds_it_then_t
         waited.append(_status(job)["state"])
         card_claim.release(another_program.pid)
 
-    monkeypatch.setattr(fix_lora_trainer.time, "sleep", let_go)
+    monkeypatch.setattr(fix_lora_trainer, "time", types.SimpleNamespace(sleep=let_go))
 
     fix_lora_trainer.run(job)
 

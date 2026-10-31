@@ -190,7 +190,7 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
         assert area.contains(corner)
         assert corner.size().width() == CORNER_SIZE
     # Top-right, lower-left, lower-right — and never top-left, which the
-    # media-type badge has always had.
+    # item type icon has always had.
     assert star.left() == plus.left() > area.center().x()
     assert star.top() < area.center().y() < plus.top()
     assert trash.left() < area.center().x()

@@ -60,7 +60,7 @@ QT_FREE = (
     # Out of the widget package with the rest of the app's machinery, and
     # needing no Qt once there: the orientation key scheme, the spin-arrow
     # PNGs, the slideshow's press vocabulary and the OSR2 controls' press grammar.
-    "origenerator.orientation",
+    "origenerator.item_shape",
     "origenerator.spin_arrows",
     "origenerator.slideshow_buttons",
     "origenerator.osr2_controls_commands",
@@ -116,7 +116,7 @@ OUTSIDE_THE_WIDGETS = (
     "radio",
     "osr2_controls_commands",
     "fun_time_bridge",
-    "orientation",
+    "item_shape",
     "osr2_driver",
     "osr2_motion_driver",
     "slideshow_buttons",

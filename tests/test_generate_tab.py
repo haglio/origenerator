@@ -239,7 +239,7 @@ def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(tab):
 
 
 def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel):
-    """Squeezed, the settings shorten — none of them runs off the side.
+    """Squeezed, the settings shorten — none of them runs off the shape.
 
     The failure this exists for: QFormLayout's WrapLongRows lays a wrapped label
     out at its own full-line size hint without clamping it to the row, so a label
@@ -401,7 +401,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
 
 def test_the_pane_keeps_a_margin_round_its_contents(tab):
     # Nothing sits flush against the tab's edge — not the preview at the top, not
-    # the form down either side, not Generate on the right, not the settings at
+    # the form down either shape, not Generate on the right, not the settings at
     # the foot. The width is written out: read from the constant that sets it,
     # this test would pass at any margin at all.
     tab.show()
@@ -1707,7 +1707,7 @@ def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
     video.parent.mkdir(parents=True)
     video.write_bytes(b"video")
     os.utime(video, (1_000_000, 1_000_000))  # made well before its upscale
-    library = tmp_path / "upscaled_by_orientation"
+    library = tmp_path / "upscaled_by_shape"
     upscale = library / "portrait" / EVOLVER_SOURCE / f"{prompt_id}_topaz.mp4"
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")

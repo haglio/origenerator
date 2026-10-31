@@ -20,12 +20,12 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY,
     LATEST_KEY,
 )
-from origenerator.gallery.sides import LANDSCAPE
+from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import slideshow_hud_model
-from origenerator.orientation import key_holds, oriented_key
+from origenerator.item_shape import key_holds, shaped_key
 from origenerator.slideshow import LIVE
 from origenerator.voice.app_commands import AppCommand
 from tests import gestures
@@ -219,13 +219,13 @@ def test_a_standalone_huds_transport_lands_on_the_slideshow_itself(qtbot, monkey
     # the press reaches the slideshow directly instead of being swallowed.
 
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
-    side = slideshow.shown.hud_side
+    shape = slideshow.shown.hud_shape
     opened = slideshow._set.playlist.current()
 
-    slideshow.shown.press(f"{side}_next")
+    slideshow.shown.press(f"{shape}_next")
     assert slideshow._set.playlist.current() != opened
 
-    slideshow.shown.press(f"{side}_lock")
+    slideshow.shown.press(f"{shape}_lock")
     assert slideshow.locked is True
     slideshow.close()
 
@@ -263,7 +263,7 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
     played = []
 
     for order in ("latest", "shuffle"):
-        slideshow.shown.press(f"{slideshow.shown.hud_side}_{order}")
+        slideshow.shown.press(f"{slideshow.shown.hud_shape}_{order}")
         playlist = slideshow._set.playlist
         played.append((slideshow.hud_order_label,
                        sorted(playlist.items[index][2] for index in playlist.order)))
@@ -506,13 +506,13 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
     names = hud_button_names(slideshow.shown)
     assert names.index("enhanced") == names.index("fmode") + 1
 
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_enhanced")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_enhanced")
 
     assert slideshow.hud_enhanced_mode is True
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
-    model = slideshow_hud_model(slideshow.shown.hud_side, slideshow, hosted=False)
+    model = slideshow_hud_model(slideshow.shown.hud_shape, slideshow, hosted=False)
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{slideshow.shown.hud_side}_enhanced"]
+    assert lit[f"{slideshow.shown.hud_shape}_enhanced"]
     assert "Enhanceds" in model.title
     slideshow.close()
 
@@ -1009,7 +1009,7 @@ def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, image):
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_play_video|{image}.png")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_play_video|{image}.png")
     return view, slideshow
 
 
@@ -1021,8 +1021,8 @@ def _looping_actions_on_a_video(qtbot, monkeypatch, *, elsewhere=()):
                              _animated_from("v1", "p1", 1), _animated_from("v2", "p1", 2),
                              *elsewhere],
         "p1")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_action_loop")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_next")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_action_loop")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_next")
     return view, slideshow
 
 
@@ -1033,9 +1033,9 @@ def _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch):
         qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
                              _image("p3", "a cat sitting", 50, 3)],
         "p1")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_more_seeds")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_next")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_next")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_more_seeds")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_next")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_next")
     return view, slideshow
 
 
@@ -1113,7 +1113,7 @@ def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on
     # image's videos has to put that video's own folder on screen, picked --
     # not the folder of the image the slideshow was started from.
     view, slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
-    folder_of_the_video = oriented_key(gallery.settings_folder_key(
+    folder_of_the_video = shaped_key(gallery.settings_folder_key(
         view._db.get_generation("v1"), view.image_config_index()), LANDSCAPE)
 
     _press_enter(slideshow)

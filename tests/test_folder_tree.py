@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 from shared_ui.colors import BLUE
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
-from origenerator.gallery.sides import LANDSCAPE
+from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gui import folder_tree, icons
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
@@ -21,7 +21,7 @@ from origenerator.gui.folder_tree import (
 )
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.orientation import oriented_key
+from origenerator.item_shape import shaped_key
 from tests.drop_style_seen import worn
 from tests.heard_drags import HeardDrags
 
@@ -36,11 +36,11 @@ class _Group:
 
 def _folder_row(label, key, favorite=False):
     """A folder row as the tree draws one: the folder it holds, and its own key —
-    that folder's, plus the side this copy of it is drawn on. The two differ
-    because both sides draw the same folder (see origenerator.orientation)."""
+    that folder's, plus the shape this copy of it is drawn on. The two differ
+    because both shapes draw the same folder (see origenerator.item_shape)."""
     item = QTreeWidgetItem([label])
     item.setData(0, _ROLE, _Group(key, favorite))
-    item.setData(0, TREE_KEY_ROLE, oriented_key(key, LANDSCAPE))
+    item.setData(0, TREE_KEY_ROLE, shaped_key(key, LANDSCAPE))
     return item
 
 
@@ -166,7 +166,7 @@ def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
 
     qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(leaf)).center())
     # The hovered ROW, so its delete is drawn — and only that copy of the folder.
-    assert tree._hover_key == oriented_key("m/w/mo/key", LANDSCAPE)
+    assert tree._hover_key == shaped_key("m/w/mo/key", LANDSCAPE)
 
     parent = leaf.parent()
     qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(parent)).center())
@@ -217,7 +217,7 @@ def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False,
     qtbot.addWidget(tree)
     collection = QTreeWidgetItem(["Favorites"])
     collection.setData(0, DROP_KEY_ROLE, "__starred__")
-    collection.setData(0, TREE_KEY_ROLE, oriented_key("__starred__", LANDSCAPE))
+    collection.setData(0, TREE_KEY_ROLE, shaped_key("__starred__", LANDSCAPE))
     a = _folder_row("A", "k/a")
     b = _folder_row("B", "k/b")
     for item in (collection, a, b):
@@ -259,8 +259,8 @@ def test_several_folders_can_be_picked_at_once(qtbot):
     a.setSelected(True)
     b.setSelected(True)
 
-    assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE),
-                                           oriented_key("k/b", LANDSCAPE)]
+    assert tree.selected_folder_keys() == [shaped_key("k/a", LANDSCAPE),
+                                           shaped_key("k/b", LANDSCAPE)]
 
 
 def test_a_collection_row_holding_no_folder_contributes_no_key(qtbot):
@@ -269,7 +269,7 @@ def test_a_collection_row_holding_no_folder_contributes_no_key(qtbot):
     collection.setSelected(True)
     a.setSelected(True)
 
-    assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE)]
+    assert tree.selected_folder_keys() == [shaped_key("k/a", LANDSCAPE)]
 
 
 def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
@@ -281,7 +281,7 @@ def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
 
     tree.setCurrentItem(a)
 
-    assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE)]
+    assert tree.selected_folder_keys() == [shaped_key("k/a", LANDSCAPE)]
 
 
 def _started_drags(monkeypatch):
@@ -320,8 +320,8 @@ def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, mo
     (drag,) = started
     _drop_at(tree, collection, drag.mime)
 
-    assert dropped == [("__starred__", [oriented_key("k/a", LANDSCAPE),
-                                        oriented_key("k/b", LANDSCAPE)])]
+    assert dropped == [("__starred__", [shaped_key("k/a", LANDSCAPE),
+                                        shaped_key("k/b", LANDSCAPE)])]
 
 
 def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch):
@@ -339,7 +339,7 @@ def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch
     (drag,) = started
     _drop_at(tree, collection, drag.mime)
 
-    assert dropped == [("__starred__", [oriented_key("k/a", LANDSCAPE)])]
+    assert dropped == [("__starred__", [shaped_key("k/a", LANDSCAPE)])]
 
 
 def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
@@ -374,7 +374,7 @@ def test_a_folder_of_your_own_drags_like_any_folder(qtbot, monkeypatch):
     (drag,) = started
     _drop_at(tree, collection, drag.mime)
 
-    assert dropped == [[oriented_key("__custom__/1", LANDSCAPE)]]
+    assert dropped == [[shaped_key("__custom__/1", LANDSCAPE)]]
 
 
 def test_a_picked_folder_of_your_own_goes_along_in_a_drag(qtbot, monkeypatch):
@@ -390,7 +390,7 @@ def test_a_picked_folder_of_your_own_goes_along_in_a_drag(qtbot, monkeypatch):
     (drag,) = started
     _drop_at(tree, collection, drag.mime)
 
-    assert dropped == [[oriented_key("k/a", LANDSCAPE), oriented_key("__custom__/1", LANDSCAPE)]]
+    assert dropped == [[shaped_key("k/a", LANDSCAPE), shaped_key("__custom__/1", LANDSCAPE)]]
 
 
 def test_a_collecting_row_refuses_a_folder_it_does_not_take(qtbot):
@@ -398,19 +398,19 @@ def test_a_collecting_row_refuses_a_folder_it_does_not_take(qtbot):
 
     def takes(row_key, folder_key):
         asked.append((row_key, folder_key))
-        return folder_key != oriented_key("k/b", LANDSCAPE)
+        return folder_key != shaped_key("k/b", LANDSCAPE)
 
     tree, collection, _a, _b = _collecting_tree(qtbot, takes_folder=takes)
     dropped = []
     tree.dropped.connect(lambda _key, keys, _items: dropped.append(keys))
-    refused, taken = _drag([oriented_key("k/b", LANDSCAPE)]), _drag(
-        [oriented_key("k/a", LANDSCAPE), oriented_key("k/b", LANDSCAPE)])
+    refused, taken = _drag([shaped_key("k/b", LANDSCAPE)]), _drag(
+        [shaped_key("k/a", LANDSCAPE), shaped_key("k/b", LANDSCAPE)])
 
     assert not _drag_move_at(tree, collection, refused).isAccepted()
     _drop_at(tree, collection, taken)
 
-    assert dropped == [[oriented_key("k/a", LANDSCAPE)]]
-    assert asked[-1] == (oriented_key("__starred__", LANDSCAPE), oriented_key("k/b", LANDSCAPE))
+    assert dropped == [[shaped_key("k/a", LANDSCAPE)]]
+    assert asked[-1] == (shaped_key("__starred__", LANDSCAPE), shaped_key("k/b", LANDSCAPE))
 
 
 def test_a_folder_of_your_own_dropped_on_itself_is_refused(qtbot):
@@ -435,7 +435,7 @@ def test_a_folder_dragged_out_tells_every_place_a_drop_can_land(qtbot, monkeypat
     tree.startDrag(Qt.DropAction.CopyAction)
 
     assert [(bytes(mime.data(FOLDER_KEYS_MIME)).decode("utf-8"), source)
-            for mime, source in heard.started] == [(oriented_key("k/a", LANDSCAPE), tree)]
+            for mime, source in heard.started] == [(shaped_key("k/a", LANDSCAPE), tree)]
     assert heard.ended == 1
 
 
@@ -452,7 +452,7 @@ def _lit_for_a_folder(qtbot):
     """A list Favorites is lit in, for folder A, with B an ordinary folder beside it."""
     tree, favorites, _a, b = _collecting_tree(qtbot)
     tree.setStyleSheet(build_stylesheet())
-    mime = _drag([oriented_key("k/a", LANDSCAPE)])
+    mime = _drag([shaped_key("k/a", LANDSCAPE)])
     under_way.started.emit(mime, tree)
     return tree, favorites, b, mime
 
@@ -577,7 +577,7 @@ def test_an_item_dropped_on_a_collecting_row_that_takes_it_is_reported(qtbot):
     _drop_at(tree, collection, mime)
 
     assert dropped == [("__starred__", [], ["p1"])]
-    assert asked[-1] == (oriented_key("__starred__", LANDSCAPE), "p1")
+    assert asked[-1] == (shaped_key("__starred__", LANDSCAPE), "p1")
 
 
 def test_an_item_a_collecting_row_does_not_take_is_refused(qtbot):
@@ -764,7 +764,7 @@ def _laid_out(tree, item, element) -> QRect:
 
 
 def _tree_with_a_collection(qtbot, which=LATEST_KEY):
-    """A collection row under a workflow folder, under All, the way a side lays them out."""
+    """A collection row under a workflow folder, under All, the way a shape lays them out."""
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")

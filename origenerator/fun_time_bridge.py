@@ -7,7 +7,7 @@ slideshows the way it reaches the Funestras:
 
 * ``PORTRAIT_NEXT`` steps whatever holds the portrait region the way ``NEXT``
   steps the Portrait Funestra — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
-  and the landscape side.  ``PORTRAIT_OPEN_SLIDESHOW`` fills that region (its
+  and the landscape shape.  ``PORTRAIT_OPEN_SLIDESHOW`` fills that region (its
   Funestra switching INTO origenerator mode), ``PORTRAIT_CLOSE_SLIDESHOW``
   clears it again and ``CLOSE_SLIDESHOWS`` clears both;
   ``FILTER_ENHANCED`` flips the enhanced-only switch a slideshow's HUD and the
@@ -51,11 +51,11 @@ from origenerator.fun_time_mode import (
     REQUEST_OPEN,
     SAID_AT,
     SAY,
-    SIDES,
+    SHAPES,
     TAKE_BACK,
     FunTimeSession,
 )
-from origenerator.osr2_controls_commands import side_press, side_spoken_to, spelled_for
+from origenerator.osr2_controls_commands import shape_press, shape_spoken_to, spelled_for
 from origenerator.radio import deal_to_the_funestras
 from origenerator.slideshow_buttons import (
     HUD_PLACES,
@@ -74,8 +74,8 @@ def ask_for_omnipause(dashboard_cmd_file) -> None:
     append_command(dashboard_cmd_file, "omnipause_toggle")
 
 
-def ask_for_the_funestra(dashboard_cmd_file, side: str) -> None:
-    append_command(dashboard_cmd_file, origenerator_mode_on(side))
+def ask_for_the_funestra(dashboard_cmd_file, shape: str) -> None:
+    append_command(dashboard_cmd_file, origenerator_mode_on(shape))
 
 
 def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
@@ -135,11 +135,11 @@ class FunTimeBridge(QObject):
             RELEASE: self._release,
             TAKE_BACK: self.take_back_asked.emit,
         }
-        self._side_verbs = {
-            OPEN_SLIDESHOW: lambda side: self._gallery.fill_the_region(side),
+        self._shape_verbs = {
+            OPEN_SLIDESHOW: lambda shape: self._gallery.fill_the_region(shape),
             CLOSE_SLIDESHOW: self._close_the_slideshow,
         }
-        self._request_side: str | None = None
+        self._request_shape: str | None = None
         self._released = False
         application = QCoreApplication.instance()
         if application is not None:
@@ -165,8 +165,8 @@ class FunTimeBridge(QObject):
         image tunes in wherever its station has got to."""
         if self._radio is not None:
             return
-        playlists = {side: channel.playlist for side in SIDES
-                     if (channel := self._session.funestra(side)) is not None}
+        playlists = {shape: channel.playlist for shape in SHAPES
+                     if (channel := self._session.funestra(shape)) is not None}
         self._radio = deal_to_the_funestras(playlists, videos_dir=self._radio_dir)
 
     def take_the_radio_back(self) -> None:
@@ -217,60 +217,60 @@ class FunTimeBridge(QObject):
         if keyword == GO_TO and marker == "|":
             self._gallery.go_to_file(argument)
             return
-        side = side_spoken_to(keyword, SIDES)
-        if side is None:
+        shape = shape_spoken_to(keyword, SHAPES)
+        if shape is None:
             logger.warning("Unknown Fun Time verb dropped: %s", line)
             return
-        action, argument = side_press(side, keyword.lower(), argument)
-        if not marker and action in self._side_verbs:
-            self._side_verbs[action](side)
+        action, argument = shape_press(shape, keyword.lower(), argument)
+        if not marker and action in self._shape_verbs:
+            self._shape_verbs[action](shape)
             return
         if action in HUD_PLACES:
-            self._gallery.place_a_hud(side, action, argument)
+            self._gallery.place_a_hud(shape, action, argument)
             return
         if action == SAY and marker == ":":
             # The session owns the microphone for the whole room, so a spoken
             # command about one of these regions is heard THERE and sent here
             # as the words themselves — matched by this app's own vocabulary,
             # which is the only place that knows its collections and its parts.
-            self._run_what_was_said(side, argument, said_at)
+            self._run_what_was_said(shape, argument, said_at)
             return
-        self._apply_side(side, action, argument, line, said_at)
+        self._apply_shape(shape, action, argument, line, said_at)
 
-    def _run_what_was_said(self, side: str, words: str, said_at: float | None) -> None:
+    def _run_what_was_said(self, shape: str, words: str, said_at: float | None) -> None:
         was_taking_a_request = self._gallery.taking_a_request()
-        self._gallery.run_spoken_command(f"{side} {words}", said_at)
+        self._gallery.run_spoken_command(f"{shape} {words}", said_at)
         taking_a_request = self._gallery.taking_a_request()
         if taking_a_request == was_taking_a_request:
             return
-        self._request_side = side if taking_a_request else None
-        self._tell_the_room(spelled_for(side, REQUEST_OPEN if taking_a_request
+        self._request_shape = shape if taking_a_request else None
+        self._tell_the_room(spelled_for(shape, REQUEST_OPEN if taking_a_request
                                         else REQUEST_CLOSED))
 
-    def _close_the_slideshow(self, side: str) -> None:
-        self._drop_the_request_said_to(side)
-        self._gallery.close_the_slideshow(side)
+    def _close_the_slideshow(self, shape: str) -> None:
+        self._drop_the_request_said_to(shape)
+        self._gallery.close_the_slideshow(shape)
 
     def _close_the_slideshows(self) -> None:
         # Through the gallery, not slideshow by slideshow: it has to stop WANTING the
         # regions first, or each close it makes here is answered by the
         # base state opening again underneath it.
-        self._drop_the_request_said_to(self._request_side)
+        self._drop_the_request_said_to(self._request_shape)
         self._gallery.close_the_slideshows()
 
-    def _drop_the_request_said_to(self, side: str | None) -> None:
-        if side is None or side != self._request_side:
+    def _drop_the_request_said_to(self, shape: str | None) -> None:
+        if shape is None or shape != self._request_shape:
             return
         self._gallery.drop_the_request()
-        self._request_side = None
-        self._tell_the_room(spelled_for(side, REQUEST_CLOSED))
+        self._request_shape = None
+        self._tell_the_room(spelled_for(shape, REQUEST_CLOSED))
 
     def _tell_the_room(self, line: str) -> None:
         if self._session.dashboard_cmd_file is not None:
             append_command(self._session.dashboard_cmd_file, line)
 
     def _release(self) -> None:
-        self._drop_the_request_said_to(self._request_side)
+        self._drop_the_request_said_to(self._request_shape)
         self._released = True
         self._timer.stop()
         self.take_the_radio_back()
@@ -285,28 +285,28 @@ class FunTimeBridge(QObject):
         region whose set has nothing enhanced in it refuses the narrowing — and
         one lit switch cannot say that a room is half narrowed.
         """
-        slideshows = [slideshow for slideshow in map(self._gallery.region_slideshow, SIDES)
+        slideshows = [slideshow for slideshow in map(self._gallery.region_slideshow, SHAPES)
                       if slideshow is not None]
         enhanced_only = not any(slideshow.hud_enhanced_mode for slideshow in slideshows)
         for slideshow in slideshows:
             slideshow.set_enhanced_mode(enhanced_only)
 
-    def _apply_side(self, side: str, action: str, argument: str, line: str,
+    def _apply_shape(self, shape: str, action: str, argument: str, line: str,
                     said_at: float | None) -> None:
-        """A press on *side*'s HUD, onto whatever holds that side.
+        """A press on *shape*'s HUD, onto whatever holds that shape.
 
         The same answers a slideshow's own HUD gets
         (:func:`~origenerator.slideshow_buttons.answer`): the session routes a
         Funestra's presses back here verbatim, and its own hotkeys spell the
         transport the same way, so one table says what every one of them means.
         """
-        slideshow = self._gallery.region_slideshow(side)
+        slideshow = self._gallery.region_slideshow(shape)
         if slideshow is None:
             return  # an empty region has nothing to drive
         if action in PRESSES_ABOUT_THE_SLIDE:
             slideshow.back_to_what_was_said_over(said_at)
         if not answer(slideshow, action, argument):
-            logger.warning("Unanswered press for the %s slideshow dropped: %s", side, line)
+            logger.warning("Unanswered press for the %s slideshow dropped: %s", shape, line)
 
     # --- the paused flag ----------------------------------------------------
 
@@ -325,7 +325,7 @@ class FunTimeBridge(QObject):
     # --- status out ---------------------------------------------------------
 
     #: The whole of it: this app is up and answering.  It published six keys
-    #: for years -- which side held a slideshow, what it was showing, whether it was
+    #: for years -- which shape held a slideshow, what it was showing, whether it was
     #: locked -- and the session read none of them; it waits on this file
     #: appearing, and nothing else, to know the mode can be opened.  The owner
     #: settled that on 2026-09-05 (audit Q13): nothing was to be wired to read

@@ -1,6 +1,6 @@
 """The shapes the tree remembers, and what it forgets.
 
-``row_orientation`` opens a file to find out which region its media belongs on,
+``row_shape`` opens a file to find out which region its media belongs on,
 and keeps the answer against the path that gave it — a rebuild re-reads every row
 and the poll rebuilds every 1.5 s, so measuring afresh each time would mean a
 thumbnail opened per row per second.  Kept for ever, though, that is a dict with
@@ -15,8 +15,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from origenerator import orientation
-from origenerator.gallery.sides import PORTRAIT
+from origenerator import item_shape
+from origenerator.gallery.shapes import PORTRAIT
 
 
 class _FakeImage:
@@ -35,7 +35,7 @@ class _FakeImage:
 @pytest.fixture(autouse=True)
 def _a_cache_of_this_files_own(monkeypatch):
     """These tests fill the cache; nothing after them should inherit it."""
-    monkeypatch.setattr(orientation, "_measured", type(orientation._measured)())
+    monkeypatch.setattr(item_shape, "_measured", type(item_shape._measured)())
 
 
 @pytest.fixture(autouse=True)
@@ -43,18 +43,18 @@ def _every_path_reads_as_a_tall_image(monkeypatch):
     """Measure without a file: what is on disk is not what these tests are about,
     and a thousand real PNGs would only be a slower way to ask the same thing."""
     monkeypatch.setattr(
-        orientation, "Image", SimpleNamespace(open=lambda path: _FakeImage((90, 160))))
+        item_shape, "Image", SimpleNamespace(open=lambda path: _FakeImage((90, 160))))
 
 
 def _measure(name: str) -> str:
-    return orientation.row_orientation({"thumbnail_path": f"/library/{name}.png"})
+    return item_shape.row_shape({"thumbnail_path": f"/library/{name}.png"})
 
 
 def test_the_remembered_shapes_stop_piling_up():
-    for n in range(orientation._MEASURED_LIMIT + 100):
+    for n in range(item_shape._MEASURED_LIMIT + 100):
         assert _measure(f"m{n}") == PORTRAIT
 
-    assert len(orientation._measured) <= orientation._MEASURED_LIMIT
+    assert len(item_shape._measured) <= item_shape._MEASURED_LIMIT
 
 
 def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypatch):
@@ -64,25 +64,25 @@ def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypat
     to close it."""
     row = {"thumbnail_path": "/library/known.png",
            "output_files": '[{"filename": "known.png", "subfolder": ""}]'}
-    orientation.row_orientation(row)
+    item_shape.row_shape(row)
     looked_up = []
-    monkeypatch.setattr(orientation.gallery, "resolve_preview",
+    monkeypatch.setattr(item_shape.gallery, "resolve_preview",
                         lambda *args: looked_up.append(args))
 
-    assert orientation.row_orientation(row) == PORTRAIT
+    assert item_shape.row_shape(row) == PORTRAIT
     assert looked_up == []
 
 
 def test_the_shape_a_row_asks_for_is_read_once_however_often_it_is_asked(monkeypatch):
     reads = []
-    real = orientation.canonical_settings
-    monkeypatch.setattr(orientation, "canonical_settings",
+    real = item_shape.canonical_settings
+    monkeypatch.setattr(item_shape, "canonical_settings",
                         lambda workflow_name, params: reads.append(workflow_name)
                         or real(workflow_name, params))
     row = {"workflow_name": "sdxl_t2i", "params_json": json.dumps({"width": 720, "height": 1281})}
 
     for _ in range(3):
-        assert orientation.row_orientation(dict(row)) == PORTRAIT
+        assert item_shape.row_shape(dict(row)) == PORTRAIT
 
     assert reads == ["sdxl_t2i"]
 
@@ -90,14 +90,14 @@ def test_the_shape_a_row_asks_for_is_read_once_however_often_it_is_asked(monkeyp
 def test_the_one_it_drops_is_the_one_nothing_has_asked_for():
     """A library past the cap still has one folder open in front of it, and the
     rows the poll redraws must outlast the ones scrolled past once."""
-    for n in range(orientation._MEASURED_LIMIT):
+    for n in range(item_shape._MEASURED_LIMIT):
         _measure(f"m{n}")
     _measure("m0")  # asked for again, so no longer the oldest thing here
 
     _measure("late")  # one over: something has to go
 
-    # ``row_orientation`` keys the cache by ``str(Path(thumbnail_path))``, so the
+    # ``row_shape`` keys the cache by ``str(Path(thumbnail_path))``, so the
     # separator is the platform's -- backslashes on Windows.  Assert against the
     # same normalization the cache stores, not a raw POSIX literal.
-    assert str(Path("/library/m0.png")) in orientation._measured
-    assert str(Path("/library/m1.png")) not in orientation._measured
+    assert str(Path("/library/m0.png")) in item_shape._measured
+    assert str(Path("/library/m1.png")) not in item_shape._measured

@@ -36,7 +36,7 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     TRASH_KEY,
 )
-from origenerator.gallery.sides import LANDSCAPE
+from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.folder_tree import _action_rects
@@ -46,7 +46,6 @@ from origenerator.gui.new_tile import NewTile
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.item_shape import base_of, shaped_key
 from origenerator.motion_engine import Motion
-from origenerator.orientation import base_of, oriented_key
 from origenerator.output_places import OutputPlaces
 from origenerator.prompt_edit import request_applier
 from origenerator.slideshow_buttons import MODE_BUTTONS
@@ -278,11 +277,11 @@ class FakeDB:
 
     # --- custom collections (the groupings the user composes) ------------------
 
-    def create_custom_folder(self, name, folder_id=None, side=None):
+    def create_custom_collection(self, name, folder_id=None, shape=None):
         if folder_id is None:
             folder_id = self._next_custom
         self._next_custom = max(self._next_custom, folder_id) + 1
-        self._custom[folder_id] = {"name": name, "side": side, "folders": {}, "items": {}}
+        self._custom[folder_id] = {"name": name, "side": shape, "folders": {}, "items": {}}
         return folder_id
 
     def delete_custom_collection(self, folder_id):
@@ -361,47 +360,47 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
-def _side(tree, side=LANDSCAPE):
+def _shape(tree, shape=LANDSCAPE):
     """One section of the TOC pane — the Portrait tree, the Landscape one, or
     the one list of both shapes the radio over them collapses to (see
-    :mod:`origenerator.gallery.sides`)."""
-    return tree._trees[side]
+    :mod:`origenerator.gallery.shapes`)."""
+    return tree._trees[shape]
 
 
-def _top_level(tree, side=LANDSCAPE):
+def _top_level(tree, shape=LANDSCAPE):
     """One half's rows: its collections, its custom collections, its All.
 
     Landscape by default because that is where these fixtures land — a row with
     no thumbnail, no file on disk and no size in its params has no shape to
     read, and an unmeasurable item files under the roomier region everywhere in
-    this app. A test about the split itself names the side it means.
+    this app. A test about the split itself names the shape it means.
     """
-    half = _side(tree, side)
+    half = _shape(tree, shape)
     return {half.topLevelItem(i).text(0): half.topLevelItem(i)
             for i in range(half.topLevelItemCount())}
 
 
-def _alls(tree, side=LANDSCAPE):
+def _alls(tree, shape=LANDSCAPE):
     """What one half's All row holds: its collections, then Images and Videos."""
-    all_row = _top_level(tree, side)["All"]
+    all_row = _top_level(tree, shape)["All"]
     return {all_row.child(i).text(0): all_row.child(i) for i in range(all_row.childCount())}
 
 
 def _selected_folder(view):
-    """Which folder the tree has open, with the side stripped — what a test that
+    """Which folder the tree has open, with the shape stripped — what a test that
     is not about the split itself means by "the selected folder"."""
     return base_of(view.selected_folder_key())
 
 
-def _collection(view, key, side=LANDSCAPE):
+def _collection(view, key, shape=LANDSCAPE):
     """One side's copy of a collection row. Landscape by default, like _top_level."""
-    return view._tree_item_for(oriented_key(key, side))
+    return view._tree_item_for(shaped_key(key, shape))
 
 
-def _side_rows(view, side):
-    """The prompt ids one side of the tree holds, from its All row down."""
+def _shape_rows(view, shape):
+    """The prompt ids one shape of the tree holds, from its All row down."""
     return [row["prompt_id"]
-            for row in view._slideshows.rows_at(oriented_key(gallery.ALL_KEY, side))]
+            for row in view._slideshows.rows_at(shaped_key(gallery.ALL_KEY, shape))]
 
 
 def _key(item):
@@ -420,19 +419,19 @@ def _at(item, *path):
     return item
 
 
-def _workflow_rows(tree, media=None, side=LANDSCAPE):
+def _workflow_rows(tree, media=None, shape=LANDSCAPE):
     """The workflow rows, which hang under Images and Videos, by label — one
     kind's alone ("image"/"video") when ``media`` says so."""
-    all_row = _top_level(tree, side).get("All")
+    all_row = _top_level(tree, shape).get("All")
     if all_row is None:
         return {}
     kinds = [kind for kind in _subs(all_row) if media in (None, _key(kind))]
     return {row.text(0): row for kind in kinds for row in _subs(kind)}
 
 
-def _image_workflow(tree, side=LANDSCAPE):
+def _image_workflow(tree, shape=LANDSCAPE):
     """The sole image workflow's row — where a one-workflow gallery starts."""
-    (row,) = _workflow_rows(tree, "image", side).values()
+    (row,) = _workflow_rows(tree, "image", shape).values()
     return row
 
 
@@ -706,9 +705,9 @@ def _tile_kinds_in_order(view):
     return [type(layout.itemAt(index).widget()) for index in range(layout.count())]
 
 
-def _select_first_leaf(view, side=LANDSCAPE):
+def _select_first_leaf(view, shape=LANDSCAPE):
     # workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
-    leaf = _at(_image_workflow(view._tree, side), 0, 0, 0)
+    leaf = _at(_image_workflow(view._tree, shape), 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
 
@@ -766,9 +765,9 @@ def _in_view(view, prompt_id) -> bool:
     return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
 
 
-def _running_reroll(view, side=LANDSCAPE):
+def _running_reroll(view, shape=LANDSCAPE):
     """Start a re-roll and return (key, job) for the freshly launched job."""
-    key = _select_first_leaf(view, side)
+    key = _select_first_leaf(view, shape)
     _new_tile(view).add_requested.emit()
     return key, view._live_jobs[key]
 
@@ -1194,12 +1193,12 @@ def _below_the_last_row(tree) -> QPoint:
     return below
 
 
-def _tree_menu(view, key=None, side=LANDSCAPE):
+def _tree_menu(view, key=None, shape=LANDSCAPE):
     """Right-click a folder's row in the list, or the empty space below the last
-    row of ``side`` when no key is given, through the window as a mouse does."""
+    row of ``shape`` when no key is given, through the window as a mouse does."""
     _tall_on_screen(view)
     if key is None:
-        tree = view._tree._trees[side]
+        tree = view._tree._trees[shape]
         at = _below_the_last_row(tree)
     else:
         row = view._tree_item_for(key)

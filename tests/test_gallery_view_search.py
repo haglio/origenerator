@@ -27,7 +27,7 @@ from origenerator.gallery.collection import (
     LATEST_KEY,
     TRASH_KEY,
 )
-from origenerator.gallery.sides import LANDSCAPE, SIDE_LABELS
+from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS
 from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
     _NO_MOD,
@@ -220,7 +220,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
 
     assert view.listed_prompt_ids() == ["i1"]
     assert view._search.field.placeholderText() == (
-        f"Search {SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest…")
+        f"Search {SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest…")
 
 
 def test_the_trash_collection_searches_what_it_is_holding(qtbot):
@@ -259,7 +259,7 @@ def test_the_field_says_what_it_would_search(qtbot):
     qtbot.addWidget(view)
     view._search.field.setFixedWidth(2000)  # room for any path, so nothing elides
     view.refresh()
-    # The side is part of the path: an All row is one half of the library.
+    # The shape is part of the path: an All row is one half of the library.
     assert view._search.field.placeholderText() == "Search Landscape  ›  All…"
 
     videos = _video_workflow(view._tree)

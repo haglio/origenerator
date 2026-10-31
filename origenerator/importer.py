@@ -12,7 +12,7 @@ from pathlib import Path
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 from PIL import Image
-from shared_ui.orientation import orientation_of_size
+from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfy_graph import (
@@ -690,7 +690,7 @@ def _size_from_its_own_file(fpath: Path, workflow_name: str) -> dict:
         return {}
     width, height = size
     if workflow is None:
-        return {"orientation": orientation_of_size(width, height)}
+        return {"orientation": shape_of_size(width, height)}
     return {"width": width, "height": height}
 
 

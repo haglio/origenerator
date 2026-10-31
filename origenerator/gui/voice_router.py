@@ -79,8 +79,8 @@ from origenerator.voice.commands import (
     SlideshowControl,
     SurfaceCommand,
     match_voice_command,
-    sided_app_command,
-    split_side,
+    shaped_app_command,
+    split_shape,
     spoken_phrases,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation
@@ -157,8 +157,8 @@ class VoiceHost(Protocol):
         """What to call a collection back — the plain name its row carries, without
         the waiting-work count."""
 
-    def stand_in_collection(self, key: str, side: str | None) -> bool:
-        """Select the collection ``key`` names on ``side`` (or on whichever side the
+    def stand_in_collection(self, key: str, shape: str | None) -> bool:
+        """Select the collection ``key`` names on ``shape`` (or on whichever shape the
         tree answers with), exactly as clicking its row does. ``False`` when the
         tree has no row for it at all."""
 
@@ -203,7 +203,7 @@ class VoiceRouter(QObject):
         # to hear; everything else is taken down as a sentence.
         self.listener = CommandAndRequestListener(
             command_matcher=match_voice_command,
-            bare_matcher=sided_app_command,
+            bare_matcher=shaped_app_command,
             dictation=RequestDictation(),
             phrases=spoken_phrases(),
             never_repaired=phrases_heard_only_outright(),
@@ -417,14 +417,14 @@ class VoiceRouter(QObject):
         request from also matching a command.  Then a whole-utterance word —
         "landscape enhanced only" turns the slideshow's switch, and left to the
         looser image matcher it would read as "enhance" with a word after it.
-        The side is split off for the dictation — it rides every utterance the
+        The shape is split off for the dictation — it rides every utterance the
         session posts, and fed in it would become the first word of the request
         instead of the region the request is about.
         """
-        side, rest = split_side(text)
+        shape, rest = split_shape(text)
         spoken = self.listener.push_dictation(rest, spoken_at=said_at)
         if spoken is not None:
-            self.on_spoken_request(spoken, side=side)
+            self.on_spoken_request(spoken, shape=shape)
             return True
         bare = self.listener.bare_command(text)
         if bare is not None:
@@ -441,19 +441,19 @@ class VoiceRouter(QObject):
     def on_command(self, matched, said_at: float | None = None) -> None:
         """One recognized utterance: a collection to play, a slideshow command, a bare
         word about the app or the slide in front of the speaker, or an order
-        about the image — each with the side it named and when it was said.
+        about the image — each with the shape it named and when it was said.
 
         An order about the image always arrives wrapped in a
-        :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
-        how the side travels, and the matchers put every one of them in it.
+        :class:`SurfaceCommand`, whether or not a shape was said: the wrapper is
+        how the shape travels, and the matchers put every one of them in it.
         """
         if isinstance(matched, CollectionCommand):
             self._slideshows.play_collection(matched)
         elif isinstance(matched, SlideshowControl):
-            self._slideshows.run_slideshow_command(matched.command, matched.side)
+            self._slideshows.run_slideshow_command(matched.command, matched.shape)
         elif isinstance(matched, SurfaceCommand):
             if isinstance(matched.command, AppCommand):
-                self._run_app_command(matched.command, matched.side, said_at)
+                self._run_app_command(matched.command, matched.shape, said_at)
             else:
                 self._on_image_command(matched, said_at)
         elif isinstance(matched, AppCommand):
@@ -468,7 +468,7 @@ class VoiceRouter(QObject):
 
     # --- the bare vocabulary: a collection, a switch, the motion, or the slide ---
 
-    def _run_app_command(self, command: AppCommand, side: str | None = None,
+    def _run_app_command(self, command: AppCommand, shape: str | None = None,
                          said_at: float | None = None) -> None:
         """One bare spoken word.
 
@@ -479,9 +479,9 @@ class VoiceRouter(QObject):
         fullscreen slideshow while one is up and the gallery otherwise.
         """
         if command in _COLLECTIONS:
-            self._go_to_collection(command, side)
+            self._go_to_collection(command, shape)
         elif command in _FILTERS:
-            self._slideshows.filter_enhanced(_FILTERS[command], side)
+            self._slideshows.filter_enhanced(_FILTERS[command], shape)
         elif command in _SWITCHES:
             self._flip_switch(command)
         elif command in _MOTION:
@@ -491,7 +491,7 @@ class VoiceRouter(QObject):
         else:
             self._run_in_gallery(command)
 
-    def _go_to_collection(self, command: AppCommand, side: str | None = None) -> None:
+    def _go_to_collection(self, command: AppCommand, shape: str | None = None) -> None:
         """Stand in the collection a spoken name asks for, exactly as clicking its
         row does.
 
@@ -499,13 +499,13 @@ class VoiceRouter(QObject):
         move is what the slideshow leaves you standing in — so the answer says which
         collection rather than refusing a command whose whole effect is out of sight.
 
-        The name is All's copy of the collection, on the utterance's own side;
-        unsided, the host takes the tree's own answer for the folder — the same
+        The name is All's copy of the collection, on the utterance's own shape;
+        unshaped, the host takes the tree's own answer for the folder — the same
         row a click would have landed on.
         """
         key = _COLLECTIONS[command]
         label = self._host.collection_label(key)
-        if not self._host.stand_in_collection(key, side):
+        if not self._host.stand_in_collection(key, shape):
             # Latest and Favorites appear only once there is one
             self._slideshows.answer(f"no {label} collection yet", kind=WARNING)
             return
@@ -598,7 +598,7 @@ class VoiceRouter(QObject):
         (or several parts, or "fix all"), "enhance" for the better version of
         it, or "genau it" to animate it as a Genau flick.
 
-        A named side takes that region's slideshow — hosted, two slideshows run at once
+        A named shape takes that region's slideshow — hosted, two slideshows run at once
         and neither is the active window, so naming one is the only way to say
         which image is meant.  Unnamed, it goes to whichever slideshow is up.
         Answered out of the slideshow's own note — the speaker is looking at it, not
@@ -606,7 +606,7 @@ class VoiceRouter(QObject):
         the same name; the other two have no "on screen" to act on, and the
         utterance has already been claimed as a command by the time it gets here,
         so the caption says so rather than letting it vanish."""
-        slideshow = self._slideshows.surface_for(command.side)
+        slideshow = self._slideshows.surface_for(command.shape)
         if slideshow is None:
             if command.command == gallery.ENHANCE_COMMAND:
                 # The word names a Gallery pane button too, and with no image filling
@@ -632,7 +632,7 @@ class VoiceRouter(QObject):
 
     # --- spoken requests: "Request … over" over whatever is on screen --------
 
-    def on_spoken_request(self, spoken, side: str | None = None) -> None:
+    def on_spoken_request(self, spoken, shape: str | None = None) -> None:
         """One step of a spoken request — from the mic's dictation, or from the
         hosting session's channel with the region it was said to.
 
@@ -641,12 +641,12 @@ class VoiceRouter(QObject):
         target is taken at the opening step and kept, because a request is about
         the image that prompted it, not whatever is up when the words run out.
 
-        Hosted, *side* is what makes "the image" an image at all: two slideshows
+        Hosted, *shape* is what makes "the image" an image at all: two slideshows
         run at once on the satellite regions and neither is the active window,
         so the region named is the only thing that says which one the words are
         about.
         """
-        slideshow = self._slideshows.surface_for(side)
+        slideshow = self._slideshows.surface_for(shape)
         if self._request_target is None:
             # Taken at the first step of the request, whichever step that is —
             # "Request, no hat, over" is a whole one in a single breath.
@@ -660,7 +660,7 @@ class VoiceRouter(QObject):
         if spoken.state != COMPLETED:  # given up on — the terminator never came
             self._answer_request(slideshow, "request dropped — never heard “over”", spoken)
             return
-        self._begin_request(target, spoken, side)
+        self._begin_request(target, spoken, shape)
 
     def drop_the_request(self) -> None:
         self.listener.drop_the_request()
@@ -712,7 +712,7 @@ class VoiceRouter(QObject):
             self._show(message, transient=not working)
 
     def _begin_request(self, prompt_id: str | None, spoken,
-                       side: str | None = None) -> None:
+                       shape: str | None = None) -> None:
         """Start working out what a finished request changes.
 
         The working-out goes to the pool because it may have to ask the local
@@ -722,12 +722,12 @@ class VoiceRouter(QObject):
         (nothing on screen, a video this app can't rebuild) is answered here,
         so a request that was never going to run doesn't wait on a model.
 
-        The side rides the pool's context so the answer comes back to the same
+        The shape rides the pool's context so the answer comes back to the same
         region the request was said to — seconds later, with two slideshows running,
         it is the only thing that still says which.
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
-        slideshow = self._slideshows.surface_for(side)
+        slideshow = self._slideshows.surface_for(shape)
         if row is None:
             self._answer_request(
                 slideshow, "nothing on screen to request a change to", spoken)
@@ -743,7 +743,7 @@ class VoiceRouter(QObject):
                              working=True)
         standing = self._starting.show(**requested_of(row, workflow, params))
         QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken, side, standing),
+            self._revision, (row, workflow, params, spoken, shape, standing),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),
             spoken.text, in_scenes=workflow.tells_a_story(),
         ))
@@ -755,14 +755,14 @@ class VoiceRouter(QObject):
         a couple of seconds still lands wherever the speaker is looking — on
         the region the request named, hosted, since two of them are up.
         """
-        row, workflow, params, spoken, side, standing = context
+        row, workflow, params, spoken, shape, standing = context
         try:
-            self._answer_the_revision(row, workflow, params, spoken, side, revision)
+            self._answer_the_revision(row, workflow, params, spoken, shape, revision)
         finally:
             self._starting.drop(standing)
 
-    def _answer_the_revision(self, row, workflow, params, spoken, side, revision) -> None:
-        slideshow = self._slideshows.surface_for(side)
+    def _answer_the_revision(self, row, workflow, params, spoken, shape, revision) -> None:
+        slideshow = self._slideshows.surface_for(shape)
         if revision is None:
             self._answer_request(
                 slideshow, f"didn't catch what to change in “{spoken.text}”", spoken,

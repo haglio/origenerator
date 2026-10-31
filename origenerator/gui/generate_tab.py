@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text, qt_icon
-from shared_ui.orientation import orientation_of_size
+from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator import act_settings, evolver_export, look_training, outside_videos, prompt_edit
@@ -49,7 +49,7 @@ from origenerator.gallery import (
     version_matching_settings,
     workflow_output_type,
 )
-from origenerator.gallery.sides import PORTRAIT
+from origenerator.gallery.shapes import PORTRAIT
 from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
@@ -1212,7 +1212,7 @@ class GenerateTab(DropZones):
 
     def _media_is_portrait(self) -> bool:
         size = self._preview.media_size()
-        return bool(size) and orientation_of_size(*size) == PORTRAIT
+        return bool(size) and shape_of_size(*size) == PORTRAIT
 
     def show_recent_preview(self):
         """Put up the newest saved generation matching this tab's settings, through

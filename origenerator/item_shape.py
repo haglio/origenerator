@@ -1,21 +1,21 @@
-"""Which side of the folder list a generation sits on, and the keys that say so.
+"""Which shape of the folder list a generation sits on, and the keys that say so.
 
 A hosting Fun Time session shows portrait media on the portrait region and
-landscape on the landscape one, so the folder list is drawn a side per shape:
+landscape on the landscape one, so the folder list is drawn a shape per shape:
 the whole tree of contents on each, built from that shape's rows alone, so
 whatever you stand on has exactly one region to play on, read off the key
 rather than measured back out of the items. On its own the app can draw it once
 over both shapes instead, for a slideshow that mixes them
-(:mod:`origenerator.gallery.sides` says what each side holds).
+(:mod:`origenerator.gallery.shapes` says what each shape holds).
 
-A row's tree key is its folder's own key with its side appended
-(:func:`oriented_key`), and :func:`split_key` takes it apart again. The
+A row's tree key is its folder's own key with its shape appended
+(:func:`shaped_key`), and :func:`split_key` takes it apart again. The
 *folder's* key is untouched by this: a star, a custom name and a place in a
 folder the user composed hang off the plain key, being the folder's rather than
 the side's.
 
 The shape is the folder's wherever its settings state a size: every item of
-that folder sits on that side, a running one is placed before it has a
+that folder sits on that shape, a running one is placed before it has a
 file, and an item that disagrees with its folder shows up beside it
 rather than hiding on the other side. A folder whose settings state no size --
 a video's, whose workflow derives the size in-graph from its start frame -- goes
@@ -33,11 +33,11 @@ from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
-from shared_ui.orientation import orientation_of_size
+from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery
 from origenerator.config import OUTPUT_PLACES
-from origenerator.gallery.sides import LANDSCAPE, SIDES, on_side
+from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH, on_shape
 from origenerator.gallery.signatures import READINGS_KEPT, canonical_settings
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -55,7 +55,7 @@ _MEASURED_LIMIT = 20_000
 
 # Measured shapes, by the file that answered. A rebuild re-reads every row, and
 # opening a thumbnail per row per poll is a cost the tree now pays for both
-# sides at once; the file a shape was read from never changes its shape, so the
+# shapes at once; the file a shape was read from never changes its shape, so the
 # answer is kept against its path. Only successful reads are kept — a row whose
 # file has not landed yet has to be asked again once it has.
 #
@@ -66,14 +66,14 @@ _MEASURED_LIMIT = 20_000
 _measured: OrderedDict[str, str] = OrderedDict()
 
 
-def oriented_key(base_key: str, side: str, inside: tuple[str, ...] = ()) -> str:
-    """The tree key of *base_key*'s row on *side*: in its own place, or drawn
+def shaped_key(base_key: str, shape: str, inside: tuple[str, ...] = ()) -> str:
+    """The tree key of *base_key*'s row on *shape*: in its own place, or drawn
     again inside the collection of your own that *inside* leads down from."""
-    return f"{base_key}{_SEPARATOR}{side}" + "".join(_INSIDE + key for key in inside)
+    return f"{base_key}{_SEPARATOR}{shape}" + "".join(_INSIDE + key for key in inside)
 
 
 def key_holds(outer: str, inner: str) -> bool:
-    """Whether *outer* is *inner* or a folder it sits in, on the same side."""
+    """Whether *outer* is *inner* or a folder it sits in, on the same shape."""
     outer_base, outer_side = split_key(outer)
     inner_base, inner_side = split_key(inner)
     if outer_side != inner_side or not outer_base or not inner_base:
@@ -82,27 +82,27 @@ def key_holds(outer: str, inner: str) -> bool:
 
 
 def split_key(key: str | None) -> tuple[str | None, str | None]:
-    """``(base_key, side)`` — side ``None`` for a plain key."""
+    """``(base_key, shape)`` — shape ``None`` for a plain key."""
     if not key:
         return key, None
     base, _, placed = key.partition(_SEPARATOR)
-    side = placed.partition(_INSIDE)[0]
-    return (base, side) if side in SIDES else (key, None)
+    shape = placed.partition(_INSIDE)[0]
+    return (base, shape) if shape in SHAPES_AND_BOTH else (key, None)
 
 
 def base_of(key: str | None) -> str | None:
-    """The folder a tree key names, with the side stripped off — what a star, a
+    """The folder a tree key names, with the shape stripped off — what a star, a
     name and a place in a custom collection are all stored under."""
     return split_key(key)[0]
 
 
-def side_of(key: str | None) -> str | None:
-    """Which side a tree key is on (``None`` for a key naming no side)."""
+def shape_of(key: str | None) -> str | None:
+    """Which shape a tree key is on (``None`` for a key naming no shape)."""
     return split_key(key)[1]
 
 
-def row_orientation(row: dict) -> str:
-    """Which region *row*'s media belongs on: its folder's side (see the
+def row_shape(row: dict) -> str:
+    """Which region *row*'s media belongs on: its folder's shape (see the
     module's account of the order)."""
     asked = _asked_shape(row.get("workflow_name"), row.get("params_json"))
     if asked is not None:
@@ -114,7 +114,7 @@ def row_orientation(row: dict) -> str:
 
 @lru_cache(maxsize=READINGS_KEPT)
 def _asked_shape(workflow_name: str | None, params_json: str | None) -> str | None:
-    return requested_orientation(canonical_settings(workflow_name, gallery.parse_params(params_json)))
+    return requested_shape(canonical_settings(workflow_name, gallery.parse_params(params_json)))
 
 
 def _measure_any(candidates) -> str | None:
@@ -127,7 +127,7 @@ def _measure_any(candidates) -> str | None:
             return remembered
         try:
             with Image.open(candidate) as image:
-                measured = orientation_of_size(*image.size)
+                measured = shape_of_size(*image.size)
         except (OSError, ValueError):
             continue
         _remember(path, measured)
@@ -161,15 +161,15 @@ def _frame_candidate(params: dict) -> list[Path]:
     return [frame] if frame is not None else []
 
 
-def requested_orientation(params: dict) -> str | None:
+def requested_shape(params: dict) -> str | None:
     """The shape a generation's *params* ask it to come out — ``None`` when they
     don't say."""
     try:
         width, height = int(params["width"]), int(params["height"])
     except (KeyError, TypeError, ValueError):
         return None
-    return orientation_of_size(width, height)
+    return shape_of_size(width, height)
 
 
-def filter_rows(rows, side: str | None) -> list[dict]:
-    return on_side(rows, side, row_orientation)
+def filter_rows(rows, shape: str | None) -> list[dict]:
+    return on_shape(rows, shape, row_shape)

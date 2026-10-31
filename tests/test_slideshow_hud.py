@@ -48,11 +48,11 @@ def _window(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")
 
 
 def _dressed(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")),
-             side="portrait", **kw):
+             shape="portrait", **kw):
     wear = {name: kw.pop(name) for name in ("dashboard_cmd_file", "collapse", "open_in", "label_for")
             if name in kw}
     window = _window(qtbot, items, **kw)
-    window.wear_the_hud(side, **wear)
+    window.wear_the_hud(shape, **wear)
     return window
 
 
@@ -255,7 +255,7 @@ class TestTheOneHudASlideshowWears:
 
     def test_a_hosted_side_verb_still_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
         """The device rows are checked before the session's transport now, so a
-        side verb that fell into them would be swallowed instead of posted."""
+        shape verb that fell into them would be swallowed instead of posted."""
         window = self._window(qtbot)
         channel = tmp_path / "dashboard_cmd.txt"
         window.wear_the_hud("portrait", dashboard_cmd_file=channel)

@@ -59,7 +59,7 @@ REMEMBERED = {
         if widget is not tab._how_many and not tab._action.isAncestorOf(widget)
     ] + [view._generate_pane.tabBar()],
     "how_many": lambda view: [tab._how_many for tab in _tabs(view)],
-    "toc_sides": lambda view: [view._tree.separate_button, view._tree.together_button],
+    "toc_shapes": lambda view: [view._tree.separate_button, view._tree.together_button],
     "open_folders": lambda view: view._tree.findChildren(QTreeView),
     "pane_sizes": lambda view: [splitter for splitter in view.findChildren(PaneSplitter)
                                 if splitter.remembered_as],

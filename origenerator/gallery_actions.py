@@ -353,24 +353,24 @@ class CustomCollectionActions:
         self._db = db
         self._history = history
 
-    def create(self, name: str, folders: list[tuple], side: str | None = None) -> int:
+    def create(self, name: str, folders: list[tuple], shape: str | None = None) -> int:
         """Make a custom collection holding ``folders`` — ``(folder_key, level,
         ref_prompt_id)`` triples — and return its id. Undo removes it again."""
-        folder_id = self._db.create_custom_collection(name, side=side)
+        folder_id = self._db.create_custom_collection(name, shape=shape)
         self._db.add_folders_to_custom_collection(folder_id, folders)
-        self._record_creation(name, folder_id, folders, side)
+        self._record_creation(name, folder_id, folders, shape)
         return folder_id
 
     def _record_creation(self, name: str, folder_id: int, folders: list[tuple],
-                         side: str | None) -> None:
+                         shape: str | None) -> None:
         """File a just-made custom collection as one undoable step, and say how to
         make it again. The redo re-creates it at the id it had rather than
         letting the database allocate a new one, so the key a saved session
         points at still resolves after undo-then-redo."""
         def redo() -> None:
-            self._db.create_custom_collection(name, folder_id, side)
+            self._db.create_custom_collection(name, folder_id, shape)
             self._db.add_folders_to_custom_collection(folder_id, folders)
-            self._record_creation(name, folder_id, folders, side)
+            self._record_creation(name, folder_id, folders, shape)
 
         self._history.push(UndoEntry(
             f"Create folder “{name}”",
@@ -435,11 +435,11 @@ class CustomCollectionActions:
         # query happened to return.
         order = {key: i for i, key in enumerate(record["folders"])}
         folders.sort(key=lambda m: order[m[0]])
-        name, side, items = record["name"], record["side"], record["items"]
+        name, shape, items = record["name"], record["side"], record["items"]
         self._db.delete_custom_collection(folder_id)
 
         def undo() -> str | None:
-            self._db.create_custom_collection(name, folder_id, side)
+            self._db.create_custom_collection(name, folder_id, shape)
             self._db.add_folders_to_custom_collection(folder_id, folders)
             self._db.add_items_to_custom_collection(folder_id, items)
             return None

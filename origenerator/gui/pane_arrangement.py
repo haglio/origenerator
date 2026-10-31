@@ -15,7 +15,7 @@ Hosted by Fun Time the rect is an upright column, so the panes fold into
 ``stack`` instead of sitting side by side: the Generate pane on top, the tree and
 Gallery pane as one row under it, and the queue across the foot of all three:
 hosted, the queue belongs to the window rather than to the folder column, so
-there is no ``left_column`` at all on that side.
+there is no ``left_column`` at all on that shape.
 """
 from __future__ import annotations
 

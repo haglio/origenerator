@@ -1033,13 +1033,23 @@
       ],
       "his_word": "shape (2026-10-30; the tooltips' and spoken commands' word)",
       "code_today": [
-        "side",
-        "orientation",
         "shape"
       ],
       "code_word": "shape",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "orientation",
+        "oriented key",
+        "side holds"
+      ],
+      "keep": [
+        "shared_ui.orientation",
+        "\"orientation\"",
+        "Qt.Orientation",
+        "orientation: Qt.Orientation",
+        "super().__init__(orientation)"
+      ]
     },
     {
       "id": "action",

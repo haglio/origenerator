@@ -38,7 +38,7 @@ def _cell(slide, label: str = "") -> HudCell:
                    label=label)
 
 
-def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
+def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
                         own_window: bool = True, device=None, foot=None) -> HudModel | None:
     """The slideshow's state as the Funestras' HUD model, or ``None`` for a slideshow
     with nothing to map (``hud_map`` unanswered).
@@ -59,7 +59,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
     order_label = slideshow.hud_order_label
     act_filter = slideshow.hud_act_filter
     return HudModel(
-        funestra=side,
+        funestra=shape,
         locked=locked,
         # The title says what the map's light says, in the words a satellite
         # says it in -- the two HUDs are one HUD in two places.  Nothing
@@ -78,7 +78,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         item_note=slideshow.hud_item_note,
         # The buttons this slideshow answers, in the rows the HUD draws them in —
         # which ones depends on what is drawing it.
-        rows=slideshow_rows(side, locked=locked, favorites_filter=favorites_filter,
+        rows=slideshow_rows(shape, locked=locked, favorites_filter=favorites_filter,
                             enhanced=enhanced, order=order_label, hosted=hosted,
                             own_window=own_window,
                             has_other_versions=slideshow.has_other_versions,

@@ -282,11 +282,11 @@ class Database:
     # --- custom collections (see origenerator.db_custom_collections) ----------------
 
     def create_custom_collection(self, name: str, folder_id: int | None = None,
-                             side: str | None = None) -> int:
-        return self.custom_collections.create_custom_collection(name, folder_id, side)
+                             shape: str | None = None) -> int:
+        return self.custom_collections.create_custom_collection(name, folder_id, shape)
 
-    def set_custom_collection_side(self, folder_id: int, side: str):
-        return self.custom_collections.set_custom_collection_side(folder_id, side)
+    def set_custom_collection_shape(self, folder_id: int, shape: str):
+        return self.custom_collections.set_custom_collection_shape(folder_id, shape)
 
     def delete_custom_collection(self, folder_id: int):
         return self.custom_collections.delete_custom_collection(folder_id)

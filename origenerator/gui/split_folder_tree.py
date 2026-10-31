@@ -1,7 +1,7 @@
-"""The folder list's sections: one tree per side, each shape's under a standing label.
+"""The folder list's sections: one tree per shape, each shape's under a standing label.
 
 The marks over them are the radio: Portrait and Landscape apart, or one list of
-both shapes (:mod:`origenerator.gallery.sides` says what a side is). Sections
+both shapes (:mod:`origenerator.gallery.shapes` says what a shape is). Sections
 rather than rows in one tree, so each scrolls alone and its label never scrolls
 away; one selection across them all, so the folder on screen is one folder.
 """
@@ -28,11 +28,11 @@ from shared_ui.spacing import (
     GAP_SMALL,
 )
 
-from origenerator.gallery.sides import (
+from origenerator.gallery.shapes import (
     BOTH,
     SEPARATE,
-    SIDE_LABELS,
-    SIDES,
+    SHAPE_LABELS,
+    SHAPES_AND_BOTH,
     TOGETHER,
 )
 from origenerator.gui import icons
@@ -75,12 +75,12 @@ class _Choice(QFrame):
         self.button.click()
 
 
-def _heading(side: str) -> QFrame:
+def _heading(shape: str) -> QFrame:
     """One section's standing label: its shape's mark, then its name."""
     heading = QFrame()
     heading.setObjectName("treeSectionLabel")
-    heading.setToolTip(f"Everything {side}-shaped — its own collections, folders and "
-                       f"library. A slideshow started here plays {side} items alone.")
+    heading.setToolTip(f"Everything {shape}-shaped — its own collections, folders and "
+                       f"library. A slideshow started here plays {shape} items alone.")
 
     row = QHBoxLayout(heading)
     row.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, _HEADING_FOOT)
@@ -88,10 +88,10 @@ def _heading(side: str) -> QFrame:
 
     mark = QLabel()
     mark.setObjectName("treeSectionMark")
-    mark.setPixmap(icons.side_mark(side))
+    mark.setPixmap(icons.shape_mark(shape))
     row.addWidget(mark)
 
-    name = QLabel(SIDE_LABELS[side])
+    name = QLabel(SHAPE_LABELS[shape])
     name.setObjectName("treeSectionName")
     row.addWidget(name)
     row.addStretch(1)
@@ -106,7 +106,7 @@ def _rule() -> QFrame:
 
 
 class SplitFolderTree(QWidget):
-    """A folder tree per side, under the radio that says which sides there are.
+    """A folder tree per shape, under the radio that says which shapes there are.
 
     Presents the surface of the single ``FolderTree`` it replaced — the same
     signals, and the methods the gallery view calls on a tree — so its callers
@@ -117,7 +117,7 @@ class SplitFolderTree(QWidget):
     to ask.
     """
 
-    sides_changed = pyqtSignal()
+    shapes_changed = pyqtSignal()
     currentItemChanged = pyqtSignal(object, object)
     itemSelectionChanged = pyqtSignal()
     favorite_clicked = pyqtSignal(object)      # folder key
@@ -132,18 +132,18 @@ class SplitFolderTree(QWidget):
         self._takes_folder = takes_folder
         self._trees: dict[str, FolderTree] = {}
         self._sections: dict[str, QWidget] = {}   # each tree under its heading
-        self._sides = SEPARATE
+        self._shapes = SEPARATE
         self._chosen = SEPARATE
         self._offered = True
         self._active = SEPARATE[0]
 
         self._splitter = PaneSplitter(Qt.Orientation.Vertical, "side_sections")
-        for side in SIDES:
-            self._splitter.addWidget(self._build_section(group_role, side))
+        for shape in SHAPES_AND_BOTH:
+            self._splitter.addWidget(self._build_section(group_role, shape))
             self._splitter.setStretchFactor(len(self._trees) - 1, 1)
         # Equal sections, and equal shares of anything the pane gains or loses:
-        # no side is the main one, and the sizes are the user's to drag.
-        self._splitter.setSizes([1] * len(SIDES))
+        # no shape is the main one, and the sizes are the user's to drag.
+        self._splitter.setSizes([1] * len(SHAPES_AND_BOTH))
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
@@ -155,31 +155,31 @@ class SplitFolderTree(QWidget):
     def _build_radio(self) -> QWidget:
         """The two choices over the sections: a list per shape, or one of both."""
         separate = _Choice(_SEPARATE_WORD, icons.separate_mark(BUTTON_FILLING_ICON), _SEPARATE_TIP)
-        together = _Choice(_TOGETHER_WORD, icons.side_mark(BOTH, BUTTON_FILLING_ICON), _TOGETHER_TIP)
+        together = _Choice(_TOGETHER_WORD, icons.shape_mark(BOTH, BUTTON_FILLING_ICON), _TOGETHER_TIP)
         self.separate_button = separate.button
         self.together_button = together.button
         radio = QButtonGroup(self)
         radio.setExclusive(True)
         self._choices = QWidget()
         FlowLayout(self._choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
-        for choice, sides in ((separate, SEPARATE), (together, TOGETHER)):
-            choice.button.clicked.connect(lambda _checked, s=sides: self.choose_sides(s))
+        for choice, shapes in ((separate, SEPARATE), (together, TOGETHER)):
+            choice.button.clicked.connect(lambda _checked, s=shapes: self.choose_shapes(s))
             radio.addButton(choice.button)
             self._choices.layout().addWidget(choice)
         return self._choices
 
-    # --- which sides the pane draws -----------------------------------------
+    # --- which shapes the pane draws -----------------------------------------
 
     @property
-    def sides(self) -> tuple[str, ...]:
-        return self._sides
+    def shapes(self) -> tuple[str, ...]:
+        return self._shapes
 
     @property
     def chosen_sides(self) -> tuple[str, ...]:
         return self._chosen
 
-    def choose_sides(self, sides) -> None:
-        self._chosen = tuple(sides)
+    def choose_shapes(self, shapes) -> None:
+        self._chosen = tuple(shapes)
         self._redraw()
 
     def offer_separate_and_together(self, offered: bool) -> None:
@@ -188,28 +188,28 @@ class SplitFolderTree(QWidget):
         self._redraw()
 
     def _redraw(self) -> None:
-        sides = self._chosen if self._offered else SEPARATE
-        if sides == self._sides:
+        shapes = self._chosen if self._offered else SEPARATE
+        if shapes == self._shapes:
             return
-        self._show_sections(sides)
-        self.sides_changed.emit()
+        self._show_sections(shapes)
+        self.shapes_changed.emit()
 
-    def _show_sections(self, sides) -> None:
-        self._sides = tuple(sides)
-        for side, section in self._sections.items():
-            section.setVisible(side in self._sides)
-        if self._active not in self._sides:
-            self._active = self._sides[0]
-        self.separate_button.setChecked(self._sides == SEPARATE)
-        self.together_button.setChecked(self._sides == TOGETHER)
+    def _show_sections(self, shapes) -> None:
+        self._shapes = tuple(shapes)
+        for shape, section in self._sections.items():
+            section.setVisible(shape in self._shapes)
+        if self._active not in self._shapes:
+            self._active = self._shapes[0]
+        self.separate_button.setChecked(self._shapes == SEPARATE)
+        self.together_button.setChecked(self._shapes == TOGETHER)
 
-    def _build_section(self, group_role, side: str) -> QWidget:
+    def _build_section(self, group_role, shape: str) -> QWidget:
         section = QWidget()
         column = QVBoxLayout(section)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(0)
-        if side in SEPARATE:
-            column.addWidget(_heading(side))
+        if shape in SEPARATE:
+            column.addWidget(_heading(shape))
         else:
             column.addSpacing(GAP_MEDIUM - _GAP_UNDER_THE_CHOICES)
         column.addWidget(_rule())
@@ -221,44 +221,44 @@ class SplitFolderTree(QWidget):
         tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         tree.setMinimumHeight(_MIN_SECTION_HEIGHT)
         tree.customContextMenuRequested.connect(
-            lambda pos, t=tree, s=side: self._on_context_menu(t, pos, s))
+            lambda pos, t=tree, s=shape: self._on_context_menu(t, pos, s))
         tree.currentItemChanged.connect(
-            lambda current, previous, s=side: self._on_current(s, current, previous))
+            lambda current, previous, s=shape: self._on_current(s, current, previous))
         tree.itemSelectionChanged.connect(self.itemSelectionChanged)
         tree.favorite_clicked.connect(self.favorite_clicked)
         tree.delete_clicked.connect(self.delete_clicked)
         tree.dropped.connect(self.dropped)
         column.addWidget(tree, 1)
 
-        self._trees[side] = tree
-        self._sections[side] = section
+        self._trees[shape] = tree
+        self._sections[shape] = section
         return section
 
     # --- the sections -------------------------------------------------------
 
-    def root_for(self, side: str):
+    def root_for(self, shape: str):
         """Where one side's rows attach — what the tree builder fills."""
-        return self._trees[side].invisibleRootItem()
+        return self._trees[shape].invisibleRootItem()
 
-    def side_of_item(self, item) -> str | None:
+    def shape_of_item(self, item) -> str | None:
         holder = item.treeWidget() if item is not None else None
-        return next((side for side, tree in self._trees.items() if tree is holder), None)
+        return next((shape for shape, tree in self._trees.items() if tree is holder), None)
 
     def landing_on(self, item, mime, source):
-        side = self.side_of_item(item)
-        return self._trees[side].landing_on(item, mime, source) if side is not None else None
+        shape = self.shape_of_item(item)
+        return self._trees[shape].landing_on(item, mime, source) if shape is not None else None
 
     # --- one selection across them all --------------------------------------
 
-    def _on_current(self, side: str, current, previous) -> None:
-        if current is not None and side != self._active:
-            self._active = side
-            self._release_all_but(side)
+    def _on_current(self, shape: str, current, previous) -> None:
+        if current is not None and shape != self._active:
+            self._active = shape
+            self._release_all_but(shape)
         self.currentItemChanged.emit(current, previous)
 
-    def _release_all_but(self, side: str) -> None:
+    def _release_all_but(self, shape: str) -> None:
         for other, tree in self._trees.items():
-            if other != side:
+            if other != shape:
                 self._release(tree)
 
     def _release(self, tree) -> None:
@@ -272,9 +272,9 @@ class SplitFolderTree(QWidget):
         finally:
             tree.blockSignals(blocked)
 
-    def _on_context_menu(self, tree, pos, side: str) -> None:
+    def _on_context_menu(self, tree, pos, shape: str) -> None:
         self.context_menu_requested.emit(tree.itemAt(pos), tree.viewport().mapToGlobal(pos),
-                                         side)
+                                         shape)
 
     # --- the surface the gallery view calls on a tree ------------------------
 
@@ -290,16 +290,16 @@ class SplitFolderTree(QWidget):
         """Whether a row is already the current one of its own section — where
         setting it again fires no signal, so a caller who needs the pane drawn
         from it has to draw it itself."""
-        side = self.side_of_item(item)
-        return side is not None and self._trees[side].currentItem() is item
+        shape = self.shape_of_item(item)
+        return shape is not None and self._trees[shape].currentItem() is item
 
     def setCurrentItem(self, item, column=0, command=None) -> None:
-        side = self.side_of_item(item)
-        if side is None:
+        shape = self.shape_of_item(item)
+        if shape is None:
             return
-        self._release_all_but(side)
-        self._active = side
-        self._trees[side].setCurrentItem(item, column, command)
+        self._release_all_but(shape)
+        self._active = shape
+        self._trees[shape].setCurrentItem(item, column, command)
 
     def selected_folder_keys(self) -> list[str]:
         return [key for tree in self._trees.values() for key in tree.selected_folder_keys()]

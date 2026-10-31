@@ -55,20 +55,20 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
-from origenerator.gallery.sides import (
+from origenerator.gallery.shapes import (
     LANDSCAPE as _LANDSCAPE,
 )
-from origenerator.gallery.sides import (
+from origenerator.gallery.shapes import (
     SEPARATE as _SEPARATE,
 )
-from origenerator.gallery.sides import (
+from origenerator.gallery.shapes import (
     TOGETHER as _TOGETHER,
 )
-from origenerator.gallery.sides import (
-    side_covers as _side_covers,
+from origenerator.gallery.shapes import (
+    shape_covers as _shape_covers,
 )
-from origenerator.gallery.sides import (
-    side_holding as _side_holding,
+from origenerator.gallery.shapes import (
+    shape_holding as _shape_holding,
 )
 from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.generation_config import (
@@ -113,7 +113,7 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.gallery_tree import (
     GalleryTree,
     PathStep,
-    SideModel,
+    ShapeModel,
     path_text,
 )
 from origenerator.gui.generate_pane import GeneratePane
@@ -151,22 +151,22 @@ from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.item_names import ItemNames
-from origenerator.media import MediaType
-from origenerator.orientation import (
+from origenerator.item_shape import (
     base_of as _base_of,
 )
-from origenerator.orientation import (
+from origenerator.item_shape import (
     filter_rows,
-    oriented_key,
-    requested_orientation,
-    row_orientation,
+    requested_shape,
+    row_shape,
+    shaped_key,
 )
-from origenerator.orientation import (
-    side_of as _side_of,
+from origenerator.item_shape import (
+    shape_of as _shape_of,
 )
-from origenerator.orientation import (
+from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
+from origenerator.media import MediaType
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.prompt_tokens import boxed_as_typed
@@ -232,7 +232,7 @@ def _offer_taking_out(menu: QMenu, open_custom, group):
 
 
 def _row_under(row, folder_key: str):
-    if row is None or _side_of(folder_key) is not None:
+    if row is None or _shape_of(folder_key) is not None:
         return None
     return next((child for child in (row.child(i) for i in range(row.childCount()))
                  if _base_of(child.data(0, _TREE_KEY_ROLE)) == folder_key), None)
@@ -516,9 +516,9 @@ class GalleryView(QWidget):
         # picked). Both are CustomCollections, so the pane, folder path, and slideshow
         # treat them exactly as they treat a derived folder.
         self._custom_collections: list = []
-        self._custom_collections_by_side: dict[str, list] = {}
+        self._custom_collections_by_shape: dict[str, list] = {}
         self._lists_built_from = None
-        self._lists_by_side: dict[str, list] = {}
+        self._lists_by_shape: dict[str, list] = {}
         self._start_frames: dict = {}
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
@@ -710,13 +710,13 @@ class GalleryView(QWidget):
         # -> settings, the LoRA level collapsing to one "(no LoRA)" folder for a
         # LoRA-less workflow and the source-image level showing only for an
         # image-conditioned one.
-        # One tree per side, each under a standing label and each scrolling on
-        # its own: the tree of contents exists once per side, and which one you
+        # One tree per shape, each under a standing label and each scrolling on
+        # its own: the tree of contents exists once per shape, and which one you
         # are in is what decides the screen a slideshow goes to.
         self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_collection_takes,
                                      takes_folder=self._collecting_row_takes_folder)
         self._tree.offer_separate_and_together(self._fun_time is None)
-        self._tree.sides_changed.connect(self._on_sides_changed)
+        self._tree.shapes_changed.connect(self._on_shapes_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
         self._tree.context_menu_requested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
@@ -1075,7 +1075,7 @@ class GalleryView(QWidget):
         return self._generate_pane.current_generate_tab()
 
     def group_for_key(self, key: str):
-        """The folder ``key`` names, as the side it is being looked at holds it."""
+        """The folder ``key`` names, as the shape it is being looked at holds it."""
         item = self._tree_item_for(key)
         return item.data(0, _GROUP_ROLE) if item is not None else None
 
@@ -1594,14 +1594,14 @@ class GalleryView(QWidget):
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`) — and kept as the
         # index every folder key is derived against until the next rebuild.
-        start_frames, trees = self._lists_for(rows, meta, self._tree.sides)
+        start_frames, trees = self._lists_for(rows, meta, self._tree.shapes)
         self._image_index = start_frames
         unreviewed = self._review_queue(rows)
         held = self._held_rows
         self._live_ids = {row["prompt_id"] for row in rows}
-        self._custom_collections_by_side = _custom_collections_by_side(
+        self._custom_collections_by_shape = _custom_collections_by_shape(
             trees, self._db.list_custom_collections())
-        self._custom_collections = [folder for folders in self._custom_collections_by_side.values()
+        self._custom_collections = [folder for folders in self._custom_collections_by_shape.values()
                                 for folder in folders]
         # Re-index for the search field while the rows are in hand: tokenizing every
         # prompt belongs to the rebuild, so a keystroke costs only lookups. Rows
@@ -1651,7 +1651,7 @@ class GalleryView(QWidget):
         self._generate_pane.reread_names()
         self._combine.reread_names()
         # _tree_item_for rather than a bare lookup, so a restore target saved as
-        # a folder key — a session from before the tree grew sides — still lands
+        # a folder key — a session from before the tree grew shapes — still lands
         # on that folder instead of falling back to the default.
         target = (self._tree_item_for(selected_key) if selected_key
                   else None) or self._tree_view.default_item()
@@ -1690,41 +1690,41 @@ class GalleryView(QWidget):
         for tab in self._generate_pane.generate_tabs():
             tab.refresh_generate_caption()
 
-    def _lists_for(self, rows, meta, sides):
+    def _lists_for(self, rows, meta, shapes):
         """The start frames, every item's name and a tree of contents for each
-        of *sides*, kept against the library they were read off; only the drawn
-        sides are built."""
+        of *shapes*, kept against the library they were read off; only the drawn
+        shapes are built."""
         library = _fingerprint(rows, meta)
         if library != self._lists_built_from:
             self._lists_built_from = library
             self._start_frames = gallery.start_frame_index(rows)
             self._item_names.take(rows, self._held_rows, self._start_frames)
-            self._lists_by_side = {}
-        for side in sides:
-            if side not in self._lists_by_side:
-                self._lists_by_side[side] = _side_list(
-                    rows, meta, self._start_frames, side, self._item_names.of)
-        return self._start_frames, {side: self._lists_by_side[side] for side in sides}
+            self._lists_by_shape = {}
+        for shape in shapes:
+            if shape not in self._lists_by_shape:
+                self._lists_by_shape[shape] = _side_list(
+                    rows, meta, self._start_frames, shape, self._item_names.of)
+        return self._start_frames, {shape: self._lists_by_shape[shape] for shape in shapes}
 
     def _build_sides(self, trees):
-        """The sides the pane is drawing, in the order it draws them.
+        """The shapes the pane is drawing, in the order it draws them.
 
-        A side is the whole tree of contents over the rows it holds: its own
+        A shape is the whole tree of contents over the rows it holds: its own
         hierarchy, its own copies of the folders the user composed, and collections
-        whose counts are its own — a number covering more than the side draws
+        whose counts are its own — a number covering more than the shape draws
         would send you to a collection that then showed you nothing.
 
-        Only the drawn sides are built. The radio's other answer is a section
+        Only the drawn shapes are built. The radio's other answer is a section
         nobody can see, and filling it would cost every rebuild a table of
         contents for nothing.
         """
-        return [SideModel(
-            side=side,
-            tree_model=trees[side],
-            custom_collections=gallery.outermost(self._custom_collections_by_side[side]),
-            show_latest=bool(trees[side]),
-            collection_counts=self._gallery_pane.collection_counts(side),
-        ) for side in self._tree.sides]
+        return [ShapeModel(
+            shape=shape,
+            tree_model=trees[shape],
+            custom_collections=gallery.outermost(self._custom_collections_by_shape[shape]),
+            show_latest=bool(trees[shape]),
+            collection_counts=self._gallery_pane.collection_counts(shape),
+        ) for shape in self._tree.shapes]
 
     def open_folders(self) -> list[str]:
         return sorted(self._tree_view.folders_left_open())
@@ -1733,24 +1733,24 @@ class GalleryView(QWidget):
         if isinstance(saved, list):
             self._tree_view.leave_folders_open(key for key in saved if isinstance(key, str))
 
-    def toc_sides(self) -> list[str]:
+    def toc_shapes(self) -> list[str]:
         return list(self._tree.chosen_sides)
 
     def set_toc_sides(self, saved) -> None:
-        self._tree.choose_sides(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
+        self._tree.choose_shapes(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
 
-    def _on_sides_changed(self):
-        """The radio over the list moved: draw the list again on the new sides.
+    def _on_shapes_changed(self):
+        """The radio over the list moved: draw the list again on the new shapes.
 
         A full rebuild rather than a redraw, because each side's table of
-        contents is built from the rows that side holds — the one list of both
+        contents is built from the rows that shape holds — the one list of both
         shapes is a different hierarchy, not the two stacked.
         """
         if not self._tree_view.built:
             return
         with working():
             self.refresh()
-        # The row that was selected is on a side nobody draws now, so the
+        # The row that was selected is on a shape nobody draws now, so the
         # folder-selected signal that normally re-syncs the slideshow button never
         # fires for the row the rebuild landed on instead.
         self._re_aim()
@@ -1849,7 +1849,7 @@ class GalleryView(QWidget):
         row for it at all.
 
         ``_tree_item_for`` rather than a bare lookup: a stop recorded before the
-        tree grew sides names a folder key with no side on it, and that key still
+        tree grew shapes names a folder key with no shape on it, and that key still
         has to find its row. Standing on the row already fires no signal, and the
         pane would go on holding the search results or the tile highlight the
         stop was recorded without, so that case is drawn by hand.
@@ -1951,7 +1951,7 @@ class GalleryView(QWidget):
             self._search.run()
             return
         self._re_aim()
-        base, side = _split_collection_key(self._tree_view.selected_folder_key())
+        base, shape = _split_collection_key(self._tree_view.selected_folder_key())
         collection = folder_collection(base)
         self._experiments_bar.setVisible(collection is not None
                                          and collection.which == _EXPERIMENTS_KEY)
@@ -1962,10 +1962,10 @@ class GalleryView(QWidget):
             self._re_aim()
             return
         if collection is not None:
-            self._open_collection(collection, side, current)
+            self._open_collection(collection, shape, current)
             return
         group = current.data(0, _GROUP_ROLE)
-        # A folder's place in the tree is where the user is standing, side and
+        # A folder's place in the tree is where the user is standing, shape and
         # all, so that — not the folder's own key — is what history and the
         # return-after-delete trail record.
         here = self._tree_view.selected_folder_key()
@@ -2005,14 +2005,14 @@ class GalleryView(QWidget):
         self._gallery_pane.apply_selection(first, Qt.KeyboardModifier.NoModifier)
         return first
 
-    def _open_collection(self, collection: FolderCollection, side: str | None, item):
+    def _open_collection(self, collection: FolderCollection, shape: str | None, item):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
         self._folder_path.show_folder(self._tree_view.path_steps(item),
                                       mark=_PATH_MARK_OF.get(collection.which, ""))
         self._avg_label.setText("")
         self._clear_metadata()
-        self._gallery_pane.show_collection(collection.key, side)
+        self._gallery_pane.show_collection(collection.key, shape)
         self._navigation.record()
 
     def _show_group_contents(self, group, item):
@@ -2105,7 +2105,7 @@ class GalleryView(QWidget):
         if not ok or not name.strip():
             return
         folder_id = self._actions.custom_collections.create(
-            name.strip(), [self._folder_identity(f) for f in folders], self.side_in_view()
+            name.strip(), [self._folder_identity(f) for f in folders], self.shape_in_view()
         )
         self._open_custom_collection(folder_id)
 
@@ -2148,11 +2148,11 @@ class GalleryView(QWidget):
 
     def _custom_collection_takes(self, row_key: str, prompt_id: str) -> bool:
         """Whether the TOC row ``row_key`` is a collection of your own that an item
-        dragged over it can go in: one the gallery shows, on the row's own side."""
+        dragged over it can go in: one the gallery shows, on the row's own shape."""
         folder = self.group_for_key(row_key)
         leaf = self._leaf_by_id.get(prompt_id)
         return (isinstance(folder, gallery.CustomCollection) and leaf is not None
-                and _side_of(leaf.data(0, _TREE_KEY_ROLE)) == _side_of(row_key))
+                and _shape_of(leaf.data(0, _TREE_KEY_ROLE)) == _shape_of(row_key))
 
     def _collecting_row_takes_folder(self, row_key: str, folder_key: str) -> bool:
         """Favorites takes any folder that takes a star, a collection of your own any
@@ -2169,13 +2169,13 @@ class GalleryView(QWidget):
             return None
         return self._tree.landing_on(self._tree.currentItem(), mime, source)
 
-    def _new_custom_collection(self, side: str):
+    def _new_custom_collection(self, shape: str):
         """Make an empty folder of the user's own — the tree's right-click action,
         for when the folders to fill it with are easier dragged in than picked."""
         name, ok = QInputDialog.getText(self, "New Collection", "Collection name:")
         if ok and name.strip():
             self._open_custom_collection(
-                self._actions.custom_collections.create(name.strip(), [], side))
+                self._actions.custom_collections.create(name.strip(), [], shape))
 
     def _remove_custom_collection(self, group):
         """Delete a folder the user made. Only the grouping goes — what it gathers
@@ -2263,51 +2263,51 @@ class GalleryView(QWidget):
         """The selected row's tree key (or a collection's), from the tree renderer."""
         return self._tree_view.selected_folder_key()
 
-    def side_in_view(self) -> str:
-        """Which side of the list the tree is standing on.
+    def shape_in_view(self) -> str:
+        """Which shape of the list the tree is standing on.
 
         Every row lives under one, so this is only ever a fallback: nothing
         selected at all (a fresh window, a rebuild that found no target) reads
-        as the side holding landscape, the roomier shape and the one an
+        as the shape holding landscape, the roomier shape and the one an
         unmeasurable item files under everywhere else.
         """
-        return (_side_of(self.selected_folder_key())
-                or _side_holding(_LANDSCAPE, self._tree.sides))
+        return (_shape_of(self.selected_folder_key())
+                or _shape_holding(_LANDSCAPE, self._tree.shapes))
 
     def _tree_item_for(self, key: str):
         """The tree row for ``key`` — a tree key resolves to its own row, and a
-        folder's own key to the copy of it on the side being browsed.
+        folder's own key to the copy of it on the shape being browsed.
 
         A folder key names a folder, not a place: a re-roll, a combine, a folder
-        tile and a delete's return target all hold one, and each side draws its
-        own row for it. Staying on the side already open is the answer that
+        tile and a delete's return target all hold one, and each shape draws its
+        own row for it. Staying on the shape already open is the answer that
         doesn't teleport the user across the tree; a folder only the other side
         holds is followed there rather than dropped.
 
-        A key naming a side the pane draws is answered by that side alone.
+        A key naming a shape the pane draws is answered by that shape alone.
         Falling back across the split would hand a portrait region a landscape
         library the moment the portrait one happened to be empty, which is the
-        whole of what the split exists to prevent. A key naming a side the pane
+        whole of what the split exists to prevent. A key naming a shape the pane
         is *not* drawing — the radio has moved, or a window reopened in the
         other arrangement — has no row of its own anywhere, so its folder is
-        looked for among the sides that are drawn.
+        looked for among the shapes that are drawn.
         """
         item = self._item_by_key.get(key)
         if item is not None:
             return item
         folder = _base_of(key)
         drawn = self._tree_view.keys_for_folder(folder)
-        if _side_of(key) in self._tree.sides:
+        if _shape_of(key) in self._tree.shapes:
             return next((self._item_by_key[row] for row in drawn
-                         if _side_of(row) == _side_of(key)), None)
+                         if _shape_of(row) == _shape_of(key)), None)
         if not drawn:
             return None
-        here = oriented_key(folder, self.side_in_view())
+        here = shaped_key(folder, self.shape_in_view())
         return self._item_by_key[here if here in drawn else drawn[0]]
 
-    def _collection_item(self, collection_key: str, side: str | None = None):
-        """One side's copy of a collection row — the side being browsed by default."""
-        return self._tree_view.collection_item(collection_key, side or self.side_in_view())
+    def _collection_item(self, collection_key: str, shape: str | None = None):
+        """One side's copy of a collection row — the shape being browsed by default."""
+        return self._tree_view.collection_item(collection_key, shape or self.shape_in_view())
 
     def _folder_context(self, key: str) -> str:
         """Where folder ``key`` lives: the folder path of its parent, or "" at the
@@ -2465,8 +2465,8 @@ class GalleryView(QWidget):
         leaves (:meth:`Database.record_request`).
         """
         wf = WORKFLOW_REGISTRY.get(workflow_name)
-        # _tree_item_for, not a bare lookup: a folder has a row per side now and
-        # the key a tab carries is the folder's own, with no side on it.
+        # _tree_item_for, not a bare lookup: a folder has a row per shape now and
+        # the key a tab carries is the folder's own, with no shape on it.
         item = self._tree_item_for(folder_key)
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         rows = self._folder_modify_rows(group) if group is not None else []
@@ -2701,10 +2701,10 @@ class GalleryView(QWidget):
         """A collection's plain name, for a spoken word to be answered in."""
         return COLLECTION_LABELS[key]
 
-    def stand_in_collection(self, key: str, side: str | None) -> bool:
+    def stand_in_collection(self, key: str, shape: str | None) -> bool:
         """Select a collection's row, exactly as clicking it does, and say whether the
         tree had one — Latest and Favorites appear only once there is one."""
-        item = self._tree_item_for(oriented_key(key, side) if side else key)
+        item = self._tree_item_for(shaped_key(key, shape) if shape else key)
         if item is None:
             return False
         self._tree.setCurrentItem(item)  # whose signal draws it
@@ -2905,11 +2905,11 @@ class GalleryView(QWidget):
         """
         self._slideshows.close_the_slideshows()
 
-    def fill_the_region(self, side: str) -> None:
-        self._slideshows.fill_the_region(side)
+    def fill_the_region(self, shape: str) -> None:
+        self._slideshows.fill_the_region(shape)
 
-    def close_the_slideshow(self, side: str) -> None:
-        self._slideshows.close_the_slideshow(side)
+    def close_the_slideshow(self, shape: str) -> None:
+        self._slideshows.close_the_slideshow(shape)
 
     # --- a spoken request's own generation -----------------------------------
 
@@ -2970,7 +2970,7 @@ class GalleryView(QWidget):
         collection = self._current_collection_key()
         if collection is not None:
             return collection
-        # The row's own key, not the folder's: which side the folder is being
+        # The row's own key, not the folder's: which shape the folder is being
         # looked at from is what decides the screen a slideshow of it goes to.
         return (self.selected_folder_key()
                 if self.current_group() is not None else None)
@@ -2995,16 +2995,16 @@ class GalleryView(QWidget):
         self._slideshows.set_room_paused(paused)
         omnipause.freeze(paused)
 
-    def hud_place(self, side: str) -> tuple:
-        return self._slideshows.hud_place(side)
+    def hud_place(self, shape: str) -> tuple:
+        return self._slideshows.hud_place(shape)
 
-    def place_a_hud(self, side: str, action: str, argument: str) -> None:
-        self._slideshows.place_a_hud(side, action, argument)
+    def place_a_hud(self, shape: str, action: str, argument: str) -> None:
+        self._slideshows.place_a_hud(shape, action, argument)
 
-    def region_slideshow(self, side: str):
-        """The slideshow occupying satellite region *side*, or None. The hosting
+    def region_slideshow(self, shape: str):
+        """The slideshow occupying satellite region *shape*, or None. The hosting
         session's bridge asks this window for it."""
-        return self._slideshows.region_slideshow(side)
+        return self._slideshows.region_slideshow(shape)
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True):
         """Favorite a generation from a fullscreen slideshow (its Down key) — the same
@@ -3129,15 +3129,15 @@ class GalleryView(QWidget):
             self._tree.setCurrentItem(latest)
 
     def _launched_side(self, key: str) -> str:
-        """Which side a job just launched in folder ``key`` will land on.
+        """Which shape a job just launched in folder ``key`` will land on.
 
         Read off the size it asked for, since it has no result to measure yet —
         the same thing that puts its in-flight tile in one Latest collection rather
-        than the other. With no job to ask, the side being browsed.
+        than the other. With no job to ask, the shape being browsed.
         """
         job = self._jobs.job_for(key)
-        asked = requested_orientation(job.params) if job is not None else None
-        return _side_holding(asked, self._tree.sides) or self.side_in_view()
+        asked = requested_shape(job.params) if job is not None else None
+        return _shape_holding(asked, self._tree.shapes) or self.shape_in_view()
 
     # --- re-roll as the Generate pane source ----------------------------------
 
@@ -3709,17 +3709,17 @@ class GalleryView(QWidget):
             self._re_aim()
 
     def _recount_the_collections(self) -> None:
-        for side in self._tree.sides:
-            self._tree_view.set_collection_counts(side, self._gallery_pane.collection_counts(side))
+        for shape in self._tree.shapes:
+            self._tree_view.set_collection_counts(shape, self._gallery_pane.collection_counts(shape))
 
     def _redrew_the_favorites_collection(self) -> bool:
         self._recount_the_collections()
-        base, side = _split_collection_key(self.selected_folder_key())
+        base, shape = _split_collection_key(self.selected_folder_key())
         collection = folder_collection(base)
         if collection is None or collection.which != _FAVORITES_KEY:
             return False
         place = self._gallery_pane.place()
-        self._gallery_pane.show_collection(collection.key, side)
+        self._gallery_pane.show_collection(collection.key, shape)
         self._gallery_pane.return_to(place)
         return True
 
@@ -3863,7 +3863,7 @@ class GalleryView(QWidget):
         under those — what a delete of ``group`` takes off the tree, so a return
         target can avoid them.
 
-        Both sides, because a folder holding both shapes is drawn twice and the
+        Both shapes, because a folder holding both shapes is drawn twice and the
         delete takes both copies.
         """
         keys, stack = set(), [self._item_by_key[key] for key
@@ -3938,9 +3938,9 @@ class GalleryView(QWidget):
 
     # --- right-click menus & star --------------------------------------------
 
-    def _on_tree_context_menu(self, item, global_pos: QPoint, side: str):
+    def _on_tree_context_menu(self, item, global_pos: QPoint, shape: str):
         if item is None:
-            self._empty_tree_context_menu(global_pos, side)
+            self._empty_tree_context_menu(global_pos, shape)
             return
         # Right-clicking inside a multi-selection offers what to do with the whole
         # set; right-clicking outside it is about the one row under the cursor.
@@ -3953,13 +3953,13 @@ class GalleryView(QWidget):
             self._folder_context_menu(item.data(0, _TREE_KEY_ROLE), global_pos,
                                       toc_rows=[item])
 
-    def _empty_tree_context_menu(self, global_pos: QPoint, side: str):
+    def _empty_tree_context_menu(self, global_pos: QPoint, shape: str):
         """Below the last row there is no folder to act on, so the only thing on
         offer is starting a new collection of your own."""
         menu = QMenu(self)
         new_action = menu.addAction("New collection…")
         if menu.exec(global_pos) == new_action:
-            self._new_custom_collection(side)
+            self._new_custom_collection(shape)
 
     def _selection_context_menu(self, global_pos: QPoint):
         names = _names_of_the_picked_folders(self._selection_group)
@@ -4016,8 +4016,8 @@ class GalleryView(QWidget):
         to what a drag onto its row does, for when dragging is awkward (a long tree,
         a folder scrolled out of sight). Returns ``{action: custom collection key}``,
         empty when there are no folders of the user's own yet."""
-        side = _side_of(key) or self.side_in_view()
-        targets = [f for f in self._custom_collections_by_side.get(side, ())
+        shape = _shape_of(key) or self.shape_in_view()
+        targets = [f for f in self._custom_collections_by_shape.get(shape, ())
                    if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
             return {}
@@ -4039,7 +4039,7 @@ class GalleryView(QWidget):
             collapse_and_expand[chosen]()
 
     def _toggle_favorite(self, key: str):
-        # A star is the folder's, not the row's: both sides draw the same folder,
+        # A star is the folder's, not the row's: both shapes draw the same folder,
         # so favoriting it on one is favoriting it.
         group = self.group_for_key(key)
         if _takes_a_favorite(group):
@@ -4207,7 +4207,7 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None:
             held = self.row_for(prompt_id)
-            return self._tree_item_for(oriented_key(_TRASH_KEY, row_orientation(held))) if held else None
+            return self._tree_item_for(shaped_key(_TRASH_KEY, row_shape(held))) if held else None
         key = self.folder_key_of(row)
         return self._tree_item_for(key) if key else None
 
@@ -4230,16 +4230,16 @@ class GalleryView(QWidget):
         self._generate_pane.pin_current_tab()
 
 
-def _side_list(rows, meta, start_frames, side, name_of):
-    return gallery.build_gallery_tree(filter_rows(rows, side), meta,
+def _side_list(rows, meta, start_frames, shape, name_of):
+    return gallery.build_gallery_tree(filter_rows(rows, shape), meta,
                                       image_index=start_frames, name_of=name_of)
 
 
-def _custom_collections_by_side(trees, records) -> dict[str, list]:
-    return {side: gallery.build_custom_collections(
+def _custom_collections_by_shape(trees, records) -> dict[str, list]:
+    return {shape: gallery.build_custom_collections(
                 tree, [record for record in records
-                       if _side_covers(side, record["side"] or _LANDSCAPE)])
-            for side, tree in trees.items()}
+                       if _shape_covers(shape, record["side"] or _LANDSCAPE)])
+            for shape, tree in trees.items()}
 
 
 def _group_workflow(group) -> str | None:

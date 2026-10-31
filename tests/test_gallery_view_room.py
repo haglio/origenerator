@@ -847,7 +847,7 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
     view, _driver, _panel = _osr2_view(qtbot)
     # Which window Qt calls active is ambient in a test process — a fullscreen
-    # slideshow another test opened and closed can still hold it — so both sides of
+    # slideshow another test opened and closed can still hold it — so both shapes of
     # the guard are said here rather than inherited.
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
     assert view._other_window_owns_keys() is False  # only the gallery is up

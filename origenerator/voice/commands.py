@@ -1,6 +1,6 @@
 """The whole spoken vocabulary: what an utterance means, if anything.
 
-Three things can be said, and any of them may be led by a side: a command about
+Three things can be said, and any of them may be led by a shape: a command about
 the image on screen (:mod:`origenerator.gallery.voice_commands`), one of the
 show's own controls (:mod:`origenerator.voice.show_commands`), or a collection's name,
 which plays that collection the way its slideshow button would.
@@ -12,12 +12,12 @@ which plays that collection the way its slideshow button would.
   (:mod:`origenerator.voice.slideshow_commands`).
 * ``<collection>`` — play that collection, the way its slideshow button would.
 
-The side ("landscape fix teeth", "landscape favorites") is what makes them
+The shape ("landscape fix teeth", "landscape favorites") is what makes them
 usable inside Fun Time, where two slideshows run at once on the satellite regions
 and NEITHER is the active window — the speaker is looking at one of them while
 Core has the keyboard, so "the slideshow that is up" names nothing and a
 collection command has no region to land on. Standalone there is one slideshow and no
-regions, so a side is accepted and ignored.
+regions, so a shape is accepted and ignored.
 
 Kept deliberately strict, because the mic hears whole sentences too: a command
 is a few words, and names something real.
@@ -37,7 +37,7 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
     TRASH_LABEL,
 )
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.voice_commands import command_phrases, match_command
 from origenerator.voice.app_commands import match_app_command, phrases_answered_when_hosted
 from origenerator.voice.app_commands import spoken_phrases as app_command_phrases
@@ -49,7 +49,7 @@ from origenerator.voice.slideshow_commands import (
 )
 from origenerator.voice.text import words
 
-SIDES = (PORTRAIT, LANDSCAPE)
+SHAPES = (PORTRAIT, LANDSCAPE)
 
 # The collections, addressed by the names they wear in the tree, so a rename
 # carries into the vocabulary rather than leaving it saying the old word.
@@ -60,7 +60,7 @@ COLLECTION_KEYS: dict[str, str] = {
     TRASH_LABEL.lower(): TRASH_KEY,
 }
 
-# A collection command is its name, at most led by a side: three words is already
+# A collection command is its name, at most led by a shape: three words is already
 # generous. Anything longer is a sentence that happens to contain the word.
 _MAX_COLLECTION_WORDS = 3
 
@@ -70,22 +70,22 @@ class SurfaceCommand(NamedTuple):
     :class:`~origenerator.gallery.detail_parts.DetailPart` to fix, an
     :class:`~origenerator.animate_command.AnimateRequest` or
     :data:`~origenerator.gallery.voice_commands.ENHANCE_COMMAND` — aimed at
-    *side*'s slideshow (``None`` — whichever slideshow is up)."""
+    *shape*'s slideshow (``None`` — whichever slideshow is up)."""
     command: object
-    side: str | None = None
+    shape: str | None = None
 
 
 class CollectionCommand(NamedTuple):
-    """Play the collection *collection_key*, on *side*'s region (``None`` — wherever the
+    """Play the collection *collection_key*, on *shape*'s region (``None`` — wherever the
     set's own shape routes it)."""
     collection_key: str
-    side: str | None = None
+    shape: str | None = None
 
 
 class SlideshowControl(NamedTuple):
-    """Start, pause or stop the slideshow — on *side*'s region when named."""
+    """Start, pause or stop the slideshow — on *shape*'s region when named."""
     command: SlideshowCommand
-    side: str | None = None
+    shape: str | None = None
 
 
 def match_voice_command(text: str) -> CollectionCommand | SlideshowControl | SurfaceCommand | None:
@@ -96,68 +96,68 @@ def match_voice_command(text: str) -> CollectionCommand | SlideshowControl | Sur
     leads with its own phrase, a collection command is nothing but the collection's
     name), so the order only decides which is asked first.
     """
-    side, spoken = split_side(text)
+    shape, spoken = split_shape(text)
     rest = spoken.split()
-    if not rest and side is None:
+    if not rest and shape is None:
         return None
 
     collection = _collection_named(rest)
     if collection is not None:
-        return CollectionCommand(collection, side)
+        return CollectionCommand(collection, shape)
 
     control = match_slideshow_command(spoken)
     if control is not None:
-        return SlideshowControl(control, side)
+        return SlideshowControl(control, shape)
 
     surface = match_command(spoken)
     if surface is not None:
-        return SurfaceCommand(surface, side)
+        return SurfaceCommand(surface, shape)
     return None
 
 
-def split_side(text: str) -> tuple[str | None, str]:
-    """The side an utterance leads with, and everything after it.
+def split_shape(text: str) -> tuple[str | None, str]:
+    """The shape an utterance leads with, and everything after it.
 
     ``("landscape", "fix teeth")`` for "landscape fix teeth", ``(None, "fix
-    teeth")`` for the same words with no side named.  Punctuation and case go
+    teeth")`` for the same words with no shape named.  Punctuation and case go
     with it: both are the transcriber's invention rather than the speaker's,
     and every matcher below works on the bare words.
 
     Public because a spoken request needs the same split and cannot get it from
     :func:`match_voice_command` — its words are the speaker's own, so no
     matcher here claims them, and the dictation that collects them must not be
-    fed the side word as if it were the first word of the request.
+    fed the shape word as if it were the first word of the request.
     """
     heard = words(text, keep_apostrophes=True)
-    if heard and heard[0] in SIDES:
+    if heard and heard[0] in SHAPES:
         return heard[0], " ".join(heard[1:])
     return None, " ".join(heard)
 
 
-def sided_app_command(text: str):
-    """The bare app command *text* is, wrapped with the side it named.
+def shaped_app_command(text: str):
+    """The bare app command *text* is, wrapped with the shape it named.
 
     The bare vocabulary (:mod:`origenerator.voice.app_commands`) is whole
     utterances only — "undo", "favorite", "experiments" — which is strict enough to
-    be asked ahead of an opening request.  A side may still lead one, for the
+    be asked ahead of an opening request.  A shape may still lead one, for the
     same reason it may lead any other order here: hosted, two slideshows run and
     neither is the active window, so "landscape lock" is the only way to say
     which image is meant.  Unsided, it comes back bare, exactly as the
     standalone app expects it.
     """
-    # The side is taken off the RAW words, not off split_side's letters-only
+    # The shape is taken off the RAW words, not off split_shape's letters-only
     # normalisation: this vocabulary says numbers ("center 30"), and a split
     # that drops the digits hands the matcher a command with nothing to set.
     words = (text or "").split()
-    side = words[0].lower().strip(".,!?") if words else ""
-    if side in SIDES:
+    shape = words[0].lower().strip(".,!?") if words else ""
+    if shape in SHAPES:
         rest = " ".join(words[1:])
     else:
-        side, rest = None, (text or "")
+        shape, rest = None, (text or "")
     matched = match_app_command(rest)
     if matched is None:
         return None
-    return SurfaceCommand(matched, side) if side else matched
+    return SurfaceCommand(matched, shape) if shape else matched
 
 
 def _collection_named(words: list[str]) -> str | None:
@@ -174,7 +174,7 @@ def _collection_named(words: list[str]) -> str | None:
 def spoken_phrases() -> frozenset[str]:
     """The whole vocabulary as a recognizer that listens for words is asked to hear it.
 
-    Unsided: a side is for a hosting session's two slideshows, and that session hears for
+    Unsided: a shape is for a hosting session's two slideshows, and that session hears for
     itself. One said here still works, by the slower road every sentence takes.
     """
     return app_command_phrases() | _what_is_said_to_a_surface()

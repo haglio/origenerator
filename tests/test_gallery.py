@@ -60,7 +60,7 @@ from origenerator.gallery import (
 )
 from origenerator.gallery import output as gallery_output
 from origenerator.gallery.labels import workflow_label
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.gallery.tree import folder_chain
 from origenerator.generation_config import prepared_params
@@ -1055,7 +1055,7 @@ def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():
     # The name that image's own tile and tab wear, so the two read as one
-    # image from either side.
+    # image from either shape.
     face = _img("face", "a smiling face", 30, 1)
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
     (source,) = _i2v_source_folders(rows, name_of={"face": "3FA9C0D2 004"}.get)

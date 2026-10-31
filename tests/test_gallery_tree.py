@@ -9,7 +9,7 @@ from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
 
 from origenerator import gallery
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, SIDE_LABELS
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.gui.gallery_tree import (
@@ -17,10 +17,10 @@ from origenerator.gui.gallery_tree import (
     PATH_SEPARATOR,
     GalleryTree,
     PathStep,
-    SideModel,
+    ShapeModel,
 )
 from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.orientation import base_of, side_of
+from origenerator.item_shape import base_of, shape_of
 
 
 def _row(prompt_id, workflow_name, params, filename):
@@ -68,9 +68,9 @@ def _gathered_tree(qtbot, rows, collections_of_your_own, folder_meta=None, recen
     qtbot.addWidget(pane)
     tree = GalleryTree(pane)
     tree.populate(
-        [SideModel(LANDSCAPE, model, custom_collections=list(collections_of_your_own(model)),
+        [ShapeModel(LANDSCAPE, model, custom_collections=list(collections_of_your_own(model)),
                    show_latest=True),
-         SideModel(PORTRAIT, [])],
+         ShapeModel(PORTRAIT, [])],
         folder_meta=folder_meta, recently_worked=recently_worked)
     return pane, tree, model
 
@@ -256,12 +256,12 @@ def test_a_rows_path_steps_from_its_side_down_through_every_row_holding_it(qtbot
         _keepers_holding_the_images)
 
     for key, row in tree.item_by_key.items():
-        side, *steps = tree.path_steps(row)
-        assert side == PathStep(SIDE_LABELS[side_of(key)], None)
+        shape, *steps = tree.path_steps(row)
+        assert shape == PathStep(SHAPE_LABELS[shape_of(key)], None)
         assert [step.key for step in steps] == [
             held.data(0, TREE_KEY_ROLE) for held in _rows_down_to(row)]
         assert tree.folder_path(row) == PATH_SEPARATOR.join(
-            step.name for step in (side, *steps))
+            step.name for step in (shape, *steps))
 
 
 def _drawn_down(row):
@@ -290,7 +290,7 @@ def test_every_row_inside_a_folder_of_your_own_has_a_key_of_its_own_naming_its_f
 
     assert len(set(keys)) == len(keys)
     assert all(tree.item_by_key[key] is row for key, row in zip(keys, rows, strict=True))
-    assert all(side_of(key) == LANDSCAPE for key in keys)
+    assert all(shape_of(key) == LANDSCAPE for key in keys)
     assert all(base_of(key) == row.data(0, GROUP_ROLE).key
                for key, row in zip(keys, rows, strict=True) if row.data(0, GROUP_ROLE) is not None)
 
@@ -345,8 +345,8 @@ def test_a_folder_left_open_inside_a_folder_of_your_own_is_open_again_after_a_re
     own, again = tree.keys_for_folder(model[0].key)
     tree.item_by_key[again].setExpanded(True)
 
-    tree.populate([SideModel(LANDSCAPE, model, custom_collections=_keepers_holding_the_images(model)),
-                   SideModel(PORTRAIT, [])])
+    tree.populate([ShapeModel(LANDSCAPE, model, custom_collections=_keepers_holding_the_images(model)),
+                   ShapeModel(PORTRAIT, [])])
 
     assert tree.item_by_key[again].isExpanded()
     assert not tree.item_by_key[own].isExpanded()

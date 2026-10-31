@@ -13,7 +13,7 @@ from shared_ui.spacing import BUTTON_FILLING_ICON
 
 import origenerator
 from origenerator.gallery.collection import LATEST_KEY
-from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
 from origenerator.media import MediaType
 
@@ -84,8 +84,8 @@ def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
     # holds, and it says it by BEING that shape: an upright frame and a
     # lying-down one, each the other transposed. Both are drawn on one square
     # canvas, so the words beside them start at the same x.
-    portrait = icons.side_mark("portrait")
-    landscape = icons.side_mark("landscape")
+    portrait = icons.shape_mark("portrait")
+    landscape = icons.shape_mark("landscape")
     assert portrait.size() == landscape.size()
     assert portrait.width() == portrait.height()
 
@@ -100,10 +100,10 @@ def test_a_side_mark_is_a_frame_and_not_a_filled_block(qtbot):
     # a region an image goes in. Filled, it would read as a swatch, and the
     # rounded corners that say "screen" would be lost against the heading's word.
 
-    image = icons.side_mark("portrait").toImage()
+    image = icons.shape_mark("portrait").toImage()
     middle = image.pixelColor(image.width() // 2, image.height() // 2)
     assert middle.alpha() == 0                       # hollow through the center
-    assert _dominant_color(icons.side_mark("portrait")) == TEXT_PRIMARY.rgb()
+    assert _dominant_color(icons.shape_mark("portrait")) == TEXT_PRIMARY.rgb()
 
 
 def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
@@ -118,7 +118,7 @@ def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(q
 
     for side, mark in marks.items():
         for size in (icons.MARK_BESIDE_A_WORD, BUTTON_FILLING_ICON):
-            assert (icons.side_mark(side, size).toImage()
+            assert (icons.shape_mark(side, size).toImage()
                     == icon_pixmap(mark, size, TEXT_PRIMARY).toImage()), (side, size)
     assert (icons.separate_mark(BUTTON_FILLING_ICON).toImage()
             == icon_pixmap("portrait_beside_landscape", BUTTON_FILLING_ICON, TEXT_PRIMARY).toImage())

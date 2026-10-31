@@ -48,7 +48,7 @@ from origenerator.gui.slideshow_hud import (
     slideshow_hud_model,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
-from origenerator.osr2_controls_commands import side_press, spelled_for
+from origenerator.osr2_controls_commands import shape_press, spelled_for
 from origenerator.slideshow_buttons import PRESSES_ON_THE_QUEUE, answer
 
 # How often the HUD is rebuilt: on its own beat, and faster while something
@@ -71,8 +71,8 @@ _WASD_AS_ARROWS = {
 
 
 class SlideshowView(QWidget):
-    def __init__(self, items, *, side: str = "", start=None,
-                 shuffle=None, actions=None, hud=None, levels=None, engine=None, motion=None,
+    def __init__(self, items, *, shape: str = "", start=None,
+                 shuffle=None, actions=None, hud=None, versions=None, engine=None, motion=None,
                  pace=None, frames=None, radio=None, volume=None,
                  clock=time.monotonic, parent=None):
         super().__init__(parent)
@@ -81,7 +81,7 @@ class SlideshowView(QWidget):
         self._actions = actions if actions is not None else SlideshowActions()
         self._motion = motion  # the gallery's app-global motion driver, or None
         self._clock = clock
-        self._hud_side = side
+        self._hud_shape = shape
         self._dashboard_cmd_file = None
         self._label_for = None
         self._corner = HudCorner.UPPER_LEFT
@@ -117,10 +117,10 @@ class SlideshowView(QWidget):
 
         channel = PaneChannel()
         self.slideshow = FunestraSlideshow(
-            items, side=side, channel=channel, shown=self,
+            items, shape=shape, channel=channel, shown=self,
             frames=frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen"),
             actions=self._actions, hud=hud, pace=pace,
-            start=start, shuffle=shuffle, levels=levels, parent=self)
+            start=start, shuffle=shuffle, versions=versions, parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._pane = FunestraPane(
@@ -133,19 +133,19 @@ class SlideshowView(QWidget):
 
     # --- the HUD this slideshow wears -------------------------------------
 
-    def wear_the_hud(self, side: str, *, dashboard_cmd_file=None, label_for=None,
+    def wear_the_hud(self, shape: str, *, dashboard_cmd_file=None, label_for=None,
                      corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
                      collapse=None, open_in=None) -> None:
         """Put the Funestras' own HUD on this slideshow, drawn by the Funestra.
 
-        *side* is whose HUD it is, which spells its verbs; *dashboard_cmd_file*
+        *shape* is whose HUD it is, which spells its verbs; *dashboard_cmd_file*
         is the session's command channel, or ``None`` standalone -- which is also
         how a press knows which of the two it is on (see :meth:`press`);
         *label_for* names the item on screen in this app's own vocabulary, and
         *collapse* is what parks the HUD in its corner where there is no
         session to ask.
         """
-        self._hud_side = side
+        self._hud_shape = shape
         self._dashboard_cmd_file = dashboard_cmd_file
         self._label_for = label_for
         self._corner, self._minimized = corner, minimized
@@ -154,8 +154,8 @@ class SlideshowView(QWidget):
         self.refresh_hud()
 
     @property
-    def hud_side(self) -> str:
-        return self._hud_side
+    def hud_shape(self) -> str:
+        return self._hud_shape
 
     def set_hud_place(self, corner, minimized: bool) -> None:
         if (corner, minimized) == (self._corner, self._minimized):
@@ -174,7 +174,7 @@ class SlideshowView(QWidget):
     def _hud_model(self):
         """The HUD as the Funestra draws it, rebuilt on its own beat -- and
         faster while the drive's trace is moving across it."""
-        if not self._hud_side:
+        if not self._hud_shape:
             return None
         now = self._clock()
         beat = REPAINT_MS if self._hud_moving() else _REFRESH_MS
@@ -182,7 +182,7 @@ class SlideshowView(QWidget):
             return self._last_hud_model
         self._hud_stale = False
         self._hud_built_at = now
-        model = slideshow_hud_model(self._hud_side, self.slideshow,
+        model = slideshow_hud_model(self._hud_shape, self.slideshow,
                                     hosted=self._dashboard_cmd_file is not None,
                                     device=self.hud_device, foot=self.queue_foot.section())
         if model is not None:
@@ -227,7 +227,7 @@ class SlideshowView(QWidget):
         if verb == OMNIPAUSE_TOGGLE:
             self._press_on_the_slide()
             return True
-        action, path = side_press(self._hud_side, verb, payload)
+        action, path = shape_press(self._hud_shape, verb, payload)
         if action in COLLAPSES or action == OPENS_IN:
             self._place_here_or_out_there(command, action, path)
             return True
@@ -242,7 +242,7 @@ class SlideshowView(QWidget):
         if self._dashboard_cmd_file is None:
             return self._act_here(action)
         allowed = ("satellites_kino_activate", "origenerator_activate",
-                   *(spelled_for(self._hud_side, verb)
+                   *(spelled_for(self._hud_shape, verb)
                      for verb in ("prev", "next", "lock", "trash")))
         if command not in allowed:
             return False

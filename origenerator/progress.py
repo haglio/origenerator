@@ -43,7 +43,7 @@ from __future__ import annotations
 #
 # Seconds, measured off this app's own completed runs, and only ever read against
 # each other: what a bar needs is the ratio between the passes of one job, and a
-# faster or slower card moves every one of these together. Two fits from those
+# faster or slower graphics card moves every one of these together. Two fits from those
 # durations:
 #
 #   WAN 2.2 I2V at 8 steps, the same settings but for the video's length: 81

@@ -1,5 +1,5 @@
 """The one claim on the graphics card every LoRA trainer on this computer takes
-before it uses the card: a file naming who holds it, read by both trainer
+before it uses the graphics card: a file naming who holds it, read by both trainer
 programs and by his hand scripts beside them, stale once its holder has died."""
 
 from __future__ import annotations

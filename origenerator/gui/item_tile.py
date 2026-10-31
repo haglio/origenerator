@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
 
-from origenerator.gui import grid_card, palette
+from origenerator.gui import palette, tile_shape
 from origenerator.gui.corner_controls import (
     CHIP_CSS,
     CORNER_GAP,
@@ -26,7 +26,7 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
-_IMAGE_SIZE = grid_card.thumbnail_size()  # the thumbnail area, inside the family card
+_IMAGE_SIZE = tile_shape.thumbnail_size()  # the thumbnail area, inside the family tile
 _BORDER_PX = 2
 # Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls, a review
 # collection's keep/reject): the same translucent chip the corner controls sit on, blue
@@ -46,7 +46,7 @@ _CORNER_BUTTON_CSS = (
 #     frame (which is what an earlier attempt did).
 _SELECTED_TILE_CSS = (
     f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}")
-_BORDER_UNSELECTED = f"2px solid {palette.CARD_BORDER}"
+_BORDER_UNSELECTED = f"2px solid {palette.TILE_BORDER}"
 _BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
 
@@ -59,7 +59,7 @@ class CornerAction(NamedTuple):
     tooltip: str
 
 
-class ThumbnailWidget(QWidget):
+class ItemTile(QWidget):
     pressed = pyqtSignal(str, Qt.KeyboardModifier)  # prompt_id, the keys held during the press
     clicked = pyqtSignal(str)  # prompt_id, let go of without being dragged
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
@@ -95,11 +95,11 @@ class ThumbnailWidget(QWidget):
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self.prompt_id, self.mapToGlobal(pos))
         )
-        self.setFixedSize(*grid_card.card_size())
+        self.setFixedSize(*tile_shape.tile_size())
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
-        layout.setSpacing(grid_card.CARD_SPACING)
+        layout.setContentsMargins(*(tile_shape.TILE_MARGIN,) * 4)
+        layout.setSpacing(tile_shape.TILE_SPACING)
 
         self._image_label = QLabel()
         self._image_label.setFixedSize(_IMAGE_SIZE)
@@ -121,7 +121,7 @@ class ThumbnailWidget(QWidget):
         self._text_label = QLabel(label_text)
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._text_label.setWordWrap(True)
-        grid_card.style_caption(self._text_label)
+        tile_shape.style_caption(self._text_label)
         # Transparent so the tile's fill shows through under the caption.
         self._text_label.setStyleSheet("background-color: transparent;")
 
@@ -157,7 +157,7 @@ class ThumbnailWidget(QWidget):
         self._sync_controls()
 
         # While an enhancement of this image is in flight, the tile wears the same
-        # two overlays an in-flight card does, so work in progress reads the same
+        # two overlays an in-flight tile does, so work in progress reads the same
         # whichever kind of work it is: a scrim naming the stage, and a bar along
         # the thumbnail's foot saying how far along the run is. The scrim dims the
         # thumbnail rather than replacing it — the base render is out and worth

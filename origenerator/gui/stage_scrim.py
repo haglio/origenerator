@@ -1,7 +1,7 @@
 """The dimming banner a tile wears while something is being made of it.
 
 Three surfaces say the same thing about an item that isn't finished — the
-Latest collection's in-flight cards, a folder's generating tile, and a finished
+Latest collection's in-flight tiles, a folder's generating tile, and a finished
 thumbnail whose enhancement is in flight — and they say it the same way: the
 message sits *over* the thumbnail, dimmed, rather than replacing it.
 
@@ -48,7 +48,7 @@ class StageScrim(QLabel):
         the frame.
 
         ``inset`` holds the scrim off a border the covered widget draws itself —
-        an in-flight card's blue "being made" edge says something the scrim has no
+        an in-flight tile's blue "being made" edge says something the scrim has no
         business painting over.
         """
         self.setGeometry(widget.geometry().adjusted(inset, inset, -inset, -inset))

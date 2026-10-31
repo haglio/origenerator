@@ -42,8 +42,9 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui.folder_tree import _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generating_tile import GeneratingTile
+from origenerator.gui.new_tile import NewTile
 from origenerator.gui.request_worker import RevisionWorker
-from origenerator.gui.reroll_tile import RerollTile
+from origenerator.item_shape import base_of, shaped_key
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, oriented_key
 from origenerator.output_places import OutputPlaces
@@ -690,8 +691,8 @@ def _png_bytes() -> bytes:
     return buf.getvalue()
 
 
-def _reroll_tile(view):
-    tiles = view._scroll.widget().findChildren(RerollTile)
+def _new_tile(view):
+    tiles = view._scroll.widget().findChildren(NewTile)
     return tiles[0] if tiles else None
 
 
@@ -768,7 +769,7 @@ def _in_view(view, prompt_id) -> bool:
 def _running_reroll(view, side=LANDSCAPE):
     """Start a re-roll and return (key, job) for the freshly launched job."""
     key = _select_first_leaf(view, side)
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
     return key, view._live_jobs[key]
 
 
@@ -849,7 +850,7 @@ def _open_latest(view):
 
 def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):
     """A running generation row, as a re-roll or a Generate job inserts up front —
-    no output yet, so it never enters the tree, only the in-flight cards."""
+    no output yet, so it never enters the tree, only the in-flight tiles."""
     return _row(prompt_id, workflow, {"positive_prompt": prompt}, f"{prompt_id}.png",
                 status="running", output_files="[]")
 

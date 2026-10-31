@@ -1,8 +1,8 @@
-"""A card for one in-flight generation, on the gallery's Latest collection.
+"""A tile for one in-flight generation, on the gallery's Latest collection.
 
-The collection leads with a card per generation currently queued or running — from a
+The collection leads with a tile per generation currently queued or running — from a
 Generate tab or a gallery re-roll — so all in-flight work is visible in one
-place. Each card mirrors the job's latest live preview frame and, when clicked,
+place. Each tile mirrors the job's latest live preview frame and, when clicked,
 opens the gallery folder the job is running in and selects its live tile.
 
 Two things are read over that frame rather than in place of it. The stage —
@@ -12,9 +12,9 @@ one a finished thumbnail wears while its enhancement cooks; and along the frame'
 foot a bar carries how far along the run is and how long that has taken
 (:func:`origenerator.timing.progress_status_label`), in the same words the Job Queue uses for the same job. A stage message that *replaced* the thumbnail
 hid the one thing worth looking at, and a percentage that lived only in the queue
-left the card and the Job Queue each telling half of one story.
+left the tile and the Job Queue each telling half of one story.
 
-A card is fed by an :class:`origenerator.gui.inflight.InFlightItem`, so this
+A tile is fed by an :class:`origenerator.gui.inflight.InFlightItem`, so this
 widget stays unaware of where a job comes from or how it is revealed. The gallery
 holds the items and calls ``reveal`` on a click; a right-click is handed up the
 same way, for the pane to answer with the run's own menu.
@@ -26,21 +26,21 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.spacing import BUTTON_RADIUS
 
-from origenerator.gui import grid_card, palette
+from origenerator.gui import palette, tile_shape
 from origenerator.gui.blurred import blurred_backdrop
 from origenerator.gui.inflight import TICK_MS, InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
-_IMAGE_SIZE = grid_card.THUMBNAIL_SIZE  # the family shape, so cards flow with tiles
+_IMAGE_SIZE = tile_shape.THUMBNAIL_SIZE  # the family shape, so tiles flow with tiles
 _BORDER_PX = 2
 # A blue "in progress" edge, distinct from a resting tile's.
 _BORDER = f"{_BORDER_PX}px solid {palette.IN_FLIGHT_BORDER}"
 
 
-class InFlightCard(QWidget):
-    """A clickable card mirroring one in-flight generation's live frame and status."""
+class InFlightTile(QWidget):
+    """A clickable tile mirroring one in-flight generation's live frame and status."""
 
     clicked = pyqtSignal(str)   # the item's key
     context_requested = pyqtSignal(str, QPoint)  # the item's key, global position
@@ -52,8 +52,8 @@ class InFlightCard(QWidget):
         self.setObjectName("thumbnailTile")  # share the finished-tile background
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Right-click anywhere on the card asks the pane for a context menu, the
-        # way a finished tile's does — the run this card stands for is otherwise
+        # Right-click anywhere on the tile asks the pane for a context menu, the
+        # way a finished tile's does — the run this tile stands for is otherwise
         # only stoppable from the Job Queue.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
@@ -61,8 +61,8 @@ class InFlightCard(QWidget):
         )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
-        layout.setSpacing(grid_card.CARD_SPACING)
+        layout.setContentsMargins(*(tile_shape.TILE_MARGIN,) * 4)
+        layout.setSpacing(tile_shape.TILE_SPACING)
 
         self._image = QLabel()
         self._image.setFixedSize(*_IMAGE_SIZE)
@@ -73,10 +73,10 @@ class InFlightCard(QWidget):
         self._caption = QLabel()
         self._caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._caption.setWordWrap(True)
-        grid_card.style_caption(self._caption)  # the grid's shared caption size
+        tile_shape.style_caption(self._caption)  # the grid's shared caption size
         self._caption.setStyleSheet("background-color: transparent;")
 
-        # Let clicks fall through the children to the card itself.
+        # Let clicks fall through the children to the tile itself.
         self._image.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
@@ -95,8 +95,8 @@ class InFlightCard(QWidget):
         self._tick.setInterval(TICK_MS)
         self._tick.timeout.connect(self._render_timing)
 
-        self.setFixedSize(*grid_card.card_size())
-        self._place_overlays()  # once: the card is a fixed size and never moves them
+        self.setFixedSize(*tile_shape.tile_size())
+        self._place_overlays()  # once: the tile is a fixed size and never moves them
         self.update_item(item)
 
         # The kind is fixed for a job, so the badge is placed once here (not in the
@@ -109,7 +109,7 @@ class InFlightCard(QWidget):
         return self._key
 
     def update_item(self, item: InFlightItem):
-        """Refresh the card in place from a fresh descriptor — a new live frame, a
+        """Refresh the tile in place from a fresh descriptor — a new live frame, a
         queued→running flip, another step of progress — so a live update never
         rebuilds the whole collection."""
         self._item = item
@@ -173,9 +173,9 @@ class InFlightCard(QWidget):
         """Lay the bar along the frame's foot, inside the frame's own border so it
         doesn't sit on the blue edge (the scrim is placed by ``cover``).
 
-        The frame is only positioned once the card's layout has run, so that is
+        The frame is only positioned once the tile's layout has run, so that is
         forced here rather than waited for: an overlay placed before it sits in
-        the card's top-left corner instead of over the thumbnail.
+        the tile's top-left corner instead of over the thumbnail.
         """
         self.layout().activate()
         frame = self._image.geometry()

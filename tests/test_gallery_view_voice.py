@@ -1333,7 +1333,7 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
     assert not view.osr2_control.isChecked()
 
 
-def test_osr2_off_parks_the_device_as_the_console_switch_does(qtbot, tmp_path):
+def test_osr2_off_parks_the_device_as_the_osr2_controls_switch_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     view._voice.listener.speak("drive on")
 

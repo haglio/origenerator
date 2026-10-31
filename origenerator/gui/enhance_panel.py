@@ -3,7 +3,7 @@
 Enhancement is not one of the settings that decide which folder a generation
 lands in — it is a finish applied to an image afterward — so it is deliberately
 not on the Generate form beside Seed, Dimensions and Output. It lives here
-instead, beside Genau's console, and it is app-wide: whatever is set here is
+instead, beside the OSR2 controls, and it is app-wide: whatever is set here is
 what Enhance All runs with, what a single image's Enhance action runs with, and
 — with the checkbox on — what every image the app newly generates receives as it
 lands. It follows you rather than the folder, so it shows in the collections

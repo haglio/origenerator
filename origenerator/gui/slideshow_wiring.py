@@ -46,7 +46,7 @@ class SlideshowActions:
     plays that library in the order it is in. ``drive_toggle`` takes nothing: Space goes to
     the app's one OSR2 switch rather than straight to this slideshow's motion, and
     ``osr2_control`` is that same switch handed over whole, which is what the
-    console's four control buttons read and set.
+    OSR2 controls' four buttons read and set.
     ``omnipause`` takes nothing: a click on the slide asks the room to pause,
     the hosting session's or this app's own, and a slideshow handed none pauses
     itself.

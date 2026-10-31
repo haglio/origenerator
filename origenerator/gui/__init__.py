@@ -2,7 +2,7 @@
 
 A module here serves something on screen: a widget, a controller that owns
 one, or the Qt-free reading a widget is built from -- which is why
-``console``, ``hud_nav_map`` and ``picking`` sit here with no Qt in
+``osr2_controls_state``, ``hud_nav_map`` and ``picking`` sit here with no Qt in
 them at all, each answering for the widget next to it.
 
 What does NOT belong here is the app's own machinery, however much a widget

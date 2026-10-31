@@ -169,7 +169,7 @@ def test_an_import_made_after_a_preview_began_launching_the_next_version_gets_no
         ("sdxl_t2i", "v002", "file_date"), ("sdxl_t2i", None, None))
 
 
-def test_a_clip_cut_later_from_an_older_run_is_not_a_launch_of_that_version(tmp_path):
+def test_a_clip_cut_later_from_an_older_run_is_not_a_launch_of_that_level(tmp_path):
     db = Database(tmp_path / "origenerator.db")
     _ran(db, "gen-cut", "v002", launched="2026-06-05 00:00:00",
          finished="2026-06-05T00:00:05+00:00", trimmed_from="gen-source")

@@ -42,7 +42,7 @@ from origenerator.gui import (
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.drop_style import LIT
 from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS
-from origenerator.gui.enhance_versions import _AddRow, _LevelRow, enhance_level_mime
+from origenerator.gui.enhance_versions import _AddRow, _VersionRow, enhance_version_mime
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.workflows import detail_parts
@@ -177,7 +177,7 @@ def test_enhance_is_grayed_for_an_image_that_already_has_that_enhancement(qtbot,
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
-    monkeypatch.setattr("origenerator.gui.enhance_controller.gallery.level_matching_settings",
+    monkeypatch.setattr("origenerator.gui.enhance_controller.gallery.version_matching_settings",
                         lambda row, settings: 0)
     offered = {}
     monkeypatch.setattr(
@@ -774,9 +774,9 @@ def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_re
     view.refresh()
     _select_first_leaf(view)
     _click_tile(view, "g0")
-    versions = view._info_tabs.current_config_panel()._versions
-    version = next(row for row in versions._host.findChildren(_LevelRow) if row._params)
-    mime = enhance_level_mime(version._params)
+    versions = view._generate_pane.current_generate_tab()._versions
+    version = next(row for row in versions._host.findChildren(_VersionRow) if row._params)
+    mime = enhance_version_mime(version._params)
 
     _dropped_on(view._enhance.pane, mime)
 

@@ -77,7 +77,7 @@ class FakeSignal:
 class FakeSlideshow:
     """A slideshow reduced to what the director asks of one."""
 
-    def __init__(self, items=(), *, actions=None, pace=None, hud=None, levels=None, **kwargs):
+    def __init__(self, items=(), *, actions=None, pace=None, hud=None, versions=None, **kwargs):
         self.items = list(items)
         self.actions = actions
         self.pace = pace
@@ -95,7 +95,7 @@ class FakeSlideshow:
         self.said = []
         self.said_kinds = []
         self.runs_said = []
-        self.levels = levels
+        self.versions = versions
         self.resumed = None
         self.taken_up = None
         self.filters = SlideshowFilters()
@@ -121,7 +121,7 @@ class FakeSlideshow:
         self.played = []
         self.leads = 0
         self.follows = 0
-        self.levels_added = []
+        self.versions_added = []
         self.hud_order_label = ""
         self.locked_on = None
         self.shown_locked = []
@@ -141,15 +141,15 @@ class FakeSlideshow:
         return self.visible
 
     # what the director tells it
-    def play(self, items, *, hud=None, levels=None, **kwargs):
+    def play(self, items, *, hud=None, versions=None, **kwargs):
         self.items = list(items)
         self.hud = hud
-        self.levels = levels
+        self.versions = versions
         self.played.append(list(items))
         self.played_with = kwargs
 
-    def set_levels(self, levels):
-        self.levels = levels
+    def set_versions(self, versions):
+        self.versions = versions
 
     def resume(self, state, *, opened_on_it=False):
         self.resumed = state
@@ -190,8 +190,8 @@ class FakeSlideshow:
     def follow_what_is_being_made(self):
         self.follows += 1
 
-    def add_levels(self, levels):
-        self.levels_added.append(levels)
+    def add_versions(self, versions):
+        self.versions_added.append(versions)
 
     def note_voice_command(self, message, *, kind=INFO):
         self.said.append(message)
@@ -806,7 +806,7 @@ def test_a_double_click_on_an_item_no_folder_lists_still_names_its_generation(sl
 
     (slideshow,) = made
     assert slideshow.items == [("t1.png", "image", "t1", None)]
-    assert slideshow.levels == {"t1.png": ["newer", "older"]}
+    assert slideshow.versions == {"t1.png": ["newer", "older"]}
 
 
 def test_one_of_two_hosted_slideshows_closing_leaves_the_other_showing(slideshows):
@@ -899,7 +899,7 @@ def test_a_slideshow_taken_over_on_an_item_of_the_other_shape_goes_on_from_the_n
         slideshows):
     director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
         slideshows, side=BOTH, shapes=(TALL, WIDE, TALL), standing=SlideshowState(
-            order=("g1", "g2", "g3"), current="g2", locked=True, level_index=1))
+            order=("g1", "g2", "g3"), current="g2", locked=True, version_index=1))
 
     open_both_sides(director)
 
@@ -1050,8 +1050,8 @@ def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slidesho
 
     open_both_sides(director)
 
-    assert director.region_slideshow(PORTRAIT).levels == {"g4.png": ["newer", "older"]}
-    assert director.region_slideshow(LANDSCAPE).levels == {"g5.png": ["newer", "older"]}
+    assert director.region_slideshow(PORTRAIT).versions == {"g4.png": ["newer", "older"]}
+    assert director.region_slideshow(LANDSCAPE).versions == {"g5.png": ["newer", "older"]}
 
 
 def test_a_sessions_regions_open_on_their_base_state_whatever_was_pressed(slideshows):
@@ -1313,10 +1313,10 @@ def test_a_set_handed_to_a_running_slideshow_brings_its_own_versions_with_it(sli
                   side=LANDSCAPE)
 
     director.reorder_slideshow(made[0], True)
-    assert made[0].levels == {"g9.png": ["newer", "older"]}
+    assert made[0].versions == {"g9.png": ["newer", "older"]}
 
     director.reset_region(made[0])
-    assert made[0].levels == {"g4.png": ["newer", "older"]}
+    assert made[0].versions == {"g4.png": ["newer", "older"]}
 
 
 def test_latest_points_a_region_slideshow_at_its_sides_latest_and_feeds_it_from_there(slideshows):
@@ -2618,7 +2618,7 @@ def test_a_landed_enhancement_hands_every_slideshow_the_images_new_versions(
 
     director.note_enhanced(_row("g1", files=("better.png",)))
 
-    assert [slideshow.levels_added for slideshow in made] == [[{"better.png": ["newer", "older"]}]] * 2
+    assert [slideshow.versions_added for slideshow in made] == [[{"better.png": ["newer", "older"]}]] * 2
 
 
 def test_the_frames_of_the_enhancements_being_made_reach_every_slideshow_that_is_up(slideshows):

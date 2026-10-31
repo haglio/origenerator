@@ -618,7 +618,7 @@ def test_a_slideshow_opening_on_a_sessions_funestra_has_its_whole_hud_out_before
 
     monkeypatch.setattr(FunestraChannel, "write_playlist", write_playlist)
 
-    _slideshow(qtbot, tmp_path, levels=_LEVELS,
+    _slideshow(qtbot, tmp_path, versions=_VERSIONS,
                actions=SlideshowActions(queue_now=lambda: ([_inflight("j1")], 0)))
 
     hud = out_when_the_list_went[0]
@@ -865,26 +865,26 @@ _ONE_LISTED_AT_ITS_NEWEST = {"one.png": [("one.png", "image", "Enhancement 1/1")
 def test_a_slideshow_picked_back_up_on_another_version_plays_that_version_locked(
         qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
-    slideshow.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
+    slideshow.set_versions(_ONE_LISTED_AT_ITS_NEWEST)
 
     slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1",
-                                    locked=True, level_index=1))
+                                    locked=True, version_index=1))
 
     sent = _sent(slideshow)
     assert ("PLAY_FILE one_original.png" in sent, _locks(sent)[-1]) == (True, "LOCK_ON")
-    assert slideshow.state().level_index == 1
+    assert slideshow.state().version_index == 1
 
 
 def test_the_funestra_reaching_the_slide_a_slideshow_resumed_on_keeps_its_version(
         qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
-    slideshow.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
-    slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1", level_index=1))
+    slideshow.set_versions(_ONE_LISTED_AT_ITS_NEWEST)
+    slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1", version_index=1))
 
     _says(slideshow, video="one.png")
     slideshow.tick()
 
-    assert slideshow.state().level_index == 1
+    assert slideshow.state().version_index == 1
 
 
 def test_a_slideshow_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
@@ -982,7 +982,7 @@ def test_a_hosted_reset_lets_go_of_the_lock_before_handing_over_the_base_set(qtb
     assert slideshow.locked is False
 
 
-_LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
+_VERSIONS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
                        ("one.png", "image", "Original")]}
 
 
@@ -992,7 +992,7 @@ class TestVersions:
 
     def test_a_step_holds_the_funestra_and_opens_the_other_version_still(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         slideshow.slideshow_step_version(1)
 
@@ -1011,7 +1011,7 @@ class TestVersions:
     def test_leaving_the_versions_hands_the_funestra_its_pace_before_it_opens_the_next(
             self, qtbot, tmp_path, move, verb):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
 
@@ -1023,12 +1023,12 @@ class TestVersions:
     def test_a_version_landing_while_they_are_compared_holds_the_funestra_on_the_new_one(
             self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
 
         slideshow.note_enhanced("id-1", "one_better.png")
-        slideshow.add_levels({"one_better.png": [
+        slideshow.add_versions({"one_better.png": [
             ("one_better.png", "image", "Enhancement 2/2"),
             ("one_enhanced.png", "image", "Enhancement 1/2"),
             ("one.png", "image", "Original")]})
@@ -1043,7 +1043,7 @@ class TestVersions:
         _says(slideshow, video="clip.mp4")
         slideshow.tick()
         _sent(slideshow)
-        slideshow.set_levels({"clip.mp4": [("clip_upscaled.mp4", "video", "Upscale"),
+        slideshow.set_versions({"clip.mp4": [("clip_upscaled.mp4", "video", "Upscale"),
                                            ("clip.mp4", "video", "Original")]})
 
         slideshow.slideshow_step_version(1)
@@ -1052,7 +1052,7 @@ class TestVersions:
 
     def test_stepping_on_and_back_walks_the_versions_in_order(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
@@ -1065,7 +1065,7 @@ class TestVersions:
         """The session sends Shift+Left as cycle_version_back, and Shift+Right as
         cycle_version, which the HUD's versions button sends too."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
+        slideshow.set_versions({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
                                           ("one_1.png", "image", "Enhancement 1/2"),
                                           ("one.png", "image", "Original")]})
 
@@ -1083,7 +1083,7 @@ class TestVersions:
         """Nothing to compare it against, and the shift was the whole point of
         the press — so it does nothing rather than walking to the neighbor."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         slideshow.slideshow_step_version(1)
 
@@ -1094,7 +1094,7 @@ class TestVersions:
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         assert slideshow.has_other_versions is False
 
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         assert slideshow.has_other_versions is True
 
@@ -1103,7 +1103,7 @@ class TestVersions:
         """A step on the new item must offer its own newest version, not carry the
         place the last item was stepped to."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels({**_LEVELS,
+        slideshow.set_versions({**_VERSIONS,
                               "two.png": [("two_enhanced.png", "image", "Enhancement 1/1"),
                                           ("two.png", "image", "Original")]})
         slideshow.slideshow_step_version(1)
@@ -1525,7 +1525,7 @@ def _hud(slideshow: FunestraSlideshow):
 def test_the_hud_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
-    slideshow.set_levels(_LEVELS)
+    slideshow.set_versions(_VERSIONS)
 
     assert _hud(slideshow).item_note == "Enhancement 1/1"
 
@@ -1658,7 +1658,7 @@ def test_a_slideshow_closed_while_a_request_holds_its_slide_lets_the_funestra_go
 def test_a_slideshow_closed_while_its_versions_are_compared_sets_the_funestra_going_again(
         qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-    slideshow.set_levels(_LEVELS)
+    slideshow.set_versions(_VERSIONS)
     slideshow.slideshow_step_version(1)
     _sent(slideshow)
 
@@ -1762,7 +1762,7 @@ def test_an_image_enhanced_during_the_slideshow_steps_its_versions_on_the_funest
     slideshow.tick()
     _sent(slideshow)
 
-    slideshow.add_levels({"one_enhanced.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
+    slideshow.add_versions({"one_enhanced.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
                                                ("one.png", "image", "Original")]})
     slideshow.slideshow_step_version(1)
 
@@ -1968,7 +1968,7 @@ _PLACED = {"one.png": [("one.png", "image", "Enhance 1", FACE), ("one-base.png",
 def test_an_image_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
 
-    slideshow.set_levels(_PLACED)
+    slideshow.set_versions(_PLACED)
 
     handed = {str(item.path): item.points_of_interest
               for item in read_playlist(slideshow.channel.playlist)}
@@ -1984,7 +1984,7 @@ def test_a_slideshow_opened_with_its_versions_hands_the_funestra_its_list_once(
     monkeypatch.setattr(FunestraChannel, "write_playlist",
                         lambda channel, items: written.append(len(items)) or write(channel, items))
 
-    slideshow = _slideshow(qtbot, tmp_path, levels=_PLACED)
+    slideshow = _slideshow(qtbot, tmp_path, versions=_PLACED)
 
     handed = {str(item.path): item.points_of_interest
               for item in read_playlist(slideshow.channel.playlist)}
@@ -1995,14 +1995,14 @@ def test_versions_that_bring_no_places_leave_the_pass_where_it_was(qtbot, tmp_pa
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
-    slideshow.set_levels(_LEVELS)
+    slideshow.set_versions(_VERSIONS)
 
     assert "RELOAD_PLAYLIST" not in _sent(slideshow)
 
 
 def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-    slideshow.set_levels({"one.png": [("one.png", "image", "Enhance 2", FACE),
+    slideshow.set_versions({"one.png": [("one.png", "image", "Enhance 2", FACE),
                                       ("one-v1.png", "image", "Enhance 1", ((0.0, 0.0, 0.5, 0.5),))]})
     _sent(slideshow)
 
@@ -2012,7 +2012,7 @@ def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
 
 
 def _ready_opening(items, *, scripts=None, lead=0, lead_neighbors=None) -> RegionOpening:
-    return RegionOpening(rows=[], items=items, levels={}, enhanced_ids=set(),
+    return RegionOpening(rows=[], items=items, versions={}, enhanced_ids=set(),
                          scripts=scripts or {}, lead=lead, lead_neighbors=lead_neighbors)
 
 

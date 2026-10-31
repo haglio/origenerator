@@ -1,6 +1,6 @@
 """Stepping the versions of the image on screen.
 
-Shift+Left/Right moves within one image's enhancement levels rather than along
+Shift+Left/Right moves within one image's versions rather than along
 the set. Which versions exist, which image they belong to, and which of them
 is showing were three fields on the slideshow, read and written from five of its
 methods; they are one small object now, and this is what it promises.
@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from origenerator.gui.level_stepper import LevelStepper, Version
+from origenerator.gui.version_stepper import Version, VersionStepper
 
 # Two images. The first has three versions, newest first, as the gallery hands
 # them over: (path, media_type, label). The second has only itself.
 _LEVELS = {
-    "a.png": [("a-v3.png", "image", "Level 3"),
-              ("a-v2.png", "image", "Level 2"),
+    "a.png": [("a-v3.png", "image", "Version 3"),
+              ("a-v2.png", "image", "Version 2"),
               ("a.png", "image", "Base")],
     "b.png": [("b.png", "image", "Base")],
 }
@@ -25,21 +25,21 @@ _LEVELS = {
 
 @pytest.fixture
 def armed():
-    stepper = LevelStepper()
+    stepper = VersionStepper()
     stepper.arm(_LEVELS)
     return stepper
 
 
 def test_a_fresh_stepper_has_nothing_to_step():
-    stepper = LevelStepper()
+    stepper = VersionStepper()
 
     assert stepper.step(1, base="a.png") is None
-    assert stepper.levels(base="a.png") == []
+    assert stepper.versions(base="a.png") == []
     assert stepper.index == 0
 
 
 def test_stepping_moves_within_the_one_image(armed):
-    assert armed.step(1, base="a.png") == Version("a-v2.png", "image", "Level 2")
+    assert armed.step(1, base="a.png") == Version("a-v2.png", "image", "Version 2")
     assert armed.step(1, base="a.png") == Version("a.png", "image", "Base")
     assert armed.index == 2
 
@@ -47,7 +47,7 @@ def test_stepping_moves_within_the_one_image(armed):
 def test_the_versions_wrap_round_in_both_directions(armed):
     assert armed.step(-1, base="a.png") == Version("a.png", "image", "Base")
     assert armed.index == 2
-    assert armed.step(1, base="a.png") == Version("a-v3.png", "image", "Level 3")
+    assert armed.step(1, base="a.png") == Version("a-v3.png", "image", "Version 3")
     assert armed.index == 0
 
 
@@ -64,7 +64,7 @@ def test_an_image_with_no_versions_at_all_does_not_step(armed):
 
 def test_the_image_being_stepped_stays_the_key_once_stepping_starts(armed):
     # The file on screen is no longer the one the set lists the image under the
-    # moment a level is showing, so the base is remembered rather than re-asked.
+    # moment a version is showing, so the base is remembered rather than re-asked.
     armed.step(1, base="a.png")
 
     assert armed.step(1, base="a-v2.png") == Version("a.png", "image", "Base")
@@ -76,41 +76,41 @@ def test_a_new_slide_starts_again_at_the_top_version(armed):
     armed.restart()
 
     assert armed.index == 0
-    assert armed.step(1, base="a.png") == Version("a-v2.png", "image", "Level 2")
+    assert armed.step(1, base="a.png") == Version("a-v2.png", "image", "Version 2")
 
 
-def test_the_levels_on_offer_are_the_ones_for_the_image_being_stepped(armed):
-    assert len(armed.levels(base="a.png")) == 3
-    assert len(armed.levels(base="b.png")) == 1
-    assert armed.levels(base="unknown.png") == []
+def test_the_versions_on_offer_are_the_ones_for_the_image_being_stepped(armed):
+    assert len(armed.versions(base="a.png")) == 3
+    assert len(armed.versions(base="b.png")) == 1
+    assert armed.versions(base="unknown.png") == []
 
     armed.step(1, base="a.png")
-    assert len(armed.levels(base="a-v2.png")) == 3  # still a.png's, being stepped
+    assert len(armed.versions(base="a-v2.png")) == 3  # still a.png's, being stepped
 
 
 def test_re_arming_replaces_what_there_is_to_step(armed):
     armed.arm({"c.png": [("c.png", "image", "Base")]})
 
-    assert armed.levels(base="a.png") == []
-    assert len(armed.levels(base="c.png")) == 1
+    assert armed.versions(base="a.png") == []
+    assert len(armed.versions(base="c.png")) == 1
 
 
 def test_the_keys_and_the_lists_are_taken_as_this_object_s_own(armed):
     # The gallery rebuilds its map on every poll, and the paths arrive as Paths
     # as often as strings; neither may reach back in here afterwards.
 
-    versions = [("d.png", "image", "Base"), ("d-v2.png", "image", "Level 2")]
-    stepper = LevelStepper()
+    versions = [("d.png", "image", "Base"), ("d-v2.png", "image", "Version 2")]
+    stepper = VersionStepper()
     stepper.arm({Path("d.png"): versions})
-    versions.append(("d-v3.png", "image", "Level 3"))
+    versions.append(("d-v3.png", "image", "Version 3"))
 
-    assert len(stepper.levels(base="d.png")) == 2
+    assert len(stepper.versions(base="d.png")) == 2
 
 
 def test_versions_taken_on_later_join_the_ones_already_armed(armed):
-    armed.add({"b-v2.png": [("b-v2.png", "image", "Level 2"), ("b.png", "image", "Base")]})
+    armed.add({"b-v2.png": [("b-v2.png", "image", "Version 2"), ("b.png", "image", "Base")]})
 
-    assert armed.levels(base="a.png")[0] == Version("a-v3.png", "image", "Level 3")
+    assert armed.versions(base="a.png")[0] == Version("a-v3.png", "image", "Version 3")
     assert armed.step(1, base="b-v2.png") == Version("b.png", "image", "Base")
 
 
@@ -122,14 +122,14 @@ def test_a_stepper_is_stepping_from_the_first_step_until_it_restarts(armed):
     assert not armed.stepping
 
 
-def test_versions_gone_a_level_deeper_are_stepped_from_their_new_top_still_stepping(armed):
+def test_versions_gone_a_version_deeper_are_stepped_from_their_new_top_still_stepping(armed):
     armed.step(1, base="a.png")
-    armed.add({"a-v4.png": [("a-v4.png", "image", "Level 4"), *_LEVELS["a.png"]]})
+    armed.add({"a-v4.png": [("a-v4.png", "image", "Version 4"), *_LEVELS["a.png"]]})
 
     armed.back_to_the_top()
 
     assert (armed.stepping, armed.index) == (True, 0)
-    assert armed.step(1, base="a-v4.png") == Version("a-v3.png", "image", "Level 3")
+    assert armed.step(1, base="a-v4.png") == Version("a-v3.png", "image", "Version 3")
 
 
 def test_the_slideshow_waits_at_a_pace_of_nought_until_another_image_comes_up(armed):
@@ -148,7 +148,7 @@ FACE = ((0.4, 0.1, 0.6, 0.3),)
 
 
 def test_a_version_carries_the_places_its_fixes_found_and_one_named_without_them_has_none():
-    stepper = LevelStepper()
+    stepper = VersionStepper()
     stepper.arm({"e.png": [("e.png", "image", "Enhanced", FACE), ("e-base.png", "image", "Base")]})
 
     assert stepper.points_of_interest("e.png") == FACE
@@ -157,10 +157,10 @@ def test_a_version_carries_the_places_its_fixes_found_and_one_named_without_them
 
 
 def test_arming_says_whether_the_places_of_what_the_set_shows_have_changed():
-    stepper = LevelStepper()
+    stepper = VersionStepper()
     placed = {"e.png": [("e.png", "image", "Enhanced", FACE), ("e-base.png", "image", "Base")]}
 
     assert stepper.arm(placed) is True
     assert stepper.arm(placed) is False
-    assert stepper.add({"f.png": [("f.png", "image", "Base"), ("f-v2.png", "image", "Level 2")]}) is False
+    assert stepper.add({"f.png": [("f.png", "image", "Base"), ("f-v2.png", "image", "Version 2")]}) is False
     assert stepper.add({"f.png": [("f.png", "image", "Enhanced", FACE)]}) is True

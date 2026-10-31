@@ -38,28 +38,28 @@ def test_tab_close_icon_is_the_familys_cross(qtbot):
             == qt_icon("cross").pixmap(16).toImage())
 
 
-def test_level_badge_icons_render_for_each_level(qtbot):
-    # Every badged level maps to a rendered ground: the four folder levels,
+def test_toc_initial_icons_render_for_each_level(qtbot):
+    # Every level maps to a rendered ground: the four folder levels,
     # workflow -> model -> LoRA -> source image.
     assert set(icons.LEVEL_LABELS) == {
         "workflow", "model", "lora", "source_image"}
     assert icons.LEVEL_LABELS["lora"] == "LoRA"
     assert icons.LEVEL_LABELS["source_image"] == "Source Image"
     for level in icons.LEVEL_LABELS:
-        icon = icons.level_badge_icon(level)
+        icon = icons.toc_initial_icon(level)
         assert not icon.isNull()
         assert not icon.pixmap(QSize(16, 16)).isNull()
 
 
 def test_a_lora_folder_wears_an_l(qtbot):
-    drawn = icons.level_badge_icon("lora").pixmap(48, 48).toImage()
-    assert drawn == QIcon(icons._render_badge("L", YELLOW)).pixmap(48, 48).toImage()
+    drawn = icons.toc_initial_icon("lora").pixmap(48, 48).toImage()
+    assert drawn == QIcon(icons._render_toc_initial("L", YELLOW)).pixmap(48, 48).toImage()
 
 
-def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
+def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
     # The grounds sit in one slot down the tree, so no two levels may draw the
     # same mark — that slot is the whole of what says which level a row is.
-    drawn = [icons.level_badge_icon(level).pixmap(48, 48).toImage()
+    drawn = [icons.toc_initial_icon(level).pixmap(48, 48).toImage()
              for level in icons.LEVEL_LABELS]
     for i, one in enumerate(drawn):
         for other in drawn[i + 1:]:
@@ -67,7 +67,7 @@ def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
 
 
 def test_item_type_icons_render_for_image_and_video(qtbot):
-    # The Latest collection marks each tile image-or-video with a small corner badge;
+    # The Latest collection marks each tile image-or-video with a small item type icon;
     # both types must draw a non-blank pixmap so neither shows an empty square.
     image_icon = icons.item_type_icon(MediaType.IMAGE)
     video_icon = icons.item_type_icon(MediaType.VIDEO)
@@ -168,7 +168,7 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
 
 
 def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
-    # The mark is the badge and the button at once, so what is filled says what
+    # The mark is the sign and the button at once, so what is filled says what
     # is true: an unfavorited item's star is an outline with nothing in the middle,
     # and an image with no enhancement yet wears the hollow plus.
     unfavorited = _corner_image(icons.corner_star_icon(favorite=False, armed=False))
@@ -218,7 +218,7 @@ def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
 
 def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
     # The tree paints a favorited leaf (and the Favorites collection) with the filled star,
-    # so it wears the badge's green: one color for "favorited", tile or folder row.
+    # so it wears the corner star's green: one color for "favorited", tile or folder row.
     filled = icons.star_icon(filled=True).pixmap(QSize(48, 48), QIcon.Mode.Normal)
     assert filled.toImage().pixelColor(24, 25) == GREEN
     # The outline is the offer to favorite, not a thing that is favorited, so it stays
@@ -302,7 +302,7 @@ def _top_corner_ink(pixmap) -> tuple[int, int]:
 
 
 def test_the_bank_colors_its_act_on_this_trio(qtbot):
-    # Star green, enhance yellow, delete red — the colors the corner badges wear,
+    # Star green, enhance yellow, delete red — the colors the corner buttons wear,
     # so a button and the mark it leaves on a tile are one symbol. And every one
     # of them still dims to the same muted gray when it has nothing to act on, so
     # a dead button never reads as a dimmer shade of its color.

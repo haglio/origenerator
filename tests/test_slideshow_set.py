@@ -766,7 +766,7 @@ def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
 
 
 def test_filtering_to_the_act_on_screen_narrows_to_what_its_row_is_named_for():
-    """A session's spoken "filter", said of a side: the act read off the item
+    """A session's spoken "filter", said of a shape: the act read off the item
     on screen rather than spoken, the way its map row's button would post it."""
     slideshow_set, _dealt = _filterable()
     slideshow_set.playlist.jump_to(2)

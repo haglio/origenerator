@@ -23,7 +23,7 @@ from origenerator import (
 from origenerator.gallery.collection import (
     FAVORITES_KEY,
 )
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
@@ -33,8 +33,7 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.orientation import oriented_key
+from origenerator.item_shape import shaped_key
 from tests import gestures
 from tests.drop_style_seen import worn
 from tests.gallery_view_support import (
@@ -51,7 +50,7 @@ from tests.gallery_view_support import (
     _menu_labels,
     _pick,
     _row,
-    _side,
+    _shape,
     _subs,
     _tall_on_screen,
     _tile_kinds_in_order,
@@ -152,7 +151,7 @@ def test_declining_the_name_prompt_makes_no_folder(qtbot, monkeypatch):
 
 def test_a_folder_of_your_own_is_drawn_only_on_the_side_it_was_made_on(qtbot):
     view, _cat, _dog = _two_leaf_view(qtbot)
-    view._db.create_custom_folder("Keepers", side=PORTRAIT)
+    view._db.create_custom_collection("Keepers", shape=PORTRAIT)
 
     view.refresh()
 
@@ -308,7 +307,7 @@ def test_a_folder_dragged_from_the_toc_into_an_open_custom_folder_goes_in(qtbot)
     view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
     mime = _folder_drag(view, cat)
 
-    assert _drop_in_the_middle_pane(view, mime, source=_side(view._tree))
+    assert _drop_in_the_middle_pane(view, mime, source=_shape(view._tree))
 
     assert view._db.list_custom_collections()[0]["folders"] == [dog, cat]
 
@@ -319,7 +318,7 @@ def test_an_open_custom_folder_refuses_a_folder_from_the_other_shapes_list(qtbot
     view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
     mime = _folder_drag(view, cat)
 
-    assert not _drop_in_the_middle_pane(view, mime, source=_side(view._tree, PORTRAIT))
+    assert not _drop_in_the_middle_pane(view, mime, source=_shape(view._tree, PORTRAIT))
 
     assert view._db.list_custom_collections()[0]["folders"] == [dog]
 
@@ -374,7 +373,7 @@ def test_open_favorites_takes_no_drop_though_its_row_does(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
     mime = _folder_drag(view, cat)
 
-    assert not _drop_in_the_middle_pane(view, mime, source=_side(view._tree))
+    assert not _drop_in_the_middle_pane(view, mime, source=_shape(view._tree))
 
 
 def _middle_pane_style(view, qtbot):
@@ -405,7 +404,7 @@ def test_open_favorites_stays_as_it_is_while_a_folder_is_dragged(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
     mime = _folder_drag(view, cat)
 
-    under_way.started.emit(mime, _side(view._tree))
+    under_way.started.emit(mime, _shape(view._tree))
 
     assert _middle_pane_style(view, qtbot) is None
     under_way.ended.emit()
@@ -739,7 +738,7 @@ def test_a_folders_menu_lists_the_folders_of_your_own_it_could_join(qtbot, monke
 
 def test_a_folders_menu_offers_only_the_folders_of_your_own_on_its_side(qtbot, monkeypatch):
     view, _cat, dog = _two_leaf_view(qtbot)
-    view._db.create_custom_folder("Tall ones", side=PORTRAIT)
+    view._db.create_custom_collection("Tall ones", shape=PORTRAIT)
     view.refresh()
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -884,7 +883,7 @@ def test_grouping_picked_folders_makes_a_folder_on_their_side(qtbot, monkeypatch
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    _pick(view, *(oriented_key(gallery.settings_folder_key(row), PORTRAIT) for row in rows))
+    _pick(view, *(shaped_key(gallery.settings_folder_key(row), PORTRAIT) for row in rows))
     monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
@@ -900,7 +899,7 @@ def test_a_folder_started_below_the_last_row_belongs_to_that_half(qtbot, monkeyp
     monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
-    _tree_menu(view, side=PORTRAIT)
+    _tree_menu(view, shape=PORTRAIT)
 
     (record,) = view._db.list_custom_collections()
     assert record["side"] == PORTRAIT

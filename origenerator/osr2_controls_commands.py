@@ -53,39 +53,39 @@ def max_intensity_asked_for(action: str) -> int | None:
     return None
 
 
-#: The one press spelled the other way round, with the side in the middle and
-#: the row it names as its payload: ``filter_<side>_<row>``.
+#: The one press spelled the other way round, with the shape in the middle and
+#: the row it names as its payload: ``filter_<shape>_<row>``.
 FILTER = "filter"
 
 
-def side_press(side: str, verb: str, argument: str = "") -> tuple[str, str]:
+def shape_press(shape: str, verb: str, argument: str = "") -> tuple[str, str]:
     """A press as the HUD spells it, taken apart into what it asks and what
-    it carries: ``<side>_<action>`` and its ``|`` payload for most, and
+    it carries: ``<shape>_<action>`` and its ``|`` payload for most, and
     :data:`FILTER`'s row for the one spelled the other way round."""
-    filtering = spelled_filter(side, "")
+    filtering = spelled_filter(shape, "")
     if verb.startswith(filtering):
         return FILTER, verb[len(filtering):]
-    return verb.removeprefix(f"{side}_"), argument
+    return verb.removeprefix(f"{shape}_"), argument
 
 
-def spelled_for(side: str, action: str) -> str:
-    """How *side*'s HUD spells *action* -- what :func:`side_press` undoes."""
-    return f"{side}_{action}"
+def spelled_for(shape: str, action: str) -> str:
+    """How *shape*'s HUD spells *action* -- what :func:`shape_press` undoes."""
+    return f"{shape}_{action}"
 
 
-def spelled_filter(side: str, row: str) -> str:
-    """How *side*'s HUD spells narrowing to *row* -- what :func:`side_press` undoes."""
-    return f"{FILTER}_{side}_{row}"
+def spelled_filter(shape: str, row: str) -> str:
+    """How *shape*'s HUD spells narrowing to *row* -- what :func:`shape_press` undoes."""
+    return f"{FILTER}_{shape}_{row}"
 
 
-def side_spoken_to(keyword: str, sides) -> str | None:
-    """Which of *sides* a verb is said to, or ``None`` for none of them.
+def shape_spoken_to(keyword: str, shapes) -> str | None:
+    """Which of *shapes* a verb is said to, or ``None`` for none of them.
 
     Case-blind, because a session sends its verbs folded
     (``PORTRAIT_NEXT``) where a HUD posts them as it drew them.
     """
     folded = keyword.casefold()
-    for side in sides:
-        if folded.startswith((spelled_for(side, ""), spelled_filter(side, ""))):
-            return side
+    for shape in shapes:
+        if folded.startswith((spelled_for(shape, ""), spelled_filter(shape, ""))):
+            return shape
     return None

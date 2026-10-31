@@ -31,7 +31,7 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
     FolderCollection,
 )
-from origenerator.gallery.sides import LANDSCAPE
+from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gui import gallery_pane
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_pane import (
@@ -42,7 +42,7 @@ from origenerator.gui.gallery_pane import (
     TreeNavigation,
 )
 from origenerator.gui.item_tile import ItemTile
-from origenerator.orientation import oriented_key
+from origenerator.item_shape import shaped_key
 from tests.thumbnail_rows import looping_video
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
@@ -677,7 +677,7 @@ def test_a_folders_trash_holds_what_was_deleted_from_that_folder(qtbot):
     pane.show_collection(trash, LANDSCAPE)
 
     assert pane.listed_prompt_ids() == ["a2"]
-    assert [row["prompt_id"] for row in pane.rows_for_collection(oriented_key(trash, LANDSCAPE))]         == ["a2"]
+    assert [row["prompt_id"] for row in pane.rows_for_collection(shaped_key(trash, LANDSCAPE))]         == ["a2"]
 
 
 def _in_flight(prompt_id, checkpoint):
@@ -714,7 +714,7 @@ def test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_bel
     assert pane.listed_prompt_ids() == ["a1"]
     assert pane._listed_folders == [scene_two.key]
     assert sorted(row["prompt_id"] for row in
-                  pane.rows_for_collection(oriented_key(favorites, LANDSCAPE))) == ["a1", "a2"]
+                  pane.rows_for_collection(shaped_key(favorites, LANDSCAPE))) == ["a1", "a2"]
 
 
 def _enhanced_made_with(prompt_id, checkpoint):
@@ -736,7 +736,7 @@ def test_a_folders_enhanced_lists_the_enhanced_images_under_it(qtbot):
 
     assert pane.listed_prompt_ids() == ["a1"]
     assert [row["prompt_id"] for row in
-            pane.rows_for_collection(oriented_key(enhanced, LANDSCAPE))] == ["a1"]
+            pane.rows_for_collection(shaped_key(enhanced, LANDSCAPE))] == ["a1"]
 
 
 def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):
@@ -770,17 +770,17 @@ def _folders_of_folders(tree):
 
 
 def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeypatch):
-    # Every collection of a side asks for its rows on each rebuild, and each ask
-    # dealt the whole listing out to the side afresh: thirteen passes over the
+    # Every collection of a shape asks for its rows on each rebuild, and each ask
+    # dealt the whole listing out to the shape afresh: thirteen passes over the
     # library per rebuild for five collections.
     dealt = []
     filter_rows = gallery_pane.filter_rows
     monkeypatch.setattr(gallery_pane, "filter_rows",
-                        lambda rows, side: dealt.append(side) or filter_rows(rows, side))
+                        lambda rows, shape: dealt.append(shape) or filter_rows(rows, shape))
     rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
     pane, _scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
-    latest = oriented_key(FolderCollection(LATEST_KEY, gallery.ALL_KEY).key, LANDSCAPE)
+    latest = shaped_key(FolderCollection(LATEST_KEY, gallery.ALL_KEY).key, LANDSCAPE)
 
     pane.collection_counts(LANDSCAPE)
     pane.rows_for_collection(latest)
@@ -865,7 +865,7 @@ def test_each_folders_collection_counts_what_that_collection_lists(qtbot):
     for folder in _folders_of_folders(tree):
         for collection in (FAVORITES_KEY, EXPERIMENTS_KEY, TRASH_KEY):
             key = FolderCollection(collection, folder).key
-            listing = pane.rows_for_collection(oriented_key(key, LANDSCAPE))
+            listing = pane.rows_for_collection(shaped_key(key, LANDSCAPE))
             assert counts.get(key, 0) == len(listing), key
 
 
@@ -874,7 +874,7 @@ def test_a_collection_square_wears_the_mark_its_row_wears(qtbot):
     pane, scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
 
-    pane.show_folder_tiles([], collections=[oriented_key(TRASH_KEY, LANDSCAPE)])
+    pane.show_folder_tiles([], collections=[shaped_key(TRASH_KEY, LANDSCAPE)])
 
     (tile,) = scroll.widget().findChildren(FolderTile)
     assert [label for label in tile.findChildren(QLabel)
@@ -887,8 +887,8 @@ def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_head
     pane, scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
 
-    pane.show_folder_tiles(tree, collections=[oriented_key(LATEST_KEY, LANDSCAPE),
-                                              oriented_key(TRASH_KEY, LANDSCAPE)])
+    pane.show_folder_tiles(tree, collections=[shaped_key(LATEST_KEY, LANDSCAPE),
+                                              shaped_key(TRASH_KEY, LANDSCAPE)])
 
     layout = scroll.widget().layout()
     shown = [layout.itemAt(index).widget() for index in range(layout.count())]

@@ -29,9 +29,9 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from origenerator import gallery
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
+from origenerator.item_shape import row_shape
 from origenerator.media import MediaType
-from origenerator.orientation import row_orientation
 
 logger = logging.getLogger(__name__)
 
@@ -78,12 +78,12 @@ def index_folders(db) -> Folders:
 def reconcile_favorites(db) -> dict:
     if not db.folder_meta_full() and not db.folders_in_custom_collections():
         return {"folder_meta": dict(_NOTHING), "custom_folders": dict(_NOTHING),
-                "custom_collection_sides": 0}
+                "custom_collection_shapes": 0}
     folders = index_folders(db)
     return {
         "folder_meta": reconcile_folder_meta(db, folders),
         "custom_folders": reconcile_custom_collections(db, folders),
-        "custom_collection_sides": stamp_custom_collection_sides(db, folders),
+        "custom_collection_shapes": stamp_custom_collection_shapes(db, folders),
     }
 
 
@@ -144,17 +144,17 @@ def reconcile_custom_collections(db, folders: Folders | None = None) -> dict:
     return summary
 
 
-def stamp_custom_collection_sides(db, folders: Folders | None = None) -> int:
-    unsided = [record for record in db.list_custom_collections() if record["side"] is None]
-    if not unsided:
+def stamp_custom_collection_shapes(db, folders: Folders | None = None) -> int:
+    unshaped = [record for record in db.list_custom_collections() if record["side"] is None]
+    if not unshaped:
         return 0
     folders = index_folders(db) if folders is None else folders
-    for folder in gallery.build_custom_collections(folders.tree, unsided):
-        shapes = Counter(row_orientation(row) for row in gallery.rows_under(folder))
-        db.set_custom_collection_side(
+    for folder in gallery.build_custom_collections(folders.tree, unshaped):
+        shapes = Counter(row_shape(row) for row in gallery.rows_under(folder))
+        db.set_custom_collection_shape(
             folder.folder_id, PORTRAIT if shapes[PORTRAIT] > shapes[LANDSCAPE] else LANDSCAPE)
-    logger.info("Put %d custom collection(s) on a side", len(unsided))
-    return len(unsided)
+    logger.info("Put %d custom collection(s) on a side", len(unshaped))
+    return len(unshaped)
 
 
 def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:

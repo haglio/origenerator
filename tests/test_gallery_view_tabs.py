@@ -28,7 +28,7 @@ from tests.gallery_view_support import (
     _image_workflow,
     _preview_of,
     _row,
-    _side,
+    _shape,
     _video_workflow,
 )
 
@@ -120,7 +120,7 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     for splitter in (view._arrangement.panes, view._arrangement.folder_panes, view._arrangement.left_column):
         assert isinstance(splitter, QSplitter)
         assert not splitter.childrenCollapsible()
-    # The TOC and browser panes sit side by side...
+    # The TOC and Gallery panes sit side by side...
     assert view._arrangement.folder_panes.count() == 2
     assert view._arrangement.folder_panes.widget(0).isAncestorOf(view._tree)
     assert view._arrangement.folder_panes.widget(1).isAncestorOf(view._scroll)
@@ -457,7 +457,7 @@ def _find_settings_node(view, predicate):
             if hit is not None:
                 return hit
         return None
-    half = _side(view._tree)
+    half = _shape(view._tree)
     for i in range(half.topLevelItemCount()):
         hit = walk(half.topLevelItem(i))
         if hit is not None:
